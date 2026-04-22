@@ -1,2 +1,13 @@
 .claude/settings.local.json
 .DS_Store
+
+## LaTeX build artefacts (in case of ad-hoc compiles in this repo)
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+texput.log

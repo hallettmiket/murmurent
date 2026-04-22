@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth *)",
+      "Bash(gh repo *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git remote *)",
+      "Bash(textutil -convert txt -stdout \"/Users/mth/repos/wigamig/assets/2026_Schulich_WRC_Research_Program_Template_19Mar2026_V1.docx\")",
+      "Bash(textutil -convert txt -stdout \"/Users/mth/repos/wigamig/assets/Untitled Bibliography.rtf\")",
+      "Bash(pdflatex -interaction=nonstopmode -halt-on-error renewal.tex)",
+      "Bash(bibtex renewal *)",
+      "Bash(pdflatex -interaction=nonstopmode renewal.tex)",
+      "Bash(pdfinfo renewal.pdf)",
+      "Bash(pdftotext -f 2 -l 2 /Users/mth/repos/chair_renewal/renewal.pdf -)",
+      "Bash(env)",
+      "Read(//tmp/**)",
+      "Bash(python3 /tmp/wigamig_zotero_tag.py)",
+      "Bash(python3 -c 'import json,sys *)",
+      "Bash(python3 /tmp/wigamig_zotero_add.py)",
+      "Bash(grep -E \"\\\\.\\(pub|pem\\)$|id_|^d\")",
+      "Bash(ssh -T git@github.com)",
+      "Bash(gh ssh-key *)",
+      "Bash(ssh-keygen -lf ~/.ssh/id_rsa.pub)",
+      "Bash(ssh -vT git@github.com)",
+      "Bash(pdftotext -f 3 -l 3 renewal.pdf -)",
+      "Bash(awk 'NF')",
+      "Bash(pdftotext -layout -f 1 -l 1 renewal.pdf -)",
+      "Bash(pdftotext -f 1 -l 1 renewal.pdf -)"
+    ],
+    "additionalDirectories": [
+      "/Users/mth/repos/chair_renewal",
+      "/tmp"
+    ]
+  }
+}
