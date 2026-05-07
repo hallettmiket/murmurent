@@ -1,6 +1,17 @@
 .claude/settings.local.json
 .DS_Store
 
+## Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
 ## LaTeX build artefacts (in case of ad-hoc compiles in this repo)
 *.aux
 *.bbl
