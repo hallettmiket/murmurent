@@ -1,0 +1,20 @@
+name: dashboard-refresh
+on:
+  pull_request:
+    types: [closed]
+    branches: [main]
+
+jobs:
+  regenerate:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Echo intent
+        run: |
+          echo "PR merged. The phase-5 dashboard refresh is a stub:"
+          echo "in production this job clones lab-mgmt + every project repo,"
+          echo "runs scripts/generate_dashboard.py, commits the diff, and pushes"
+          echo "to lab-mgmt/main."
+          echo "v1 leaves the regeneration to the PI's local machine via"
+          echo "'python scripts/generate_dashboard.py'."

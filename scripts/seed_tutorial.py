@@ -1020,12 +1020,18 @@ def main() -> int:
                         cwd=project_dir,
                         check=False,
                     )
+        log("regenerating per-member dashboards")
+        from wigamig.commands import dashboard_cmd  # noqa: PLC0415
+
+        for path in dashboard_cmd.cmd_generate_all():
+            log(f"wrote dashboard: {path}")
+
         # After project commits, push lab-mgmt one more time so the
-        # `projects/` registry entries reach origin.
+        # `projects/` registry entries + dashboards reach origin.
         if not args.skip_github:
             committed = stage_and_commit(
                 repo_root,
-                "phase-2 seed: register dcis_sc_tutorial + bbb_drug_screen",
+                "phase-5 seed: register projects + initial dashboards",
             )
             if committed:
                 run(["git", "push", "-u", "origin", "main"], cwd=repo_root, check=False)
