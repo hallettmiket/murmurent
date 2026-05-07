@@ -15,6 +15,7 @@ from rich.console import Console
 from rich.table import Table
 
 from . import __version__
+from .commands import experiment_cmd, project_cmd
 from .core.agents import load_registry
 from .core.repo import wigamig_repo_root
 
@@ -230,34 +231,70 @@ def project_group() -> None:
 
 @project_group.command("list", help="List projects you are a member of.")
 def project_list() -> None:
-    _stub()
+    project_cmd.cmd_list()
 
 
 @project_group.command("describe", help="Print charter, MEMBERS, status.")
 @click.argument("name")
 def project_describe(name: str) -> None:
-    _stub()
+    project_cmd.cmd_describe(name)
 
 
 @project_group.command("new", help="Create a new project.")
 @click.argument("name")
-@click.option("--charter", "charter_path", required=True, type=click.Path())
-@click.option("--members", "members_list", required=True)
-def project_new(name: str, charter_path: str, members_list: str) -> None:
-    _stub()
+@click.option("--charter", "charter_path", default=None, type=click.Path())
+@click.option("--members", "members_list", required=True, help="Comma-separated handles.")
+@click.option(
+    "--sensitivity",
+    type=click.Choice(["standard", "restricted", "clinical"]),
+    default=None,
+)
+@click.option("--lead", default=None, help="Project lead handle (defaults to first member).")
+@click.option("--description", default=None, help="One-paragraph charter body.")
+@click.option("--choreography", default=None)
+@click.option("--reb-number", "reb_number", default=None)
+@click.option("--reb-expires", "reb_expires", default=None)
+@click.option("--data-residency", "data_residency", default=None)
+@click.option("--skip-github", is_flag=True, help="Skip the gh repo create + push step.")
+def project_new(
+    name: str,
+    charter_path: str | None,
+    members_list: str,
+    sensitivity: str | None,
+    lead: str | None,
+    description: str | None,
+    choreography: str | None,
+    reb_number: str | None,
+    reb_expires: str | None,
+    data_residency: str | None,
+    skip_github: bool,
+) -> None:
+    project_cmd.cmd_new(
+        name,
+        charter_path=charter_path,
+        members_csv=members_list,
+        description=description,
+        sensitivity=sensitivity,
+        choreography=choreography,
+        reb_number=reb_number,
+        reb_expires=reb_expires,
+        data_residency=data_residency,
+        lead=lead,
+        skip_github=skip_github,
+    )
 
 
 @project_group.command("members", help="Print the MEMBERS file for a project.")
 @click.argument("name")
 def project_members(name: str) -> None:
-    _stub()
+    project_cmd.cmd_members(name)
 
 
 @project_group.command("admit", help="(PI) Add a member to a project.")
 @click.argument("name")
 @click.argument("member")
 def project_admit(name: str, member: str) -> None:
-    _stub()
+    project_cmd.cmd_admit(name, member)
 
 
 @project_group.command("release", help="(PI) Remove a member from a project.")
@@ -301,7 +338,7 @@ def project_archive(name: str) -> None:
     default=None,
 )
 def project_sensitivity(name: str, set_value: str | None) -> None:
-    _stub()
+    project_cmd.cmd_sensitivity(name, set_value)
 
 
 # ---------------------------------------------------------------------------
@@ -317,14 +354,26 @@ def experiment_group() -> None:
 @experiment_group.command("new", help="Scaffold a new experiment folder.")
 @click.option("--project", "project_name", required=True)
 @click.option("--name", "exp_name", required=True)
-def experiment_new(project_name: str, exp_name: str) -> None:
-    _stub()
+@click.option(
+    "--status",
+    "status",
+    default="planned",
+    type=click.Choice(["planned", "running", "complete", "failed", "inconclusive"]),
+)
+@click.option(
+    "--analysis-status",
+    "analysis_status",
+    default="not_started",
+    type=click.Choice(["not_started", "examined", "concluded"]),
+)
+def experiment_new(project_name: str, exp_name: str, status: str, analysis_status: str) -> None:
+    experiment_cmd.cmd_new(project_name, exp_name, status=status, analysis_status=analysis_status)
 
 
 @experiment_group.command("list", help="List experiments and their statuses.")
 @click.option("--project", "project_name", default=None)
 def experiment_list(project_name: str | None) -> None:
-    _stub()
+    experiment_cmd.cmd_list(project_name)
 
 
 @experiment_group.command("status", help="Update an experiment's notebook status.")
@@ -332,7 +381,7 @@ def experiment_list(project_name: str | None) -> None:
 @click.argument("slug")
 @click.option("--set", "set_value", required=True)
 def experiment_status(project_name: str, slug: str, set_value: str) -> None:
-    _stub()
+    experiment_cmd.cmd_status(project_name, slug, set_value)
 
 
 @experiment_group.command("ingest", help="Classify and copy raw + derived files.")
@@ -350,7 +399,14 @@ def experiment_ingest(
     accept: bool,
     dry_run: bool,
 ) -> None:
-    _stub()
+    experiment_cmd.cmd_ingest(
+        project_name,
+        slug,
+        source,
+        instrument=instrument,
+        accept=accept,
+        dry_run=dry_run,
+    )
 
 
 @experiment_group.command("attach", help="Attach a documentation file to an experiment.")

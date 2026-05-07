@@ -1,21 +1,24 @@
 """
-Purpose: Seed the wigamig smoke-test tutorial. Phase 1 scope: create the
-         ``hallett-lab-mgmt`` repo locally, create the matching private GitHub
-         repo under ``hallettmiket``, populate member profile files, generate
-         per-persona age key pairs, and scaffold empty subdirectories.
+Purpose: Seed the wigamig smoke-test tutorial. Phase 1 scope: lab-mgmt repo +
+         members + age keys. Phase 2 scope: also seed the two project repos
+         (``dcis_sc_tutorial`` and ``bbb_drug_screen``) with charters,
+         experiments, lab-VM dirs, and clearly-fake instrument data.
 Author: Mike Hallett (with Claude Code)
-Date: 2026-05-06
+Date: 2026-05-07
 Input: ``WIGAMIG_LAB_MGMT_REPO`` env var (default ``~/repos/hallett-lab-mgmt``);
+       ``WIGAMIG_LAB_VM_ROOT`` env var (default ``~/lab_vm/data``);
        ``gh`` CLI authenticated against the ``hallettmiket`` org;
        ``age-keygen`` available on PATH.
 Output: ``~/repos/hallett-lab-mgmt/`` populated with members/, keys/, inventory/,
-        projects/, dashboards/, audit/, roles/, onboarding/ + an initial commit
-        pushed to ``hallettmiket/hallett-lab-mgmt`` (created private if absent).
-        Private age keys are saved outside the repo at
-        ``~/.config/wigamig/keys/<handle>.age-private`` (mode 0600).
+        projects/, dashboards/, audit/, roles/, onboarding/. Private age keys
+        saved at ``~/.config/wigamig/keys/<handle>.age-private`` (mode 0600).
+        ``~/repos/dcis_sc_tutorial/`` and ``~/repos/bbb_drug_screen/`` populated
+        with the lab project layout, four + one experiments respectively,
+        ``CHARTER.md``, ``MEMBERS``, and lab-VM raw + refined dirs scaffolded
+        with fake data.
 
 The script is idempotent: re-running it does not overwrite existing files,
-duplicate the GitHub repo, or rotate keys. It is safe to invoke after partial
+duplicate GitHub repos, or rotate keys. It is safe to invoke after partial
 failures.
 """
 
@@ -32,6 +35,21 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
+# Make the wigamig package importable when running this script from a checkout
+# without `pip install -e .` (e.g. inside the seed flow on a fresh machine).
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_SRC_PATH = _REPO_ROOT / "src"
+if _SRC_PATH.is_dir() and str(_SRC_PATH) not in sys.path:
+    sys.path.insert(0, str(_SRC_PATH))
+
+from wigamig.commands import experiment_cmd, project_cmd  # noqa: E402
+from wigamig.core import lab_vm  # noqa: E402
+
+# Importing the fake-data generator lets us call it without spawning a
+# subprocess; the file lives next to this one.
+sys.path.insert(0, str(_REPO_ROOT / "scripts"))
+import fake_data  # type: ignore[import-not-found]  # noqa: E402
+
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
@@ -40,7 +58,78 @@ GITHUB_ORG = "hallettmiket"
 LAB_MGMT_NAME = "hallett-lab-mgmt"
 DEFAULT_LAB_MGMT_PATH = Path("~/repos") / LAB_MGMT_NAME
 DEFAULT_KEYS_DIR = Path("~/.config/wigamig/keys")
-TODAY = "2026-05-06"
+TODAY = "2026-05-07"
+
+
+# ---------------------------------------------------------------------------
+# Project + experiment seed configuration (phase 2)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ExperimentSeed:
+    """One experiment to scaffold inside a project repo."""
+
+    slug: str
+    lead: str
+    status: str
+    analysis_status: str
+
+
+@dataclass(frozen=True)
+class ProjectSeed:
+    """One project to scaffold (repo + experiments + GH)."""
+
+    name: str
+    sensitivity: str
+    lead: str
+    members: tuple[str, ...]
+    description: str
+    choreography: str | None
+    reb_number: str | None = None
+    reb_expires: str | None = None
+    data_residency: str | None = None
+    experiments: tuple[ExperimentSeed, ...] = ()
+
+
+PROJECT_SEEDS: tuple[ProjectSeed, ...] = (
+    ProjectSeed(
+        name="dcis_sc_tutorial",
+        sensitivity="clinical",
+        lead="@allie",
+        members=("@mike", "@allie", "@bob", "@cassie"),
+        description=(
+            "Single-cell DCIS tutorial project for the wigamig smoke-test. All data "
+            "is clearly fake: clinicopathology rows use OHIPs of the form "
+            "0000-000-NNN, FASTQ files are random-base sequences, count matrices are "
+            "uniform integers. Used to exercise the clinical-sensitivity controls "
+            "(REB-bounded access, PHI hooks, raw-data guard) without touching real PHI."
+        ),
+        choreography="clinical_cohort",
+        reb_number="WREM-2026-9999",
+        reb_expires="2027-09-01",
+        data_residency="ca",
+        experiments=(
+            ExperimentSeed("sample_qc", "@allie", "complete", "examined"),
+            ExperimentSeed("alignment_count_matrix", "@bob", "running", "not_started"),
+            ExperimentSeed("clustering", "@cassie", "planned", "not_started"),
+            ExperimentSeed("clinical_associations", "@allie", "planned", "not_started"),
+        ),
+    ),
+    ProjectSeed(
+        name="bbb_drug_screen",
+        sensitivity="standard",
+        lead="@bob",
+        members=("@mike", "@bob", "@allie"),
+        description=(
+            "Blood-brain-barrier drug-screen tutorial project for the wigamig "
+            "smoke-test. All compound data is clearly fake (FAKE_CMP_NNNN). "
+            "Used to exercise the drug-discovery LitL choreography."
+        ),
+        choreography="drug_discovery_litl",
+        experiments=(ExperimentSeed("pharmacophore_alignment", "@bob", "complete", "concluded"),),
+    ),
+)
 
 
 @dataclass(frozen=True)
@@ -403,6 +492,135 @@ def ensure_remote_and_push(repo_root: Path, slug: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Phase 2: project + experiment seeding
+# ---------------------------------------------------------------------------
+
+
+def seed_project(seed: ProjectSeed, *, skip_github: bool) -> Path:
+    """Create the project repo (idempotent) and return its local path."""
+    members_csv = ",".join(seed.members)
+    log(f"seeding project {seed.name} ({seed.sensitivity})")
+    summary = project_cmd.cmd_new(
+        seed.name,
+        charter_path=None,
+        members_csv=members_csv,
+        description=seed.description,
+        sensitivity=seed.sensitivity,
+        choreography=seed.choreography,
+        reb_number=seed.reb_number,
+        reb_expires=seed.reb_expires,
+        data_residency=seed.data_residency,
+        lead=seed.lead,
+        skip_github=skip_github,
+    )
+    return summary.path
+
+
+def seed_experiments(project: ProjectSeed) -> None:
+    """Scaffold each experiment in ``project`` (idempotent)."""
+    project_path = Path("~/repos").expanduser() / project.name
+    exp_root = project_path / "exp"
+    for exp in project.experiments:
+        existing = [
+            p for p in exp_root.glob("*_*") if p.is_dir() and p.name.split("_", 1)[1] == exp.slug
+        ]
+        if existing:
+            log(f"experiment {project.name}/{existing[0].name} exists; skipping scaffold")
+            _ensure_experiment_status(existing[0], exp)
+            continue
+        experiment_cmd.cmd_new(
+            project.name,
+            exp.slug,
+            status=exp.status,
+            analysis_status=exp.analysis_status,
+            performer=[exp.lead],
+        )
+
+
+def _ensure_experiment_status(exp_dir: Path, target: ExperimentSeed) -> None:
+    """Re-flip status on a previously-seeded experiment if it has drifted."""
+    notebook = exp_dir / "notebook.md"
+    if not notebook.is_file():
+        return
+    text = notebook.read_text(encoding="utf-8")
+    needs_write = False
+    for field, value in (("status", target.status), ("analysis_status", target.analysis_status)):
+        for prefix in (f"{field}: ",):
+            if f"\n{prefix}" in text:
+                lines = text.splitlines()
+                for i, line in enumerate(lines):
+                    if line.startswith(prefix) and line.strip() != f"{prefix.strip()} {value}":
+                        lines[i] = f"{prefix}{value}"
+                        needs_write = True
+                text = "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+    if needs_write:
+        notebook.write_text(text, encoding="utf-8")
+
+
+def seed_fake_data(staging_root: Path) -> dict[str, Path]:
+    """Generate fake instrument-export bundles into ``staging_root``.
+
+    Returns a dict mapping bundle-name to the staging directory containing it.
+    """
+    import random
+
+    rng = random.Random(20260507)
+    seq_dir = staging_root / "dcis_sequencing"
+    clin_dir = staging_root / "dcis_clinical"
+    counts_dir = staging_root / "dcis_counts"
+    bbb_dir = staging_root / "bbb_compounds"
+    seq_dir.mkdir(parents=True, exist_ok=True)
+    clin_dir.mkdir(parents=True, exist_ok=True)
+    counts_dir.mkdir(parents=True, exist_ok=True)
+    bbb_dir.mkdir(parents=True, exist_ok=True)
+    fake_data.generate_dcis_sequencing(seq_dir, rng=random.Random(20260507))
+    fake_data.generate_dcis_clinical(clin_dir, rng=random.Random(20260508))
+    fake_data.generate_dcis_counts(counts_dir, rng=random.Random(20260509))
+    fake_data.generate_bbb_compounds(bbb_dir, rng=random.Random(20260510))
+    return {
+        "dcis_sequencing": seq_dir,
+        "dcis_clinical": clin_dir,
+        "dcis_counts": counts_dir,
+        "bbb_compounds": bbb_dir,
+    }
+
+
+def stage_data_into_lab_vm(bundles: dict[str, Path]) -> None:
+    """Copy generated files directly into the lab-VM raw / refined trees.
+
+    For the seed we don't go through ``wigamig experiment ingest`` because the
+    interactive prompt would block the non-interactive script. We populate the
+    lab-VM tree by hand so the smoke-test acceptance step can exercise ingest
+    against a *fresh* source directory (`scripts/fake_data.py` regenerates it).
+    """
+    import shutil as _sh
+
+    # Pre-stage some clinicopath/count data straight into refined as a stand-in
+    # for already-completed runs (matches the experiment status table: 1_sample_qc
+    # is `complete + examined`, 2_alignment_count_matrix is `running`, etc.).
+    refined_qc = lab_vm.experiment_refined_dir("dcis_sc_tutorial", "1_sample_qc")
+    refined_qc.mkdir(parents=True, exist_ok=True)
+    for src in bundles["dcis_clinical"].iterdir():
+        dest = refined_qc / src.name
+        if not dest.exists():
+            _sh.copy2(src, dest)
+
+    refined_counts = lab_vm.experiment_refined_dir("dcis_sc_tutorial", "2_alignment_count_matrix")
+    refined_counts.mkdir(parents=True, exist_ok=True)
+    for src in bundles["dcis_counts"].iterdir():
+        dest = refined_counts / src.name
+        if not dest.exists():
+            _sh.copy2(src, dest)
+
+    refined_bbb = lab_vm.experiment_refined_dir("bbb_drug_screen", "1_pharmacophore_alignment")
+    refined_bbb.mkdir(parents=True, exist_ok=True)
+    for src in bundles["bbb_compounds"].iterdir():
+        dest = refined_bbb / src.name
+        if not dest.exists():
+            _sh.copy2(src, dest)
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -413,6 +631,17 @@ def parse_args() -> argparse.Namespace:
         "--skip-github",
         action="store_true",
         help="Skip the GitHub create/push step (for local-only smoke testing).",
+    )
+    parser.add_argument(
+        "--skip-projects",
+        action="store_true",
+        help="Skip the phase-2 project + experiment seeding.",
+    )
+    parser.add_argument(
+        "--fake-data-staging",
+        type=Path,
+        default=Path("~/lab_vm/staging/fake_instrument_export").expanduser(),
+        help="Where to drop the generated fake instrument-export bundles.",
     )
     return parser.parse_args()
 
@@ -455,11 +684,45 @@ def main() -> int:
         log("no new changes to commit")
 
     if args.skip_github:
-        log("skipping github (--skip-github)")
-        return 0
+        log("skipping github (--skip-github) for lab-mgmt")
+    else:
+        ensure_github_repo(LAB_MGMT_NAME)
+        ensure_remote_and_push(repo_root, LAB_MGMT_NAME)
 
-    ensure_github_repo(LAB_MGMT_NAME)
-    ensure_remote_and_push(repo_root, LAB_MGMT_NAME)
+    if not args.skip_projects:
+        log("seeding projects + experiments")
+        for seed in PROJECT_SEEDS:
+            seed_project(seed, skip_github=args.skip_github)
+            seed_experiments(seed)
+            project_dir = Path("~/repos").expanduser() / seed.name
+            if has_uncommitted_changes(project_dir):
+                run(["git", "add", "-A"], cwd=project_dir)
+                run(
+                    ["git", "commit", "-m", f"seed experiments for {seed.name}"],
+                    cwd=project_dir,
+                )
+            if not args.skip_github:
+                run(
+                    ["git", "push", "-u", "origin", "main"],
+                    cwd=project_dir,
+                    check=False,
+                )
+        log(f"generating fake instrument-export bundles in {args.fake_data_staging}")
+        bundles = seed_fake_data(args.fake_data_staging)
+        log("staging fake data into the lab-VM refined tree (raw left empty for ingest demo)")
+        stage_data_into_lab_vm(bundles)
+        # After project commits, push lab-mgmt one more time so the
+        # `projects/` registry entries reach origin.
+        if not args.skip_github:
+            committed = stage_and_commit(
+                repo_root,
+                "phase-2 seed: register dcis_sc_tutorial + bbb_drug_screen",
+            )
+            if committed:
+                run(["git", "push", "-u", "origin", "main"], cwd=repo_root, check=False)
+    else:
+        log("skipping project seed (--skip-projects)")
+
     log("done")
     return 0
 
