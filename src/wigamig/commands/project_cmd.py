@@ -142,44 +142,47 @@ def cmd_new(
     members = [_at(h) for h in members]
     lead = _at(lead)
 
-    if charter_path is not None and Path(charter_path).is_file():
-        existing = parse_file(charter_path)
-        meta = dict(existing.meta)
-        meta.setdefault("project", name)
-        meta.setdefault("members", members)
-        meta.setdefault("lead", lead)
-        if sensitivity:
-            meta["sensitivity"] = sensitivity
-        if choreography:
-            meta["choreography"] = choreography
-        if reb_number:
-            meta["reb_number"] = reb_number
-        if reb_expires:
-            meta["reb_expires"] = reb_expires
-        if data_residency:
-            meta["data_residency"] = data_residency
-        validate_charter(meta, context=str(charter_path))
-        body = existing.body or f"# {name}\n\nProject charter for {name}.\n"
-        charter_text = _serialize_charter(meta, body)
-    else:
-        if sensitivity is None:
-            raise click.ClickException("--sensitivity (or a charter file) is required")
-        body_text = description or (
-            f"Project {name}. Edit this charter to describe scope, deliverables, and "
-            "the choreography in effect."
-        )
-        charter_text = render_charter(
-            project=name,
-            lead=lead,
-            members=members,
-            sensitivity=sensitivity,
-            description=body_text,
-            choreography=choreography,
-            reb_number=reb_number,
-            reb_expires=reb_expires,
-            data_residency=data_residency,
-            created=_today(),
-        )
+    try:
+        if charter_path is not None and Path(charter_path).is_file():
+            existing = parse_file(charter_path)
+            meta = dict(existing.meta)
+            meta.setdefault("project", name)
+            meta.setdefault("members", members)
+            meta.setdefault("lead", lead)
+            if sensitivity:
+                meta["sensitivity"] = sensitivity
+            if choreography:
+                meta["choreography"] = choreography
+            if reb_number:
+                meta["reb_number"] = reb_number
+            if reb_expires:
+                meta["reb_expires"] = reb_expires
+            if data_residency:
+                meta["data_residency"] = data_residency
+            validate_charter(meta, context=str(charter_path))
+            body = existing.body or f"# {name}\n\nProject charter for {name}.\n"
+            charter_text = _serialize_charter(meta, body)
+        else:
+            if sensitivity is None:
+                raise click.ClickException("--sensitivity (or a charter file) is required")
+            body_text = description or (
+                f"Project {name}. Edit this charter to describe scope, deliverables, and "
+                "the choreography in effect."
+            )
+            charter_text = render_charter(
+                project=name,
+                lead=lead,
+                members=members,
+                sensitivity=sensitivity,
+                description=body_text,
+                choreography=choreography,
+                reb_number=reb_number,
+                reb_expires=reb_expires,
+                data_residency=data_residency,
+                created=_today(),
+            )
+    except CharterError as exc:
+        raise click.ClickException(str(exc)) from exc
 
     repo_dir = project_path(name)
     repo_dir.mkdir(parents=True, exist_ok=True)
@@ -289,7 +292,10 @@ def cmd_sensitivity(name: str, set_value: str | None) -> int:
                     f"raising to clinical requires {required} in CHARTER.md; "
                     "edit the charter and re-run."
                 )
-    validate_charter(parsed.meta, context=str(repo.charter_path))
+    try:
+        validate_charter(parsed.meta, context=str(repo.charter_path))
+    except CharterError as exc:
+        raise click.ClickException(str(exc)) from exc
     repo.charter_path.write_text(_serialize_charter(parsed.meta, parsed.body), encoding="utf-8")
     click.echo(f"Sensitivity for {name}: {current} -> {set_value}")
     return 0
