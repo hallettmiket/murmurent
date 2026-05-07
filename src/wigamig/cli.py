@@ -16,6 +16,8 @@ from rich.table import Table
 
 from . import __version__
 from .commands import experiment_cmd, project_cmd
+from .commands import push_cmd as push_impl
+from .commands import sea_cmd
 from .core.agents import load_registry
 from .core.repo import wigamig_repo_root
 
@@ -494,58 +496,71 @@ def sea_group() -> None:
 
 
 @sea_group.command("request", help="File an SEA request.")
+@click.option("--project", "project_name", default=None)
 @click.option("--to", "to_target", required=True)
 @click.option("--kind", required=True, type=click.Choice(["skill", "experiment", "analysis"]))
 @click.option("--description", required=True)
-def sea_request(to_target: str, kind: str, description: str) -> None:
-    _stub()
+def sea_request(project_name: str | None, to_target: str, kind: str, description: str) -> None:
+    sea_cmd.cmd_request(
+        project_name=project_name,
+        to_target=to_target,
+        kind=kind,
+        description=description,
+    )
 
 
 @sea_group.command("list", help="Browse SEAs.")
+@click.option("--project", "project_name", default=None)
 @click.option("--mine", is_flag=True)
 @click.option("--incoming", is_flag=True)
 @click.option("--outgoing", is_flag=True)
-def sea_list(mine: bool, incoming: bool, outgoing: bool) -> None:
-    _stub()
+def sea_list(project_name: str | None, mine: bool, incoming: bool, outgoing: bool) -> None:
+    sea_cmd.cmd_list(project_name=project_name, mine=mine, incoming=incoming, outgoing=outgoing)
 
 
 @sea_group.command("claim", help="Declare you'll perform an offered SEA.")
-@click.argument("sea_id")
-def sea_claim(sea_id: str) -> None:
-    _stub()
+@click.argument("sea_id", type=int)
+@click.option("--project", "project_name", default=None)
+def sea_claim(sea_id: int, project_name: str | None) -> None:
+    sea_cmd.cmd_claim(sea_id, project_name=project_name)
 
 
 @sea_group.command("complete", help="Mark operational completion of an SEA.")
-@click.argument("sea_id")
+@click.argument("sea_id", type=int)
 @click.option("--delivery", required=True, type=click.Path())
-def sea_complete(sea_id: str, delivery: str) -> None:
-    _stub()
+@click.option("--project", "project_name", default=None)
+def sea_complete(sea_id: int, delivery: str, project_name: str | None) -> None:
+    sea_cmd.cmd_complete(sea_id, delivery=delivery, project_name=project_name)
 
 
 @sea_group.command("decline", help="Refuse an SEA with a reason.")
-@click.argument("sea_id")
+@click.argument("sea_id", type=int)
 @click.option("--reason", required=True)
-def sea_decline(sea_id: str, reason: str) -> None:
-    _stub()
+@click.option("--project", "project_name", default=None)
+def sea_decline(sea_id: int, reason: str, project_name: str | None) -> None:
+    sea_cmd.cmd_decline(sea_id, reason=reason, project_name=project_name)
 
 
 @sea_group.command("examine", help="Trigger common agents to scaffold the deliberation doc.")
-@click.argument("sea_id")
-def sea_examine(sea_id: str) -> None:
-    _stub()
+@click.argument("sea_id", type=int)
+@click.option("--project", "project_name", default=None)
+def sea_examine(sea_id: int, project_name: str | None) -> None:
+    sea_cmd.cmd_examine(sea_id, project_name=project_name)
 
 
 @sea_group.command("conclude", help="Close the deliberation; optionally promote a finding.")
-@click.argument("sea_id")
+@click.argument("sea_id", type=int)
 @click.option("--statement", default=None, type=click.Path())
-def sea_conclude(sea_id: str, statement: str | None) -> None:
-    _stub()
+@click.option("--project", "project_name", default=None)
+def sea_conclude(sea_id: int, statement: str | None, project_name: str | None) -> None:
+    sea_cmd.cmd_conclude(sea_id, statement=statement, project_name=project_name)
 
 
 @sea_group.command("reopen", help="Re-open a concluded deliberation.")
-@click.argument("sea_id")
-def sea_reopen(sea_id: str) -> None:
-    _stub()
+@click.argument("sea_id", type=int)
+@click.option("--project", "project_name", default=None)
+def sea_reopen(sea_id: int, project_name: str | None) -> None:
+    sea_cmd.cmd_reopen(sea_id, project_name=project_name)
 
 
 # ---------------------------------------------------------------------------
@@ -554,10 +569,11 @@ def sea_reopen(sea_id: str) -> None:
 
 
 @cli.command("finalize", help="Run examine then conclude end-to-end for a scope.")
-@click.argument("scope", type=click.Choice(["sea", "experiment", "projects"]))
+@click.argument("scope", type=click.Choice(["sea", "experiment", "project"]))
 @click.argument("target_id")
-def finalize_cmd(scope: str, target_id: str) -> None:
-    _stub()
+@click.option("--project", "project_name", default=None)
+def finalize_cmd(scope: str, target_id: str, project_name: str | None) -> None:
+    sea_cmd.cmd_finalize(scope, target_id, project_name=project_name)
 
 
 # ---------------------------------------------------------------------------
@@ -742,17 +758,30 @@ def dashboard_cmd(pi_view: bool, snapshot: bool, outstanding: bool) -> None:
 @click.argument("project_name")
 @click.option("--message", default=None)
 @click.option("--finalize", is_flag=True)
+@click.option("--topic", default=None, help="Personal-branch topic suffix (default: wip).")
 @click.option(
     "--refined", default=None, help="Recompute checksums for an experiment's refined dir."
 )
-def push_cmd(project_name: str, message: str | None, finalize: bool, refined: str | None) -> None:
-    _stub()
+def push_cmd(
+    project_name: str,
+    message: str | None,
+    finalize: bool,
+    topic: str | None,
+    refined: str | None,
+) -> None:
+    push_impl.cmd_push(
+        project_name,
+        message=message,
+        finalize=finalize,
+        refined=refined,
+        topic=topic,
+    )
 
 
 @cli.command("pull", help="Fetch the latest project state.")
 @click.argument("project_name")
 def pull_cmd(project_name: str) -> None:
-    _stub()
+    push_impl.cmd_pull(project_name)
 
 
 @cli.command("cite", help="Resolve and insert a citation.")

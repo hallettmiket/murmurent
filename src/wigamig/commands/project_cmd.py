@@ -41,6 +41,9 @@ from ..core.projects import (
 )
 from ..core.repo import MEMBERS_FILENAME, lab_mgmt_repo_root, read_members, require_project_repo
 
+_TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent.parent / "templates"
+ADVERSARY_STUB_TEMPLATE = _TEMPLATES_DIR / "github_workflows" / "adversary_stub.yml"
+
 PROJECT_SUBDIRS = (
     "exp",
     "src",
@@ -205,6 +208,15 @@ def cmd_new(
         readme.write_text(
             f"# {name}\n\nWigamig project. See `CHARTER.md` for scope and `MEMBERS` for access.\n",
             encoding="utf-8",
+        )
+
+    # Adversary-stub GH Action workflow
+    workflow_dir = repo_dir / ".github" / "workflows"
+    workflow_dir.mkdir(parents=True, exist_ok=True)
+    workflow_dest = workflow_dir / "adversary_stub.yml"
+    if not workflow_dest.exists() and ADVERSARY_STUB_TEMPLATE.is_file():
+        workflow_dest.write_text(
+            ADVERSARY_STUB_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8"
         )
 
     # Lab-VM dirs

@@ -43,7 +43,9 @@ if _SRC_PATH.is_dir() and str(_SRC_PATH) not in sys.path:
     sys.path.insert(0, str(_SRC_PATH))
 
 from wigamig.commands import experiment_cmd, project_cmd  # noqa: E402
-from wigamig.core import lab_vm  # noqa: E402
+from wigamig.core import deliberation, lab_vm  # noqa: E402
+from wigamig.core import sea as sea_core  # noqa: E402
+from wigamig.core.projects import find_project  # noqa: E402
 
 # Importing the fake-data generator lets us call it without spawning a
 # subprocess; the file lives next to this one.
@@ -128,6 +130,90 @@ PROJECT_SEEDS: tuple[ProjectSeed, ...] = (
         ),
         choreography="drug_discovery_litl",
         experiments=(ExperimentSeed("pharmacophore_alignment", "@bob", "complete", "concluded"),),
+    ),
+)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: SEA seed configuration
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SeaSeed:
+    """One pre-seeded SEA per the umbrella prompt."""
+
+    project: str
+    id: int
+    from_handle: str
+    to_handle: str
+    kind: str
+    description: str
+    state: str
+    delivery: str | None = None
+    decline_reason: str | None = None
+    deliberation: str | None = None  # 'partial' | 'complete' | None
+
+
+SEA_SEEDS: tuple[SeaSeed, ...] = (
+    SeaSeed(
+        project="dcis_sc_tutorial",
+        id=1,
+        from_handle="@allie",
+        to_handle="@bob",
+        kind="experiment",
+        description="Re-generate count matrix with GRCh38.p14 + GENCODE 47",
+        state="claimed",
+    ),
+    SeaSeed(
+        project="dcis_sc_tutorial",
+        id=2,
+        from_handle="@bob",
+        to_handle="@cassie",
+        kind="analysis",
+        description="UMAPs coloured by ER, PR, grade",
+        state="requested",
+    ),
+    SeaSeed(
+        project="dcis_sc_tutorial",
+        id=3,
+        from_handle="@allie",
+        to_handle="@mike",
+        kind="analysis",
+        description="Review statistical assumptions in DE pipeline",
+        state="complete",
+        delivery="findings/de_pipeline_review.md",
+        deliberation="partial",
+    ),
+    SeaSeed(
+        project="dcis_sc_tutorial",
+        id=4,
+        from_handle="@cassie",
+        to_handle="@allie",
+        kind="analysis",
+        description="Interpret cluster 7 marker genes - macrophages or DCs?",
+        state="requested",
+    ),
+    SeaSeed(
+        project="dcis_sc_tutorial",
+        id=5,
+        from_handle="@allie",
+        to_handle="@bob",
+        kind="analysis",
+        description="scVI vs Harmony batch-correction comparison",
+        state="declined",
+        decline_reason="Out of scope for v1; revisit after baseline DE is finalised.",
+    ),
+    SeaSeed(
+        project="bbb_drug_screen",
+        id=10,
+        from_handle="@bob",
+        to_handle="@allie",
+        kind="analysis",
+        description="Pharmacophore alignment for compound set 3",
+        state="concluded",
+        delivery="findings/pharmacophore_alignment_set_3.md",
+        deliberation="complete",
     ),
 )
 
@@ -621,6 +707,115 @@ def stage_data_into_lab_vm(bundles: dict[str, Path]) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Phase 3: SEA + deliberation seeding
+# ---------------------------------------------------------------------------
+
+
+def seed_seas() -> None:
+    """Pre-populate the six SEAs from the umbrella prompt."""
+    for sd in SEA_SEEDS:
+        repo = find_project(sd.project)
+        if repo is None:
+            warn(f"project {sd.project!r} not found; skipping SEA {sd.id}")
+            continue
+        path = sea_core.sea_path(repo, sd.id)
+        if path.is_file():
+            log(f"SEA {sd.project}/{sd.id} exists; skipping")
+        else:
+            new_sea = sea_core.Sea(
+                id=sd.id,
+                from_handle=sd.from_handle,
+                to_handle=sd.to_handle,
+                kind=sd.kind,
+                description=sd.description,
+                state="requested",
+            )
+            sea_core.write_sea(repo, new_sea)
+            log(f"filed SEA {sd.project}/{sd.id}: {sd.from_handle} -> {sd.to_handle}")
+        # Drive lifecycle into target state.
+        sea = sea_core.parse_sea(path if path.is_file() else sea_core.sea_path(repo, sd.id))
+        target_chain = _state_chain(sd)
+        for next_state in target_chain:
+            if sea.state == next_state:
+                continue
+            try:
+                if next_state == "claimed":
+                    sea_core.claim(sea)
+                elif next_state == "complete":
+                    sea_core.complete(sea, delivery=sd.delivery or "(seed)")
+                elif next_state == "examined":
+                    sea_core.mark_examined(sea)
+                elif next_state == "concluded":
+                    sea_core.mark_concluded(sea)
+                elif next_state == "declined":
+                    sea_core.decline(sea, reason=sd.decline_reason or "(seed)")
+            except sea_core.SeaTransitionError:
+                continue
+        sea_core.write_sea(repo, sea)
+        if sd.deliberation == "partial":
+            _ensure_partial_deliberation(repo, sd)
+        elif sd.deliberation == "complete":
+            _ensure_complete_deliberation(repo, sd)
+
+
+def _state_chain(sd: SeaSeed) -> list[str]:
+    """Return the lifecycle path needed to land at ``sd.state``."""
+    if sd.state == "requested":
+        return []
+    if sd.state == "claimed":
+        return ["claimed"]
+    if sd.state == "complete":
+        return ["claimed", "complete"]
+    if sd.state == "examined":
+        return ["claimed", "complete", "examined"]
+    if sd.state == "concluded":
+        return ["claimed", "complete", "examined", "concluded"]
+    if sd.state == "declined":
+        return ["declined"]
+    return []
+
+
+def _ensure_partial_deliberation(repo, sd: SeaSeed) -> None:
+    delib_path = deliberation.deliberation_path(repo, "sea", str(sd.id))
+    if delib_path.is_file():
+        return
+    delib_path.parent.mkdir(parents=True, exist_ok=True)
+    delib_path.write_text(
+        deliberation.render_deliberation(
+            scope="sea",
+            target=str(sd.id),
+            operational_status="complete",
+            analysis_status="examined",
+            examined_at=TODAY,
+        ),
+        encoding="utf-8",
+    )
+    log(f"wrote partial deliberation for SEA {sd.id}")
+
+
+def _ensure_complete_deliberation(repo, sd: SeaSeed) -> None:
+    delib_path = deliberation.deliberation_path(repo, "sea", str(sd.id))
+    if delib_path.is_file():
+        return
+    delib_path.parent.mkdir(parents=True, exist_ok=True)
+    text = deliberation.render_deliberation(
+        scope="sea",
+        target=str(sd.id),
+        operational_status="complete",
+        analysis_status="concluded",
+        examined_at=TODAY,
+        concluded_at=TODAY,
+    )
+    text = text.replace(
+        "_(filled in during conclude — claim, partial findings, explicit non-consensus, artefact reference, or next steps)_",
+        f"Squad finalised SEA {sd.id}: {sd.description}. See {sd.delivery}.",
+        1,
+    )
+    delib_path.write_text(text, encoding="utf-8")
+    log(f"wrote complete deliberation for SEA {sd.id}")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -711,6 +906,23 @@ def main() -> int:
         bundles = seed_fake_data(args.fake_data_staging)
         log("staging fake data into the lab-VM refined tree (raw left empty for ingest demo)")
         stage_data_into_lab_vm(bundles)
+
+        log("seeding pre-populated SEAs + deliberation docs")
+        seed_seas()
+        for project_seed in PROJECT_SEEDS:
+            project_dir = Path("~/repos").expanduser() / project_seed.name
+            if has_uncommitted_changes(project_dir):
+                run(["git", "add", "-A"], cwd=project_dir)
+                run(
+                    ["git", "commit", "-m", f"seed SEAs + deliberations for {project_seed.name}"],
+                    cwd=project_dir,
+                )
+                if not args.skip_github:
+                    run(
+                        ["git", "push", "-u", "origin", "main"],
+                        cwd=project_dir,
+                        check=False,
+                    )
         # After project commits, push lab-mgmt one more time so the
         # `projects/` registry entries reach origin.
         if not args.skip_github:
