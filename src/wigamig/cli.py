@@ -10,12 +10,14 @@ Output: Side effects per subcommand; v1 working commands write to stdout.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
 from rich.console import Console
 from rich.table import Table
 
 from . import __version__
-from .commands import experiment_cmd, project_cmd
+from .commands import experiment_cmd, install_cmd, project_cmd
 from .commands import push_cmd as push_impl
 from .commands import sea_cmd
 from .core.agents import load_registry
@@ -40,9 +42,21 @@ def cli() -> None:
 # ---------------------------------------------------------------------------
 
 
-@cli.command("install", help="Install wigamig agents and configuration locally.")
-def install_cmd() -> None:
-    _stub()
+@cli.command("install", help="Install wigamig hooks + MCP into ~/.claude/settings.json.")
+@click.option("--hooks", is_flag=True, help="Install hook + MCP registrations only (phase 4).")
+@click.option(
+    "--settings",
+    "settings_path",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Override the settings.json target path (mostly for tests).",
+)
+@click.option("--no-backup", is_flag=True, help="Skip the .bak copy of settings.json.")
+def install_command(hooks: bool, settings_path: Path | None, no_backup: bool) -> None:
+    if not hooks:
+        click.echo("not yet implemented in v1 (use --hooks to install hooks + MCP).")
+        return
+    install_cmd.cmd_install(hooks=hooks, settings_path=settings_path, backup=not no_backup)
 
 
 @cli.command("onboard", help="One-shot setup for a new member (clone, key, profile, PR).")

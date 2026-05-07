@@ -1,0 +1,168 @@
+"""
+Purpose: Implement ``wigamig install --hooks`` for phase 4. Idempotently merges
+         hook + MCP entries into ``~/.claude/settings.json``.
+Author: Mike Hallett (with Claude Code)
+Date: 2026-05-07
+Input: CLI flags from :mod:`wigamig.cli`.
+Output: Updated ``~/.claude/settings.json``; returns the path that was edited.
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+import sys
+from pathlib import Path
+from typing import Any
+
+import click
+
+DEFAULT_SETTINGS_PATH = Path("~/.claude/settings.json").expanduser()
+
+
+HOOK_REGISTRATIONS: list[dict[str, Any]] = [
+    {
+        "event": "PreToolUse",
+        "matcher": "Write|Edit|Bash|NotebookEdit",
+        "module": "wigamig.hooks.raw_guard",
+        "env": {},
+        "label": "wigamig-raw-guard",
+    },
+    {
+        "event": "PreToolUse",
+        "matcher": "Bash|WebFetch|WebSearch|mcp__slack__.*|mcp__claude_ai_Slack__.*",
+        "module": "wigamig.hooks.phi_check",
+        "env": {"WIGAMIG_PHI_HOOK_MODE": "pre"},
+        "label": "wigamig-phi-pre",
+    },
+    {
+        "event": "PostToolUse",
+        "matcher": ".*",
+        "module": "wigamig.hooks.phi_check",
+        "env": {"WIGAMIG_PHI_HOOK_MODE": "post"},
+        "label": "wigamig-phi-post",
+    },
+    {
+        "event": "UserPromptSubmit",
+        "matcher": ".*",
+        "module": "wigamig.hooks.context_inject",
+        "env": {},
+        "label": "wigamig-context-inject",
+    },
+    {
+        "event": "PostToolUse",
+        "matcher": ".*",
+        "module": "wigamig.hooks.audit",
+        "env": {},
+        "label": "wigamig-audit",
+    },
+]
+
+MCP_REGISTRATIONS: dict[str, dict[str, Any]] = {
+    "wigamig-inventory": {
+        "command": sys.executable,
+        "args": ["-m", "wigamig.mcp.inventory_server"],
+        "env": {},
+    },
+}
+
+
+def _hook_command(module: str, env: dict[str, str]) -> str:
+    """Render a shell command that invokes ``module`` with optional env vars."""
+    parts: list[str] = []
+    for k, v in env.items():
+        parts.append(f"{k}={v}")
+    parts.extend([sys.executable, "-m", module])
+    return " ".join(parts)
+
+
+def _matches_existing(entry: dict[str, Any], reg: dict[str, Any]) -> bool:
+    """Decide whether ``entry`` corresponds to ``reg`` (so we can replace it)."""
+    if entry.get("matcher") != reg["matcher"]:
+        return False
+    hooks = entry.get("hooks") or []
+    for h in hooks:
+        cmd = h.get("command", "")
+        if isinstance(cmd, list):
+            cmd = " ".join(cmd)
+        if reg["module"] in cmd:
+            return True
+        if reg["label"] in cmd:
+            return True
+    return False
+
+
+def _ensure_hook(settings: dict[str, Any], reg: dict[str, Any]) -> bool:
+    """Ensure ``reg`` is present under ``settings.hooks[reg.event]``.
+
+    Returns True if anything changed.
+    """
+    hooks = settings.setdefault("hooks", {})
+    bucket = hooks.setdefault(reg["event"], [])
+    new_entry = {
+        "matcher": reg["matcher"],
+        "hooks": [
+            {
+                "type": "command",
+                "command": _hook_command(reg["module"], reg["env"]),
+                "name": reg["label"],
+            }
+        ],
+    }
+    for i, entry in enumerate(bucket):
+        if _matches_existing(entry, reg):
+            if entry == new_entry:
+                return False
+            bucket[i] = new_entry
+            return True
+    bucket.append(new_entry)
+    return True
+
+
+def _ensure_mcp(settings: dict[str, Any]) -> bool:
+    """Ensure each entry in ``MCP_REGISTRATIONS`` is in ``settings.mcpServers``."""
+    changed = False
+    servers = settings.setdefault("mcpServers", {})
+    for name, spec in MCP_REGISTRATIONS.items():
+        if servers.get(name) != spec:
+            servers[name] = spec
+            changed = True
+    return changed
+
+
+def cmd_install(
+    *,
+    hooks: bool = False,
+    settings_path: Path | None = None,
+    backup: bool = True,
+) -> Path:
+    """Install hooks + MCP servers into the CC settings file."""
+    if not hooks:
+        raise click.ClickException("phase 4 supports --hooks only (full install lands in phase 5).")
+    target = settings_path or DEFAULT_SETTINGS_PATH
+    target.parent.mkdir(parents=True, exist_ok=True)
+    settings: dict[str, Any] = {}
+    if target.is_file():
+        try:
+            settings = json.loads(target.read_text(encoding="utf-8") or "{}")
+        except json.JSONDecodeError as exc:
+            raise click.ClickException(
+                f"could not parse existing {target}: {exc}; back it up and retry."
+            )
+
+    if backup and target.is_file():
+        shutil.copy2(target, target.with_suffix(target.suffix + ".bak"))
+
+    changed = False
+    for reg in HOOK_REGISTRATIONS:
+        if _ensure_hook(settings, reg):
+            changed = True
+    if _ensure_mcp(settings):
+        changed = True
+
+    target.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
+    if changed:
+        click.echo(f"Installed wigamig hooks + MCP into {target}")
+    else:
+        click.echo(f"{target}: no changes (already installed).")
+    return target
