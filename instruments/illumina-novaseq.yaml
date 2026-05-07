@@ -1,0 +1,19 @@
+---
+instrument: illumina-novaseq
+description: Illumina NovaSeq 6000 short-read sequencer
+detect_marker: '*.fastq.gz'
+raw:
+  extensions: [fastq, fastq.gz]
+  patterns:
+    - '*RunInfo.xml'
+    - '*RunParameters.xml'
+    - 'SampleSheet*.csv'
+derived:
+  extensions: [pdf, html]
+  patterns:
+    - '*thumbnail*'
+    - '*qc.html*'
+    - '*summary.pdf*'
+    - '*_qc.*'
+    - '*report*'
+---
