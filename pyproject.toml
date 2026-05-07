@@ -20,6 +20,9 @@ dev = [
     "black>=24.0",
     "isort>=5.13",
 ]
+mcp = [
+    "mcp>=1.0",
+]
 
 [project.scripts]
 wigamig = "wigamig.cli:cli"

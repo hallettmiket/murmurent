@@ -43,7 +43,7 @@ if _SRC_PATH.is_dir() and str(_SRC_PATH) not in sys.path:
     sys.path.insert(0, str(_SRC_PATH))
 
 from wigamig.commands import experiment_cmd, project_cmd  # noqa: E402
-from wigamig.core import deliberation, lab_vm  # noqa: E402
+from wigamig.core import deliberation, inventory, lab_vm  # noqa: E402
 from wigamig.core import sea as sea_core  # noqa: E402
 from wigamig.core.projects import find_project  # noqa: E402
 
@@ -711,6 +711,101 @@ def stage_data_into_lab_vm(bundles: dict[str, Path]) -> None:
 # ---------------------------------------------------------------------------
 
 
+INVENTORY_SEEDS: tuple[dict[str, object], ...] = (
+    {
+        "name": "anti_cd31",
+        "vendor": "FAKE Biolabs",
+        "catalog_no": "FB-CD31-001",
+        "lot": "AB-2026-04",
+        "qty": 0.5,
+        "unit": "mg",
+        "expiry": "2027-03-01",
+        "location": "freezer-A / shelf-2",
+        "status": "in_stock",
+        "protocols": ["[[src/protocols/ihc_panel_v1.md]]"],
+    },
+    {
+        "name": "4_oht",
+        "vendor": "FAKE Sigma",
+        "catalog_no": "F-OHT-100MG",
+        "lot": "2025-44",
+        "qty": 12.0,
+        "unit": "mg",
+        "expiry": "2026-04-01",
+        "location": "fridge-2 / shelf-1",
+        "status": "expired",
+    },
+    {
+        "name": "nebnext_kit",
+        "vendor": "FAKE NEB",
+        "catalog_no": "FN-NEXT-24",
+        "lot": "L-26-009",
+        "qty": 3.0,
+        "unit": "rxn",
+        "expiry": "2026-12-31",
+        "location": "freezer-B / box-3",
+        "status": "low",
+        "protocols": ["[[src/protocols/library_prep_v2.md]]"],
+    },
+    {
+        "name": "dapi",
+        "vendor": "FAKE ThermoFisher",
+        "catalog_no": "FT-DAPI-1ML",
+        "lot": "T-26-101",
+        "qty": 5.0,
+        "unit": "mL",
+        "expiry": "2028-01-15",
+        "location": "fridge-1 / shelf-3",
+        "status": "in_stock",
+    },
+    {
+        "name": "dmso",
+        "vendor": "FAKE Sigma",
+        "catalog_no": "FS-DMSO-500ML",
+        "lot": "2025-22",
+        "qty": 2.0,
+        "unit": "L",
+        "expiry": "2030-01-01",
+        "location": "shelf-RT-A",
+        "status": "in_stock",
+    },
+    {
+        "name": "livedead_stain",
+        "vendor": "FAKE Invitrogen",
+        "catalog_no": "FI-LD-1KIT",
+        "lot": "L-26-204",
+        "qty": 1.0,
+        "unit": "kit",
+        "expiry": "2026-05-21",  # ~14 days from TODAY
+        "location": "freezer-A / shelf-1",
+        "status": "in_stock",
+    },
+)
+
+
+def seed_inventory() -> None:
+    """Pre-populate the six umbrella-prompt inventory items (idempotent)."""
+    for spec in INVENTORY_SEEDS:
+        path = inventory.item_path(spec["name"])  # type: ignore[arg-type]
+        if path.is_file():
+            log(f"inventory item {spec['name']} exists; skipping")
+            continue
+        item = inventory.InventoryItem(
+            name=spec["name"],  # type: ignore[arg-type]
+            vendor=spec.get("vendor"),  # type: ignore[arg-type]
+            catalog_no=spec.get("catalog_no"),  # type: ignore[arg-type]
+            lot=spec.get("lot"),  # type: ignore[arg-type]
+            qty=spec.get("qty"),  # type: ignore[arg-type]
+            unit=spec.get("unit"),  # type: ignore[arg-type]
+            expiry=spec.get("expiry"),  # type: ignore[arg-type]
+            location=spec.get("location"),  # type: ignore[arg-type]
+            status=spec.get("status", "in_stock"),  # type: ignore[arg-type]
+            protocols=list(spec.get("protocols") or []),  # type: ignore[arg-type]
+        )
+        inventory.write_item(item)
+        log(f"wrote inventory item {item.name} ({item.status})")
+
+
 def seed_seas() -> None:
     """Pre-populate the six SEAs from the umbrella prompt."""
     for sd in SEA_SEEDS:
@@ -907,6 +1002,8 @@ def main() -> int:
         log("staging fake data into the lab-VM refined tree (raw left empty for ingest demo)")
         stage_data_into_lab_vm(bundles)
 
+        log("seeding inventory items")
+        seed_inventory()
         log("seeding pre-populated SEAs + deliberation docs")
         seed_seas()
         for project_seed in PROJECT_SEEDS:
