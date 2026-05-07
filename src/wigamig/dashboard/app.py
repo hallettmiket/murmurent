@@ -24,7 +24,13 @@ except ModuleNotFoundError:  # pragma: no cover
     print("streamlit is not installed; install with `uv pip install streamlit`.")
     sys.exit(1)
 
-from ..core import dashboard
+try:
+    from ..core import dashboard
+except ImportError:
+    # Streamlit loads this file as a top-level script, not a package member,
+    # so the relative import fails. Fall back to absolute import; the wigamig
+    # package only needs to be installed in the env (it is).
+    from wigamig.core import dashboard  # type: ignore[no-redef]
 
 
 def _parse_argv() -> argparse.Namespace:
