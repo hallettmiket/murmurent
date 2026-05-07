@@ -17,6 +17,7 @@ from rich.console import Console
 from rich.table import Table
 
 from . import __version__
+from .commands import dashboard_cmd as dashboard_impl
 from .commands import experiment_cmd, install_cmd, project_cmd
 from .commands import push_cmd as push_impl
 from .commands import sea_cmd
@@ -760,7 +761,7 @@ def breach_cmd(project_name: str, description: str) -> None:
 @click.option("--snapshot", is_flag=True, help="Print the latest markdown snapshot.")
 @click.option("--outstanding", is_flag=True, help="Print only the Outstanding panel.")
 def dashboard_cmd(pi_view: bool, snapshot: bool, outstanding: bool) -> None:
-    _stub()
+    dashboard_impl.cmd_dashboard(pi_view=pi_view, snapshot=snapshot, outstanding=outstanding)
 
 
 # ---------------------------------------------------------------------------

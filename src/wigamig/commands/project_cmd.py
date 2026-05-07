@@ -43,6 +43,7 @@ from ..core.repo import MEMBERS_FILENAME, lab_mgmt_repo_root, read_members, requ
 
 _TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent.parent / "templates"
 ADVERSARY_STUB_TEMPLATE = _TEMPLATES_DIR / "github_workflows" / "adversary_stub.yml"
+DASHBOARD_WORKFLOW_TEMPLATE = _TEMPLATES_DIR / "github_workflows" / "dashboard.yml"
 
 PROJECT_SUBDIRS = (
     "exp",
@@ -210,14 +211,16 @@ def cmd_new(
             encoding="utf-8",
         )
 
-    # Adversary-stub GH Action workflow
+    # Adversary-stub + dashboard GH Action workflows
     workflow_dir = repo_dir / ".github" / "workflows"
     workflow_dir.mkdir(parents=True, exist_ok=True)
-    workflow_dest = workflow_dir / "adversary_stub.yml"
-    if not workflow_dest.exists() and ADVERSARY_STUB_TEMPLATE.is_file():
-        workflow_dest.write_text(
-            ADVERSARY_STUB_TEMPLATE.read_text(encoding="utf-8"), encoding="utf-8"
-        )
+    for template, dest_name in (
+        (ADVERSARY_STUB_TEMPLATE, "adversary_stub.yml"),
+        (DASHBOARD_WORKFLOW_TEMPLATE, "dashboard.yml"),
+    ):
+        dest = workflow_dir / dest_name
+        if not dest.exists() and template.is_file():
+            dest.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
 
     # Lab-VM dirs
     lab_vm.project_raw_dir(name).mkdir(parents=True, exist_ok=True)
