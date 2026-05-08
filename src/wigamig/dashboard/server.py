@@ -65,6 +65,36 @@ class CreateProjectRequestBody(BaseModel):
     justification: str = ""
 
 
+class CatalogEntryBody(BaseModel):
+    """JSON body for ``POST /api/sea_catalog`` (upsert)."""
+
+    slug: str
+    title: str
+    kind: str  # skill | experiment | analysis
+    contact: str  # @handle
+    description: str = ""
+    turnaround_days: int | None = None
+    prerequisites: list[str] = []
+    accepting: bool = True
+
+
+class InboundActionBody(BaseModel):
+    """JSON body for ``POST /api/inbound-sea/{id}/{accept|decline}``."""
+
+    routed_to: str | None = None  # required for accept
+    reason: str | None = None     # required for decline
+
+
+class SimulateInboundBody(BaseModel):
+    """For testing the receptionist flow without a real second group."""
+
+    catalog_slug: str
+    from_group: str
+    from_handle: str
+    from_pi: str = ""
+    description: str = ""
+
+
 class RequestActionBody(BaseModel):
     """JSON body for ``POST /api/request/{id}/{action}``."""
 
@@ -369,6 +399,130 @@ def create_app() -> FastAPI:
                 "decline_reason": req.decline_reason,
             },
         }
+
+    # -----------------------------------------------------------------
+    # SEA catalog (Phase 10)
+    # -----------------------------------------------------------------
+
+    def _require_pi(user: str) -> str:
+        from ..core.lab import pi_handle as _pi
+        actor = (user or "").strip().lstrip("@")
+        if not actor:
+            identity = resolve_identity(allow_unknown=True)
+            actor = identity.handle if identity.source != "unknown" else ""
+        if not actor:
+            raise HTTPException(status_code=400, detail="No actor resolved")
+        if actor.lower() != _pi().lower():
+            raise HTTPException(
+                status_code=403,
+                detail=f"only the lab PI (@{_pi()}) can perform this action",
+            )
+        return actor
+
+    @app.post("/api/sea_catalog")
+    def catalog_upsert(
+        body: CatalogEntryBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Create or update a catalog entry. PI only."""
+        from ..core import sea_catalog as _catalog
+        actor = _require_pi(user)
+        try:
+            entry = _catalog.upsert(
+                slug=body.slug,
+                title=body.title,
+                kind=body.kind,
+                contact=body.contact,
+                description=body.description,
+                turnaround_days=body.turnaround_days,
+                prerequisites=body.prerequisites,
+                accepting=body.accepting,
+            )
+        except _catalog.CatalogError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"ok": True, "entry": entry.to_meta()}
+
+    @app.post("/api/sea_catalog/{slug}/{action}")
+    def catalog_action(
+        slug: str,
+        action: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Toggle accepting (enable/disable) or remove (delete). PI only."""
+        from ..core import sea_catalog as _catalog
+        _require_pi(user)
+        try:
+            if action == "enable":
+                entry = _catalog.set_accepting(slug, accepting=True)
+                return {"ok": True, "accepting": True, "entry": entry.to_meta()}
+            if action == "disable":
+                entry = _catalog.set_accepting(slug, accepting=False)
+                return {"ok": True, "accepting": False, "entry": entry.to_meta()}
+            if action == "delete":
+                _catalog.delete(slug)
+                return {"ok": True, "deleted": True, "slug": slug}
+        except _catalog.CatalogNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _catalog.CatalogError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        raise HTTPException(status_code=422, detail=f"unknown action: {action}")
+
+    # -----------------------------------------------------------------
+    # Inbound cross-group SEA requests (receptionist)
+    # -----------------------------------------------------------------
+
+    @app.post("/api/inbound-sea/_simulate")
+    def inbound_simulate(body: SimulateInboundBody) -> dict:
+        """Test hook: file a fake inbound request as if it came from
+        another group's MCP. Used by the smoke test + tutorial."""
+        from ..core import cross_group as _xg
+
+        try:
+            req = _xg.file_inbound(
+                catalog_slug=body.catalog_slug,
+                from_group=body.from_group,
+                from_handle=body.from_handle,
+                from_pi=body.from_pi,
+                description=body.description,
+            )
+        except _xg.CrossGroupError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"ok": True, "request": req.to_meta()}
+
+    @app.post("/api/inbound-sea/{request_id}/{action}")
+    def inbound_action(
+        request_id: int,
+        action: str,
+        body: InboundActionBody = Body(default_factory=InboundActionBody),
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Accept or decline an inbound cross-group SEA. PI only."""
+        from ..core import cross_group as _xg
+
+        _require_pi(user)
+        path = _xg.inbound_path(request_id)
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail=f"inbound #{request_id} not found")
+        req = _xg.parse_inbound(path)
+
+        try:
+            if action == "accept":
+                if not body.routed_to:
+                    raise HTTPException(
+                        status_code=422,
+                        detail="accept requires routed_to (which member will own it)",
+                    )
+                _xg.accept_inbound(req, routed_to=body.routed_to)
+            elif action == "decline":
+                if not body.reason:
+                    raise HTTPException(status_code=422, detail="decline requires a reason")
+                _xg.decline_inbound(req, reason=body.reason)
+            else:
+                raise HTTPException(status_code=422, detail=f"unknown action: {action}")
+        except _xg.CrossGroupError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        _xg.write_inbound(req)
+        return {"ok": True, "request": req.to_meta()}
 
     @app.post("/api/oracle/process")
     def oracle_process(
