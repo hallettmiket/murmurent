@@ -24,7 +24,9 @@ from ..core.dashboard import DashboardSnapshot, _load_member_meta, _parse_certif
 from ..core.frontmatter import parse_file
 from ..core.projects import ProjectSummary, iter_local_projects, load_summary
 from ..core.agents import load_registry as load_agent_registry
+from ..core import compliance as compliance_core
 from ..core import cross_group as xgroup
+from ..core import membership as membership_core
 from ..core.repo import lab_mgmt_repo_root, wigamig_repo_root
 from ..core import requests as req_core
 from ..core import sea_catalog as catalog_core
@@ -92,6 +94,7 @@ def build_response(
         group_members=_group_members(),
         sea_catalog=_sea_catalog_rows(),
         inbound_requests=_inbound_rows(effective_persona),
+        training_compliance=_training_compliance(today_d),
         attention=_attention(snap, effective_persona, project_summaries, today_d),
         stats=_stats(
             snap, all_seas, today_d,
@@ -1011,6 +1014,44 @@ def _group_members() -> list[str]:
             continue
         handles.add(h if h.startswith("@") else f"@{h}")
     return sorted(handles)
+
+
+def _training_compliance(today_d: _dt.date) -> C.TrainingComplianceBlock:
+    """Read compliance.md + each member's certs; build the panel data."""
+    cfg = compliance_core.load_config()
+    spec_rows = [
+        C.TrainingCertSpec(
+            code=s.code, name=s.name, short=s.short,
+            cadence_years=s.cadence_years, audience=s.audience,  # type: ignore[arg-type]
+        )
+        for s in cfg.required
+    ]
+    member_rows: list[C.TrainingMemberRow] = []
+    for rec in membership_core.iter_members():
+        statuses = compliance_core.compute_member_status(
+            handle=rec.handle,
+            member_certs=rec.certifications,
+            config=cfg,
+            today=today_d,
+        )
+        cells = [
+            C.TrainingCertCell(code=cs.code, status=cs.status, expires=cs.expires)  # type: ignore[arg-type]
+            for cs in statuses
+        ]
+        member_rows.append(
+            C.TrainingMemberRow(
+                handle=rec.handle,
+                name=rec.full_name,
+                role=rec.role,
+                member_status=rec.status,  # type: ignore[arg-type]
+                certs=cells,
+            )
+        )
+    return C.TrainingComplianceBlock(
+        required=spec_rows,
+        members=member_rows,
+        yellow_threshold_days=cfg.yellow_threshold_days,
+    )
 
 
 def _sea_catalog_rows() -> list[C.CatalogEntryRow]:

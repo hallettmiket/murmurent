@@ -213,6 +213,38 @@ class OracleEntry(BaseModel):
     path: str  # ``oracle/<file>.md`` for click-to-open
 
 
+class TrainingCertSpec(BaseModel):
+    """Phase 14: one required cert from <lab-mgmt>/compliance.md."""
+
+    code: str
+    name: str
+    short: str
+    cadence_years: int | None = None
+    audience: Literal["all", "lab", "clinical", "optional"] = "all"
+
+
+class TrainingCertCell(BaseModel):
+    code: str
+    status: Literal["ok", "expiring", "expired", "missing", "n/a", "one_time"]
+    expires: str | None = None
+
+
+class TrainingMemberRow(BaseModel):
+    handle: str
+    name: str
+    role: str
+    member_status: Literal["active", "inactive"]
+    certs: list[TrainingCertCell] = []
+
+
+class TrainingComplianceBlock(BaseModel):
+    """The whole panel: declared specs + per-member status grid."""
+
+    required: list[TrainingCertSpec] = []
+    members: list[TrainingMemberRow] = []
+    yellow_threshold_days: int = 60
+
+
 class JoinRequestRow(BaseModel):
     """Phase 8 / 9: project-join or project-create request row."""
 
@@ -449,6 +481,7 @@ class DashboardResponse(BaseModel):
     group_members: list[str] = []                # all known @handles (for forms)
     sea_catalog: list[CatalogEntryRow] = []      # SEAs we offer (entire group sees)
     inbound_requests: list[InboundRequestRow] = []  # receptionist queue (PI only)
+    training_compliance: TrainingComplianceBlock = TrainingComplianceBlock()
     attention: list[AttentionItem]
     stats: StatStrip
     spark: list[int]
