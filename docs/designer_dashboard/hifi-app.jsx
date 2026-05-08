@@ -440,6 +440,201 @@ function AgentsPanel({ agents, span="c-4" }) {
   );
 }
 
+/* ───────── join-requests panel ─────────
+   PI lens: pending queue with approve/decline buttons.
+   Member lens: viewer's own outgoing requests with status pill. */
+async function postRequestAction(id, action, body = {}) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/request/" + encodeURIComponent(id) + "/" + encodeURIComponent(action)
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+async function postJoinRequest(project, justification) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/request/join" + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ project, justification }),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function RequestActionRow({ req, isPI }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState(null);
+  const refresh = async () => {
+    if (typeof window.__wigamigFetchData === "function") {
+      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    }
+  };
+  const onApprove = async () => {
+    setBusy(true); setErr(null);
+    try { await postRequestAction(req.id, "approve"); await refresh(); }
+    catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(false); }
+  };
+  const onDecline = async () => {
+    const reason = window.prompt("Decline reason:");
+    if (!reason || !reason.trim()) return;
+    setBusy(true); setErr(null);
+    try { await postRequestAction(req.id, "decline", { reason: reason.trim() }); await refresh(); }
+    catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div style={{padding:"9px 14px", borderBottom:"1px solid var(--rule)"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline"}}>
+        <div>
+          <span style={{fontWeight:500}}>{req.requester}</span>
+          <span className="muted" style={{marginLeft:6}}>→</span>
+          <span className="mono" style={{marginLeft:6, fontSize:12}}>{req.project}</span>
+        </div>
+        <span className="mono muted" style={{fontSize:10}}>{req.created_at || ""}</span>
+      </div>
+      {req.justification && (
+        <div className="muted" style={{fontSize:12, marginTop:4, lineHeight:1.45}}>
+          {req.justification}
+        </div>
+      )}
+      {isPI ? (
+        <div className="row" style={{marginTop:6, justifyContent:"flex-end", gap:6}}>
+          <button className="btn sm primary" disabled={busy} onClick={onApprove}>
+            {busy ? "…" : "approve"}
+          </button>
+          <button className="btn sm" disabled={busy} onClick={onDecline}>
+            decline
+          </button>
+        </div>
+      ) : (
+        <div className="row" style={{marginTop:6, justifyContent:"flex-end"}}>
+          <Pill tone="amber">{req.state}</Pill>
+        </div>
+      )}
+      {err && (
+        <div style={{fontSize:11, color:"var(--red)", marginTop:4, textAlign:"right"}}>
+          {err}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RequestStatusRow({ req }) {
+  const tone =
+    req.state === "approved" ? "green" :
+    req.state === "declined" ? "red"   : "amber";
+  return (
+    <div style={{padding:"7px 14px", borderBottom:"1px solid var(--rule)"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline"}}>
+        <span className="mono" style={{fontSize:12}}>
+          #{req.id} · {req.project}
+        </span>
+        <Pill tone={tone}>{req.state}</Pill>
+      </div>
+      <div className="mono muted" style={{fontSize:10, marginTop:2}}>
+        filed {req.created_at || "—"}
+        {req.resolved_at && <span> · resolved {req.resolved_at} by {req.resolved_by}</span>}
+      </div>
+      {req.state === "declined" && req.decline_reason && (
+        <div style={{fontSize:11, color:"var(--red)", marginTop:3}}>
+          {req.decline_reason}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function NewJoinRequestButton() {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState(null);
+  const onClick = async () => {
+    const project = window.prompt("Project name to request joining (e.g. dcis_sc_tutorial):");
+    if (!project || !project.trim()) return;
+    const justification = window.prompt(
+      "Why do you want to join this project? (visible to the PI)"
+    ) || "";
+    setBusy(true); setErr(null);
+    try {
+      await postJoinRequest(project.trim(), justification.trim());
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+    } catch (ex) {
+      setErr(String(ex.message || ex));
+      alert("Request failed: " + (ex.message || ex));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button className="btn sm" disabled={busy} onClick={onClick}>
+      {busy ? "…" : "＋ join project"}
+    </button>
+  );
+}
+
+function RequestsPanel({ pending, mine, span="c-6" }) {
+  const persona = window.DATA.persona || "member";
+  const isPI    = persona === "pi";
+  const showQueue = isPI ? (pending || []) : [];
+  const showMine  = (mine || []).filter(r => r.state !== "approved" || true);
+
+  const headerLabel = isPI
+    ? `${(pending || []).length} pending`
+    : `${(mine || []).filter(r => r.state === "pending").length} pending · ${
+        (mine || []).filter(r => r.state !== "pending").length} resolved`;
+
+  return (
+    <div className={"panel "+span}>
+      <header>
+        <h2>Project-join requests</h2>
+        <div className="row" style={{gap:10}}>
+          <span className="meta">{headerLabel}</span>
+          <NewJoinRequestButton />
+        </div>
+      </header>
+      <div className="body" style={{padding:"6px 0"}}>
+        {isPI && showQueue.length === 0 && (
+          <div className="muted" style={{padding:"14px", fontSize:13}}>
+            No pending requests. Members will appear here when they ask to join a project.
+          </div>
+        )}
+        {isPI && showQueue.map(r => (
+          <RequestActionRow key={r.id} req={r} isPI={true} />
+        ))}
+        {!isPI && showMine.length === 0 && (
+          <div className="muted" style={{padding:"14px", fontSize:13}}>
+            You haven't filed any join requests. Click <code>＋ join project</code> above.
+          </div>
+        )}
+        {!isPI && showMine.map(r => (
+          <RequestStatusRow key={r.id} req={r} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ───────── group oracle panel ───────── */
 function GroupOraclePanel({ entries, span="c-6" }) {
   const list = entries || [];
@@ -857,6 +1052,16 @@ function App() {
         <div className="grid" style={{marginBottom:14}}>
           <GroupPanel peers={D.peers} span="c-6" />
           <InventoryPanel inv={D.inventory} span="c-6" />
+        </div>
+
+        {/* Project-join requests. PI sees the approval queue; members see
+            their own outgoing-request status. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <RequestsPanel
+            pending={D.requests_pending}
+            mine={D.requests_mine}
+            span="c-12"
+          />
         </div>
 
         {/* Compliance — most sporadic; lives at the bottom. */}

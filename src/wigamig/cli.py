@@ -857,5 +857,103 @@ def triage_cmd() -> None:
     _stub()
 
 
+# ---------------------------------------------------------------------------
+# request (project-join, Phase 8)
+# ---------------------------------------------------------------------------
+
+
+@cli.group("request", help="File or manage project-join requests.")
+def request_group() -> None:
+    pass
+
+
+@request_group.command("join", help="Ask the PI to admit you to a project.")
+@click.argument("project")
+@click.option("--reason", "justification", default="", help="Why you want in (visible to PI).")
+def request_join_cmd(project: str, justification: str) -> None:
+    from .core.identity import resolve as resolve_identity
+    from .dashboard import request_actions
+
+    actor = resolve_identity(allow_unknown=False).handle
+    try:
+        result = request_actions.file_join_request(
+            actor=actor, project=project, justification=justification
+        )
+    except request_actions.RequestActionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        f"Filed request #{result.request.id}: {result.request.requester} → {project}."
+    )
+
+
+@request_group.command("list", help="Browse requests (defaults to your own).")
+@click.option("--all", "list_all", is_flag=True, help="(PI) show every pending request.")
+def request_list_cmd(list_all: bool) -> None:
+    from .core import requests as req_core
+    from .core.identity import resolve as resolve_identity
+    from .core.lab import pi_handle
+
+    me = resolve_identity(allow_unknown=False).handle.lower()
+    if list_all and me != pi_handle().lower():
+        raise click.ClickException(
+            f"--all is PI-only (lab PI per lab.md is @{pi_handle()})."
+        )
+    rows = req_core.iter_requests()
+    if not list_all:
+        rows = [r for r in rows if r.requester.lstrip("@").lower() == me]
+    if not rows:
+        click.echo("No requests match.")
+        return
+    console = Console()
+    table = Table(title="Project-join requests")
+    table.add_column("id", style="bold")
+    table.add_column("requester")
+    table.add_column("project")
+    table.add_column("state")
+    table.add_column("created")
+    for r in rows:
+        table.add_row(
+            str(r.id), r.requester, r.project, r.state, r.created_at or "—"
+        )
+    console.print(table)
+
+
+@request_group.command("approve", help="(PI) Approve a request — adds requester to MEMBERS.")
+@click.argument("request_id", type=int)
+def request_approve_cmd(request_id: int) -> None:
+    from .core.identity import resolve as resolve_identity
+    from .dashboard import request_actions
+
+    actor = resolve_identity(allow_unknown=False).handle
+    try:
+        result = request_actions.apply_action(
+            request_id=request_id, action="approve", actor=actor
+        )
+    except request_actions.RequestActionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    r = result.request
+    click.echo(
+        f"Approved request #{r.id}. {r.requester} added to {r.project} "
+        f"(commit + push to share)."
+    )
+
+
+@request_group.command("decline", help="(PI) Decline a request with a reason.")
+@click.argument("request_id", type=int)
+@click.option("--reason", required=True)
+def request_decline_cmd(request_id: int, reason: str) -> None:
+    from .core.identity import resolve as resolve_identity
+    from .dashboard import request_actions
+
+    actor = resolve_identity(allow_unknown=False).handle
+    try:
+        result = request_actions.apply_action(
+            request_id=request_id, action="decline", actor=actor, reason=reason
+        )
+    except request_actions.RequestActionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Declined request #{result.request.id}: {reason}")
+
+
 if __name__ == "__main__":  # pragma: no cover
     cli()

@@ -25,6 +25,7 @@ from ..core.frontmatter import parse_file
 from ..core.projects import ProjectSummary, iter_local_projects, load_summary
 from ..core.agents import load_registry as load_agent_registry
 from ..core.repo import lab_mgmt_repo_root, wigamig_repo_root
+from ..core import requests as req_core
 from ..core.sea import Sea, iter_seas
 from . import audit_log
 from . import contract as C
@@ -78,6 +79,8 @@ def build_response(
         pi=_pi_identity(),
         agents=_agents(),
         oracle_recent=_oracle_recent(limit=8),
+        requests_pending=_requests_pending(effective_persona, norm),
+        requests_mine=_requests_mine(norm),
         attention=_attention(snap, effective_persona, project_summaries, today_d),
         stats=_stats(
             snap, all_seas, today_d,
@@ -853,6 +856,55 @@ def _oracle_recent(*, limit: int = 8) -> list[C.OracleEntry]:
             )
         )
     return rows
+
+
+# ---------------------------------------------------------------------------
+# Project-join requests (Phase 8)
+# ---------------------------------------------------------------------------
+
+
+def _to_request_row(r) -> C.JoinRequestRow:
+    return C.JoinRequestRow(
+        id=r.id,
+        requester=r.requester,
+        project=r.project,
+        state=r.state,  # type: ignore[arg-type]
+        justification=r.justification,
+        created_at=r.created_at,
+        resolved_at=r.resolved_at,
+        resolved_by=r.resolved_by,
+        decline_reason=r.decline_reason,
+    )
+
+
+def _requests_pending(persona: str, viewer: str) -> list[C.JoinRequestRow]:
+    """Pending requests visible to the viewer.
+
+    PI lens: every pending request lab-wide (the approval queue).
+    Member lens: only the viewer's own pending requests (status tracking).
+    """
+    norm = viewer.lstrip("@").lower()
+    all_reqs = req_core.iter_requests()
+    pending = [r for r in all_reqs if r.state == "pending"]
+    if persona == "pi":
+        return [_to_request_row(r) for r in pending]
+    return [
+        _to_request_row(r)
+        for r in pending
+        if r.requester.lstrip("@").lower() == norm
+    ]
+
+
+def _requests_mine(viewer: str) -> list[C.JoinRequestRow]:
+    """The viewer's outgoing requests, regardless of state, newest first."""
+    norm = viewer.lstrip("@").lower()
+    mine = [
+        r
+        for r in req_core.iter_requests()
+        if r.requester.lstrip("@").lower() == norm
+    ]
+    mine.sort(key=lambda r: r.id, reverse=True)
+    return [_to_request_row(r) for r in mine[:10]]
 
 
 def _first_paragraph(body: str, *, max_len: int = 240) -> str:
