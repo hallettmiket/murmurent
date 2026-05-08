@@ -60,11 +60,42 @@ const DATA = {
   ],
 
   peers: [
-    { handle: "bob",     name: "Bob Yamazaki",   role: "postdoc",     tcps: "ok",       shared: 2 },
-    { handle: "cassie",  name: "Cassie Okello",  role: "PhD year 1",  tcps: "expiring", shared: 2 },
-    { handle: "diego",   name: "Diego Ferreira", role: "MSc",         tcps: "missing",  shared: 1 },
-    { handle: "ezra",    name: "Ezra Wynn",      role: "research asst.", tcps: "ok",    shared: 1 },
-    { handle: "fenwick", name: "Fenwick Liu",    role: "postdoc",     tcps: "ok",       shared: 1 },
+    { handle: "bob",     name: "Bob Yamazaki",   role: "postdoc",     tcps: "ok",       shared: 2,
+      projects: ["dcis_imaging_genomics","method_bench_24"], open_seas: 3, experiments: 2 },
+    { handle: "cassie",  name: "Cassie Okello",  role: "PhD year 1",  tcps: "expiring", shared: 2,
+      projects: ["dcis_imaging_genomics","cohort_v3"], open_seas: 5, experiments: 1 },
+    { handle: "diego",   name: "Diego Ferreira", role: "MSc",         tcps: "missing",  shared: 1,
+      projects: ["imaging_pheno"], open_seas: 1, experiments: 1 },
+    { handle: "ezra",    name: "Ezra Wynn",      role: "research asst.", tcps: "ok",    shared: 1,
+      projects: ["method_bench_24"], open_seas: 0, experiments: 1 },
+    { handle: "fenwick", name: "Fenwick Liu",    role: "postdoc",     tcps: "ok",       shared: 1,
+      projects: ["dcis_imaging_genomics"], open_seas: 2, experiments: 0 },
+  ],
+
+  agents: [
+    { name: "oracle",       description: "Cross-project institutional memory; surfaces prior findings.",
+      freeze: "frozen",   model: "opus",   required_tools: ["Read","Write","Glob","Grep","Bash"] },
+    { name: "bookworm",     description: "Literature scout. Pulls papers from PubMed, bioRxiv, Zotero.",
+      freeze: "frozen",   model: "sonnet", required_tools: ["Read","Write","WebFetch","Glob"] },
+    { name: "blacksmith",   description: "Computational workhorse. Loads data, trains classifiers, builds dashboards.",
+      freeze: "personal", model: "opus",   required_tools: ["Read","Write","Bash","Glob","Grep"] },
+    { name: "artist",       description: "Visualization specialist; figures, plots, presentations.",
+      freeze: "personal", model: "sonnet", required_tools: ["Read","Write","Bash","Glob"] },
+    { name: "adversary",    description: "Scientific skeptic. Audits methodology, demands cross-validation.",
+      freeze: "frozen",   model: "opus",   required_tools: ["Read","Write","Bash","Glob","Grep"] },
+    { name: "conscience",   description: "Equity, diversity, inclusion, decolonization watchdog.",
+      freeze: "frozen",   model: "sonnet", required_tools: ["Read","Write","Bash","Glob","Grep"] },
+  ],
+
+  oracle_recent: [
+    { title: "GRCh38.p14 fixes the chrM contig issue for run 17",
+      excerpt: "The chrM artefact we hit in February with GRCh38.p13 is patched in p14. For DCIS run 17 we are aligning against p14, not p13.",
+      author: "@allie",  date: "2026-05-08", project: "dcis_imaging_genomics",
+      path: "oracle/2026-05-08_dcis_chrm_p14.md" },
+    { title: "Drift correction belongs in run_all, not in QC",
+      excerpt: "Drift correction is a per-run preprocessing step, not a QC gate. Moving the drift step into run_all.py upstream of the QC pass.",
+      author: "@bob",    date: "2026-05-07", project: "method_bench_24",
+      path: "oracle/2026-05-07_methods_drift_correction.md" },
   ],
 
   seas: [

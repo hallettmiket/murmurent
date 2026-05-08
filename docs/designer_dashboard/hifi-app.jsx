@@ -169,20 +169,9 @@ function CmdBar({ persona, setPersona, query, setQuery }) {
 
 /* ───────── stat strip ───────── */
 function Strip({ persona }) {
-  const a = D.stats.attention, s = D.stats.seas, c = D.stats.compliance, inv = D.stats.inventory, nb = D.stats.notebook;
+  const s = D.stats.seas, c = D.stats.compliance, inv = D.stats.inventory, nb = D.stats.notebook;
   return (
     <div className="strip">
-      <div className="stat red">
-        <div className="lab">attention</div>
-        <div className="row">
-          <div className="big num">{a.red+a.amber}</div>
-          <div className="muted mono" style={{fontSize:11}}>
-            <span className="dot r"/> {a.red} · <span className="dot a"/> {a.amber}
-          </div>
-        </div>
-        <div className="sub">{persona==="pi" ? "across the lab" : "needs you today"}</div>
-      </div>
-
       <div className="stat">
         <div className="lab">SEAs · this week</div>
         <div className="row">
@@ -221,43 +210,15 @@ function Strip({ persona }) {
   );
 }
 
-/* ───────── attention panel ───────── */
-function Attention({ items }) {
-  return (
-    <div className="panel c-5">
-      <header>
-        <h2>What needs you today</h2>
-        <span className="meta">{items.length} items · sorted by urgency</span>
-      </header>
-      <div className="body scroll" style={{maxHeight:480}}>
-        {items.map(it => (
-          <div key={it.id} className={"attn "+it.sev}>
-            <div className="head">
-              <Pill tone={it.sev==="red"?"red":it.sev==="amber"?"amber":"green"}>{it.kind}</Pill>
-              <span className="mono">{it.id}</span>
-              <span>·</span>
-              <span>{it.project}</span>
-              <span style={{marginLeft:"auto", color: it.sev==="red"?"var(--red)":"var(--muted)"}}>{it.age}</span>
-            </div>
-            <h4>{it.text}</h4>
-            <div className="row" style={{marginTop:8}}>
-              {it.actions.map(([label, tone]) => (
-                <button key={label} className={"btn sm "+(tone||"")}>{label}</button>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+/* (Attention "What needs you today" panel removed — its red/amber items
+   are already surfaced by Compliance, Inventory, and the SEAs in-tray.) */
 
 /* ───────── SEAs panel ───────── */
-function SeasPanel({ seas }) {
+function SeasPanel({ seas, span="c-7" }) {
   const [tab, setTab] = useState("in");
   const filtered = seas.filter(s => s.dir === tab);
   return (
-    <div className="panel c-7">
+    <div className={"panel "+span}>
       <header>
         <h2>SEAs</h2>
         <div className="row">
@@ -391,25 +352,128 @@ function Heatmap({ data, persona, span="c-7" }) {
 }
 
 /* ───────── group panel ───────── */
-function GroupPanel({ peers }) {
+function GroupPanel({ peers, span="c-6" }) {
   const tcpsTone = { ok:"green", expiring:"amber", missing:"red" };
+  const persona = window.DATA.persona || "member";
   return (
-    <div className="panel c-3">
+    <div className={"panel "+span}>
       <header>
         <h2>Group</h2>
-        <span className="meta">{peers.length} peers</span>
+        <span className="meta">
+          {peers.length} {persona === "pi" ? "members lab-wide" : "shared-project peers"}
+        </span>
       </header>
       <div className="body" style={{padding:"6px 0"}}>
         {peers.map(p => (
-          <div key={p.handle} style={{padding:"7px 14px", borderBottom:"1px solid var(--rule)"}}>
-            <div style={{fontWeight:500}}>{p.name}</div>
-            <div className="mono muted" style={{fontSize:11, display:"flex", justifyContent:"space-between"}}>
-              <span>@{p.handle} · {p.role}</span>
+          <div key={p.handle} style={{padding:"9px 14px", borderBottom:"1px solid var(--rule)"}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline"}}>
+              <div>
+                <span style={{fontWeight:500}}>{p.name}</span>
+                <span className="mono muted" style={{fontSize:11, marginLeft:6}}>@{p.handle} · {p.role}</span>
+              </div>
               <Pill tone={tcpsTone[p.tcps]}>tcps {p.tcps}</Pill>
             </div>
-            <div className="muted" style={{fontSize:12, marginTop:2}}>{p.shared} shared project{p.shared===1?"":"s"}</div>
+            {(p.projects && p.projects.length > 0) && (
+              <div className="row" style={{gap:4, marginTop:5, flexWrap:"wrap"}}>
+                {p.projects.map(name => (
+                  <span key={name} className="mono"
+                        style={{fontSize:10, color:"var(--purple)",
+                                background:"rgba(79,38,131,0.07)",
+                                padding:"1px 6px", borderRadius:2}}>
+                    {name}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="mono muted" style={{fontSize:11, marginTop:5, display:"flex", gap:14}}>
+              <span><strong style={{color:"var(--ink-2)"}}>{p.open_seas}</strong> open SEAs</span>
+              <span><strong style={{color:"var(--ink-2)"}}>{p.experiments}</strong> experiments</span>
+            </div>
           </div>
         ))}
+        {peers.length === 0 && (
+          <div className="muted" style={{padding:"14px", fontSize:13}}>
+            No peers in your projects.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ───────── agents panel ───────── */
+function AgentsPanel({ agents, span="c-4" }) {
+  const list = agents || [];
+  return (
+    <div className={"panel "+span}>
+      <header>
+        <h2>Agents</h2>
+        <span className="meta">{list.length} installed</span>
+      </header>
+      <div className="body" style={{padding:"6px 0"}}>
+        {list.map(a => (
+          <div key={a.name} style={{padding:"7px 14px", borderBottom:"1px solid var(--rule)"}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline"}}>
+              <span style={{fontWeight:500, textTransform:"capitalize"}}>{a.name}</span>
+              <Pill tone={a.freeze === "frozen" ? "purple" : "outline"}>{a.freeze}</Pill>
+            </div>
+            <div className="muted" style={{fontSize:12, marginTop:2, lineHeight:1.4}}>
+              {a.description}
+            </div>
+            <div className="mono muted" style={{fontSize:10, marginTop:3, letterSpacing:1}}>
+              {a.model && <span>{a.model.toUpperCase()}</span>}
+              {a.required_tools && a.required_tools.length > 0 && (
+                <span style={{marginLeft:10}}>
+                  · {a.required_tools.length} tool{a.required_tools.length === 1 ? "" : "s"}
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+        {list.length === 0 && (
+          <div className="muted" style={{padding:"14px", fontSize:13}}>
+            No agents installed. Run <code className="mono">wigamig agent list</code>.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ───────── group oracle panel ───────── */
+function GroupOraclePanel({ entries, span="c-6" }) {
+  const list = entries || [];
+  return (
+    <div className={"panel "+span}>
+      <header>
+        <h2>Group oracle · recent</h2>
+        <span className="meta">{list.length} entr{list.length === 1 ? "y" : "ies"}</span>
+      </header>
+      <div className="body" style={{padding:"6px 0"}}>
+        {list.map((e, i) => (
+          <div key={i} style={{padding:"9px 14px", borderBottom:"1px solid var(--rule)"}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:10}}>
+              <span style={{fontWeight:500, fontSize:14, lineHeight:1.3}}>{e.title}</span>
+              <span className="mono muted" style={{fontSize:10, whiteSpace:"nowrap"}}>{e.date}</span>
+            </div>
+            <div className="muted" style={{fontSize:12, marginTop:4, lineHeight:1.45}}>
+              {e.excerpt}
+            </div>
+            <div className="mono muted" style={{fontSize:10, marginTop:5, letterSpacing:0.5}}>
+              {e.author}
+              {e.project && <span> · {e.project}</span>}
+              <span style={{marginLeft:10, color:"var(--purple)"}}>
+                <code>{e.path}</code>
+              </span>
+            </div>
+          </div>
+        ))}
+        {list.length === 0 && (
+          <div className="muted" style={{padding:"14px", fontSize:13}}>
+            No oracle entries yet. Promote a finding with{" "}
+            <code className="mono">wigamig publish &lt;path&gt; --to oracle</code>.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -541,10 +605,23 @@ function NotebookEditButton({ date, label="edit", style }) {
 function NotebookPanel({ span="c-9" }) {
   const NB = window.DATA.notebook || {};
   const t  = NB.today || {};
+  const days = NB.days || [];
   const path = (NB.folder || "lab-notebook/") + (t.iso || "") + ".md";
-  // word_count comes from the matching day in NB.days (the today row).
-  const todayDay = (NB.days || []).find(d => d.is_today) || {};
+  const todayDay = days.find(d => d.is_today) || {};
   const words = todayDay.word_count || 0;
+
+  // Inline 7-day strip in the header — replaces the dropped rail.
+  const onDayClick = async (iso) => {
+    try {
+      await window.postNotebookEdit(iso);
+      if (typeof window.__wigamigFetchData === "function") {
+        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      }
+    } catch (ex) {
+      alert("Could not open " + iso + ".md: " + (ex.message || ex));
+    }
+  };
+
   return (
     <div className={"panel "+span}>
       <header>
@@ -556,6 +633,32 @@ function NotebookPanel({ span="c-9" }) {
           <NotebookEditButton date={t.iso} />
         </div>
       </header>
+      {/* 7-day strip (formerly the daily-notes rail). Click to open. */}
+      <div style={{display:"flex", gap:4, padding:"8px 14px",
+                   borderBottom:"1px solid var(--rule)",
+                   background:"var(--paper-2)"}}>
+        {days.slice().reverse().map(d => (
+          <div
+            key={d.iso}
+            onClick={() => onDayClick(d.iso)}
+            title={"Open " + d.iso + ".md"}
+            style={{
+              flex:1, textAlign:"center", cursor:"pointer",
+              padding:"4px 2px", borderRadius:2,
+              fontFamily:"var(--mono)",
+              background: d.is_today ? "var(--purple)" : "transparent",
+              color: d.is_today ? "#fff" : (d.has_entry ? "var(--ink-2)" : "var(--muted-2)"),
+              border: d.has_entry ? "1px solid var(--rule)" : "1px dashed var(--rule)",
+            }}
+          >
+            <div style={{fontSize:10, opacity:0.85}}>{d.weekday.toUpperCase()}</div>
+            <div style={{fontSize:13, fontWeight:600}}>{d.iso.slice(8)}</div>
+            <div style={{fontSize:9, opacity:0.7}}>
+              {d.has_entry ? `${d.word_count}w` : "—"}
+            </div>
+          </div>
+        ))}
+      </div>
       <div className="body" style={{padding:"16px 22px 22px"}}>
         <window.NbToday />
       </div>
@@ -563,24 +666,8 @@ function NotebookPanel({ span="c-9" }) {
   );
 }
 
-function NotebookRailPanel() {
-  return (
-    <div className="panel c-3">
-      <header>
-        <h2>Daily notes</h2>
-        <span className="meta">last 7 days</span>
-      </header>
-      <div className="body">
-        <window.NbRail />
-        <h4 style={{margin:"14px 0 6px", fontFamily:"var(--mono)", fontSize:10, letterSpacing:1.5, color:"var(--muted)", textTransform:"uppercase"}}>yesterday · excerpt</h4>
-        <div style={{fontSize:13, color:"var(--ink-2)"}}>
-          <em>{D.notebook.yesterday_excerpt.title}</em>
-          <p style={{margin:"4px 0 0", color:"var(--muted)"}}>{D.notebook.yesterday_excerpt.excerpt}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
+/* (NotebookRailPanel removed — daily-notes calendar lives inside the
+   NotebookPanel header now, since both fed off the same files.) */
 
 /* ───────── footer ───────── */
 /* FooterMeta reads everything from window.DATA.member — the API merges the
@@ -738,9 +825,7 @@ function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Attention queue is now backend-shaped per persona. No client-side
-  // synthesis. Memoise by D.attention reference (replaced on each fetch).
-  const attention = useMemo(() => D.attention, [D.attention]);
+  // (Attention queue removed — see grid below.)
 
   return (
     <>
@@ -750,24 +835,31 @@ function App() {
         <Strip persona={persona} />
 
         <div className="grid" style={{marginBottom:14}}>
-          <Attention items={attention} />
-          <SeasPanel seas={D.seas} />
+          <SeasPanel seas={D.seas} span="c-12" />
         </div>
 
+        {/* Daily actionable info: projects + activity + agents. */}
         <div className="grid" style={{marginBottom:14}}>
           <ProjectsPanel projects={D.projects} />
-          <GroupPanel peers={D.peers} />
-          <InventoryPanel inv={D.inventory} span="c-4" />
-        </div>
-
-        <div className="grid" style={{marginBottom:14}}>
           <ActivityPanel />
-          <NotebookRailPanel />
-          <NotebookPanel span="c-6" />
+          <AgentsPanel agents={D.agents} />
         </div>
 
-        {/* Compliance is the most sporadic action — surface it last so it
-            stays out of the daily-attention path. */}
+        {/* Notebook (personal) + Group oracle (shared knowledge). The
+            daily-notes rail is gone — it duplicated the Notebook panel's
+            data. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <NotebookPanel span="c-6" />
+          <GroupOraclePanel entries={D.oracle_recent} />
+        </div>
+
+        {/* Group + inventory: things you check, but not every day. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <GroupPanel peers={D.peers} span="c-6" />
+          <InventoryPanel inv={D.inventory} span="c-6" />
+        </div>
+
+        {/* Compliance — most sporadic; lives at the bottom. */}
         <div className="grid">
           <Heatmap data={D.heatmap} persona={persona} span="c-12" />
         </div>

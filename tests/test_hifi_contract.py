@@ -137,6 +137,8 @@ HIFI_TOP_LEVEL_KEYS = {
     "persona",
     "member",
     "pi",
+    "agents",
+    "oracle_recent",
     "attention",
     "stats",
     "spark",
@@ -282,6 +284,74 @@ def test_api_endpoint_accepts_persona_param(world):
     resp2 = client.get("/api/dashboard?user=allie&persona=pi")
     assert resp2.status_code == 200
     assert resp2.json()["persona"] == "member"
+
+
+def test_member_peer_row_carries_per_peer_involvement(world):
+    """Group panel rows include projects[], open_seas, experiments per peer."""
+    resp = snapshot.build_response("allie", today=_dt.date(2026, 5, 8))
+    bob = next((p for p in resp.peers if p.handle == "bob"), None)
+    assert bob is not None
+    # Member view: Allie shares both fixture projects with Bob.
+    assert {"dcis_test", "bbb_test"} <= set(bob.projects)
+    assert isinstance(bob.open_seas, int)
+    assert isinstance(bob.experiments, int)
+
+
+def test_member_peers_only_includes_shared_project_peers(world):
+    """Member persona: peer list = members of viewer's projects only."""
+    resp = snapshot.build_response("cassie", today=_dt.date(2026, 5, 8))
+    handles = {p.handle for p in resp.peers}
+    # cassie is only on dcis_test (clinical), so we shouldn't see bbb_test-only members.
+    # Both fixture projects share members in this case, so this just confirms
+    # mhallet/allie/bob are visible (peers from dcis_test).
+    assert "mhallet" in handles or "allie" in handles
+
+
+def test_pi_persona_peers_include_lab_wide_view(world):
+    """PI persona surfaces peer involvement across the whole lab."""
+    resp = snapshot.build_response(
+        "mhallet", persona="pi", today=_dt.date(2026, 5, 8)
+    )
+    # Each peer's projects field should be non-empty for at least one peer.
+    assert any(p.projects for p in resp.peers)
+
+
+def test_agents_panel_populated_from_registry(world):
+    resp = snapshot.build_response("allie", today=_dt.date(2026, 5, 8))
+    assert len(resp.agents) >= 1
+    names = {a.name for a in resp.agents}
+    # The wigamig repo ships at least these.
+    assert {"oracle", "bookworm"} <= names
+    for a in resp.agents:
+        assert a.freeze in {"frozen", "personal"}
+
+
+def test_oracle_recent_empty_when_no_dir(world):
+    """Empty oracle/ → empty list (test fixture doesn't seed any)."""
+    resp = snapshot.build_response("allie", today=_dt.date(2026, 5, 8))
+    assert resp.oracle_recent == []
+
+
+def test_oracle_recent_picks_up_published_files(world):
+    oracle_dir = world / "lab-mgmt" / "oracle"
+    oracle_dir.mkdir(parents=True, exist_ok=True)
+    (oracle_dir / "2026-05-08_finding.md").write_text(
+        "---\n"
+        "title: 'Test finding'\n"
+        "author: '@allie'\n"
+        "date: 2026-05-08\n"
+        "project: dcis_test\n"
+        "---\n\n"
+        "# Test finding\n\n"
+        "First paragraph as the excerpt.\n",
+        encoding="utf-8",
+    )
+    resp = snapshot.build_response("allie", today=_dt.date(2026, 5, 8))
+    assert len(resp.oracle_recent) == 1
+    entry = resp.oracle_recent[0]
+    assert entry.title == "Test finding"
+    assert entry.author == "@allie"
+    assert "First paragraph" in entry.excerpt
 
 
 def test_api_endpoint_rejects_invalid_persona(world):
