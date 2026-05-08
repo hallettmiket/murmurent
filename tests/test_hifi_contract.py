@@ -139,6 +139,8 @@ HIFI_TOP_LEVEL_KEYS = {
     "pi",
     "agents",
     "oracle_recent",
+    "requests_pending",
+    "requests_mine",
     "attention",
     "stats",
     "spark",

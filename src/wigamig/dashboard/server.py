@@ -29,6 +29,7 @@ from pydantic import BaseModel
 from ..core.identity import resolve as resolve_identity
 from . import contract as C
 from . import notebook_actions
+from . import request_actions
 from . import sea_actions
 from . import snapshot as snap_mod
 
@@ -37,6 +38,19 @@ class NotebookEditBody(BaseModel):
     """Optional JSON body for ``POST /api/notebook/edit``."""
 
     date: str | None = None  # ISO date; defaults to today
+
+
+class JoinRequestBody(BaseModel):
+    """JSON body for ``POST /api/request/join``."""
+
+    project: str
+    justification: str = ""
+
+
+class RequestActionBody(BaseModel):
+    """JSON body for ``POST /api/request/{id}/{action}``."""
+
+    reason: str | None = None
 
 
 class SeaActionBody(BaseModel):
@@ -146,6 +160,80 @@ def create_app() -> FastAPI:
                 "concluded_at": result.sea.concluded_at,
                 "delivery": result.sea.delivery,
                 "decline_reason": result.sea.decline_reason,
+            },
+        }
+
+    @app.post("/api/request/join")
+    def request_join(
+        body: JoinRequestBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """File a project-join request. Anyone can call this."""
+        actor = (user or "").strip().lstrip("@")
+        if not actor:
+            identity = resolve_identity(allow_unknown=True)
+            actor = identity.handle if identity.source != "unknown" else ""
+        if not actor:
+            raise HTTPException(
+                status_code=400,
+                detail="No actor resolved. Set $WIGAMIG_USER or pass ?user=<handle>.",
+            )
+        try:
+            result = request_actions.file_join_request(
+                actor=actor, project=body.project, justification=body.justification
+            )
+        except request_actions.RequestMissing as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except request_actions.RequestForbidden as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+        except request_actions.RequestBadRequest as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return _request_response(result.request)
+
+    @app.post("/api/request/{request_id}/{action}")
+    def request_action(
+        request_id: int,
+        action: str,
+        body: RequestActionBody = Body(default_factory=RequestActionBody),
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Approve or decline a project-join request. PI only."""
+        actor = (user or "").strip().lstrip("@")
+        if not actor:
+            identity = resolve_identity(allow_unknown=True)
+            actor = identity.handle if identity.source != "unknown" else ""
+        if not actor:
+            raise HTTPException(
+                status_code=400,
+                detail="No actor resolved. Set $WIGAMIG_USER or pass ?user=<handle>.",
+            )
+        try:
+            result = request_actions.apply_action(
+                request_id=request_id, action=action, actor=actor, reason=body.reason
+            )
+        except request_actions.RequestMissing as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except request_actions.RequestForbidden as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+        except request_actions.RequestConflict as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except request_actions.RequestBadRequest as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return _request_response(result.request)
+
+    def _request_response(req) -> dict:
+        return {
+            "ok": True,
+            "request": {
+                "id": req.id,
+                "requester": req.requester,
+                "project": req.project,
+                "state": req.state,
+                "justification": req.justification,
+                "created_at": req.created_at,
+                "resolved_at": req.resolved_at,
+                "resolved_by": req.resolved_by,
+                "decline_reason": req.decline_reason,
             },
         }
 

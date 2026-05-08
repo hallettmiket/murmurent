@@ -201,6 +201,20 @@ class OracleEntry(BaseModel):
     path: str  # ``oracle/<file>.md`` for click-to-open
 
 
+class JoinRequestRow(BaseModel):
+    """Phase 8: project-join request row for the Requests panel."""
+
+    id: int
+    requester: str  # ``@handle``
+    project: str
+    state: Literal["pending", "approved", "declined"]
+    justification: str = ""
+    created_at: str | None = None
+    resolved_at: str | None = None
+    resolved_by: str | None = None
+    decline_reason: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # SEAs
 # ---------------------------------------------------------------------------
@@ -383,6 +397,8 @@ class DashboardResponse(BaseModel):
     pi: IdentityBlock
     agents: list[AgentRow] = []
     oracle_recent: list[OracleEntry] = []
+    requests_pending: list[JoinRequestRow] = []  # PI: all pending; member: theirs only
+    requests_mine: list[JoinRequestRow] = []     # the viewer's outgoing requests
     attention: list[AttentionItem]
     stats: StatStrip
     spark: list[int]
