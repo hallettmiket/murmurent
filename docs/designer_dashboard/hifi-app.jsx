@@ -386,8 +386,8 @@ function SeasPanel({ seas, span="c-7" }) {
           <thead>
             <tr>
               <th style={{width:50}}>id</th>
-              <th style={{width:90}}>state</th>
-              <th style={{width:100}}>kind</th>
+              <th style={{width:110}}>state</th>
+              <th style={{width:90}}>kind</th>
               <th>description</th>
               <th style={{width:140}}>project</th>
               <th style={{width:80}}>{tab==="in"?"from":"to"}</th>
