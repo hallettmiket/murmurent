@@ -164,6 +164,7 @@ _LAB_DEFAULT_LOCATION = C.MemberLocation(
 def _identity(handle: str, full_name: str | None, role: str) -> C.IdentityBlock:
     """Build the current-member ``IdentityBlock`` with frontmatter overrides."""
     profile = _load_member_profile(handle)
+    is_active = str(profile.get("status", "active")) == "active" if profile else True
     return C.IdentityBlock(
         handle=handle,
         name=full_name or profile.get("full_name") or handle,
@@ -171,6 +172,7 @@ def _identity(handle: str, full_name: str | None, role: str) -> C.IdentityBlock:
         lab=str(profile.get("lab") or "hallett"),
         contact=_merge_contact(profile.get("contact")),
         location=_merge_location(profile.get("location")),
+        is_active=is_active,
     )
 
 
@@ -719,8 +721,17 @@ def _peers(
     }
 
     if persona == "pi":
-        # Whole lab.
+        # Whole lab. Start from the canonical roster
+        # (<lab-mgmt>/members/*.md) so the PI sees newly-added or
+        # inactive members even before they're on any project.
+        from ..core import membership as _m
+
         peer_handles: dict[str, list[str]] = {}
+        for rec in _m.iter_members():
+            if rec.handle == norm_viewer:
+                continue
+            peer_handles.setdefault(rec.handle, [])
+        # Then layer project-membership info on top.
         for p in project_summaries:
             for raw in p.members:
                 peer = raw.lstrip("@").lower()
@@ -769,7 +780,7 @@ def _peers(
     rows: list[C.PeerRow] = []
     for peer, projects in sorted(peer_handles.items()):
         unique_projects = sorted(set(projects))
-        full_name, status, raw_certs = _load_member_meta(peer)
+        full_name, member_status, raw_certs = _load_member_meta(peer)
         certs = _parse_certifications(raw_certs, today_d)
         tcps = next((c for c in certs if c.name == "TCPS_2"), None)
         role = _peer_role(peer)
@@ -788,6 +799,7 @@ def _peers(
                 projects=unique_projects,
                 open_seas=open_seas,
                 experiments=experiments,
+                status="inactive" if member_status == "inactive" else "active",  # type: ignore[arg-type]
             )
         )
     return rows

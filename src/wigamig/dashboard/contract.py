@@ -67,6 +67,7 @@ class IdentityBlock(BaseModel):
     # When True, the front-end shows the persona toggle in the command bar.
     # Auto-detected from PI handle today; ``project lead → can_pi`` is v2.
     can_pi: bool = False
+    is_active: bool = True  # Phase 13: deactivated members can read but not act
 
 
 # ---------------------------------------------------------------------------
@@ -184,6 +185,10 @@ class PeerRow(BaseModel):
     projects: list[str] = []
     open_seas: int = 0
     experiments: int = 0
+    # Phase 13: roster status. "inactive" = file exists but person is on
+    # leave / departed; cannot run wigamig actions but historical refs
+    # (audit, SEAs, projects) still resolve to their handle.
+    status: Literal["active", "inactive"] = "active"
 
 
 class AgentRow(BaseModel):

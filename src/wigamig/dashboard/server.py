@@ -66,6 +66,14 @@ class CreateProjectRequestBody(BaseModel):
     justification: str = ""
 
 
+class AddMemberBody(BaseModel):
+    """JSON body for ``POST /api/members``."""
+
+    handle: str
+    full_name: str
+    role: str = "staff"
+
+
 class CatalogEntryBody(BaseModel):
     """JSON body for ``POST /api/sea_catalog`` (upsert)."""
 
@@ -196,15 +204,8 @@ def create_app() -> FastAPI:
         from ..core import sea as sea_core
         from ..core.projects import find_project as _find_project
 
-        actor = (user or "").strip().lstrip("@")
-        if not actor:
-            identity = resolve_identity(allow_unknown=True)
-            actor = identity.handle if identity.source != "unknown" else ""
-        if not actor:
-            raise HTTPException(
-                status_code=400,
-                detail="No actor resolved. Set $WIGAMIG_USER or pass ?user=<handle>.",
-            )
+        actor = _resolve_actor(user)
+        _require_active(actor)
         if body.kind not in sea_core.VALID_KINDS:
             raise HTTPException(
                 status_code=422,
@@ -250,15 +251,8 @@ def create_app() -> FastAPI:
         action — see :mod:`sea_actions` for the matrix. Returns the updated
         SEA payload on success; HTTP 403 / 404 / 409 / 422 on failure.
         """
-        actor = (user or "").strip().lstrip("@")
-        if not actor:
-            identity = resolve_identity(allow_unknown=True)
-            actor = identity.handle if identity.source != "unknown" else ""
-        if not actor:
-            raise HTTPException(
-                status_code=400,
-                detail="No actor resolved. Set $WIGAMIG_USER or pass ?user=<handle>.",
-            )
+        actor = _resolve_actor(user)
+        _require_active(actor)
 
         try:
             result = sea_actions.apply_action(
@@ -303,15 +297,8 @@ def create_app() -> FastAPI:
         user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
     ) -> dict:
         """File a project-join request. Anyone can call this."""
-        actor = (user or "").strip().lstrip("@")
-        if not actor:
-            identity = resolve_identity(allow_unknown=True)
-            actor = identity.handle if identity.source != "unknown" else ""
-        if not actor:
-            raise HTTPException(
-                status_code=400,
-                detail="No actor resolved. Set $WIGAMIG_USER or pass ?user=<handle>.",
-            )
+        actor = _resolve_actor(user)
+        _require_active(actor)
         try:
             result = request_actions.file_join_request(
                 actor=actor, project=body.project, justification=body.justification
@@ -330,15 +317,8 @@ def create_app() -> FastAPI:
         user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
     ) -> dict:
         """Propose a new project (anyone can; PI approves to scaffold)."""
-        actor = (user or "").strip().lstrip("@")
-        if not actor:
-            identity = resolve_identity(allow_unknown=True)
-            actor = identity.handle if identity.source != "unknown" else ""
-        if not actor:
-            raise HTTPException(
-                status_code=400,
-                detail="No actor resolved. Set $WIGAMIG_USER or pass ?user=<handle>.",
-            )
+        actor = _resolve_actor(user)
+        _require_active(actor)
         try:
             result = request_actions.file_create_request(
                 actor=actor,
@@ -362,15 +342,8 @@ def create_app() -> FastAPI:
         user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
     ) -> dict:
         """Approve or decline a project-join request. PI only."""
-        actor = (user or "").strip().lstrip("@")
-        if not actor:
-            identity = resolve_identity(allow_unknown=True)
-            actor = identity.handle if identity.source != "unknown" else ""
-        if not actor:
-            raise HTTPException(
-                status_code=400,
-                detail="No actor resolved. Set $WIGAMIG_USER or pass ?user=<handle>.",
-            )
+        actor = _resolve_actor(user)
+        _require_active(actor)
         try:
             result = request_actions.apply_action(
                 request_id=request_id, action=action, actor=actor, reason=body.reason
@@ -402,17 +375,108 @@ def create_app() -> FastAPI:
         }
 
     # -----------------------------------------------------------------
+    # Membership (PI-only roster mgmt)
+    # -----------------------------------------------------------------
+
+    @app.post("/api/members")
+    def add_member_endpoint(
+        body: AddMemberBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Add a new member to the lab roster. PI only."""
+        from ..core import membership as _m
+        from . import audit_log as _audit
+
+        actor = _require_pi(user)
+        try:
+            rec = _m.add(handle=body.handle, full_name=body.full_name, role=body.role)
+        except _m.MemberAlreadyExists as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except _m.MembershipError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        try:
+            _audit.write_event(
+                actor=actor, kind="member.add", project="",
+                target=f"member/{rec.handle}",
+                summary=f"@{actor} added @{rec.handle} ({rec.role})",
+            )
+        except OSError:
+            pass
+        return {"ok": True, "member": {
+            "handle": rec.handle, "full_name": rec.full_name,
+            "role": rec.role, "status": rec.status, "created": rec.created,
+        }}
+
+    @app.post("/api/members/{handle}/{action}")
+    def member_status_endpoint(
+        handle: str,
+        action: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Activate / deactivate a member. PI only."""
+        from ..core import membership as _m
+        from . import audit_log as _audit
+
+        actor = _require_pi(user)
+        if action not in {"activate", "deactivate"}:
+            raise HTTPException(status_code=422, detail=f"unknown action: {action}")
+        new_status = _m.ACTIVE if action == "activate" else _m.INACTIVE
+        try:
+            rec = _m.set_status(handle, new_status)
+        except _m.MemberNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _m.CannotDeactivatePI as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except _m.MembershipError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        try:
+            _audit.write_event(
+                actor=actor, kind=f"member.{action}d", project="",
+                target=f"member/{rec.handle}",
+                summary=f"@{actor} {action}d @{rec.handle}",
+            )
+        except OSError:
+            pass
+        return {"ok": True, "handle": rec.handle, "status": rec.status}
+
+    # -----------------------------------------------------------------
     # SEA catalog (Phase 10)
     # -----------------------------------------------------------------
 
-    def _require_pi(user: str) -> str:
-        from ..core.lab import pi_handle as _pi
+    def _resolve_actor(user: str) -> str:
         actor = (user or "").strip().lstrip("@")
         if not actor:
             identity = resolve_identity(allow_unknown=True)
             actor = identity.handle if identity.source != "unknown" else ""
         if not actor:
             raise HTTPException(status_code=400, detail="No actor resolved")
+        return actor
+
+    def _require_active(actor: str) -> None:
+        """403 if ``actor`` is in members/ but flagged inactive.
+
+        Unknown handles (no member file) are allowed through — the
+        PI can be running on a fresh checkout before any members are
+        seeded.
+        """
+        from ..core import membership as _m
+        try:
+            rec = _m.get(actor)
+        except _m.MemberNotFound:
+            return
+        if rec.status != _m.ACTIVE:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"@{actor} is inactive in <lab-mgmt>/members/. "
+                    f"Ask the PI to reactivate before running wigamig actions."
+                ),
+            )
+
+    def _require_pi(user: str) -> str:
+        from ..core.lab import pi_handle as _pi
+        actor = _resolve_actor(user)
+        _require_active(actor)
         if actor.lower() != _pi().lower():
             raise HTTPException(
                 status_code=403,
@@ -535,11 +599,7 @@ def create_app() -> FastAPI:
         """Approve or decline a draft oracle entry. PI only."""
         from ..core import slack_distill as _distill
 
-        _require_pi(user)
-        actor = (user or "").strip().lstrip("@")
-        if not actor:
-            identity = resolve_identity(allow_unknown=True)
-            actor = identity.handle if identity.source != "unknown" else ""
+        actor = _require_pi(user)
 
         path = lab_mgmt_repo_root() / "oracle" / f"{slug}"
         # Allow callers to pass either "<slug>" or "<slug>.md".
@@ -581,15 +641,8 @@ def create_app() -> FastAPI:
         from ..core import sea as sea_core
         from ..core.projects import iter_local_projects, load_summary
 
-        actor = (user or "").strip().lstrip("@")
-        if not actor:
-            identity = resolve_identity(allow_unknown=True)
-            actor = identity.handle if identity.source != "unknown" else ""
-        if not actor:
-            raise HTTPException(
-                status_code=400,
-                detail="No actor resolved. Set $WIGAMIG_USER or pass ?user=<handle>.",
-            )
+        actor = _resolve_actor(user)
+        _require_active(actor)
 
         recent_concluded = 0
         for repo in iter_local_projects():
