@@ -1292,18 +1292,17 @@ def _inventory(snap: DashboardSnapshot) -> C.InventoryBlock:
 
 
 def _notebook_folder(handle: str) -> Path:
-    """Resolve ``~/lab-notebook/`` for ``handle``.
+    """Resolve the daily-notes folder.
 
-    Per the handoff: notebook storage is per-user, read from each user's home
-    directory. For the smoke test we honour ``$WIGAMIG_NOTEBOOK_DIR`` to
-    redirect; otherwise ``~/lab-notebook/``.
+    Delegates to :func:`notebook_actions.notebook_folder` so the
+    dashboard reads from the same place the editor writes to. That
+    means the user's registered Obsidian vault when one is
+    discoverable; otherwise ``~/lab-notebook/`` (or
+    ``$WIGAMIG_NOTEBOOK_DIR`` when set).
     """
-    import os
+    from . import notebook_actions
 
-    override = os.environ.get("WIGAMIG_NOTEBOOK_DIR")
-    if override:
-        return Path(override).expanduser()
-    return Path.home() / NOTEBOOK_DIR_NAME
+    return notebook_actions.notebook_folder()
 
 
 def _notebook(handle: str, today_d: _dt.date) -> C.NotebookBlock:
@@ -1311,8 +1310,14 @@ def _notebook(handle: str, today_d: _dt.date) -> C.NotebookBlock:
     days = _notebook_days(folder, today_d)
     today_entry = _notebook_today(folder, today_d)
     yesterday = _notebook_yesterday(folder, today_d)
+    # Display: relative to home when possible, else absolute. Matches the
+    # convention `~/foo/bar/` so the dashboard header reads naturally.
+    try:
+        display_folder = "~/" + str(folder.relative_to(Path.home())) + "/"
+    except ValueError:
+        display_folder = str(folder).rstrip("/") + "/"
     return C.NotebookBlock(
-        folder=f"{NOTEBOOK_DIR_NAME}/",
+        folder=display_folder,
         days=days,
         today=today_entry,
         yesterday_excerpt=yesterday,
@@ -1368,6 +1373,13 @@ def _notebook_today(folder: Path, today_d: _dt.date) -> C.NotebookToday:
     path = folder / f"{today_d.isoformat()}.md"
     title = today_d.strftime("%-d %B %Y")
     if not path.is_file():
+        # Show the user the path their click-edit will actually create,
+        # not a hard-coded ~/lab-notebook reference. Prefer ~ when the
+        # path is under the user's home; otherwise show the full path.
+        try:
+            display = "~/" + str(path.relative_to(Path.home()))
+        except ValueError:
+            display = str(path)
         return C.NotebookToday(
             iso=today_d.isoformat(),
             title=title,
@@ -1379,9 +1391,10 @@ def _notebook_today(folder: Path, today_d: _dt.date) -> C.NotebookToday:
                 C.NbParagraph(
                     kind="p",
                     text=(
-                        "Create your daily note at "
-                        f"`~/{NOTEBOOK_DIR_NAME}/{today_d.isoformat()}.md` "
-                        "to log today's plan, decisions, and links to SEAs."
+                        "Click the **edit** button above to create today's "
+                        f"note at `{display}`. It opens in Obsidian when the "
+                        "folder is inside your registered vault; otherwise "
+                        "it falls back to your `$EDITOR` / system default."
                     ),
                 ),
             ],
