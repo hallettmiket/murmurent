@@ -17,11 +17,12 @@ Editor resolution (first match wins):
           export WIGAMIG_NOTEBOOK_EDITOR="code -g {path}"
           export WIGAMIG_NOTEBOOK_EDITOR="vim {path}"
 
-  2. ``$EDITOR`` / ``$VISUAL``  — the user's general editor preference.
-     We trust this above the design's Obsidian default; users who set
-     ``$EDITOR=vim`` almost always want that.
-  3. ``obsidian://`` URL  — the design doc's preferred path; works when the
-     user has registered ``~/lab-notebook`` as an Obsidian vault.
+  2. ``obsidian://`` URL  — when the file is *inside a registered
+     Obsidian vault*. We win over ``$EDITOR`` here because the file
+     literally lives in the user's Obsidian world; opening it elsewhere
+     surprises them and breaks the ``[[wikilink]]`` graph.
+  3. ``$EDITOR`` / ``$VISUAL``  — for files that aren't in a vault
+     (e.g. when ``$WIGAMIG_NOTEBOOK_DIR`` points outside Obsidian).
   4. ``code`` (VS Code) if on PATH.
   5. Platform default — ``open`` (macOS) / ``xdg-open`` (Linux).
 
@@ -37,8 +38,11 @@ import shlex
 import shutil
 import subprocess
 import sys
+import urllib.parse
 from dataclasses import dataclass
 from pathlib import Path
+
+from ..core import obsidian as _obs
 
 NOTEBOOK_DIR_NAME = "lab-notebook"
 
@@ -68,13 +72,59 @@ class NotebookEditorNotAvailable(NotebookActionError):
 def notebook_folder() -> Path:
     """Resolve the daily-notes folder.
 
-    Honours ``$WIGAMIG_NOTEBOOK_DIR`` for tests / non-default vaults;
-    otherwise ``~/lab-notebook/``.
+    Priority:
+      1. ``$WIGAMIG_NOTEBOOK_DIR`` — explicit override (used by tests
+         + power users with non-Obsidian setups).
+      2. ``<obsidian-vault>/lab-notebook/`` — the user's registered
+         Obsidian vault, so the ``obsidian://`` URL works and notes
+         live alongside the rest of their thinking.
+      3. ``~/lab-notebook/`` — fallback when no vault is registered.
+
+    On the first call after switching to the vault path, any pre-existing
+    files under ``~/lab-notebook/`` are migrated in (one-time, logged).
     """
     override = os.environ.get("WIGAMIG_NOTEBOOK_DIR")
     if override:
         return Path(override).expanduser()
+
+    vault = _obs.preferred_vault()
+    if vault is not None:
+        target = vault.path / NOTEBOOK_DIR_NAME
+        _migrate_legacy_into_vault(Path.home() / NOTEBOOK_DIR_NAME, target)
+        return target
+
     return Path.home() / NOTEBOOK_DIR_NAME
+
+
+def _migrate_legacy_into_vault(legacy: Path, target: Path) -> None:
+    """Move any ``.md`` files from ``legacy`` to ``target`` once.
+
+    Skipped silently when ``legacy`` is empty or non-existent. Existing
+    files in ``target`` are not overwritten.
+    """
+    if not legacy.is_dir() or legacy.resolve() == target.resolve():
+        return
+    md_files = [p for p in legacy.glob("*.md") if p.is_file()]
+    if not md_files:
+        return
+    target.mkdir(parents=True, exist_ok=True)
+    moved: list[str] = []
+    for src in md_files:
+        dst = target / src.name
+        if dst.exists():
+            continue  # respect existing vault content
+        try:
+            src.replace(dst)
+            moved.append(src.name)
+        except OSError:
+            continue
+    if moved:
+        # Single-line stderr note; harmless in tests.
+        print(
+            f"[wigamig] migrated {len(moved)} note(s) from {legacy} -> {target}: "
+            f"{', '.join(moved[:3])}{'…' if len(moved) > 3 else ''}",
+            file=sys.stderr,
+        )
 
 
 def entry_path(date_iso: str) -> Path:
@@ -125,16 +175,17 @@ def resolve_editor_cmd(path: Path) -> list[str]:
         # Plain command name -> append the path.
         return shlex.split(override) + [str(path)]
 
-    editor = os.environ.get("EDITOR") or os.environ.get("VISUAL")
-    if editor:
-        return shlex.split(editor) + [str(path)]
-
-    # Implicit Obsidian fallback only when the vault is genuinely
-    # registered. Otherwise the URL fails silently and the user sees
-    # nothing happen.
+    # Files inside a registered Obsidian vault always open in Obsidian
+    # — the URL form actually works because the vault is registered, and
+    # the user's [[wikilink]] graph + plugin set is in Obsidian, not
+    # whatever $EDITOR they happen to have set.
     obsidian = _obsidian_cmd(path)
     if obsidian:
         return obsidian
+
+    editor = os.environ.get("EDITOR") or os.environ.get("VISUAL")
+    if editor:
+        return shlex.split(editor) + [str(path)]
 
     if shutil.which("code"):
         return ["code", str(path)]
@@ -150,65 +201,44 @@ def resolve_editor_cmd(path: Path) -> list[str]:
 
 
 def _obsidian_cmd(path: Path, *, force: bool = False) -> list[str] | None:
-    """Build an ``obsidian://`` open command if possible.
+    """Build an ``obsidian://`` open command, or ``None`` if not applicable.
 
-    Refuses to return a URL command unless we can confirm Obsidian has
-    the target folder registered as a vault — otherwise the URL fails
-    silently (``Unable to find a vault for the URL …``) and the file
-    never opens.
+    The URL only works when the *containing vault* is registered in
+    Obsidian. We:
 
-    ``force=True`` skips the registration check (the user explicitly
-    asked for Obsidian via ``WIGAMIG_NOTEBOOK_EDITOR=obsidian``; trust
-    them even if we can't auto-detect the registry).
+      - Look up which vault contains ``path`` via :mod:`core.obsidian`.
+      - Build the URL with ``vault=<vault name>&file=<relative path
+        without .md>``, both URL-encoded.
+      - Return ``["open", url]`` (macOS) / ``["xdg-open", url]`` (Linux).
 
-    Returns ``None`` if (a) the platform can't dispatch URLs, (b) the
-    vault isn't registered (and not forced).
+    ``force=True`` (e.g. user set ``WIGAMIG_NOTEBOOK_EDITOR=obsidian``
+    explicitly) builds a best-effort URL using the parent folder name
+    even when no vault match is found. The URL may still fail in
+    Obsidian, but at least we try.
     """
-    folder = path.parent
-    if not force and not _obsidian_vault_registered(folder):
+    vault = _obs.vault_for_path(path)
+    rel: str | None = None
+    vault_name: str | None = None
+    if vault is not None:
+        vault_name = vault.name
+        rel = _obs.relative_inside_vault(path, vault)
+    elif force:
+        vault_name = path.parent.name
+        rel = path.stem
+
+    if vault_name is None:
         return None
-    vault = folder.name
-    file_stem = path.stem
-    url = f"obsidian://open?vault={vault}&file={file_stem}"
+    file_param = rel if rel is not None else path.stem
+    url = (
+        "obsidian://open"
+        f"?vault={urllib.parse.quote(vault_name, safe='')}"
+        f"&file={urllib.parse.quote(file_param, safe='/')}"
+    )
     if sys.platform == "darwin" and shutil.which("open"):
         return ["open", url]
     if shutil.which("xdg-open"):
         return ["xdg-open", url]
     return None
-
-
-def _obsidian_vault_registered(folder: Path) -> bool:
-    """Return True if ``folder`` is in Obsidian's vault registry.
-
-    Obsidian stores its registry as JSON. Path varies by platform:
-
-      macOS:   ~/Library/Application Support/obsidian/obsidian.json
-      Linux:   ~/.config/obsidian/obsidian.json
-      Windows: %APPDATA%/obsidian/obsidian.json (not supported here)
-    """
-    import json
-
-    candidates: list[Path] = []
-    if sys.platform == "darwin":
-        candidates.append(
-            Path.home() / "Library" / "Application Support" / "obsidian" / "obsidian.json"
-        )
-    candidates.append(Path.home() / ".config" / "obsidian" / "obsidian.json")
-
-    target = str(folder.resolve())
-    for cfg in candidates:
-        if not cfg.is_file():
-            continue
-        try:
-            data = json.loads(cfg.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        vaults = data.get("vaults") or {}
-        for entry in vaults.values():
-            vp = entry.get("path")
-            if vp and Path(vp).resolve() == Path(target):
-                return True
-    return False
 
 
 # ---------------------------------------------------------------------------
