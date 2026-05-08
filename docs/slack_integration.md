@@ -23,8 +23,8 @@ trail.
 
 ## Channel convention
 
-- One channel per project, named `#proj-<project_slug>` (e.g.
-  `#proj-dcis_sc_tutorial`). The convention matches the project repo's
+- One channel per project, named `#proj_<project_slug>` (e.g.
+  `#proj_dcis_sc_tutorial`). The convention matches the project repo's
   directory name so a glance at the sidebar is unambiguous.
 - Lab-wide channels (`#general`, `#random`, journal clubs, etc.) are
   not auto-monitored.
@@ -62,21 +62,21 @@ Slack admin UI.
 ```
 ~/repos/hallett-lab-mgmt/
 ├── slack/
-│   ├── proj-dcis_sc_tutorial/
+│   ├── proj_dcis_sc_tutorial/
 │   │   ├── 2026-05-08.md           ← raw mirror (one file per day)
 │   │   └── 2026-05-07.md
-│   └── proj-bbb_drug_screen/
+│   └── proj_bbb_drug_screen/
 │       └── 2026-05-08.md
 └── oracle/
     ├── 2026-05-08_dcis_chrm_p14.md          ← manual publish (current)
-    └── 2026-05-09_proj-dcis_summary.md      ← bot-distilled
+    └── 2026-05-09_proj_dcis_summary.md      ← bot-distilled
 ```
 
 Each raw mirror file is markdown with frontmatter:
 
 ```yaml
 ---
-channel: proj-dcis_sc_tutorial
+channel: proj_dcis_sc_tutorial
 date: 2026-05-08
 message_count: 47
 participants: ['@allie', '@bob', '@cassie']
@@ -102,7 +102,7 @@ title: 'GRCh38.p14 fixes the chrM contig issue for run 17'
 author: '@wigamig-oracle'
 date: 2026-05-09
 project: dcis_sc_tutorial
-source_channel: proj-dcis_sc_tutorial
+source_channel: proj_dcis_sc_tutorial
 source_date: 2026-05-08
 source_messages: ['09:14', '09:18', '09:24']
 participants: ['@allie', '@bob']
@@ -116,7 +116,7 @@ p14. For run 17 we are aligning against p14, not p13.
 
 ## Provenance
 
-[[slack/proj-dcis_sc_tutorial/2026-05-08]] — messages at 09:14, 09:18, 09:24.
+[[slack/proj_dcis_sc_tutorial/2026-05-08]] — messages at 09:14, 09:18, 09:24.
 ```
 
 Linking the raw mirror as `[[slack/...]]` means the dashboard can
@@ -214,7 +214,7 @@ shape of the markdown output against fixture conversations.
 
 These are the questions I'd want answered as a PR comment on this doc:
 
-1. Which channels to monitor first? `#proj-dcis_sc_tutorial` only as
+1. Which channels to monitor first? `#proj_dcis_sc_tutorial` only as
    a pilot, or all current project channels at once?
 2. Where does the bot's OAuth token live? Slack app config has it; we
    need to store it locally for the cron to read. Default proposal:

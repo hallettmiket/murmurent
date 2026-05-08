@@ -358,8 +358,9 @@ function SeasPanel({ seas, span="c-7" }) {
   return (
     <div className={"panel "+span}>
       <header>
-        <h2>SEAs</h2>
-        <div className="row">
+        <h2>All SEAs</h2>
+        <div className="row" style={{gap:10}}>
+          <span className="meta">internal · cross-group inbound visible to receptionist</span>
           <div className="persona">
             <button className={tab==="in"?"on":""}  onClick={()=>setTab("in")} style={{padding:"5px 10px",fontSize:12}}>incoming&nbsp;·&nbsp;{seas.filter(s=>s.dir==="in").length}</button>
             <button className={tab==="out"?"on":""} onClick={()=>setTab("out")} style={{padding:"5px 10px",fontSize:12}}>outgoing&nbsp;·&nbsp;{seas.filter(s=>s.dir==="out").length}</button>
@@ -430,12 +431,28 @@ function SeasPanel({ seas, span="c-7" }) {
 /* ───────── projects panel ───────── */
 function ProjectsPanel({ projects, span="c-5" }) {
   const [openProj, setOpenProj] = useState(null);
+  const [showNewProj, setShowNewProj] = useState(false);
+  // Pending project-create requests count (so users see what's in flight).
+  const pendingCreate = (window.DATA.requests_pending || []).filter(
+    r => r.kind === "project-create"
+  ).length;
   return (
     <div className={"panel "+span}>
       <header>
         <h2>Projects</h2>
-        <span className="meta">{projects.length} active · {projects.reduce((a,p)=>a+p.openSeas,0)} open SEAs</span>
+        <div className="row" style={{gap:6}}>
+          <span className="meta">
+            {projects.length} active · {projects.reduce((a,p)=>a+p.openSeas,0)} open SEAs
+            {pendingCreate > 0 && (
+              <span> · <strong style={{color:"var(--tiger-deep)"}}>
+                {pendingCreate} pending
+              </strong></span>
+            )}
+          </span>
+          <button className="btn sm" onClick={() => setShowNewProj(true)}>＋ new project</button>
+        </div>
       </header>
+      {showNewProj && <NewProjectModal onClose={() => setShowNewProj(false)} />}
       <div className="body" style={{padding:0}}>
         <table className="dt">
           <thead><tr>
@@ -463,30 +480,40 @@ function ProjectsPanel({ projects, span="c-5" }) {
                       padding:"10px 12px",
                       fontSize:12, fontFamily:"var(--mono)",
                       borderBottom:"1px solid var(--rule)",
+                      wordBreak:"break-all",
+                      overflowWrap:"anywhere",
                     }}>
                       {p.github_repo && (
-                        <div>
-                          <span className="muted">github</span>{" "}
-                          <a href={"https://github.com/" + p.github_repo} target="_blank" rel="noopener">
+                        <div style={{marginBottom:3}}>
+                          <span className="muted" style={{display:"inline-block", width:60}}>github</span>
+                          <a href={"https://github.com/" + p.github_repo} target="_blank" rel="noopener"
+                             style={{wordBreak:"break-all"}}>
                             {p.github_repo}
                           </a>
                         </div>
                       )}
                       {p.slack_channel && (
-                        <div>
-                          <span className="muted">slack</span>{" "}
+                        <div style={{marginBottom:3}}>
+                          <span className="muted" style={{display:"inline-block", width:60}}>slack</span>
                           {p.slack_url ? (
-                            <a href={p.slack_url} target="_blank" rel="noopener">#{p.slack_channel}</a>
+                            <a href={p.slack_url} target="_blank" rel="noopener"
+                               style={{wordBreak:"break-all"}}>#{p.slack_channel}</a>
                           ) : (
                             <span>#{p.slack_channel}</span>
                           )}
                         </div>
                       )}
                       {p.refined_path && (
-                        <div><span className="muted">refined</span> <code>{p.refined_path}</code></div>
+                        <div style={{marginBottom:3}}>
+                          <span className="muted" style={{display:"inline-block", width:60}}>refined</span>
+                          <code style={{wordBreak:"break-all"}}>{p.refined_path}</code>
+                        </div>
                       )}
                       {p.raw_path && (
-                        <div><span className="muted">raw</span> <code>{p.raw_path}</code></div>
+                        <div style={{marginBottom:3}}>
+                          <span className="muted" style={{display:"inline-block", width:60}}>raw</span>
+                          <code style={{wordBreak:"break-all"}}>{p.raw_path}</code>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -596,11 +623,11 @@ function GroupPanel({ peers, span="c-6" }) {
 }
 
 /* ───────── agents panel ───────── */
-async function postAgentToggle(name, action) {
-  const res = await fetch(
-    "/api/agents/" + encodeURIComponent(name) + "/" + encodeURIComponent(action),
-    { method: "POST", headers: { Accept: "application/json" } }
-  );
+async function postAgentAction(name, action, params = {}) {
+  const qs = new URLSearchParams(params).toString();
+  const url = "/api/agents/" + encodeURIComponent(name) + "/" + encodeURIComponent(action)
+    + (qs ? "?" + qs : "");
+  const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
   if (!res.ok) {
     let detail = "HTTP " + res.status;
     try { detail = (await res.json()).detail || detail; } catch (_) {}
@@ -612,17 +639,30 @@ async function postAgentToggle(name, action) {
 function AgentToggleButton({ agent }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState(null);
-  const target = agent.disabled ? "enable" : "disable";
-  const onClick = async () => {
+  const refresh = async () => {
+    if (typeof window.__wigamigFetchData === "function") {
+      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    }
+  };
+  const onToggle = async () => {
     setBusy(true); setErr(null);
     try {
-      await postAgentToggle(agent.name, target);
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
-      }
+      await postAgentAction(agent.name, agent.disabled ? "enable" : "disable");
+      await refresh();
     } catch (ex) { setErr(String(ex.message || ex)); }
     finally { setBusy(false); }
   };
+  const onModelChange = async (e) => {
+    const newModel = e.target.value;
+    if (!newModel || newModel === agent.model) return;
+    setBusy(true); setErr(null);
+    try {
+      await postAgentAction(agent.name, "set_model", { model: newModel });
+      await refresh();
+    } catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(false); }
+  };
+
   if (agent.freeze === "frozen") {
     return (
       <span className="mono muted" style={{fontSize:10, letterSpacing:1}}
@@ -633,8 +673,23 @@ function AgentToggleButton({ agent }) {
   }
   return (
     <span style={{display:"inline-flex", alignItems:"center", gap:6}}>
-      <button className="btn sm" disabled={busy} onClick={onClick}>
-        {busy ? "…" : target}
+      <select
+        value={agent.model || ""}
+        onChange={onModelChange}
+        disabled={busy}
+        title="Pick the model this agent uses"
+        style={{
+          fontFamily:"var(--mono)", fontSize:11,
+          padding:"2px 6px", border:"1px solid var(--rule-strong)",
+          borderRadius:2, background:"#fff", color:"var(--ink)",
+        }}>
+        <option value="">model…</option>
+        <option value="opus">opus (4.7)</option>
+        <option value="sonnet">sonnet (4.6)</option>
+        <option value="haiku">haiku (4.5)</option>
+      </select>
+      <button className="btn sm" disabled={busy} onClick={onToggle}>
+        {busy ? "…" : (agent.disabled ? "enable" : "disable")}
       </button>
       {err && <span style={{fontSize:10, color:"var(--red)"}}>{err}</span>}
     </span>
@@ -754,20 +809,40 @@ async function postCreateProjectRequest(payload) {
 
 function NewProjectModal({ onClose }) {
   const [name, setName] = useState("");
-  const [members, setMembers] = useState("");
+  const [selectedMembers, setSelectedMembers] = useState([]);  // chips
+  const [otherInput, setOtherInput] = useState("");            // free-text
   const [sensitivity, setSensitivity] = useState("standard");
   const [justification, setJustification] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const groupMembers = window.DATA.group_members || [];
+
+  const addFromDropdown = (handle) => {
+    if (!handle) return;
+    if (!selectedMembers.includes(handle)) {
+      setSelectedMembers([...selectedMembers, handle]);
+    }
+  };
+  const addFromInput = () => {
+    const h = otherInput.trim();
+    if (!h) return;
+    const norm = h.startsWith("@") ? h : "@" + h;
+    if (!selectedMembers.includes(norm)) {
+      setSelectedMembers([...selectedMembers, norm]);
+    }
+    setOtherInput("");
+  };
+  const removeMember = (h) => setSelectedMembers(selectedMembers.filter(m => m !== h));
+
   const submit = async (e) => {
     e.preventDefault();
     if (!name.trim()) { setErr("project name is required"); return; }
+    if (selectedMembers.length === 0) { setErr("add at least one member"); return; }
     setBusy(true); setErr(null);
     try {
-      const proposed_members = members.split(",").map(s => s.trim()).filter(Boolean);
       await postCreateProjectRequest({
         project: name.trim(),
-        proposed_members,
+        proposed_members: selectedMembers,
         sensitivity,
         justification: justification.trim(),
       });
@@ -778,6 +853,9 @@ function NewProjectModal({ onClose }) {
     } catch (ex) { setErr(String(ex.message || ex)); }
     finally { setBusy(false); }
   };
+
+  const availableMembers = groupMembers.filter(m => !selectedMembers.includes(m));
+
   return (
     <div onClick={onClose} style={{
       position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
@@ -798,9 +876,50 @@ function NewProjectModal({ onClose }) {
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>name (snake_case)</label>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. dcis_imaging_genomics"
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
-        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>proposed members (comma-separated handles)</label>
-        <input value={members} onChange={e => setMembers(e.target.value)} placeholder="@allie, @bob"
-               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
+
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>proposed members</label>
+        {/* chips: already-selected handles */}
+        {selectedMembers.length > 0 && (
+          <div className="row" style={{flexWrap:"wrap", gap:4}}>
+            {selectedMembers.map(h => (
+              <span key={h} className="mono"
+                    style={{fontSize:11, padding:"2px 6px",
+                            background:"rgba(79,38,131,0.10)",
+                            color:"var(--purple)", borderRadius:2,
+                            display:"inline-flex", alignItems:"center", gap:4}}>
+                {h}
+                <button type="button" onClick={() => removeMember(h)}
+                        style={{background:"none", border:0, cursor:"pointer",
+                                color:"var(--purple)", fontSize:14, padding:0, lineHeight:1}}
+                        title={"remove " + h}>×</button>
+              </span>
+            ))}
+          </div>
+        )}
+        {/* dropdown: pick from known group members */}
+        <div className="row" style={{gap:6}}>
+          <select value="" onChange={e => addFromDropdown(e.target.value)}
+                  disabled={availableMembers.length === 0}
+                  style={{flex:1, padding:"6px 8px", border:"1px solid var(--rule-strong)",
+                          borderRadius:2, fontFamily:"var(--mono)"}}>
+            <option value="">
+              {availableMembers.length === 0 ? "(all known members added)" : "+ add from group…"}
+            </option>
+            {availableMembers.map(h => (
+              <option key={h} value={h}>{h}</option>
+            ))}
+          </select>
+        </div>
+        {/* free-text: handle not yet known */}
+        <div className="row" style={{gap:6}}>
+          <input value={otherInput} onChange={e => setOtherInput(e.target.value)}
+                 onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addFromInput(); }}}
+                 placeholder="…or type an unknown @handle"
+                 style={{flex:1, padding:"6px 8px", border:"1px solid var(--rule-strong)",
+                         borderRadius:2, fontFamily:"var(--mono)"}}/>
+          <button type="button" className="btn sm" onClick={addFromInput}>add</button>
+        </div>
+
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>sensitivity</label>
         <select value={sensitivity} onChange={e => setSensitivity(e.target.value)}
                 style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}>
@@ -951,25 +1070,28 @@ function RequestsPanel({ pending, mine, span="c-6" }) {
   const persona = window.DATA.persona || "member";
   const isPI    = persona === "pi";
   const showQueue = isPI ? (pending || []) : [];
-  const showMine  = (mine || []).filter(r => r.state !== "approved" || true);
-  const [showNewProj, setShowNewProj] = useState(false);
+  // Member view: show only project-join (not project-create) requests in
+  // the Requests panel. project-create requests show up in the PI's queue
+  // and on the Projects panel; members track those via the Projects panel
+  // header chip.
+  const isJoin = (r) => r.kind !== "project-create";
+  const filteredQueue = showQueue.filter(isJoin);
+  const filteredMine  = (mine || []).filter(isJoin);
 
   const headerLabel = isPI
-    ? `${(pending || []).length} pending`
-    : `${(mine || []).filter(r => r.state === "pending").length} pending · ${
-        (mine || []).filter(r => r.state !== "pending").length} resolved`;
+    ? `${filteredQueue.length} pending`
+    : `${filteredMine.filter(r => r.state === "pending").length} pending · ${
+        filteredMine.filter(r => r.state !== "pending").length} resolved`;
 
   return (
     <div className={"panel "+span}>
       <header>
-        <h2>Requests</h2>
+        <h2>Requests · project join</h2>
         <div className="row" style={{gap:6}}>
           <span className="meta">{headerLabel}</span>
           <NewJoinRequestButton />
-          <button className="btn sm" onClick={() => setShowNewProj(true)}>＋ new project</button>
         </div>
       </header>
-      {showNewProj && <NewProjectModal onClose={() => setShowNewProj(false)} />}
       <div className="body" style={{padding:"6px 0"}}>
         {isPI && showQueue.length === 0 && (
           <div className="muted" style={{padding:"14px", fontSize:13}}>
@@ -1817,38 +1939,38 @@ function App() {
       <TopBar />
       <div className="app">
         <CmdBar query={query} setQuery={setQuery} />
-        <Strip persona={persona} />
+        {/* The stat strip ("SEAs this week / compliance / etc.") was removed
+            per user feedback - the same info is in the panels below. */}
 
+        {/* Daily action zone: SEAs > Requests > Receptionist (PI). */}
         <div className="grid" style={{marginBottom:14}}>
           <SeasPanel seas={D.seas} span="c-12" />
         </div>
 
-        {/* Projects + Project-join requests sit together: requests are
-            the membership-side of projects so they belong adjacent. */}
         <div className="grid" style={{marginBottom:14}}>
-          <ProjectsPanel projects={D.projects} />
           <RequestsPanel
             pending={D.requests_pending}
             mine={D.requests_mine}
-            span="c-7"
+            span="c-12"
           />
         </div>
 
-        {/* Activity + Notebook + Group oracle row. (3 + 5 + 4 = 12) */}
-        <div className="grid" style={{marginBottom:14}}>
-          <ActivityPanel span="c-3" />
-          <NotebookPanel span="c-5" />
-          <GroupOraclePanel entries={D.oracle_recent} drafts={D.oracle_drafts} span="c-4" />
-        </div>
-
-        {/* Receptionist: PI-only inbound cross-group SEA queue. Sits up
-            here in the action zone so the PI can clear it daily.
-            Hidden entirely for non-PI members. */}
         {persona === "pi" && (
           <div className="grid" style={{marginBottom:14}}>
             <ReceptionistPanel inbound={D.inbound_requests} span="c-12" />
           </div>
         )}
+
+        {/* Reference zone: projects + activity + notebook + oracle. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <ProjectsPanel projects={D.projects} span="c-7" />
+          <ActivityPanel span="c-5" />
+        </div>
+
+        <div className="grid" style={{marginBottom:14}}>
+          <NotebookPanel span="c-7" />
+          <GroupOraclePanel entries={D.oracle_recent} drafts={D.oracle_drafts} span="c-5" />
+        </div>
 
         {/* Group + inventory: things you check, but not every day. */}
         <div className="grid" style={{marginBottom:14}}>
@@ -1856,7 +1978,7 @@ function App() {
           <InventoryPanel inv={D.inventory} span="c-6" />
         </div>
 
-        {/* SEAs we offer (catalog) — every member sees; PI edits. */}
+        {/* SEAs we offer (catalog) - every member sees; PI edits. */}
         <div className="grid" style={{marginBottom:14}}>
           <SeaCatalogPanel entries={D.sea_catalog} span="c-12" />
         </div>
@@ -1866,7 +1988,7 @@ function App() {
           <AgentsPanel agents={D.agents} span="c-12" />
         </div>
 
-        {/* Compliance — most sporadic; lives at the bottom. */}
+        {/* Compliance - most sporadic; lives at the bottom. */}
         <div className="grid">
           <Heatmap data={D.heatmap} persona={persona} span="c-12" />
         </div>

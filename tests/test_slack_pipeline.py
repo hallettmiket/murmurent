@@ -92,16 +92,16 @@ class _MockClient:
 
 def test_list_monitored_channels_filters_by_marker(world):
     client = _MockClient(channels=[
-        {"id": "C1", "name": "proj-dcis", "topic": {"value": "DCIS team [oracle:on]"}},
+        {"id": "C1", "name": "proj_dcis", "topic": {"value": "DCIS team [oracle:on]"}},
         {"id": "C2", "name": "general",   "topic": {"value": "everyone hangs out"}},
     ])
     out = mirror.list_monitored_channels(client)
-    assert [c["name"] for c in out] == ["proj-dcis"]
+    assert [c["name"] for c in out] == ["proj_dcis"]
 
 
 def test_is_oracle_on(world):
     client = _MockClient(channels=[
-        {"id": "C1", "name": "proj-dcis", "topic": {"value": "[oracle:on]"}},
+        {"id": "C1", "name": "proj_dcis", "topic": {"value": "[oracle:on]"}},
         {"id": "C2", "name": "noop",      "topic": {"value": "x"}},
     ])
     assert mirror.is_oracle_on(client, "C1") is True
@@ -143,9 +143,9 @@ def test_render_mirror_has_frontmatter_and_body(world):
         mirror.Message(ts="2.0", iso_local="2024-04-26T09:18:00",
                        user_handle="@bob",   text="confirmed — same chrM artefact."),
     ]
-    text = mirror.render_mirror(channel_name="proj-dcis", date=_dt.date(2024, 4, 26),
+    text = mirror.render_mirror(channel_name="proj_dcis", date=_dt.date(2024, 4, 26),
                                 messages=msgs, workspace="hallett-lab.slack.com")
-    assert "channel: proj-dcis" in text
+    assert "channel: proj_dcis" in text
     assert "message_count: 2" in text
     assert "## 09:14 · @allie" in text
     assert "run 17 fastqs look fine." in text
@@ -153,25 +153,25 @@ def test_render_mirror_has_frontmatter_and_body(world):
 
 def test_mirror_channel_day_writes_file(world, tmp_path):
     client = _MockClient(
-        channels=[{"id": "C1", "name": "proj-dcis", "topic": {"value": "[oracle:on]"}}],
+        channels=[{"id": "C1", "name": "proj_dcis", "topic": {"value": "[oracle:on]"}}],
         history={"C1": [{"ts": "1714128842.001234", "user": "U1", "text": "hi"}]},
         users={"U1": "allie"},
     )
     path = mirror.mirror_channel_day(
-        channel_name="proj-dcis", channel_id="C1",
+        channel_name="proj_dcis", channel_id="C1",
         date=_dt.date(2024, 4, 26), client=client,
     )
     assert path.is_file()
-    assert "proj-dcis" in path.read_text()
+    assert "proj_dcis" in path.read_text()
 
 
 def test_mirror_channel_day_refuses_non_optin(world):
     client = _MockClient(
-        channels=[{"id": "C1", "name": "proj-dcis", "topic": {"value": "no marker"}}],
+        channels=[{"id": "C1", "name": "proj_dcis", "topic": {"value": "no marker"}}],
     )
     with pytest.raises(mirror.SlackMirrorError):
         mirror.mirror_channel_day(
-            channel_name="proj-dcis", channel_id="C1",
+            channel_name="proj_dcis", channel_id="C1",
             date=_dt.date(2024, 4, 26), client=client,
         )
 

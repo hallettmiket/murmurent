@@ -166,7 +166,7 @@ class ProjectRow(BaseModel):
     lastActivity: str
     # Phase 9: where to find the project's artefacts.
     github_repo: str | None = None    # e.g. "hallettmiket/dcis_sc_tutorial"
-    slack_channel: str | None = None  # e.g. "proj-dcis_sc_tutorial"
+    slack_channel: str | None = None  # e.g. "proj_dcis_sc_tutorial"
     slack_url: str | None = None      # full deep-link, when known
     refined_path: str | None = None   # /data/lab_vm/refined/<project>
     raw_path: str | None = None       # /data/lab_vm/raw/<project>
@@ -441,6 +441,7 @@ class DashboardResponse(BaseModel):
     oracle_drafts: list[OracleEntry] = []  # PI-only; awaiting approval
     requests_pending: list[JoinRequestRow] = []  # PI: all pending; member: theirs only
     requests_mine: list[JoinRequestRow] = []     # the viewer's outgoing requests
+    group_members: list[str] = []                # all known @handles (for forms)
     sea_catalog: list[CatalogEntryRow] = []      # SEAs we offer (entire group sees)
     inbound_requests: list[InboundRequestRow] = []  # receptionist queue (PI only)
     attention: list[AttentionItem]
