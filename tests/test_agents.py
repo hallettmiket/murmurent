@@ -23,12 +23,13 @@ EXPECTED_AGENTS = {
     "bookworm",
     "conscience",
     "oracle",
+    "receptionist",
     "saul_goodman",
     "security_guard",
 }
 
 
-def test_registry_contains_all_eight_agents() -> None:
+def test_registry_contains_all_expected_agents() -> None:
     registry = load_registry(REPO_AGENTS_DIR)
     names = {record.name for record in registry}
     assert names == EXPECTED_AGENTS

@@ -992,6 +992,335 @@ function RequestsPanel({ pending, mine, span="c-6" }) {
   );
 }
 
+/* ───────── SEA catalog (we offer) ───────── */
+async function postCatalogUpsert(body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/sea_catalog" + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+async function postCatalogAction(slug, action) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/sea_catalog/" + encodeURIComponent(slug) + "/" + encodeURIComponent(action)
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function CatalogEntryForm({ entry, onClose }) {
+  const [slug, setSlug] = useState(entry?.slug || "");
+  const [title, setTitle] = useState(entry?.title || "");
+  const [kind, setKind] = useState(entry?.kind || "experiment");
+  const [contact, setContact] = useState(entry?.contact || "");
+  const [turnaround, setTurnaround] = useState(entry?.turnaround_days || "");
+  const [description, setDescription] = useState(entry?.description || "");
+  const [prereqs, setPrereqs] = useState((entry?.prerequisites || []).join(", "));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!slug.trim() || !title.trim() || !contact.trim()) {
+      setErr("slug, title, and contact are required"); return;
+    }
+    setBusy(true); setErr(null);
+    try {
+      await postCatalogUpsert({
+        slug: slug.trim(),
+        title: title.trim(),
+        kind,
+        contact: contact.trim(),
+        description: description.trim(),
+        turnaround_days: turnaround ? parseInt(turnaround, 10) : null,
+        prerequisites: prereqs.split(",").map(s => s.trim()).filter(Boolean),
+        accepting: entry?.accepting !== false,
+      });
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+      onClose();
+    } catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
+    }}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:18, width:"min(560px, 92vw)",
+        display:"flex", flexDirection:"column", gap:8,
+      }}>
+        <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
+          {entry ? "Edit catalog entry" : "Add catalog entry"}
+        </h2>
+        <p className="muted" style={{fontSize:12, margin:0}}>
+          What you publish here is what other groups discover via the sea_catalog MCP.
+        </p>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>slug (lower_snake_case)</label>
+        <input value={slug} onChange={e => setSlug(e.target.value)} disabled={!!entry}
+               placeholder="e.g. bulk_rnaseq_alignment"
+               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>title</label>
+        <input value={title} onChange={e => setTitle(e.target.value)}
+               placeholder="DCIS bulk RNA-seq alignment"
+               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2}}/>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>kind</label>
+        <select value={kind} onChange={e => setKind(e.target.value)}
+                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}>
+          <option value="skill">skill</option>
+          <option value="experiment">experiment</option>
+          <option value="analysis">analysis</option>
+        </select>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>contact (member who owns it)</label>
+        <input value={contact} onChange={e => setContact(e.target.value)} placeholder="@allie"
+               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>turnaround (days, optional)</label>
+        <input value={turnaround} onChange={e => setTurnaround(e.target.value)} placeholder="7"
+               type="number" min="0" style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)", width:120}}/>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>prerequisites (comma-separated)</label>
+        <input value={prereqs} onChange={e => setPrereqs(e.target.value)} placeholder="GRCh38 reference, fastq files"
+               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2}}/>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>description</label>
+        <textarea value={description} onChange={e => setDescription(e.target.value)}
+                  rows={3} placeholder="What we deliver, in one paragraph."
+                  style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--serif)", fontSize:14}}/>
+        {err && <div style={{color:"var(--red)", fontSize:12}}>{err}</div>}
+        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:6}}>
+          <button type="button" className="btn sm ghost" onClick={onClose}>cancel</button>
+          <button type="submit" className="btn sm primary" disabled={busy}>
+            {busy ? "…" : (entry ? "save" : "publish")}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function SeaCatalogPanel({ entries, span="c-12" }) {
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
+  const [editing, setEditing] = useState(null);  // null | {} (new) | entry (edit)
+  const [busy, setBusy] = useState(null);
+  const list = entries || [];
+
+  const refresh = async () => {
+    if (typeof window.__wigamigFetchData === "function") {
+      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    }
+  };
+  const onToggle = async (entry) => {
+    setBusy(entry.slug);
+    try { await postCatalogAction(entry.slug, entry.accepting ? "disable" : "enable"); await refresh(); }
+    catch (ex) { alert(ex.message || ex); }
+    finally { setBusy(null); }
+  };
+  const onDelete = async (entry) => {
+    if (!window.confirm(`Delete catalog entry "${entry.slug}"?`)) return;
+    setBusy(entry.slug);
+    try { await postCatalogAction(entry.slug, "delete"); await refresh(); }
+    catch (ex) { alert(ex.message || ex); }
+    finally { setBusy(null); }
+  };
+
+  return (
+    <div className={"panel "+span}>
+      <header>
+        <h2>SEAs we offer</h2>
+        <div className="row" style={{gap:8}}>
+          <span className="meta">
+            {list.length} entr{list.length === 1 ? "y" : "ies"} ·
+            {" "}{list.filter(e => e.accepting).length} accepting
+          </span>
+          {isPI && (
+            <button className="btn sm primary" onClick={() => setEditing({})}>
+              ＋ add
+            </button>
+          )}
+        </div>
+      </header>
+      {editing !== null && (
+        <CatalogEntryForm
+          entry={Object.keys(editing).length === 0 ? null : editing}
+          onClose={() => setEditing(null)}
+        />
+      )}
+      <div className="body" style={{padding:0}}>
+        {list.length === 0 && (
+          <div className="muted" style={{padding:"14px", fontSize:13}}>
+            No SEAs offered yet.{" "}
+            {isPI && <span>Click <code>＋ add</code> to publish the lab's first one.</span>}
+          </div>
+        )}
+        <table className="dt">
+          <thead><tr>
+            <th>slug</th><th>title</th><th style={{width:90}}>kind</th>
+            <th style={{width:90}}>contact</th><th style={{width:80}}>turnaround</th>
+            <th style={{width:80}}>state</th>
+            {isPI && <th style={{width:200}}></th>}
+          </tr></thead>
+          <tbody>
+            {list.map(e => (
+              <tr key={e.slug} style={{opacity: e.accepting ? 1 : 0.55}}>
+                <td className="mono" style={{fontSize:12}}>{e.slug}</td>
+                <td>
+                  <div style={{fontWeight:500}}>{e.title}</div>
+                  {e.description && (
+                    <div className="muted" style={{fontSize:11, marginTop:2}}>
+                      {e.description.length > 80 ? e.description.slice(0, 80) + "…" : e.description}
+                    </div>
+                  )}
+                </td>
+                <td className="mono muted" style={{fontSize:12}}>{e.kind}</td>
+                <td className="mono" style={{fontSize:12}}>{e.contact}</td>
+                <td className="num">{e.turnaround_days ? `${e.turnaround_days}d` : "—"}</td>
+                <td>
+                  <Pill tone={e.accepting ? "green" : "outline"}>
+                    {e.accepting ? "accepting" : "paused"}
+                  </Pill>
+                </td>
+                {isPI && (
+                  <td>
+                    <div className="row" style={{justifyContent:"flex-end", gap:4}}>
+                      <button className="btn sm" disabled={busy===e.slug}
+                              onClick={() => setEditing(e)}>edit</button>
+                      <button className="btn sm" disabled={busy===e.slug}
+                              onClick={() => onToggle(e)}>
+                        {e.accepting ? "pause" : "resume"}
+                      </button>
+                      <button className="btn sm danger" disabled={busy===e.slug}
+                              onClick={() => onDelete(e)}>delete</button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+/* ───────── Receptionist (inbound cross-group SEA queue) ───────── */
+async function postInboundAction(id, action, body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/inbound-sea/" + encodeURIComponent(id) + "/" + encodeURIComponent(action)
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function ReceptionistPanel({ inbound, span="c-12" }) {
+  const persona = window.DATA.persona || "member";
+  if (persona !== "pi") return null;  // member doesn't see this box
+  const list = inbound || [];
+  const refresh = async () => {
+    if (typeof window.__wigamigFetchData === "function") {
+      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    }
+  };
+  const onAccept = async (req) => {
+    const routed_to = window.prompt("Route to which member? (e.g. @allie)");
+    if (!routed_to || !routed_to.trim()) return;
+    try { await postInboundAction(req.id, "accept", { routed_to: routed_to.trim() }); await refresh(); }
+    catch (ex) { alert(ex.message || ex); }
+  };
+  const onDecline = async (req) => {
+    const reason = window.prompt("Decline reason:");
+    if (!reason || !reason.trim()) return;
+    try { await postInboundAction(req.id, "decline", { reason: reason.trim() }); await refresh(); }
+    catch (ex) { alert(ex.message || ex); }
+  };
+  return (
+    <div className={"panel "+span}>
+      <header>
+        <h2>Receptionist · inbound SEA requests</h2>
+        <span className="meta">
+          {list.filter(r => r.state === "pending").length} pending ·
+          {" "}{list.filter(r => r.state !== "pending").length} resolved
+        </span>
+      </header>
+      <div className="body" style={{padding:"6px 0"}}>
+        {list.length === 0 && (
+          <div className="muted" style={{padding:"14px", fontSize:13}}>
+            No inbound requests. Other groups will appear here when they
+            consume our sea_catalog MCP.
+          </div>
+        )}
+        {list.map(r => (
+          <div key={r.id} style={{padding:"9px 14px", borderBottom:"1px solid var(--rule)",
+                                  opacity: r.state === "pending" ? 1 : 0.6}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
+              <div>
+                <Pill tone={r.state === "pending" ? "amber" : (r.state === "accepted" ? "green" : "red")}>
+                  {r.state}
+                </Pill>
+                <span className="mono" style={{fontSize:12, marginLeft:8}}>#{r.id}</span>
+                <span className="muted" style={{marginLeft:6}}>·</span>
+                <span style={{marginLeft:6, fontWeight:500}}>{r.from_handle}</span>
+                <span className="muted" style={{marginLeft:4}}>({r.from_group})</span>
+                <span className="muted" style={{marginLeft:6}}>→</span>
+                <span className="mono" style={{marginLeft:6, fontSize:12, color:"var(--purple)"}}>
+                  {r.catalog_slug}
+                </span>
+              </div>
+              <span className="mono muted" style={{fontSize:10}}>{r.created_at}</span>
+            </div>
+            {r.description && (
+              <div className="muted" style={{fontSize:12, marginTop:4, lineHeight:1.45}}>
+                {r.description}
+              </div>
+            )}
+            {r.routed_to && (
+              <div className="mono muted" style={{fontSize:11, marginTop:3}}>
+                routed to {r.routed_to}
+              </div>
+            )}
+            {r.decline_reason && (
+              <div style={{fontSize:11, color:"var(--red)", marginTop:3}}>
+                {r.decline_reason}
+              </div>
+            )}
+            {r.state === "pending" && (
+              <div className="row" style={{marginTop:6, justifyContent:"flex-end", gap:6}}>
+                <button className="btn sm primary" onClick={() => onAccept(r)}>accept · route</button>
+                <button className="btn sm" onClick={() => onDecline(r)}>decline</button>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /* ───────── group oracle panel ───────── */
 function OracleProcessButton() {
   const [busy, setBusy] = useState(false);
@@ -1423,10 +1752,24 @@ function App() {
           <GroupOraclePanel entries={D.oracle_recent} span="c-4" />
         </div>
 
+        {/* Receptionist: PI-only inbound cross-group SEA queue. Sits up
+            here in the action zone so the PI can clear it daily.
+            Hidden entirely for non-PI members. */}
+        {persona === "pi" && (
+          <div className="grid" style={{marginBottom:14}}>
+            <ReceptionistPanel inbound={D.inbound_requests} span="c-12" />
+          </div>
+        )}
+
         {/* Group + inventory: things you check, but not every day. */}
         <div className="grid" style={{marginBottom:14}}>
           <GroupPanel peers={D.peers} span="c-6" />
           <InventoryPanel inv={D.inventory} span="c-6" />
+        </div>
+
+        {/* SEAs we offer (catalog) — every member sees; PI edits. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <SeaCatalogPanel entries={D.sea_catalog} span="c-12" />
         </div>
 
         {/* Agents (large, low-frequency) lives toward the bottom. */}

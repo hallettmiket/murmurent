@@ -226,6 +226,36 @@ class JoinRequestRow(BaseModel):
     proposed_lead: str | None = None
 
 
+class CatalogEntryRow(BaseModel):
+    """Phase 10: one offered SEA in our group's catalog."""
+
+    slug: str
+    title: str
+    kind: Literal["skill", "experiment", "analysis"]
+    contact: str
+    description: str = ""
+    turnaround_days: int | None = None
+    prerequisites: list[str] = []
+    accepting: bool = True
+    created: str | None = None
+    updated: str | None = None
+
+
+class InboundRequestRow(BaseModel):
+    """Phase 10: receptionist's view of a cross-group inbound request."""
+
+    id: int
+    catalog_slug: str
+    from_group: str
+    from_handle: str
+    from_pi: str | None = None
+    description: str = ""
+    state: Literal["pending", "accepted", "declined", "fulfilled"]
+    created_at: str | None = None
+    routed_to: str | None = None
+    decline_reason: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # SEAs
 # ---------------------------------------------------------------------------
@@ -410,6 +440,8 @@ class DashboardResponse(BaseModel):
     oracle_recent: list[OracleEntry] = []
     requests_pending: list[JoinRequestRow] = []  # PI: all pending; member: theirs only
     requests_mine: list[JoinRequestRow] = []     # the viewer's outgoing requests
+    sea_catalog: list[CatalogEntryRow] = []      # SEAs we offer (entire group sees)
+    inbound_requests: list[InboundRequestRow] = []  # receptionist queue (PI only)
     attention: list[AttentionItem]
     stats: StatStrip
     spark: list[int]

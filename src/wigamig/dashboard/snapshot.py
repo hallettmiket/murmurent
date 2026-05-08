@@ -24,8 +24,10 @@ from ..core.dashboard import DashboardSnapshot, _load_member_meta, _parse_certif
 from ..core.frontmatter import parse_file
 from ..core.projects import ProjectSummary, iter_local_projects, load_summary
 from ..core.agents import load_registry as load_agent_registry
+from ..core import cross_group as xgroup
 from ..core.repo import lab_mgmt_repo_root, wigamig_repo_root
 from ..core import requests as req_core
+from ..core import sea_catalog as catalog_core
 from ..core.sea import Sea, iter_seas
 from . import audit_log
 from . import contract as C
@@ -86,6 +88,8 @@ def build_response(
         oracle_recent=_oracle_recent(limit=8),
         requests_pending=_requests_pending(effective_persona, norm),
         requests_mine=_requests_mine(norm),
+        sea_catalog=_sea_catalog_rows(),
+        inbound_requests=_inbound_rows(effective_persona),
         attention=_attention(snap, effective_persona, project_summaries, today_d),
         stats=_stats(
             snap, all_seas, today_d,
@@ -930,6 +934,54 @@ def _requests_mine(viewer: str) -> list[C.JoinRequestRow]:
     ]
     mine.sort(key=lambda r: r.id, reverse=True)
     return [_to_request_row(r) for r in mine[:10]]
+
+
+def _sea_catalog_rows() -> list[C.CatalogEntryRow]:
+    """All SEAs we offer. Visible to every member (transparency)."""
+    rows: list[C.CatalogEntryRow] = []
+    for entry in catalog_core.iter_catalog():
+        rows.append(
+            C.CatalogEntryRow(
+                slug=entry.slug,
+                title=entry.title,
+                kind=entry.kind,  # type: ignore[arg-type]
+                contact=entry.contact,
+                description=entry.description,
+                turnaround_days=entry.turnaround_days,
+                prerequisites=list(entry.prerequisites),
+                accepting=entry.accepting,
+                created=entry.created,
+                updated=entry.updated,
+            )
+        )
+    return rows
+
+
+def _inbound_rows(persona: str) -> list[C.InboundRequestRow]:
+    """Receptionist queue. PI sees pending; members see only their own
+    routed-to entries."""
+    rows: list[C.InboundRequestRow] = []
+    for req in xgroup.iter_inbound():
+        # PI sees everything; member sees only requests routed to them.
+        # For now, we don't filter at member level since members don't
+        # currently have inbound visibility - PI handles all routing.
+        rows.append(
+            C.InboundRequestRow(
+                id=req.id,
+                catalog_slug=req.catalog_slug,
+                from_group=req.from_group,
+                from_handle=req.from_handle,
+                from_pi=req.from_pi or None,
+                description=req.description,
+                state=req.state,  # type: ignore[arg-type]
+                created_at=req.created_at,
+                routed_to=req.routed_to,
+                decline_reason=req.decline_reason,
+            )
+        )
+    if persona != "pi":
+        return []  # only the PI sees the receptionist box for v1
+    return rows
 
 
 def _first_paragraph(body: str, *, max_len: int = 240) -> str:

@@ -141,6 +141,8 @@ HIFI_TOP_LEVEL_KEYS = {
     "oracle_recent",
     "requests_pending",
     "requests_mine",
+    "sea_catalog",
+    "inbound_requests",
     "attention",
     "stats",
     "spark",
