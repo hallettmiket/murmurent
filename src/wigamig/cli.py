@@ -1116,5 +1116,88 @@ def oracle_decline_cmd(slug: str, reason: str) -> None:
     click.echo(f"Declined {path}: {reason}")
 
 
+# ---------------------------------------------------------------------------
+# member (Phase 13: roster mgmt)
+# ---------------------------------------------------------------------------
+
+
+@cli.group("member", help="Manage the lab's member roster.")
+def member_group() -> None:
+    pass
+
+
+@member_group.command("list", help="List every member with their status.")
+def member_list_cmd() -> None:
+    from .core import membership as _m
+    members = _m.iter_members()
+    if not members:
+        click.echo("No members.")
+        return
+    console = Console()
+    table = Table(title="Lab roster")
+    table.add_column("handle", style="bold")
+    table.add_column("full_name")
+    table.add_column("role")
+    table.add_column("status")
+    for rec in members:
+        table.add_row(
+            f"@{rec.handle}", rec.full_name, rec.role, rec.status
+        )
+    console.print(table)
+
+
+@member_group.command("add", help="(PI) Add a new member to the roster.")
+@click.argument("handle")
+@click.option("--full-name", required=True)
+@click.option("--role", default="postdoc")
+def member_add_cmd(handle: str, full_name: str, role: str) -> None:
+    from .core import membership as _m
+    from .core.identity import resolve as resolve_identity
+    from .core.lab import pi_handle
+
+    actor = resolve_identity(allow_unknown=False).handle.lower()
+    if actor != pi_handle().lower():
+        raise click.ClickException(f"Only the PI (@{pi_handle()}) can add members.")
+    try:
+        rec = _m.add(handle=handle, full_name=full_name, role=role)
+    except _m.MembershipError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Added @{rec.handle} ({rec.full_name}, {rec.role}).")
+
+
+@member_group.command("deactivate", help="(PI) Mark a member inactive.")
+@click.argument("handle")
+def member_deactivate_cmd(handle: str) -> None:
+    from .core import membership as _m
+    from .core.identity import resolve as resolve_identity
+    from .core.lab import pi_handle
+
+    actor = resolve_identity(allow_unknown=False).handle.lower()
+    if actor != pi_handle().lower():
+        raise click.ClickException(f"Only the PI (@{pi_handle()}) can deactivate members.")
+    try:
+        rec = _m.set_status(handle, _m.INACTIVE)
+    except _m.MembershipError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Deactivated @{rec.handle}.")
+
+
+@member_group.command("activate", help="(PI) Reactivate a previously-deactivated member.")
+@click.argument("handle")
+def member_activate_cmd(handle: str) -> None:
+    from .core import membership as _m
+    from .core.identity import resolve as resolve_identity
+    from .core.lab import pi_handle
+
+    actor = resolve_identity(allow_unknown=False).handle.lower()
+    if actor != pi_handle().lower():
+        raise click.ClickException(f"Only the PI (@{pi_handle()}) can activate members.")
+    try:
+        rec = _m.set_status(handle, _m.ACTIVE)
+    except _m.MembershipError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Activated @{rec.handle}.")
+
+
 if __name__ == "__main__":  # pragma: no cover
     cli()

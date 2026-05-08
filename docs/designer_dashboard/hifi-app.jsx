@@ -573,26 +573,162 @@ function Heatmap({ data, persona, span="c-7" }) {
 }
 
 /* ───────── group panel ───────── */
+async function postMemberAdd(body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/members" + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+async function postMemberStatus(handle, action) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/members/" + encodeURIComponent(handle) + "/" + encodeURIComponent(action)
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function AddMemberModal({ onClose }) {
+  const [handle, setHandle] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [role, setRole] = useState("postdoc");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!handle.trim() || !fullName.trim()) {
+      setErr("handle and full name are required"); return;
+    }
+    setBusy(true); setErr(null);
+    try {
+      await postMemberAdd({
+        handle: handle.trim().replace(/^@/, ""),
+        full_name: fullName.trim(),
+        role,
+      });
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+      onClose();
+    } catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
+    }}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:18, width:"min(480px, 92vw)",
+        display:"flex", flexDirection:"column", gap:8,
+      }}>
+        <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
+          Add member to lab
+        </h2>
+        <p className="muted" style={{fontSize:12, margin:0}}>
+          Creates <code>&lt;lab-mgmt&gt;/members/&lt;handle&gt;.md</code>. The new member will need to
+          push their own ORCID / contact info via the dashboard.
+        </p>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>handle (Western username, no @)</label>
+        <input value={handle} onChange={e => setHandle(e.target.value)} placeholder="e.g. jdoe123"
+               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>full name</label>
+        <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Jane Doe"
+               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2}}/>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>role</label>
+        <select value={role} onChange={e => setRole(e.target.value)}
+                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}>
+          <option value="postdoc">postdoc</option>
+          <option value="student">student</option>
+          <option value="research_assistant">research_assistant</option>
+          <option value="staff">staff</option>
+          <option value="collaborator">collaborator</option>
+        </select>
+        {err && <div style={{color:"var(--red)", fontSize:12}}>{err}</div>}
+        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:6}}>
+          <button type="button" className="btn sm ghost" onClick={onClose}>cancel</button>
+          <button type="submit" className="btn sm primary" disabled={busy}>
+            {busy ? "…" : "add member"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function GroupPanel({ peers, span="c-6" }) {
   const tcpsTone = { ok:"green", expiring:"amber", missing:"red" };
   const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
+  const [showAdd, setShowAdd] = useState(false);
+  const [busyHandle, setBusyHandle] = useState(null);
+
+  const refresh = async () => {
+    if (typeof window.__wigamigFetchData === "function") {
+      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    }
+  };
+  const onToggle = async (peer) => {
+    const action = peer.status === "active" ? "deactivate" : "activate";
+    if (action === "deactivate" && !window.confirm(
+      `Deactivate @${peer.handle}? They'll be unable to run wigamig actions but their history stays. ` +
+      `You can reactivate any time.`)) return;
+    setBusyHandle(peer.handle);
+    try { await postMemberStatus(peer.handle, action); await refresh(); }
+    catch (ex) { alert(ex.message || ex); }
+    finally { setBusyHandle(null); }
+  };
+
+  const activeCount = peers.filter(p => p.status === "active").length;
+  const inactiveCount = peers.length - activeCount;
   return (
     <div className={"panel "+span}>
       <header>
         <h2>Group</h2>
-        <span className="meta">
-          {peers.length} {persona === "pi" ? "members lab-wide" : "shared-project peers"}
-        </span>
+        <div className="row" style={{gap:6}}>
+          <span className="meta">
+            {isPI
+              ? `${activeCount} active${inactiveCount ? " · " + inactiveCount + " inactive" : ""}`
+              : `${peers.length} shared-project peers`}
+          </span>
+          {isPI && (
+            <button className="btn sm primary" onClick={() => setShowAdd(true)}>＋ add</button>
+          )}
+        </div>
       </header>
+      {showAdd && <AddMemberModal onClose={() => setShowAdd(false)} />}
       <div className="body" style={{padding:"6px 0"}}>
         {peers.map(p => (
-          <div key={p.handle} style={{padding:"9px 14px", borderBottom:"1px solid var(--rule)"}}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline"}}>
+          <div key={p.handle} style={{
+            padding:"9px 14px", borderBottom:"1px solid var(--rule)",
+            opacity: p.status === "inactive" ? 0.55 : 1,
+            background: p.status === "inactive" ? "var(--paper-2)" : "transparent",
+          }}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
               <div>
                 <span style={{fontWeight:500}}>{p.name}</span>
                 <span className="mono muted" style={{fontSize:11, marginLeft:6}}>@{p.handle} · {p.role}</span>
               </div>
-              <Pill tone={tcpsTone[p.tcps]}>tcps {p.tcps}</Pill>
+              <div className="row" style={{gap:6}}>
+                {p.status === "inactive" && <Pill tone="red">inactive</Pill>}
+                <Pill tone={tcpsTone[p.tcps]}>tcps {p.tcps}</Pill>
+              </div>
             </div>
             {(p.projects && p.projects.length > 0) && (
               <div className="row" style={{gap:4, marginTop:5, flexWrap:"wrap"}}>
@@ -606,15 +742,29 @@ function GroupPanel({ peers, span="c-6" }) {
                 ))}
               </div>
             )}
-            <div className="mono muted" style={{fontSize:11, marginTop:5, display:"flex", gap:14}}>
-              <span><strong style={{color:"var(--ink-2)"}}>{p.open_seas}</strong> open SEAs</span>
-              <span><strong style={{color:"var(--ink-2)"}}>{p.experiments}</strong> experiments</span>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:5}}>
+              <div className="mono muted" style={{fontSize:11, display:"flex", gap:14}}>
+                <span><strong style={{color:"var(--ink-2)"}}>{p.open_seas}</strong> open SEAs</span>
+                <span><strong style={{color:"var(--ink-2)"}}>{p.experiments}</strong> experiments</span>
+              </div>
+              {isPI && (
+                <button
+                  className="btn sm"
+                  disabled={busyHandle === p.handle}
+                  onClick={() => onToggle(p)}>
+                  {busyHandle === p.handle
+                    ? "…"
+                    : (p.status === "active" ? "deactivate" : "reactivate")}
+                </button>
+              )}
             </div>
           </div>
         ))}
         {peers.length === 0 && (
           <div className="muted" style={{padding:"14px", fontSize:13}}>
-            No peers in your projects.
+            {isPI
+              ? <>No members yet. Click <code>＋ add</code> to seed the lab roster.</>
+              : "No peers in your projects."}
           </div>
         )}
       </div>
