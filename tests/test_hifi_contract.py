@@ -145,6 +145,7 @@ HIFI_TOP_LEVEL_KEYS = {
     "group_members",
     "sea_catalog",
     "inbound_requests",
+    "training_compliance",
     "attention",
     "stats",
     "spark",

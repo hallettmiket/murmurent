@@ -74,6 +74,14 @@ class AddMemberBody(BaseModel):
     role: str = "staff"
 
 
+class WorkspaceLaunchBody(BaseModel):
+    """JSON body for ``POST /api/workspace/launch``."""
+
+    project: str
+    agents: list[str] = []
+    sea_id: int | None = None
+
+
 class CatalogEntryBody(BaseModel):
     """JSON body for ``POST /api/sea_catalog`` (upsert)."""
 
@@ -372,6 +380,66 @@ def create_app() -> FastAPI:
                 "resolved_by": req.resolved_by,
                 "decline_reason": req.decline_reason,
             },
+        }
+
+    # -----------------------------------------------------------------
+    # Workspace launcher (Phase 14)
+    # -----------------------------------------------------------------
+
+    @app.post("/api/workspace/launch")
+    def workspace_launch(
+        body: WorkspaceLaunchBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Open VSCode + per-agent iTerm windows for a project.
+
+        Pass ``project`` (the basename of a local project repo under
+        ``~/repos``) and ``agents`` (a list of agent names). Optionally
+        ``sea_id`` to focus on a specific SEA. The server spawns
+        ``scripts/start_workspace.sh`` in the background; the actual
+        windows pop up locally.
+        """
+        import subprocess
+        from ..core.repo import wigamig_repo_root
+        from ..core.projects import find_project as _find_project
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+
+        if not body.agents:
+            raise HTTPException(status_code=422, detail="at least one agent required")
+        if _find_project(body.project) is None:
+            raise HTTPException(status_code=404, detail=f"project not found: {body.project}")
+
+        script = wigamig_repo_root() / "scripts" / "start_workspace.sh"
+        if not script.is_file():
+            raise HTTPException(status_code=500, detail=f"launcher missing: {script}")
+
+        from ..core.projects import project_path
+        project_dir = project_path(body.project)
+        agents_csv = ",".join(body.agents)
+        cmd: list[str] = [str(script), str(project_dir), agents_csv]
+        if body.sea_id is not None:
+            cmd.append(str(body.sea_id))
+
+        try:
+            subprocess.Popen(  # noqa: S603 — args are list, never shelled
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                close_fds=True,
+            )
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"launcher failed: {exc}")
+
+        return {
+            "ok": True,
+            "project": body.project,
+            "project_dir": str(project_dir),
+            "agents": body.agents,
+            "sea_id": body.sea_id,
+            "cmd": cmd,
         }
 
     # -----------------------------------------------------------------

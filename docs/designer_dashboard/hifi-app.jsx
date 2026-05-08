@@ -170,6 +170,111 @@ function CmdBar({ query, setQuery }) {
   );
 }
 
+/* ───────── workspace launcher row ─────────
+   Under the command bar; pick a project + agents (+ optional SEA),
+   click 'open workspace' and the server runs scripts/start_workspace.sh
+   to lay out VSCode (left 65%) + agent iTerm windows (right 35%). */
+async function postWorkspaceLaunch(body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/workspace/launch" + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function WorkspaceLauncherRow() {
+  const projects = window.DATA.projects || [];
+  const allAgents = (window.DATA.agents || []).filter(a => !a.disabled);
+  const allSeas   = window.DATA.seas || [];
+  const [projectName, setProjectName] = useState(projects[0]?.name || "");
+  const [seaId, setSeaId] = useState("");
+  const [picked, setPicked] = useState(() => allAgents.slice(0, 3).map(a => a.name));
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const seasInProject = allSeas.filter(s => s.project === projectName);
+  const togglePick = (name) =>
+    setPicked(p => p.includes(name) ? p.filter(x => x !== name) : [...p, name]);
+
+  const launch = async () => {
+    if (!projectName) { setMsg("pick a project"); return; }
+    if (picked.length === 0) { setMsg("pick at least one agent"); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const r = await postWorkspaceLaunch({
+        project: projectName,
+        agents: picked,
+        sea_id: seaId ? parseInt(seaId, 10) : null,
+      });
+      setMsg(`opened ${r.agents.length} pane(s) for ${r.project}`);
+      setTimeout(() => setMsg(null), 3500);
+    } catch (ex) {
+      setMsg(String(ex.message || ex));
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div style={{
+      padding: "10px 12px", marginBottom: 14,
+      border: "1px solid var(--rule)", borderRadius: 2,
+      background: "var(--card)",
+      display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+    }}>
+      <span className="mono muted" style={{
+        fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase",
+      }}>open workspace</span>
+      <select value={projectName} onChange={e => setProjectName(e.target.value)}
+              style={{padding:"5px 8px", border:"1px solid var(--rule-strong)",
+                      borderRadius:2, fontFamily:"var(--mono)", fontSize:12}}>
+        {projects.length === 0 && <option value="">(no projects)</option>}
+        {projects.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+      </select>
+      <select value={seaId} onChange={e => setSeaId(e.target.value)}
+              style={{padding:"5px 8px", border:"1px solid var(--rule-strong)",
+                      borderRadius:2, fontFamily:"var(--mono)", fontSize:12}}>
+        <option value="">(no SEA focus)</option>
+        {seasInProject.map(s => (
+          <option key={s.id} value={s.id}>#{s.id} · {s.desc.slice(0, 40)}</option>
+        ))}
+      </select>
+      <span className="mono muted" style={{fontSize:10, letterSpacing:1.5, textTransform:"uppercase"}}>agents</span>
+      <div className="row" style={{gap:4, flexWrap:"wrap"}}>
+        {allAgents.map(a => (
+          <button
+            key={a.name}
+            type="button"
+            onClick={() => togglePick(a.name)}
+            className="mono"
+            style={{
+              fontSize:11, padding:"3px 8px", border:"1px solid var(--rule-strong)",
+              borderRadius:2, cursor:"pointer",
+              background: picked.includes(a.name) ? "var(--purple)" : "var(--paper-2)",
+              color: picked.includes(a.name) ? "#fff" : "var(--ink-2)",
+            }}>
+            {a.name}
+          </button>
+        ))}
+        {allAgents.length === 0 && (
+          <span className="muted" style={{fontSize:11}}>(no enabled agents)</span>
+        )}
+      </div>
+      <button className="btn sm primary" onClick={launch} disabled={busy}>
+        {busy ? "…" : "open workspace"}
+      </button>
+      {msg && <span style={{fontSize:11, color: /failed|HTTP/i.test(msg) ? "var(--red)" : "var(--muted)"}}>{msg}</span>}
+    </div>
+  );
+}
+
 /* ───────── stat strip ───────── */
 function Strip({ persona }) {
   const s = D.stats.seas, c = D.stats.compliance, inv = D.stats.inventory, nb = D.stats.notebook;
@@ -522,6 +627,112 @@ function ProjectsPanel({ projects, span="c-5" }) {
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+/* ───────── Western training compliance panel ─────────
+   Each member × each required cert grid. Status colours match the
+   Compliance heatmap (ok / amb / exp / mis) plus a "n/a" cell for
+   optional certs and "✓" for one-time certs already completed. */
+function TrainingCompliancePanel({ data, span="c-12" }) {
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
+  const me = (window.DATA.member || {}).handle;
+  const required = (data && data.required) || [];
+  const allMembers = (data && data.members) || [];
+  // Members see only their own row; PI sees everyone.
+  const members = isPI ? allMembers : allMembers.filter(m => m.handle === me);
+  if (required.length === 0) {
+    return (
+      <div className={"panel "+span}>
+        <header><h2>Compliance · Western training</h2></header>
+        <div className="body" style={{padding:14, fontSize:13, color:"var(--muted)"}}>
+          No compliance config. Seed <code>&lt;lab-mgmt&gt;/compliance.md</code> with the
+          Western required-training catalog.
+        </div>
+      </div>
+    );
+  }
+
+  const cellSym = {
+    ok: "✓", expiring: "~", expired: "!", missing: "?", "n/a": "·", one_time: "✓",
+  };
+  const cellClass = {
+    ok: "ok", expiring: "amb", expired: "exp", missing: "mis",
+    "n/a": "na", one_time: "ok",
+  };
+
+  // Roll-up summary across members for the meta header.
+  const counts = {expired:0, expiring:0, missing:0};
+  for (const m of members) for (const c of m.certs) {
+    if (c.status === "expired") counts.expired++;
+    else if (c.status === "expiring") counts.expiring++;
+    else if (c.status === "missing") counts.missing++;
+  }
+
+  return (
+    <div className={"panel "+span}>
+      <header>
+        <h2>Compliance · Western training</h2>
+        <span className="meta">
+          {counts.expired} expired · {counts.expiring} expiring · {counts.missing} missing
+        </span>
+      </header>
+      <div className="body" style={{overflowX:"auto"}}>
+        <table className="heat" style={{minWidth:"max-content"}}>
+          <thead>
+            <tr>
+              <th style={{textAlign:"left", minWidth:160}}>member</th>
+              {required.map(s => (
+                <th key={s.code}
+                    title={s.name + " (" + s.code + ")"
+                      + (s.cadence_years ? " · renew every " + s.cadence_years + "y" : " · one-time")}>
+                  {s.short}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {members.map(m => (
+              <tr key={m.handle} style={{opacity: m.member_status === "inactive" ? 0.4 : 1}}>
+                <td style={{textAlign:"left"}}>
+                  <div>{m.name}</div>
+                  <div className="mono muted" style={{fontSize:10}}>
+                    @{m.handle} · {m.role}
+                  </div>
+                </td>
+                {m.certs.map(cell => (
+                  <td key={cell.code}>
+                    <span
+                      className={"cell " + (cellClass[cell.status] || "na")}
+                      title={cell.code + ": " + cell.status
+                             + (cell.expires ? " (expires " + cell.expires + ")" : "")}>
+                      {cellSym[cell.status] || "·"}
+                    </span>
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {members.length === 0 && (
+              <tr><td colSpan={required.length + 1} className="muted"
+                      style={{padding:14, textAlign:"left"}}>
+                No members declared yet.
+              </td></tr>
+            )}
+          </tbody>
+        </table>
+        <div className="row" style={{marginTop:10, fontSize:11, color:"var(--muted)", flexWrap:"wrap"}}>
+          <span><span className="cell ok">✓</span> compliant / completed</span>
+          <span><span className="cell amb">~</span> expiring</span>
+          <span><span className="cell exp">!</span> expired</span>
+          <span><span className="cell mis">?</span> missing</span>
+          <span><span className="cell na">·</span> n/a</span>
+          <span style={{marginLeft:"auto", fontStyle:"italic"}}>
+            sourced from <code>&lt;lab-mgmt&gt;/compliance.md</code>
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -2089,8 +2300,7 @@ function App() {
       <TopBar />
       <div className="app">
         <CmdBar query={query} setQuery={setQuery} />
-        {/* The stat strip ("SEAs this week / compliance / etc.") was removed
-            per user feedback - the same info is in the panels below. */}
+        <WorkspaceLauncherRow />
 
         {/* Daily action zone: SEAs > Requests > Receptionist (PI). */}
         <div className="grid" style={{marginBottom:14}}>
@@ -2138,9 +2348,14 @@ function App() {
           <AgentsPanel agents={D.agents} span="c-12" />
         </div>
 
-        {/* Compliance - most sporadic; lives at the bottom. */}
-        <div className="grid">
+        {/* Compliance - most sporadic; lives at the bottom.
+            Top: TCPS_2 access matrix per project (clinical access).
+            Bottom: full Western training roster per member. */}
+        <div className="grid" style={{marginBottom:14}}>
           <Heatmap data={D.heatmap} persona={persona} span="c-12" />
+        </div>
+        <div className="grid">
+          <TrainingCompliancePanel data={D.training_compliance} span="c-12" />
         </div>
       </div>
       <FooterMeta />
