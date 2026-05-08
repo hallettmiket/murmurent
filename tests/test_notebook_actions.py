@@ -12,6 +12,7 @@ silent no-op).
 from __future__ import annotations
 
 import datetime as _dt
+from pathlib import Path
 
 import pytest
 
@@ -64,6 +65,38 @@ def test_editor_env_fallback(lab_notebook, monkeypatch):
     assert cmd[0] == "nano"
 
 
+def test_obsidian_wins_when_file_inside_registered_vault(monkeypatch, tmp_path):
+    """When the file is in a registered Obsidian vault, Obsidian opens
+    even if $EDITOR is set — the file lives in the user's Obsidian world."""
+    from wigamig.core import obsidian as _obs
+
+    vault = _obs.Vault(name="lab-vault", path=tmp_path / "lab-vault", ts=1234)
+    monkeypatch.setattr(_obs, "discover_vaults", lambda: [vault])
+    monkeypatch.setenv("EDITOR", "nano")  # would win in the old order
+    monkeypatch.delenv("WIGAMIG_NOTEBOOK_EDITOR", raising=False)
+    nb = vault.path / "lab-notebook"
+    nb.mkdir(parents=True)
+    target = nb / "2026-05-08.md"
+
+    cmd = notebook_actions.resolve_editor_cmd(target)
+    assert any("obsidian://" in arg for arg in cmd)
+    # URL should point at the right vault + relative path:
+    full = " ".join(cmd)
+    assert "vault=lab-vault" in full
+    assert "lab-notebook/2026-05-08" in full
+
+
+def test_obsidian_url_skipped_when_file_outside_any_vault(monkeypatch, tmp_path):
+    """File outside vaults -> Obsidian doesn't fire; $EDITOR wins."""
+    from wigamig.core import obsidian as _obs
+
+    monkeypatch.setattr(_obs, "discover_vaults", lambda: [])
+    monkeypatch.setenv("EDITOR", "nano")
+    monkeypatch.delenv("WIGAMIG_NOTEBOOK_EDITOR", raising=False)
+    cmd = notebook_actions.resolve_editor_cmd(tmp_path / "elsewhere" / "x.md")
+    assert cmd[0] == "nano"
+
+
 def test_visual_env_fallback(lab_notebook, monkeypatch):
     monkeypatch.delenv("EDITOR", raising=False)
     monkeypatch.setenv("VISUAL", "ed")
@@ -89,6 +122,53 @@ def test_resolver_raises_when_nothing_available(lab_notebook, monkeypatch):
 def test_entry_path_uses_overridden_folder(lab_notebook):
     p = notebook_actions.entry_path("2026-05-08")
     assert p == lab_notebook / "2026-05-08.md"
+
+
+def test_notebook_folder_prefers_obsidian_vault(monkeypatch, tmp_path):
+    """When a vault is registered and no $WIGAMIG_NOTEBOOK_DIR override,
+    the notebook lives inside the vault."""
+    from wigamig.core import obsidian as _obs
+
+    vault = _obs.Vault(name="my-vault", path=tmp_path / "my-vault", ts=1)
+    vault.path.mkdir()
+    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    monkeypatch.setattr(_obs, "preferred_vault", lambda: vault)
+
+    folder = notebook_actions.notebook_folder()
+    assert folder == vault.path / "lab-notebook"
+
+
+def test_notebook_folder_migrates_legacy_into_vault(monkeypatch, tmp_path):
+    """First call with a vault registered moves stale ~/lab-notebook entries in."""
+    from wigamig.core import obsidian as _obs
+
+    vault = _obs.Vault(name="v", path=tmp_path / "v", ts=1)
+    vault.path.mkdir()
+    legacy = tmp_path / "home" / "lab-notebook"
+    legacy.mkdir(parents=True)
+    (legacy / "2026-05-01.md").write_text("hello", encoding="utf-8")
+    (legacy / "2026-05-02.md").write_text("world", encoding="utf-8")
+
+    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    monkeypatch.setattr(_obs, "preferred_vault", lambda: vault)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
+
+    folder = notebook_actions.notebook_folder()
+    assert folder == vault.path / "lab-notebook"
+    assert (folder / "2026-05-01.md").is_file()
+    assert (folder / "2026-05-02.md").is_file()
+    # Legacy dir should now be empty of .md files (moved, not copied).
+    assert not list(legacy.glob("*.md"))
+
+
+def test_notebook_folder_falls_back_to_home_when_no_vault(monkeypatch, tmp_path):
+    from wigamig.core import obsidian as _obs
+
+    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    monkeypatch.setattr(_obs, "preferred_vault", lambda: None)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    folder = notebook_actions.notebook_folder()
+    assert folder == tmp_path / "lab-notebook"
 
 
 def test_default_entry_text_has_required_frontmatter(lab_notebook):
