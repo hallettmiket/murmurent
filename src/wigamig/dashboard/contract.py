@@ -164,6 +164,12 @@ class ProjectRow(BaseModel):
     members: int
     openSeas: int
     lastActivity: str
+    # Phase 9: where to find the project's artefacts.
+    github_repo: str | None = None    # e.g. "hallettmiket/dcis_sc_tutorial"
+    slack_channel: str | None = None  # e.g. "proj-dcis_sc_tutorial"
+    slack_url: str | None = None      # full deep-link, when known
+    refined_path: str | None = None   # /data/lab_vm/refined/<project>
+    raw_path: str | None = None       # /data/lab_vm/raw/<project>
 
 
 class PeerRow(BaseModel):
@@ -188,6 +194,7 @@ class AgentRow(BaseModel):
     freeze: Literal["frozen", "personal"]
     model: str | None = None
     required_tools: list[str] = []
+    disabled: bool = False  # personal agents only; frozen are always active
 
 
 class OracleEntry(BaseModel):
@@ -202,17 +209,21 @@ class OracleEntry(BaseModel):
 
 
 class JoinRequestRow(BaseModel):
-    """Phase 8: project-join request row for the Requests panel."""
+    """Phase 8 / 9: project-join or project-create request row."""
 
     id: int
     requester: str  # ``@handle``
     project: str
+    kind: Literal["project-join", "project-create"] = "project-join"
     state: Literal["pending", "approved", "declined"]
     justification: str = ""
     created_at: str | None = None
     resolved_at: str | None = None
     resolved_by: str | None = None
     decline_reason: str | None = None
+    proposed_members: list[str] | None = None
+    proposed_sensitivity: str | None = None
+    proposed_lead: str | None = None
 
 
 # ---------------------------------------------------------------------------

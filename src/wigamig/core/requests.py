@@ -44,7 +44,7 @@ from .repo import MEMBERS_FILENAME, lab_mgmt_repo_root
 
 REQUESTS_SUBDIR = "requests"
 REQUEST_ID_RE = re.compile(r"^(?P<id>\d+)\.md$")
-VALID_KINDS: tuple[str, ...] = ("project-join",)
+VALID_KINDS: tuple[str, ...] = ("project-join", "project-create")
 VALID_STATES: tuple[str, ...] = ("pending", "approved", "declined")
 TERMINAL_STATES = frozenset({"approved", "declined"})
 
@@ -63,7 +63,13 @@ class RequestNotFound(RequestError):
 
 @dataclass
 class JoinRequest:
-    """One project-join request loaded from disk."""
+    """One request (project-join or project-create) loaded from disk.
+
+    For ``kind == "project-create"`` the ``project`` field is the
+    *proposed* project name (which doesn't exist yet); the additional
+    ``proposed_members``, ``proposed_sensitivity``, and
+    ``proposed_lead`` fields capture the rest of the spec.
+    """
 
     id: int
     requester: str
@@ -77,6 +83,10 @@ class JoinRequest:
     decline_reason: str | None = None
     body: str = ""
     path: Path | None = None
+    # project-create extras (ignored for project-join):
+    proposed_members: list[str] | None = None
+    proposed_sensitivity: str | None = None
+    proposed_lead: str | None = None
 
     def to_meta(self) -> dict[str, Any]:
         meta: dict[str, Any] = {
@@ -92,6 +102,9 @@ class JoinRequest:
             ("resolved_at", self.resolved_at),
             ("resolved_by", self.resolved_by),
             ("decline_reason", self.decline_reason),
+            ("proposed_members", self.proposed_members),
+            ("proposed_sensitivity", self.proposed_sensitivity),
+            ("proposed_lead", self.proposed_lead),
         ):
             if value is not None:
                 meta[key] = value
@@ -117,6 +130,9 @@ def parse_request(path: Path) -> JoinRequest:
     """Parse one request markdown file."""
     parsed = parse_file(path)
     meta = parsed.meta
+    proposed_members = meta.get("proposed_members")
+    if proposed_members is not None and not isinstance(proposed_members, list):
+        proposed_members = list(proposed_members)
     return JoinRequest(
         id=int(meta["id"]),
         requester=str(meta["requester"]),
@@ -128,6 +144,9 @@ def parse_request(path: Path) -> JoinRequest:
         resolved_at=_opt_str(meta.get("resolved_at")),
         resolved_by=_opt_str(meta.get("resolved_by")),
         decline_reason=_opt_str(meta.get("decline_reason")),
+        proposed_members=proposed_members,
+        proposed_sensitivity=_opt_str(meta.get("proposed_sensitivity")),
+        proposed_lead=_opt_str(meta.get("proposed_lead")),
         body=parsed.body,
         path=path,
     )
@@ -233,17 +252,100 @@ def approve(
     approver: str,
     today: _dt.date | None = None,
 ) -> JoinRequest:
-    """Mark the request approved and add the requester to the project."""
+    """Mark the request approved and apply the appropriate side effect.
+
+    For ``project-join``: adds the requester to the existing project's
+    MEMBERS file + CHARTER frontmatter.
+
+    For ``project-create``: scaffolds a brand-new project repo with the
+    proposed members, sensitivity, and lead. The requester is added to
+    members automatically (otherwise they couldn't see what they
+    proposed).
+    """
     if req.state in TERMINAL_STATES:
         raise RequestStateError(
             f"request #{req.id} is already {req.state}; cannot approve."
         )
     today = today or _dt.date.today()
-    _add_to_project_members(req.project, req.requester)
+    if req.kind == "project-create":
+        _create_project_from_request(req)
+    else:
+        _add_to_project_members(req.project, req.requester)
     req.state = "approved"
     req.resolved_at = today.isoformat()
     req.resolved_by = _at(approver)
     return req
+
+
+def file_create_request(
+    *,
+    requester: str,
+    project: str,
+    proposed_members: list[str],
+    sensitivity: str = "standard",
+    proposed_lead: str | None = None,
+    justification: str = "",
+    today: _dt.date | None = None,
+) -> JoinRequest:
+    """File a ``project-create`` request.
+
+    Refuses if a project with that name already exists locally.
+    """
+    today = today or _dt.date.today()
+    if find_project(project) is not None:
+        raise RequestError(f"project already exists: {project}")
+    if not project.replace("_", "").isalnum():
+        raise RequestError(
+            f"project name must be alphanumeric + underscore; got {project!r}"
+        )
+    norm_members = [_at(m) for m in proposed_members if m.strip()]
+    if _at(requester) not in norm_members:
+        norm_members.insert(0, _at(requester))
+    if not norm_members:
+        raise RequestError("project-create needs at least one member")
+    # No duplicate-pending check here — multiple people might propose related
+    # projects and the PI sorts it out.
+
+    req = JoinRequest(
+        id=next_request_id(),
+        requester=_at(requester),
+        project=project,
+        kind="project-create",
+        justification=justification,
+        state="pending",
+        created_at=today.isoformat(),
+        proposed_members=norm_members,
+        proposed_sensitivity=sensitivity,
+        proposed_lead=_at(proposed_lead) if proposed_lead else _at(requester),
+    )
+    write_request(req)
+    return req
+
+
+def _create_project_from_request(req: JoinRequest) -> None:
+    """Run the actual scaffolding for an approved project-create request."""
+    if req.kind != "project-create":
+        return
+    members_csv = ",".join(req.proposed_members or [])
+    sensitivity = req.proposed_sensitivity or "standard"
+    lead = req.proposed_lead or req.requester
+    description = req.justification or f"Proposed by {req.requester}."
+    # Reuse the CLI command's logic — it already handles charter,
+    # MEMBERS file, lab-VM dirs, and the lab-mgmt registry entry.
+    from ..commands import project_cmd as _project_cmd
+    _project_cmd.cmd_new(
+        req.project,
+        charter_path=None,
+        members_csv=members_csv,
+        description=description,
+        sensitivity=sensitivity,
+        choreography=None,
+        reb_number=None,
+        reb_expires=None,
+        data_residency=None,
+        lead=lead,
+        skip_github=True,  # PI can push to GitHub manually after approval
+    )
 
 
 def decline(

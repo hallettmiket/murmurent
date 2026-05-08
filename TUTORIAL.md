@@ -97,12 +97,12 @@ What to check:
 
 ## Day 3 — finalisation choreography (collaborative)
 
-All three students together. Goal: walk SEA #3 (Allie's methodology review with Mike) through `examine -> conclude`.
+All three students together. Goal: walk SEA #3 (Allie's methodology review with @mhallet) through `examine -> conclude`.
 
-As Mike (squad lead for #3):
+As mhallet (squad lead for #3):
 
 ```bash
-WIGAMIG_USER=mike wigamig sea examine 3
+WIGAMIG_USER=mhallet wigamig sea examine 3
 # -> scaffolds ~/repos/dcis_sc_tutorial/deliberations/sea/3.md
 #    with empty agent + member sections.
 ```
@@ -114,7 +114,7 @@ section of `deliberations/sea/3.md`:
 ```bash
 # In separate CC sessions:
 # WIGAMIG_USER=allie  -> ask the bookworm agent for citations.
-# WIGAMIG_USER=mike   -> ask the adversary agent to challenge the methodology.
+# WIGAMIG_USER=mhallet   -> ask the adversary agent to challenge the methodology.
 # WIGAMIG_USER=bob    -> ask the artist agent for any figure suggestions.
 ```
 
@@ -122,7 +122,7 @@ When the agent + member sections look complete:
 
 ```bash
 echo "Pipeline assumptions hold; recommend continuing." > /tmp/sea3.md
-WIGAMIG_USER=mike wigamig sea conclude 3 --statement /tmp/sea3.md
+WIGAMIG_USER=mhallet wigamig sea conclude 3 --statement /tmp/sea3.md
 ```
 
 What to check:
@@ -135,7 +135,7 @@ Optional next step: promote the statement to a finding.
 ```bash
 mkdir -p ~/repos/dcis_sc_tutorial/findings/sea
 cp /tmp/sea3.md ~/repos/dcis_sc_tutorial/findings/sea/3.md
-WIGAMIG_USER=mike wigamig push dcis_sc_tutorial --finalize \
+WIGAMIG_USER=mhallet wigamig push dcis_sc_tutorial --finalize \
     --message "promote SEA 3 statement to finding"
 ```
 

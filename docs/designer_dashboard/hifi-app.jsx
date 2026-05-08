@@ -141,10 +141,10 @@ function TopBar() {
   );
 }
 
-function CmdBar({ persona, setPersona, query, setQuery }) {
-  // Phase 3: hide the persona toggle entirely when the signed-in user
-  // isn't authorised. Backend stamps `member.can_pi` based on PI handle.
-  const canPi = !!(window.DATA.member && window.DATA.member.can_pi);
+function CmdBar({ query, setQuery }) {
+  // The persona is derived from lab.md (the PI handle), not chosen by the
+  // user. The role badge below the search is informational, not interactive.
+  const persona = window.DATA.persona || "member";
   return (
     <div className="cmdbar">
       <div className="home">wigamig <small>v0.7</small></div>
@@ -157,12 +157,15 @@ function CmdBar({ persona, setPersona, query, setQuery }) {
         />
         <K>⌘K</K>
       </div>
-      {canPi && (
-        <div className="persona" role="tablist">
-          <button className={persona==="member"?"on":""} onClick={()=>setPersona("member")}>member</button>
-          <button className={persona==="pi"?"on":""}     onClick={()=>setPersona("pi")}>PI</button>
-        </div>
-      )}
+      <div className="persona-badge" title={
+        persona === "pi"
+          ? "You are the lab PI per lab.md (see <lab-mgmt>/lab.md)."
+          : "You are a lab member per lab.md."
+      }>
+        <span className={"role-pill "+(persona==="pi"?"pi":"member")}>
+          {persona === "pi" ? "PI VIEW" : "MEMBER VIEW"}
+        </span>
+      </div>
     </div>
   );
 }
@@ -213,9 +216,144 @@ function Strip({ persona }) {
 /* (Attention "What needs you today" panel removed — its red/amber items
    are already surfaced by Compliance, Inventory, and the SEAs in-tray.) */
 
+/* SEA detail modal: GET /api/sea/{project}/{id} -> body + frontmatter. */
+function SeaDetailModal({ project, id, onClose }) {
+  const [data, setData] = useState(null);
+  const [err, setErr]   = useState(null);
+  useEffect(() => {
+    fetch("/api/sea/" + encodeURIComponent(project) + "/" + encodeURIComponent(id))
+      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(setData)
+      .catch(ex => setErr(String(ex.message || ex)));
+  }, [project, id]);
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:0, width:"min(720px, 92vw)", maxHeight:"86vh",
+        display:"flex", flexDirection:"column",
+      }}>
+        <div style={{
+          padding:"12px 18px", borderBottom:"1px solid var(--rule)",
+          display:"flex", justifyContent:"space-between", alignItems:"baseline",
+        }}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
+            SEA #{id} · {project}
+          </h2>
+          <button className="btn sm ghost" onClick={onClose}>✕ close</button>
+        </div>
+        <div style={{padding:"14px 18px", overflowY:"auto", flex:1}}>
+          {err && <div style={{color:"var(--red)"}}>{err}</div>}
+          {!data && !err && <div className="muted">Loading…</div>}
+          {data && (
+            <>
+              <div className="mono muted" style={{fontSize:11, marginBottom:10}}>
+                {data.from} → {data.to} · kind <strong>{data.kind}</strong> · state <strong>{data.state}</strong>
+                {data.delivery && <span> · delivery <code>{data.delivery}</code></span>}
+              </div>
+              <p style={{fontSize:14, lineHeight:1.5}}>{data.description}</p>
+              <pre style={{
+                fontSize:12, fontFamily:"var(--mono)", whiteSpace:"pre-wrap",
+                background:"var(--paper-2)", padding:12, borderRadius:2,
+                border:"1px solid var(--rule)", overflowX:"auto",
+              }}>{data.body || "(no body)"}</pre>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* New SEA form modal: POST /api/sea/{project}/new */
+function NewSeaModal({ projects, onClose }) {
+  const [project, setProject]         = useState(projects[0]?.name || "");
+  const [toTarget, setToTarget]       = useState("");
+  const [kind, setKind]               = useState("analysis");
+  const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState(null);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!toTarget.trim() || !description.trim()) {
+      setErr("to: and description are required"); return;
+    }
+    setBusy(true); setErr(null);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const userParam = params.get("user");
+      const url = "/api/sea/" + encodeURIComponent(project) + "/new"
+        + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ to_target: toTarget.trim(), kind, description: description.trim() }),
+      });
+      if (!res.ok) {
+        let detail = "HTTP " + res.status;
+        try { detail = (await res.json()).detail || detail; } catch (_) {}
+        throw new Error(detail);
+      }
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+      onClose();
+    } catch (ex) {
+      setErr(String(ex.message || ex));
+    } finally { setBusy(false); }
+  };
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
+    }}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:18, width:"min(560px, 92vw)",
+        display:"flex", flexDirection:"column", gap:10,
+      }}>
+        <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
+          New SEA
+        </h2>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>project</label>
+        <select value={project} onChange={e => setProject(e.target.value)}
+                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}>
+          {projects.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+        </select>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>to (recipient handle, e.g. @bob)</label>
+        <input value={toTarget} onChange={e => setToTarget(e.target.value)} placeholder="@bob"
+               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>kind</label>
+        <select value={kind} onChange={e => setKind(e.target.value)}
+                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}>
+          <option value="skill">skill</option>
+          <option value="experiment">experiment</option>
+          <option value="analysis">analysis</option>
+        </select>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>description</label>
+        <textarea value={description} onChange={e => setDescription(e.target.value)}
+                  rows={4} placeholder="One-paragraph statement of what you're asking for."
+                  style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--serif)", fontSize:14}}/>
+        {err && <div style={{color:"var(--red)", fontSize:12}}>{err}</div>}
+        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:6}}>
+          <button type="button" className="btn sm ghost" onClick={onClose}>cancel</button>
+          <button type="submit" className="btn sm primary" disabled={busy}>
+            {busy ? "…" : "file SEA"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 /* ───────── SEAs panel ───────── */
 function SeasPanel({ seas, span="c-7" }) {
   const [tab, setTab] = useState("in");
+  const [showNew, setShowNew] = useState(false);
+  const [openSea, setOpenSea] = useState(null);  // {project, id}
   const filtered = seas.filter(s => s.dir === tab);
   return (
     <div className={"panel "+span}>
@@ -226,9 +364,22 @@ function SeasPanel({ seas, span="c-7" }) {
             <button className={tab==="in"?"on":""}  onClick={()=>setTab("in")} style={{padding:"5px 10px",fontSize:12}}>incoming&nbsp;·&nbsp;{seas.filter(s=>s.dir==="in").length}</button>
             <button className={tab==="out"?"on":""} onClick={()=>setTab("out")} style={{padding:"5px 10px",fontSize:12}}>outgoing&nbsp;·&nbsp;{seas.filter(s=>s.dir==="out").length}</button>
           </div>
-          <button className="btn sm">＋ new SEA</button>
+          <button className="btn sm" onClick={() => setShowNew(true)}>＋ new SEA</button>
         </div>
       </header>
+      {showNew && (
+        <NewSeaModal
+          projects={window.DATA.projects || []}
+          onClose={() => setShowNew(false)}
+        />
+      )}
+      {openSea && (
+        <SeaDetailModal
+          project={openSea.project}
+          id={openSea.id}
+          onClose={() => setOpenSea(null)}
+        />
+      )}
       <div className="body" style={{padding:0}}>
         <table className="dt">
           <thead>
@@ -246,7 +397,12 @@ function SeasPanel({ seas, span="c-7" }) {
           <tbody>
             {filtered.map(s => (
               <tr key={s.id}>
-                <td className="num"><a href="#">#{s.id}</a></td>
+                <td className="num">
+                  <a
+                    href="#"
+                    onClick={e => { e.preventDefault(); setOpenSea({project: s.project, id: s.id}); }}
+                  >#{s.id}</a>
+                </td>
                 <td><Pill tone={s.state==="complete"?"green":s.state==="claimed"?"purple":"outline"}>{s.state}</Pill></td>
                 <td className="mono muted" style={{fontSize:12}}>{s.kind}</td>
                 <td>{s.desc}</td>
@@ -272,9 +428,10 @@ function SeasPanel({ seas, span="c-7" }) {
 }
 
 /* ───────── projects panel ───────── */
-function ProjectsPanel({ projects }) {
+function ProjectsPanel({ projects, span="c-5" }) {
+  const [openProj, setOpenProj] = useState(null);
   return (
-    <div className="panel c-5">
+    <div className={"panel "+span}>
       <header>
         <h2>Projects</h2>
         <span className="meta">{projects.length} active · {projects.reduce((a,p)=>a+p.openSeas,0)} open SEAs</span>
@@ -287,17 +444,54 @@ function ProjectsPanel({ projects }) {
           </tr></thead>
           <tbody>
             {projects.map(p => (
-              <tr key={p.name}>
-                <td>
-                  <div style={{fontWeight:500}}>{p.name}</div>
-                  <div className="mono muted" style={{fontSize:11}}>{p.choreo}</div>
-                </td>
-                <td><Pill tone={p.sens==="clinical"?"red":""}>{p.sens}</Pill></td>
-                <td className="mono" style={{fontSize:12}}>{p.lead}</td>
-                <td className="num">{p.members}</td>
-                <td className="num"><strong>{p.openSeas}</strong></td>
-                <td className="muted" style={{fontSize:12}}>{p.lastActivity}</td>
-              </tr>
+              <React.Fragment key={p.name}>
+                <tr style={{cursor:"pointer"}} onClick={() => setOpenProj(openProj === p.name ? null : p.name)}>
+                  <td>
+                    <div style={{fontWeight:500}}>{p.name}</div>
+                    <div className="mono muted" style={{fontSize:11}}>{p.choreo}</div>
+                  </td>
+                  <td><Pill tone={p.sens==="clinical"?"red":""}>{p.sens}</Pill></td>
+                  <td className="mono" style={{fontSize:12}}>{p.lead}</td>
+                  <td className="num">{p.members}</td>
+                  <td className="num"><strong>{p.openSeas}</strong></td>
+                  <td className="muted" style={{fontSize:12}}>{p.lastActivity}</td>
+                </tr>
+                {openProj === p.name && (
+                  <tr>
+                    <td colSpan={6} style={{
+                      background:"var(--paper-2)",
+                      padding:"10px 12px",
+                      fontSize:12, fontFamily:"var(--mono)",
+                      borderBottom:"1px solid var(--rule)",
+                    }}>
+                      {p.github_repo && (
+                        <div>
+                          <span className="muted">github</span>{" "}
+                          <a href={"https://github.com/" + p.github_repo} target="_blank" rel="noopener">
+                            {p.github_repo}
+                          </a>
+                        </div>
+                      )}
+                      {p.slack_channel && (
+                        <div>
+                          <span className="muted">slack</span>{" "}
+                          {p.slack_url ? (
+                            <a href={p.slack_url} target="_blank" rel="noopener">#{p.slack_channel}</a>
+                          ) : (
+                            <span>#{p.slack_channel}</span>
+                          )}
+                        </div>
+                      )}
+                      {p.refined_path && (
+                        <div><span className="muted">refined</span> <code>{p.refined_path}</code></div>
+                      )}
+                      {p.raw_path && (
+                        <div><span className="muted">raw</span> <code>{p.raw_path}</code></div>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
@@ -402,34 +596,95 @@ function GroupPanel({ peers, span="c-6" }) {
 }
 
 /* ───────── agents panel ───────── */
+async function postAgentToggle(name, action) {
+  const res = await fetch(
+    "/api/agents/" + encodeURIComponent(name) + "/" + encodeURIComponent(action),
+    { method: "POST", headers: { Accept: "application/json" } }
+  );
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function AgentToggleButton({ agent }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState(null);
+  const target = agent.disabled ? "enable" : "disable";
+  const onClick = async () => {
+    setBusy(true); setErr(null);
+    try {
+      await postAgentToggle(agent.name, target);
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+    } catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(false); }
+  };
+  if (agent.freeze === "frozen") {
+    return (
+      <span className="mono muted" style={{fontSize:10, letterSpacing:1}}
+            title="Frozen agents change via PR against agents/<name>.md">
+        FROZEN
+      </span>
+    );
+  }
+  return (
+    <span style={{display:"inline-flex", alignItems:"center", gap:6}}>
+      <button className="btn sm" disabled={busy} onClick={onClick}>
+        {busy ? "…" : target}
+      </button>
+      {err && <span style={{fontSize:10, color:"var(--red)"}}>{err}</span>}
+    </span>
+  );
+}
+
 function AgentsPanel({ agents, span="c-4" }) {
   const list = agents || [];
+  // Render as a 2-column compact grid since this panel is now full-width.
   return (
     <div className={"panel "+span}>
       <header>
         <h2>Agents</h2>
-        <span className="meta">{list.length} installed</span>
+        <span className="meta">
+          {list.length} installed · {list.filter(a => a.disabled).length} disabled
+        </span>
       </header>
-      <div className="body" style={{padding:"6px 0"}}>
-        {list.map(a => (
-          <div key={a.name} style={{padding:"7px 14px", borderBottom:"1px solid var(--rule)"}}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline"}}>
-              <span style={{fontWeight:500, textTransform:"capitalize"}}>{a.name}</span>
-              <Pill tone={a.freeze === "frozen" ? "purple" : "outline"}>{a.freeze}</Pill>
+      <div className="body" style={{padding:0}}>
+        <div style={{display:"grid", gridTemplateColumns:"repeat(2, 1fr)"}}>
+          {list.map(a => (
+            <div key={a.name} style={{
+              padding:"9px 14px", borderBottom:"1px solid var(--rule)",
+              borderRight:"1px solid var(--rule)",
+              opacity: a.disabled ? 0.55 : 1,
+            }}>
+              <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
+                <div>
+                  <span style={{fontWeight:500, textTransform:"capitalize"}}>{a.name}</span>
+                  {a.disabled && (
+                    <span className="mono muted" style={{fontSize:10, marginLeft:8}}>
+                      DISABLED
+                    </span>
+                  )}
+                </div>
+                <AgentToggleButton agent={a} />
+              </div>
+              <div className="muted" style={{fontSize:12, marginTop:3, lineHeight:1.4}}>
+                {a.description}
+              </div>
+              <div className="mono muted" style={{fontSize:10, marginTop:4, letterSpacing:1}}>
+                {a.model && <span>{a.model.toUpperCase()}</span>}
+                {a.required_tools && a.required_tools.length > 0 && (
+                  <span style={{marginLeft:10}}>
+                    · {a.required_tools.length} tool{a.required_tools.length === 1 ? "" : "s"}
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="muted" style={{fontSize:12, marginTop:2, lineHeight:1.4}}>
-              {a.description}
-            </div>
-            <div className="mono muted" style={{fontSize:10, marginTop:3, letterSpacing:1}}>
-              {a.model && <span>{a.model.toUpperCase()}</span>}
-              {a.required_tools && a.required_tools.length > 0 && (
-                <span style={{marginLeft:10}}>
-                  · {a.required_tools.length} tool{a.required_tools.length === 1 ? "" : "s"}
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
         {list.length === 0 && (
           <div className="muted" style={{padding:"14px", fontSize:13}}>
             No agents installed. Run <code className="mono">wigamig agent list</code>.
@@ -479,6 +734,96 @@ async function postJoinRequest(project, justification) {
   return res.json();
 }
 
+async function postCreateProjectRequest(payload) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/request/create-project" + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function NewProjectModal({ onClose }) {
+  const [name, setName] = useState("");
+  const [members, setMembers] = useState("");
+  const [sensitivity, setSensitivity] = useState("standard");
+  const [justification, setJustification] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) { setErr("project name is required"); return; }
+    setBusy(true); setErr(null);
+    try {
+      const proposed_members = members.split(",").map(s => s.trim()).filter(Boolean);
+      await postCreateProjectRequest({
+        project: name.trim(),
+        proposed_members,
+        sensitivity,
+        justification: justification.trim(),
+      });
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+      onClose();
+    } catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
+    }}>
+      <form onSubmit={submit} onClick={e => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:18, width:"min(560px, 92vw)",
+        display:"flex", flexDirection:"column", gap:8,
+      }}>
+        <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
+          Propose new project
+        </h2>
+        <p className="muted" style={{fontSize:12, margin:0}}>
+          PI approval required. On approval, wigamig scaffolds the project repo
+          and adds the proposed members to MEMBERS.
+        </p>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>name (snake_case)</label>
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. dcis_imaging_genomics"
+               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>proposed members (comma-separated handles)</label>
+        <input value={members} onChange={e => setMembers(e.target.value)} placeholder="@allie, @bob"
+               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>sensitivity</label>
+        <select value={sensitivity} onChange={e => setSensitivity(e.target.value)}
+                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}>
+          <option value="standard">standard</option>
+          <option value="restricted">restricted</option>
+          <option value="clinical">clinical</option>
+        </select>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>justification</label>
+        <textarea value={justification} onChange={e => setJustification(e.target.value)}
+                  rows={3} placeholder="Brief description of the project, scope, expected duration."
+                  style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--serif)", fontSize:14}}/>
+        {err && <div style={{color:"var(--red)", fontSize:12}}>{err}</div>}
+        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:6}}>
+          <button type="button" className="btn sm ghost" onClick={onClose}>cancel</button>
+          <button type="submit" className="btn sm primary" disabled={busy}>
+            {busy ? "…" : "submit for approval"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function RequestActionRow({ req, isPI }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState(null);
@@ -501,16 +846,25 @@ function RequestActionRow({ req, isPI }) {
     catch (ex) { setErr(String(ex.message || ex)); }
     finally { setBusy(false); }
   };
+  const isCreate = req.kind === "project-create";
   return (
     <div style={{padding:"9px 14px", borderBottom:"1px solid var(--rule)"}}>
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
         <div>
-          <span style={{fontWeight:500}}>{req.requester}</span>
+          <Pill tone={isCreate ? "tiger" : "purple"}>
+            {isCreate ? "new project" : "join"}
+          </Pill>
+          <span style={{fontWeight:500, marginLeft:8}}>{req.requester}</span>
           <span className="muted" style={{marginLeft:6}}>→</span>
           <span className="mono" style={{marginLeft:6, fontSize:12}}>{req.project}</span>
         </div>
         <span className="mono muted" style={{fontSize:10}}>{req.created_at || ""}</span>
       </div>
+      {isCreate && req.proposed_members && (
+        <div className="mono muted" style={{fontSize:11, marginTop:4}}>
+          members: {req.proposed_members.join(", ")} · sens: {req.proposed_sensitivity || "standard"}
+        </div>
+      )}
       {req.justification && (
         <div className="muted" style={{fontSize:12, marginTop:4, lineHeight:1.45}}>
           {req.justification}
@@ -598,6 +952,7 @@ function RequestsPanel({ pending, mine, span="c-6" }) {
   const isPI    = persona === "pi";
   const showQueue = isPI ? (pending || []) : [];
   const showMine  = (mine || []).filter(r => r.state !== "approved" || true);
+  const [showNewProj, setShowNewProj] = useState(false);
 
   const headerLabel = isPI
     ? `${(pending || []).length} pending`
@@ -607,12 +962,14 @@ function RequestsPanel({ pending, mine, span="c-6" }) {
   return (
     <div className={"panel "+span}>
       <header>
-        <h2>Project-join requests</h2>
-        <div className="row" style={{gap:10}}>
+        <h2>Requests</h2>
+        <div className="row" style={{gap:6}}>
           <span className="meta">{headerLabel}</span>
           <NewJoinRequestButton />
+          <button className="btn sm" onClick={() => setShowNewProj(true)}>＋ new project</button>
         </div>
       </header>
+      {showNewProj && <NewProjectModal onClose={() => setShowNewProj(false)} />}
       <div className="body" style={{padding:"6px 0"}}>
         {isPI && showQueue.length === 0 && (
           <div className="muted" style={{padding:"14px", fontSize:13}}>
@@ -636,13 +993,51 @@ function RequestsPanel({ pending, mine, span="c-6" }) {
 }
 
 /* ───────── group oracle panel ───────── */
+function OracleProcessButton() {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg]   = useState(null);
+  const onClick = async () => {
+    setBusy(true); setMsg(null);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const userParam = params.get("user");
+      const url = "/api/oracle/process" + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+      const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+      if (!res.ok) {
+        let detail = "HTTP " + res.status;
+        try { detail = (await res.json()).detail || detail; } catch (_) {}
+        throw new Error(detail);
+      }
+      const j = await res.json();
+      setMsg(j.stub
+        ? `queued (${j.inputs.concluded_seas} concluded SEAs ready) — pipeline lands soon`
+        : "processed");
+      setTimeout(() => setMsg(null), 3500);
+    } catch (ex) {
+      setMsg("Failed: " + (ex.message || ex));
+    } finally { setBusy(false); }
+  };
+  return (
+    <span style={{display:"inline-flex", alignItems:"center", gap:6}}>
+      <button className="btn sm" disabled={busy} onClick={onClick}
+              title="Trigger an oracle distillation pass over recent activity">
+        {busy ? "…" : "process input"}
+      </button>
+      {msg && <span style={{fontSize:10, color:"var(--muted)", maxWidth:240}}>{msg}</span>}
+    </span>
+  );
+}
+
 function GroupOraclePanel({ entries, span="c-6" }) {
   const list = entries || [];
   return (
     <div className={"panel "+span}>
       <header>
         <h2>Group oracle · recent</h2>
-        <span className="meta">{list.length} entr{list.length === 1 ? "y" : "ies"}</span>
+        <div className="row" style={{gap:6}}>
+          <span className="meta">{list.length} entr{list.length === 1 ? "y" : "ies"}</span>
+          <OracleProcessButton />
+        </div>
       </header>
       <div className="body" style={{padding:"6px 0"}}>
         {list.map((e, i) => (
@@ -715,9 +1110,9 @@ function InventoryPanel({ inv, span="c-3" }) {
 }
 
 /* ───────── activity panel (sparkline + feed) ───────── */
-function ActivityPanel() {
+function ActivityPanel({ span="c-3" }) {
   return (
-    <div className="panel c-3">
+    <div className={"panel "+span}>
       <header>
         <h2>Activity</h2>
         <span className="meta">last 12 weeks</span>
@@ -974,8 +1369,8 @@ function Footer() {
 
 /* ───────── App ───────── */
 function App() {
-  const [persona, setPersona] = useState(() => window.DATA.persona || "member");
   const [query, setQuery]     = useState("");
+  const persona = window.DATA.persona || "member";  // derived, not user-chosen
   // Phase 1: hifi-data.jsx mutates window.DATA after fetching /api/dashboard
   // and calls window.__wigamigRerender() to bump this counter, which forces
   // a re-render so panels pick up the new data via the (mutated) D reference.
@@ -985,32 +1380,11 @@ function App() {
     return () => { delete window.__wigamigRerender; };
   }, []);
 
-  // Phase 3: refetch when persona changes so attention + heatmap re-shape
-  // server-side. The first render reflects the initial fetch from
-  // hifi-data.jsx; subsequent persona changes go through __wigamigFetchData.
-  // Skip the very first effect so we don't double-fetch on mount.
-  const didMount = React.useRef(false);
-  useEffect(() => {
-    if (!didMount.current) { didMount.current = true; return; }
-    if (typeof window.__wigamigFetchData !== "function") return;
-    window.__wigamigFetchData(persona).then((real) => {
-      // If the server downgraded the persona (non-PI user), reflect that
-      // back in the toggle state so the UI matches what we actually got.
-      if (real && real.persona && real.persona !== persona) {
-        setPersona(real.persona);
-      }
-    }).catch(() => { /* mock stays in place; warn already logged */ });
-  }, [persona]);
-
-  // keyboard: V to switch persona (PI only), / to focus search
+  // keyboard: / to focus search. (Persona V-shortcut removed — persona is
+  // derived from lab.md, not user-toggled.)
   useEffect(() => {
     const onKey = (e) => {
       if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
-      if (e.key === "v" || e.key === "V") {
-        if (window.DATA.member && window.DATA.member.can_pi) {
-          setPersona(p => p === "member" ? "pi" : "member");
-        }
-      }
       if (e.key === "/" || (e.key === "k" && (e.metaKey || e.ctrlKey))) {
         e.preventDefault();
         document.querySelector(".search input")?.focus();
@@ -1020,32 +1394,33 @@ function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // (Attention queue removed — see grid below.)
-
   return (
     <>
       <TopBar />
       <div className="app">
-        <CmdBar persona={persona} setPersona={setPersona} query={query} setQuery={setQuery} />
+        <CmdBar query={query} setQuery={setQuery} />
         <Strip persona={persona} />
 
         <div className="grid" style={{marginBottom:14}}>
           <SeasPanel seas={D.seas} span="c-12" />
         </div>
 
-        {/* Daily actionable info: projects + activity + agents. */}
+        {/* Projects + Project-join requests sit together: requests are
+            the membership-side of projects so they belong adjacent. */}
         <div className="grid" style={{marginBottom:14}}>
           <ProjectsPanel projects={D.projects} />
-          <ActivityPanel />
-          <AgentsPanel agents={D.agents} />
+          <RequestsPanel
+            pending={D.requests_pending}
+            mine={D.requests_mine}
+            span="c-7"
+          />
         </div>
 
-        {/* Notebook (personal) + Group oracle (shared knowledge). The
-            daily-notes rail is gone — it duplicated the Notebook panel's
-            data. */}
+        {/* Activity + Notebook + Group oracle row. (3 + 5 + 4 = 12) */}
         <div className="grid" style={{marginBottom:14}}>
-          <NotebookPanel span="c-6" />
-          <GroupOraclePanel entries={D.oracle_recent} />
+          <ActivityPanel span="c-3" />
+          <NotebookPanel span="c-5" />
+          <GroupOraclePanel entries={D.oracle_recent} span="c-4" />
         </div>
 
         {/* Group + inventory: things you check, but not every day. */}
@@ -1054,14 +1429,9 @@ function App() {
           <InventoryPanel inv={D.inventory} span="c-6" />
         </div>
 
-        {/* Project-join requests. PI sees the approval queue; members see
-            their own outgoing-request status. */}
+        {/* Agents (large, low-frequency) lives toward the bottom. */}
         <div className="grid" style={{marginBottom:14}}>
-          <RequestsPanel
-            pending={D.requests_pending}
-            mine={D.requests_mine}
-            span="c-12"
-          />
+          <AgentsPanel agents={D.agents} span="c-12" />
         </div>
 
         {/* Compliance — most sporadic; lives at the bottom. */}

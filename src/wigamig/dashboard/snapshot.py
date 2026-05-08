@@ -62,8 +62,13 @@ def build_response(
     """
     today_d = today or _dt.date.today()
     norm = handle.lstrip("@").lower()
-    can_pi = norm == _pi_handle().lower()
-    effective_persona: str = "pi" if (persona == "pi" and can_pi) else "member"
+    is_pi = norm == _pi_handle().lower()
+    # Persona is now derived from lab.md, not chosen by the user. The PI
+    # always sees the PI lens; members always see the member lens. The
+    # ``persona`` argument is retained for back-compat with tests + CLI
+    # but is overridden whenever it disagrees with the user's actual role.
+    effective_persona: str = "pi" if is_pi else "member"
+    can_pi = is_pi
 
     snap = core_dashboard.build_snapshot(handle, today=today_d)
     project_summaries = [load_summary(repo) for repo in iter_local_projects()]
@@ -637,6 +642,16 @@ def _projects(
                 d = _date_or_none(ts)
                 if d and (last_activity is None or d > last_activity):
                     last_activity = d
+        # Project artefact paths. Slack URL only filled when lab.md
+        # declares the workspace, otherwise just the channel name.
+        from ..core.lab import load_lab_config as _load_lab
+        slack_channel = f"proj-{p.name}"
+        ws = _load_lab().slack_workspace
+        slack_url = (
+            f"https://{ws}/channels/{slack_channel}"
+            if ws and ws != "<set-on-first-publish>"
+            else None
+        )
         rows.append(
             C.ProjectRow(
                 name=p.name,
@@ -646,6 +661,11 @@ def _projects(
                 members=len(p.members),
                 openSeas=open_seas,
                 lastActivity=_humanize(last_activity, today_d),
+                github_repo=f"hallettmiket/{p.name}",
+                slack_channel=slack_channel,
+                slack_url=slack_url,
+                refined_path=f"/data/lab_vm/refined/{p.name}",
+                raw_path=f"/data/lab_vm/raw/{p.name}",
             )
         )
     return rows
@@ -790,9 +810,9 @@ def _agents() -> list[C.AgentRow]:
         return []
     rows: list[C.AgentRow] = []
     for record in registry:
-        # ``defaults`` may carry `model:` in the body or top-level frontmatter;
-        # the AgentRecord doesn't expose model directly, so re-parse the file.
-        model = _agent_model(record.path)
+        # The AgentRecord doesn't expose model + disabled directly, so
+        # re-parse the source file for the extra fields.
+        model, disabled = _agent_extras(record.path)
         rows.append(
             C.AgentRow(
                 name=record.name,
@@ -800,20 +820,21 @@ def _agents() -> list[C.AgentRow]:
                 freeze=record.freeze,  # type: ignore[arg-type]
                 model=model,
                 required_tools=list(record.required_tools),
+                disabled=disabled,
             )
         )
     return rows
 
 
-def _agent_model(path) -> str | None:
+def _agent_extras(path) -> tuple[str | None, bool]:
     if path is None:
-        return None
+        return None, False
     try:
         meta = parse_file(path).meta
     except Exception:
-        return None
+        return None, False
     model = meta.get("model")
-    return str(model) if model else None
+    return (str(model) if model else None, bool(meta.get("disabled", False)))
 
 
 # ---------------------------------------------------------------------------
@@ -868,12 +889,16 @@ def _to_request_row(r) -> C.JoinRequestRow:
         id=r.id,
         requester=r.requester,
         project=r.project,
+        kind=r.kind,  # type: ignore[arg-type]
         state=r.state,  # type: ignore[arg-type]
         justification=r.justification,
         created_at=r.created_at,
         resolved_at=r.resolved_at,
         resolved_by=r.resolved_by,
         decline_reason=r.decline_reason,
+        proposed_members=r.proposed_members,
+        proposed_sensitivity=r.proposed_sensitivity,
+        proposed_lead=r.proposed_lead,
     )
 
 
