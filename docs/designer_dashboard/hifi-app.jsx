@@ -1093,20 +1093,20 @@ function RequestsPanel({ pending, mine, span="c-6" }) {
         </div>
       </header>
       <div className="body" style={{padding:"6px 0"}}>
-        {isPI && showQueue.length === 0 && (
+        {isPI && filteredQueue.length === 0 && (
           <div className="muted" style={{padding:"14px", fontSize:13}}>
             No pending requests. Members will appear here when they ask to join a project.
           </div>
         )}
-        {isPI && showQueue.map(r => (
+        {isPI && filteredQueue.map(r => (
           <RequestActionRow key={r.id} req={r} isPI={true} />
         ))}
-        {!isPI && showMine.length === 0 && (
+        {!isPI && filteredMine.length === 0 && (
           <div className="muted" style={{padding:"14px", fontSize:13}}>
             You haven't filed any join requests. Click <code>＋ join project</code> above.
           </div>
         )}
-        {!isPI && showMine.map(r => (
+        {!isPI && filteredMine.map(r => (
           <RequestStatusRow key={r.id} req={r} />
         ))}
       </div>
