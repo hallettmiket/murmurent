@@ -139,6 +139,21 @@
       }
       .persona button:not(.on):hover { background: var(--paper-2); color: var(--ink); }
 
+      /* Role badge — replaces the old persona toggle. Informational only. */
+      .persona-badge { display: inline-flex; align-items: center; }
+      .persona-badge .role-pill {
+        font-family: var(--mono); font-size: 10px; font-weight: 700;
+        letter-spacing: 1.5px; padding: 4px 10px; border-radius: 2px;
+        text-transform: uppercase; white-space: nowrap;
+      }
+      .persona-badge .role-pill.pi {
+        background: var(--purple); color: #fff;
+      }
+      .persona-badge .role-pill.member {
+        background: var(--paper-2); color: var(--muted);
+        border: 1px solid var(--rule-strong);
+      }
+
       /* ─── stat strip ─────────────────────────────────────────────── */
       .strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 18px 0; }
       .stat {

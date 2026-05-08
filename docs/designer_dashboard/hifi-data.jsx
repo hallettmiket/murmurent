@@ -160,7 +160,7 @@ const DATA = {
       links_exp:  ["exp/2_align_grch38"],
       content: [
         { kind: "h4",  text: "Plan for today" },
-        { kind: "task", done: true,  text: "Stand-up at 09:00 — flag SEA #214 with Mike" },
+        { kind: "task", done: true,  text: "Stand-up at 09:00 — flag SEA #214 with @the_pi" },
         { kind: "task", done: false, text: "Re-run alignment with GRCh38.p14 chrM patched" },
         { kind: "task", done: false, text: "Draft response to TCPS_2 renewal email" },
         { kind: "task", done: false, text: "Pull TNBC biomarker refs (Bookworm) for SEA #231" },
@@ -169,7 +169,7 @@ const DATA = {
         { kind: "p",   text: "Run 17 fastqs look fine — Q30 above 92% across the lane (per @bob's exam in [[exp/1_ingest_run17]] yesterday). The chrM contig is the same one that bit us in February; patch ships in GRCh38.p14 so I'll redo alignment against that build, not p13." },
         { kind: "code",text: "$ bcftools view --regions chrM run17.vcf.gz | head\n$ samtools view -b run17.bam chrM > run17.chrM.bam" },
 
-        { kind: "blockquote", text: "From Mike (Slack, 07:42): \"please get me a QC report by Friday — even a draft is fine, I just need numbers for the IRB update.\"" },
+        { kind: "blockquote", text: "From @the_pi (Slack, 07:42): \"please get me a QC report by Friday — even a draft is fine, I just need numbers for the IRB update.\"" },
 
         { kind: "h4",  text: "Decisions" },
         { kind: "p",   text: "Going with GRCh38.p14 over T2T-CHM13 for run 17 — switching reference mid-cohort would invalidate cross-sample comparison. Document in [[CHANGELOG]] for the project repo." },

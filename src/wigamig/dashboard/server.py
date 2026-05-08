@@ -40,10 +40,28 @@ class NotebookEditBody(BaseModel):
     date: str | None = None  # ISO date; defaults to today
 
 
+class NewSeaBody(BaseModel):
+    """JSON body for ``POST /api/sea/{project}/new``."""
+
+    to_target: str
+    kind: str  # "skill" | "experiment" | "analysis"
+    description: str
+
+
 class JoinRequestBody(BaseModel):
     """JSON body for ``POST /api/request/join``."""
 
     project: str
+    justification: str = ""
+
+
+class CreateProjectRequestBody(BaseModel):
+    """JSON body for ``POST /api/request/create-project``."""
+
+    project: str
+    proposed_members: list[str] = []
+    sensitivity: str = "standard"
+    proposed_lead: str | None = None
     justification: str = ""
 
 
@@ -101,6 +119,91 @@ def create_app() -> FastAPI:
                 ),
             )
         return snap_mod.build_response(handle, persona=persona)
+
+    @app.get("/api/sea/{project}/{sea_id}")
+    def get_sea(project: str, sea_id: int) -> dict:
+        """Return one SEA's full payload (frontmatter + markdown body)."""
+        from ..core import sea as sea_core
+        from ..core.projects import find_project as _find_project
+
+        repo = _find_project(project)
+        if repo is None:
+            raise HTTPException(status_code=404, detail=f"project not found: {project}")
+        path = sea_core.sea_path(repo, sea_id)
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail=f"SEA #{sea_id} not found in {project}")
+        s = sea_core.parse_sea(path)
+        return {
+            "id": s.id,
+            "project": project,
+            "from": s.from_handle,
+            "to": s.to_handle,
+            "kind": s.kind,
+            "state": s.state,
+            "description": s.description,
+            "claimed_at": s.claimed_at,
+            "completed_at": s.completed_at,
+            "examined_at": s.examined_at,
+            "concluded_at": s.concluded_at,
+            "delivery": s.delivery,
+            "decline_reason": s.decline_reason,
+            "body": s.body,
+        }
+
+    @app.post("/api/sea/{project}/new")
+    def post_new_sea(
+        project: str,
+        body: NewSeaBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """File a new SEA in ``project``. Anyone in the project can call.
+
+        The SEA goes into ``requested`` state with ``from_handle = actor``,
+        ``to_handle = body.to_target``. The recipient claims it from there.
+        """
+        from ..commands import sea_cmd as _sea_cmd
+        from ..core import sea as sea_core
+        from ..core.projects import find_project as _find_project
+
+        actor = (user or "").strip().lstrip("@")
+        if not actor:
+            identity = resolve_identity(allow_unknown=True)
+            actor = identity.handle if identity.source != "unknown" else ""
+        if not actor:
+            raise HTTPException(
+                status_code=400,
+                detail="No actor resolved. Set $WIGAMIG_USER or pass ?user=<handle>.",
+            )
+        if body.kind not in sea_core.VALID_KINDS:
+            raise HTTPException(
+                status_code=422,
+                detail=f"kind must be one of {sea_core.VALID_KINDS}",
+            )
+        if not body.to_target.strip():
+            raise HTTPException(status_code=422, detail="to_target is required")
+        if not body.description.strip():
+            raise HTTPException(status_code=422, detail="description is required")
+        if _find_project(project) is None:
+            raise HTTPException(status_code=404, detail=f"project not found: {project}")
+
+        try:
+            new_sea = _sea_cmd.cmd_request(
+                project_name=project,
+                to_target=body.to_target.lstrip("@"),
+                kind=body.kind,
+                description=body.description,
+                from_handle=actor,
+            )
+        except Exception as exc:  # click.ClickException + others
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"ok": True, "project": project, "sea": {
+            "id": new_sea.id,
+            "from": new_sea.from_handle,
+            "to": new_sea.to_handle,
+            "kind": new_sea.kind,
+            "state": new_sea.state,
+            "description": new_sea.description,
+        }}
 
     @app.post("/api/sea/{project}/{sea_id}/{action}")
     def sea_action(
@@ -190,6 +293,36 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc))
         return _request_response(result.request)
 
+    @app.post("/api/request/create-project")
+    def request_create_project(
+        body: CreateProjectRequestBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Propose a new project (anyone can; PI approves to scaffold)."""
+        actor = (user or "").strip().lstrip("@")
+        if not actor:
+            identity = resolve_identity(allow_unknown=True)
+            actor = identity.handle if identity.source != "unknown" else ""
+        if not actor:
+            raise HTTPException(
+                status_code=400,
+                detail="No actor resolved. Set $WIGAMIG_USER or pass ?user=<handle>.",
+            )
+        try:
+            result = request_actions.file_create_request(
+                actor=actor,
+                project=body.project,
+                proposed_members=body.proposed_members,
+                sensitivity=body.sensitivity,
+                proposed_lead=body.proposed_lead,
+                justification=body.justification,
+            )
+        except request_actions.RequestForbidden as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+        except request_actions.RequestBadRequest as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return _request_response(result.request)
+
     @app.post("/api/request/{request_id}/{action}")
     def request_action(
         request_id: int,
@@ -236,6 +369,108 @@ def create_app() -> FastAPI:
                 "decline_reason": req.decline_reason,
             },
         }
+
+    @app.post("/api/oracle/process")
+    def oracle_process(
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Trigger a (stubbed) oracle distillation pass.
+
+        v1: writes an audit row noting the request and counts the inputs
+        the real distiller would consume (recent SEA conclusions, recent
+        notebook entries, recent slack mirrors when those land in
+        Phase 9). The actual distillation pipeline is the design in
+        ``docs/slack_integration.md`` — wire-up lands in a follow-up.
+        """
+        from . import audit_log as _audit
+        from ..core import sea as sea_core
+        from ..core.projects import iter_local_projects, load_summary
+
+        actor = (user or "").strip().lstrip("@")
+        if not actor:
+            identity = resolve_identity(allow_unknown=True)
+            actor = identity.handle if identity.source != "unknown" else ""
+        if not actor:
+            raise HTTPException(
+                status_code=400,
+                detail="No actor resolved. Set $WIGAMIG_USER or pass ?user=<handle>.",
+            )
+
+        recent_concluded = 0
+        for repo in iter_local_projects():
+            for s in sea_core.iter_seas(repo):
+                if s.state == "concluded":
+                    recent_concluded += 1
+
+        try:
+            _audit.write_event(
+                actor=actor,
+                kind="oracle.process_requested",
+                project="",
+                target="oracle/",
+                summary=(
+                    f"@{actor} requested oracle distillation "
+                    f"({recent_concluded} concluded SEAs available as input)"
+                ),
+            )
+        except OSError:
+            pass
+
+        return {
+            "ok": True,
+            "queued": True,
+            "stub": True,
+            "inputs": {"concluded_seas": recent_concluded},
+            "next": (
+                "Distillation pipeline lands in a follow-up "
+                "(see docs/slack_integration.md). For now, run "
+                "`wigamig publish <path> --to oracle` manually."
+            ),
+        }
+
+    @app.post("/api/agents/{name}/{action}")
+    def agent_toggle(name: str, action: str) -> dict:
+        """Enable/disable a personal agent.
+
+        Frozen agents (centre-controlled) cannot be toggled here; they
+        require a PR against the agents/ registry.
+        """
+        from ..core import agents as agents_core
+        from ..core.repo import wigamig_repo_root
+
+        if action not in {"enable", "disable"}:
+            raise HTTPException(status_code=422, detail=f"unknown action: {action}")
+
+        registry_dir = wigamig_repo_root() / "agents"
+        try:
+            registry = agents_core.load_registry(registry_dir)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+        match = next((a for a in registry if a.name == name), None)
+        if match is None:
+            raise HTTPException(status_code=404, detail=f"agent not found: {name}")
+        if match.freeze == "frozen":
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"agent {name!r} is frozen (centre-controlled). "
+                    f"Toggle via PR against agents/{name}.md."
+                ),
+            )
+
+        # Personal-agent enable/disable is implemented by toggling a
+        # `disabled: true` field in the agent's frontmatter (the agent
+        # registry loader skips disabled agents in v2; for now we just
+        # mark them so the dashboard reflects the state).
+        path = match.path
+        if path is None:
+            raise HTTPException(status_code=500, detail="agent path missing")
+        from ..core.frontmatter import dump_document, parse_file
+        parsed = parse_file(path)
+        parsed.meta["disabled"] = action == "disable"
+        path.write_text(dump_document(parsed.meta, parsed.body), encoding="utf-8")
+        return {"ok": True, "name": name, "disabled": action == "disable"}
 
     @app.post("/api/notebook/edit")
     def notebook_edit(

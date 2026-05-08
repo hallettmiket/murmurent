@@ -89,6 +89,39 @@ def file_join_request(
     return FileResult(request=req)
 
 
+def file_create_request(
+    *,
+    actor: str,
+    project: str,
+    proposed_members: list[str],
+    sensitivity: str = "standard",
+    proposed_lead: str | None = None,
+    justification: str = "",
+) -> FileResult:
+    """Propose creating a new project. PI approval scaffolds the repo."""
+    if not actor:
+        raise RequestForbidden("no actor identity resolved")
+    try:
+        req = req_core.file_create_request(
+            requester=actor,
+            project=project,
+            proposed_members=proposed_members,
+            sensitivity=sensitivity,
+            proposed_lead=proposed_lead,
+            justification=justification,
+        )
+    except RequestError as exc:
+        msg = str(exc)
+        raise RequestBadRequest(msg) from exc
+    _log(
+        "request.file",
+        req,
+        actor,
+        summary=f"{req.requester} proposed new project {req.project}",
+    )
+    return FileResult(request=req)
+
+
 def apply_action(
     *,
     request_id: int,

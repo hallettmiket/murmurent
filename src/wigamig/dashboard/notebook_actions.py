@@ -115,7 +115,11 @@ def resolve_editor_cmd(path: Path) -> list[str]:
     override = os.environ.get("WIGAMIG_NOTEBOOK_EDITOR", "").strip()
     if override:
         if override.lower() == "obsidian":
-            return _obsidian_cmd(path)
+            # Explicit override - trust the user even if the vault isn't
+            # auto-detected in Obsidian's registry.
+            forced = _obsidian_cmd(path, force=True)
+            if forced:
+                return forced
         if "{path}" in override:
             return shlex.split(override.replace("{path}", str(path)))
         # Plain command name -> append the path.
@@ -125,6 +129,9 @@ def resolve_editor_cmd(path: Path) -> list[str]:
     if editor:
         return shlex.split(editor) + [str(path)]
 
+    # Implicit Obsidian fallback only when the vault is genuinely
+    # registered. Otherwise the URL fails silently and the user sees
+    # nothing happen.
     obsidian = _obsidian_cmd(path)
     if obsidian:
         return obsidian
@@ -142,13 +149,24 @@ def resolve_editor_cmd(path: Path) -> list[str]:
     )
 
 
-def _obsidian_cmd(path: Path) -> list[str] | None:
+def _obsidian_cmd(path: Path, *, force: bool = False) -> list[str] | None:
     """Build an ``obsidian://`` open command if possible.
 
-    Uses the URL-scheme approach (``open <url>``) so the OS hands the URL
-    to Obsidian. Returns ``None`` if the platform can't open URLs.
+    Refuses to return a URL command unless we can confirm Obsidian has
+    the target folder registered as a vault — otherwise the URL fails
+    silently (``Unable to find a vault for the URL …``) and the file
+    never opens.
+
+    ``force=True`` skips the registration check (the user explicitly
+    asked for Obsidian via ``WIGAMIG_NOTEBOOK_EDITOR=obsidian``; trust
+    them even if we can't auto-detect the registry).
+
+    Returns ``None`` if (a) the platform can't dispatch URLs, (b) the
+    vault isn't registered (and not forced).
     """
     folder = path.parent
+    if not force and not _obsidian_vault_registered(folder):
+        return None
     vault = folder.name
     file_stem = path.stem
     url = f"obsidian://open?vault={vault}&file={file_stem}"
@@ -157,6 +175,40 @@ def _obsidian_cmd(path: Path) -> list[str] | None:
     if shutil.which("xdg-open"):
         return ["xdg-open", url]
     return None
+
+
+def _obsidian_vault_registered(folder: Path) -> bool:
+    """Return True if ``folder`` is in Obsidian's vault registry.
+
+    Obsidian stores its registry as JSON. Path varies by platform:
+
+      macOS:   ~/Library/Application Support/obsidian/obsidian.json
+      Linux:   ~/.config/obsidian/obsidian.json
+      Windows: %APPDATA%/obsidian/obsidian.json (not supported here)
+    """
+    import json
+
+    candidates: list[Path] = []
+    if sys.platform == "darwin":
+        candidates.append(
+            Path.home() / "Library" / "Application Support" / "obsidian" / "obsidian.json"
+        )
+    candidates.append(Path.home() / ".config" / "obsidian" / "obsidian.json")
+
+    target = str(folder.resolve())
+    for cfg in candidates:
+        if not cfg.is_file():
+            continue
+        try:
+            data = json.loads(cfg.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        vaults = data.get("vaults") or {}
+        for entry in vaults.values():
+            vp = entry.get("path")
+            if vp and Path(vp).resolve() == Path(target):
+                return True
+    return False
 
 
 # ---------------------------------------------------------------------------
