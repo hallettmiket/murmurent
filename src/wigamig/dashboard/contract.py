@@ -438,6 +438,7 @@ class DashboardResponse(BaseModel):
     pi: IdentityBlock
     agents: list[AgentRow] = []
     oracle_recent: list[OracleEntry] = []
+    oracle_drafts: list[OracleEntry] = []  # PI-only; awaiting approval
     requests_pending: list[JoinRequestRow] = []  # PI: all pending; member: theirs only
     requests_mine: list[JoinRequestRow] = []     # the viewer's outgoing requests
     sea_catalog: list[CatalogEntryRow] = []      # SEAs we offer (entire group sees)

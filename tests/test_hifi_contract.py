@@ -139,6 +139,7 @@ HIFI_TOP_LEVEL_KEYS = {
     "pi",
     "agents",
     "oracle_recent",
+    "oracle_drafts",
     "requests_pending",
     "requests_mine",
     "sea_catalog",

@@ -955,5 +955,166 @@ def request_decline_cmd(request_id: int, reason: str) -> None:
     click.echo(f"Declined request #{result.request.id}: {reason}")
 
 
+# ---------------------------------------------------------------------------
+# slack (Phase 11): mirror + distil
+# ---------------------------------------------------------------------------
+
+
+@cli.group("slack", help="Mirror Slack channels + distil to oracle drafts.")
+def slack_group() -> None:
+    pass
+
+
+@slack_group.command("mirror", help="Fetch one channel, one day -> <lab-mgmt>/slack/.")
+@click.option("--channel", "channel_name", required=True, help="Channel name (no leading #).")
+@click.option("--channel-id", default=None, help="Slack channel id; auto-resolved if omitted.")
+@click.option("--date", "date_iso", default=None, help="ISO date (default: yesterday).")
+def slack_mirror_cmd(channel_name: str, channel_id: str | None, date_iso: str | None) -> None:
+    import datetime as _dt
+    from .core import slack_mirror as _sm
+    from .core.lab import load_lab_config
+
+    if date_iso:
+        date = _dt.date.fromisoformat(date_iso)
+    else:
+        date = _dt.date.today() - _dt.timedelta(days=1)
+
+    try:
+        client = _sm.make_client()
+    except _sm.SlackMirrorError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if channel_id is None:
+        # resolve via channel listing
+        channels = _sm.list_monitored_channels(client)
+        match = next((c for c in channels if c["name"] == channel_name), None)
+        if match is None:
+            raise click.ClickException(
+                f"channel #{channel_name} not in [oracle:on] list. "
+                f"Add the marker to its topic, or pass --channel-id."
+            )
+        channel_id = match["id"]
+
+    try:
+        path = _sm.mirror_channel_day(
+            channel_name=channel_name,
+            channel_id=channel_id,
+            date=date,
+            workspace=load_lab_config().slack_workspace or "",
+            client=client,
+        )
+    except _sm.SlackMirrorError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Mirrored #{channel_name} {date.isoformat()} -> {path}")
+
+
+@slack_group.command("distil", help="Distil one mirror file into oracle drafts.")
+@click.option("--channel", "channel_name", required=True)
+@click.option("--date", "date_iso", default=None, help="ISO date (default: yesterday).")
+def slack_distil_cmd(channel_name: str, date_iso: str | None) -> None:
+    import datetime as _dt
+    from .core import slack_distill as _distill
+    from .core import slack_mirror as _sm
+    from .core.lab import load_lab_config
+
+    if date_iso:
+        date = _dt.date.fromisoformat(date_iso)
+    else:
+        date = _dt.date.today() - _dt.timedelta(days=1)
+    mirror_path = _sm.mirror_path(channel_name, date)
+    if not mirror_path.is_file():
+        raise click.ClickException(
+            f"no mirror at {mirror_path}; run `wigamig slack mirror` first."
+        )
+
+    try:
+        result = _distill.distill_mirror(
+            mirror_path=mirror_path,
+            channel_name=channel_name,
+            date=date,
+            lab_name=load_lab_config().name,
+        )
+    except _distill.DistillError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        f"Distilled #{channel_name} {date.isoformat()}: "
+        f"{len(result.drafts_written)} draft(s)."
+    )
+    for p in result.drafts_written:
+        click.echo(f"  -> {p}")
+
+
+# ---------------------------------------------------------------------------
+# oracle (Phase 11 approval flow)
+# ---------------------------------------------------------------------------
+
+
+@cli.group("oracle", help="Manage oracle drafts and published entries.")
+def oracle_group() -> None:
+    pass
+
+
+@oracle_group.command("drafts", help="List oracle entries awaiting approval.")
+def oracle_drafts_cmd() -> None:
+    from .core import slack_distill as _distill
+
+    drafts = _distill.iter_drafts()
+    if not drafts:
+        click.echo("No drafts.")
+        return
+    console = Console()
+    table = Table(title="Oracle drafts")
+    table.add_column("slug", style="bold")
+    table.add_column("title")
+    for path in drafts:
+        from .core.frontmatter import parse_file
+        meta = parse_file(path).meta or {}
+        table.add_row(path.name, str(meta.get("title", path.stem)))
+    console.print(table)
+
+
+@oracle_group.command("approve", help="(PI) Promote a draft to published.")
+@click.argument("slug")
+def oracle_approve_cmd(slug: str) -> None:
+    from .core import slack_distill as _distill
+    from .core.identity import resolve as resolve_identity
+    from .core.lab import pi_handle
+    from .core.repo import lab_mgmt_repo_root as _root
+
+    actor = resolve_identity(allow_unknown=False).handle.lower()
+    if actor != pi_handle().lower():
+        raise click.ClickException(
+            f"only the PI (@{pi_handle()}) can approve drafts."
+        )
+    path = _root() / "oracle" / (slug if slug.endswith(".md") else f"{slug}.md")
+    try:
+        _distill.approve_draft(path, approver=actor)
+    except _distill.DistillError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Approved {path}")
+
+
+@oracle_group.command("decline", help="(PI) Decline a draft with a reason.")
+@click.argument("slug")
+@click.option("--reason", required=True)
+def oracle_decline_cmd(slug: str, reason: str) -> None:
+    from .core import slack_distill as _distill
+    from .core.identity import resolve as resolve_identity
+    from .core.lab import pi_handle
+    from .core.repo import lab_mgmt_repo_root as _root
+
+    actor = resolve_identity(allow_unknown=False).handle.lower()
+    if actor != pi_handle().lower():
+        raise click.ClickException(
+            f"only the PI (@{pi_handle()}) can decline drafts."
+        )
+    path = _root() / "oracle" / (slug if slug.endswith(".md") else f"{slug}.md")
+    try:
+        _distill.decline_draft(path, reason=reason)
+    except _distill.DistillError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Declined {path}: {reason}")
+
+
 if __name__ == "__main__":  # pragma: no cover
     cli()

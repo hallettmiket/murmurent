@@ -1357,18 +1357,107 @@ function OracleProcessButton() {
   );
 }
 
-function GroupOraclePanel({ entries, span="c-6" }) {
+async function postOracleAction(slug, action, body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  // strip oracle/ prefix if present
+  const cleanSlug = slug.replace(/^oracle\//, "");
+  const url = "/api/oracle/" + encodeURIComponent(cleanSlug) + "/" + encodeURIComponent(action)
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function OracleDraftRow({ entry }) {
+  const refresh = async () => {
+    if (typeof window.__wigamigFetchData === "function") {
+      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    }
+  };
+  const onApprove = async () => {
+    try { await postOracleAction(entry.path, "approve"); await refresh(); }
+    catch (ex) { alert(ex.message || ex); }
+  };
+  const onDecline = async () => {
+    const reason = window.prompt("Decline reason:");
+    if (!reason || !reason.trim()) return;
+    try { await postOracleAction(entry.path, "decline", { reason: reason.trim() }); await refresh(); }
+    catch (ex) { alert(ex.message || ex); }
+  };
+  return (
+    <div style={{padding:"9px 14px", borderBottom:"1px solid var(--rule)",
+                 background:"#fff7eb"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
+        <span style={{fontWeight:500, fontSize:14}}>{entry.title}</span>
+        <Pill tone="amber">draft</Pill>
+      </div>
+      <div className="muted" style={{fontSize:12, marginTop:4, lineHeight:1.45}}>
+        {entry.excerpt}
+      </div>
+      <div className="mono muted" style={{fontSize:10, marginTop:5}}>
+        {entry.author} · {entry.date}
+        {entry.project && <span> · {entry.project}</span>}
+        <span style={{marginLeft:10, color:"var(--purple)"}}><code>{entry.path}</code></span>
+      </div>
+      <div className="row" style={{marginTop:6, justifyContent:"flex-end", gap:6}}>
+        <button className="btn sm primary" onClick={onApprove}>approve</button>
+        <button className="btn sm" onClick={onDecline}>decline</button>
+      </div>
+    </div>
+  );
+}
+
+function GroupOraclePanel({ entries, drafts, span="c-6" }) {
   const list = entries || [];
+  const pendingDrafts = drafts || [];
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
   return (
     <div className={"panel "+span}>
       <header>
         <h2>Group oracle · recent</h2>
         <div className="row" style={{gap:6}}>
-          <span className="meta">{list.length} entr{list.length === 1 ? "y" : "ies"}</span>
+          <span className="meta">
+            {list.length} published
+            {isPI && pendingDrafts.length > 0 && (
+              <span> · <strong style={{color:"var(--tiger-deep)"}}>
+                {pendingDrafts.length} draft{pendingDrafts.length === 1 ? "" : "s"}
+              </strong></span>
+            )}
+          </span>
           <OracleProcessButton />
         </div>
       </header>
       <div className="body" style={{padding:"6px 0"}}>
+        {/* PI-only: drafts queue at the top, awaiting approval. */}
+        {isPI && pendingDrafts.length > 0 && (
+          <>
+            <div className="mono muted" style={{padding:"6px 14px", fontSize:10,
+                                                 letterSpacing:1.5, textTransform:"uppercase",
+                                                 borderBottom:"1px solid var(--rule)"}}>
+              Drafts awaiting approval
+            </div>
+            {pendingDrafts.map((e, i) => (
+              <OracleDraftRow key={"d"+i} entry={e} />
+            ))}
+            {list.length > 0 && (
+              <div className="mono muted" style={{padding:"6px 14px", fontSize:10,
+                                                  letterSpacing:1.5, textTransform:"uppercase",
+                                                  borderBottom:"1px solid var(--rule)"}}>
+                Published
+              </div>
+            )}
+          </>
+        )}
         {list.map((e, i) => (
           <div key={i} style={{padding:"9px 14px", borderBottom:"1px solid var(--rule)"}}>
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:10}}>
@@ -1749,7 +1838,7 @@ function App() {
         <div className="grid" style={{marginBottom:14}}>
           <ActivityPanel span="c-3" />
           <NotebookPanel span="c-5" />
-          <GroupOraclePanel entries={D.oracle_recent} span="c-4" />
+          <GroupOraclePanel entries={D.oracle_recent} drafts={D.oracle_drafts} span="c-4" />
         </div>
 
         {/* Receptionist: PI-only inbound cross-group SEA queue. Sits up
