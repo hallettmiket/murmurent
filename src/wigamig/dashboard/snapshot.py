@@ -23,11 +23,16 @@ from ..core import inventory as inventory_core
 from ..core.dashboard import DashboardSnapshot, _load_member_meta, _parse_certifications
 from ..core.frontmatter import parse_file
 from ..core.projects import ProjectSummary, iter_local_projects, load_summary
+from ..core.agents import load_registry as load_agent_registry
+from ..core.repo import lab_mgmt_repo_root, wigamig_repo_root
 from ..core.sea import Sea, iter_seas
 from . import audit_log
 from . import contract as C
 
-PI_HANDLE = core_dashboard.PI_HANDLE
+def _pi_handle() -> str:
+    """Resolve the PI handle from lab.md (fresh per call for tests)."""
+    from ..core.lab import pi_handle as _resolved
+    return _resolved()
 NOTEBOOK_DIR_NAME = "lab-notebook"
 
 
@@ -56,7 +61,7 @@ def build_response(
     """
     today_d = today or _dt.date.today()
     norm = handle.lstrip("@").lower()
-    can_pi = norm == PI_HANDLE.lower()
+    can_pi = norm == _pi_handle().lower()
     effective_persona: str = "pi" if (persona == "pi" and can_pi) else "member"
 
     snap = core_dashboard.build_snapshot(handle, today=today_d)
@@ -71,6 +76,8 @@ def build_response(
         persona=effective_persona,  # type: ignore[arg-type]
         member=member_block,
         pi=_pi_identity(),
+        agents=_agents(),
+        oracle_recent=_oracle_recent(limit=8),
         attention=_attention(snap, effective_persona, project_summaries, today_d),
         stats=_stats(
             snap, all_seas, today_d,
@@ -79,7 +86,13 @@ def build_response(
         spark=_spark(all_seas, today_d),
         sparkLabels=_spark_labels(today_d),
         projects=_projects(project_summaries, all_seas, today_d),
-        peers=_peers(snap),
+        peers=_peers(
+            snap,
+            project_summaries,
+            all_seas,
+            persona=effective_persona,
+            viewer=norm,
+        ),
         seas=_seas(snap, all_seas, today_d),
         experiments=_experiments(snap),
         notifs=_notifs(all_seas, today_d),
@@ -148,11 +161,11 @@ def _identity(handle: str, full_name: str | None, role: str) -> C.IdentityBlock:
 
 
 def _pi_identity() -> C.IdentityBlock:
-    profile = _load_member_profile(PI_HANDLE)
+    profile = _load_member_profile(_pi_handle())
     full_name = profile.get("full_name")
     return C.IdentityBlock(
-        handle=PI_HANDLE,
-        name=str(full_name) if full_name else PI_HANDLE,
+        handle=_pi_handle(),
+        name=str(full_name) if full_name else _pi_handle(),
         role="Principal Investigator",
         lab=str(profile.get("lab") or "hallett"),
         contact=_merge_contact(profile.get("contact")),
@@ -650,17 +663,214 @@ def _humanize(when: _dt.date | None, today_d: _dt.date) -> str:
     return when.isoformat()
 
 
-def _peers(snap: DashboardSnapshot) -> list[C.PeerRow]:
-    return [
-        C.PeerRow(
-            handle=p.handle,
-            name=p.full_name or p.handle,
-            role=p.role,
-            tcps=p.tcps_status if p.tcps_status in {"ok", "expiring", "missing"} else "missing",
-            shared=len(p.shared_projects),
+def _peers(
+    snap: DashboardSnapshot,
+    project_summaries: list[ProjectSummary],
+    all_seas: list[tuple[str, Sea]],
+    *,
+    persona: str,
+    viewer: str,
+) -> list[C.PeerRow]:
+    """Build the Group panel rows.
+
+    Member lens (default): rows = peers in the viewer's projects;
+    each peer's per-peer involvement is restricted to **shared**
+    projects only (so a member never sees what a peer is doing on a
+    project the viewer isn't on).
+
+    PI lens: rows = every member of every project on disk;
+    per-peer involvement is unrestricted across the whole lab.
+    """
+    norm_viewer = viewer.lstrip("@").lower()
+
+    # Build the (peer -> set of projects) map under the viewer's lens.
+    viewer_projects = {
+        p.name for p in project_summaries
+        if any(m.lstrip("@").lower() == norm_viewer for m in p.members)
+    }
+
+    if persona == "pi":
+        # Whole lab.
+        peer_handles: dict[str, list[str]] = {}
+        for p in project_summaries:
+            for raw in p.members:
+                peer = raw.lstrip("@").lower()
+                if peer == norm_viewer:
+                    continue
+                peer_handles.setdefault(peer, []).append(p.name)
+    else:
+        # Member: only peers from shared projects, scoped to those projects.
+        peer_handles = {}
+        for p in project_summaries:
+            if p.name not in viewer_projects:
+                continue
+            for raw in p.members:
+                peer = raw.lstrip("@").lower()
+                if peer == norm_viewer:
+                    continue
+                peer_handles.setdefault(peer, []).append(p.name)
+
+    # Index SEAs and experiments by (project, handle) once.
+    open_seas_index: dict[tuple[str, str], int] = {}
+    for proj, sea in all_seas:
+        if sea.state in {"concluded", "declined"}:
+            continue
+        for h in (sea.from_handle, sea.to_handle):
+            key = (proj, h.lstrip("@").lower())
+            open_seas_index[key] = open_seas_index.get(key, 0) + 1
+
+    exp_index: dict[tuple[str, str], int] = {}
+    for project in project_summaries:
+        exp_root = project.path / "exp"
+        if not exp_root.is_dir():
+            continue
+        for exp_dir in exp_root.glob("*_*"):
+            notebook = exp_dir / "notebook.md"
+            if not notebook.is_file():
+                continue
+            try:
+                parsed = parse_file(notebook)
+            except Exception:
+                continue
+            for performer in parsed.meta.get("performer") or []:
+                key = (project.name, str(performer).lstrip("@").lower())
+                exp_index[key] = exp_index.get(key, 0) + 1
+
+    today_d = _dt.date.today()
+    rows: list[C.PeerRow] = []
+    for peer, projects in sorted(peer_handles.items()):
+        unique_projects = sorted(set(projects))
+        full_name, status, raw_certs = _load_member_meta(peer)
+        certs = _parse_certifications(raw_certs, today_d)
+        tcps = next((c for c in certs if c.name == "TCPS_2"), None)
+        role = _peer_role(peer)
+        open_seas = sum(open_seas_index.get((p, peer), 0) for p in unique_projects)
+        experiments = sum(exp_index.get((p, peer), 0) for p in unique_projects)
+        rows.append(
+            C.PeerRow(
+                handle=peer,
+                name=full_name or peer,
+                role=role,
+                tcps=tcps.status
+                if tcps and tcps.status in {"ok", "expiring", "missing"}
+                else "missing",
+                shared=len(unique_projects) if persona != "pi" else
+                len(set(unique_projects) & viewer_projects),
+                projects=unique_projects,
+                open_seas=open_seas,
+                experiments=experiments,
+            )
         )
-        for p in snap.peers
-    ]
+    return rows
+
+
+def _peer_role(handle: str) -> str:
+    """Re-export of the helper from core.dashboard, with safe fallback."""
+    from ..core.dashboard import _peer_role as _core_peer_role  # type: ignore[attr-defined]
+
+    try:
+        return _core_peer_role(handle)
+    except Exception:
+        return "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Agents (Phase 7)
+# ---------------------------------------------------------------------------
+
+
+def _agents() -> list[C.AgentRow]:
+    """Load the wigamig agent registry as a list of dashboard rows."""
+    try:
+        registry = load_agent_registry(wigamig_repo_root() / "agents")
+    except Exception:
+        return []
+    rows: list[C.AgentRow] = []
+    for record in registry:
+        # ``defaults`` may carry `model:` in the body or top-level frontmatter;
+        # the AgentRecord doesn't expose model directly, so re-parse the file.
+        model = _agent_model(record.path)
+        rows.append(
+            C.AgentRow(
+                name=record.name,
+                description=record.description,
+                freeze=record.freeze,  # type: ignore[arg-type]
+                model=model,
+                required_tools=list(record.required_tools),
+            )
+        )
+    return rows
+
+
+def _agent_model(path) -> str | None:
+    if path is None:
+        return None
+    try:
+        meta = parse_file(path).meta
+    except Exception:
+        return None
+    model = meta.get("model")
+    return str(model) if model else None
+
+
+# ---------------------------------------------------------------------------
+# Group oracle (Phase 7)
+# ---------------------------------------------------------------------------
+
+
+def _oracle_recent(*, limit: int = 8) -> list[C.OracleEntry]:
+    """Return the N most recently-published group-oracle markdown files.
+
+    Reads ``<lab-mgmt>/oracle/*.md``; each file is one curated finding
+    or note. Frontmatter is parsed for ``title``, ``author``, ``date``,
+    ``project``. Body's first non-blank, non-heading paragraph becomes
+    the excerpt. If the dir is missing or empty, returns ``[]``.
+    """
+    oracle_dir = lab_mgmt_repo_root() / "oracle"
+    if not oracle_dir.is_dir():
+        return []
+    files = sorted(oracle_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    rows: list[C.OracleEntry] = []
+    for path in files[:limit]:
+        try:
+            doc = parse_file(path)
+        except Exception:
+            continue
+        meta = doc.meta or {}
+        title = str(meta.get("title") or path.stem)
+        author = str(meta.get("author") or "")
+        date = str(meta.get("date") or "")
+        project = meta.get("project")
+        excerpt = _first_paragraph(doc.body)
+        rows.append(
+            C.OracleEntry(
+                title=title,
+                excerpt=excerpt,
+                author=author,
+                date=date,
+                project=str(project) if project else None,
+                path=f"oracle/{path.name}",
+            )
+        )
+    return rows
+
+
+def _first_paragraph(body: str, *, max_len: int = 240) -> str:
+    """Pull the first non-blank, non-heading paragraph from markdown body."""
+    buf: list[str] = []
+    for line in body.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if buf:
+                break
+            continue
+        if stripped.startswith("#"):
+            continue
+        buf.append(stripped)
+    out = " ".join(buf).strip()
+    if len(out) > max_len:
+        out = out[: max_len - 1] + "…"
+    return out
 
 
 def _seas(

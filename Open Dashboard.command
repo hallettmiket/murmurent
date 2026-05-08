@@ -1,16 +1,17 @@
 #!/bin/zsh -l
 # Double-click this file in Finder to open your wigamig dashboard.
 #
+# Launches the hi-fi (FastAPI) dashboard at http://127.0.0.1:8770/ and
+# opens it in your default browser.
+#
 # Username resolution (first match wins):
 #   1. $WIGAMIG_USER if already set in the environment
 #   2. ~/.wigamig/user (single line containing your Western username, e.g.
 #      "the_pi")
 #
-# If neither is set, the dashboard opens with no member selected and
-# prompts you in the Streamlit sidebar to type a handle. The handle you
-# enter there is saved to ~/.wigamig/user automatically. There is no
-# fallback to your Mac login name (`$USER`) because that almost always
-# disagrees with the Western username and produced confusing dashboards.
+# If neither is set, the dashboard server still starts (the API will
+# 400 on /api/dashboard until you append ?user=<handle> to the URL or
+# set $WIGAMIG_USER and re-launch).
 
 set -e
 
@@ -42,13 +43,28 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
+PORT="${WIGAMIG_DASHBOARD_PORT:-8770}"
+URL="http://127.0.0.1:${PORT}/"
+
 if [[ -n "$WIGAMIG_USER" ]]; then
   print "Launching wigamig dashboard for: $WIGAMIG_USER"
 else
-  print "Launching wigamig dashboard (no saved user — pick one in the sidebar)."
+  print "Launching wigamig dashboard (no saved user — set \$WIGAMIG_USER or"
+  print "add ?user=<handle> to the URL)."
 fi
-print "Repo: $REPO_DIR"
+print "Repo:  $REPO_DIR"
+print "URL:   $URL"
 print "Press Ctrl+C in this window to stop the dashboard."
 print ""
 
-exec uv run wigamig dashboard
+# Pop the browser once the server is listening, then hand the foreground
+# to uvicorn. The subshell sleeps a beat for the server to bind.
+( for i in {1..30}; do
+    if curl -s "${URL}healthz" >/dev/null 2>&1; then
+      open "$URL" >/dev/null 2>&1 || xdg-open "$URL" >/dev/null 2>&1 || true
+      break
+    fi
+    sleep 0.2
+  done ) &
+
+exec uv run wigamig dashboard --hifi --port "$PORT"

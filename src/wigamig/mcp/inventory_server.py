@@ -1,7 +1,8 @@
 """
 Purpose: Wigamig inventory MCP server. Exposes the markdown-backed
          ``<lab-mgmt-repo>/inventory/`` as a set of MCP tools (list, show,
-         provision, set, add, order). v1 hardcodes ``@the_pi`` as the
+         provision, set, add, order). v1 derives the lab manager from
+         ``<lab-mgmt>/lab.md`` (the lab's PI), so changes happen via PR.
          ``lab_manager``; real token-based auth lands in v2.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-07
@@ -31,7 +32,11 @@ from ..core.frontmatter import parse_file
 from ..core.identity import resolve as resolve_identity
 from ..core.repo import lab_mgmt_repo_root
 
-LAB_MANAGER_HANDLE = "the_pi"  # v1 hardcoded; design says token-based v2.
+def _lab_manager_handle() -> str:
+    """The lab manager handle today is the PI from <lab-mgmt>/lab.md."""
+    from ..core.lab import pi_handle
+
+    return pi_handle()
 ORDER_DIR = "onboarding"  # placeholder for `inventory_order` issues until
 # a real Issues integration lands; "open an order issue file in lab-mgmt".
 
@@ -58,10 +63,10 @@ def _resolve_caller(handle_override: str | None = None) -> str:
 
 def _require_lab_manager(handle: str | None) -> None:
     caller = _resolve_caller(handle)
-    if caller != LAB_MANAGER_HANDLE.lower():
+    lm = _lab_manager_handle().lower()
+    if caller != lm:
         raise PermissionError(
-            f"inventory write tools require lab_manager (@{LAB_MANAGER_HANDLE}); "
-            f"caller is @{caller}."
+            f"inventory write tools require lab_manager (@{lm}); caller is @{caller}."
         )
 
 
@@ -186,7 +191,7 @@ def tool_order(name: str, *, handle: str | None = None) -> dict[str, str]:
     order_path = orders_dir / f"{today}_{name}.md"
     if not order_path.exists():
         order_path.write_text(
-            f"---\nitem: {name}\nopened: {today}\nopened_by: '@{LAB_MANAGER_HANDLE}'\n---\n\n"
+            f"---\nitem: {name}\nopened: {today}\nopened_by: '@{_lab_manager_handle()}'\n---\n\n"
             f"# Order: {name}\n\nPlaced by lab_manager via the inventory MCP.\n",
             encoding="utf-8",
         )

@@ -172,6 +172,33 @@ class PeerRow(BaseModel):
     role: str
     tcps: Literal["ok", "expiring", "missing"]
     shared: int
+    # Phase 7: per-peer involvement summary.
+    # PI lens populates with the peer's complete set; member lens filters
+    # to projects the viewer also belongs to.
+    projects: list[str] = []
+    open_seas: int = 0
+    experiments: int = 0
+
+
+class AgentRow(BaseModel):
+    """Phase 7: an installed agent visible to the dashboard."""
+
+    name: str
+    description: str
+    freeze: Literal["frozen", "personal"]
+    model: str | None = None
+    required_tools: list[str] = []
+
+
+class OracleEntry(BaseModel):
+    """Phase 7: one curated note in the group oracle."""
+
+    title: str
+    excerpt: str
+    author: str
+    date: str  # ISO date or human-readable
+    project: str | None = None
+    path: str  # ``oracle/<file>.md`` for click-to-open
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +381,8 @@ class DashboardResponse(BaseModel):
     persona: Persona = "member"
     member: IdentityBlock
     pi: IdentityBlock
+    agents: list[AgentRow] = []
+    oracle_recent: list[OracleEntry] = []
     attention: list[AttentionItem]
     stats: StatStrip
     spark: list[int]

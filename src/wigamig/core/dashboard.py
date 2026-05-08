@@ -21,7 +21,43 @@ from .frontmatter import parse_file
 from .projects import ProjectSummary, iter_local_projects, load_summary
 from .repo import lab_mgmt_repo_root, read_members
 
-PI_HANDLE = "the_pi"
+def _pi_handle() -> str:
+    """Resolve the PI handle from <lab-mgmt>/lab.md, fresh on every call.
+
+    Tests redirect ``WIGAMIG_LAB_MGMT_REPO`` per-fixture, so a module-level
+    constant goes stale. Always call this at the use site.
+    """
+    from .lab import pi_handle as _resolved
+
+    return _resolved()
+
+
+class _PiHandleProxy(str):
+    """Backwards-compat: ``PI_HANDLE`` still works as a string but resolves fresh.
+
+    Old code that does ``from .dashboard import PI_HANDLE`` keeps working;
+    new code should call ``_pi_handle()`` directly. The proxy resolves
+    on every comparison + every method call, so tests that re-point
+    WIGAMIG_LAB_MGMT_REPO see the right value.
+    """
+
+    def __new__(cls):
+        return super().__new__(cls, "")
+
+    def __str__(self) -> str:  # type: ignore[override]
+        return _pi_handle()
+
+    def __eq__(self, other: object) -> bool:  # type: ignore[override]
+        return _pi_handle() == other
+
+    def __hash__(self) -> int:  # type: ignore[override]
+        return hash(_pi_handle())
+
+    def lower(self) -> str:  # type: ignore[override]
+        return _pi_handle().lower()
+
+
+PI_HANDLE = _PiHandleProxy()
 
 # Yellow / red thresholds for outstanding-analysis escalation, in days since
 # operational `complete` without analysis having reached `examined`.
