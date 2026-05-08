@@ -89,6 +89,7 @@ def build_response(
         oracle_drafts=_oracle_drafts(effective_persona, limit=20),
         requests_pending=_requests_pending(effective_persona, norm),
         requests_mine=_requests_mine(norm),
+        group_members=_group_members(),
         sea_catalog=_sea_catalog_rows(),
         inbound_requests=_inbound_rows(effective_persona),
         attention=_attention(snap, effective_persona, project_summaries, today_d),
@@ -650,7 +651,7 @@ def _projects(
         # Project artefact paths. Slack URL only filled when lab.md
         # declares the workspace, otherwise just the channel name.
         from ..core.lab import load_lab_config as _load_lab
-        slack_channel = f"proj-{p.name}"
+        slack_channel = f"proj_{p.name}"
         ws = _load_lab().slack_workspace
         slack_url = (
             f"https://{ws}/channels/{slack_channel}"
@@ -975,6 +976,29 @@ def _requests_mine(viewer: str) -> list[C.JoinRequestRow]:
     ]
     mine.sort(key=lambda r: r.id, reverse=True)
     return [_to_request_row(r) for r in mine[:10]]
+
+
+def _group_members() -> list[str]:
+    """All ``@handle``s declared in <lab-mgmt>/members/*.md (alphabetised).
+
+    Used by FE forms (project-create member picker) so users can pick
+    from a known list without typing handles by hand.
+    """
+    members_dir = lab_mgmt_repo_root() / "members"
+    if not members_dir.is_dir():
+        return []
+    handles: set[str] = set()
+    for path in members_dir.glob("*.md"):
+        try:
+            meta = parse_file(path).meta or {}
+        except Exception:
+            continue
+        handle = meta.get("handle") or path.stem
+        h = str(handle).strip()
+        if not h:
+            continue
+        handles.add(h if h.startswith("@") else f"@{h}")
+    return sorted(handles)
 
 
 def _sea_catalog_rows() -> list[C.CatalogEntryRow]:

@@ -1,14 +1,15 @@
 ---
 name: blacksmith
-description: The computational workhorse. Loads data, engineers features, trains and evaluates classifiers, and builds dashboards/GUIs.
+description: The computational workhorse. Loads data, engineers features, trains and
+  evaluates classifiers, and builds dashboards/GUIs.
 freeze: personal
 model: opus
 required_tools:
-  - Read
-  - Write
-  - Bash
-  - Glob
-  - Grep
+- Read
+- Write
+- Bash
+- Glob
+- Grep
 denied_tools: []
 defaults:
   language: en

@@ -245,7 +245,8 @@
       .muted { color: var(--muted); }
       .num { font-variant-numeric: tabular-nums; }
 
-      table.dt { width: 100%; border-collapse: collapse; font-size: 13px; }
+      table.dt { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
+      table.dt td, table.dt th { overflow-wrap: anywhere; }
       table.dt th, table.dt td {
         text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--rule);
         vertical-align: middle;

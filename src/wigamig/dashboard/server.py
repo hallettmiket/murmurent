@@ -624,17 +624,34 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/agents/{name}/{action}")
-    def agent_toggle(name: str, action: str) -> dict:
-        """Enable/disable a personal agent.
+    def agent_toggle(
+        name: str,
+        action: str,
+        model: str | None = Query(
+            None,
+            description="When action='set_model', the new model shorthand (opus|sonnet|haiku).",
+        ),
+    ) -> dict:
+        """Manage a personal agent's frontmatter.
 
-        Frozen agents (centre-controlled) cannot be toggled here; they
+        Actions:
+          - ``enable`` / ``disable`` — flip the ``disabled:`` flag
+          - ``set_model`` — pick a model shorthand (``opus|sonnet|haiku``)
+
+        Frozen agents (centre-controlled) cannot be modified here; they
         require a PR against the agents/ registry.
         """
         from ..core import agents as agents_core
         from ..core.repo import wigamig_repo_root
 
-        if action not in {"enable", "disable"}:
+        VALID_MODELS = {"opus", "sonnet", "haiku"}
+        if action not in {"enable", "disable", "set_model"}:
             raise HTTPException(status_code=422, detail=f"unknown action: {action}")
+        if action == "set_model" and (not model or model not in VALID_MODELS):
+            raise HTTPException(
+                status_code=422,
+                detail=f"set_model needs ?model={'|'.join(sorted(VALID_MODELS))}",
+            )
 
         registry_dir = wigamig_repo_root() / "agents"
         try:
@@ -650,22 +667,26 @@ def create_app() -> FastAPI:
                 status_code=403,
                 detail=(
                     f"agent {name!r} is frozen (centre-controlled). "
-                    f"Toggle via PR against agents/{name}.md."
+                    f"Modify via PR against agents/{name}.md."
                 ),
             )
 
-        # Personal-agent enable/disable is implemented by toggling a
-        # `disabled: true` field in the agent's frontmatter (the agent
-        # registry loader skips disabled agents in v2; for now we just
-        # mark them so the dashboard reflects the state).
         path = match.path
         if path is None:
             raise HTTPException(status_code=500, detail="agent path missing")
         from ..core.frontmatter import dump_document, parse_file
         parsed = parse_file(path)
-        parsed.meta["disabled"] = action == "disable"
+        if action in {"enable", "disable"}:
+            parsed.meta["disabled"] = action == "disable"
+        elif action == "set_model":
+            parsed.meta["model"] = model
         path.write_text(dump_document(parsed.meta, parsed.body), encoding="utf-8")
-        return {"ok": True, "name": name, "disabled": action == "disable"}
+        return {
+            "ok": True,
+            "name": name,
+            "disabled": bool(parsed.meta.get("disabled", False)),
+            "model": parsed.meta.get("model"),
+        }
 
     @app.post("/api/notebook/edit")
     def notebook_edit(
