@@ -27,6 +27,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from ..core.identity import resolve as resolve_identity
+from ..core.repo import lab_mgmt_repo_root
 from . import contract as C
 from . import notebook_actions
 from . import request_actions
@@ -523,6 +524,46 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc))
         _xg.write_inbound(req)
         return {"ok": True, "request": req.to_meta()}
+
+    @app.post("/api/oracle/{slug}/{action}")
+    def oracle_approve_decline(
+        slug: str,
+        action: str,
+        body: SeaActionBody = Body(default_factory=SeaActionBody),
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Approve or decline a draft oracle entry. PI only."""
+        from ..core import slack_distill as _distill
+
+        _require_pi(user)
+        actor = (user or "").strip().lstrip("@")
+        if not actor:
+            identity = resolve_identity(allow_unknown=True)
+            actor = identity.handle if identity.source != "unknown" else ""
+
+        path = lab_mgmt_repo_root() / "oracle" / f"{slug}"
+        # Allow callers to pass either "<slug>" or "<slug>.md".
+        if not path.suffix:
+            path = path.with_suffix(".md")
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail=f"oracle entry not found: {slug}")
+        if not _distill.is_draft(path):
+            raise HTTPException(
+                status_code=409,
+                detail=f"oracle entry {slug!r} is not a draft.",
+            )
+        try:
+            if action == "approve":
+                _distill.approve_draft(path, approver=actor)
+            elif action == "decline":
+                if not body.reason:
+                    raise HTTPException(status_code=422, detail="decline requires reason")
+                _distill.decline_draft(path, reason=body.reason)
+            else:
+                raise HTTPException(status_code=422, detail=f"unknown action: {action}")
+        except _distill.DistillError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"ok": True, "slug": slug, "action": action}
 
     @app.post("/api/oracle/process")
     def oracle_process(

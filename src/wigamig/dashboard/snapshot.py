@@ -86,6 +86,7 @@ def build_response(
         pi=_pi_identity(),
         agents=_agents(),
         oracle_recent=_oracle_recent(limit=8),
+        oracle_drafts=_oracle_drafts(effective_persona, limit=20),
         requests_pending=_requests_pending(effective_persona, norm),
         requests_mine=_requests_mine(norm),
         sea_catalog=_sea_catalog_rows(),
@@ -846,25 +847,31 @@ def _agent_extras(path) -> tuple[str | None, bool]:
 # ---------------------------------------------------------------------------
 
 
-def _oracle_recent(*, limit: int = 8) -> list[C.OracleEntry]:
-    """Return the N most recently-published group-oracle markdown files.
+def _oracle_recent(
+    *, limit: int = 8, include_drafts: bool = False
+) -> list[C.OracleEntry]:
+    """Return the N most-recent group-oracle entries.
 
-    Reads ``<lab-mgmt>/oracle/*.md``; each file is one curated finding
-    or note. Frontmatter is parsed for ``title``, ``author``, ``date``,
-    ``project``. Body's first non-blank, non-heading paragraph becomes
-    the excerpt. If the dir is missing or empty, returns ``[]``.
+    By default, **excludes drafts** — the PI sees those in the drafts
+    queue (rendered separately on the dashboard). Pass
+    ``include_drafts=True`` to include them (e.g. for the PI's
+    queue endpoint).
     """
     oracle_dir = lab_mgmt_repo_root() / "oracle"
     if not oracle_dir.is_dir():
         return []
     files = sorted(oracle_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
     rows: list[C.OracleEntry] = []
-    for path in files[:limit]:
+    for path in files:
         try:
             doc = parse_file(path)
         except Exception:
             continue
         meta = doc.meta or {}
+        status = str(meta.get("status", "")).lower()
+        # Skip drafts (and declined) for member-visible feed.
+        if not include_drafts and status in {"draft", "declined"}:
+            continue
         title = str(meta.get("title") or path.stem)
         author = str(meta.get("author") or "")
         date = str(meta.get("date") or "")
@@ -880,6 +887,40 @@ def _oracle_recent(*, limit: int = 8) -> list[C.OracleEntry]:
                 path=f"oracle/{path.name}",
             )
         )
+        if len(rows) >= limit:
+            break
+    return rows
+
+
+def _oracle_drafts(persona: str, *, limit: int = 20) -> list[C.OracleEntry]:
+    """PI-only: oracle entries with ``status: draft`` awaiting approval."""
+    if persona != "pi":
+        return []
+    oracle_dir = lab_mgmt_repo_root() / "oracle"
+    if not oracle_dir.is_dir():
+        return []
+    rows: list[C.OracleEntry] = []
+    files = sorted(oracle_dir.glob("*.md"), key=lambda p: p.stat().st_mtime, reverse=True)
+    for path in files:
+        try:
+            doc = parse_file(path)
+        except Exception:
+            continue
+        meta = doc.meta or {}
+        if str(meta.get("status", "")).lower() != "draft":
+            continue
+        rows.append(
+            C.OracleEntry(
+                title=str(meta.get("title") or path.stem),
+                excerpt=_first_paragraph(doc.body),
+                author=str(meta.get("author") or ""),
+                date=str(meta.get("date") or ""),
+                project=str(meta.get("project")) if meta.get("project") else None,
+                path=f"oracle/{path.name}",
+            )
+        )
+        if len(rows) >= limit:
+            break
     return rows
 
 

@@ -29,6 +29,10 @@ dashboard = [
     "uvicorn>=0.30",
     "httpx>=0.27",
 ]
+slack = [
+    "slack-sdk>=3.30",
+    "anthropic>=0.40",
+]
 
 [project.scripts]
 wigamig = "wigamig.cli:cli"
