@@ -24,7 +24,7 @@ def _make_project(root: Path) -> Path:
     project = root / "project_a"
     project.mkdir()
     (project / "CHARTER.md").write_text("---\nname: project_a\n---\n", encoding="utf-8")
-    (project / "MEMBERS").write_text("# header\n@mike\n@allie\n", encoding="utf-8")
+    (project / "MEMBERS").write_text("# header\n@mhallet\n@allie\n", encoding="utf-8")
     nested = project / "exp" / "1_qc"
     nested.mkdir(parents=True)
     return project
@@ -51,5 +51,5 @@ def test_require_project_repo_raises(tmp_path: Path) -> None:
 
 def test_read_members_skips_blank_and_comments(tmp_path: Path) -> None:
     members = tmp_path / "MEMBERS"
-    members.write_text("# comment\n\n@mike\n@allie\n", encoding="utf-8")
-    assert read_members(members) == ["@mike", "@allie"]
+    members.write_text("# comment\n\n@mhallet\n@allie\n", encoding="utf-8")
+    assert read_members(members) == ["@mhallet", "@allie"]

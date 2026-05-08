@@ -1,7 +1,7 @@
 # wigamig smoke-test tutorial
 
 > 5-day walkthrough for two students using the four fake personas
-> (`@mike`, `@allie`, `@bob`, `@cassie`). Everything is fake — no real PHI,
+> (`@mhallet`, `@allie`, `@bob`, `@cassie`). Everything is fake — no real PHI,
 > no real cross-group communication. The point is to exercise the *shape*
 > of the design and find what's confusing or broken.
 
@@ -9,7 +9,7 @@
 
 | Persona | Role | TCPS_2 status |
 |---|---|---|
-| `@mike` | PI | OK |
+| `@mhallet` | PI | OK |
 | `@allie` | postdoc, dcis lead | OK |
 | `@bob` | senior PhD | expires in ~30 days (yellow) |
 | `@cassie` | junior PhD | missing (red) |
@@ -32,7 +32,7 @@ fire on every CC session, and the inventory MCP is reachable from CC.
 
 ## Day 1 — solo orientation
 
-Each student picks a persona (Bob, Cassie). Pretend Allie / Mike are offline.
+Each student picks a persona (Bob, Cassie). Pretend Allie / mhallet (PI) are offline.
 
 ```bash
 WIGAMIG_USER=bob wigamig dashboard --snapshot
@@ -49,10 +49,22 @@ What to check:
 - Bob's compliance section shows TCPS_2 expiring (yellow); Cassie's shows TCPS_2 missing (red).
 - `sea list --incoming` for Bob shows SEA #1 (claimed) and SEA #5 (declined).
 
-Open the live view too if streamlit is installed:
+Open the live Streamlit view. Easiest path: in Finder, double-click
+**`Open Dashboard.command`** at the top of the repo. It picks your username
+from (in order) `$WIGAMIG_USER` or `~/.wigamig/user`. If neither is set,
+the dashboard prompts you to type a handle in the sidebar (e.g. `mhallet`)
+and saves it for next time. There is no fallback to your Mac login name —
+that almost always disagrees with your Western username.
+To run it as Bob for the tutorial, set the env var first:
 
 ```bash
-WIGAMIG_USER=bob wigamig dashboard
+WIGAMIG_USER=bob open "Open Dashboard.command"
+```
+
+Or stay on the command line:
+
+```bash
+WIGAMIG_USER=bob uv run wigamig dashboard
 ```
 
 ## Day 2 — claim, work, push

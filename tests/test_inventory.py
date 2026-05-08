@@ -90,7 +90,7 @@ def test_mcp_set_requires_lab_manager(inv, monkeypatch):
 
 
 def test_mcp_set_as_lab_manager(inv, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_USER", "mike")
+    monkeypatch.setenv("WIGAMIG_USER", "mhallet")
     inventory_server.tool_set("anti_cd31", {"status": "low"})
     item = inventory.parse_item(inventory.item_path("anti_cd31"))
     assert item.status == "low"

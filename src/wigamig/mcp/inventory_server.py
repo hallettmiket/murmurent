@@ -1,7 +1,7 @@
 """
 Purpose: Wigamig inventory MCP server. Exposes the markdown-backed
          ``<lab-mgmt-repo>/inventory/`` as a set of MCP tools (list, show,
-         provision, set, add, order). v1 hardcodes ``@mike`` as the
+         provision, set, add, order). v1 hardcodes ``@mhallet`` as the
          ``lab_manager``; real token-based auth lands in v2.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-07
@@ -31,7 +31,7 @@ from ..core.frontmatter import parse_file
 from ..core.identity import resolve as resolve_identity
 from ..core.repo import lab_mgmt_repo_root
 
-LAB_MANAGER_HANDLE = "mike"  # v1 hardcoded; design says token-based v2.
+LAB_MANAGER_HANDLE = "mhallet"  # v1 hardcoded; design says token-based v2.
 ORDER_DIR = "onboarding"  # placeholder for `inventory_order` issues until
 # a real Issues integration lands; "open an order issue file in lab-mgmt".
 
