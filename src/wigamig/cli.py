@@ -760,8 +760,29 @@ def breach_cmd(project_name: str, description: str) -> None:
 @click.option("--pi", "pi_view", is_flag=True, help="Open PI view (rejected if not PI).")
 @click.option("--snapshot", is_flag=True, help="Print the latest markdown snapshot.")
 @click.option("--outstanding", is_flag=True, help="Print only the Outstanding panel.")
-def dashboard_cmd(pi_view: bool, snapshot: bool, outstanding: bool) -> None:
-    dashboard_impl.cmd_dashboard(pi_view=pi_view, snapshot=snapshot, outstanding=outstanding)
+@click.option(
+    "--hifi",
+    is_flag=True,
+    help="Launch the FastAPI hi-fi dashboard (Phase 0 of the redesign).",
+)
+@click.option("--host", default="127.0.0.1", show_default=True, help="Hi-fi server host.")
+@click.option("--port", default=8770, show_default=True, type=int, help="Hi-fi server port.")
+def dashboard_cmd(
+    pi_view: bool,
+    snapshot: bool,
+    outstanding: bool,
+    hifi: bool,
+    host: str,
+    port: int,
+) -> None:
+    dashboard_impl.cmd_dashboard(
+        pi_view=pi_view,
+        snapshot=snapshot,
+        outstanding=outstanding,
+        hifi=hifi,
+        host=host,
+        port=port,
+    )
 
 
 # ---------------------------------------------------------------------------

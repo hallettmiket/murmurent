@@ -10,7 +10,7 @@ assignees: hallettmiket
 
 Which fake persona were you running as?
 
-- [ ] @mike
+- [ ] @the_pi
 - [ ] @allie
 - [ ] @bob
 - [ ] @cassie

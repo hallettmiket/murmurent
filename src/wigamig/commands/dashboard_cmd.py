@@ -26,30 +26,71 @@ def cmd_dashboard(
     pi_view: bool,
     snapshot: bool,
     outstanding: bool,
+    hifi: bool = False,
+    host: str = "127.0.0.1",
+    port: int = 8770,
 ) -> int:
     """``wigamig dashboard`` — open Streamlit, print the snapshot, or print outstanding."""
     identity = resolve_identity(allow_unknown=True)
-    handle = identity.handle
+    handle = identity.handle if identity.source != "unknown" else ""
+
+    # Hi-fi (FastAPI) launcher: phase-0 lives alongside Streamlit until the
+    # panels finish porting.
+    if hifi:
+        return _launch_hifi(host=host, port=port)
+
+    # Streamlit-only mode: handle may be empty; the app shows a login sidebar.
+    if not (snapshot or outstanding):
+        return _launch_streamlit(handle)
+
+    if not handle:
+        raise click.ClickException(
+            "No member identity resolved. Set $WIGAMIG_USER or write your handle to "
+            "~/.wigamig/user (e.g. `echo the_pi > ~/.wigamig/user`)."
+        )
+
     snap = dashboard.build_snapshot(handle)
 
     if pi_view and not snap.is_pi:
         raise click.ClickException(
-            "--pi requires WIGAMIG_USER=mike (or PI gh handle); v1 hardcodes PI to @mike."
+            "--pi requires WIGAMIG_USER=the_pi (or PI gh handle); v1 hardcodes PI to @the_pi."
         )
 
     if outstanding:
         click.echo(dashboard.render_outstanding(snap), nl=False)
         return 0
 
-    if snapshot:
-        target = lab_mgmt_repo_root() / "dashboards" / f"{snap.member}.md"
-        if target.is_file():
-            click.echo(target.read_text(encoding="utf-8"), nl=False)
-        else:
-            click.echo(dashboard.render_markdown(snap), nl=False)
-        return 0
+    target = lab_mgmt_repo_root() / "dashboards" / f"{snap.member}.md"
+    if target.is_file():
+        click.echo(target.read_text(encoding="utf-8"), nl=False)
+    else:
+        click.echo(dashboard.render_markdown(snap), nl=False)
+    return 0
 
-    return _launch_streamlit(handle)
+
+def _launch_hifi(*, host: str, port: int) -> int:
+    """Launch the FastAPI hi-fi server (uvicorn) in the foreground."""
+    try:
+        from ..dashboard import server as hifi_server  # noqa: F401
+    except ModuleNotFoundError as exc:  # pragma: no cover
+        raise click.ClickException(
+            "hi-fi dashboard deps missing. Install with "
+            "`uv sync --extra dashboard`."
+        ) from exc
+
+    click.echo(f"Hi-fi dashboard: http://{host}:{port}/")
+    click.echo(f"  Data contract:   http://{host}:{port}/api/dashboard")
+    click.echo("  Ctrl+C to stop.")
+    import uvicorn
+
+    uvicorn.run(
+        "wigamig.dashboard.server:app",
+        host=host,
+        port=port,
+        log_level="info",
+        reload=False,
+    )
+    return 0
 
 
 def _launch_streamlit(handle: str) -> int:

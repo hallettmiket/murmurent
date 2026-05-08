@@ -107,7 +107,7 @@ def test_filter_for_member_helper():
     seas = [
         sea.Sea(id=1, from_handle="@allie", to_handle="@bob", kind="skill", description="x"),
         sea.Sea(id=2, from_handle="@bob", to_handle="@allie", kind="skill", description="y"),
-        sea.Sea(id=3, from_handle="@cassie", to_handle="@mike", kind="skill", description="z"),
+        sea.Sea(id=3, from_handle="@cassie", to_handle="@the_pi", kind="skill", description="z"),
     ]
     inc = sea.filter_for_member(seas, "bob", direction="incoming")
     assert [s.id for s in inc] == [1]

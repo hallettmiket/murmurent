@@ -26,7 +26,7 @@ def world(monkeypatch, tmp_path):
 
     # Member files mirror the seed's umbrella state.
     members = {
-        "mike": "TCPS_2:2030-12-31\n  - TOTP:enrolled\n  - signing_key:registered",
+        "the_pi": "TCPS_2:2030-12-31\n  - TOTP:enrolled\n  - signing_key:registered",
         "allie": "TCPS_2:2027-06-15\n  - TOTP:enrolled\n  - signing_key:registered",
         "bob": "TCPS_2:2026-06-05\n  - TOTP:enrolled\n  - signing_key:registered",
         "cassie": "TOTP:pending\n  - signing_key:pending",
@@ -47,7 +47,7 @@ def world(monkeypatch, tmp_path):
     project_cmd.cmd_new(
         "dcis_test",
         charter_path=None,
-        members_csv="@mike,@allie,@bob,@cassie",
+        members_csv="@the_pi,@allie,@bob,@cassie",
         description="Fake clinical project.",
         sensitivity="clinical",
         choreography="clinical_cohort",
@@ -60,7 +60,7 @@ def world(monkeypatch, tmp_path):
     project_cmd.cmd_new(
         "bbb_test",
         charter_path=None,
-        members_csv="@mike,@bob,@allie",
+        members_csv="@the_pi,@bob,@allie",
         description="Fake standard project.",
         sensitivity="standard",
         lead="@bob",
@@ -130,14 +130,14 @@ def test_compliance_for_bob_marks_expiring(world):
 
 
 def test_pi_view_includes_clinical_grid(world):
-    snap = dashboard.build_snapshot("mike", today=_dt.date(2026, 5, 7))
+    snap = dashboard.build_snapshot("the_pi", today=_dt.date(2026, 5, 7))
     assert snap.is_pi
     grid = snap.pi_view.get("clinical_compliance", [])
     assert any(row["member"] == "@cassie" and row["tcps_status"] == "missing" for row in grid)
 
 
 def test_render_markdown_includes_sections(world):
-    snap = dashboard.build_snapshot("mike", today=_dt.date(2026, 5, 7))
+    snap = dashboard.build_snapshot("the_pi", today=_dt.date(2026, 5, 7))
     text = dashboard.render_markdown(snap)
     assert "## Outstanding analysis" in text
     assert "## Security and compliance" in text

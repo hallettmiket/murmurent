@@ -28,7 +28,7 @@ def test_project_new_creates_repo_and_registry(isolated_env):
     summary = project_cmd.cmd_new(
         "dcis_sc_tutorial",
         charter_path=None,
-        members_csv="@mike,@allie,@bob,@cassie",
+        members_csv="@the_pi,@allie,@bob,@cassie",
         description="Fake clinical project for the smoke test.",
         sensitivity="clinical",
         choreography="clinical_cohort",
@@ -121,7 +121,7 @@ def test_project_describe_shows_clinical_metadata(isolated_env):
     project_cmd.cmd_new(
         "dcis_sc_tutorial",
         charter_path=None,
-        members_csv="@mike,@allie,@bob,@cassie",
+        members_csv="@the_pi,@allie,@bob,@cassie",
         description="Fake clinical.",
         sensitivity="clinical",
         choreography="clinical_cohort",

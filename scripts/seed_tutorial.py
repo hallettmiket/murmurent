@@ -99,7 +99,7 @@ PROJECT_SEEDS: tuple[ProjectSeed, ...] = (
         name="dcis_sc_tutorial",
         sensitivity="clinical",
         lead="@allie",
-        members=("@mike", "@allie", "@bob", "@cassie"),
+        members=("@the_pi", "@allie", "@bob", "@cassie"),
         description=(
             "Single-cell DCIS tutorial project for the wigamig smoke-test. All data "
             "is clearly fake: clinicopathology rows use OHIPs of the form "
@@ -122,7 +122,7 @@ PROJECT_SEEDS: tuple[ProjectSeed, ...] = (
         name="bbb_drug_screen",
         sensitivity="standard",
         lead="@bob",
-        members=("@mike", "@bob", "@allie"),
+        members=("@the_pi", "@bob", "@allie"),
         description=(
             "Blood-brain-barrier drug-screen tutorial project for the wigamig "
             "smoke-test. All compound data is clearly fake (FAKE_CMP_NNNN). "
@@ -178,7 +178,7 @@ SEA_SEEDS: tuple[SeaSeed, ...] = (
         project="dcis_sc_tutorial",
         id=3,
         from_handle="@allie",
-        to_handle="@mike",
+        to_handle="@the_pi",
         kind="analysis",
         description="Review statistical assumptions in DE pipeline",
         state="complete",
@@ -231,8 +231,8 @@ class Persona:
 
 PERSONAS: tuple[Persona, ...] = (
     Persona(
-        handle="mike",
-        full_name="Mike Hallett (PI, fake tutorial persona)",
+        handle="the_pi",
+        full_name="Mike Hallett (PI, Western username)",
         role="pi",
         status="active",
         certifications=["TCPS_2:2030-12-31", "TOTP:enrolled", "signing_key:registered"],

@@ -21,7 +21,7 @@ from .frontmatter import parse_file
 from .projects import ProjectSummary, iter_local_projects, load_summary
 from .repo import lab_mgmt_repo_root, read_members
 
-PI_HANDLE = "mike"
+PI_HANDLE = "the_pi"
 
 # Yellow / red thresholds for outstanding-analysis escalation, in days since
 # operational `complete` without analysis having reached `examined`.
@@ -66,6 +66,43 @@ class OutstandingItem:
 
 
 @dataclass
+class PeerRow:
+    """One peer in the shared-project group panel."""
+
+    handle: str
+    full_name: str | None
+    role: str
+    status: str
+    shared_projects: list[str]
+    tcps_status: str  # "ok" | "expiring" | "expired" | "missing"
+
+
+@dataclass
+class ExperimentRow:
+    """One row of the cross-project experiment browser."""
+
+    project: str
+    slug: str
+    status: str
+    analysis_status: str
+    performer: list[str]
+    date: str | None
+
+
+@dataclass
+class SeaRow:
+    """One row of the cross-project SEA browser."""
+
+    project: str
+    id: int
+    state: str
+    kind: str
+    from_handle: str
+    to_handle: str
+    description: str
+
+
+@dataclass
 class DashboardSnapshot:
     """Everything the markdown writer + Streamlit viewer need to render."""
 
@@ -79,6 +116,10 @@ class DashboardSnapshot:
     outstanding: list[OutstandingItem]
     compliance: list[ProjectComplianceRow]
     inventory_summary: dict[str, list[dict]] = field(default_factory=dict)
+    peers: list[PeerRow] = field(default_factory=list)
+    all_projects: list[ProjectSummary] = field(default_factory=list)
+    all_experiments: list[ExperimentRow] = field(default_factory=list)
+    all_seas: list[SeaRow] = field(default_factory=list)
     is_pi: bool = False
     pi_view: dict[str, list] = field(default_factory=dict)
     generated_at: str = ""
@@ -320,6 +361,10 @@ def build_snapshot(handle: str, *, today: _dt.date | None = None) -> DashboardSn
 
     inventory_summary = _inventory_summary()
 
+    peers = _peers_for_member(norm_handle, member_projects, today_d)
+    all_experiments = _all_experiments(projects_all)
+    all_seas = _all_seas(projects_all)
+
     pi_view: dict[str, list] = {}
     if is_pi:
         pi_view = _build_pi_view(projects_all, today_d)
@@ -335,10 +380,108 @@ def build_snapshot(handle: str, *, today: _dt.date | None = None) -> DashboardSn
         outstanding=outstanding,
         compliance=compliance,
         inventory_summary=inventory_summary,
+        peers=peers,
+        all_projects=list(projects_all),
+        all_experiments=all_experiments,
+        all_seas=all_seas,
         is_pi=is_pi,
         pi_view=pi_view,
         generated_at=today_d.isoformat(),
     )
+
+
+def _peers_for_member(
+    handle: str, member_projects: Iterable[ProjectSummary], today: _dt.date
+) -> list[PeerRow]:
+    """Build the group panel: anyone who shares a project with ``handle``."""
+    norm = handle.lstrip("@").lower()
+    project_list = list(member_projects)
+    by_handle: dict[str, list[str]] = {}
+    for project in project_list:
+        for raw in project.members:
+            peer = raw.lstrip("@").lower()
+            if peer == norm:
+                continue
+            by_handle.setdefault(peer, []).append(project.name)
+
+    rows: list[PeerRow] = []
+    for peer, projects in sorted(by_handle.items()):
+        full_name, status, raw_certs = _load_member_meta(peer)
+        certs = _parse_certifications(raw_certs, today)
+        # Read role from the lab-mgmt member file (if present).
+        role = _peer_role(peer)
+        tcps = next((c for c in certs if c.name == "TCPS_2"), None)
+        rows.append(
+            PeerRow(
+                handle=peer,
+                full_name=full_name,
+                role=role,
+                status=status,
+                shared_projects=sorted(set(projects)),
+                tcps_status=tcps.status if tcps else "missing",
+            )
+        )
+    return rows
+
+
+def _peer_role(handle: str) -> str:
+    """Return the ``role`` field from ``members/<handle>.md`` (``unknown`` if missing)."""
+    member_path = lab_mgmt_repo_root() / "members" / f"{handle}.md"
+    if not member_path.is_file():
+        return "unknown"
+    parsed = parse_file(member_path)
+    return str(parsed.meta.get("role", "unknown"))
+
+
+def _all_experiments(projects: Iterable[ProjectSummary]) -> list[ExperimentRow]:
+    """Walk every project's ``exp/`` and return one row per experiment."""
+    rows: list[ExperimentRow] = []
+    for project in projects:
+        exp_root = project.path / "exp"
+        if not exp_root.is_dir():
+            continue
+        for exp_dir in sorted(exp_root.glob("*_*")):
+            notebook = exp_dir / "notebook.md"
+            if not notebook.is_file():
+                continue
+            try:
+                parsed = parse_file(notebook)
+            except Exception:
+                continue
+            performer = [str(p) for p in (parsed.meta.get("performer") or [])]
+            rows.append(
+                ExperimentRow(
+                    project=project.name,
+                    slug=exp_dir.name,
+                    status=str(parsed.meta.get("status", "planned")),
+                    analysis_status=str(parsed.meta.get("analysis_status", "not_started")),
+                    performer=performer,
+                    date=parsed.meta.get("date") if parsed.meta.get("date") else None,
+                )
+            )
+    return rows
+
+
+def _all_seas(projects: Iterable[ProjectSummary]) -> list[SeaRow]:
+    """Walk every project's ``seas/`` and return one row per SEA."""
+    rows: list[SeaRow] = []
+    for project in projects:
+        repo = _project_repo_for(project)
+        if repo is None:
+            continue
+        for s in sea.iter_seas(repo):
+            rows.append(
+                SeaRow(
+                    project=project.name,
+                    id=s.id,
+                    state=s.state,
+                    kind=s.kind,
+                    from_handle=s.from_handle,
+                    to_handle=s.to_handle,
+                    description=s.description,
+                )
+            )
+    return rows
 
 
 def _inventory_summary() -> dict[str, list[dict]]:
