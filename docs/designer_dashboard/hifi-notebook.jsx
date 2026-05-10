@@ -6,6 +6,59 @@
    on re-render. The previous module-level `const NB = ...` froze a stale
    reference after Object.assign(window.DATA, ...). */
 
+/* ── NbHintPopup: ⓘ button with a click-to-open popover.
+   First line of `text` is the file path (rendered as <code>);
+   remaining text is the human-readable explanation.             */
+function NbHintPopup({ text }) {
+  const [open, setOpen] = React.useState(false);
+  React.useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [open]);
+
+  const newline = text.indexOf("\n");
+  const path    = newline > -1 ? text.slice(0, newline)      : text;
+  const note    = newline > -1 ? text.slice(newline + 1).trim() : "";
+
+  return (
+    <span style={{position:"relative", display:"inline-block"}}
+          onClick={e => e.stopPropagation()}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{
+          background:"none", border:"1px solid var(--rule-strong)", borderRadius:2,
+          padding:"2px 8px", cursor:"pointer", fontSize:11,
+          color:"var(--muted)", fontFamily:"var(--mono)", letterSpacing:0.3,
+        }}>
+        ⓘ where does this save?
+      </button>
+      {open && (
+        <div style={{
+          position:"absolute", top:"calc(100% + 6px)", left:0, zIndex:60,
+          background:"var(--card)", border:"1px solid var(--rule-strong)",
+          borderRadius:2, padding:"10px 12px", width:360, maxWidth:"90vw",
+          fontSize:11, color:"var(--ink-2)",
+          boxShadow:"0 4px 16px rgba(32,20,54,0.15)",
+        }}>
+          <div style={{marginBottom:6}}>
+            <span className="muted" style={{display:"block", marginBottom:3,
+              fontSize:10, letterSpacing:1, textTransform:"uppercase"}}>
+              path
+            </span>
+            <code style={{wordBreak:"break-all", fontSize:10.5}}>{path}</code>
+          </div>
+          {note && (
+            <div style={{color:"var(--muted)", borderTop:"1px solid var(--rule)", paddingTop:6}}>
+              {note}
+            </div>
+          )}
+        </div>
+      )}
+    </span>
+  );
+}
+
 function NbToday() {
   const NB = window.DATA.notebook;
   const t = NB.today;
@@ -19,12 +72,13 @@ function NbToday() {
       </div>
 
       {t.content.map((b, i) => {
-        if (b.kind === "h4") return <h4 key={i}>{b.text}</h4>;
-        if (b.kind === "p")  return <p key={i}>{b.text.split(/(\[\[[^\]]+\]\])/).map((s,j) => /^\[\[/.test(s) ? <span key={j} className="wikilink">{s.replace(/[\[\]]/g,'')}</span> : <span key={j}>{s}</span>)}</p>;
-        if (b.kind === "task") return <p key={i} style={{margin:"4px 0"}}><span className={"check"+(b.done?" done":"")}></span><span style={{textDecoration:b.done?"line-through":"none",color:b.done?"var(--muted)":"inherit"}}>{b.text}</span></p>;
-        if (b.kind === "list") return <ul key={i}>{b.items.map((x,j) => <li key={j}>{x}</li>)}</ul>;
+        if (b.kind === "h4")        return <h4 key={i}>{b.text}</h4>;
+        if (b.kind === "hint")      return <NbHintPopup key={i} text={b.text} />;
+        if (b.kind === "p")         return <p key={i}>{b.text.split(/(\[\[[^\]]+\]\])/).map((s,j) => /^\[\[/.test(s) ? <span key={j} className="wikilink">{s.replace(/[\[\]]/g,'')}</span> : <span key={j}>{s}</span>)}</p>;
+        if (b.kind === "task")      return <p key={i} style={{margin:"4px 0"}}><span className={"check"+(b.done?" done":"")}></span><span style={{textDecoration:b.done?"line-through":"none",color:b.done?"var(--muted)":"inherit"}}>{b.text}</span></p>;
+        if (b.kind === "list")      return <ul key={i}>{b.items.map((x,j) => <li key={j}>{x}</li>)}</ul>;
         if (b.kind === "blockquote") return <blockquote key={i}>{b.text}</blockquote>;
-        if (b.kind === "code") return <code key={i} className="codeblock">{b.text}</code>;
+        if (b.kind === "code")      return <code key={i} className="codeblock">{b.text}</code>;
         return null;
       })}
     </div>
