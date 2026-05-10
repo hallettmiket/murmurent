@@ -70,6 +70,30 @@ class IdentityBlock(BaseModel):
     is_active: bool = True  # Phase 13: deactivated members can read but not act
 
 
+class MemberSettings(BaseModel):
+    """Editable member profile settings — displayed in the profile modal."""
+
+    # Obsidian / notebook
+    obsidian_vault_path: str | None = None     # full path displayed as short form
+    obsidian_vault_name: str | None = None     # vault name for obsidian:// URLs
+    notebook_subfolder: str = "lab-notebook"   # subfolder within the vault
+    oracle_subfolder: str = "oracle"           # personal oracle subfolder within vault
+    # Contact
+    email: str | None = None
+    orcid: str | None = None
+    bluesky: str | None = None
+    github: str | None = None
+    osf: str | None = None
+    website: str | None = None
+    # Location
+    office: str | None = None
+    dry_lab: str | None = None
+    wet_labs: str | None = None
+    address: str | None = None
+    city: str | None = None
+    department: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # Attention queue
 # ---------------------------------------------------------------------------
@@ -116,8 +140,8 @@ class AttentionStats(BaseModel):
 
 
 class SeasStats(BaseModel):
-    closedThisWeek: int
-    deltaPct: int
+    closed_this_week: int
+    delta_pct: int
     in_: int = Field(alias="in")
     out: int
 
@@ -137,8 +161,8 @@ class InventoryStats(BaseModel):
 
 
 class NotebookStats(BaseModel):
-    entriesThisWeek: int
-    lastWritten: str
+    entries_this_week: int
+    last_written: str
 
 
 class StatStrip(BaseModel):
@@ -163,8 +187,8 @@ class ProjectRow(BaseModel):
     lead: str
     choreo: str | None
     members: int
-    openSeas: int
-    lastActivity: str
+    open_seas: int
+    last_activity: str
     # Phase 9: where to find the project's artefacts.
     github_repo: str | None = None    # e.g. "hallettmiket/dcis_sc_tutorial"
     slack_channel: str | None = None  # e.g. "proj_dcis_sc_tutorial"
@@ -203,7 +227,7 @@ class AgentRow(BaseModel):
 
 
 class OracleEntry(BaseModel):
-    """Phase 7: one curated note in the group oracle."""
+    """Phase 7: one curated note in the lab oracle."""
 
     title: str
     excerpt: str
@@ -211,6 +235,35 @@ class OracleEntry(BaseModel):
     date: str  # ISO date or human-readable
     project: str | None = None
     path: str  # ``oracle/<file>.md`` for click-to-open
+
+
+class PersonalOracleEntry(BaseModel):
+    """One entry in the member's personal Oracle memory."""
+
+    title: str
+    excerpt: str
+    date: str      # ISO date or human-readable
+    path: str      # e.g. "oracle/memory_entry.md" for click-to-open
+
+
+class PersonalOracleBlock(BaseModel):
+    """The member's personal Oracle panel data."""
+
+    folder: str            # short display path, e.g. "obsidian-lab/oracle/"
+    entry_count: int = 0
+    recent: list[PersonalOracleEntry] = []
+
+
+class LabSettings(BaseModel):
+    """Lab-wide configuration — editable only by the PI or a designated admin."""
+
+    name: str = "hallett"                      # short identifier, used in paths
+    display_name: str = "Hallett Lab"          # human label shown in the UI
+    pi_handle: str = ""
+    website: str | None = None                 # e.g. https://mikehallett.science
+    notebook_large_files_path: str | None = None  # e.g. /data/lab_vm/obsidian-lab/notebooks
+    lab_oracle_vault: str | None = None        # wigamig-vault-<name>/ on lab base
+    admins: list[str] = []                     # handles with PI-level settings edit rights
 
 
 class TrainingCertSpec(BaseModel):
@@ -425,8 +478,17 @@ class NbCode(BaseModel):
     text: str
 
 
+class NbHint(BaseModel):
+    """Renders as a small ⓘ button; full text appears in a click-to-open popover.
+    First line of text is treated as the file path (displayed as <code>);
+    remaining lines are the human-readable explanation."""
+
+    kind: Literal["hint"]
+    text: str
+
+
 NbBlock = Annotated[
-    NbHeading | NbParagraph | NbTask | NbList | NbBlockquote | NbCode,
+    NbHeading | NbParagraph | NbTask | NbList | NbBlockquote | NbCode | NbHint,
     Field(discriminator="kind"),
 ]
 
@@ -473,9 +535,13 @@ class DashboardResponse(BaseModel):
     persona: Persona = "member"
     member: IdentityBlock
     pi: IdentityBlock
+    member_settings: MemberSettings = MemberSettings()
+    lab_settings: LabSettings = LabSettings()
     agents: list[AgentRow] = []
     oracle_recent: list[OracleEntry] = []
     oracle_drafts: list[OracleEntry] = []  # PI-only; awaiting approval
+    personal_oracle: PersonalOracleBlock = PersonalOracleBlock(folder="oracle/")
+    lab_oracle_folder: str = ""   # short display path for the lab oracle vault root
     requests_pending: list[JoinRequestRow] = []  # PI: all pending; member: theirs only
     requests_mine: list[JoinRequestRow] = []     # the viewer's outgoing requests
     group_members: list[str] = []                # all known @handles (for forms)
@@ -485,7 +551,7 @@ class DashboardResponse(BaseModel):
     attention: list[AttentionItem]
     stats: StatStrip
     spark: list[int]
-    sparkLabels: list[str]
+    spark_labels: list[str]
     projects: list[ProjectRow]
     peers: list[PeerRow]
     seas: list[SeaRow]

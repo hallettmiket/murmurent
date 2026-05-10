@@ -39,6 +39,7 @@ def _pi_handle() -> str:
     from ..core.lab import pi_handle as _resolved
     return _resolved()
 NOTEBOOK_DIR_NAME = "lab-notebook"
+PERSONAL_ORACLE_DIR = Path.home() / ".claude" / "agent-memory" / "oracle"
 
 
 # ---------------------------------------------------------------------------
@@ -81,14 +82,21 @@ def build_response(
     member_block = _identity(snap.member, snap.full_name, snap.role)
     member_block = member_block.model_copy(update={"can_pi": can_pi})
 
+    member_profile = _load_member_profile(norm)
+    lab_name = str(member_profile.get("lab") or "hallett")
+
     return C.DashboardResponse(
         today=_today_block(today_d),
         persona=effective_persona,  # type: ignore[arg-type]
         member=member_block,
         pi=_pi_identity(),
+        member_settings=_member_settings(member_profile),
+        lab_settings=_lab_settings(lab_name),
         agents=_agents(),
         oracle_recent=_oracle_recent(limit=8),
         oracle_drafts=_oracle_drafts(effective_persona, limit=20),
+        personal_oracle=_personal_oracle(limit=5),
+        lab_oracle_folder=_lab_oracle_folder(lab_name),
         requests_pending=_requests_pending(effective_persona, norm),
         requests_mine=_requests_mine(norm),
         group_members=_group_members(),
@@ -101,7 +109,7 @@ def build_response(
             persona=effective_persona, projects=project_summaries,
         ),
         spark=_spark(all_seas, today_d),
-        sparkLabels=_spark_labels(today_d),
+        spark_labels=_spark_labels(today_d),
         projects=_projects(project_summaries, all_seas, today_d),
         peers=_peers(
             snap,
@@ -227,6 +235,175 @@ def _merge_location(meta: dict | None) -> C.MemberLocation:
             if meta.get(key):
                 base[key] = str(meta[key])
     return C.MemberLocation(**base)
+
+
+# ---------------------------------------------------------------------------
+# Member settings (profile modal)
+# ---------------------------------------------------------------------------
+
+
+def _member_settings(profile: dict) -> C.MemberSettings:
+    """Build the ``MemberSettings`` block for the profile modal.
+
+    Sources values from the member's frontmatter dict (already loaded
+    via :func:`_load_member_profile`), with sensible defaults for
+    notebook / oracle subfolder names that match how the rest of the
+    dashboard resolves them.
+    """
+    contact = profile.get("contact") if isinstance(profile, dict) else None
+    location = profile.get("location") if isinstance(profile, dict) else None
+    obsidian = profile.get("obsidian") if isinstance(profile, dict) else None
+
+    contact_d = contact if isinstance(contact, dict) else {}
+    location_d = location if isinstance(location, dict) else {}
+    obsidian_d = obsidian if isinstance(obsidian, dict) else {}
+
+    vault_path = obsidian_d.get("vault_path") or profile.get("obsidian_vault_path")
+    vault_name = obsidian_d.get("vault_name") or profile.get("obsidian_vault_name")
+    notebook_subfolder = (
+        obsidian_d.get("notebook_subfolder")
+        or profile.get("notebook_subfolder")
+        or "lab-notebook"
+    )
+    oracle_subfolder = (
+        obsidian_d.get("oracle_subfolder")
+        or profile.get("oracle_subfolder")
+        or "oracle"
+    )
+
+    def _s(value) -> str | None:
+        if value is None:
+            return None
+        s = str(value).strip()
+        return s or None
+
+    return C.MemberSettings(
+        obsidian_vault_path=_s(vault_path),
+        obsidian_vault_name=_s(vault_name),
+        notebook_subfolder=str(notebook_subfolder),
+        oracle_subfolder=str(oracle_subfolder),
+        email=_s(contact_d.get("email")),
+        orcid=_s(contact_d.get("orcid")),
+        bluesky=_s(contact_d.get("bluesky")),
+        github=_s(contact_d.get("github")),
+        osf=_s(contact_d.get("osf")),
+        website=_s(contact_d.get("website")),
+        office=_s(location_d.get("office")),
+        dry_lab=_s(location_d.get("dry_lab")),
+        wet_labs=_s(location_d.get("wet_labs")),
+        address=_s(location_d.get("address")),
+        city=_s(location_d.get("city")),
+        department=_s(location_d.get("department")),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Personal oracle (member's own knowledge base)
+# ---------------------------------------------------------------------------
+
+
+def _personal_oracle(*, limit: int = 5) -> C.PersonalOracleBlock:
+    """Read the personal Oracle memory at ``~/.claude/agent-memory/oracle/``.
+
+    Returns a shape-correct empty block when the directory is absent so
+    the JSX panel can render a friendly empty state.
+    """
+    folder = PERSONAL_ORACLE_DIR
+    # Short display: ``<vault>/oracle/`` style. Use the parent's name to
+    # keep it human-readable without leaking the absolute path.
+    display_folder = f"{folder.parent.name}/{folder.name}/"
+    if not folder.is_dir():
+        return C.PersonalOracleBlock(folder=display_folder, entry_count=0, recent=[])
+
+    md_files = [p for p in folder.glob("*.md") if p.is_file()]
+    md_files.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    entry_count = len(md_files)
+
+    recent: list[C.PersonalOracleEntry] = []
+    for path in md_files[:limit]:
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            text = ""
+        excerpt = _personal_oracle_excerpt(text)
+        try:
+            mtime = _dt.datetime.fromtimestamp(path.stat().st_mtime)
+            date_str = mtime.date().isoformat()
+        except OSError:
+            date_str = ""
+        recent.append(
+            C.PersonalOracleEntry(
+                title=path.stem,
+                excerpt=excerpt,
+                date=date_str,
+                path=f"oracle/{path.name}",
+            )
+        )
+
+    return C.PersonalOracleBlock(
+        folder=display_folder,
+        entry_count=entry_count,
+        recent=recent,
+    )
+
+
+def _personal_oracle_excerpt(text: str, *, max_len: int = 120) -> str:
+    """Return the first 120 chars of useful (non-heading) content."""
+    parts: list[str] = []
+    in_frontmatter = False
+    for idx, line in enumerate(text.splitlines()):
+        stripped = line.strip()
+        # Skip YAML frontmatter (---\n...\n---) at the top of the file.
+        if idx == 0 and stripped == "---":
+            in_frontmatter = True
+            continue
+        if in_frontmatter:
+            if stripped == "---":
+                in_frontmatter = False
+            continue
+        if not stripped:
+            continue
+        if stripped.startswith("#"):
+            continue
+        parts.append(stripped)
+    out = " ".join(parts).strip()
+    if len(out) > max_len:
+        out = out[: max_len - 1] + "…"
+    return out
+
+
+def _lab_oracle_folder(lab_name: str) -> str:
+    """Short display path for the lab oracle vault root.
+
+    Example: ``wigamig-vault-hallett/`` for the Hallett lab.
+    """
+    name = (lab_name or "hallett").strip() or "hallett"
+    return f"wigamig-vault-{name}/"
+
+
+def _lab_settings(lab_name: str) -> C.LabSettings:
+    """Read lab-wide settings from ``<lab-mgmt>/lab.md`` frontmatter."""
+    try:
+        root = lab_mgmt_repo_root()
+        lab_file = root / "lab.md"
+        if lab_file.is_file():
+            meta = parse_file(lab_file).meta or {}
+            return C.LabSettings(
+                name=str(meta.get("name") or lab_name),
+                display_name=str(meta.get("display_name") or f"{lab_name.capitalize()} Lab"),
+                pi_handle=str(meta.get("pi") or _pi_handle()),
+                website=meta.get("website") or None,
+                notebook_large_files_path=meta.get("notebook_large_files_path") or None,
+                lab_oracle_vault=meta.get("lab_oracle_vault") or _lab_oracle_folder(lab_name),
+                admins=list(meta.get("admins") or []),
+            )
+    except Exception:
+        pass
+    return C.LabSettings(
+        name=lab_name,
+        pi_handle=_pi_handle(),
+        lab_oracle_vault=_lab_oracle_folder(lab_name),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -525,8 +702,8 @@ def _stats(
         attention=C.AttentionStats(red=red, amber=amber, ok=ok),
         seas=C.SeasStats(
             **{
-                "closedThisWeek": closed_this_week,
-                "deltaPct": delta_pct,
+                "closed_this_week": closed_this_week,
+                "delta_pct": delta_pct,
                 "in": len(snap.seas_incoming),
                 "out": len(snap.seas_outgoing),
             }
@@ -579,7 +756,7 @@ def _date_or_none(value) -> _dt.date | None:
 def _notebook_stats(handle: str, today_d: _dt.date) -> C.NotebookStats:
     folder = _notebook_folder(handle)
     if not folder.is_dir():
-        return C.NotebookStats(entriesThisWeek=0, lastWritten="never")
+        return C.NotebookStats(entries_this_week=0, last_written="never")
     week_start = today_d - _dt.timedelta(days=today_d.weekday())
     files = sorted(folder.glob("*.md"))
     entries_this_week = 0
@@ -601,7 +778,7 @@ def _notebook_stats(handle: str, today_d: _dt.date) -> C.NotebookStats:
         last = "yesterday"
     else:
         last = last_written.isoformat()
-    return C.NotebookStats(entriesThisWeek=entries_this_week, lastWritten=last)
+    return C.NotebookStats(entries_this_week=entries_this_week, last_written=last)
 
 
 # ---------------------------------------------------------------------------
@@ -670,8 +847,8 @@ def _projects(
                 lead=p.lead,
                 choreo=p.choreography,
                 members=len(p.members),
-                openSeas=open_seas,
-                lastActivity=_humanize(last_activity, today_d),
+                open_seas=open_seas,
+                last_activity=_humanize(last_activity, today_d),
                 github_repo=f"hallettmiket/{p.name}",
                 slack_channel=slack_channel,
                 slack_url=slack_url,
@@ -1351,12 +1528,9 @@ def _notebook(handle: str, today_d: _dt.date) -> C.NotebookBlock:
     days = _notebook_days(folder, today_d)
     today_entry = _notebook_today(folder, today_d)
     yesterday = _notebook_yesterday(folder, today_d)
-    # Display: relative to home when possible, else absolute. Matches the
-    # convention `~/foo/bar/` so the dashboard header reads naturally.
-    try:
-        display_folder = "~/" + str(folder.relative_to(Path.home())) + "/"
-    except ValueError:
-        display_folder = str(folder).rstrip("/") + "/"
+    # Short display — vault-name/notebook-dir/ is enough to identify location;
+    # full path lives in the hint popup ("where does this save?").
+    display_folder = f"{folder.parent.name}/{folder.name}/"
     return C.NotebookBlock(
         folder=display_folder,
         days=days,
@@ -1429,13 +1603,12 @@ def _notebook_today(folder: Path, today_d: _dt.date) -> C.NotebookToday:
             links_exp=[],
             content=[
                 C.NbHeading(kind="h4", text="No entry yet"),
-                C.NbParagraph(
-                    kind="p",
+                C.NbHint(
+                    kind="hint",
                     text=(
-                        "Click the **edit** button above to create today's "
-                        f"note at `{display}`. It opens in Obsidian when the "
-                        "folder is inside your registered vault; otherwise "
-                        "it falls back to your `$EDITOR` / system default."
+                        f"{display}\n"
+                        "Opens in Obsidian when the folder is inside your "
+                        "registered vault; otherwise falls back to $EDITOR."
                     ),
                 ),
             ],

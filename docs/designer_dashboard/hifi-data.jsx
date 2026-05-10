@@ -32,6 +32,35 @@ const DATA = {
     },
   },
 
+  member_settings: {
+    obsidian_vault_path: "/Users/mth/Library/Mobile Documents/iCloud~md~obsidian/Documents/obsidian-lab",
+    obsidian_vault_name: "obsidian-lab",
+    notebook_subfolder: "lab-notebook",
+    oracle_subfolder: "oracle",
+    email: "hallett.mike.t@gmail.com",
+    orcid: "0000-0002-1234-5678",
+    bluesky: "@hallett.bsky.social",
+    github: "hallettmiket",
+    osf: null,
+    website: "https://hallettlab.ca",
+    office: "Biological & Geological Sciences 307",
+    dry_lab: "BGS 310",
+    wet_labs: "MSB B112, B130",
+    address: "1 Example Avereet",
+    city: "London, ON  N6A 5C1",
+    department: "Biochemistry, Schulich School of Medicine & Dentistry",
+  },
+
+  lab_settings: {
+    name: "hallett",
+    display_name: "Hallett Lab",
+    pi_handle: "the_pi",
+    website: "https://mikehallett.science",
+    notebook_large_files_path: "/data/lab_vm/obsidian-lab/notebooks",
+    lab_oracle_vault: "wigamig-vault-hallett/",
+    admins: [],
+  },
+
   attention: [
     { sev: "red",   kind: "SEA",  id: "#214", text: "Align NovaSeq run 17 against GRCh38",      project: "dcis_imaging_genomics", age: "62d overdue", actions: [["complete","tiger"], ["reassign",""], ["open",""]] },
     { sev: "red",   kind: "CERT", id: "TCPS_2", text: "TCPS_2 expired — clinical access blocked", project: "—",                     age: "26d ago",     actions: [["renew now","primary"], ["guide",""]] },
@@ -43,20 +72,20 @@ const DATA = {
 
   stats: {
     attention: { red: 2, amber: 4, ok: 1 },
-    seas: { closedThisWeek: 10, deltaPct: 28, in: 3, out: 2 },
+    seas: { closed_this_week: 10, delta_pct: 28, in: 3, out: 2 },
     compliance: { expired: 2, expiring: 1, missing: 1 },
     inventory: { expired: 1, low: 2, expiring30: 1 },
-    notebook: { entriesThisWeek: 5, lastWritten: "yesterday" },
+    notebook: { entries_this_week: 5, last_written: "yesterday" },
   },
 
   spark: [3, 5, 4, 6, 4, 7, 5, 8, 6, 9, 7, 10],
-  sparkLabels: ["w8","w9","w10","w11","w12","w13","w14","w15","w16","w17","w18","w19"],
+  spark_labels: ["w8","w9","w10","w11","w12","w13","w14","w15","w16","w17","w18","w19"],
 
   projects: [
-    { name: "dcis_imaging_genomics", sens: "clinical", lead: "@the_pi", choreo: "drug_discovery_litl", members: 7, openSeas: 4, lastActivity: "2h ago" },
-    { name: "cohort_v3",             sens: "clinical", lead: "@cassie",  choreo: "clinical_cohort",     members: 5, openSeas: 6, lastActivity: "1h ago" },
-    { name: "imaging_pheno",         sens: "standard", lead: "@allie",   choreo: "imaging_phenotyping", members: 4, openSeas: 2, lastActivity: "yesterday" },
-    { name: "method_bench_24",       sens: "standard", lead: "@bob",     choreo: "method_benchmarking", members: 3, openSeas: 1, lastActivity: "3d ago" },
+    { name: "dcis_imaging_genomics", sens: "clinical", lead: "@the_pi", choreo: "drug_discovery_litl", members: 7, open_seas: 4, last_activity: "2h ago" },
+    { name: "cohort_v3",             sens: "clinical", lead: "@cassie",  choreo: "clinical_cohort",     members: 5, open_seas: 6, last_activity: "1h ago" },
+    { name: "imaging_pheno",         sens: "standard", lead: "@allie",   choreo: "imaging_phenotyping", members: 4, open_seas: 2, last_activity: "yesterday" },
+    { name: "method_bench_24",       sens: "standard", lead: "@bob",     choreo: "method_benchmarking", members: 3, open_seas: 1, last_activity: "3d ago" },
   ],
 
   peers: [
@@ -73,8 +102,8 @@ const DATA = {
   ],
 
   agents: [
-    { name: "oracle",       description: "Cross-project institutional memory; surfaces prior findings.",
-      freeze: "frozen",   model: "opus",   required_tools: ["Read","Write","Glob","Grep","Bash"] },
+    { name: "oracle",       description: "Personal institutional memory; accumulates your own findings across all projects.",
+      freeze: "personal", model: "opus",   required_tools: ["Read","Write","Glob","Grep","Bash"] },
     { name: "bookworm",     description: "Literature scout. Pulls papers from PubMed, bioRxiv, Zotero.",
       freeze: "frozen",   model: "sonnet", required_tools: ["Read","Write","WebFetch","Glob"] },
     { name: "blacksmith",   description: "Computational workhorse. Loads data, trains classifiers, builds dashboards.",
@@ -84,6 +113,8 @@ const DATA = {
     { name: "adversary",    description: "Scientific skeptic. Audits methodology, demands cross-validation.",
       freeze: "frozen",   model: "opus",   required_tools: ["Read","Write","Bash","Glob","Grep"] },
     { name: "conscience",   description: "Equity, diversity, inclusion, decolonization watchdog.",
+      freeze: "frozen",   model: "sonnet", required_tools: ["Read","Write","Bash","Glob","Grep"] },
+    { name: "cable_guy",    description: "Infrastructure provisioner. Onboards members, scaffolds projects, maintains installations registry.",
       freeze: "frozen",   model: "sonnet", required_tools: ["Read","Write","Bash","Glob","Grep"] },
   ],
 
@@ -97,6 +128,17 @@ const DATA = {
       author: "@bob",    date: "2026-05-07", project: "method_bench_24",
       path: "oracle/2026-05-07_methods_drift_correction.md" },
   ],
+
+  personal_oracle: {
+    folder: "obsidian-lab/oracle/",
+    entry_count: 12,
+    recent: [
+      { title: "ABCB1 expression in DCIS", excerpt: "Multi-cohort analysis confirms elevated ABCB1...", date: "2026-05-09", path: "oracle/abcb1_dcis.md" },
+      { title: "scRNA clustering best practices", excerpt: "Leiden resolution 0.3–0.6 works well for...", date: "2026-05-07", path: "oracle/scrna_clustering.md" },
+      { title: "Lab server SSH config", excerpt: "Use lab-server.example.edu port 22, key in ~/.ssh/id_ed25519...", date: "2026-05-05", path: "oracle/ssh_config.md" },
+    ],
+  },
+  lab_oracle_folder: "wigamig-vault-hallett/",
 
   seas: [
     { id: 214, dir: "in",  state: "claimed",   kind: "experiment", who: "@the_pi", project: "dcis_imaging_genomics", desc: "Align NovaSeq run 17 against GRCh38; QC report by Friday.", age: "62d" },
@@ -140,6 +182,56 @@ const DATA = {
     stock:    { reagents: [42, 50], kits: [6, 12] },
   },
 
+  // Known machines (PI-configured; each has a lab-base path).
+  machines: [
+    { id: "lab-server", type: "lab_server", hostname: "lab-server.example.edu",
+      description: "Primary lab data server", lab_base: "/data/lab_vm" },
+    { id: "laptop", type: "laptop", hostname: null,
+      description: "Personal laptop (SSH key access to lab-base)", lab_base: null },
+  ],
+
+  // Existing Wigamig installations per member × machine.
+  installations: [
+    {
+      member: "@allie", project: "dcis_imaging_genomics",
+      machine_type: "lab_server", hostname: "lab-server.example.edu", username: "allie",
+      access: "direct", has_direct_access: true,
+      lab_base: "/data/lab_vm",
+      raw_path: "/data/lab_vm/raw",
+      refined_path: "/data/lab_vm/refined",
+      notebook_path: "/data/lab_vm/lab-notebook",
+      components: ["git", "vscode", "github_cli", "claude_code", "obsidian"],
+      agents: ["oracle", "blacksmith", "bookworm"],
+      status: "active", created: "2026-03-15", last_checked: "2026-05-07", issues: [],
+    },
+    {
+      member: "@bob", project: "method_bench_24",
+      machine_type: "laptop", hostname: null, username: "bob",
+      access: "ssh", has_direct_access: false,
+      lab_base: "/data/lab_vm",
+      raw_path: "/data/lab_vm/raw",
+      refined_path: "/data/lab_vm/refined",
+      notebook_path: "~/Documents/lab-notebook",
+      components: ["git", "vscode", "github_cli", "claude_code", "obsidian"],
+      agents: ["blacksmith", "adversary"],
+      status: "active", created: "2026-02-01", last_checked: "2026-05-05",
+      issues: ["SSH mount lag on large refined/ reads"],
+    },
+    {
+      member: "@cassie", project: "cohort_v3",
+      machine_type: "lab_server", hostname: "lab-server.example.edu", username: "cassie",
+      access: "direct", has_direct_access: true,
+      lab_base: "/data/lab_vm",
+      raw_path: "/data/lab_vm/raw",
+      refined_path: "/data/lab_vm/refined",
+      notebook_path: "/data/lab_vm/lab-notebook",
+      components: ["git", "vscode", "github_cli", "claude_code", "obsidian"],
+      agents: ["oracle", "bookworm", "conscience"],
+      status: "issues", created: "2026-01-20", last_checked: "2026-05-06",
+      issues: ["TCPS_2 cert expired — clinical data access blocked"],
+    },
+  ],
+
   // Lab notebook — Obsidian "daily notes" in <repo>/lab-notebook/YYYY-MM-DD.md
   notebook: {
     folder: "lab-notebook/",
@@ -159,6 +251,7 @@ const DATA = {
       links_seas: [214, 231],
       links_exp:  ["exp/2_align_grch38"],
       content: [
+        { kind: "hint", text: "~/obsidian-lab/lab-notebook/2026-05-08.md\nOpens in Obsidian when the folder is inside your registered vault; otherwise falls back to $EDITOR." },
         { kind: "h4",  text: "Plan for today" },
         { kind: "task", done: true,  text: "Stand-up at 09:00 — flag SEA #214 with @the_pi" },
         { kind: "task", done: false, text: "Re-run alignment with GRCh38.p14 chrM patched" },

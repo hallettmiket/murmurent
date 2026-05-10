@@ -170,10 +170,12 @@ function CmdBar({ query, setQuery }) {
   );
 }
 
-/* ───────── workspace launcher row ─────────
-   Under the command bar; pick a project + agents (+ optional SEA),
-   click 'open workspace' and the server runs scripts/start_workspace.sh
-   to lay out VSCode (left 65%) + agent iTerm windows (right 35%). */
+/* ───────── workspace launcher row + initialization wizard ─────────
+   Three modes share this row:
+     open workspace  — pick project + agents → POST /api/workspace/launch
+     initialize      — multi-step wizard to onboard a member on a machine
+     installations   — inline table of all provisioned environments       */
+
 async function postWorkspaceLaunch(body) {
   const params = new URLSearchParams(window.location.search);
   const userParam = params.get("user");
@@ -191,86 +193,594 @@ async function postWorkspaceLaunch(body) {
   return res.json();
 }
 
-function WorkspaceLauncherRow() {
-  const projects = window.DATA.projects || [];
-  const allAgents = (window.DATA.agents || []).filter(a => !a.disabled);
-  const allSeas   = window.DATA.seas || [];
-  const [projectName, setProjectName] = useState(projects[0]?.name || "");
-  const [seaId, setSeaId] = useState("");
-  const [picked, setPicked] = useState(() => allAgents.slice(0, 3).map(a => a.name));
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(null);
+/* Infrastructure checklist items for the initialization wizard. */
+const INFRA_ITEMS = [
+  { id: "git",         label: "git",             note: "version control (required)" },
+  { id: "vscode",      label: "VS Code",          note: "IDE with Claude Code extension" },
+  { id: "github_cli",  label: "GitHub CLI (gh)",  note: "repo cloning & auth" },
+  { id: "claude_code", label: "Claude Code (CC)", note: "AI runtime — needs API key" },
+  { id: "obsidian",    label: "Obsidian",          note: "lab-notebook vault" },
+];
 
-  const seasInProject = allSeas.filter(s => s.project === projectName);
-  const togglePick = (name) =>
-    setPicked(p => p.includes(name) ? p.filter(x => x !== name) : [...p, name]);
+/* ── InstallationsBox: persistent panel — always visible.
+   Members see only their own rows; PI sees all.
+   Each row has an "open workspace" button that launches with that
+   installation's project, machine context, and saved agent set.         */
+function InstallationsBox({ span = "c-12" }) {
+  const allInstallations = window.DATA.installations || [];
+  const persona    = window.DATA.persona || "member";
+  const myHandle   = "@" + (window.DATA.member?.handle || "");
+  const rows       = persona === "pi"
+    ? allInstallations
+    : allInstallations.filter(i => i.member === myHandle);
 
-  const launch = async () => {
-    if (!projectName) { setMsg("pick a project"); return; }
-    if (picked.length === 0) { setMsg("pick at least one agent"); return; }
-    setBusy(true); setMsg(null);
+  const [openRow,      setOpenRow]      = useState(null);
+  const [launchingIdx, setLaunchingIdx] = useState(null);
+  const [rowMsg,       setRowMsg]       = useState({});
+  const [showInstall,  setShowInstall]  = useState(false);
+
+  const cols = (persona === "pi" ? 2 : 1) + 3; // member? + project + machine + status + launch
+
+  const launchRow = async (inst, i) => {
+    setLaunchingIdx(i);
+    setRowMsg(m => ({ ...m, [i]: null }));
     try {
       const r = await postWorkspaceLaunch({
-        project: projectName,
-        agents: picked,
-        sea_id: seaId ? parseInt(seaId, 10) : null,
+        project: inst.project,
+        agents:  inst.agents || [],
       });
-      setMsg(`opened ${r.agents.length} pane(s) for ${r.project}`);
-      setTimeout(() => setMsg(null), 3500);
+      setRowMsg(m => ({ ...m, [i]: `opened ${r.agents.length} pane(s)` }));
+      setTimeout(() => setRowMsg(m => ({ ...m, [i]: null })), 3000);
     } catch (ex) {
-      setMsg(String(ex.message || ex));
-    } finally { setBusy(false); }
+      setRowMsg(m => ({ ...m, [i]: String(ex.message || ex) }));
+    } finally {
+      setLaunchingIdx(null);
+    }
   };
 
   return (
-    <div style={{
-      padding: "10px 12px", marginBottom: 14,
-      border: "1px solid var(--rule)", borderRadius: 2,
-      background: "var(--card)",
-      display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
-    }}>
-      <span className="mono muted" style={{
-        fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase",
-      }}>open workspace</span>
-      <select value={projectName} onChange={e => setProjectName(e.target.value)}
-              style={{padding:"5px 8px", border:"1px solid var(--rule-strong)",
-                      borderRadius:2, fontFamily:"var(--mono)", fontSize:12}}>
-        {projects.length === 0 && <option value="">(no projects)</option>}
-        {projects.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-      </select>
-      <select value={seaId} onChange={e => setSeaId(e.target.value)}
-              style={{padding:"5px 8px", border:"1px solid var(--rule-strong)",
-                      borderRadius:2, fontFamily:"var(--mono)", fontSize:12}}>
-        <option value="">(no SEA focus)</option>
-        {seasInProject.map(s => (
-          <option key={s.id} value={s.id}>#{s.id} · {s.desc.slice(0, 40)}</option>
-        ))}
-      </select>
-      <span className="mono muted" style={{fontSize:10, letterSpacing:1.5, textTransform:"uppercase"}}>agents</span>
-      <div className="row" style={{gap:4, flexWrap:"wrap"}}>
-        {allAgents.map(a => (
-          <button
-            key={a.name}
-            type="button"
-            onClick={() => togglePick(a.name)}
-            className="mono"
-            style={{
-              fontSize:11, padding:"3px 8px", border:"1px solid var(--rule-strong)",
-              borderRadius:2, cursor:"pointer",
-              background: picked.includes(a.name) ? "var(--purple)" : "var(--paper-2)",
-              color: picked.includes(a.name) ? "#fff" : "var(--ink-2)",
-            }}>
-            {a.name}
-          </button>
-        ))}
-        {allAgents.length === 0 && (
-          <span className="muted" style={{fontSize:11}}>(no enabled agents)</span>
+    <div className={"card " + span}>
+      <header className="card-header" style={{display:"flex", alignItems:"center", justifyContent:"space-between"}}>
+        <h3>Installations</h3>
+        <div style={{display:"flex", alignItems:"center", gap:10}}>
+          <span className="mono muted" style={{fontSize:10, letterSpacing:1.2, textTransform:"uppercase"}}>
+            {persona === "pi" ? "all members" : "your environments"}
+          </span>
+          <button className="btn sm" onClick={() => setShowInstall(true)}>＋ install</button>
+        </div>
+      </header>
+      <div className="body" style={{padding:0}}>
+        {rows.length === 0 ? (
+          <div style={{padding:"14px 16px", color:"var(--muted)", fontSize:12, fontFamily:"var(--mono)"}}>
+            No installations yet.{" "}
+            <button type="button" onClick={() => setShowInstall(true)}
+              style={{background:"none", border:0, padding:0, cursor:"pointer",
+                      color:"var(--purple)", fontSize:12, textDecoration:"underline"}}>
+              Install now
+            </button>{" "}to provision this machine for a project.
+          </div>
+        ) : (
+          <table className="dt">
+            <thead><tr>
+              {persona === "pi" && <th>member</th>}
+              <th>project</th>
+              <th>machine</th>
+              <th style={{width:72}}>status</th>
+              <th style={{width:120}}></th>
+            </tr></thead>
+            <tbody>
+              {rows.map((inst, i) => (
+                <React.Fragment key={i}>
+                  <tr>
+                    {persona === "pi" && (
+                      <td className="mono" style={{fontSize:12}}>{inst.member}</td>
+                    )}
+                    <td style={{fontSize:12, cursor:"pointer"}}
+                        onClick={() => setOpenRow(openRow === i ? null : i)}>
+                      {inst.project}
+                    </td>
+                    <td className="mono" style={{fontSize:11, cursor:"pointer"}}
+                        onClick={() => setOpenRow(openRow === i ? null : i)}>
+                      {inst.machine_type === "lab_server"
+                        ? `${inst.username}@${inst.hostname}`
+                        : `laptop (${inst.username})`}
+                    </td>
+                    <td>
+                      <Pill tone={inst.status === "active" ? "green" : inst.status === "issues" ? "red" : ""}>
+                        {inst.status}
+                      </Pill>
+                    </td>
+                    <td style={{textAlign:"right", paddingRight:10}}>
+                      {rowMsg[i] ? (
+                        <span style={{fontSize:10, color:/open/i.test(rowMsg[i]) ? "var(--muted)" : "var(--red)"}}>
+                          {rowMsg[i]}
+                        </span>
+                      ) : (
+                        <button className="btn sm primary"
+                          disabled={launchingIdx !== null}
+                          onClick={() => launchRow(inst, i)}>
+                          {launchingIdx === i ? "…" : "open workspace"}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                  {openRow === i && (
+                    <tr>
+                      <td colSpan={cols} style={{
+                        background:"var(--paper-2)", padding:"10px 14px",
+                        fontSize:11, fontFamily:"var(--mono)",
+                        borderBottom:"1px solid var(--rule)",
+                      }}>
+                        <div style={{display:"grid", gridTemplateColumns:"repeat(2,1fr)", gap:"4px 24px"}}>
+                          <div><span className="muted" style={{display:"inline-block",width:90}}>access</span>
+                            <Pill tone={inst.access === "ssh" ? "purple" : "green"}>{inst.access}</Pill>
+                          </div>
+                          <div><span className="muted" style={{display:"inline-block",width:90}}>checked</span>{inst.last_checked}</div>
+                          <div><span className="muted" style={{display:"inline-block",width:90}}>lab_base</span>{inst.lab_base}</div>
+                          <div><span className="muted" style={{display:"inline-block",width:90}}>raw/</span>{inst.raw_path}</div>
+                          <div><span className="muted" style={{display:"inline-block",width:90}}>refined/</span>{inst.refined_path}</div>
+                          <div><span className="muted" style={{display:"inline-block",width:90}}>notebook/</span>{inst.notebook_path}</div>
+                          <div><span className="muted" style={{display:"inline-block",width:90}}>components</span>{(inst.components||[]).join(", ")}</div>
+                          <div><span className="muted" style={{display:"inline-block",width:90}}>agents</span>{(inst.agents||[]).join(", ")}</div>
+                          {inst.issues?.length > 0 && (
+                            <div style={{gridColumn:"span 2", color:"var(--red)", marginTop:4}}>
+                              <span style={{display:"inline-block",width:90}}>issues</span>{inst.issues.join("; ")}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              ))}
+            </tbody>
+          </table>
         )}
       </div>
-      <button className="btn sm primary" onClick={launch} disabled={busy}>
-        {busy ? "…" : "open workspace"}
-      </button>
-      {msg && <span style={{fontSize:11, color: /failed|HTTP/i.test(msg) ? "var(--red)" : "var(--muted)"}}>{msg}</span>}
+      {showInstall && (
+        <InstallModal onClose={() => setShowInstall(false)} />
+      )}
+    </div>
+  );
+}
+
+/* ── InstallModal: 5-step wizard to install Wigamig for a member on a machine ── */
+function InstallModal({ initialProject, onClose }) {
+  const [step, setStep]                     = useState(1);
+  /* step 1 */
+  const [who, setWho]                       = useState("");
+  const [project, setProject]               = useState(initialProject || window.DATA.projects?.[0]?.name || "");
+  /* step 2 */
+  const [machineType, setMachineType]       = useState("lab_server");
+  const [hostname, setHostname]             = useState("");
+  const [username, setUsername]             = useState("");
+  /* step 3 */
+  const [hasDirectAccess, setHasDirectAccess] = useState(true);
+  const [labBase, setLabBase]               = useState("/data/lab_vm");
+  const [rawPath, setRawPath]               = useState("/data/lab_vm/raw");
+  const [refinedPath, setRefinedPath]       = useState("/data/lab_vm/refined");
+  const [notebookPath, setNotebookPath]     = useState("/data/lab_vm/lab-notebook");
+  const [sshRemote, setSshRemote]           = useState("");
+  const [mountPoint, setMountPoint]         = useState("~/mnt/lab_vm");
+  /* step 4 */
+  const [infra, setInfra]                   = useState(INFRA_ITEMS.map(x => x.id));
+  const [pickedAgents, setPickedAgents]     = useState(["oracle", "blacksmith", "bookworm"]);
+  /* ui */
+  const [busy, setBusy]                     = useState(false);
+  const [err, setErr]                       = useState(null);
+  const [done, setDone]                     = useState(false);
+
+  const peers     = window.DATA.peers     || [];
+  const projects  = window.DATA.projects  || [];
+  const allAgents = (window.DATA.agents   || []).filter(a => !a.disabled);
+
+  const syncPaths = (base) => {
+    setLabBase(base);
+    setRawPath(base + "/raw");
+    setRefinedPath(base + "/refined");
+    setNotebookPath(base + "/lab-notebook");
+  };
+
+  const toggleInfra  = (id)   => setInfra(f       => f.includes(id)   ? f.filter(x => x !== id)   : [...f, id]);
+  const toggleAgent  = (name) => setPickedAgents(a => a.includes(name) ? a.filter(x => x !== name) : [...a, name]);
+
+  const canProceed = () => {
+    if (step === 1) return who.trim() && project;
+    if (step === 2) return (machineType === "laptop" || hostname.trim()) && username.trim();
+    if (step === 3) return labBase.trim() && rawPath.trim() && refinedPath.trim() && notebookPath.trim();
+    if (step === 4) return infra.length > 0;
+    return true;
+  };
+
+  const provision = async () => {
+    setBusy(true); setErr(null);
+    try {
+      /* endpoint not yet implemented — ignore 404 and show success checklist */
+      await fetch("/api/workspace/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          member: who, project, machine_type: machineType,
+          hostname: machineType === "lab_server" ? hostname : null,
+          username, has_direct_access: hasDirectAccess,
+          lab_base: labBase, raw_path: rawPath,
+          refined_path: refinedPath, notebook_path: notebookPath,
+          ssh_remote: !hasDirectAccess ? sshRemote : null,
+          mount_point: !hasDirectAccess ? mountPoint : null,
+          infra_components: infra, agents: pickedAgents,
+        }),
+      }).catch(() => {});
+      setDone(true);
+    } catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(false); }
+  };
+
+  const STEP_LABELS = ["Who & What", "Target Machine", "Lab-base Paths", "Infrastructure", "Review"];
+
+  /* shared input styles */
+  const INP = { style:{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2,
+    fontFamily:"var(--mono)", fontSize:12, width:"100%", boxSizing:"border-box"} };
+  const SEL = { style:{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2,
+    fontFamily:"var(--mono)", fontSize:12, width:"100%"} };
+  const LBL = { style:{fontSize:10.5, letterSpacing:1, textTransform:"uppercase",
+    fontFamily:"var(--mono)", color:"var(--muted)", marginBottom:3, display:"block"} };
+
+  const MachineCard = ({ id, label, desc }) => (
+    <button type="button" onClick={() => setMachineType(id)} style={{
+      flex:1, padding:"10px 12px", border:"1px solid", borderRadius:2,
+      textAlign:"left", cursor:"pointer",
+      background: machineType === id ? "rgba(79,38,131,0.08)" : "var(--paper-2)",
+      borderColor: machineType === id ? "var(--purple)" : "var(--rule-strong)",
+    }}>
+      <div style={{fontFamily:"var(--mono)", fontSize:12, fontWeight:500,
+                   color: machineType === id ? "var(--purple)" : "var(--ink)"}}>
+        {label}
+      </div>
+      <div style={{fontSize:10.5, color:"var(--muted)", marginTop:3}}>{desc}</div>
+    </button>
+  );
+
+  const AccessCard = ({ id, label, desc }) => (
+    <button type="button" onClick={() => setHasDirectAccess(id)} style={{
+      flex:1, padding:"10px 12px", border:"1px solid", borderRadius:2,
+      textAlign:"left", cursor:"pointer",
+      background: hasDirectAccess === id ? "rgba(79,38,131,0.08)" : "var(--paper-2)",
+      borderColor: hasDirectAccess === id ? "var(--purple)" : "var(--rule-strong)",
+    }}>
+      <div style={{fontFamily:"var(--mono)", fontSize:12, fontWeight:500,
+                   color: hasDirectAccess === id ? "var(--purple)" : "var(--ink)"}}>
+        {label}
+      </div>
+      <div style={{fontSize:10.5, color:"var(--muted)", marginTop:3}}>{desc}</div>
+    </button>
+  );
+
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, width:"min(600px, 95vw)",
+        display:"flex", flexDirection:"column", maxHeight:"92vh",
+      }}>
+
+        {/* header + step tabs */}
+        <div style={{background:"var(--paper-2)", borderBottom:"1px solid var(--rule)", padding:"12px 16px 0"}}>
+          <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:10}}>
+            <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:17, color:"var(--purple-deep)"}}>
+              Install Wigamig Environment
+            </h2>
+            <button type="button" onClick={onClose}
+                    style={{background:"none", border:0, cursor:"pointer", color:"var(--muted)", fontSize:20, lineHeight:1}}>
+              ×
+            </button>
+          </div>
+          <div style={{display:"flex", overflowX:"auto"}}>
+            {STEP_LABELS.map((label, i) => {
+              const s = i + 1;
+              return (
+                <div key={s} onClick={() => s < step && setStep(s)} style={{
+                  padding:"5px 12px 8px", fontSize:10.5, fontFamily:"var(--mono)",
+                  letterSpacing:0.8, textTransform:"uppercase", whiteSpace:"nowrap",
+                  borderBottom: s === step ? "2px solid var(--purple)" : "2px solid transparent",
+                  color: s === step ? "var(--purple)" : s < step ? "var(--ink-2)" : "var(--muted)",
+                  cursor: s < step ? "pointer" : "default",
+                }}>
+                  {s}. {label}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* body */}
+        <div style={{padding:"16px", overflowY:"auto", flex:1, display:"flex", flexDirection:"column", gap:12}}>
+          {done ? (
+            <div style={{textAlign:"center", padding:"28px 0"}}>
+              <div style={{fontSize:30, marginBottom:8, color:"var(--green)"}}>✓</div>
+              <div style={{fontFamily:"var(--serif)", fontSize:16, color:"var(--purple-deep)", marginBottom:6}}>
+                Provisioning checklist generated
+              </div>
+              <p className="muted" style={{fontSize:12, maxWidth:380, margin:"0 auto"}}>
+                Share the checklist with <strong>{who}</strong>. Once completed,
+                their environment will appear in the Installations panel below.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* ── step 1: who & what ── */}
+              {step === 1 && (
+                <>
+                  <p className="muted" style={{fontSize:12, margin:0}}>
+                    Who is joining, and which project should be set up first?
+                  </p>
+                  <div>
+                    <label {...LBL}>Lab member handle</label>
+                    <select value={who} onChange={e => { setWho(e.target.value); if (!username) setUsername(e.target.value.replace(/^@/, "")); }}
+                            style={SEL.style}>
+                      <option value="">— select member —</option>
+                      {peers.map(p => (
+                        <option key={p.handle} value={"@" + p.handle}>
+                          @{p.handle} · {p.name}
+                        </option>
+                      ))}
+                    </select>
+                    {who && !peers.find(p => "@" + p.handle === who) && (
+                      <div style={{fontSize:11, color:"var(--tiger-deep)", marginTop:3}}>
+                        ⚠ Handle not in current peers list — add them to the lab roster first.
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label {...LBL}>Project to install</label>
+                    <select value={project} onChange={e => setProject(e.target.value)} style={SEL.style}>
+                      {projects.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+                    </select>
+                    <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
+                      The project repo will be cloned to ~/repos/{project || "…"} on the target machine.
+                    </div>
+                  </div>
+                  <div style={{
+                    background:"var(--paper-2)", borderRadius:2, padding:"8px 12px",
+                    fontSize:11, color:"var(--ink-2)", borderLeft:"3px solid var(--purple)",
+                  }}>
+                    Installation provisions: repo clone · Wigamig CC config · agent definitions ·
+                    Obsidian vault · lab-base path access. Slack membership assumed.
+                  </div>
+                </>
+              )}
+
+              {/* ── step 2: target machine ── */}
+              {step === 2 && (
+                <>
+                  <p className="muted" style={{fontSize:12, margin:0}}>
+                    Which machine will this Wigamig environment run on?
+                  </p>
+                  <div>
+                    <label {...LBL}>Machine type</label>
+                    <div style={{display:"flex", gap:8}}>
+                      <MachineCard id="lab_server" label="Lab server"
+                        desc="e.g. lab-server — direct or SSH to lab-base; login via username" />
+                      <MachineCard id="laptop" label="Laptop / personal machine"
+                        desc="SSH key required to reach lab-base; local or SSH-mount storage" />
+                    </div>
+                  </div>
+                  {machineType === "lab_server" && (
+                    <div>
+                      <label {...LBL}>Hostname</label>
+                      <input value={hostname} onChange={e => setHostname(e.target.value)}
+                             placeholder="e.g. lab-server  or  lab-server.example.edu" {...INP} />
+                    </div>
+                  )}
+                  <div>
+                    <label {...LBL}>Username on this machine</label>
+                    <input value={username} onChange={e => setUsername(e.target.value)}
+                           placeholder="e.g. didi" {...INP} />
+                    <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
+                      All lab-base communication uses SSH key auth — no passwords stored.
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* ── step 3: lab-base paths ── */}
+              {step === 3 && (
+                <>
+                  <p className="muted" style={{fontSize:12, margin:0}}>
+                    Where do raw/, refined/, and lab-notebook/ live on{" "}
+                    {machineType === "lab_server" ? hostname || "the lab server" : "this laptop"}?
+                    {machineType === "laptop" && " Laptops can store data locally or via SSH mount."}
+                  </p>
+                  {machineType === "laptop" && (
+                    <div>
+                      <label {...LBL}>Lab-base access on this laptop</label>
+                      <div style={{display:"flex", gap:8}}>
+                        <AccessCard id={true}  label="Local copy"
+                          desc="raw/, refined/, lab-notebook/ sit on the laptop itself" />
+                        <AccessCard id={false} label="SSH mount"
+                          desc="Access lab-base remotely via sshfs — needs network to lab server" />
+                      </div>
+                    </div>
+                  )}
+                  {!hasDirectAccess && machineType === "laptop" && (
+                    <>
+                      <div>
+                        <label {...LBL}>SSH remote (host where lab-base lives)</label>
+                        <input value={sshRemote} onChange={e => setSshRemote(e.target.value)}
+                               placeholder="e.g. lab-server.example.edu" {...INP} />
+                      </div>
+                      <div>
+                        <label {...LBL}>Local mount point</label>
+                        <input value={mountPoint} onChange={e => setMountPoint(e.target.value)}
+                               placeholder="~/mnt/lab_vm" {...INP} />
+                        <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
+                          macOS: <code>brew install sshfs</code> then <code>sshfs {sshRemote || "host"}:{labBase} {mountPoint}</code>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  <div>
+                    <label {...LBL}>
+                      Lab-base root{(!hasDirectAccess && machineType === "laptop") ? " (path on remote)" : ""}
+                    </label>
+                    <input value={labBase} onChange={e => syncPaths(e.target.value)}
+                           placeholder="/data/lab_vm" {...INP} />
+                    <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
+                      Editing this auto-fills the paths below.
+                    </div>
+                  </div>
+                  <div style={{display:"grid", gridTemplateColumns:"1fr 1fr", gap:10}}>
+                    <div>
+                      <label {...LBL}>raw/ path</label>
+                      <input value={rawPath} onChange={e => setRawPath(e.target.value)} {...INP} />
+                    </div>
+                    <div>
+                      <label {...LBL}>refined/ path</label>
+                      <input value={refinedPath} onChange={e => setRefinedPath(e.target.value)} {...INP} />
+                    </div>
+                  </div>
+                  <div>
+                    <label {...LBL}>lab-notebook/ path (Obsidian vault root)</label>
+                    <input value={notebookPath} onChange={e => setNotebookPath(e.target.value)} {...INP} />
+                  </div>
+                </>
+              )}
+
+              {/* ── step 4: infrastructure ── */}
+              {step === 4 && (
+                <>
+                  <p className="muted" style={{fontSize:12, margin:0}}>
+                    Which software and agents should be installed?
+                    Slack is assumed present in the lab workspace.
+                  </p>
+                  <div>
+                    <label {...LBL}>Infrastructure components</label>
+                    <div style={{display:"flex", flexDirection:"column", gap:5}}>
+                      {INFRA_ITEMS.map(item => (
+                        <label key={item.id} style={{
+                          display:"flex", alignItems:"center", gap:10, cursor:"pointer",
+                          padding:"7px 10px", border:"1px solid var(--rule)", borderRadius:2,
+                          background: infra.includes(item.id) ? "rgba(79,38,131,0.06)" : "var(--paper-2)",
+                        }}>
+                          <input type="checkbox" checked={infra.includes(item.id)}
+                                 onChange={() => toggleInfra(item.id)} />
+                          <span style={{fontFamily:"var(--mono)", fontSize:12, minWidth:140}}>{item.label}</span>
+                          <span style={{fontSize:11, color:"var(--muted)"}}>{item.note}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label {...LBL}>Wigamig agents to deploy</label>
+                    <div style={{display:"flex", flexWrap:"wrap", gap:6}}>
+                      {allAgents.map(a => (
+                        <button key={a.name} type="button" onClick={() => toggleAgent(a.name)}
+                          className="mono" style={{
+                            fontSize:11, padding:"4px 10px", border:"1px solid var(--rule-strong)",
+                            borderRadius:2, cursor:"pointer",
+                            background: pickedAgents.includes(a.name) ? "var(--purple)" : "var(--paper-2)",
+                            color: pickedAgents.includes(a.name) ? "#fff" : "var(--ink-2)",
+                          }}>
+                          {a.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div style={{
+                    background:"var(--paper-2)", borderRadius:2, padding:"8px 12px",
+                    fontSize:11, color:"var(--ink-2)", borderLeft:"3px solid var(--tiger)",
+                  }}>
+                    <strong>Post-install steps:</strong> CC needs a Claude API key in the shell env.
+                    Obsidian vault must be created at <code>{notebookPath}</code>.
+                    Run <code>gh auth login</code> after GitHub CLI install.
+                  </div>
+                </>
+              )}
+
+              {/* ── step 5: review ── */}
+              {step === 5 && (
+                <>
+                  <p className="muted" style={{fontSize:12, margin:0}}>
+                    Review the plan then click <strong>provision</strong> to generate the setup checklist.
+                  </p>
+                  <table style={{width:"100%", borderCollapse:"collapse", fontSize:12}}>
+                    <tbody>
+                      {[
+                        ["Member",        who],
+                        ["Project",       project],
+                        ["Machine",       machineType === "lab_server"
+                          ? `${username}@${hostname} (lab server)`
+                          : `${username} · laptop`],
+                        ["Lab-base",      !hasDirectAccess && machineType === "laptop"
+                          ? `SSH mount ${sshRemote} → ${mountPoint}`
+                          : labBase + " (direct)"],
+                        ["raw/",          rawPath],
+                        ["refined/",      refinedPath],
+                        ["lab-notebook/", notebookPath],
+                        ["Infrastructure",infra.join(", ")],
+                        ["Agents",        pickedAgents.join(", ")],
+                      ].map(([k, v]) => (
+                        <tr key={k} style={{borderBottom:"1px solid var(--rule)"}}>
+                          <td style={{padding:"5px 8px", fontFamily:"var(--mono)",
+                                      color:"var(--muted)", width:130, whiteSpace:"nowrap"}}>{k}</td>
+                          <td style={{padding:"5px 8px", fontFamily:"var(--mono)"}}>{v}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div style={{
+                    background:"var(--paper-2)", borderRadius:2, padding:"8px 12px",
+                    fontSize:11, color:"var(--ink-2)", borderLeft:"3px solid var(--purple)",
+                  }}>
+                    <strong>New project?</strong> If <code>{project}</code> has no GitHub repo,
+                    Slack channel, or raw/refined directories yet, those will be scaffolded
+                    as part of provisioning.
+                  </div>
+                </>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* footer */}
+        {!done ? (
+          <div style={{
+            padding:"10px 16px", borderTop:"1px solid var(--rule)",
+            display:"flex", justifyContent:"space-between", alignItems:"center",
+            background:"var(--paper-2)",
+          }}>
+            {err
+              ? <span style={{fontSize:11, color:"var(--red)"}}>{err}</span>
+              : <span style={{fontSize:11, color:"var(--muted)"}}>step {step} of {STEP_LABELS.length}</span>
+            }
+            <div style={{display:"flex", gap:8}}>
+              {step > 1 && (
+                <button className="btn sm" onClick={() => setStep(s => s - 1)}>← back</button>
+              )}
+              {step < 5 && (
+                <button className="btn sm primary" disabled={!canProceed()}
+                        onClick={() => setStep(s => s + 1)}>
+                  next →
+                </button>
+              )}
+              {step === 5 && (
+                <button className="btn sm primary" disabled={busy} onClick={provision}>
+                  {busy ? "provisioning…" : "provision"}
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            padding:"10px 16px", borderTop:"1px solid var(--rule)",
+            display:"flex", justifyContent:"flex-end", background:"var(--paper-2)",
+          }}>
+            <button className="btn sm primary" onClick={onClose}>done</button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -283,7 +793,7 @@ function Strip({ persona }) {
       <div className="stat">
         <div className="lab">SEAs · this week</div>
         <div className="row">
-          <div className="big num">{s.closedThisWeek}<span className="delta up num">▲ {s.deltaPct}%</span></div>
+          <div className="big num">{s.closed_this_week}<span className="delta up num">▲ {s.delta_pct}%</span></div>
         </div>
         <div className="sub">closed · {s.in} in-tray, {s.out} out-tray open</div>
       </div>
@@ -309,10 +819,10 @@ function Strip({ persona }) {
       <div className="stat green">
         <div className="lab">notebook</div>
         <div className="row">
-          <div className="big num">{nb.entriesThisWeek}<span className="mono muted" style={{fontSize:11,fontWeight:400,marginLeft:4}}>/5</span></div>
+          <div className="big num">{nb.entries_this_week}<span className="mono muted" style={{fontSize:11,fontWeight:400,marginLeft:4}}>/5</span></div>
           <div className="muted mono" style={{fontSize:11}}>entries</div>
         </div>
-        <div className="sub">last written {nb.lastWritten}</div>
+        <div className="sub">last written {nb.last_written}</div>
       </div>
     </div>
   );
@@ -547,7 +1057,7 @@ function ProjectsPanel({ projects, span="c-5" }) {
         <h2>Projects</h2>
         <div className="row" style={{gap:6}}>
           <span className="meta">
-            {projects.length} active · {projects.reduce((a,p)=>a+p.openSeas,0)} open SEAs
+            {projects.length} active · {projects.reduce((a,p)=>a+p.open_seas,0)} open SEAs
             {pendingCreate > 0 && (
               <span> · <strong style={{color:"var(--tiger-deep)"}}>
                 {pendingCreate} pending
@@ -573,10 +1083,10 @@ function ProjectsPanel({ projects, span="c-5" }) {
                     <div className="mono muted" style={{fontSize:11}}>{p.choreo}</div>
                   </td>
                   <td><Pill tone={p.sens==="clinical"?"red":""}>{p.sens}</Pill></td>
-                  <td className="mono" style={{fontSize:12}}>{p.lead}</td>
+                  <td className="mono" style={{fontSize:12, paddingLeft:14}}>{p.lead}</td>
                   <td className="num">{p.members}</td>
-                  <td className="num"><strong>{p.openSeas}</strong></td>
-                  <td className="muted" style={{fontSize:12}}>{p.lastActivity}</td>
+                  <td className="num"><strong>{p.open_seas}</strong></td>
+                  <td className="muted" style={{fontSize:12}}>{p.last_activity}</td>
                 </tr>
                 {openProj === p.name && (
                   <tr>
@@ -783,7 +1293,7 @@ function Heatmap({ data, persona, span="c-7" }) {
   );
 }
 
-/* ───────── group panel ───────── */
+/* ───────── lab members panel ───────── */
 async function postMemberAdd(body) {
   const params = new URLSearchParams(window.location.search);
   const userParam = params.get("user");
@@ -883,7 +1393,7 @@ function AddMemberModal({ onClose }) {
   );
 }
 
-function GroupPanel({ peers, span="c-6" }) {
+function LabMembersPanel({ peers, span="c-6" }) {
   const tcpsTone = { ok:"green", expiring:"amber", missing:"red" };
   const persona = window.DATA.persona || "member";
   const isPI = persona === "pi";
@@ -911,7 +1421,7 @@ function GroupPanel({ peers, span="c-6" }) {
   return (
     <div className={"panel "+span}>
       <header>
-        <h2>Group</h2>
+        <h2>Lab members</h2>
         <div className="row" style={{gap:6}}>
           <span className="meta">
             {isPI
@@ -1804,7 +2314,7 @@ function ReceptionistPanel({ inbound, span="c-12" }) {
   );
 }
 
-/* ───────── group oracle panel ───────── */
+/* ───────── lab oracle panel ───────── */
 function OracleProcessButton() {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg]   = useState(null);
@@ -1899,7 +2409,49 @@ function OracleDraftRow({ entry }) {
   );
 }
 
-function GroupOraclePanel({ entries, drafts, span="c-6" }) {
+/* Personal Oracle — the member's own evolving knowledge base, backed by
+   their personal Obsidian vault. No drafts/approval flow (that's the
+   lab oracle's job); this is just the member's notes-to-self. */
+function PersonalOraclePanel({ data, span="c-4" }) {
+  const block = data || { folder: "oracle/", entry_count: 0, recent: [] };
+  const recent = block.recent || [];
+  return (
+    <div className={"panel "+span}>
+      <header>
+        <h2>Oracle · personal</h2>
+        <span className="meta">{block.entry_count} entries</span>
+      </header>
+      <div className="muted" style={{padding:"2px 14px 6px",
+           fontSize:11, borderBottom:"1px solid var(--rule)"}}>
+        <code className="mono">{block.folder}</code>
+      </div>
+      <div className="body" style={{padding:"6px 0"}}>
+        {recent.map((e, i) => (
+          <div key={i} style={{padding:"9px 14px", borderBottom:"1px solid var(--rule)"}}>
+            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:10}}>
+              <span style={{fontWeight:500, fontSize:14, lineHeight:1.3, color:"var(--purple-deep)"}}>{e.title}</span>
+              <span className="mono muted" style={{fontSize:10, whiteSpace:"nowrap"}}>{e.date}</span>
+            </div>
+            <div className="muted" style={{fontSize:12, marginTop:4, lineHeight:1.45}}>
+              {e.excerpt}
+            </div>
+            <div className="mono muted" style={{fontSize:10, marginTop:5, letterSpacing:0.5, color:"var(--purple)"}}>
+              <code>{e.path}</code>
+            </div>
+          </div>
+        ))}
+        {recent.length === 0 && (
+          <div className="muted" style={{padding:"14px", fontSize:13}}>
+            No personal oracle entries yet. Ask the Oracle to remember
+            something and it'll show up here.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function LabOraclePanel({ entries, drafts, labFolder, span="c-6" }) {
   const list = entries || [];
   const pendingDrafts = drafts || [];
   const persona = window.DATA.persona || "member";
@@ -1907,7 +2459,7 @@ function GroupOraclePanel({ entries, drafts, span="c-6" }) {
   return (
     <div className={"panel "+span}>
       <header>
-        <h2>Group oracle · recent</h2>
+        <h2>Lab oracle · recent</h2>
         <div className="row" style={{gap:6}}>
           <span className="meta">
             {list.length} published
@@ -1920,6 +2472,12 @@ function GroupOraclePanel({ entries, drafts, span="c-6" }) {
           <OracleProcessButton />
         </div>
       </header>
+      {labFolder && (
+        <div className="muted" style={{padding:"2px 14px 6px",
+             fontSize:11, borderBottom:"1px solid var(--rule)"}}>
+          <code className="mono">{labFolder}</code>
+        </div>
+      )}
       <div className="body" style={{padding:"6px 0"}}>
         {/* PI-only: drafts queue at the top, awaiting approval. */}
         {isPI && pendingDrafts.length > 0 && (
@@ -2119,7 +2677,7 @@ function NotebookPanel({ span="c-9" }) {
         <h2>Lab notebook · today</h2>
         <div className="row" style={{gap:10}}>
           <span className="meta">
-            <code className="mono">~/{path}</code> · {words} words
+            <code className="mono">{path}</code> · {words} words
           </span>
           <NotebookEditButton date={t.iso} />
         </div>
@@ -2160,6 +2718,332 @@ function NotebookPanel({ span="c-9" }) {
 /* (NotebookRailPanel removed — daily-notes calendar lives inside the
    NotebookPanel header now, since both fed off the same files.) */
 
+/* MemberProfileModal — view/edit member-specific settings. Opened from
+   the gear button beside the member name in FooterMeta. POSTs to
+   /api/member/settings on save (silently ignores 404 / fetch errors
+   while the backend wiring lands). */
+function MemberProfileModal({ onClose }) {
+  const m = window.DATA.member || {};
+  const initial = window.DATA.member_settings || {};
+  const [form, setForm] = useState({
+    obsidian_vault_path: initial.obsidian_vault_path || "",
+    obsidian_vault_name: initial.obsidian_vault_name || "",
+    notebook_subfolder:  initial.notebook_subfolder  || "lab-notebook",
+    oracle_subfolder:    initial.oracle_subfolder    || "oracle",
+    email:    initial.email    || "",
+    orcid:    initial.orcid    || "",
+    bluesky:  initial.bluesky  || "",
+    github:   initial.github   || "",
+    osf:      initial.osf      || "",
+    website:  initial.website  || "",
+    office:   initial.office   || "",
+    dry_lab:  initial.dry_lab  || "",
+    wet_labs: initial.wet_labs || "",
+    address:  initial.address  || "",
+    city:     initial.city     || "",
+    department: initial.department || "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg]   = useState(null);
+
+  const update = (k) => (e) =>
+    setForm((prev) => ({ ...prev, [k]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch("/api/member/settings", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        setMsg("saved");
+        if (typeof window.__wigamigFetchData === "function") {
+          try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+        }
+      } else {
+        // Endpoint not wired yet — keep local state, surface a hint.
+        setMsg("backend not wired (HTTP " + res.status + ")");
+      }
+    } catch (ex) {
+      setMsg("offline — local only");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const labelStyle = {
+    fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+    textTransform:"uppercase", color:"var(--muted)",
+    marginTop:8, marginBottom:2,
+  };
+  const inputStyle = {
+    padding:"5px 8px", border:"1px solid var(--rule-strong)",
+    borderRadius:2, fontFamily:"var(--mono)", fontSize:12, width:"100%",
+    boxSizing:"border-box", background:"var(--paper)",
+  };
+  const sectionStyle = {
+    borderTop:"1px solid var(--rule)", paddingTop:10, marginTop:10,
+  };
+  const sectionHeader = {
+    margin:0, fontFamily:"var(--mono)", fontSize:10, letterSpacing:1.5,
+    textTransform:"uppercase", color:"var(--purple-deep)",
+  };
+
+  const vaultName = form.obsidian_vault_name || initial.obsidian_vault_name || "—";
+
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"flex-start", justifyContent:"center",
+      zIndex:200, padding:"40px 20px", overflowY:"auto",
+    }}>
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:18, width:"min(640px, 96vw)",
+        display:"flex", flexDirection:"column", gap:4,
+      }}>
+        <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:20, color:"var(--purple-deep)"}}>
+            Member profile
+          </h2>
+          <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
+        </div>
+        <p className="muted" style={{fontSize:12, margin:"4px 0 0"}}>
+          Edits POST to <code>/api/member/settings</code> and update
+          <code> &lt;lab-mgmt&gt;/members/&lt;handle&gt;.yaml</code>.
+        </p>
+
+        {/* Identity (read-only) */}
+        <div style={sectionStyle}>
+          <h4 style={sectionHeader}>Identity</h4>
+          <div className="row" style={{flexWrap:"wrap", gap:14, marginTop:6, fontSize:13}}>
+            <div><span className="muted">Western username</span> <code className="mono">{m.handle}</code></div>
+            <div><span className="muted">name</span> {m.name}</div>
+            <div><span className="muted">role</span> {m.role}</div>
+            <div><span className="muted">lab</span> <code className="mono">{m.lab}</code></div>
+            <div><span className="muted">personal vault</span> <code className="mono">{vaultName}/</code></div>
+          </div>
+        </div>
+
+        {/* Obsidian + notebook */}
+        <div style={sectionStyle}>
+          <h4 style={sectionHeader}>Obsidian &amp; notebook</h4>
+          <div style={labelStyle}>vault path (full)</div>
+          <input style={inputStyle} value={form.obsidian_vault_path}
+                 onChange={update("obsidian_vault_path")}
+                 placeholder="/Users/you/.../obsidian-lab" />
+          <div style={labelStyle}>vault name (for obsidian:// URLs)</div>
+          <input style={inputStyle} value={form.obsidian_vault_name}
+                 onChange={update("obsidian_vault_name")}
+                 placeholder="obsidian-lab" />
+          <div className="row" style={{gap:10, marginTop:4}}>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>notebook subfolder</div>
+              <input style={inputStyle} value={form.notebook_subfolder}
+                     onChange={update("notebook_subfolder")} />
+            </div>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>oracle subfolder</div>
+              <input style={inputStyle} value={form.oracle_subfolder}
+                     onChange={update("oracle_subfolder")} />
+            </div>
+          </div>
+        </div>
+
+        {/* Contact */}
+        <div style={sectionStyle}>
+          <h4 style={sectionHeader}>Contact</h4>
+          <div style={labelStyle}>email</div>
+          <input style={inputStyle} value={form.email} onChange={update("email")} />
+          <div className="row" style={{gap:10, marginTop:4}}>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>ORCID</div>
+              <input style={inputStyle} value={form.orcid} onChange={update("orcid")} />
+            </div>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>Bluesky</div>
+              <input style={inputStyle} value={form.bluesky} onChange={update("bluesky")} />
+            </div>
+          </div>
+          <div className="row" style={{gap:10, marginTop:4}}>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>GitHub</div>
+              <input style={inputStyle} value={form.github} onChange={update("github")} />
+            </div>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>OSF</div>
+              <input style={inputStyle} value={form.osf} onChange={update("osf")} />
+            </div>
+          </div>
+          <div style={labelStyle}>website</div>
+          <input style={inputStyle} value={form.website} onChange={update("website")} />
+        </div>
+
+        {/* Location */}
+        <div style={sectionStyle}>
+          <h4 style={sectionHeader}>Location</h4>
+          <div className="row" style={{gap:10, marginTop:4}}>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>office</div>
+              <input style={inputStyle} value={form.office} onChange={update("office")} />
+            </div>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>dry lab</div>
+              <input style={inputStyle} value={form.dry_lab} onChange={update("dry_lab")} />
+            </div>
+          </div>
+          <div style={labelStyle}>wet labs</div>
+          <input style={inputStyle} value={form.wet_labs} onChange={update("wet_labs")} />
+          <div style={labelStyle}>address</div>
+          <input style={inputStyle} value={form.address} onChange={update("address")} />
+          <div style={labelStyle}>city</div>
+          <input style={inputStyle} value={form.city} onChange={update("city")} />
+          <div style={labelStyle}>department</div>
+          <input style={inputStyle} value={form.department} onChange={update("department")} />
+        </div>
+
+        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:14, alignItems:"center"}}>
+          {msg && (
+            <span className="muted" style={{fontSize:11, marginRight:"auto"}}>{msg}</span>
+          )}
+          <button type="button" className="btn sm ghost" onClick={onClose}>close</button>
+          <button type="submit" className="btn sm primary" disabled={busy}>
+            {busy ? "…" : "save"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+/* ───────── Lab settings modal (PI + admins only) ───────── */
+function LabSettingsModal({ onClose }) {
+  const ls = window.DATA.lab_settings || {};
+  const [form, setForm] = useState({
+    display_name:              ls.display_name              || "",
+    website:                   ls.website                   || "",
+    notebook_large_files_path: ls.notebook_large_files_path || "",
+    lab_oracle_vault:          ls.lab_oracle_vault          || "",
+    admins:                    (ls.admins || []).join(", "),
+  });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg]   = useState(null);
+
+  const update = (k) => (e) => setForm((prev) => ({ ...prev, [k]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true); setMsg(null);
+    try {
+      const payload = { ...form, admins: form.admins.split(",").map(s => s.trim()).filter(Boolean) };
+      const res = await fetch("/api/lab/settings", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+      setMsg(res.ok ? "saved" : "backend not wired (HTTP " + res.status + ")");
+      if (res.ok && typeof window.__wigamigFetchData === "function") {
+        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      }
+    } catch (_) { setMsg("offline — local only"); }
+    finally { setBusy(false); }
+  };
+
+  const labelStyle = {
+    fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+    textTransform:"uppercase", color:"var(--muted)", marginTop:8, marginBottom:2,
+  };
+  const inputStyle = {
+    padding:"5px 8px", border:"1px solid var(--rule-strong)",
+    borderRadius:2, fontFamily:"var(--mono)", fontSize:12, width:"100%",
+    boxSizing:"border-box", background:"var(--paper)",
+  };
+  const roStyle = { ...inputStyle, background:"var(--paper-2)", color:"var(--muted)", cursor:"default" };
+
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"flex-start", justifyContent:"center",
+      zIndex:200, padding:"40px 20px", overflowY:"auto",
+    }}>
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:18, width:"min(600px, 96vw)",
+        display:"flex", flexDirection:"column", gap:4,
+      }}>
+        <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:20, color:"var(--purple-deep)"}}>
+            Lab settings
+          </h2>
+          <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
+        </div>
+        <p className="muted" style={{fontSize:12, margin:"4px 0 8px"}}>
+          Lab-wide parameters. Edits POST to <code>/api/lab/settings</code> and update
+          <code> &lt;lab-mgmt&gt;/lab.md</code>. Only the PI and designated admins can save changes.
+        </p>
+
+        {/* Read-only identity */}
+        <div style={{borderTop:"1px solid var(--rule)", paddingTop:10}}>
+          <h4 style={{margin:0, fontFamily:"var(--mono)", fontSize:10, letterSpacing:1.5,
+                      textTransform:"uppercase", color:"var(--purple-deep)"}}>Identity (read-only)</h4>
+          <div className="row" style={{flexWrap:"wrap", gap:14, marginTop:6, fontSize:13}}>
+            <div><span className="muted">lab id</span> <code className="mono">{ls.name}</code></div>
+            <div><span className="muted">PI</span> <code className="mono">{ls.pi_handle}</code></div>
+          </div>
+          <div style={labelStyle}>display name</div>
+          <input style={inputStyle} value={form.display_name} onChange={update("display_name")}
+                 placeholder="e.g. Hallett Lab" />
+        </div>
+
+        {/* Web presence */}
+        <div style={{borderTop:"1px solid var(--rule)", paddingTop:10, marginTop:6}}>
+          <h4 style={{margin:0, fontFamily:"var(--mono)", fontSize:10, letterSpacing:1.5,
+                      textTransform:"uppercase", color:"var(--purple-deep)"}}>Web presence</h4>
+          <div style={labelStyle}>lab website</div>
+          <input style={inputStyle} value={form.website} onChange={update("website")}
+                 placeholder="https://mikehallett.science" />
+        </div>
+
+        {/* Storage paths */}
+        <div style={{borderTop:"1px solid var(--rule)", paddingTop:10, marginTop:6}}>
+          <h4 style={{margin:0, fontFamily:"var(--mono)", fontSize:10, letterSpacing:1.5,
+                      textTransform:"uppercase", color:"var(--purple-deep)"}}>Storage paths</h4>
+          <div style={labelStyle}>notebook large files (figures, data — on lab base)</div>
+          <input style={inputStyle} value={form.notebook_large_files_path}
+                 onChange={update("notebook_large_files_path")}
+                 placeholder="/data/lab_vm/obsidian-lab/notebooks" />
+          <div style={labelStyle}>lab oracle vault (on lab base)</div>
+          <input style={inputStyle} value={form.lab_oracle_vault}
+                 onChange={update("lab_oracle_vault")}
+                 placeholder="wigamig-vault-hallett/" />
+        </div>
+
+        {/* Admins */}
+        <div style={{borderTop:"1px solid var(--rule)", paddingTop:10, marginTop:6}}>
+          <h4 style={{margin:0, fontFamily:"var(--mono)", fontSize:10, letterSpacing:1.5,
+                      textTransform:"uppercase", color:"var(--purple-deep)"}}>Settings admins</h4>
+          <div style={labelStyle}>handles with PI-level settings edit rights (comma-separated)</div>
+          <input style={inputStyle} value={form.admins} onChange={update("admins")}
+                 placeholder="e.g. jsmith, admin_asst" />
+        </div>
+
+        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:14, alignItems:"center"}}>
+          {msg && <span className="muted" style={{fontSize:11, marginRight:"auto"}}>{msg}</span>}
+          <button type="button" className="btn sm ghost" onClick={onClose}>close</button>
+          <button type="submit" className="btn sm primary" disabled={busy}>
+            {busy ? "…" : "save"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 /* ───────── footer ───────── */
 /* FooterMeta reads everything from window.DATA.member — the API merges the
    member's frontmatter (`contact:` / `location:`) on top of the lab defaults,
@@ -2169,6 +3053,13 @@ function FooterMeta() {
   const m = window.DATA.member;
   const loc = m.location || {};
   const c = m.contact || {};
+  const [showProfile, setShowProfile] = useState(false);
+  const ls = window.DATA.lab_settings || {};
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
+  const myHandle = (m.handle || "").toLowerCase();
+  const canEditLab = isPI || (ls.admins || []).map(h => h.toLowerCase()).includes(myHandle);
+  const [showLabSettings, setShowLabSettings] = useState(false);
 
   // Build the office/dry-lab/wet-labs line, dropping any blank pieces.
   const officeBits = [
@@ -2179,9 +3070,43 @@ function FooterMeta() {
 
   return (
     <div className="footer-meta">
+      {showProfile    && <MemberProfileModal onClose={() => setShowProfile(false)} />}
+      {showLabSettings && <LabSettingsModal   onClose={() => setShowLabSettings(false)} />}
       <div className="grid">
         <div>
-          <h5>Location</h5>
+          <h5>
+            <span style={{display:"inline-flex", alignItems:"center", gap:6}}>
+              {m.name || m.handle}
+              <button
+                type="button"
+                title="Edit my profile"
+                onClick={() => setShowProfile(true)}
+                style={{
+                  background:"transparent", border:"1px solid var(--rule-strong)",
+                  borderRadius:2, padding:"1px 6px", cursor:"pointer",
+                  fontSize:11, color:"var(--muted)",
+                }}>
+                ⚙
+              </button>
+              {canEditLab && (
+                <button
+                  type="button"
+                  title="Lab settings (PI / admin)"
+                  onClick={() => setShowLabSettings(true)}
+                  style={{
+                    background:"transparent", border:"1px solid var(--rule-strong)",
+                    borderRadius:2, padding:"1px 6px", cursor:"pointer",
+                    fontSize:11, color:"var(--purple)",
+                  }}>
+                  ⚙ lab
+                </button>
+              )}
+            </span>
+          </h5>
+          <div className="row mono muted" style={{fontSize:11, marginBottom:6}}>
+            @{m.handle} · {m.role}
+          </div>
+          <h5 style={{marginTop:10}}>Location</h5>
           {officeBits && <div className="row">{officeBits}</div>}
           {loc.address && <div className="row">{loc.address}</div>}
           {loc.city && <div className="row">{loc.city}</div>}
@@ -2230,6 +3155,12 @@ function FooterMeta() {
 
         <div>
           <h5>Affiliations</h5>
+          {ls.website && (
+            <div className="row" style={{marginBottom:8}}>
+              <span className="lbl">Lab</span>
+              <a href={ls.website} target="_blank" rel="noopener">{ls.website}</a>
+            </div>
+          )}
           <div className="affil">
             <a href="https://www.schulich.uwo.ca/biochem/" target="_blank" rel="noopener">
               <img className="schulich" src="assets/Schulich_horizontal_CMYK.png" alt="Schulich School of Dentristy and Medicine" />
@@ -2300,7 +3231,17 @@ function App() {
       <TopBar />
       <div className="app">
         <CmdBar query={query} setQuery={setQuery} />
-        <WorkspaceLauncherRow />
+
+        {/* Installations: always-visible — open workspace or install from here. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <InstallationsBox span="c-12" />
+        </div>
+
+        {/* Reference zone: projects + activity (sit high — context for the action zone below). */}
+        <div className="grid" style={{marginBottom:14}}>
+          <ProjectsPanel projects={D.projects} span="c-7" />
+          <ActivityPanel span="c-5" />
+        </div>
 
         {/* Daily action zone: SEAs > Requests > Receptionist (PI). */}
         <div className="grid" style={{marginBottom:14}}>
@@ -2321,20 +3262,16 @@ function App() {
           </div>
         )}
 
-        {/* Reference zone: projects + activity + notebook + oracle. */}
         <div className="grid" style={{marginBottom:14}}>
-          <ProjectsPanel projects={D.projects} span="c-7" />
-          <ActivityPanel span="c-5" />
+          <PersonalOraclePanel data={D.personal_oracle} span="c-3" />
+          <NotebookPanel span="c-5" />
+          <LabOraclePanel entries={D.oracle_recent} drafts={D.oracle_drafts}
+                          labFolder={D.lab_oracle_folder} span="c-4" />
         </div>
 
+        {/* Lab members + inventory: things you check, but not every day. */}
         <div className="grid" style={{marginBottom:14}}>
-          <NotebookPanel span="c-7" />
-          <GroupOraclePanel entries={D.oracle_recent} drafts={D.oracle_drafts} span="c-5" />
-        </div>
-
-        {/* Group + inventory: things you check, but not every day. */}
-        <div className="grid" style={{marginBottom:14}}>
-          <GroupPanel peers={D.peers} span="c-6" />
+          <LabMembersPanel peers={D.peers} span="c-6" />
           <InventoryPanel inv={D.inventory} span="c-6" />
         </div>
 
