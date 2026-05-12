@@ -24,6 +24,7 @@ from __future__ import annotations
 import datetime as _dt
 from pathlib import Path
 
+from ..core import compliance as _compliance
 from ..core import registrar as _reg
 from ..core.frontmatter import parse_file
 from . import contract as C
@@ -164,6 +165,113 @@ def _coerce_collab(entry: _reg.CollaborationEntry) -> C.RegistrarCollaborationRo
     )
 
 
+def _build_cert_panel(reg: _reg.Registry, today_d: _dt.date) -> C.RegistrarCertPanel:
+    """Walk every ACTIVE lab + core; render the centre-wide cert table.
+
+    For each group we load that group's own ``compliance.md`` (falling
+    back to the global default set when absent) so we honour each lab's
+    audience choices. Per-member status is computed by
+    ``compliance.compute_member_status`` — the exact same logic the
+    lab-internal dashboard uses, just aggregated across every group.
+    """
+    rows: list[C.RegistrarMemberCertRow] = []
+    cert_codes_seen: list[str] = []  # preserve discovery order
+
+    # Aggregate counters
+    handles_with_issues: set[str] = set()
+    handles_total: set[str] = set()
+    expired_count = 0
+    expiring_count = 0
+    missing_count = 0
+
+    def _walk_group(name: str, display: str, kind: str, lab_path: Path) -> None:
+        nonlocal expired_count, expiring_count, missing_count
+        if not lab_path.is_dir():
+            return
+        config = _compliance.load_config_at(lab_path / "compliance.md")
+        for code in (s.code for s in config.required):
+            if code not in cert_codes_seen:
+                cert_codes_seen.append(code)
+        members_dir = lab_path / "members"
+        if not members_dir.is_dir():
+            return
+        for md in sorted(members_dir.glob("*.md")):
+            try:
+                meta = parse_file(md).meta or {}
+            except Exception:
+                continue
+            handle = str(meta.get("handle") or f"@{md.stem}")
+            full_name = str(meta.get("full_name") or "")
+            role = str(meta.get("role") or "member")
+            member_status_raw = str(meta.get("status") or "active")
+            member_status = member_status_raw if member_status_raw in ("active", "inactive") else "active"
+            raw_certs = meta.get("certifications") or []
+            if not isinstance(raw_certs, list):
+                raw_certs = [raw_certs]
+            statuses = _compliance.compute_member_status(
+                handle=handle.lstrip("@"),
+                member_certs=[str(x) for x in raw_certs],
+                config=config,
+                today=today_d,
+            )
+            cells: list[C.RegistrarCertCell] = []
+            has_expired = has_expiring = has_missing = False
+            for cs in statuses:
+                cells.append(
+                    C.RegistrarCertCell(
+                        code=cs.code,
+                        status=cs.status,  # type: ignore[arg-type]
+                        expires=cs.expires,
+                    )
+                )
+                if cs.status == "expired":
+                    expired_count += 1
+                    has_expired = True
+                elif cs.status == "expiring":
+                    expiring_count += 1
+                    has_expiring = True
+                elif cs.status == "missing":
+                    missing_count += 1
+                    has_missing = True
+            handle_key = handle.lower().lstrip("@")
+            handles_total.add(handle_key)
+            if has_expired or has_expiring or has_missing:
+                handles_with_issues.add(handle_key)
+            rows.append(
+                C.RegistrarMemberCertRow(
+                    group=name, group_display=display, group_kind=kind,  # type: ignore[arg-type]
+                    handle=handle,
+                    full_name=full_name, role=role,
+                    member_status=member_status,  # type: ignore[arg-type]
+                    certs=cells,
+                    has_expired=has_expired,
+                    has_expiring=has_expiring,
+                    has_missing=has_missing,
+                )
+            )
+
+    for lab in reg.labs:
+        if lab.status != "active":
+            continue
+        _walk_group(lab.name, lab.name.title() + " Lab", "lab", Path(lab.lab_mgmt_path))
+    for core in reg.cores:
+        if core.status != "active":
+            continue
+        _walk_group(core.name, core.name.title() + " Core", "core", Path(core.lab_mgmt_path))
+
+    return C.RegistrarCertPanel(
+        aggregate=C.RegistrarCertAggregate(
+            members_total=len(handles_total),
+            members_with_issues=len(handles_with_issues),
+            expired_count=expired_count,
+            expiring_count=expiring_count,
+            missing_count=missing_count,
+        ),
+        rows=rows,
+        cert_codes=cert_codes_seen,
+    )
+
+
 def build_registrar_response(
     handle: str,
     *,
@@ -199,4 +307,5 @@ def build_registrar_response(
             total_collaborations=sum(1 for x in collab_rows if x.status == "active"),
             total_members=len(seen),
         ),
+        certs=_build_cert_panel(reg, today_d),
     )
