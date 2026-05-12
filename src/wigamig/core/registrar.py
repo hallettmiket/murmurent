@@ -48,6 +48,10 @@ class PIAlreadyLeadsAnother(RegistrarError):
 class InvalidLabName(RegistrarError):
     """Refused: lab name violates the alphanumeric + underscore rule."""
 
+
+class LabNotFound(RegistrarError):
+    """Refused: no lab with that short ID is registered."""
+
 # -----------------------------------------------------------------
 # Identity
 # -----------------------------------------------------------------
@@ -429,17 +433,20 @@ def _enforce_create_invariants(
         raise LabAlreadyExists(f"name collides with an existing core: {name}")
     if not pi_at or pi_at == "@":
         raise RegistrarError("pi_handle is required")
+    # The one-PI-per-lab/core invariant only applies to ACTIVE entries.
+    # Archiving a lab frees its PI to lead a different one; this is how
+    # PI handover at retirement / lab closure is supposed to work.
     for l in existing.labs:
-        if _normalize_pi(l.pi) == pi_at:
+        if l.status == "active" and _normalize_pi(l.pi) == pi_at:
             raise PIAlreadyLeadsAnother(
                 f"{pi_at} already leads lab {l.name!r}. "
-                f"A PI can lead at most one lab or core."
+                f"A PI can lead at most one active lab or core."
             )
     for c in existing.cores:
-        if _normalize_pi(c.pi) == pi_at:
+        if c.status == "active" and _normalize_pi(c.pi) == pi_at:
             raise PIAlreadyLeadsAnother(
                 f"{pi_at} already leads core {c.name!r}. "
-                f"A PI can lead at most one lab or core."
+                f"A PI can lead at most one active lab or core."
             )
 
 
@@ -598,3 +605,223 @@ def create_lab(
     )
 
     return entry
+
+
+# -----------------------------------------------------------------
+# Phase C: archive + update lab metadata
+# -----------------------------------------------------------------
+
+
+def _find_lab(name: str, env: dict[str, str] | None = None) -> tuple[Registry, int]:
+    """Return (registry, index_of_lab) or raise :class:`LabNotFound`."""
+    reg = read_registry(env)
+    for i, l in enumerate(reg.labs):
+        if l.name == name:
+            return reg, i
+    raise LabNotFound(f"no lab registered with short id: {name!r}")
+
+
+def _replace_lab(reg: Registry, idx: int, new_entry: LabEntry) -> Registry:
+    """Return a copy of ``reg`` with ``new_entry`` at ``labs[idx]``."""
+    new_labs = list(reg.labs)
+    new_labs[idx] = new_entry
+    return Registry(labs=new_labs, cores=reg.cores, collaborations=reg.collaborations)
+
+
+def _set_status(name: str, status: str, env: dict[str, str] | None = None) -> LabEntry:
+    """Flip a lab's status in the registry. Files are preserved either way."""
+    reg, idx = _find_lab(name, env)
+    current = reg.labs[idx]
+    if current.status == status:
+        return current  # no-op
+    updated = LabEntry(
+        name=current.name, pi=current.pi, lab_mgmt_path=current.lab_mgmt_path,
+        status=status, created=current.created,
+        slack_workspace=current.slack_workspace, github_org=current.github_org,
+        oracle_vault=current.oracle_vault,
+    )
+    new_reg = _replace_lab(reg, idx, updated)
+    write_registry(new_reg, env)
+    root = lab_info_root(env)
+    _git_init_if_needed(root)
+    verb = "archive" if status == "archived" else "unarchive" if status == "active" else f"set {status}"
+    _git_commit_all(root, f"registrar: {verb} lab {name}")
+    return updated
+
+
+def archive_lab(name: str, env: dict[str, str] | None = None) -> LabEntry:
+    """Soft-delete a lab: ``status -> archived``.
+
+    The lab's files (``labs/<name>/lab-mgmt/``) are preserved untouched.
+    Archival is reversible via :func:`unarchive_lab`. Once archived,
+    the lab's PI handle is freed up — a different lab can claim that PI.
+    """
+    return _set_status(name, "archived", env)
+
+
+def unarchive_lab(name: str, env: dict[str, str] | None = None) -> LabEntry:
+    """Bring an archived lab back. ``status -> active``.
+
+    Refuses if the lab's PI now leads a different active lab/core —
+    the one-PI-per-active-lab invariant must hold post-unarchival too.
+    """
+    reg, idx = _find_lab(name, env)
+    current = reg.labs[idx]
+    if current.status != "archived":
+        return current
+    pi_at = _normalize_pi(current.pi)
+    for j, l in enumerate(reg.labs):
+        if j == idx:
+            continue
+        if l.status == "active" and _normalize_pi(l.pi) == pi_at:
+            raise PIAlreadyLeadsAnother(
+                f"cannot unarchive {name}: {pi_at} now leads active lab {l.name!r}. "
+                f"Reassign one before unarchiving."
+            )
+    for c in reg.cores:
+        if c.status == "active" and _normalize_pi(c.pi) == pi_at:
+            raise PIAlreadyLeadsAnother(
+                f"cannot unarchive {name}: {pi_at} now leads active core {c.name!r}."
+            )
+    return _set_status(name, "active", env)
+
+
+# Set of fields editable via update_lab_metadata. ``name`` is NOT
+# editable (renaming would invalidate every path that references it);
+# ``status`` is reserved for archive/unarchive; ``created`` is history.
+_EDITABLE_FIELDS = frozenset({
+    "display_name",
+    "pi_handle",
+    "pi_full_name",
+    "slack_workspace",
+    "github_org",
+    "oracle_vault",
+    "institution",
+    "department",
+})
+
+
+def update_lab_metadata(
+    name: str,
+    *,
+    display_name: str | None = None,
+    pi_handle: str | None = None,
+    pi_full_name: str | None = None,
+    slack_workspace: str | None = None,
+    github_org: str | None = None,
+    oracle_vault: str | None = None,
+    institution: str | None = None,
+    department: str | None = None,
+    env: dict[str, str] | None = None,
+) -> LabEntry:
+    """Modify a lab's metadata at the registrar level.
+
+    Updates ``_registry.yaml`` AND the lab's ``lab.md`` frontmatter.
+    A ``None`` argument means "do not touch this field"; passing an
+    empty string clears the field. The one-PI-per-active-lab invariant
+    is re-enforced when ``pi_handle`` is supplied. Renaming the lab
+    short ID is intentionally not supported.
+    """
+    from .frontmatter import parse_file as _pf, dump_document as _dump
+
+    reg, idx = _find_lab(name, env)
+    current = reg.labs[idx]
+
+    # Validate PI change against active labs/cores.
+    new_pi_at: str | None = None
+    if pi_handle is not None:
+        new_pi_at = _normalize_pi(pi_handle)
+        if not new_pi_at or new_pi_at == "@":
+            raise RegistrarError("pi_handle cannot be blank")
+        if new_pi_at != _normalize_pi(current.pi):
+            # Only enforce the invariant for active labs — archived ones
+            # don't compete for a PI slot.
+            for j, l in enumerate(reg.labs):
+                if j == idx:
+                    continue
+                if l.status == "active" and _normalize_pi(l.pi) == new_pi_at:
+                    raise PIAlreadyLeadsAnother(
+                        f"{new_pi_at} already leads lab {l.name!r}"
+                    )
+            for c in reg.cores:
+                if c.status == "active" and _normalize_pi(c.pi) == new_pi_at:
+                    raise PIAlreadyLeadsAnother(
+                        f"{new_pi_at} already leads core {c.name!r}"
+                    )
+
+    # Compose updated registry entry.
+    updated = LabEntry(
+        name=current.name,
+        pi=new_pi_at if new_pi_at is not None else current.pi,
+        lab_mgmt_path=current.lab_mgmt_path,
+        status=current.status,
+        created=current.created,
+        slack_workspace=(slack_workspace if slack_workspace is not None
+                         else current.slack_workspace) or None,
+        github_org=(github_org if github_org is not None
+                    else current.github_org) or None,
+        oracle_vault=(oracle_vault if oracle_vault is not None
+                      else current.oracle_vault) or None,
+    )
+
+    # Update lab.md frontmatter to match — preserve body + unknown keys.
+    lab_md = Path(current.lab_mgmt_path) / "lab.md"
+    if lab_md.is_file():
+        parsed = _pf(lab_md)
+        meta = dict(parsed.meta or {})
+        if display_name is not None:
+            if display_name:
+                meta["name"] = display_name
+            else:
+                meta.pop("name", None)
+        if new_pi_at is not None:
+            meta["pi"] = new_pi_at
+        for key, value in (
+            ("slack_workspace", slack_workspace),
+            ("github_org", github_org),
+            ("lab_oracle_vault", oracle_vault),
+            ("institution", institution),
+            ("department", department),
+        ):
+            if value is None:
+                continue
+            if value:
+                meta[key] = value
+            else:
+                meta.pop(key, None)
+        lab_md.write_text(_dump(meta, parsed.body or ""), encoding="utf-8")
+
+    # Optionally bump the PI member file if pi handle changed AND a new
+    # member file doesn't already exist. We DO NOT delete the old PI's
+    # member file — that's the lab's roster decision. Just create the new
+    # one so the registrar dashboard sees a populated PI.
+    if new_pi_at is not None and new_pi_at != _normalize_pi(current.pi):
+        members_dir = Path(current.lab_mgmt_path) / "members"
+        new_pi_member = members_dir / f"{new_pi_at.lstrip('@')}.md"
+        if members_dir.is_dir() and not new_pi_member.exists():
+            new_pi_member.write_text(
+                _render_pi_member_md(
+                    pi_at=new_pi_at, pi_full_name=pi_full_name,
+                    lab_name=current.name,
+                ),
+                encoding="utf-8",
+            )
+
+    new_reg = _replace_lab(reg, idx, updated)
+    write_registry(new_reg, env)
+
+    root = lab_info_root(env)
+    _git_init_if_needed(root)
+    changed_summary: list[str] = []
+    if display_name is not None: changed_summary.append("display_name")
+    if new_pi_at is not None and new_pi_at != _normalize_pi(current.pi):
+        changed_summary.append(f"pi -> {new_pi_at}")
+    if slack_workspace is not None: changed_summary.append("slack_workspace")
+    if github_org is not None: changed_summary.append("github_org")
+    if oracle_vault is not None: changed_summary.append("oracle_vault")
+    if institution is not None: changed_summary.append("institution")
+    if department is not None: changed_summary.append("department")
+    summary = ", ".join(changed_summary) or "no-op"
+    _git_commit_all(root, f"registrar: update lab {name} ({summary})")
+
+    return updated

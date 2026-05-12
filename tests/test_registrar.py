@@ -488,3 +488,253 @@ def test_endpoint_create_lab_400_on_invalid_name(isolated):
         "name": "Invalid Name!", "display_name": "X", "pi_handle": "p",
     })
     assert res.status_code == 400
+
+
+# ---------------------------------------------------------------------------
+# Phase C: archive / unarchive / update_lab_metadata
+# ---------------------------------------------------------------------------
+
+
+def test_archive_lab_flips_status_and_preserves_files(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
+    lab_md = registrar.lab_info_root() / "labs" / "ortega" / "lab-mgmt" / "lab.md"
+    assert lab_md.is_file()
+
+    entry = registrar.archive_lab("ortega")
+    assert entry.status == "archived"
+    # Files untouched:
+    assert lab_md.is_file()
+    # Registry reflects it:
+    reg = registrar.read_registry()
+    assert next(l.status for l in reg.labs if l.name == "ortega") == "archived"
+
+
+def test_archive_lab_is_idempotent(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
+    registrar.archive_lab("ortega")
+    # Second call is a no-op; should not raise.
+    entry = registrar.archive_lab("ortega")
+    assert entry.status == "archived"
+
+
+def test_archive_lab_raises_when_missing(isolated):
+    _seed_registrar(isolated)
+    with pytest.raises(registrar.LabNotFound):
+        registrar.archive_lab("nothing_here")
+
+
+def test_archive_frees_pi_for_new_lab(isolated):
+    """After archiving, the freed PI can lead a brand-new lab."""
+    _seed_registrar(isolated)
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
+    registrar.archive_lab("ortega")
+    # Should succeed — jortega is no longer leading an active lab.
+    entry = registrar.create_lab(name="ortega2", display_name="Ortega Lab 2", pi_handle="jortega")
+    assert entry.pi == "@jortega"
+
+
+def test_unarchive_lab_brings_it_back(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
+    registrar.archive_lab("ortega")
+    entry = registrar.unarchive_lab("ortega")
+    assert entry.status == "active"
+
+
+def test_unarchive_refuses_when_pi_now_leads_another(isolated):
+    """Once a PI has taken over a new active lab, unarchiving the old
+    one would violate one-PI-per-active-lab and must be refused."""
+    _seed_registrar(isolated)
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
+    registrar.archive_lab("ortega")
+    registrar.create_lab(name="ortega2", display_name="Ortega Lab 2", pi_handle="jortega")
+    with pytest.raises(registrar.PIAlreadyLeadsAnother):
+        registrar.unarchive_lab("ortega")
+
+
+def test_archive_lands_its_own_audit_commit(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
+    registrar.archive_lab("ortega")
+    log = subprocess.run(
+        ["git", "-C", str(registrar.lab_info_root()), "log", "--oneline"],
+        check=True, capture_output=True, text=True,
+    ).stdout
+    # Two commits: create then archive.
+    assert "create lab ortega" in log
+    assert "archive" in log.lower() or "archived" in log.lower()
+
+
+# update_lab_metadata
+# ---------------
+
+
+def test_update_changes_display_name_and_persists_to_lab_md(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
+    registrar.update_lab_metadata("ortega", display_name="Ortega Group")
+
+    from wigamig.core.frontmatter import parse_file
+    meta = parse_file(registrar.lab_info_root() / "labs" / "ortega" / "lab-mgmt" / "lab.md").meta
+    assert meta["name"] == "Ortega Group"
+    # Other fields untouched:
+    assert meta["lab"] == "ortega"
+    assert meta["pi"] == "@jortega"
+
+
+def test_update_clears_optional_field_with_empty_string(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(
+        name="ortega", display_name="Ortega Lab", pi_handle="jortega",
+        slack_workspace="T01ABC",
+    )
+    registrar.update_lab_metadata("ortega", slack_workspace="")
+    # Registry now has None:
+    entry = next(l for l in registrar.read_registry().labs if l.name == "ortega")
+    assert entry.slack_workspace is None
+    # lab.md no longer has the key:
+    from wigamig.core.frontmatter import parse_file
+    meta = parse_file(registrar.lab_info_root() / "labs" / "ortega" / "lab-mgmt" / "lab.md").meta
+    assert "slack_workspace" not in meta
+
+
+def test_update_pi_handoff_writes_new_member_file(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
+    registrar.update_lab_metadata(
+        "ortega", pi_handle="kortega", pi_full_name="Kim Ortega",
+    )
+    members_dir = registrar.lab_info_root() / "labs" / "ortega" / "lab-mgmt" / "members"
+    # Old member file preserved (lab roster decision, not registrar's).
+    assert (members_dir / "jortega.md").is_file()
+    # New PI gets a member file.
+    new_pi_md = members_dir / "kortega.md"
+    assert new_pi_md.is_file()
+    from wigamig.core.frontmatter import parse_file
+    meta = parse_file(new_pi_md).meta
+    assert meta["role"] == "pi"
+    assert meta["handle"] == "@kortega"
+    assert meta["full_name"] == "Kim Ortega"
+
+
+def test_update_pi_handoff_refuses_when_target_already_leads(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
+    registrar.create_lab(name="other", display_name="Other Lab", pi_handle="otherpi")
+    with pytest.raises(registrar.PIAlreadyLeadsAnother):
+        registrar.update_lab_metadata("ortega", pi_handle="otherpi")
+
+
+def test_update_is_a_no_op_when_no_fields_supplied(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
+    # No-op kwargs — must not raise, must not change anything.
+    registrar.update_lab_metadata("ortega")
+    entry = next(l for l in registrar.read_registry().labs if l.name == "ortega")
+    assert entry.pi == "@jortega"
+    assert entry.status == "active"
+
+
+def test_update_lab_not_found(isolated):
+    _seed_registrar(isolated)
+    with pytest.raises(registrar.LabNotFound):
+        registrar.update_lab_metadata("missing", display_name="x")
+
+
+# Phase C endpoints
+# ---------------
+
+
+def _client_as_registrar(isolated):
+    _seed_registrar(isolated)
+    return TestClient(create_app())
+
+
+def test_endpoint_archive_403_when_not_registrar(isolated):
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega") \
+        if False else None  # need registrar to bootstrap; do it manually:
+    _seed_registrar(isolated)
+    client = TestClient(create_app())
+    client.post("/api/registrar/lab", json={
+        "name": "ortega", "display_name": "Ortega Lab", "pi_handle": "jortega",
+    })
+    # Strip the sentinel to simulate a non-registrar caller.
+    registrar.REGISTRAR_SENTINEL.unlink()
+    res = client.post("/api/registrar/lab/ortega/archive")
+    assert res.status_code == 403
+
+
+def test_endpoint_archive_404_for_unknown_lab(isolated):
+    client = _client_as_registrar(isolated)
+    res = client.post("/api/registrar/lab/no_such_lab/archive")
+    assert res.status_code == 404
+
+
+def test_endpoint_archive_then_unarchive_round_trip(isolated):
+    client = _client_as_registrar(isolated)
+    client.post("/api/registrar/lab", json={
+        "name": "ortega", "display_name": "Ortega Lab", "pi_handle": "jortega",
+    })
+    r1 = client.post("/api/registrar/lab/ortega/archive")
+    assert r1.status_code == 200
+    assert r1.json()["lab"]["status"] == "archived"
+    r2 = client.post("/api/registrar/lab/ortega/unarchive")
+    assert r2.status_code == 200
+    assert r2.json()["lab"]["status"] == "active"
+
+
+def test_endpoint_unarchive_409_when_pi_now_active_elsewhere(isolated):
+    client = _client_as_registrar(isolated)
+    client.post("/api/registrar/lab", json={
+        "name": "ortega", "display_name": "Ortega Lab", "pi_handle": "jortega",
+    })
+    client.post("/api/registrar/lab/ortega/archive")
+    client.post("/api/registrar/lab", json={
+        "name": "ortega2", "display_name": "Ortega Lab 2", "pi_handle": "jortega",
+    })
+    res = client.post("/api/registrar/lab/ortega/unarchive")
+    assert res.status_code == 409
+
+
+def test_endpoint_edit_changes_metadata(isolated):
+    client = _client_as_registrar(isolated)
+    client.post("/api/registrar/lab", json={
+        "name": "ortega", "display_name": "Ortega Lab", "pi_handle": "jortega",
+        "slack_workspace": "T01ABC",
+    })
+    res = client.post("/api/registrar/lab/ortega/edit", json={
+        "display_name": "Ortega Group",
+        "slack_workspace": "",  # clear
+        "github_org": "ortegahub",
+    })
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["lab"]["github_org"] == "ortegahub"
+    assert body["lab"]["slack_workspace"] is None
+
+
+def test_endpoint_edit_409_on_pi_conflict(isolated):
+    client = _client_as_registrar(isolated)
+    client.post("/api/registrar/lab", json={
+        "name": "ortega", "display_name": "Ortega Lab", "pi_handle": "jortega",
+    })
+    client.post("/api/registrar/lab", json={
+        "name": "other", "display_name": "Other Lab", "pi_handle": "otherpi",
+    })
+    res = client.post("/api/registrar/lab/ortega/edit", json={"pi_handle": "otherpi"})
+    assert res.status_code == 409
+
+
+def test_endpoint_edit_partial_post_preserves_unsent_fields(isolated):
+    """Posting only display_name must not clear pi_handle / github_org."""
+    client = _client_as_registrar(isolated)
+    client.post("/api/registrar/lab", json={
+        "name": "ortega", "display_name": "Ortega Lab", "pi_handle": "jortega",
+        "github_org": "ortegalab",
+    })
+    res = client.post("/api/registrar/lab/ortega/edit", json={"display_name": "Renamed"})
+    assert res.status_code == 200
+    assert res.json()["lab"]["pi"] == "@jortega"
+    assert res.json()["lab"]["github_org"] == "ortegalab"
