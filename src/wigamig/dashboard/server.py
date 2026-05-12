@@ -193,6 +193,26 @@ class RegistrarLabEditBody(BaseModel):
     department: str | None = None
 
 
+class RegistrarProfileBody(BaseModel):
+    """JSON body for ``POST /api/registrar/profile``.
+
+    Partial-POST safe: ``None`` means "don't touch", empty string
+    clears. Same semantics as the member-settings endpoint.
+    """
+
+    full_name: str | None = None
+    title: str | None = None
+    email: str | None = None
+    orcid: str | None = None
+    website: str | None = None
+    github: str | None = None
+    office: str | None = None
+    address: str | None = None
+    city: str | None = None
+    department: str | None = None
+    institution: str | None = None
+
+
 class CatalogEntryBody(BaseModel):
     """JSON body for ``POST /api/sea_catalog`` (upsert)."""
 
@@ -1477,6 +1497,25 @@ def create_app() -> FastAPI:
         except _reg.PIAlreadyLeadsAnother as exc:
             raise HTTPException(status_code=409, detail=str(exc))
         return {"ok": True, "lab": _lab_entry_to_dict(entry)}
+
+    @app.post("/api/registrar/profile")
+    def registrar_edit_profile(
+        body: RegistrarProfileBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Update the registrar's centre-level profile.
+
+        Writes to ``$WIGAMIG_LAB_INFO_ROOT/registrar.md`` frontmatter.
+        Partial-POST: only fields present in the body are touched;
+        empty string clears a field.
+        """
+        from ..core import registrar as _reg
+
+        _require_registrar(user)
+        sent = body.model_fields_set
+        updates = {k: getattr(body, k) for k in type(body).model_fields if k in sent}
+        path = _reg.write_profile(updates)
+        return {"ok": True, "path": str(path)}
 
     @app.post("/api/registrar/lab/{name}/edit")
     def registrar_edit_lab(

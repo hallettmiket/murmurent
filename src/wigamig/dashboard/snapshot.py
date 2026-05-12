@@ -84,8 +84,15 @@ def build_response(
     project_summaries = [load_summary(repo) for repo in iter_local_projects()]
     all_seas = list(_iter_all_seas())
 
+    # Cross-link gate: True when this handle is the centre's registrar.
+    from ..core import registrar as _registrar_mod
+    is_registrar_handle = _registrar_mod.is_registrar(norm)
+
     member_block = _identity(snap.member, snap.full_name, snap.role)
-    member_block = member_block.model_copy(update={"can_pi": can_pi})
+    member_block = member_block.model_copy(update={
+        "can_pi": can_pi,
+        "is_registrar": is_registrar_handle,
+    })
 
     member_profile = _load_member_profile(norm)
     lab_name = str(member_profile.get("lab") or "hallett")

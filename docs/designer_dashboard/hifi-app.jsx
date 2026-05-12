@@ -3336,6 +3336,18 @@ function FooterMeta() {
                   ⚙ lab
                 </button>
               )}
+              {m.is_registrar && (
+                <a
+                  href="/registrar"
+                  title="Switch to the centre's registrar dashboard (you're declared as registrar in ~/.wigamig/registrar)"
+                  style={{
+                    background:"transparent", border:"1px solid var(--purple)",
+                    borderRadius:2, padding:"1px 6px", cursor:"pointer",
+                    fontSize:11, color:"var(--purple)", textDecoration:"none",
+                  }}>
+                  → registrar
+                </a>
+              )}
             </span>
           </h5>
           <div className="row mono muted" style={{fontSize:11, marginBottom:6}}>

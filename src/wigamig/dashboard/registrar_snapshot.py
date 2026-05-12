@@ -304,9 +304,27 @@ def build_registrar_response(
         for m in row.members:
             seen.add(m.handle.lower().lstrip("@"))
 
+    # Registrar's own contact / location, from <lab_info_root>/registrar.md.
+    profile_meta = _reg.read_profile()
+    profile = C.RegistrarProfile(
+        handle=f"@{handle.lstrip('@')}",
+        full_name=str(profile_meta.get("full_name") or ""),
+        title=str(profile_meta.get("title") or ""),
+        email=profile_meta.get("email") or None,
+        orcid=profile_meta.get("orcid") or None,
+        website=profile_meta.get("website") or None,
+        github=profile_meta.get("github") or None,
+        office=profile_meta.get("office") or None,
+        address=profile_meta.get("address") or None,
+        city=profile_meta.get("city") or None,
+        department=profile_meta.get("department") or None,
+        institution=profile_meta.get("institution") or None,
+    )
+
     return C.RegistrarResponse(
         registrar_handle=f"@{handle.lstrip('@')}",
         today=_today_block(today_d),
+        profile=profile,
         labs=lab_rows,
         cores=core_rows,
         collaborations=collab_rows,

@@ -924,6 +924,132 @@ def test_load_config_at_returns_default_when_missing(tmp_path):
     assert isinstance(cfg.required, list)
 
 
+# ---------------------------------------------------------------------------
+# Phase C+: registrar's own profile (centre-level contact)
+# ---------------------------------------------------------------------------
+
+
+def test_read_profile_empty_when_file_missing(isolated):
+    assert registrar.read_profile() == {}
+
+
+def test_write_profile_round_trip(isolated):
+    _seed_registrar(isolated)
+    registrar.write_profile({
+        "full_name": "Mike Hallett",
+        "title": "Centre Director",
+        "email": "mh@example.edu",
+        "office": "MSB-360",
+    })
+    meta = registrar.read_profile()
+    assert meta["full_name"] == "Mike Hallett"
+    assert meta["title"] == "Centre Director"
+    assert meta["email"] == "mh@example.edu"
+    assert meta["office"] == "MSB-360"
+    assert registrar.profile_path().is_file()
+
+
+def test_write_profile_partial_post_preserves_other_fields(isolated):
+    """Saving just ``office`` must not blank ``email`` from a prior write."""
+    _seed_registrar(isolated)
+    registrar.write_profile({"email": "mh@example.edu", "office": "OLD-100"})
+    registrar.write_profile({"office": "MSB-360"})  # only office
+    meta = registrar.read_profile()
+    assert meta["email"] == "mh@example.edu"
+    assert meta["office"] == "MSB-360"
+
+
+def test_write_profile_empty_string_clears_field(isolated):
+    _seed_registrar(isolated)
+    registrar.write_profile({"email": "mh@example.edu"})
+    registrar.write_profile({"email": ""})
+    meta = registrar.read_profile()
+    assert "email" not in meta
+
+
+def test_write_profile_creates_audit_commit(isolated):
+    _seed_registrar(isolated)
+    registrar.write_profile({"full_name": "Mike Hallett"})
+    log = subprocess.run(
+        ["git", "-C", str(registrar.lab_info_root()), "log", "--oneline"],
+        check=True, capture_output=True, text=True,
+    ).stdout
+    assert "profile" in log.lower()
+
+
+def test_endpoint_profile_403_when_not_registrar(isolated):
+    client = TestClient(create_app())
+    res = client.post("/api/registrar/profile", json={"full_name": "x"})
+    assert res.status_code == 403
+
+
+def test_endpoint_profile_persists_changes(isolated):
+    _seed_registrar(isolated)
+    client = TestClient(create_app())
+    res = client.post("/api/registrar/profile", json={
+        "full_name": "Mike Hallett",
+        "email": "mh@example.edu",
+    })
+    assert res.status_code == 200, res.text
+    # Snapshot now reflects the new values.
+    dash = client.get("/api/registrar/dashboard").json()
+    assert dash["profile"]["full_name"] == "Mike Hallett"
+    assert dash["profile"]["email"] == "mh@example.edu"
+    assert dash["profile"]["handle"] == "@the_pi"
+
+
+def test_snapshot_profile_handle_always_set(isolated):
+    """Even with no profile file, the snapshot's profile carries the handle."""
+    _seed_registrar(isolated)
+    resp = rs.build_registrar_response("the_pi")
+    assert resp.profile.handle == "@the_pi"
+
+
+# ---------------------------------------------------------------------------
+# Cross-link gate: is_registrar flag on the lab dashboard's identity block
+# ---------------------------------------------------------------------------
+
+
+def test_lab_dashboard_identity_has_is_registrar_flag(isolated, tmp_path, monkeypatch):
+    """The lab dashboard exposes ``member.is_registrar=True`` only for the
+    handle declared in ~/.wigamig/registrar — used to gate the
+    "→ registrar" cross-link in the PI dashboard footer."""
+    _seed_registrar(isolated)
+    lab_dir = _make_lab_mgmt(
+        tmp_path, lab_id="hallett", pi="the_pi",
+        members=[("the_pi", "pi")],
+    )
+    # Point the lab dashboard at the seeded lab-mgmt + provide the
+    # other roots its snapshot expects.
+    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
+    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos_empty"))
+    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm_empty"))
+    (tmp_path / "repos_empty").mkdir()
+    (tmp_path / "lab_vm_empty").mkdir()
+    client = TestClient(create_app())
+    res = client.get("/api/dashboard")
+    assert res.status_code == 200, res.text
+    assert res.json()["member"]["is_registrar"] is True
+
+
+def test_lab_dashboard_is_registrar_false_for_non_registrar(isolated, tmp_path, monkeypatch):
+    """Switching to a non-registrar handle flips the flag false."""
+    _seed_registrar(isolated)
+    lab_dir = _make_lab_mgmt(
+        tmp_path, lab_id="hallett", pi="the_pi",
+        members=[("the_pi", "pi"), ("bob", "postdoc")],
+    )
+    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
+    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos_empty"))
+    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm_empty"))
+    (tmp_path / "repos_empty").mkdir()
+    (tmp_path / "lab_vm_empty").mkdir()
+    client = TestClient(create_app())
+    res = client.get("/api/dashboard?user=bob")
+    assert res.status_code == 200, res.text
+    assert res.json()["member"]["is_registrar"] is False
+
+
 def test_registrar_cert_specs_use_same_fields_as_pi_dashboard(isolated, tmp_path):
     """Naming parity guard: the registrar surfaces ``code``, ``short``,
     ``name``, and ``cadence_years`` — the exact fields the PI's
