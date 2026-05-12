@@ -52,6 +52,18 @@ class InvalidLabName(RegistrarError):
 class LabNotFound(RegistrarError):
     """Refused: no lab with that short ID is registered."""
 
+
+class CollaborationAlreadyExists(RegistrarError):
+    """Refused: a collaboration with this short ID is already registered."""
+
+
+class CollaborationNotFound(RegistrarError):
+    """Refused: no collaboration with that short ID is registered."""
+
+
+class InvalidCollaboration(RegistrarError):
+    """Refused: collaboration violates an invariant (>=2 PIs/groups, etc.)."""
+
 # -----------------------------------------------------------------
 # Identity
 # -----------------------------------------------------------------
@@ -904,4 +916,379 @@ def update_lab_metadata(
     summary = ", ".join(changed_summary) or "no-op"
     _git_commit_all(root, f"registrar: update lab {name} ({summary})")
 
+    return updated
+
+
+# -----------------------------------------------------------------
+# Phase D: collaborations (multi-PI, multi-group)
+# -----------------------------------------------------------------
+
+
+def _find_collaboration(
+    name: str, env: dict[str, str] | None = None,
+) -> tuple[Registry, int]:
+    reg = read_registry(env)
+    for i, c in enumerate(reg.collaborations):
+        if c.name == name:
+            return reg, i
+    raise CollaborationNotFound(f"no collaboration with short id: {name!r}")
+
+
+def _replace_collaboration(
+    reg: Registry, idx: int, new_entry: CollaborationEntry,
+) -> Registry:
+    new_collabs = list(reg.collaborations)
+    new_collabs[idx] = new_entry
+    return Registry(labs=reg.labs, cores=reg.cores, collaborations=new_collabs)
+
+
+def _normalize_handles(handles: list[str]) -> list[str]:
+    """Strip, lowercase, ensure leading @ on each handle. Dedupe."""
+    out: list[str] = []
+    for h in handles or []:
+        norm = f"@{str(h).strip().lstrip('@').lower()}"
+        if norm == "@" or norm in out:
+            continue
+        out.append(norm)
+    return out
+
+
+def _normalize_subset(subset: dict | None) -> dict[str, list[str]]:
+    """Apply ``_normalize_handles`` to every list in the subset dict."""
+    if not isinstance(subset, dict):
+        return {}
+    out: dict[str, list[str]] = {}
+    for group_id, handles in subset.items():
+        if not isinstance(handles, list):
+            continue
+        out[str(group_id)] = _normalize_handles(handles)
+    return out
+
+
+def _group_members_handles(lab_mgmt_path: Path) -> set[str]:
+    """Return the set of ``@handle``s present in ``<lab_mgmt>/members/*.md``.
+
+    Used to validate that a collaboration's ``member_subset`` only
+    references real members of the contributing groups.
+    """
+    from .frontmatter import parse_file as _pf
+
+    members_dir = lab_mgmt_path / "members"
+    if not members_dir.is_dir():
+        return set()
+    out: set[str] = set()
+    for md in members_dir.glob("*.md"):
+        try:
+            meta = _pf(md).meta or {}
+        except Exception:
+            continue
+        handle = str(meta.get("handle") or f"@{md.stem}").strip().lower()
+        if not handle.startswith("@"):
+            handle = f"@{handle.lstrip('@')}"
+        out.add(handle)
+    return out
+
+
+def _enforce_collab_invariants(
+    *,
+    name: str,
+    pis: list[str],
+    groups: list[str],
+    member_subset: dict[str, list[str]],
+    existing: Registry,
+    check_duplicate: bool = True,
+) -> tuple[dict[str, LabEntry | CoreEntry], dict[str, set[str]]]:
+    """Validate a collaboration spec. Returns (group_lookup, members_lookup).
+
+    - Name is lowercase alphanumeric + _ and (when ``check_duplicate``)
+      not already taken.
+    - At least 2 groups; each must be an ACTIVE lab or core in the registry.
+    - At least 2 PIs; each contributing group's PI must appear in ``pis``.
+    - ``member_subset`` keys must be a subset of ``groups``; every handle
+      listed must be a real member of that group.
+    """
+    if not name or not _NAME_RE.match(name):
+        raise InvalidLabName(
+            f"collaboration name must be lowercase alphanumeric + underscore, "
+            f"starting with a letter; got {name!r}"
+        )
+    if check_duplicate and any(c.name == name for c in existing.collaborations):
+        raise CollaborationAlreadyExists(f"collaboration already registered: {name}")
+
+    if len(groups) < 2:
+        raise InvalidCollaboration("collaboration must span at least 2 groups (labs/cores)")
+    if len(pis) < 2:
+        raise InvalidCollaboration("collaboration must have at least 2 PIs")
+
+    # Resolve each group to its registry entry; reject unknown/archived.
+    group_lookup: dict[str, LabEntry | CoreEntry] = {}
+    for g in groups:
+        found = next((l for l in existing.labs if l.name == g), None)
+        kind = "lab"
+        if found is None:
+            found = next((c for c in existing.cores if c.name == g), None)
+            kind = "core"
+        if found is None:
+            raise InvalidCollaboration(f"unknown group: {g!r} (no lab or core registered)")
+        if found.status != "active":
+            raise InvalidCollaboration(
+                f"group {g!r} is {found.status}; collaborations require active groups"
+            )
+        group_lookup[g] = found
+
+    # Each group's PI must be in ``pis``.
+    missing_pis: list[str] = []
+    for g, entry in group_lookup.items():
+        pi_at = _normalize_pi(entry.pi)
+        if pi_at not in pis:
+            missing_pis.append(f"{pi_at} (PI of {g})")
+    if missing_pis:
+        raise InvalidCollaboration(
+            "every contributing group's PI must be listed in pis; missing: "
+            + ", ".join(missing_pis)
+        )
+
+    # member_subset must be a subset of groups; every handle must exist.
+    members_lookup: dict[str, set[str]] = {}
+    for g in member_subset.keys():
+        if g not in group_lookup:
+            raise InvalidCollaboration(
+                f"member_subset references unknown group {g!r}"
+            )
+    for g, entry in group_lookup.items():
+        members_lookup[g] = _group_members_handles(Path(entry.lab_mgmt_path))
+        for handle in member_subset.get(g, []):
+            if handle not in members_lookup[g]:
+                raise InvalidCollaboration(
+                    f"@{handle.lstrip('@')} is not a member of group {g!r}"
+                )
+
+    # Each PI must appear in their group's subset.
+    for g, entry in group_lookup.items():
+        pi_at = _normalize_pi(entry.pi)
+        subset_for_g = set(member_subset.get(g, []))
+        if pi_at not in subset_for_g:
+            raise InvalidCollaboration(
+                f"member_subset[{g!r}] must include the group's PI {pi_at}"
+            )
+
+    return group_lookup, members_lookup
+
+
+def _render_collaboration_md(
+    *,
+    name: str,
+    pis: list[str],
+    groups: list[str],
+    member_subset: dict[str, list[str]],
+    oracle_vault: str | None,
+    created: str,
+) -> str:
+    meta: dict[str, Any] = {
+        "collaboration": name,
+        "pis": pis,
+        "groups": groups,
+        "member_subset": member_subset,
+    }
+    if oracle_vault:
+        meta["oracle_vault"] = oracle_vault
+    meta["created"] = created
+    body = (
+        f"# Collaboration: {name}\n\n"
+        f"Cross-group collaboration tracked by the registrar. "
+        f"PIs: {', '.join(pis)}. Groups: {', '.join(groups)}.\n\n"
+        f"Project files live in `projects/` here; the collaboration's own "
+        f"Obsidian vault is rooted at `oracle/`. The lab dashboard never "
+        f"surfaces collaboration content — only the collaboration's own "
+        f"dashboard does (Phase D follow-on).\n"
+    )
+    yaml_text = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip() + "\n"
+    return f"---\n{yaml_text}---\n\n{body}"
+
+
+def create_collaboration(
+    *,
+    name: str,
+    pis: list[str],
+    groups: list[str],
+    member_subset: dict[str, list[str]] | None = None,
+    oracle_vault: str | None = None,
+    today: _dt.date | None = None,
+    env: dict[str, str] | None = None,
+) -> CollaborationEntry:
+    """Register a new collaboration and scaffold its directory.
+
+    Side effects:
+      1. Validates invariants (see ``_enforce_collab_invariants``).
+      2. Creates ``<lab_info_root>/collaborations/<name>/`` with
+         ``collaboration.md``, ``projects/``, and ``oracle/``.
+      3. Adds the entry to ``_registry.yaml``.
+      4. Audit-trail commit.
+    """
+    today_d = today or _dt.date.today()
+    norm_pis = _normalize_handles(pis)
+    norm_subset = _normalize_subset(member_subset or {})
+
+    existing = read_registry(env)
+    _enforce_collab_invariants(
+        name=name, pis=norm_pis, groups=groups,
+        member_subset=norm_subset, existing=existing,
+    )
+
+    root = lab_info_root(env)
+    collab_dir = root / "collaborations" / name
+    (collab_dir / "projects").mkdir(parents=True, exist_ok=True)
+    (collab_dir / "oracle").mkdir(parents=True, exist_ok=True)
+    for sub in ("projects", "oracle"):
+        gitkeep = collab_dir / sub / ".gitkeep"
+        if not gitkeep.exists():
+            gitkeep.write_text("", encoding="utf-8")
+
+    vault = oracle_vault or f"wigamig-collab-{name}"
+    (collab_dir / "collaboration.md").write_text(
+        _render_collaboration_md(
+            name=name, pis=norm_pis, groups=list(groups),
+            member_subset=norm_subset, oracle_vault=vault,
+            created=today_d.isoformat(),
+        ),
+        encoding="utf-8",
+    )
+
+    entry = CollaborationEntry(
+        name=name,
+        pis=norm_pis,
+        groups=list(groups),
+        member_subset=norm_subset,
+        oracle_vault=vault,
+        status="active",
+        created=today_d.isoformat(),
+    )
+    new_reg = Registry(
+        labs=existing.labs, cores=existing.cores,
+        collaborations=[*existing.collaborations, entry],
+    )
+    write_registry(new_reg, env)
+
+    _git_init_if_needed(root)
+    _git_commit_all(
+        root,
+        f"registrar: create collaboration {name} "
+        f"(PIs: {', '.join(norm_pis)}; groups: {', '.join(groups)})",
+    )
+    return entry
+
+
+def _set_collab_status(
+    name: str, status: str, env: dict[str, str] | None = None,
+) -> CollaborationEntry:
+    reg, idx = _find_collaboration(name, env)
+    current = reg.collaborations[idx]
+    if current.status == status:
+        return current
+    updated = CollaborationEntry(
+        name=current.name, pis=list(current.pis), groups=list(current.groups),
+        member_subset=dict(current.member_subset),
+        oracle_vault=current.oracle_vault, status=status, created=current.created,
+    )
+    new_reg = _replace_collaboration(reg, idx, updated)
+    write_registry(new_reg, env)
+    root = lab_info_root(env)
+    _git_init_if_needed(root)
+    verb = "archive" if status == "archived" else "unarchive" if status == "active" else f"set {status}"
+    _git_commit_all(root, f"registrar: {verb} collaboration {name}")
+    return updated
+
+
+def archive_collaboration(name: str, env: dict[str, str] | None = None) -> CollaborationEntry:
+    """Soft-delete: ``status -> archived``. Files preserved."""
+    return _set_collab_status(name, "archived", env)
+
+
+def unarchive_collaboration(name: str, env: dict[str, str] | None = None) -> CollaborationEntry:
+    """Restore: ``status -> active``. Re-validates invariants against
+    the current registry (groups may have been archived in the meantime)."""
+    reg, idx = _find_collaboration(name, env)
+    current = reg.collaborations[idx]
+    if current.status == "active":
+        return current
+    # Re-validate against current registry but skip the duplicate-name
+    # check (this collaboration's own entry is in ``existing``).
+    _enforce_collab_invariants(
+        name=current.name,
+        pis=current.pis, groups=current.groups,
+        member_subset=current.member_subset,
+        existing=reg, check_duplicate=False,
+    )
+    return _set_collab_status(name, "active", env)
+
+
+def update_collaboration(
+    name: str,
+    *,
+    pis: list[str] | None = None,
+    groups: list[str] | None = None,
+    member_subset: dict[str, list[str]] | None = None,
+    oracle_vault: str | None = None,
+    env: dict[str, str] | None = None,
+) -> CollaborationEntry:
+    """Modify a collaboration. ``None`` means "don't touch" per field.
+
+    Renaming is not supported. Invariants are re-enforced on the merged
+    spec.
+    """
+    from .frontmatter import dump_document as _dump, parse_file as _pf
+
+    reg, idx = _find_collaboration(name, env)
+    current = reg.collaborations[idx]
+    merged_pis = _normalize_handles(pis) if pis is not None else list(current.pis)
+    merged_groups = list(groups) if groups is not None else list(current.groups)
+    merged_subset = (
+        _normalize_subset(member_subset) if member_subset is not None
+        else dict(current.member_subset)
+    )
+    merged_vault = oracle_vault if oracle_vault is not None else current.oracle_vault
+    if isinstance(merged_vault, str) and not merged_vault.strip():
+        merged_vault = None
+
+    _enforce_collab_invariants(
+        name=current.name, pis=merged_pis, groups=merged_groups,
+        member_subset=merged_subset, existing=reg, check_duplicate=False,
+    )
+
+    updated = CollaborationEntry(
+        name=current.name, pis=merged_pis, groups=merged_groups,
+        member_subset=merged_subset, oracle_vault=merged_vault,
+        status=current.status, created=current.created,
+    )
+
+    # Update on-disk collaboration.md too.
+    collab_md = lab_info_root(env) / "collaborations" / name / "collaboration.md"
+    if collab_md.is_file():
+        parsed = _pf(collab_md)
+        meta = dict(parsed.meta or {})
+        if pis is not None:
+            meta["pis"] = merged_pis
+        if groups is not None:
+            meta["groups"] = merged_groups
+        if member_subset is not None:
+            meta["member_subset"] = merged_subset
+        if oracle_vault is not None:
+            if merged_vault is None:
+                meta.pop("oracle_vault", None)
+            else:
+                meta["oracle_vault"] = merged_vault
+        collab_md.write_text(_dump(meta, parsed.body or ""), encoding="utf-8")
+
+    new_reg = _replace_collaboration(reg, idx, updated)
+    write_registry(new_reg, env)
+
+    root = lab_info_root(env)
+    _git_init_if_needed(root)
+    changed: list[str] = []
+    if pis is not None: changed.append("pis")
+    if groups is not None: changed.append("groups")
+    if member_subset is not None: changed.append("member_subset")
+    if oracle_vault is not None: changed.append("oracle_vault")
+    summary = ", ".join(changed) or "no-op"
+    _git_commit_all(root, f"registrar: update collaboration {name} ({summary})")
     return updated

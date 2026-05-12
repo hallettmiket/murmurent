@@ -276,6 +276,13 @@
     function renderCollab(c) {
       const groups = (c.groups || []).join(", ");
       const pis = (c.pis || []).join(", ");
+      const isActive = c.status === "active";
+      const nameEsc = escapeHTML(c.name);
+      const actions = ''
+        + '<button class="btn collab-action" data-action="edit" data-collab="' + nameEsc + '">edit</button> '
+        + (isActive
+            ? '<button class="btn collab-action" data-action="archive" data-collab="' + nameEsc + '">archive</button>'
+            : '<button class="btn collab-action" data-action="unarchive" data-collab="' + nameEsc + '">unarchive</button>');
       const subsetLines = Object.keys(c.member_subset || {}).map(g =>
         '<div class="mono"><span class="muted">' + escapeHTML(g) + ':</span> ' +
         (c.member_subset[g] || []).map(escapeHTML).join(", ") + '</div>'
@@ -287,9 +294,12 @@
         + '<td class="mono">' + escapeHTML(groups) + '</td>'
         + '<td class="mono muted">' + escapeHTML(c.created || "—") + '</td>'
         + '<td>' + pill(c.status) + '</td>'
+        + '<td style="text-align:right; white-space:nowrap;">' + actions + '</td>'
         + '</tr>'
         + (subsetLines
-          ? '<tr><td colspan="5" class="lab-detail"><h4>member subset</h4>' + subsetLines + '</td></tr>'
+          ? '<tr><td colspan="6" class="lab-detail"><h4>member subset</h4>' + subsetLines
+            + (c.oracle_vault ? '<h4>oracle vault</h4><div class="mono">' + escapeHTML(c.oracle_vault) + '</div>' : '')
+            + '</td></tr>'
           : "");
     }
 
@@ -350,11 +360,15 @@
       }
       html += '</div>';
 
-      html += '<div class="panel"><header><h2>Collaborations</h2><span class="meta">' + (data.collaborations || []).length + ' total</span></header>';
+      html += '<div class="panel"><header><h2>Collaborations</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + (data.collaborations || []).length + ' total'
+        + '<button class="btn" id="btn-new-collab">＋ new collaboration</button>'
+        + '</span></header>';
       if ((data.collaborations || []).length === 0) {
-        html += '<div class="empty">No collaborations registered yet. Phase D will add multi-PI, multi-group create flow.</div>';
+        html += '<div class="empty">No collaborations registered yet. Click <strong>＋ new collaboration</strong> above to register one (requires ≥2 active groups with ≥2 PIs).</div>';
       } else {
-        html += '<table><thead><tr><th>name</th><th>PIs</th><th>groups</th><th>created</th><th>status</th></tr></thead><tbody>';
+        html += '<table><thead><tr><th>name</th><th>PIs</th><th>groups</th><th>created</th><th>status</th><th style="text-align:right;">actions</th></tr></thead><tbody>';
         for (const c of data.collaborations) html += renderCollab(c);
         html += '</tbody></table>';
       }
@@ -426,6 +440,20 @@
           if (action === "edit") openEditLabModal(lab, data.labs.find(l => l.name === lab));
           else if (action === "archive" || action === "unarchive") {
             confirmLabAction(action, lab);
+          }
+        });
+      });
+
+      // Phase D: collaboration controls.
+      const newCollabBtn = document.getElementById("btn-new-collab");
+      if (newCollabBtn) newCollabBtn.addEventListener("click", () => openNewCollabModal(data));
+      root.querySelectorAll(".collab-action").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const action = btn.getAttribute("data-action");
+          const name = btn.getAttribute("data-collab");
+          if (action === "edit") openEditCollabModal(name, (data.collaborations || []).find(c => c.name === name), data);
+          else if (action === "archive" || action === "unarchive") {
+            confirmCollabAction(action, name);
           }
         });
       });
@@ -744,6 +772,189 @@
           submitBtn.disabled = false;
         }
       });
+    }
+
+    // -----------------------------------------------------------
+    // Phase D: collaboration modals
+    // -----------------------------------------------------------
+
+    function _parseHandlesField(value) {
+      // Accepts comma-separated, newline-separated, or whitespace-separated.
+      return (value || "")
+        .split(/[\s,]+/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(s => s.startsWith("@") ? s : "@" + s);
+    }
+
+    function _parseGroupsField(value) {
+      return (value || "")
+        .split(/[\s,]+/)
+        .map(s => s.trim().toLowerCase())
+        .filter(Boolean);
+    }
+
+    function _parseSubsetField(value) {
+      // "hallett: @the_pi, @bob; ortega: @jortega" -> dict
+      const subset = {};
+      const segments = (value || "").split(/[;\n]+/);
+      for (const seg of segments) {
+        const trimmed = seg.trim();
+        if (!trimmed) continue;
+        const colon = trimmed.indexOf(":");
+        if (colon < 0) continue;
+        const g = trimmed.slice(0, colon).trim().toLowerCase();
+        const handles = _parseHandlesField(trimmed.slice(colon + 1));
+        if (g && handles.length) subset[g] = handles;
+      }
+      return subset;
+    }
+
+    function _serializeSubset(subset) {
+      return Object.keys(subset || {})
+        .map(g => g + ": " + (subset[g] || []).join(", "))
+        .join("\n");
+    }
+
+    async function confirmCollabAction(action, name) {
+      const verb = action === "archive" ? "archive" : "unarchive";
+      if (!confirm(`${verb} collaboration "${name}"?\n\nFiles will be preserved.`)) return;
+      const url = "/api/registrar/collaboration/" + encodeURIComponent(name) + "/" + action
+        + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+      let res;
+      try {
+        res = await fetch(url, { method: "POST", credentials: "same-origin" });
+      } catch (ex) {
+        alert("network error: " + (ex.message || ex));
+        return;
+      }
+      if (!res.ok) {
+        let detail = "HTTP " + res.status;
+        try { detail = (await res.json()).detail || detail; } catch (_) {}
+        alert(verb + " failed: " + detail);
+        return;
+      }
+      load();
+    }
+
+    function _collabModalBody({ title, name, initial, suggestion }) {
+      const v = (k) => escapeHTML(initial[k] || "");
+      return ''
+        + '<h2>' + title + '</h2>'
+        + '<p class="muted">Validations: at least 2 active groups, at least 2 PIs (each contributing group\'s PI must be in the list), and every member in the subset must already be a member of their group.</p>'
+        + (name ? '<label>short ID (not editable)</label><input value="' + escapeHTML(name) + '" disabled />' : '<label>short ID (snake_case)</label><input name="name" required placeholder="e.g. dcis_imaging" />')
+        + '<label>groups (comma-separated short IDs)</label>'
+        + '<input name="groups" value="' + escapeHTML((initial.groups || []).join(", ")) + '" placeholder="' + escapeHTML(suggestion || "e.g. hallett, ortega") + '" />'
+        + '<label>PIs (comma-separated @handles)</label>'
+        + '<input name="pis" value="' + escapeHTML((initial.pis || []).join(", ")) + '" placeholder="e.g. @the_pi, @jortega" />'
+        + '<label>member subset (one group per line: <code>group: @h1, @h2</code>)</label>'
+        + '<textarea name="member_subset" rows="4" style="width:100%; padding:6px 8px; border:1px solid var(--rule-strong); border-radius:2px; font-family:var(--mono); font-size:12px; box-sizing:border-box;" placeholder="hallett: @the_pi, @bob&#10;ortega: @jortega">' + escapeHTML(_serializeSubset(initial.member_subset || {})) + '</textarea>'
+        + '<label>oracle vault (optional; defaults to wigamig-collab-&lt;name&gt;)</label>'
+        + '<input name="oracle_vault" value="' + v("oracle_vault") + '" placeholder="wigamig-collab-…" />';
+    }
+
+    function openNewCollabModal(data) {
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      const activeLabs = (data.labs || []).filter(l => l.status === "active").map(l => l.name);
+      wrap.innerHTML =
+        '<form class="modal" id="new-collab-form" autocomplete="off">' +
+          _collabModalBody({
+            title: "Create a new collaboration",
+            name: null,
+            initial: {},
+            suggestion: activeLabs.slice(0, 2).join(", "),
+          }) +
+          '<div class="actions">' +
+            '<span class="form-msg" id="new-collab-msg"></span>' +
+            '<button type="button" class="btn ghost" id="new-collab-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="new-collab-submit">create</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("new-collab-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("new-collab-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const payload = {
+          name: String(fd.get("name") || "").trim(),
+          groups: _parseGroupsField(fd.get("groups")),
+          pis: _parseHandlesField(fd.get("pis")),
+          member_subset: _parseSubsetField(fd.get("member_subset")),
+        };
+        const oracleVault = String(fd.get("oracle_vault") || "").trim();
+        if (oracleVault) payload.oracle_vault = oracleVault;
+        await _submitCollab(wrap, "new-collab", "POST",
+          "/api/registrar/collaboration", payload);
+      });
+    }
+
+    function openEditCollabModal(name, current, data) {
+      if (!current) return;
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      wrap.innerHTML =
+        '<form class="modal" id="edit-collab-form" autocomplete="off">' +
+          _collabModalBody({
+            title: "Edit collaboration",
+            name: name,
+            initial: current,
+            suggestion: null,
+          }) +
+          '<div class="actions">' +
+            '<span class="form-msg" id="edit-collab-msg"></span>' +
+            '<button type="button" class="btn ghost" id="edit-collab-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="edit-collab-submit">save</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("edit-collab-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("edit-collab-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const payload = {
+          groups: _parseGroupsField(fd.get("groups")),
+          pis: _parseHandlesField(fd.get("pis")),
+          member_subset: _parseSubsetField(fd.get("member_subset")),
+        };
+        const oracleVault = String(fd.get("oracle_vault") || "").trim();
+        // Always send oracle_vault (so empty string clears).
+        payload.oracle_vault = oracleVault;
+        await _submitCollab(wrap, "edit-collab", "POST",
+          "/api/registrar/collaboration/" + encodeURIComponent(name) + "/edit", payload);
+      });
+    }
+
+    async function _submitCollab(wrap, prefix, method, urlBase, payload) {
+      const msg = document.getElementById(prefix + "-msg");
+      const submitBtn = document.getElementById(prefix + "-submit");
+      msg.textContent = "saving…";
+      msg.className = "form-msg";
+      submitBtn.disabled = true;
+      try {
+        const url = urlBase + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const res = await fetch(url, {
+          method: method,
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          let detail = "HTTP " + res.status;
+          try { detail = (await res.json()).detail || detail; } catch (_) {}
+          throw new Error(detail);
+        }
+        msg.textContent = "saved";
+        msg.className = "form-msg ok";
+        setTimeout(() => { wrap.remove(); load(); }, 600);
+      } catch (ex) {
+        msg.textContent = String(ex.message || ex);
+        msg.className = "form-msg error";
+      } finally {
+        submitBtn.disabled = false;
+      }
     }
 
     load();
