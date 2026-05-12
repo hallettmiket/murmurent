@@ -591,6 +591,101 @@ class InstallationRow(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Registrar (Phase A, read-only): the administrative layer above any lab.
+# ---------------------------------------------------------------------------
+
+
+class RegistrarMemberRow(BaseModel):
+    """One member of a lab/core as the registrar sees them.
+
+    Intentionally narrow: handle, role, and a one-line cert summary.
+    The registrar must NEVER see notebooks, oracles, SEAs, or
+    inventories — those stay inside the lab's own dashboard.
+    """
+
+    handle: str                              # ``@netname``
+    full_name: str = ""
+    role: str = "member"
+    member_status: Literal["active", "inactive"] = "active"
+    cert_summary: str = ""                   # e.g. "TCPS_2: ok · TOTP: ok"
+
+
+class RegistrarLabRow(BaseModel):
+    """One lab as the registrar sees it.
+
+    Source of truth is the lab's own ``lab.md``; this row is what the
+    registrar dashboard renders to the UI.
+    """
+
+    name: str                                # short ID, e.g. "hallett"
+    display_name: str
+    pi: str                                  # ``@handle``
+    status: Literal["active", "archived"] = "active"
+    created: str | None = None
+    lab_mgmt_path: str                       # filesystem path (audit-only)
+    slack_workspace: str | None = None
+    github_org: str | None = None
+    oracle_vault: str | None = None
+    members: list[RegistrarMemberRow] = []
+    member_count: int = 0
+    # Set when the registry points at a path that no longer resolves —
+    # the registrar should see this without the whole dashboard breaking.
+    unresolved: bool = False
+    unresolved_reason: str | None = None
+
+
+class RegistrarCoreRow(BaseModel):
+    """One core facility. Phase A schema matches a lab; Phase E will
+    extend with core-specific fields."""
+
+    name: str
+    display_name: str
+    pi: str
+    status: Literal["active", "archived"] = "active"
+    created: str | None = None
+    lab_mgmt_path: str
+    members: list[RegistrarMemberRow] = []
+    member_count: int = 0
+    unresolved: bool = False
+    unresolved_reason: str | None = None
+
+
+class RegistrarCollaborationRow(BaseModel):
+    """One cross-group collaboration."""
+
+    name: str
+    pis: list[str] = []
+    groups: list[str] = []                   # short IDs of contributing labs/cores
+    member_subset: dict[str, list[str]] = {} # by group: list of @handles
+    oracle_vault: str | None = None
+    status: Literal["active", "archived"] = "active"
+    created: str | None = None
+
+
+class RegistrarStats(BaseModel):
+    total_labs: int = 0
+    total_cores: int = 0
+    total_collaborations: int = 0
+    total_members: int = 0                   # deduped across labs
+
+
+class RegistrarResponse(BaseModel):
+    """The payload for ``GET /api/registrar/dashboard``.
+
+    Deliberately does NOT include projects, SEAs, inventory, notebooks,
+    personal Oracles, or any per-lab editable content. The registrar
+    sees groups as opaque units.
+    """
+
+    registrar_handle: str                    # the actor (``@mhallet`` in dev)
+    today: TodayBlock
+    labs: list[RegistrarLabRow] = []
+    cores: list[RegistrarCoreRow] = []
+    collaborations: list[RegistrarCollaborationRow] = []
+    stats: RegistrarStats = RegistrarStats()
+
+
+# ---------------------------------------------------------------------------
 # Top-level response
 # ---------------------------------------------------------------------------
 
