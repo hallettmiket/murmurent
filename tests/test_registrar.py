@@ -815,7 +815,7 @@ def test_cert_panel_renders_one_row_per_member_group(isolated, tmp_path):
     assert ("hallett", "@mhallet") in handles_by_group
     assert ("hallett", "@bob") in handles_by_group
     assert ("ortega", "@jortega") in handles_by_group
-    assert "TCPS_2" in panel.cert_codes
+    assert "TCPS_2" in [s.code for s in panel.cert_specs]
 
 
 def test_cert_panel_aggregate_counts_issues(isolated, tmp_path):
@@ -856,9 +856,11 @@ def test_cert_panel_uses_each_groups_own_compliance(isolated, tmp_path):
     registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_b)
 
     resp = rs.build_registrar_response("mhallet", today=_dt.date(2026, 5, 12))
-    # Both cert codes surface in the column header.
-    assert "TCPS_2" in resp.certs.cert_codes
-    assert "WHM103" in resp.certs.cert_codes
+    # Both cert codes surface in the column header, each with its
+    # own short name + cadence for the JSX tooltip.
+    seen_codes = [s.code for s in resp.certs.cert_specs]
+    assert "TCPS_2" in seen_codes
+    assert "WHM103" in seen_codes
     # mhallet's TCPS_2 status is ok; he has no row in ortega (different lab).
     mhallet_row = next(r for r in resp.certs.rows if r.handle == "@mhallet")
     assert mhallet_row.group == "hallett"
@@ -891,7 +893,11 @@ def test_cert_panel_endpoint_returns_panel(isolated, tmp_path):
     assert res.status_code == 200
     body = res.json()
     assert "certs" in body
-    assert body["certs"]["cert_codes"] == ["TCPS_2"]
+    specs = body["certs"]["cert_specs"]
+    assert [s["code"] for s in specs] == ["TCPS_2"]
+    # Short name + full name surface, matching the PI dashboard.
+    assert specs[0]["short"] == "tcps_2"
+    assert specs[0]["name"] == "TCPS 2"
     assert len(body["certs"]["rows"]) == 1
 
 
@@ -916,3 +922,24 @@ def test_load_config_at_returns_default_when_missing(tmp_path):
     cfg = compliance.load_config_at(tmp_path / "no_such_file.md")
     # Falls back to the default set; should not raise.
     assert isinstance(cfg.required, list)
+
+
+def test_registrar_cert_specs_use_same_fields_as_pi_dashboard(isolated, tmp_path):
+    """Naming parity guard: the registrar surfaces ``code``, ``short``,
+    ``name``, and ``cadence_years`` — the exact fields the PI's
+    ``TrainingCompliancePanel`` reads. A future contract drift here
+    would split the two dashboards apart, which is what this test
+    exists to catch."""
+    _seed_registrar(isolated)
+    lab_dir = _seed_lab_with_compliance(
+        tmp_path, lab_id="hallett", pi="mhallet",
+        members=[("mhallet", "pi", ["TCPS_2:2030-12-31"])],
+        required_codes=[("TCPS_2", "TCPS 2", 3, "all")],
+    )
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
+    resp = rs.build_registrar_response("mhallet", today=_dt.date(2026, 5, 12))
+    spec = resp.certs.cert_specs[0]
+    assert spec.code == "TCPS_2"
+    assert spec.short == "tcps_2"      # <- this is what the JSX renders as the column header
+    assert spec.name == "TCPS 2"       # <- this is what shows up in the tooltip
+    assert spec.cadence_years == 3

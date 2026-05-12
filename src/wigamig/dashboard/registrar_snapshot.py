@@ -175,7 +175,12 @@ def _build_cert_panel(reg: _reg.Registry, today_d: _dt.date) -> C.RegistrarCertP
     lab-internal dashboard uses, just aggregated across every group.
     """
     rows: list[C.RegistrarMemberCertRow] = []
-    cert_codes_seen: list[str] = []  # preserve discovery order
+    # Discovered cert specs, deduped by code. First lab that declares
+    # a given code wins; later labs that declare the same code with
+    # a different cadence/audience are tolerated silently (the value
+    # actually applied to each member is computed against THEIR lab's
+    # config — only the column header is shared).
+    cert_specs_by_code: dict[str, C.TrainingCertSpec] = {}
 
     # Aggregate counters
     handles_with_issues: set[str] = set()
@@ -189,9 +194,13 @@ def _build_cert_panel(reg: _reg.Registry, today_d: _dt.date) -> C.RegistrarCertP
         if not lab_path.is_dir():
             return
         config = _compliance.load_config_at(lab_path / "compliance.md")
-        for code in (s.code for s in config.required):
-            if code not in cert_codes_seen:
-                cert_codes_seen.append(code)
+        for s in config.required:
+            if s.code not in cert_specs_by_code:
+                cert_specs_by_code[s.code] = C.TrainingCertSpec(
+                    code=s.code, name=s.name, short=s.short,
+                    cadence_years=s.cadence_years,
+                    audience=s.audience,  # type: ignore[arg-type]
+                )
         members_dir = lab_path / "members"
         if not members_dir.is_dir():
             return
@@ -268,7 +277,7 @@ def _build_cert_panel(reg: _reg.Registry, today_d: _dt.date) -> C.RegistrarCertP
             missing_count=missing_count,
         ),
         rows=rows,
-        cert_codes=cert_codes_seen,
+        cert_specs=list(cert_specs_by_code.values()),
     )
 
 
