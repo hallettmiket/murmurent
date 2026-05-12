@@ -718,10 +718,12 @@ class RegistrarCertPanel(BaseModel):
 
     aggregate: RegistrarCertAggregate = RegistrarCertAggregate()
     rows: list[RegistrarMemberCertRow] = []
-    # Distinct cert codes seen across all groups, in the order they
-    # appear when iterating labs then cores. The JSX uses this to lay
-    # out the table columns.
-    cert_codes: list[str] = []
+    # Distinct cert specs seen across every active group, in discovery
+    # order (labs first, then cores). The JSX uses ``spec.short`` as
+    # the column header and ``spec.name`` + ``spec.cadence_years`` in
+    # the tooltip — matching exactly how the PI's lab-internal
+    # ``TrainingCompliancePanel`` renders these.
+    cert_specs: list[TrainingCertSpec] = []
 
 
 class RegistrarResponse(BaseModel):
