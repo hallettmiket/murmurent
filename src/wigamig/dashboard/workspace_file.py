@@ -219,7 +219,7 @@ Folders that don't exist yet are hidden — they'll appear automatically once th
 
 ## Need help?
 
-- Lab Slack: `#claude-code`
+- Lab Slack: `#claude-test`
 - Wigamig training: see the dashboard's "Training" row.
 
 ---
