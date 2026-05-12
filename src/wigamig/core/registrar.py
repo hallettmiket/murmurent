@@ -22,12 +22,31 @@ Phase A is **read-only** — no create/archive operations land here.
 
 from __future__ import annotations
 
+import datetime as _dt
 import os
+import re
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+
+class RegistrarError(ValueError):
+    """Base class for registrar invariant violations."""
+
+
+class LabAlreadyExists(RegistrarError):
+    """Refused: a lab with this short ID is already registered."""
+
+
+class PIAlreadyLeadsAnother(RegistrarError):
+    """Refused: this PI handle already leads another lab or core."""
+
+
+class InvalidLabName(RegistrarError):
+    """Refused: lab name violates the alphanumeric + underscore rule."""
 
 # -----------------------------------------------------------------
 # Identity
@@ -322,3 +341,260 @@ def bootstrap_from_existing_lab_mgmt(
     reg = Registry(labs=other_labs, cores=existing.cores, collaborations=existing.collaborations)
     write_registry(reg, env)
     return reg
+
+
+# -----------------------------------------------------------------
+# Git-backed audit trail for the registrar data directory
+# -----------------------------------------------------------------
+
+
+def _git_init_if_needed(root: Path) -> None:
+    """Idempotent ``git init -b main`` on ``root``.
+
+    The registrar's data directory is its own git repo (separate from
+    the wigamig code repo). Every mutation auto-commits so the centre
+    has a cryptographic audit trail of who created / archived which lab
+    when, with no extra effort. Push to a private remote when ready.
+    """
+    if (root / ".git").is_dir():
+        return
+    root.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", "init", "-b", "main"], cwd=str(root),
+        check=False, capture_output=True,
+    )
+    # Best-effort identity if the user has no global git config.
+    handle = registrar_handle() or "wigamig-registrar"
+    for cfg in (("user.name", f"wigamig registrar ({handle})"),
+                ("user.email", f"{handle}@wigamig.local")):
+        # Only set repo-local if not already inherited from global.
+        existing = subprocess.run(
+            ["git", "-C", str(root), "config", "--get", cfg[0]],
+            check=False, capture_output=True,
+        )
+        if existing.returncode != 0 or not existing.stdout.strip():
+            subprocess.run(
+                ["git", "-C", str(root), "config", cfg[0], cfg[1]],
+                check=False, capture_output=True,
+            )
+
+
+def _git_commit_all(root: Path, message: str) -> None:
+    """Stage every change in ``root`` and commit. Silent if nothing changed.
+
+    Best-effort: never raises. A failed audit commit must not break
+    the user-visible operation it was recording.
+    """
+    try:
+        subprocess.run(
+            ["git", "-C", str(root), "add", "-A"],
+            check=False, capture_output=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(root), "commit", "-m", message],
+            check=False, capture_output=True,
+        )
+    except OSError:
+        pass
+
+
+# -----------------------------------------------------------------
+# Phase B: create_lab
+# -----------------------------------------------------------------
+
+
+_NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
+
+
+def _normalize_pi(handle: str) -> str:
+    """Return ``@<lowered, stripped, no leading @>``."""
+    stripped = handle.strip().lstrip("@").lower()
+    return f"@{stripped}" if stripped else ""
+
+
+def _enforce_create_invariants(
+    *,
+    name: str,
+    pi_at: str,
+    existing: Registry,
+) -> None:
+    if not name or not _NAME_RE.match(name):
+        raise InvalidLabName(
+            f"lab name must be lowercase alphanumeric + underscore, "
+            f"starting with a letter; got {name!r}"
+        )
+    if any(l.name == name for l in existing.labs):
+        raise LabAlreadyExists(f"lab already registered: {name}")
+    if any(c.name == name for c in existing.cores):
+        raise LabAlreadyExists(f"name collides with an existing core: {name}")
+    if not pi_at or pi_at == "@":
+        raise RegistrarError("pi_handle is required")
+    for l in existing.labs:
+        if _normalize_pi(l.pi) == pi_at:
+            raise PIAlreadyLeadsAnother(
+                f"{pi_at} already leads lab {l.name!r}. "
+                f"A PI can lead at most one lab or core."
+            )
+    for c in existing.cores:
+        if _normalize_pi(c.pi) == pi_at:
+            raise PIAlreadyLeadsAnother(
+                f"{pi_at} already leads core {c.name!r}. "
+                f"A PI can lead at most one lab or core."
+            )
+
+
+def _render_lab_md(
+    *,
+    name: str,
+    display_name: str,
+    pi_at: str,
+    slack_workspace: str | None,
+    github_org: str | None,
+    oracle_vault: str | None,
+    institution: str | None,
+    department: str | None,
+    created: str,
+) -> str:
+    """Render lab.md frontmatter for a freshly-scaffolded lab.
+
+    Mirrors the shape the snapshot reader already understands. Only
+    optional fields with a value are emitted, so the file stays clean.
+    """
+    meta: dict[str, Any] = {
+        "lab": name,
+        "name": display_name,
+        "pi": pi_at,
+    }
+    if institution:
+        meta["institution"] = institution
+    if department:
+        meta["department"] = department
+    if slack_workspace:
+        meta["slack_workspace"] = slack_workspace
+    if github_org:
+        meta["github_org"] = github_org
+    if oracle_vault:
+        meta["lab_oracle_vault"] = oracle_vault
+    meta["created"] = created
+
+    body = (
+        f"# {display_name} — group config\n\n"
+        f"This file is the canonical declaration of the **{display_name}** "
+        f"group. Edit through the lab's own dashboard; the registrar's "
+        f"audit log records every modification it sees.\n"
+    )
+    yaml_text = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip() + "\n"
+    return f"---\n{yaml_text}---\n\n{body}"
+
+
+def _render_pi_member_md(
+    *,
+    pi_at: str,
+    pi_full_name: str | None,
+    lab_name: str,
+) -> str:
+    """Render ``members/<pi>.md`` for the initial PI."""
+    meta: dict[str, Any] = {
+        "handle": pi_at,
+        "full_name": pi_full_name or pi_at.lstrip("@").title(),
+        "role": "pi",
+        "status": "active",
+        "lab": lab_name,
+    }
+    yaml_text = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip() + "\n"
+    return f"---\n{yaml_text}---\n\n# {pi_at}\n"
+
+
+def create_lab(
+    *,
+    name: str,
+    display_name: str,
+    pi_handle: str,
+    pi_full_name: str | None = None,
+    slack_workspace: str | None = None,
+    github_org: str | None = None,
+    oracle_vault: str | None = None,
+    institution: str | None = None,
+    department: str | None = None,
+    today: _dt.date | None = None,
+    env: dict[str, str] | None = None,
+) -> LabEntry:
+    """Scaffold a new lab and register it.
+
+    Side effects:
+      1. Creates ``<lab_info_root>/labs/<name>/lab-mgmt/`` with ``lab.md``,
+         ``members/<pi>.md``, and empty ``projects/``, ``requests/``,
+         ``audit/`` directories.
+      2. Adds an entry to ``_registry.yaml``.
+      3. ``git init`` on ``<lab_info_root>`` if needed and commits the
+         change with an audit-trail message.
+
+    Idempotency: refuses if the lab name is already registered or if
+    the PI already leads another lab/core. There is no implicit
+    overwrite — duplicates are a registrar error, not a no-op.
+    """
+    today_d = today or _dt.date.today()
+    pi_at = _normalize_pi(pi_handle)
+
+    existing = read_registry(env)
+    _enforce_create_invariants(name=name, pi_at=pi_at, existing=existing)
+
+    root = lab_info_root(env)
+    root.mkdir(parents=True, exist_ok=True)
+    lab_dir = root / "labs" / name
+    lab_mgmt_dir = lab_dir / "lab-mgmt"
+    for sub in ("members", "projects", "requests", "audit"):
+        (lab_mgmt_dir / sub).mkdir(parents=True, exist_ok=True)
+        gitkeep = lab_mgmt_dir / sub / ".gitkeep"
+        if not gitkeep.exists():
+            gitkeep.write_text("", encoding="utf-8")
+
+    lab_md = lab_mgmt_dir / "lab.md"
+    lab_md.write_text(
+        _render_lab_md(
+            name=name,
+            display_name=display_name,
+            pi_at=pi_at,
+            slack_workspace=slack_workspace,
+            github_org=github_org,
+            oracle_vault=oracle_vault,
+            institution=institution,
+            department=department,
+            created=today_d.isoformat(),
+        ),
+        encoding="utf-8",
+    )
+
+    pi_member_md = lab_mgmt_dir / "members" / f"{pi_at.lstrip('@')}.md"
+    pi_member_md.write_text(
+        _render_pi_member_md(
+            pi_at=pi_at, pi_full_name=pi_full_name, lab_name=name,
+        ),
+        encoding="utf-8",
+    )
+
+    entry = LabEntry(
+        name=name,
+        pi=pi_at,
+        lab_mgmt_path=str(lab_mgmt_dir),
+        status="active",
+        created=today_d.isoformat(),
+        slack_workspace=slack_workspace,
+        github_org=github_org,
+        oracle_vault=oracle_vault,
+    )
+    updated_registry = Registry(
+        labs=[*existing.labs, entry],
+        cores=existing.cores,
+        collaborations=existing.collaborations,
+    )
+    write_registry(updated_registry, env)
+
+    # Audit trail: every mutation lands as its own commit.
+    _git_init_if_needed(root)
+    _git_commit_all(
+        root,
+        f"registrar: create lab {name} (PI: {pi_at})",
+    )
+
+    return entry

@@ -110,6 +110,47 @@
         padding: 0 28px; color: var(--muted); font-size: 12px;
         line-height: 1.5;
       }
+      /* New-lab form (Phase B) */
+      .modal-backdrop {
+        position: fixed; inset: 0; background: rgba(32,20,54,0.55);
+        display: flex; align-items: flex-start; justify-content: center;
+        z-index: 200; padding: 40px 20px; overflow-y: auto;
+      }
+      .modal {
+        background: var(--card); border: 1px solid var(--rule-strong);
+        border-radius: 2px; padding: 18px; width: min(560px, 96vw);
+      }
+      .modal h2 { margin: 0 0 4px; font-family: var(--serif); font-size: 18px;
+                  color: var(--purple-deep); }
+      .modal p.muted { font-size: 12px; margin: 4px 0 12px; color: var(--muted); }
+      .modal label {
+        display: block; margin-top: 8px;
+        font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+        text-transform: uppercase; color: var(--muted);
+      }
+      .modal input, .modal textarea {
+        width: 100%; padding: 6px 8px; border: 1px solid var(--rule-strong);
+        border-radius: 2px; font-family: var(--mono); font-size: 12px;
+        box-sizing: border-box; background: var(--paper);
+      }
+      .modal .actions {
+        display: flex; justify-content: flex-end; gap: 6px;
+        margin-top: 14px; align-items: center;
+      }
+      .btn {
+        padding: 5px 12px; font-family: var(--mono); font-size: 11px;
+        letter-spacing: 0.5px; cursor: pointer; border-radius: 2px;
+        border: 1px solid var(--rule-strong); background: var(--card);
+      }
+      .btn:hover { border-color: var(--purple); color: var(--purple); }
+      .btn.primary {
+        background: var(--purple); color: white; border-color: var(--purple);
+      }
+      .btn.primary:hover { background: var(--purple-deep); }
+      .btn.ghost { background: transparent; }
+      .form-msg { font-size: 11px; margin-right: auto; }
+      .form-msg.error { color: var(--red); }
+      .form-msg.ok { color: var(--green); }
     </style>
   </head>
   <body>
@@ -253,7 +294,11 @@
         + '<div class="stat"><div class="label">members</div><div class="value">' + (s.total_members || 0) + '</div></div>'
         + '</div>';
 
-      html += '<div class="panel"><header><h2>Labs</h2><span class="meta">' + (data.labs || []).length + ' total</span></header>';
+      html += '<div class="panel"><header><h2>Labs</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + (data.labs || []).length + ' total'
+        + '<button class="btn" id="btn-new-lab">＋ new lab</button>'
+        + '</span></header>';
       if ((data.labs || []).length === 0) {
         html += '<div class="empty">No labs registered yet. Seed via <code>wigamig.core.registrar.bootstrap_from_existing_lab_mgmt(...)</code> or hand-edit <code>~/.wigamig/lab_info/_registry.yaml</code>.</div>';
       } else {
@@ -290,6 +335,85 @@
       html += '</div>';
 
       root.innerHTML = html;
+      const newLabBtn = document.getElementById("btn-new-lab");
+      if (newLabBtn) newLabBtn.addEventListener("click", openNewLabModal);
+    }
+
+    // -----------------------------------------------------------
+    // Phase B: create-lab modal
+    // -----------------------------------------------------------
+
+    function openNewLabModal() {
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      wrap.innerHTML =
+        '<form class="modal" id="new-lab-form" autocomplete="off">' +
+          '<h2>Create a new lab</h2>' +
+          '<p class="muted">Scaffolds a fresh <code>lab-mgmt</code> repo and adds the lab to the registry. The registrar PI invariant (one lab/core per PI) is enforced server-side.</p>' +
+          '<label>short ID (snake_case)</label>' +
+          '<input name="name" required placeholder="e.g. ortega" />' +
+          '<label>display name</label>' +
+          '<input name="display_name" required placeholder="e.g. Ortega Lab" />' +
+          '<label>PI Western netname</label>' +
+          '<input name="pi_handle" required placeholder="e.g. jortega" />' +
+          '<label>PI full name (optional)</label>' +
+          '<input name="pi_full_name" placeholder="e.g. Jane Ortega" />' +
+          '<label>Slack workspace ID (optional)</label>' +
+          '<input name="slack_workspace" placeholder="e.g. T01ABC23DE" />' +
+          '<label>GitHub org (optional)</label>' +
+          '<input name="github_org" placeholder="e.g. ortegalab" />' +
+          '<label>Obsidian vault name (optional)</label>' +
+          '<input name="oracle_vault" placeholder="e.g. wigamig-vault-ortega" />' +
+          '<label>institution (optional)</label>' +
+          '<input name="institution" placeholder="e.g. Western University" />' +
+          '<label>department (optional)</label>' +
+          '<input name="department" placeholder="e.g. Schulich School of Dentistry & Medicine" />' +
+          '<div class="actions">' +
+            '<span class="form-msg" id="new-lab-msg"></span>' +
+            '<button type="button" class="btn ghost" id="new-lab-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="new-lab-submit">create</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("new-lab-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("new-lab-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById("new-lab-msg");
+        const submitBtn = document.getElementById("new-lab-submit");
+        const form = e.target;
+        const fd = new FormData(form);
+        const payload = {};
+        for (const [k, v] of fd.entries()) {
+          const trimmed = String(v).trim();
+          if (trimmed) payload[k] = trimmed;
+        }
+        msg.textContent = "creating…";
+        msg.className = "form-msg";
+        submitBtn.disabled = true;
+        try {
+          const url = "/api/registrar/lab" + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+          const res = await fetch(url, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            let detail = "HTTP " + res.status;
+            try { detail = (await res.json()).detail || detail; } catch (_) {}
+            throw new Error(detail);
+          }
+          msg.textContent = "created — refreshing…";
+          msg.className = "form-msg ok";
+          setTimeout(() => { wrap.remove(); load(); }, 600);
+        } catch (ex) {
+          msg.textContent = String(ex.message || ex);
+          msg.className = "form-msg error";
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
     }
 
     load();
