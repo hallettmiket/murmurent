@@ -11,6 +11,7 @@ Covers:
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -293,3 +294,197 @@ def test_endpoint_user_override_query_param(isolated):
     client = TestClient(create_app())
     res = client.get("/api/registrar/dashboard?user=bob")
     assert res.status_code == 403
+
+
+# ---------------------------------------------------------------------------
+# Phase B: create_lab
+# ---------------------------------------------------------------------------
+
+
+def _seed_registrar(isolated):
+    """Declare the_pi as registrar; assume isolated fixture is active."""
+    registrar.REGISTRAR_SENTINEL.write_text("the_pi\n", encoding="utf-8")
+
+
+def test_create_lab_scaffolds_files_and_registry(isolated):
+    _seed_registrar(isolated)
+    entry = registrar.create_lab(
+        name="ortega", display_name="Ortega Lab",
+        pi_handle="jortega", pi_full_name="Jane Ortega",
+        slack_workspace="T01ABC", github_org="ortegalab",
+        oracle_vault="wigamig-vault-ortega",
+    )
+    assert entry.name == "ortega"
+    assert entry.pi == "@jortega"
+
+    # Files on disk:
+    lab_mgmt = Path(entry.lab_mgmt_path)
+    assert (lab_mgmt / "lab.md").is_file()
+    assert (lab_mgmt / "members" / "jortega.md").is_file()
+    for sub in ("members", "projects", "requests", "audit"):
+        assert (lab_mgmt / sub).is_dir()
+
+    # Registry was updated:
+    reg = registrar.read_registry()
+    assert [l.name for l in reg.labs] == ["ortega"]
+    assert reg.labs[0].pi == "@jortega"
+    assert reg.labs[0].github_org == "ortegalab"
+
+
+def test_create_lab_renders_labmd_frontmatter_correctly(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(
+        name="ortega", display_name="Ortega Lab", pi_handle="jortega",
+        institution="Western University",
+        department="Schulich",
+    )
+    from wigamig.core.frontmatter import parse_file
+    meta = parse_file(registrar.lab_info_root() / "labs" / "ortega" / "lab-mgmt" / "lab.md").meta
+    assert meta["lab"] == "ortega"
+    assert meta["name"] == "Ortega Lab"
+    assert meta["pi"] == "@jortega"
+    assert meta["institution"] == "Western University"
+    assert meta["department"] == "Schulich"
+    assert "created" in meta
+
+
+def test_create_lab_pi_member_file_has_pi_role(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(
+        name="ortega", display_name="Ortega Lab",
+        pi_handle="jortega", pi_full_name="Jane Ortega",
+    )
+    from wigamig.core.frontmatter import parse_file
+    member_md = registrar.lab_info_root() / "labs" / "ortega" / "lab-mgmt" / "members" / "jortega.md"
+    meta = parse_file(member_md).meta
+    assert meta["handle"] == "@jortega"
+    assert meta["full_name"] == "Jane Ortega"
+    assert meta["role"] == "pi"
+    assert meta["status"] == "active"
+    assert meta["lab"] == "ortega"
+
+
+def test_create_lab_refuses_duplicate_name(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(
+        name="ortega", display_name="Ortega Lab", pi_handle="jortega",
+    )
+    with pytest.raises(registrar.LabAlreadyExists):
+        registrar.create_lab(
+            name="ortega", display_name="Ortega Lab 2", pi_handle="other",
+        )
+
+
+def test_create_lab_refuses_pi_already_leading(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(
+        name="ortega", display_name="Ortega Lab", pi_handle="jortega",
+    )
+    with pytest.raises(registrar.PIAlreadyLeadsAnother):
+        registrar.create_lab(
+            name="other", display_name="Other Lab", pi_handle="jortega",
+        )
+
+
+def test_create_lab_refuses_invalid_name(isolated):
+    _seed_registrar(isolated)
+    for bad in ("UPPERCASE", "with space", "starts1with2digits-no-wait", "-leading-dash",
+                "", "1starts_with_digit"):
+        with pytest.raises(registrar.InvalidLabName):
+            registrar.create_lab(name=bad, display_name="X", pi_handle="p")
+
+
+def test_create_lab_normalises_pi_handle(isolated):
+    """`@JOrtega` should land as `@jortega` in storage."""
+    _seed_registrar(isolated)
+    entry = registrar.create_lab(
+        name="ortega", display_name="Ortega Lab", pi_handle="@JOrtega",
+    )
+    assert entry.pi == "@jortega"
+    # And the member file path uses the normalised handle too.
+    assert (Path(entry.lab_mgmt_path) / "members" / "jortega.md").is_file()
+
+
+def test_create_lab_initialises_git_repo_and_commits(isolated):
+    """Phase B audit trail: first create_lab() lays down a git repo
+    on the lab_info root and records the change as a commit."""
+    _seed_registrar(isolated)
+    root = registrar.lab_info_root()
+    assert not (root / ".git").exists()
+    registrar.create_lab(
+        name="ortega", display_name="Ortega Lab", pi_handle="jortega",
+    )
+    assert (root / ".git").is_dir(), "lab_info root must auto-init as a git repo"
+    # At least one commit, mentioning the lab name + PI in the subject.
+    log = subprocess.run(
+        ["git", "-C", str(root), "log", "--oneline"],
+        check=True, capture_output=True, text=True,
+    ).stdout
+    assert "ortega" in log
+    assert "@jortega" in log
+
+
+def test_create_lab_each_mutation_is_its_own_commit(isolated):
+    _seed_registrar(isolated)
+    registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
+    registrar.create_lab(name="other", display_name="Other Lab", pi_handle="otherpi")
+    log = subprocess.run(
+        ["git", "-C", str(registrar.lab_info_root()), "log", "--oneline"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip().splitlines()
+    # One commit per lab. (No bootstrap commit because the bootstrap
+    # helper isn't called in this test.)
+    assert len(log) == 2
+
+
+# ---------------------------------------------------------------------------
+# Endpoint: POST /api/registrar/lab
+# ---------------------------------------------------------------------------
+
+
+def test_endpoint_create_lab_403_when_not_registrar(isolated):
+    client = TestClient(create_app())
+    res = client.post("/api/registrar/lab", json={
+        "name": "x", "display_name": "X", "pi_handle": "p",
+    })
+    assert res.status_code == 403
+
+
+def test_endpoint_create_lab_200_when_registrar(isolated):
+    _seed_registrar(isolated)
+    client = TestClient(create_app())
+    res = client.post("/api/registrar/lab", json={
+        "name": "ortega", "display_name": "Ortega Lab",
+        "pi_handle": "jortega", "pi_full_name": "Jane Ortega",
+    })
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["ok"] is True
+    assert body["lab"]["name"] == "ortega"
+    assert body["lab"]["pi"] == "@jortega"
+    # Now it should appear in the dashboard.
+    res2 = client.get("/api/registrar/dashboard")
+    assert res2.status_code == 200
+    assert [l["name"] for l in res2.json()["labs"]] == ["ortega"]
+
+
+def test_endpoint_create_lab_409_on_pi_conflict(isolated):
+    _seed_registrar(isolated)
+    client = TestClient(create_app())
+    client.post("/api/registrar/lab", json={
+        "name": "ortega", "display_name": "Ortega Lab", "pi_handle": "jortega",
+    })
+    res = client.post("/api/registrar/lab", json={
+        "name": "other", "display_name": "Other Lab", "pi_handle": "jortega",
+    })
+    assert res.status_code == 409
+    assert "PI" in res.text or "lead" in res.text
+
+
+def test_endpoint_create_lab_400_on_invalid_name(isolated):
+    _seed_registrar(isolated)
+    client = TestClient(create_app())
+    res = client.post("/api/registrar/lab", json={
+        "name": "Invalid Name!", "display_name": "X", "pi_handle": "p",
+    })
+    assert res.status_code == 400

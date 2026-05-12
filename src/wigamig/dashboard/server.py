@@ -162,6 +162,20 @@ class LabSettingsBody(BaseModel):
     git_repos_subpath: str | None = None             # default "git_repos"
 
 
+class RegistrarLabCreateBody(BaseModel):
+    """JSON body for ``POST /api/registrar/lab`` (Phase B)."""
+
+    name: str                                        # short ID, lowercase + _
+    display_name: str
+    pi_handle: str                                   # Western netname, with or without @
+    pi_full_name: str | None = None
+    slack_workspace: str | None = None
+    github_org: str | None = None
+    oracle_vault: str | None = None
+    institution: str | None = None
+    department: str | None = None
+
+
 class CatalogEntryBody(BaseModel):
     """JSON body for ``POST /api/sea_catalog`` (upsert)."""
 
@@ -1347,6 +1361,53 @@ def create_app() -> FastAPI:
                 ),
             )
         return _reg_snap.build_registrar_response(actor)
+
+    @app.post("/api/registrar/lab")
+    def registrar_create_lab(
+        body: RegistrarLabCreateBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Phase B: registrar creates a new lab.
+
+        Scaffolds the lab's lab-mgmt structure, registers it in
+        ``_registry.yaml``, and commits the change to the registrar's
+        git-backed data directory. Enforces the one-PI-per-lab/core
+        invariant.
+        """
+        from ..core import registrar as _reg
+
+        actor = _resolve_actor(user)
+        if not _reg.is_registrar(actor):
+            raise HTTPException(status_code=403, detail="registrar role required")
+
+        try:
+            entry = _reg.create_lab(
+                name=body.name,
+                display_name=body.display_name,
+                pi_handle=body.pi_handle,
+                pi_full_name=body.pi_full_name,
+                slack_workspace=body.slack_workspace,
+                github_org=body.github_org,
+                oracle_vault=body.oracle_vault,
+                institution=body.institution,
+                department=body.department,
+            )
+        except _reg.InvalidLabName as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except (_reg.LabAlreadyExists, _reg.PIAlreadyLeadsAnother) as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except _reg.RegistrarError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+        return {
+            "ok": True,
+            "lab": {
+                "name": entry.name,
+                "pi": entry.pi,
+                "lab_mgmt_path": entry.lab_mgmt_path,
+                "created": entry.created,
+            },
+        }
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
