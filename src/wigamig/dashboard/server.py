@@ -193,6 +193,25 @@ class RegistrarLabEditBody(BaseModel):
     department: str | None = None
 
 
+class RegistrarCollabCreateBody(BaseModel):
+    """JSON body for ``POST /api/registrar/collaboration`` (Phase D)."""
+
+    name: str                                  # short ID, lowercase + _
+    pis: list[str]                             # >=2 @handles
+    groups: list[str]                          # >=2 lab/core short IDs
+    member_subset: dict[str, list[str]] = {}   # group -> [@handles]
+    oracle_vault: str | None = None            # defaults to "wigamig-collab-<name>"
+
+
+class RegistrarCollabEditBody(BaseModel):
+    """JSON body for ``POST /api/registrar/collaboration/{name}/edit``."""
+
+    pis: list[str] | None = None
+    groups: list[str] | None = None
+    member_subset: dict[str, list[str]] | None = None
+    oracle_vault: str | None = None
+
+
 class RegistrarProfileBody(BaseModel):
     """JSON body for ``POST /api/registrar/profile``.
 
@@ -1497,6 +1516,92 @@ def create_app() -> FastAPI:
         except _reg.PIAlreadyLeadsAnother as exc:
             raise HTTPException(status_code=409, detail=str(exc))
         return {"ok": True, "lab": _lab_entry_to_dict(entry)}
+
+    def _collab_entry_to_dict(entry) -> dict:
+        return {
+            "name": entry.name,
+            "pis": list(entry.pis),
+            "groups": list(entry.groups),
+            "member_subset": dict(entry.member_subset),
+            "oracle_vault": entry.oracle_vault,
+            "status": entry.status,
+            "created": entry.created,
+        }
+
+    @app.post("/api/registrar/collaboration")
+    def registrar_create_collaboration(
+        body: RegistrarCollabCreateBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Phase D: registrar creates a cross-group collaboration."""
+        from ..core import registrar as _reg
+
+        _require_registrar(user)
+        try:
+            entry = _reg.create_collaboration(
+                name=body.name,
+                pis=body.pis,
+                groups=body.groups,
+                member_subset=body.member_subset,
+                oracle_vault=body.oracle_vault,
+            )
+        except _reg.InvalidLabName as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except _reg.CollaborationAlreadyExists as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except _reg.InvalidCollaboration as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except _reg.RegistrarError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"ok": True, "collaboration": _collab_entry_to_dict(entry)}
+
+    @app.post("/api/registrar/collaboration/{name}/archive")
+    def registrar_archive_collaboration(
+        name: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        from ..core import registrar as _reg
+        _require_registrar(user)
+        try:
+            entry = _reg.archive_collaboration(name)
+        except _reg.CollaborationNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True, "collaboration": _collab_entry_to_dict(entry)}
+
+    @app.post("/api/registrar/collaboration/{name}/unarchive")
+    def registrar_unarchive_collaboration(
+        name: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        from ..core import registrar as _reg
+        _require_registrar(user)
+        try:
+            entry = _reg.unarchive_collaboration(name)
+        except _reg.CollaborationNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _reg.InvalidCollaboration as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"ok": True, "collaboration": _collab_entry_to_dict(entry)}
+
+    @app.post("/api/registrar/collaboration/{name}/edit")
+    def registrar_edit_collaboration(
+        name: str,
+        body: RegistrarCollabEditBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        from ..core import registrar as _reg
+        _require_registrar(user)
+        sent = body.model_fields_set
+        kwargs = {k: getattr(body, k) for k in type(body).model_fields if k in sent}
+        try:
+            entry = _reg.update_collaboration(name, **kwargs)
+        except _reg.CollaborationNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _reg.InvalidCollaboration as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except _reg.RegistrarError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"ok": True, "collaboration": _collab_entry_to_dict(entry)}
 
     @app.post("/api/registrar/profile")
     def registrar_edit_profile(

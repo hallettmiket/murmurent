@@ -1050,6 +1050,303 @@ def test_lab_dashboard_is_registrar_false_for_non_registrar(isolated, tmp_path, 
     assert res.json()["member"]["is_registrar"] is False
 
 
+# ---------------------------------------------------------------------------
+# Phase D: collaborations (multi-PI, multi-group)
+# ---------------------------------------------------------------------------
+
+
+def _seed_two_labs_for_collab(isolated_world, tmp_path):
+    """Set up two registered labs (hallett + ortega) so collaboration
+    tests have something realistic to wire across."""
+    _seed_registrar(isolated_world)
+    lab_a = _make_lab_mgmt(
+        tmp_path, lab_id="hallett", pi="mhallet",
+        members=[("mhallet", "pi"), ("allie", "postdoc"), ("bob", "student")],
+    )
+    lab_b = _make_lab_mgmt(
+        tmp_path, lab_id="ortega", pi="jortega",
+        members=[("jortega", "pi"), ("cassie", "postdoc")],
+    )
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_a)
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_b)
+
+
+def test_create_collaboration_scaffolds_and_registers(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    entry = registrar.create_collaboration(
+        name="dcis_imaging",
+        pis=["@mhallet", "@jortega"],
+        groups=["hallett", "ortega"],
+        member_subset={
+            "hallett": ["@mhallet", "@allie"],
+            "ortega":  ["@jortega"],
+        },
+    )
+    assert entry.name == "dcis_imaging"
+    assert entry.pis == ["@mhallet", "@jortega"]
+    assert entry.oracle_vault == "wigamig-collab-dcis_imaging"
+    collab_md = registrar.lab_info_root() / "collaborations" / "dcis_imaging" / "collaboration.md"
+    assert collab_md.is_file()
+    # projects/ and oracle/ scaffolded
+    assert (registrar.lab_info_root() / "collaborations" / "dcis_imaging" / "projects").is_dir()
+    assert (registrar.lab_info_root() / "collaborations" / "dcis_imaging" / "oracle").is_dir()
+
+
+def test_create_collaboration_refuses_fewer_than_two_groups(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    with pytest.raises(registrar.InvalidCollaboration, match="at least 2 groups"):
+        registrar.create_collaboration(
+            name="dcis_solo",
+            pis=["@mhallet", "@jortega"],
+            groups=["hallett"],
+            member_subset={"hallett": ["@mhallet"]},
+        )
+
+
+def test_create_collaboration_refuses_fewer_than_two_pis(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    with pytest.raises(registrar.InvalidCollaboration, match="at least 2 PIs"):
+        registrar.create_collaboration(
+            name="dcis_imaging",
+            pis=["@mhallet"],
+            groups=["hallett", "ortega"],
+            member_subset={"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+        )
+
+
+def test_create_collaboration_refuses_unknown_group(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    with pytest.raises(registrar.InvalidCollaboration, match="unknown group"):
+        registrar.create_collaboration(
+            name="dcis_imaging",
+            pis=["@mhallet", "@jortega"],
+            groups=["hallett", "ghostlab"],
+            member_subset={"hallett": ["@mhallet"], "ghostlab": []},
+        )
+
+
+def test_create_collaboration_refuses_archived_group(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    registrar.archive_lab("ortega")
+    with pytest.raises(registrar.InvalidCollaboration, match="archived"):
+        registrar.create_collaboration(
+            name="dcis_imaging",
+            pis=["@mhallet", "@jortega"],
+            groups=["hallett", "ortega"],
+            member_subset={"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+        )
+
+
+def test_create_collaboration_requires_each_groups_pi(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    with pytest.raises(registrar.InvalidCollaboration, match="must be listed"):
+        registrar.create_collaboration(
+            name="dcis_imaging",
+            pis=["@mhallet", "@allie"],  # @jortega missing
+            groups=["hallett", "ortega"],
+            member_subset={"hallett": ["@mhallet", "@allie"], "ortega": ["@allie"]},
+        )
+
+
+def test_create_collaboration_subset_must_match_real_members(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    with pytest.raises(registrar.InvalidCollaboration, match="not a member"):
+        registrar.create_collaboration(
+            name="dcis_imaging",
+            pis=["@mhallet", "@jortega"],
+            groups=["hallett", "ortega"],
+            member_subset={
+                "hallett": ["@mhallet"],
+                "ortega":  ["@jortega", "@ghost_member"],  # not in ortega
+            },
+        )
+
+
+def test_create_collaboration_subset_must_include_pis(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    with pytest.raises(registrar.InvalidCollaboration, match="must include"):
+        registrar.create_collaboration(
+            name="dcis_imaging",
+            pis=["@mhallet", "@jortega"],
+            groups=["hallett", "ortega"],
+            member_subset={
+                "hallett": ["@mhallet"],
+                "ortega":  ["@cassie"],  # missing @jortega
+            },
+        )
+
+
+def test_create_collaboration_refuses_duplicate(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    registrar.create_collaboration(
+        name="dcis_imaging", pis=["@mhallet", "@jortega"],
+        groups=["hallett", "ortega"],
+        member_subset={"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+    )
+    with pytest.raises(registrar.CollaborationAlreadyExists):
+        registrar.create_collaboration(
+            name="dcis_imaging", pis=["@mhallet", "@jortega"],
+            groups=["hallett", "ortega"],
+            member_subset={"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+        )
+
+
+def test_create_collaboration_commits_audit_trail(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    registrar.create_collaboration(
+        name="dcis_imaging", pis=["@mhallet", "@jortega"],
+        groups=["hallett", "ortega"],
+        member_subset={"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+    )
+    log = subprocess.run(
+        ["git", "-C", str(registrar.lab_info_root()), "log", "--oneline"],
+        check=True, capture_output=True, text=True,
+    ).stdout
+    assert "create collaboration dcis_imaging" in log
+
+
+def test_archive_unarchive_collaboration(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    registrar.create_collaboration(
+        name="dcis_imaging", pis=["@mhallet", "@jortega"],
+        groups=["hallett", "ortega"],
+        member_subset={"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+    )
+    archived = registrar.archive_collaboration("dcis_imaging")
+    assert archived.status == "archived"
+    unarchived = registrar.unarchive_collaboration("dcis_imaging")
+    assert unarchived.status == "active"
+
+
+def test_unarchive_collaboration_revalidates_invariants(isolated, tmp_path):
+    """If a contributing group was archived since the collab was created,
+    unarchiving the collab must fail (the groups must be active)."""
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    registrar.create_collaboration(
+        name="dcis_imaging", pis=["@mhallet", "@jortega"],
+        groups=["hallett", "ortega"],
+        member_subset={"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+    )
+    registrar.archive_collaboration("dcis_imaging")
+    registrar.archive_lab("ortega")
+    with pytest.raises(registrar.InvalidCollaboration, match="archived"):
+        registrar.unarchive_collaboration("dcis_imaging")
+
+
+def test_update_collaboration_partial_edit(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    registrar.create_collaboration(
+        name="dcis_imaging", pis=["@mhallet", "@jortega"],
+        groups=["hallett", "ortega"],
+        member_subset={"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+    )
+    # Add @cassie to ortega's subset; nothing else changes.
+    updated = registrar.update_collaboration(
+        "dcis_imaging",
+        member_subset={
+            "hallett": ["@mhallet"],
+            "ortega":  ["@jortega", "@cassie"],
+        },
+    )
+    assert "@cassie" in updated.member_subset["ortega"]
+    assert updated.pis == ["@mhallet", "@jortega"]  # untouched
+
+
+# Phase D endpoints
+# -----------------
+
+
+def _seed_collab_world(isolated, tmp_path):
+    _seed_two_labs_for_collab(isolated, tmp_path)
+    return TestClient(create_app())
+
+
+def test_endpoint_create_collaboration_403_when_not_registrar(isolated, tmp_path):
+    """No registrar sentinel → endpoint refuses."""
+    # Don't call _seed_registrar; that's the missing piece.
+    _make_lab_mgmt(tmp_path, lab_id="hallett", pi="mhallet", members=[("mhallet","pi")])
+    client = TestClient(create_app())
+    res = client.post("/api/registrar/collaboration", json={
+        "name": "x", "pis": ["@a", "@b"], "groups": ["g1", "g2"], "member_subset": {},
+    })
+    assert res.status_code == 403
+
+
+def test_endpoint_create_collaboration_400_on_invariant_violation(isolated, tmp_path):
+    client = _seed_collab_world(isolated, tmp_path)
+    res = client.post("/api/registrar/collaboration", json={
+        "name": "dcis_imaging",
+        "pis": ["@mhallet"],  # only 1 PI → fails
+        "groups": ["hallett", "ortega"],
+        "member_subset": {"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+    })
+    assert res.status_code == 400
+    assert "PI" in res.text
+
+
+def test_endpoint_create_collaboration_409_on_duplicate(isolated, tmp_path):
+    client = _seed_collab_world(isolated, tmp_path)
+    payload = {
+        "name": "dcis_imaging",
+        "pis": ["@mhallet", "@jortega"],
+        "groups": ["hallett", "ortega"],
+        "member_subset": {"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+    }
+    assert client.post("/api/registrar/collaboration", json=payload).status_code == 200
+    assert client.post("/api/registrar/collaboration", json=payload).status_code == 409
+
+
+def test_endpoint_create_archive_round_trip(isolated, tmp_path):
+    client = _seed_collab_world(isolated, tmp_path)
+    client.post("/api/registrar/collaboration", json={
+        "name": "dcis_imaging",
+        "pis": ["@mhallet", "@jortega"],
+        "groups": ["hallett", "ortega"],
+        "member_subset": {"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+    })
+    r = client.post("/api/registrar/collaboration/dcis_imaging/archive")
+    assert r.status_code == 200
+    assert r.json()["collaboration"]["status"] == "archived"
+    r2 = client.post("/api/registrar/collaboration/dcis_imaging/unarchive")
+    assert r2.status_code == 200
+    assert r2.json()["collaboration"]["status"] == "active"
+
+
+def test_endpoint_edit_collaboration_partial(isolated, tmp_path):
+    client = _seed_collab_world(isolated, tmp_path)
+    client.post("/api/registrar/collaboration", json={
+        "name": "dcis_imaging",
+        "pis": ["@mhallet", "@jortega"],
+        "groups": ["hallett", "ortega"],
+        "member_subset": {"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+        "oracle_vault": "wigamig-collab-dcis",
+    })
+    # Change just the oracle vault.
+    r = client.post("/api/registrar/collaboration/dcis_imaging/edit", json={
+        "oracle_vault": "wigamig-collab-dcis-renamed",
+    })
+    assert r.status_code == 200
+    body = r.json()["collaboration"]
+    assert body["oracle_vault"] == "wigamig-collab-dcis-renamed"
+    assert body["pis"] == ["@mhallet", "@jortega"]  # untouched
+    assert body["groups"] == ["hallett", "ortega"]  # untouched
+
+
+def test_dashboard_payload_surfaces_collaboration(isolated, tmp_path):
+    """The /api/registrar/dashboard payload includes created collabs."""
+    client = _seed_collab_world(isolated, tmp_path)
+    client.post("/api/registrar/collaboration", json={
+        "name": "dcis_imaging",
+        "pis": ["@mhallet", "@jortega"],
+        "groups": ["hallett", "ortega"],
+        "member_subset": {"hallett": ["@mhallet"], "ortega": ["@jortega"]},
+    })
+    body = client.get("/api/registrar/dashboard").json()
+    names = [c["name"] for c in body["collaborations"]]
+    assert "dcis_imaging" in names
+    assert body["stats"]["total_collaborations"] == 1
+
+
 def test_registrar_cert_specs_use_same_fields_as_pi_dashboard(isolated, tmp_path):
     """Naming parity guard: the registrar surfaces ``code``, ``short``,
     ``name``, and ``cadence_years`` — the exact fields the PI's
