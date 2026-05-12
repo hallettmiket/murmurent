@@ -20,6 +20,10 @@
 # primary display at 1920x1080 logical pts):
 #   WIGAMIG_DISPLAY_X, _Y, _WIDTH, _HEIGHT — display rectangle
 #   WIGAMIG_LEFT_PCT (default 65) — VSCode pane width as a percent
+#   WIGAMIG_WORKSPACE_FILE — path to a .code-workspace file. When set and
+#       readable, VSCode opens that multi-root workspace instead of the
+#       bare project directory. The dashboard launcher writes this file
+#       so users see repo + refined/ + notebook + oracle side-by-side.
 
 set -euo pipefail
 
@@ -78,7 +82,14 @@ for A in "${AGENTS[@]}"; do
 done
 
 # 1. Open VSCode at the project repo, position it on the left.
-"$CODE" "$PROJECT_DIR" &
+#    Prefer a generated multi-root workspace when WIGAMIG_WORKSPACE_FILE
+#    points at a real file, so non-IT users see refined/, notebook, and
+#    Oracle alongside the repo without manual folder-add.
+if [[ -n "${WIGAMIG_WORKSPACE_FILE:-}" && -f "${WIGAMIG_WORKSPACE_FILE}" ]]; then
+  "$CODE" "${WIGAMIG_WORKSPACE_FILE}" &
+else
+  "$CODE" "$PROJECT_DIR" &
+fi
 sleep 3
 osascript -e "tell application \"Visual Studio Code\" to activate"
 sleep 1

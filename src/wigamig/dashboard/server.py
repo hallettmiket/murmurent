@@ -399,9 +399,11 @@ def create_app() -> FastAPI:
         ``scripts/start_workspace.sh`` in the background; the actual
         windows pop up locally.
         """
+        import os
         import subprocess
         from ..core.repo import wigamig_repo_root
         from ..core.projects import find_project as _find_project
+        from . import workspace_file as _workspace_file
 
         actor = _resolve_actor(user)
         _require_active(actor)
@@ -422,6 +424,31 @@ def create_app() -> FastAPI:
         if body.sea_id is not None:
             cmd.append(str(body.sea_id))
 
+        # Generate the multi-root .code-workspace file so VSCode opens
+        # with repo + refined/ + notebook + Oracle visible together.
+        # Failures here are non-fatal — fall back to opening just the repo.
+        workspace_path: str | None = None
+        try:
+            member_profile = snap_mod._load_member_profile(actor)
+            settings = snap_mod._member_settings(member_profile)
+            lab_name = str(member_profile.get("lab") or "hallett")
+            lab_settings = snap_mod._lab_settings(lab_name)
+            written = _workspace_file.write_workspace_file(
+                project=body.project,
+                obsidian_vault_path=settings.obsidian_vault_path,
+                notebook_subfolder=settings.notebook_subfolder,
+                oracle_subfolder=settings.oracle_subfolder,
+                lab_oracle_vault=lab_settings.lab_oracle_vault,
+            )
+            workspace_path = str(written)
+        except Exception:
+            # Best-effort — never block the launch on a workspace-file glitch.
+            workspace_path = None
+
+        sub_env = os.environ.copy()
+        if workspace_path:
+            sub_env["WIGAMIG_WORKSPACE_FILE"] = workspace_path
+
         try:
             subprocess.Popen(  # noqa: S603 — args are list, never shelled
                 cmd,
@@ -429,6 +456,7 @@ def create_app() -> FastAPI:
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
                 close_fds=True,
+                env=sub_env,
             )
         except OSError as exc:
             raise HTTPException(status_code=500, detail=f"launcher failed: {exc}")
@@ -437,6 +465,7 @@ def create_app() -> FastAPI:
             "ok": True,
             "project": body.project,
             "project_dir": str(project_dir),
+            "workspace_file": workspace_path,
             "agents": body.agents,
             "sea_id": body.sea_id,
             "cmd": cmd,
