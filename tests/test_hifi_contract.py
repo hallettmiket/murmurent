@@ -137,9 +137,14 @@ HIFI_TOP_LEVEL_KEYS = {
     "persona",
     "member",
     "pi",
+    "member_settings",
+    "machine_settings",
+    "lab_settings",
     "agents",
     "oracle_recent",
     "oracle_drafts",
+    "personal_oracle",
+    "lab_oracle_folder",
     "requests_pending",
     "requests_mine",
     "group_members",
@@ -149,7 +154,7 @@ HIFI_TOP_LEVEL_KEYS = {
     "attention",
     "stats",
     "spark",
-    "sparkLabels",
+    "spark_labels",
     "projects",
     "peers",
     "seas",
@@ -158,6 +163,7 @@ HIFI_TOP_LEVEL_KEYS = {
     "heatmap",
     "inventory",
     "notebook",
+    "installations",
 }
 
 
@@ -384,13 +390,13 @@ def test_stats_strip_has_all_fields(world):
     assert s.seas.in_ >= 0
     assert s.compliance.expired >= 0
     assert s.inventory.expired >= 1  # 4_oht is expired in the fixture
-    assert s.notebook.entriesThisWeek == 0  # no notebook dir written
+    assert s.notebook.entries_this_week == 0  # no notebook dir written
 
 
 def test_spark_has_12_weekly_buckets(world):
     resp = snapshot.build_response("allie", today=_dt.date(2026, 5, 8))
     assert len(resp.spark) == 12
-    assert len(resp.sparkLabels) == 12
+    assert len(resp.spark_labels) == 12
     assert all(isinstance(x, int) for x in resp.spark)
 
 
@@ -485,10 +491,14 @@ def test_api_endpoint_returns_full_payload(world):
 def test_api_endpoint_400_when_no_user(monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
 
+    from wigamig.core import identity as _identity
     from wigamig.dashboard.server import create_app
 
     monkeypatch.delenv("WIGAMIG_USER", raising=False)
     monkeypatch.setenv("PATH", "")  # blocks gh fallback
+    # Also block the ~/.wigamig/user fallback; otherwise the developer's
+    # real saved Western netname leaks into the test and the 400 never fires.
+    monkeypatch.setattr(_identity, "USER_FILE", tmp_path / "no_user_here")
     app = create_app()
     client = TestClient(app)
     resp = client.get("/api/dashboard")

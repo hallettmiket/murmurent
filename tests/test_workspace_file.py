@@ -141,8 +141,83 @@ def test_write_workspace_file_round_trip(world):
     assert written.exists()
     payload = json.loads(written.read_text())
     assert "folders" in payload and "settings" in payload
-    assert payload["folders"][0]["name"] == "Project: proj_a"
-    assert payload["settings"]["workbench.startupEditor"] == "none"
+    # Quick-start cheatsheet is prepended, project comes second.
+    assert payload["folders"][0]["name"] == wf.QUICKSTART_FOLDER_NAME
+    assert payload["folders"][1]["name"] == "Project: proj_a"
+    # startupEditor must be "readme" so the quick-start README auto-opens.
+    assert payload["settings"]["workbench.startupEditor"] == "readme"
+
+
+def test_quickstart_help_folder_and_readme_created(world):
+    """The cheatsheet folder exists on disk with a useful README inside."""
+    _mkdir(world["repos"] / "proj_a")
+    wf.write_workspace_file(project="proj_a", obsidian_vault_path=None)
+
+    help_dir = wf.quickstart_help_dir("proj_a")
+    assert help_dir.is_dir()
+    readme = help_dir / "README.md"
+    assert readme.exists()
+
+    body = readme.read_text()
+    # Names the project so users know which workspace they opened.
+    assert "proj_a" in body
+    # Leads with the one keystroke they really need to learn.
+    assert "Cmd+Shift+P" in body
+    # Bridges back to the VSCode task we added previously.
+    assert "Monitor Claude agents" in body
+
+
+def test_quickstart_readme_regenerates_on_relaunch(world):
+    """Stale or hand-edited content is overwritten on the next launch."""
+    _mkdir(world["repos"] / "proj_a")
+    wf.write_workspace_file(project="proj_a", obsidian_vault_path=None)
+    readme = wf.quickstart_help_dir("proj_a") / "README.md"
+    readme.write_text("STALE CONTENT")
+
+    wf.write_workspace_file(project="proj_a", obsidian_vault_path=None)
+    assert "Cmd+Shift+P" in readme.read_text()
+
+
+def test_payload_pins_claude_code_to_editor_and_blocks_copilot(world):
+    """Single-chat-window policy: Claude Code in editor, Copilot not recommended."""
+    _mkdir(world["repos"] / "proj_a")
+    folders = wf.gather_folders(project="proj_a", obsidian_vault_path=None)
+    payload = wf.build_payload(folders)
+
+    assert payload["settings"]["claudeCode.preferredLocation"] == "editor"
+
+    unwanted = payload["extensions"]["unwantedRecommendations"]
+    assert "GitHub.copilot-chat" in unwanted
+    assert "GitHub.copilot" in unwanted
+
+
+def test_quickstart_readme_mentions_claude_code_shortcut(world):
+    """Cheatsheet must explain how to open Claude Code itself."""
+    _mkdir(world["repos"] / "proj_a")
+    wf.write_workspace_file(project="proj_a", obsidian_vault_path=None)
+    body = (wf.quickstart_help_dir("proj_a") / "README.md").read_text()
+    assert "Cmd+Shift+Esc" in body
+    assert "Claude Code" in body
+
+
+def test_payload_includes_claude_agents_task(world):
+    """The generated workspace exposes a one-click `claude agents` TUI task."""
+    _mkdir(world["repos"] / "proj_a")
+    folders = wf.gather_folders(project="proj_a", obsidian_vault_path=None)
+    payload = wf.build_payload(folders)
+
+    assert payload["tasks"]["version"] == "2.0.0"
+    labels = [t["label"] for t in payload["tasks"]["tasks"]]
+    assert "Monitor Claude agents" in labels
+
+    task = next(
+        t for t in payload["tasks"]["tasks"] if t["label"] == "Monitor Claude agents"
+    )
+    assert task["type"] == "shell"
+    # The version gate must mention claude agents AND the minimum version,
+    # so the user gets a useful upgrade hint if their CLI is too old.
+    assert "claude agents" in task["command"]
+    assert wf.MIN_CLAUDE_VERSION in task["command"]
 
 
 def test_custom_subfolder_names(world):

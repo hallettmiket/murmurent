@@ -348,12 +348,29 @@ function InstallationsBox({ span = "c-12" }) {
 function InstallModal({ initialProject, onClose }) {
   const [step, setStep]                     = useState(1);
   /* step 1 */
-  const [who, setWho]                       = useState("");
+  const [who, setWho]                       = useState("@" + ((window.DATA.member || {}).handle || ""));
   const [project, setProject]               = useState(initialProject || window.DATA.projects?.[0]?.name || "");
   /* step 2 */
   const [machineType, setMachineType]       = useState("lab_server");
   const [hostname, setHostname]             = useState("");
   const [username, setUsername]             = useState("");
+  // Detected OS account name on the machine running the dashboard.
+  // Used to prefill the laptop case — the dashboard runs locally on
+  // the user's laptop, so this is exactly the right value.
+  const [detectedLocalUser, setDetectedLocalUser] = useState("");
+  useEffect(() => {
+    fetch("/api/environment/local_user")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && d.local_user) setDetectedLocalUser(d.local_user); })
+      .catch(() => {});
+  }, []);
+  // Auto-fill username when switching to laptop, but only if the user
+  // hasn't typed anything yet. Don't clobber their input.
+  useEffect(() => {
+    if (machineType === "laptop" && !username && detectedLocalUser) {
+      setUsername(detectedLocalUser);
+    }
+  }, [machineType, detectedLocalUser]);  // intentionally not on `username`
   /* step 3 */
   const [hasDirectAccess, setHasDirectAccess] = useState(true);
   const [labBase, setLabBase]               = useState("/data/lab_vm");
@@ -364,7 +381,11 @@ function InstallModal({ initialProject, onClose }) {
   const [mountPoint, setMountPoint]         = useState("~/mnt/lab_vm");
   /* step 4 */
   const [infra, setInfra]                   = useState(INFRA_ITEMS.map(x => x.id));
-  const [pickedAgents, setPickedAgents]     = useState(["oracle", "blacksmith", "bookworm"]);
+  const [pickedAgents, setPickedAgents]     = useState(() => {
+    const all = (window.DATA.agents || []).filter(a => !a.disabled).map(a => a.name);
+    const p = window.DATA.persona || "member";
+    return p === "pi" ? all : all.filter(n => n !== "receptionist");
+  });
   /* ui */
   const [busy, setBusy]                     = useState(false);
   const [err, setErr]                       = useState(null);
@@ -385,7 +406,7 @@ function InstallModal({ initialProject, onClose }) {
   const toggleAgent  = (name) => setPickedAgents(a => a.includes(name) ? a.filter(x => x !== name) : [...a, name]);
 
   const canProceed = () => {
-    if (step === 1) return who.trim() && project;
+    if (step === 1) return !!project;
     if (step === 2) return (machineType === "laptop" || hostname.trim()) && username.trim();
     if (step === 3) return labBase.trim() && rawPath.trim() && refinedPath.trim() && notebookPath.trim();
     if (step === 4) return infra.length > 0;
@@ -395,8 +416,7 @@ function InstallModal({ initialProject, onClose }) {
   const provision = async () => {
     setBusy(true); setErr(null);
     try {
-      /* endpoint not yet implemented — ignore 404 and show success checklist */
-      await fetch("/api/workspace/initialize", {
+      const res = await fetch("/api/workspace/initialize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -409,7 +429,15 @@ function InstallModal({ initialProject, onClose }) {
           mount_point: !hasDirectAccess ? mountPoint : null,
           infra_components: infra, agents: pickedAgents,
         }),
-      }).catch(() => {});
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || ("HTTP " + res.status));
+      }
+      // Force a fresh fetch so the new Installation row shows up below.
+      if (typeof window.__wigamigFetchData === "function") {
+        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      }
       setDone(true);
     } catch (ex) { setErr(String(ex.message || ex)); }
     finally { setBusy(false); }
@@ -514,25 +542,8 @@ function InstallModal({ initialProject, onClose }) {
               {step === 1 && (
                 <>
                   <p className="muted" style={{fontSize:12, margin:0}}>
-                    Who is joining, and which project should be set up first?
+                    Which project do you want to install on this machine?
                   </p>
-                  <div>
-                    <label {...LBL}>Lab member handle</label>
-                    <select value={who} onChange={e => { setWho(e.target.value); if (!username) setUsername(e.target.value.replace(/^@/, "")); }}
-                            style={SEL.style}>
-                      <option value="">— select member —</option>
-                      {peers.map(p => (
-                        <option key={p.handle} value={"@" + p.handle}>
-                          @{p.handle} · {p.name}
-                        </option>
-                      ))}
-                    </select>
-                    {who && !peers.find(p => "@" + p.handle === who) && (
-                      <div style={{fontSize:11, color:"var(--tiger-deep)", marginTop:3}}>
-                        ⚠ Handle not in current peers list — add them to the lab roster first.
-                      </div>
-                    )}
-                  </div>
                   <div>
                     <label {...LBL}>Project to install</label>
                     <select value={project} onChange={e => setProject(e.target.value)} style={SEL.style}>
@@ -575,10 +586,16 @@ function InstallModal({ initialProject, onClose }) {
                     </div>
                   )}
                   <div>
-                    <label {...LBL}>Username on this machine</label>
+                    <label {...LBL}>Local OS account on this target machine</label>
                     <input value={username} onChange={e => setUsername(e.target.value)}
-                           placeholder="e.g. didi" {...INP} />
+                           placeholder={machineType === "laptop"
+                             ? (detectedLocalUser || "e.g. mike-laptop")
+                             : "e.g. mhallet"} {...INP} />
                     <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
+                      The OS account you log into the machine with — <strong>not</strong> your
+                      Western netname. On a laptop it's what <code>whoami</code> returns
+                      ({detectedLocalUser ? <>detected: <code>{detectedLocalUser}</code></> : "auto-detecting…"});
+                      on a lab server it usually matches your Western netname but doesn't have to.
                       All lab-base communication uses SSH key auth — no passwords stored.
                     </div>
                   </div>
@@ -1043,14 +1060,106 @@ function SeasPanel({ seas, span="c-7" }) {
   );
 }
 
+/* ───────── project detail rows + provision buttons ───────── */
+/* ───────── project detail rows + provision buttons ───────── */
+function ProjectDetailRows({ proj: p }) {
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
+  const userParam = (window.DATA.member || {}).handle || "";
+  const [busy, setBusy] = React.useState({});
+  const [errs, setErrs] = React.useState({});
+  const [done, setDone] = React.useState({});
+
+  const provision = async (resource) => {
+    setBusy(b => ({...b, [resource]: true}));
+    setErrs(e => ({...e, [resource]: null}));
+    try {
+      const q = userParam ? "?user=" + encodeURIComponent(userParam) : "";
+      const r = await fetch("/api/project/" + encodeURIComponent(p.name) + "/provision/" + resource + q,
+        {method: "POST"});
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(d.detail || r.statusText);
+      }
+      setDone(d => ({...d, [resource]: true}));
+      if (typeof window.__wigamigFetchData === "function") {
+        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      }
+    } catch (ex) {
+      setErrs(e => ({...e, [resource]: String(ex.message || ex)}));
+    } finally {
+      setBusy(b => ({...b, [resource]: false}));
+    }
+  };
+
+  const lbl = {display:"inline-block", width:70, color:"var(--muted)"};
+  const row = {marginBottom:4, display:"flex", alignItems:"center", gap:8};
+
+  const repoKind = p.repo_kind || "github";
+  const remoteUrl = p.remote_url || null;
+  const remoteLabel = repoKind === "local" ? "local repo" : "github";
+  const remoteRendered = repoKind === "local"
+    ? (remoteUrl
+        ? <span className="mono" style={{fontSize:12}}>{remoteUrl}</span>
+        : <span style={{color:"var(--muted)"}}>not created</span>)
+    : (p.github_pushed
+        ? <a href={"https://github.com/" + p.github_repo} target="_blank" rel="noopener">{p.github_repo}</a>
+        : <span style={{color:"var(--muted)"}}>not created</span>);
+  const remoteCreated = repoKind === "local" ? !!remoteUrl : !!p.github_pushed;
+  const createLabel = repoKind === "local" ? "Create local bare repo" : "Create GitHub repo";
+  const retryLabel = repoKind === "local" ? "Retry local setup" : "Retry GitHub setup";
+
+  return (
+    <div>
+      {/* Remote — project identity (github OR local bare repo) */}
+      <div style={row}>
+        <span style={lbl}>{remoteLabel}</span>
+        {remoteRendered}
+        {isPI && !remoteCreated && !done.github && (
+          <button className="btn sm" disabled={busy.github}
+            onClick={() => provision("github")}>
+            {busy.github ? "…" : (errs.github ? retryLabel : createLabel)}
+          </button>
+        )}
+        {done.github && <Pill tone="green">done</Pill>}
+        {errs.github && <span style={{color:"var(--red)", fontSize:11}}>{errs.github}</span>}
+      </div>
+
+      {/* Slack — project identity */}
+      <div style={row}>
+        <span style={lbl}>slack</span>
+        {p.slack_channel_id ? (
+          p.slack_url ? (
+            <a href={p.slack_url} target="_blank" rel="noopener">#{p.slack_channel}</a>
+          ) : (
+            <span>#{p.slack_channel}</span>
+          )
+        ) : (
+          <span style={{color:"var(--muted)"}}>no channel</span>
+        )}
+        {isPI && !p.slack_channel_id && !done.slack && (
+          <button className="btn sm" disabled={busy.slack}
+            onClick={() => provision("slack")}>
+            {busy.slack ? "…" : (errs.slack ? "Retry Slack setup" : "Create Slack channel")}
+          </button>
+        )}
+        {done.slack && <Pill tone="green">done — refresh to see channel</Pill>}
+        {errs.slack && <span style={{color:"var(--red)", fontSize:11}}>{errs.slack}</span>}
+      </div>
+    </div>
+  );
+}
+
 /* ───────── projects panel ───────── */
 function ProjectsPanel({ projects, span="c-5" }) {
   const [openProj, setOpenProj] = useState(null);
   const [showNewProj, setShowNewProj] = useState(false);
-  // Pending project-create requests count (so users see what's in flight).
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
+  // Pending project-create requests — shown as an approval queue for the PI.
   const pendingCreate = (window.DATA.requests_pending || []).filter(
     r => r.kind === "project-create"
-  ).length;
+  );
   return (
     <div className={"panel "+span}>
       <header>
@@ -1058,9 +1167,9 @@ function ProjectsPanel({ projects, span="c-5" }) {
         <div className="row" style={{gap:6}}>
           <span className="meta">
             {projects.length} active · {projects.reduce((a,p)=>a+p.open_seas,0)} open SEAs
-            {pendingCreate > 0 && (
+            {pendingCreate.length > 0 && (
               <span> · <strong style={{color:"var(--tiger-deep)"}}>
-                {pendingCreate} pending
+                {pendingCreate.length} pending
               </strong></span>
             )}
           </span>
@@ -1068,6 +1177,16 @@ function ProjectsPanel({ projects, span="c-5" }) {
         </div>
       </header>
       {showNewProj && <NewProjectModal onClose={() => setShowNewProj(false)} />}
+      {isPI && pendingCreate.length > 0 && (
+        <div style={{borderBottom:"2px solid var(--rule)"}}>
+          <div className="mono muted" style={{fontSize:11, padding:"6px 14px 2px", textTransform:"uppercase", letterSpacing:"0.05em"}}>
+            Pending approval
+          </div>
+          {pendingCreate.map(r => (
+            <RequestActionRow key={r.id} req={r} isPI={true} />
+          ))}
+        </div>
+      )}
       <div className="body" style={{padding:0}}>
         <table className="dt">
           <thead><tr>
@@ -1098,38 +1217,7 @@ function ProjectsPanel({ projects, span="c-5" }) {
                       wordBreak:"break-all",
                       overflowWrap:"anywhere",
                     }}>
-                      {p.github_repo && (
-                        <div style={{marginBottom:3}}>
-                          <span className="muted" style={{display:"inline-block", width:60}}>github</span>
-                          <a href={"https://github.com/" + p.github_repo} target="_blank" rel="noopener"
-                             style={{wordBreak:"break-all"}}>
-                            {p.github_repo}
-                          </a>
-                        </div>
-                      )}
-                      {p.slack_channel && (
-                        <div style={{marginBottom:3}}>
-                          <span className="muted" style={{display:"inline-block", width:60}}>slack</span>
-                          {p.slack_url ? (
-                            <a href={p.slack_url} target="_blank" rel="noopener"
-                               style={{wordBreak:"break-all"}}>#{p.slack_channel}</a>
-                          ) : (
-                            <span>#{p.slack_channel}</span>
-                          )}
-                        </div>
-                      )}
-                      {p.refined_path && (
-                        <div style={{marginBottom:3}}>
-                          <span className="muted" style={{display:"inline-block", width:60}}>refined</span>
-                          <code style={{wordBreak:"break-all"}}>{p.refined_path}</code>
-                        </div>
-                      )}
-                      {p.raw_path && (
-                        <div style={{marginBottom:3}}>
-                          <span className="muted" style={{display:"inline-block", width:60}}>raw</span>
-                          <code style={{wordBreak:"break-all"}}>{p.raw_path}</code>
-                        </div>
-                      )}
+                      <ProjectDetailRows proj={p} />
                     </td>
                   </tr>
                 )}
@@ -1687,6 +1775,15 @@ function NewProjectModal({ onClose }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const groupMembers = window.DATA.group_members || [];
+  // Phase 16: pick where the git repo lives. ``local`` is required for
+  // clinical / industrial data that must not leave the lab VM.
+  const [repoKind, setRepoKind] = useState("github");
+  const ms = window.DATA.machine_settings || {};
+  const ls = window.DATA.lab_settings || {};
+  const defaultLocalRoot = (ms.lab_base && ls.git_repos_subpath)
+    ? ms.lab_base.replace(/\/$/, "") + "/" + ls.git_repos_subpath
+    : (ms.lab_base ? ms.lab_base.replace(/\/$/, "") + "/git_repos" : "");
+  const [localRepoRoot, setLocalRepoRoot] = useState(defaultLocalRoot);
 
   const addFromDropdown = (handle) => {
     if (!handle) return;
@@ -1716,6 +1813,8 @@ function NewProjectModal({ onClose }) {
         proposed_members: selectedMembers,
         sensitivity,
         justification: justification.trim(),
+        repo_kind: repoKind,
+        local_repo_root: repoKind === "local" ? (localRepoRoot.trim() || null) : null,
       });
       if (typeof window.__wigamigFetchData === "function") {
         await window.__wigamigFetchData(window.DATA.persona);
@@ -1798,6 +1897,35 @@ function NewProjectModal({ onClose }) {
           <option value="restricted">restricted</option>
           <option value="clinical">clinical</option>
         </select>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>repo destination</label>
+        <div className="row" style={{gap:14, alignItems:"flex-start", marginTop:2}}>
+          <label style={{display:"flex", alignItems:"center", gap:6, cursor:"pointer", fontSize:12}}>
+            <input type="radio" name="repo_kind" value="github"
+                   checked={repoKind === "github"}
+                   onChange={() => setRepoKind("github")} />
+            GitHub <span className="mono muted" style={{fontSize:11}}>(default — pushes to github.com/{ls.github_org || "hallettmiket"})</span>
+          </label>
+          <label style={{display:"flex", alignItems:"center", gap:6, cursor:"pointer", fontSize:12}}>
+            <input type="radio" name="repo_kind" value="local"
+                   checked={repoKind === "local"}
+                   onChange={() => setRepoKind("local")} />
+            Local bare repo <span className="mono muted" style={{fontSize:11}}>(stays on the lab VM)</span>
+          </label>
+        </div>
+        {repoKind === "local" && (
+          <div style={{marginTop:4}}>
+            <input value={localRepoRoot}
+                   onChange={e => setLocalRepoRoot(e.target.value)}
+                   placeholder="/data/lab_vm/git_repos"
+                   style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)", width:"100%", boxSizing:"border-box", fontSize:12}}/>
+            <div className="muted" style={{fontSize:11, marginTop:3}}>
+              The bare repo will be created at <code>{(localRepoRoot.replace(/\/$/, "") || "<path>")}/{name.trim() || "<project>"}.git</code> —
+              required for clinical or industrial data that must not leave the lab VM.
+              No GitHub remote is created.
+            </div>
+          </div>
+        )}
+
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>justification</label>
         <textarea value={justification} onChange={e => setJustification(e.target.value)}
                   rows={3} placeholder="Brief description of the project, scope, expected duration."
@@ -2725,11 +2853,8 @@ function NotebookPanel({ span="c-9" }) {
 function MemberProfileModal({ onClose }) {
   const m = window.DATA.member || {};
   const initial = window.DATA.member_settings || {};
+  const machineInitial = window.DATA.machine_settings || {};
   const [form, setForm] = useState({
-    obsidian_vault_path: initial.obsidian_vault_path || "",
-    obsidian_vault_name: initial.obsidian_vault_name || "",
-    notebook_subfolder:  initial.notebook_subfolder  || "lab-notebook",
-    oracle_subfolder:    initial.oracle_subfolder    || "oracle",
     email:    initial.email    || "",
     orcid:    initial.orcid    || "",
     bluesky:  initial.bluesky  || "",
@@ -2759,17 +2884,17 @@ function MemberProfileModal({ onClose }) {
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(form),
       });
-      if (res.ok) {
-        setMsg("saved");
-        if (typeof window.__wigamigFetchData === "function") {
-          try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
-        }
-      } else {
-        // Endpoint not wired yet — keep local state, surface a hint.
-        setMsg("backend not wired (HTTP " + res.status + ")");
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || ("HTTP " + res.status));
       }
+      setMsg("saved");
+      if (typeof window.__wigamigFetchData === "function") {
+        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      }
+      setTimeout(onClose, 800);
     } catch (ex) {
-      setMsg("offline — local only");
+      setMsg(String(ex.message || ex));
     } finally {
       setBusy(false);
     }
@@ -2793,7 +2918,9 @@ function MemberProfileModal({ onClose }) {
     textTransform:"uppercase", color:"var(--purple-deep)",
   };
 
-  const vaultName = form.obsidian_vault_name || initial.obsidian_vault_name || "—";
+  // Personal-vault display sources from machine_settings now — Obsidian
+  // paths moved out of the member profile because they're per-machine.
+  const vaultName = machineInitial.obsidian_vault_name || "—";
 
   return (
     <div onClick={onClose} style={{
@@ -2813,8 +2940,10 @@ function MemberProfileModal({ onClose }) {
           <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
         </div>
         <p className="muted" style={{fontSize:12, margin:"4px 0 0"}}>
-          Edits POST to <code>/api/member/settings</code> and update
-          <code> &lt;lab-mgmt&gt;/members/&lt;handle&gt;.yaml</code>.
+          Edits save to <code>&lt;lab-mgmt&gt;/members/&lt;handle&gt;.md</code> —
+          follows you to any machine. Per-machine paths (Obsidian vault,
+          notebook subfolder) live in the <strong>Machine settings</strong>
+          dialog instead.
         </p>
 
         {/* Identity (read-only) */}
@@ -2826,31 +2955,6 @@ function MemberProfileModal({ onClose }) {
             <div><span className="muted">role</span> {m.role}</div>
             <div><span className="muted">lab</span> <code className="mono">{m.lab}</code></div>
             <div><span className="muted">personal vault</span> <code className="mono">{vaultName}/</code></div>
-          </div>
-        </div>
-
-        {/* Obsidian + notebook */}
-        <div style={sectionStyle}>
-          <h4 style={sectionHeader}>Obsidian &amp; notebook</h4>
-          <div style={labelStyle}>vault path (full)</div>
-          <input style={inputStyle} value={form.obsidian_vault_path}
-                 onChange={update("obsidian_vault_path")}
-                 placeholder="/Users/you/.../obsidian-lab" />
-          <div style={labelStyle}>vault name (for obsidian:// URLs)</div>
-          <input style={inputStyle} value={form.obsidian_vault_name}
-                 onChange={update("obsidian_vault_name")}
-                 placeholder="obsidian-lab" />
-          <div className="row" style={{gap:10, marginTop:4}}>
-            <div style={{flex:1}}>
-              <div style={labelStyle}>notebook subfolder</div>
-              <input style={inputStyle} value={form.notebook_subfolder}
-                     onChange={update("notebook_subfolder")} />
-            </div>
-            <div style={{flex:1}}>
-              <div style={labelStyle}>oracle subfolder</div>
-              <input style={inputStyle} value={form.oracle_subfolder}
-                     onChange={update("oracle_subfolder")} />
-            </div>
           </div>
         </div>
 
@@ -2920,6 +3024,119 @@ function MemberProfileModal({ onClose }) {
   );
 }
 
+/* ───────── Machine settings modal (per-machine: Obsidian paths) ───────── */
+/* These four fields live in ~/.wigamig/machine.yaml because they differ
+   between a user's laptop and the lab server. Editing happens here so
+   non-IT users don't need to hand-edit YAML. */
+function MachineSettingsModal({ onClose }) {
+  const initial = window.DATA.machine_settings || {};
+  const [form, setForm] = useState({
+    obsidian_vault_path: initial.obsidian_vault_path || "",
+    obsidian_vault_name: initial.obsidian_vault_name || "",
+    notebook_subfolder:  initial.notebook_subfolder  || "lab-notebook",
+    oracle_subfolder:    initial.oracle_subfolder    || "oracle",
+  });
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg]   = useState(null);
+
+  const update = (k) => (e) => setForm((prev) => ({ ...prev, [k]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true); setMsg(null);
+    try {
+      const res = await fetch("/api/machine/settings", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || ("HTTP " + res.status));
+      }
+      setMsg("saved");
+      if (typeof window.__wigamigFetchData === "function") {
+        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      }
+      setTimeout(onClose, 800);
+    } catch (ex) { setMsg(String(ex.message || ex)); }
+    finally { setBusy(false); }
+  };
+
+  const labelStyle = {
+    fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+    textTransform:"uppercase", color:"var(--muted)", marginTop:8, marginBottom:2,
+  };
+  const inputStyle = {
+    padding:"5px 8px", border:"1px solid var(--rule-strong)",
+    borderRadius:2, fontFamily:"var(--mono)", fontSize:12, width:"100%",
+    boxSizing:"border-box", background:"var(--paper)",
+  };
+
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"flex-start", justifyContent:"center",
+      zIndex:200, padding:"40px 20px", overflowY:"auto",
+    }}>
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:18, width:"min(560px, 96vw)",
+        display:"flex", flexDirection:"column", gap:4,
+      }}>
+        <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:20, color:"var(--purple-deep)"}}>
+            Machine settings
+          </h2>
+          <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
+        </div>
+        <p className="muted" style={{fontSize:12, margin:"4px 0 0"}}>
+          Per-machine paths — saved to <code>~/.wigamig/machine.yaml</code>.
+          These don't sync to other machines; each install (laptop, lab server,
+          …) has its own values.
+        </p>
+
+        <div style={{borderTop:"1px solid var(--rule)", paddingTop:10, marginTop:10}}>
+          <div style={labelStyle}>vault path (full)</div>
+          <input style={inputStyle} value={form.obsidian_vault_path}
+                 onChange={update("obsidian_vault_path")}
+                 placeholder="/Users/you/.../obsidian-lab" />
+          <div style={labelStyle}>vault name (for obsidian:// URLs)</div>
+          <input style={inputStyle} value={form.obsidian_vault_name}
+                 onChange={update("obsidian_vault_name")}
+                 placeholder="obsidian-lab" />
+          <div className="row" style={{gap:10, marginTop:4}}>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>notebook subfolder</div>
+              <input style={inputStyle} value={form.notebook_subfolder}
+                     onChange={update("notebook_subfolder")} />
+            </div>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>oracle subfolder</div>
+              <input style={inputStyle} value={form.oracle_subfolder}
+                     onChange={update("oracle_subfolder")} />
+            </div>
+          </div>
+        </div>
+
+        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:14, alignItems:"center"}}>
+          {msg && (
+            <span className="muted" style={{fontSize:11, marginRight:"auto",
+              color: msg === "saved" ? "var(--green)" : "var(--red)"}}>
+              {msg}
+            </span>
+          )}
+          <button type="button" className="btn sm ghost" onClick={onClose}>close</button>
+          <button type="submit" className="btn sm primary" disabled={busy}>
+            {busy ? "…" : "save"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 /* ───────── Lab settings modal (PI + admins only) ───────── */
 function LabSettingsModal({ onClose }) {
   const ls = window.DATA.lab_settings || {};
@@ -2946,11 +3163,16 @@ function LabSettingsModal({ onClose }) {
         headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(payload),
       });
-      setMsg(res.ok ? "saved" : "backend not wired (HTTP " + res.status + ")");
-      if (res.ok && typeof window.__wigamigFetchData === "function") {
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || ("HTTP " + res.status));
+      }
+      setMsg("saved");
+      if (typeof window.__wigamigFetchData === "function") {
         try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
       }
-    } catch (_) { setMsg("offline — local only"); }
+      setTimeout(onClose, 800);
+    } catch (ex) { setMsg(String(ex.message || ex)); }
     finally { setBusy(false); }
   };
 
@@ -3060,6 +3282,7 @@ function FooterMeta() {
   const myHandle = (m.handle || "").toLowerCase();
   const canEditLab = isPI || (ls.admins || []).map(h => h.toLowerCase()).includes(myHandle);
   const [showLabSettings, setShowLabSettings] = useState(false);
+  const [showMachine, setShowMachine] = useState(false);
 
   // Build the office/dry-lab/wet-labs line, dropping any blank pieces.
   const officeBits = [
@@ -3070,7 +3293,8 @@ function FooterMeta() {
 
   return (
     <div className="footer-meta">
-      {showProfile    && <MemberProfileModal onClose={() => setShowProfile(false)} />}
+      {showProfile    && <MemberProfileModal  onClose={() => setShowProfile(false)} />}
+      {showMachine    && <MachineSettingsModal onClose={() => setShowMachine(false)} />}
       {showLabSettings && <LabSettingsModal   onClose={() => setShowLabSettings(false)} />}
       <div className="grid">
         <div>
@@ -3084,9 +3308,20 @@ function FooterMeta() {
                 style={{
                   background:"transparent", border:"1px solid var(--rule-strong)",
                   borderRadius:2, padding:"1px 6px", cursor:"pointer",
-                  fontSize:11, color:"var(--muted)",
+                  fontSize:11, color:"var(--purple)",
                 }}>
-                ⚙
+                ⚙ profile
+              </button>
+              <button
+                type="button"
+                title="Machine settings — paths on this computer"
+                onClick={() => setShowMachine(true)}
+                style={{
+                  background:"transparent", border:"1px solid var(--rule-strong)",
+                  borderRadius:2, padding:"1px 6px", cursor:"pointer",
+                  fontSize:11, color:"var(--purple)",
+                }}>
+                ⚙ machine
               </button>
               {canEditLab && (
                 <button
@@ -3151,16 +3386,16 @@ function FooterMeta() {
               <a href={c.website} target="_blank" rel="noopener">{c.website}</a>
             </div>
           )}
-        </div>
-
-        <div>
-          <h5>Affiliations</h5>
           {ls.website && (
-            <div className="row" style={{marginBottom:8}}>
+            <div className="row">
               <span className="lbl">Lab</span>
               <a href={ls.website} target="_blank" rel="noopener">{ls.website}</a>
             </div>
           )}
+        </div>
+
+        <div>
+          <h5>Affiliations</h5>
           <div className="affil">
             <a href="https://www.schulich.uwo.ca/biochem/" target="_blank" rel="noopener">
               <img className="schulich" src="assets/Schulich_horizontal_CMYK.png" alt="Schulich School of Dentristy and Medicine" />

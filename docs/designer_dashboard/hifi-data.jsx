@@ -182,14 +182,6 @@ const DATA = {
     stock:    { reagents: [42, 50], kits: [6, 12] },
   },
 
-  // Known machines (PI-configured; each has a lab-base path).
-  machines: [
-    { id: "biodatadci", type: "lab_server", hostname: "biodatadci.uwo.ca",
-      description: "Primary lab data server", lab_base: "/data/lab_vm" },
-    { id: "laptop", type: "laptop", hostname: null,
-      description: "Personal laptop (SSH key access to lab-base)", lab_base: null },
-  ],
-
   // Existing Wigamig installations per member × machine.
   installations: [
     {

@@ -71,13 +71,13 @@ class IdentityBlock(BaseModel):
 
 
 class MemberSettings(BaseModel):
-    """Editable member profile settings — displayed in the profile modal."""
+    """Editable member profile settings — cross-machine, lives in
+    ``<lab-mgmt>/members/<handle>.md`` so it follows the user to any
+    machine they sign in from. Strictly contact + location info: the
+    Obsidian/notebook fields have been moved to :class:`MachineSettings`
+    because they are per-machine, not per-member.
+    """
 
-    # Obsidian / notebook
-    obsidian_vault_path: str | None = None     # full path displayed as short form
-    obsidian_vault_name: str | None = None     # vault name for obsidian:// URLs
-    notebook_subfolder: str = "lab-notebook"   # subfolder within the vault
-    oracle_subfolder: str = "oracle"           # personal oracle subfolder within vault
     # Contact
     email: str | None = None
     orcid: str | None = None
@@ -92,6 +92,31 @@ class MemberSettings(BaseModel):
     address: str | None = None
     city: str | None = None
     department: str | None = None
+    # Read-only Obsidian fields, surfaced for backwards-compat callers.
+    # New code should read these from ``machine_settings`` instead — the
+    # Member Profile modal no longer edits them.
+    obsidian_vault_path: str | None = None
+    obsidian_vault_name: str | None = None
+    notebook_subfolder: str = "lab-notebook"
+    oracle_subfolder: str = "oracle"
+
+
+class MachineSettings(BaseModel):
+    """Per-machine settings, stored in ``~/.wigamig/machine.yaml``.
+
+    These paths differ between a user's laptop and a lab server, so they
+    cannot live in the git-synced ``<lab-mgmt>/members/<handle>.md``.
+    The dashboard reads this file once per request and exposes it as
+    :attr:`DashboardResponse.machine_settings`.
+    """
+
+    obsidian_vault_path: str | None = None      # absolute path on this machine
+    obsidian_vault_name: str | None = None      # for obsidian:// URLs
+    notebook_subfolder: str = "lab-notebook"    # subfolder within the vault
+    oracle_subfolder: str = "oracle"            # personal oracle subfolder
+    # Where the lab VM is mounted on this machine. Local (kind="local")
+    # bare repos are written under ``<lab_base>/<git_repos_subpath>/``.
+    lab_base: str | None = None                 # e.g. /data/lab_vm, or laptop mount
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +204,7 @@ class StatStrip(BaseModel):
 
 
 Sensitivity = Literal["clinical", "restricted", "standard"]
+RepoDestination = Literal["github", "local"]
 
 
 class ProjectRow(BaseModel):
@@ -190,11 +216,23 @@ class ProjectRow(BaseModel):
     open_seas: int
     last_activity: str
     # Phase 9: where to find the project's artefacts.
-    github_repo: str | None = None    # e.g. "hallettmiket/dcis_sc_tutorial"
-    slack_channel: str | None = None  # e.g. "proj_dcis_sc_tutorial"
-    slack_url: str | None = None      # full deep-link, when known
-    refined_path: str | None = None   # /data/lab_vm/refined/<project>
-    raw_path: str | None = None       # /data/lab_vm/raw/<project>
+    github_repo: str | None = None       # e.g. "hallettmiket/dcis_sc_tutorial"
+    github_pushed: bool = False          # local git repo has a GitHub remote
+    slack_channel: str | None = None     # derived channel name, e.g. "proj_dcis_sc_tutorial"
+    slack_channel_id: str | None = None  # real Slack channel ID from CHARTER.md
+    slack_url: str | None = None         # full deep-link, when known
+    # Phase 16: generalised repo destination. ``github`` matches the
+    # original behaviour; ``local`` means the project's ``origin`` is a
+    # bare repo on the lab VM rather than on github.com. ``remote_url``
+    # is whatever ``git remote get-url origin`` returns regardless of
+    # kind, so the JSX can render the correct link.
+    repo_kind: RepoDestination = "github"
+    remote_url: str | None = None
+    # Installation (per-machine): raw/refined dirs may not exist if project not yet installed.
+    refined_path: str | None = None      # e.g. ~/lab_vm/data/refined/<project>
+    raw_path: str | None = None          # e.g. ~/lab_vm/data/raw/<project>
+    raw_exists: bool = False
+    refined_exists: bool = False
 
 
 class PeerRow(BaseModel):
@@ -264,6 +302,13 @@ class LabSettings(BaseModel):
     notebook_large_files_path: str | None = None  # e.g. /data/lab_vm/obsidian-lab/notebooks
     lab_oracle_vault: str | None = None        # wigamig-vault-<name>/ on lab base
     admins: list[str] = []                     # handles with PI-level settings edit rights
+    # Project-repo defaults at lab scope. ``github_org`` was previously
+    # hard-coded as "hallettmiket"; now read from lab.md so multi-lab
+    # support stops requiring code edits. ``git_repos_subpath`` lets a
+    # lab choose whether local bare repos live under ``git_repos/``,
+    # ``repos/``, ``bare/``, …
+    github_org: str = "hallettmiket"           # used when repo_kind="github"
+    git_repos_subpath: str = "git_repos"       # used when repo_kind="local"
 
 
 class TrainingCertSpec(BaseModel):
@@ -515,6 +560,36 @@ class NotebookBlock(BaseModel):
     yesterday_excerpt: NotebookYesterday
 
 
+class InstallationRow(BaseModel):
+    """One member-project-machine triple, persisted to disk by the install wizard.
+
+    Manifest lives at ``~/.wigamig/installations/<project>.yaml`` — per-machine
+    state, not shared across machines. If a user installs the same project on
+    two machines, each machine has its own manifest under its own
+    ``~/.wigamig/installations/`` directory.
+    """
+
+    member: str                                # ``@handle``
+    project: str
+    machine_type: Literal["laptop", "lab_server"]
+    hostname: str | None = None                # ``None`` for laptops
+    username: str                              # local OS account on the machine
+    access: Literal["direct", "ssh"] = "direct"
+    has_direct_access: bool = True
+    lab_base: str | None = None
+    raw_path: str | None = None
+    refined_path: str | None = None
+    notebook_path: str | None = None
+    ssh_remote: str | None = None
+    mount_point: str | None = None
+    components: list[str] = []                 # infra installed (git, vscode, …)
+    agents: list[str] = []                     # agent set provisioned
+    status: Literal["active", "issues", "pending"] = "active"
+    created: str | None = None                 # ISO date
+    last_checked: str | None = None
+    issues: list[str] = []
+
+
 # ---------------------------------------------------------------------------
 # Top-level response
 # ---------------------------------------------------------------------------
@@ -536,6 +611,7 @@ class DashboardResponse(BaseModel):
     member: IdentityBlock
     pi: IdentityBlock
     member_settings: MemberSettings = MemberSettings()
+    machine_settings: MachineSettings = MachineSettings()
     lab_settings: LabSettings = LabSettings()
     agents: list[AgentRow] = []
     oracle_recent: list[OracleEntry] = []
@@ -560,3 +636,4 @@ class DashboardResponse(BaseModel):
     heatmap: Heatmap
     inventory: InventoryBlock
     notebook: NotebookBlock
+    installations: list[InstallationRow] = []

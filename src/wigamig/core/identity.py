@@ -2,7 +2,8 @@
 Purpose: Resolve the wigamig identity of the current user.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-06
-Input: Environment (``WIGAMIG_USER``) or ``gh api user`` as fallback.
+Input: Environment (``WIGAMIG_USER``), ``~/.wigamig/user`` (the saved
+       Western netname), or ``gh api user`` as final fallback.
 Output: ``Identity`` dataclass with the resolved handle and source.
 """
 
@@ -13,10 +14,12 @@ import os
 import shutil
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 ENV_VAR = "WIGAMIG_USER"
-IdentitySource = Literal["env", "gh", "unknown"]
+USER_FILE = Path.home() / ".wigamig" / "user"
+IdentitySource = Literal["env", "user_file", "gh", "unknown"]
 
 
 class IdentityError(RuntimeError):
@@ -52,6 +55,27 @@ def from_env() -> Identity | None:
     return Identity(handle=handle, source="env")
 
 
+def from_user_file() -> Identity | None:
+    """Return an :class:`Identity` from ``~/.wigamig/user`` if present, else ``None``.
+
+    This file is written by the dashboard's "Remember me on this machine"
+    flow and stores the user's **Western netname**. It must be consulted
+    before ``gh api user`` because a member's GitHub login is often
+    different from their Western netname — the Streamlit app already
+    knows this; the FastAPI server should too.
+    """
+    if not USER_FILE.is_file():
+        return None
+    try:
+        text = USER_FILE.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    handle = _normalize(text)
+    if not handle:
+        return None
+    return Identity(handle=handle, source="user_file")
+
+
 def from_gh() -> Identity | None:
     """Return an :class:`Identity` from ``gh api user`` if available, else ``None``."""
     if shutil.which("gh") is None:
@@ -81,20 +105,22 @@ def from_gh() -> Identity | None:
 def resolve(*, allow_unknown: bool = False) -> Identity:
     """Resolve the current user.
 
-    Resolution order: ``WIGAMIG_USER`` env var, then ``gh api user``.
+    Resolution order: ``WIGAMIG_USER`` env var, then ``~/.wigamig/user``
+    (the saved Western netname), then ``gh api user``.
 
     Parameters
     ----------
     allow_unknown:
         If ``True``, return ``Identity(handle="unknown", source="unknown")``
-        when neither source resolves. Otherwise raise :class:`IdentityError`.
+        when no source resolves. Otherwise raise :class:`IdentityError`.
     """
-    for resolver in (from_env, from_gh):
+    for resolver in (from_env, from_user_file, from_gh):
         identity = resolver()
         if identity is not None:
             return identity
     if allow_unknown:
         return Identity(handle="unknown", source="unknown")
     raise IdentityError(
-        f"Could not resolve current user. Set ${ENV_VAR} or authenticate with `gh auth login`."
+        f"Could not resolve current user. Set ${ENV_VAR}, save your "
+        f"Western netname to {USER_FILE}, or run `gh auth login`."
     )

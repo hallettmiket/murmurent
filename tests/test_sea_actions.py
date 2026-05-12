@@ -228,9 +228,14 @@ def test_endpoint_missing_sea_is_404(world):
     assert res.status_code == 404
 
 
-def test_endpoint_no_user_is_400(world, monkeypatch):
+def test_endpoint_no_user_is_400(world, monkeypatch, tmp_path):
+    from wigamig.core import identity as _identity
+
     monkeypatch.delenv("WIGAMIG_USER", raising=False)
     monkeypatch.setenv("PATH", "")  # block gh fallback
+    # Also block the ~/.wigamig/user fallback so the developer's saved
+    # Western netname doesn't leak in.
+    monkeypatch.setattr(_identity, "USER_FILE", tmp_path / "no_user_here")
     client = _client()
     res = client.post("/api/sea/p_test/1/claim", json={})
     assert res.status_code == 400

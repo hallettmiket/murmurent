@@ -21,6 +21,7 @@ EXPECTED_AGENTS = {
     "artist",
     "blacksmith",
     "bookworm",
+    "cable_guy",
     "conscience",
     "oracle",
     "receptionist",

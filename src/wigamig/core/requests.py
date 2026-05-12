@@ -87,6 +87,11 @@ class JoinRequest:
     proposed_members: list[str] | None = None
     proposed_sensitivity: str | None = None
     proposed_lead: str | None = None
+    # Phase 16: where the project's git origin should live. Default
+    # ``"github"`` preserves the pre-Phase-16 behaviour. ``local_repo_root``
+    # is consulted only when kind="local".
+    repo_kind: str | None = None
+    local_repo_root: str | None = None
 
     def to_meta(self) -> dict[str, Any]:
         meta: dict[str, Any] = {
@@ -105,6 +110,8 @@ class JoinRequest:
             ("proposed_members", self.proposed_members),
             ("proposed_sensitivity", self.proposed_sensitivity),
             ("proposed_lead", self.proposed_lead),
+            ("repo_kind", self.repo_kind),
+            ("local_repo_root", self.local_repo_root),
         ):
             if value is not None:
                 meta[key] = value
@@ -147,6 +154,8 @@ def parse_request(path: Path) -> JoinRequest:
         proposed_members=proposed_members,
         proposed_sensitivity=_opt_str(meta.get("proposed_sensitivity")),
         proposed_lead=_opt_str(meta.get("proposed_lead")),
+        repo_kind=_opt_str(meta.get("repo_kind")),
+        local_repo_root=_opt_str(meta.get("local_repo_root")),
         body=parsed.body,
         path=path,
     )
@@ -286,6 +295,8 @@ def file_create_request(
     proposed_lead: str | None = None,
     justification: str = "",
     today: _dt.date | None = None,
+    repo_kind: str = "github",
+    local_repo_root: str | None = None,
 ) -> JoinRequest:
     """File a ``project-create`` request.
 
@@ -317,6 +328,8 @@ def file_create_request(
         proposed_members=norm_members,
         proposed_sensitivity=sensitivity,
         proposed_lead=_at(proposed_lead) if proposed_lead else _at(requester),
+        repo_kind=repo_kind or "github",
+        local_repo_root=local_repo_root,
     )
     write_request(req)
     return req
@@ -344,7 +357,9 @@ def _create_project_from_request(req: JoinRequest) -> None:
         reb_expires=None,
         data_residency=None,
         lead=lead,
-        skip_github=True,  # PI can push to GitHub manually after approval
+        skip_github=True,  # PI / dashboard does the push after approval
+        repo_kind=req.repo_kind or "github",
+        local_repo_root=req.local_repo_root,
     )
 
 

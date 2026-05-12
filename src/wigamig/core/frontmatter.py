@@ -108,8 +108,13 @@ def require_fields(meta: dict[str, Any], fields: Iterable[str], *, context: str 
 
 
 def dump_document(meta: dict[str, Any], body: str) -> str:
-    """Serialize ``meta`` + ``body`` back into a markdown string with frontmatter."""
-    yaml_text = yaml.safe_dump(meta, sort_keys=False).rstrip() + "\n"
+    """Serialize ``meta`` + ``body`` back into a markdown string with frontmatter.
+
+    Uses ``allow_unicode=True`` so characters like ``·`` survive as-is
+    rather than being escaped to ``\\xB7`` — important because these
+    files are read by humans, not just by code.
+    """
+    yaml_text = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip() + "\n"
     body_clean = body.lstrip("\n")
     if body_clean and not body_clean.endswith("\n"):
         body_clean += "\n"

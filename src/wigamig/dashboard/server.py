@@ -64,6 +64,12 @@ class CreateProjectRequestBody(BaseModel):
     sensitivity: str = "standard"
     proposed_lead: str | None = None
     justification: str = ""
+    # Phase 16: repo destination. Default preserves the existing GitHub
+    # path. ``local_repo_root`` is consulted only when kind="local" —
+    # it defaults to ``<lab_base>/<git_repos_subpath>`` resolved
+    # server-side from machine + lab settings.
+    repo_kind: C.RepoDestination = "github"
+    local_repo_root: str | None = None
 
 
 class AddMemberBody(BaseModel):
@@ -80,6 +86,80 @@ class WorkspaceLaunchBody(BaseModel):
     project: str
     agents: list[str] = []
     sea_id: int | None = None
+
+
+class WorkspaceInitializeBody(BaseModel):
+    """JSON body for ``POST /api/workspace/initialize`` (install wizard)."""
+
+    member: str                                # ``@handle`` of the installer
+    project: str
+    machine_type: str                          # "laptop" | "lab_server"
+    hostname: str | None = None
+    username: str                              # local OS account on the machine
+    has_direct_access: bool = True
+    lab_base: str
+    raw_path: str
+    refined_path: str
+    notebook_path: str
+    ssh_remote: str | None = None
+    mount_point: str | None = None
+    infra_components: list[str] = []
+    agents: list[str] = []
+
+
+class MachineSettingsBody(BaseModel):
+    """JSON body for ``POST /api/machine/settings``."""
+
+    obsidian_vault_path: str | None = None
+    obsidian_vault_name: str | None = None
+    notebook_subfolder: str = "lab-notebook"
+    oracle_subfolder: str = "oracle"
+    lab_base: str | None = None
+
+
+class MemberSettingsBody(BaseModel):
+    """JSON body for ``POST /api/member/settings``.
+
+    Flat — the same shape the modal already sends. The endpoint maps
+    these onto nested ``contact:`` / ``location:`` blocks in the member's
+    lab-mgmt frontmatter.
+    """
+
+    # Contact
+    email: str | None = None
+    orcid: str | None = None
+    bluesky: str | None = None
+    github: str | None = None
+    osf: str | None = None
+    website: str | None = None
+    # Location
+    office: str | None = None
+    dry_lab: str | None = None
+    wet_labs: str | None = None
+    address: str | None = None
+    city: str | None = None
+    department: str | None = None
+    # Legacy Obsidian fields — accepted for backwards-compat (the old
+    # modal still posts them) but silently ignored: those moved to
+    # ``POST /api/machine/settings`` because they are per-machine.
+    obsidian_vault_path: str | None = None
+    obsidian_vault_name: str | None = None
+    notebook_subfolder: str | None = None
+    oracle_subfolder: str | None = None
+
+
+class LabSettingsBody(BaseModel):
+    """JSON body for ``POST /api/lab/settings`` (PI-only)."""
+
+    name: str | None = None                          # short id, e.g. "hallett"
+    display_name: str | None = None                  # e.g. "Hallett Lab"
+    pi_handle: str | None = None                     # ``@handle``
+    website: str | None = None
+    notebook_large_files_path: str | None = None
+    lab_oracle_vault: str | None = None
+    admins: list[str] | None = None
+    github_org: str | None = None                    # e.g. "hallettmiket"
+    git_repos_subpath: str | None = None             # default "git_repos"
 
 
 class CatalogEntryBody(BaseModel):
@@ -280,6 +360,16 @@ def create_app() -> FastAPI:
         except sea_actions.SeaBadRequest as exc:
             raise HTTPException(status_code=422, detail=str(exc))
 
+        from . import slack_notify as _notify
+        _notify.sea_state_change(
+            project=result.project,
+            sea_id=result.sea.id,
+            actor=actor,
+            action=action,
+            description=result.sea.description or "",
+            new_state=result.sea.state,
+        )
+
         return {
             "ok": True,
             "project": result.project,
@@ -317,6 +407,8 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=403, detail=str(exc))
         except request_actions.RequestBadRequest as exc:
             raise HTTPException(status_code=409, detail=str(exc))
+        from . import slack_notify as _notify
+        _notify.project_request(kind="join", project=body.project, actor=actor)
         return _request_response(result.request)
 
     @app.post("/api/request/create-project")
@@ -335,6 +427,8 @@ def create_app() -> FastAPI:
                 sensitivity=body.sensitivity,
                 proposed_lead=body.proposed_lead,
                 justification=body.justification,
+                repo_kind=body.repo_kind,
+                local_repo_root=body.local_repo_root,
             )
         except request_actions.RequestForbidden as exc:
             raise HTTPException(status_code=403, detail=str(exc))
@@ -364,6 +458,47 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc))
         except request_actions.RequestBadRequest as exc:
             raise HTTPException(status_code=422, detail=str(exc))
+        req = result.request
+        if action == "approve" and req.kind == "project-create":
+            import logging as _logging
+            from . import slack_notify as _notify
+            from ..commands import project_cmd as _project_cmd
+            _log = _logging.getLogger(__name__)
+            # Create Slack channel
+            ch = _notify.create_project_channel(req.project)
+            if ch:
+                _notify._write_charter_channel_id(req.project, ch)
+                _notify._post(ch, f":rocket: Project `{req.project}` approved! Welcome to the channel.")
+            else:
+                _log.warning("Slack channel creation failed for project %s", req.project)
+            # Provision the git origin per the request's repo_kind.
+            local_repo = Path(f"~/repos/{req.project}").expanduser()
+            if (local_repo / ".git").is_dir():
+                kind = req.repo_kind or "github"
+                try:
+                    if kind == "local":
+                        if not req.local_repo_root:
+                            _log.warning(
+                                "local repo provisioning skipped for %s: no local_repo_root",
+                                req.project,
+                            )
+                        else:
+                            bare = Path(req.local_repo_root).expanduser() / f"{req.project}.git"
+                            _project_cmd.ensure_remote(
+                                local_repo, req.project, kind="local", bare_repo_path=bare,
+                            )
+                    else:
+                        # kind="github" — read org from lab.md, fall back to historic literal.
+                        lab_name = "hallett"
+                        org = snap_mod._lab_settings(lab_name).github_org or "hallettmiket"
+                        _project_cmd.ensure_remote(
+                            local_repo, req.project, kind="github", org=org,
+                        )
+                except Exception as _exc:
+                    _log.warning(
+                        "remote provisioning (kind=%s) failed for %s: %s",
+                        kind, req.project, _exc,
+                    )
         return _request_response(result.request)
 
     def _request_response(req) -> dict:
@@ -471,6 +606,219 @@ def create_app() -> FastAPI:
             "cmd": cmd,
         }
 
+    @app.post("/api/workspace/initialize")
+    def workspace_initialize(
+        body: WorkspaceInitializeBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Provision a project on this machine: mkdir raw/refined + write manifest.
+
+        Minimal scope by design. Does not clone the repo, install agents,
+        or run any shell beyond ``mkdir -p`` — those steps stay as a user
+        checklist. The manifest at ``~/.wigamig/installations/<project>.yaml``
+        is what makes the installation appear in the dashboard's
+        Installations panel on the next refresh.
+        """
+        import datetime as _dt
+        import yaml as _yaml
+        from .snapshot import INSTALLATIONS_DIR
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+
+        # Validate project exists locally before scribbling any state.
+        from ..core.projects import project_path as _pp
+        if not _pp(body.project).is_dir():
+            raise HTTPException(status_code=404, detail=f"project not found: {body.project}")
+
+        # Create raw + refined dirs for this project. ``mkdir -p`` is idempotent.
+        try:
+            raw_proj = Path(body.raw_path).expanduser() / body.project
+            refined_proj = Path(body.refined_path).expanduser() / body.project
+            raw_proj.mkdir(parents=True, exist_ok=True)
+            refined_proj.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"mkdir failed: {exc}")
+
+        member_at = body.member if body.member.startswith("@") else f"@{body.member}"
+        today_iso = _dt.date.today().isoformat()
+        manifest = {
+            "member": member_at,
+            "project": body.project,
+            "machine_type": body.machine_type,
+            "hostname": body.hostname,
+            "username": body.username,
+            "access": "direct" if body.has_direct_access else "ssh",
+            "has_direct_access": body.has_direct_access,
+            "lab_base": body.lab_base,
+            "raw_path": body.raw_path,
+            "refined_path": body.refined_path,
+            "notebook_path": body.notebook_path,
+            "ssh_remote": body.ssh_remote,
+            "mount_point": body.mount_point,
+            "components": body.infra_components,
+            "agents": body.agents,
+            "status": "active",
+            "created": today_iso,
+            "last_checked": today_iso,
+            "issues": [],
+        }
+
+        INSTALLATIONS_DIR.mkdir(parents=True, exist_ok=True)
+        manifest_path = INSTALLATIONS_DIR / f"{body.project}.yaml"
+        try:
+            manifest_path.write_text(
+                _yaml.safe_dump(manifest, sort_keys=False, allow_unicode=True),
+                encoding="utf-8",
+            )
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"manifest write failed: {exc}")
+
+        return {
+            "ok": True,
+            "project": body.project,
+            "manifest": str(manifest_path),
+            "raw_dir": str(raw_proj),
+            "refined_dir": str(refined_proj),
+        }
+
+    # -----------------------------------------------------------------
+    # Settings: machine (per-machine), member (per-person), lab (PI-only)
+    # -----------------------------------------------------------------
+
+    @app.post("/api/machine/settings")
+    def save_machine_settings(body: MachineSettingsBody) -> dict:
+        """Persist per-machine settings to ``~/.wigamig/machine.yaml``.
+
+        Not gated on identity: the file is in the user's home dir, so
+        the OS already enforces who can write it. Returns the path so
+        the UI can display where the value landed.
+        """
+        from . import machine_settings as _ms
+        path = _ms.write(C.MachineSettings(**body.model_dump()))
+        return {"ok": True, "path": str(path)}
+
+    @app.post("/api/member/settings")
+    def save_member_settings(
+        body: MemberSettingsBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Write the member's contact + location fields back to lab-mgmt.
+
+        Edits ``<lab-mgmt>/members/<actor>.md`` frontmatter. Preserves
+        the body, ``handle``/``full_name``/``role``/``status``/``lab``/
+        ``certifications``/``obsidian``/``created`` and any other
+        unknown keys. Per-machine Obsidian fields posted by older
+        clients are silently dropped — they belong on machine.yaml.
+        """
+        from ..core.frontmatter import parse_file, dump_document
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+
+        member_path = lab_mgmt_repo_root() / "members" / f"{actor}.md"
+        if not member_path.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail=f"member file not found: {member_path}",
+            )
+
+        parsed = parse_file(member_path)
+        meta = dict(parsed.meta or {})
+
+        # Only modify fields the request actually sent — a partial POST
+        # like ``{"email": "x"}`` must not nuke the user's other contact
+        # info. ``model_fields_set`` distinguishes "omitted" from
+        # "explicitly null", which a plain dict from body.model_dump()
+        # cannot.
+        sent = body.model_fields_set
+        contact_keys = ("email", "orcid", "bluesky", "github", "osf", "website")
+        location_keys = ("office", "dry_lab", "wet_labs", "address", "city", "department")
+
+        def _merge(block_name: str, fields: dict) -> None:
+            existing = meta.get(block_name)
+            block = dict(existing) if isinstance(existing, dict) else {}
+            for k, v in fields.items():
+                if v is None or (isinstance(v, str) and not v.strip()):
+                    block.pop(k, None)
+                else:
+                    block[k] = v
+            if block:
+                meta[block_name] = block
+            else:
+                meta.pop(block_name, None)
+
+        _merge("contact", {k: getattr(body, k) for k in contact_keys if k in sent})
+        _merge("location", {k: getattr(body, k) for k in location_keys if k in sent})
+
+        try:
+            member_path.write_text(dump_document(meta, parsed.body or ""), encoding="utf-8")
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"write failed: {exc}")
+
+        return {"ok": True, "path": str(member_path)}
+
+    @app.post("/api/lab/settings")
+    def save_lab_settings(
+        body: LabSettingsBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Write lab-wide settings to ``<lab-mgmt>/lab.md`` frontmatter (PI only).
+
+        Preserves the body, ``lab:`` (the short ID), ``created:``,
+        ``institution``, ``department``, and any other unknown keys.
+        Only the fields explicitly present in the body are updated.
+        """
+        from ..core.frontmatter import parse_file, dump_document
+
+        _require_pi(user)
+
+        lab_path = lab_mgmt_repo_root() / "lab.md"
+        if not lab_path.is_file():
+            raise HTTPException(status_code=404, detail=f"lab.md not found at {lab_path}")
+
+        parsed = parse_file(lab_path)
+        meta = dict(parsed.meta or {})
+
+        # Map LabSettings keys onto lab.md frontmatter keys. ``name`` in
+        # the contract is the short ID (lab); ``display_name`` is the
+        # human label. The current lab.md uses ``name:`` for the display
+        # label, so we keep that for backwards compat: store display in
+        # ``name`` and the short ID in ``lab``.
+        updates: dict[str, object] = {}
+        if body.name is not None:
+            updates["lab"] = body.name
+        if body.display_name is not None:
+            updates["name"] = body.display_name
+        if body.pi_handle is not None:
+            pi = body.pi_handle.strip()
+            updates["pi"] = pi if pi.startswith("@") else f"@{pi}"
+        if body.website is not None:
+            updates["website"] = body.website or None
+        if body.notebook_large_files_path is not None:
+            updates["notebook_large_files_path"] = body.notebook_large_files_path or None
+        if body.lab_oracle_vault is not None:
+            updates["lab_oracle_vault"] = body.lab_oracle_vault or None
+        if body.admins is not None:
+            updates["admins"] = list(body.admins)
+        if body.github_org is not None:
+            updates["github_org"] = body.github_org or None
+        if body.git_repos_subpath is not None:
+            updates["git_repos_subpath"] = body.git_repos_subpath or None
+
+        for k, v in updates.items():
+            if v in (None, ""):
+                meta.pop(k, None)
+            else:
+                meta[k] = v
+
+        try:
+            lab_path.write_text(dump_document(meta, parsed.body or ""), encoding="utf-8")
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"write failed: {exc}")
+
+        return {"ok": True, "path": str(lab_path)}
+
     # -----------------------------------------------------------------
     # Membership (PI-only roster mgmt)
     # -----------------------------------------------------------------
@@ -499,6 +847,8 @@ def create_app() -> FastAPI:
             )
         except OSError:
             pass
+        from . import slack_notify as _notify
+        _notify.member_added(handle=rec.handle, full_name=rec.full_name, role=rec.role)
         return {"ok": True, "member": {
             "handle": rec.handle, "full_name": rec.full_name,
             "role": rec.role, "status": rec.status, "created": rec.created,
@@ -535,6 +885,112 @@ def create_app() -> FastAPI:
         except OSError:
             pass
         return {"ok": True, "handle": rec.handle, "status": rec.status}
+
+    # -----------------------------------------------------------------
+    # Project provisioning (GitHub / Slack / installation dirs)
+    # -----------------------------------------------------------------
+
+    @app.post("/api/project/{project}/provision/slack")
+    def provision_slack(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Create the Slack channel for a project. PI only. Idempotent."""
+        actor = _require_pi(user)
+        from . import slack_notify as _notify
+        channel_id = _notify.create_project_channel(project)
+        if not channel_id:
+            raise HTTPException(status_code=500, detail="Slack channel creation failed — check server logs")
+        _notify._write_charter_channel_id(project, channel_id)
+        _notify._post(channel_id, f":rocket: Project `{project}` channel ready.")
+        return {"ok": True, "channel_id": channel_id}
+
+    @app.post("/api/project/{project}/provision/github")
+    def provision_github(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Create the project's remote and push. PI only. Idempotent retry.
+
+        Kind is read from the project's ``CHARTER.md`` frontmatter
+        (``repo_kind: github|local``). Endpoint name kept for URL
+        back-compat; the action is now kind-aware.
+        """
+        import subprocess
+        from ..core.frontmatter import parse_file as _pf
+        from ..commands import project_cmd as _project_cmd
+
+        _require_pi(user)
+        local_repo = Path(f"~/repos/{project}").expanduser()
+        if not (local_repo / ".git").is_dir():
+            raise HTTPException(status_code=404, detail=f"No local git repo at {local_repo}")
+        try:
+            subprocess.check_output(
+                ["git", "-C", str(local_repo), "remote", "get-url", "origin"],
+                stderr=subprocess.DEVNULL,
+            )
+            raise HTTPException(status_code=409, detail="Remote already configured")
+        except subprocess.CalledProcessError:
+            pass
+
+        # Read repo_kind from CHARTER.md. Default to "github" for projects
+        # created before Phase 16, which never persisted the field.
+        charter = local_repo / "CHARTER.md"
+        kind = "github"
+        local_repo_root: str | None = None
+        if charter.is_file():
+            meta = _pf(charter).meta or {}
+            kind = str(meta.get("repo_kind") or "github")
+            local_repo_root = meta.get("local_repo_root") or None
+
+        try:
+            if kind == "local":
+                if not local_repo_root:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="CHARTER.md says repo_kind=local but local_repo_root is missing",
+                    )
+                bare = Path(local_repo_root).expanduser() / f"{project}.git"
+                url = _project_cmd.ensure_remote(
+                    local_repo, project, kind="local", bare_repo_path=bare,
+                )
+                return {"ok": True, "kind": "local", "remote": url}
+            # kind="github"
+            org = snap_mod._lab_settings("hallett").github_org or "hallettmiket"
+            url = _project_cmd.ensure_remote(
+                local_repo, project, kind="github", org=org,
+            )
+            if url is None:
+                raise HTTPException(
+                    status_code=500,
+                    detail="'gh' CLI not found — install from https://cli.github.com/",
+                )
+            return {"ok": True, "kind": "github", "remote": url, "repo": f"{org}/{project}"}
+        except HTTPException:
+            raise
+        except subprocess.CalledProcessError as exc:
+            detail = (exc.stderr or b"").decode(errors="replace") or str(exc)
+            raise HTTPException(status_code=500, detail=f"provisioning failed: {detail}")
+        except Exception as exc:  # noqa: BLE001 — surface to the user
+            raise HTTPException(status_code=500, detail=f"provisioning failed: {exc}")
+
+    @app.post("/api/project/{project}/provision/install")
+    def provision_install(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Create raw/ and refined/ installation dirs for a project. Never overwrites existing dirs."""
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        from ..core import lab_vm as _lv
+        raw = _lv.project_raw_dir(project)
+        refined = _lv.project_refined_dir(project)
+        created: list[str] = []
+        for d in (raw, refined):
+            if not d.is_dir():
+                d.mkdir(parents=True, exist_ok=True)
+                created.append(str(d))
+        return {"ok": True, "created": created, "already_existed": [str(d) for d in (raw, refined) if d not in [Path(x) for x in created]]}
 
     # -----------------------------------------------------------------
     # SEA catalog (Phase 10)
@@ -720,6 +1176,16 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=422, detail=f"unknown action: {action}")
         except _distill.DistillError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
+
+        # Notify Slack after successful approve/decline
+        try:
+            parsed = _distill._parse_oracle(path)
+            title = (parsed.meta or {}).get("title", slug)
+        except Exception:
+            title = slug
+        from . import slack_notify as _notify
+        _notify.oracle_approval(slug=slug, action=action, actor=actor, title=str(title))
+
         return {"ok": True, "slug": slug, "action": action}
 
     @app.post("/api/oracle/process")
@@ -862,6 +1328,17 @@ def create_app() -> FastAPI:
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/api/environment/local_user")
+    def environment_local_user() -> dict[str, str]:
+        """Return the OS account name on the machine running the dashboard.
+
+        Used by the installation wizard to prefill the "Local OS account"
+        field when the target machine is the user's laptop — disambiguates
+        from the Western netname, which is a separate concept.
+        """
+        import getpass
+        return {"local_user": getpass.getuser()}
 
     if STATIC_DIR.is_dir():
         app.mount(
