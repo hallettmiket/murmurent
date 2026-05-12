@@ -669,12 +669,68 @@ class RegistrarStats(BaseModel):
     total_members: int = 0                   # deduped across labs
 
 
+# -- Phase C+: cross-group certification visibility ---------------
+
+
+class RegistrarCertCell(BaseModel):
+    """One cert's status for one member in one group (lab/core)."""
+
+    code: str
+    status: Literal["ok", "expiring", "expired", "missing", "n/a", "one_time"]
+    expires: str | None = None
+
+
+class RegistrarMemberCertRow(BaseModel):
+    """A flat row joining (group, member, certs) for the centre-wide table.
+
+    Members who belong to multiple labs appear once per lab — that's
+    the correct shape because each lab declares its own compliance
+    config, and a member's "missing" cert in lab A might be "n/a"
+    (wrong audience) in lab B.
+    """
+
+    group: str                               # short ID (e.g. "hallett")
+    group_display: str                       # e.g. "Hallett Lab"
+    group_kind: Literal["lab", "core"] = "lab"
+    handle: str                              # ``@netname``
+    full_name: str = ""
+    role: str = "member"
+    member_status: Literal["active", "inactive"] = "active"
+    certs: list[RegistrarCertCell] = []
+    # Convenience flags so the JSX can colour the row without re-scanning:
+    has_expired: bool = False
+    has_expiring: bool = False
+    has_missing: bool = False
+
+
+class RegistrarCertAggregate(BaseModel):
+    """Centre-wide compliance summary, surfaced as stat cards."""
+
+    members_total: int = 0                   # unique handles across active groups
+    members_with_issues: int = 0             # any expired / missing / expiring
+    expired_count: int = 0                   # total expired cert cells
+    expiring_count: int = 0                  # total expiring cert cells (< yellow threshold)
+    missing_count: int = 0                   # total missing required certs
+
+
+class RegistrarCertPanel(BaseModel):
+    """The whole Certifications panel — aggregate + per-member rows."""
+
+    aggregate: RegistrarCertAggregate = RegistrarCertAggregate()
+    rows: list[RegistrarMemberCertRow] = []
+    # Distinct cert codes seen across all groups, in the order they
+    # appear when iterating labs then cores. The JSX uses this to lay
+    # out the table columns.
+    cert_codes: list[str] = []
+
+
 class RegistrarResponse(BaseModel):
     """The payload for ``GET /api/registrar/dashboard``.
 
     Deliberately does NOT include projects, SEAs, inventory, notebooks,
     personal Oracles, or any per-lab editable content. The registrar
-    sees groups as opaque units.
+    sees groups as opaque units. Certifications are explicitly in scope
+    (institutional compliance is a centre-level concern, not lab-private).
     """
 
     registrar_handle: str                    # the actor (``@the_pi`` in dev)
@@ -683,6 +739,7 @@ class RegistrarResponse(BaseModel):
     cores: list[RegistrarCoreRow] = []
     collaborations: list[RegistrarCollaborationRow] = []
     stats: RegistrarStats = RegistrarStats()
+    certs: RegistrarCertPanel = RegistrarCertPanel()
 
 
 # ---------------------------------------------------------------------------

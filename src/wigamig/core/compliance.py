@@ -93,7 +93,17 @@ def compliance_file() -> Path:
 
 def load_config() -> ComplianceConfig:
     """Read ``<lab-mgmt>/compliance.md``; fall back to a sensible default."""
-    path = compliance_file()
+    return load_config_at(compliance_file())
+
+
+def load_config_at(path: Path) -> ComplianceConfig:
+    """Read a compliance.md from any path.
+
+    Phase B+ multi-lab callers (e.g. the registrar) need to read each
+    lab's own compliance.md, not the single one resolved through
+    ``lab_mgmt_repo_root()``. ``load_config()`` stays the
+    single-lab-default entry point and now delegates here.
+    """
     if not path.is_file():
         return ComplianceConfig(
             required=[CertSpec(**spec) for spec in _DEFAULT_REQUIRED],
@@ -114,7 +124,11 @@ def load_config() -> ComplianceConfig:
                     short=str(entry.get("short") or entry["code"]).lower(),
                     cadence_years=(
                         int(entry["cadence_years"])
-                        if entry.get("cadence_years") not in (None, "null")
+                        # Accept ``null``, ``~``, ``None``/``none`` — the
+                        # last two are common hand-edit mistakes since
+                        # users coming from Python type ``None`` rather
+                        # than the YAML-correct ``null``.
+                        if entry.get("cadence_years") not in (None, "null", "None", "none", "~")
                         else None
                     ),
                     audience=str(entry.get("audience") or "all"),

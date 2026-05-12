@@ -11,6 +11,7 @@ Covers:
 
 from __future__ import annotations
 
+import datetime as _dt
 import subprocess
 from pathlib import Path
 
@@ -738,3 +739,180 @@ def test_endpoint_edit_partial_post_preserves_unsent_fields(isolated):
     assert res.status_code == 200
     assert res.json()["lab"]["pi"] == "@jortega"
     assert res.json()["lab"]["github_org"] == "ortegalab"
+
+
+# ---------------------------------------------------------------------------
+# Phase C+: cross-group certifications panel
+# ---------------------------------------------------------------------------
+
+
+def _seed_lab_with_compliance(
+    root: Path,
+    *,
+    lab_id: str,
+    pi: str,
+    members: list[tuple[str, str, list[str]]],
+    required_codes: list[tuple[str, str, int | None, str]] | None = None,
+) -> Path:
+    """Scaffold a lab-mgmt repo with compliance.md and members carrying certs.
+
+    ``members`` is a list of ``(handle, role, [cert_strings])``.
+    ``required_codes`` is a list of ``(code, name, cadence_years, audience)``;
+    defaults to TCPS_2 only when None.
+    """
+    lab_dir = root / f"{lab_id}-lab-mgmt"
+    (lab_dir / "members").mkdir(parents=True)
+    (lab_dir / "lab.md").write_text(
+        f"---\nlab: {lab_id}\nname: {lab_id.title()} Lab\npi: '@{pi}'\n---\n",
+        encoding="utf-8",
+    )
+    required = required_codes or [("TCPS_2", "TCPS 2", 3, "all")]
+    required_yaml = "\n".join(
+        f"  - code: {c}\n    name: {n}\n    short: {c.lower()}\n"
+        f"    cadence_years: {('null' if y is None else y)}\n    audience: {a}"
+        for (c, n, y, a) in required
+    )
+    (lab_dir / "compliance.md").write_text(
+        "---\nrequired:\n" + required_yaml + "\n---\n",
+        encoding="utf-8",
+    )
+    for handle, role, certs in members:
+        cert_lines = "\n".join(f"  - {c}" for c in certs)
+        (lab_dir / "members" / f"{handle}.md").write_text(
+            "---\n"
+            f"handle: '@{handle}'\n"
+            f"full_name: {handle.title()}\n"
+            f"role: {role}\n"
+            "status: active\n"
+            "certifications:\n" + cert_lines + "\n"
+            "---\n",
+            encoding="utf-8",
+        )
+    return lab_dir
+
+
+def test_cert_panel_renders_one_row_per_member_group(isolated, tmp_path):
+    _seed_registrar(isolated)
+    lab_a = _seed_lab_with_compliance(
+        tmp_path, lab_id="hallett", pi="the_pi",
+        members=[
+            ("the_pi", "pi", ["TCPS_2:2030-12-31"]),
+            ("bob", "postdoc", ["TCPS_2:2028-06-15"]),
+        ],
+    )
+    lab_b = _seed_lab_with_compliance(
+        tmp_path, lab_id="ortega", pi="jortega",
+        members=[
+            ("jortega", "pi", ["TCPS_2:2027-06-15"]),
+        ],
+    )
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_a)
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_b)
+
+    resp = rs.build_registrar_response("the_pi", today=_dt.date(2026, 5, 12))
+    panel = resp.certs
+    handles_by_group = {(r.group, r.handle) for r in panel.rows}
+    assert ("hallett", "@the_pi") in handles_by_group
+    assert ("hallett", "@bob") in handles_by_group
+    assert ("ortega", "@jortega") in handles_by_group
+    assert "TCPS_2" in panel.cert_codes
+
+
+def test_cert_panel_aggregate_counts_issues(isolated, tmp_path):
+    _seed_registrar(isolated)
+    lab_dir = _seed_lab_with_compliance(
+        tmp_path, lab_id="hallett", pi="the_pi",
+        members=[
+            ("the_pi", "pi", ["TCPS_2:2030-12-31"]),  # ok
+            ("bob",     "postdoc", ["TCPS_2:2024-01-01"]),  # expired (today=2026-05)
+            ("cassie",  "student", []),  # missing TCPS_2
+        ],
+    )
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
+
+    resp = rs.build_registrar_response("the_pi", today=_dt.date(2026, 5, 12))
+    a = resp.certs.aggregate
+    assert a.members_total == 3
+    assert a.expired_count == 1   # bob
+    assert a.missing_count == 1   # cassie
+    assert a.members_with_issues == 2
+
+
+def test_cert_panel_uses_each_groups_own_compliance(isolated, tmp_path):
+    """A cert that's required in lab A might be unknown to lab B; the
+    registrar must read each group's compliance.md, not a single global."""
+    _seed_registrar(isolated)
+    lab_a = _seed_lab_with_compliance(
+        tmp_path, lab_id="hallett", pi="the_pi",
+        members=[("the_pi", "pi", ["TCPS_2:2030-12-31"])],
+        required_codes=[("TCPS_2", "TCPS 2", 3, "all")],
+    )
+    lab_b = _seed_lab_with_compliance(
+        tmp_path, lab_id="ortega", pi="jortega",
+        members=[("jortega", "pi", ["WHM103:2030-12-31"])],
+        required_codes=[("WHM103", "WHMIS", None, "all")],
+    )
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_a)
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_b)
+
+    resp = rs.build_registrar_response("the_pi", today=_dt.date(2026, 5, 12))
+    # Both cert codes surface in the column header.
+    assert "TCPS_2" in resp.certs.cert_codes
+    assert "WHM103" in resp.certs.cert_codes
+    # the_pi's TCPS_2 status is ok; he has no row in ortega (different lab).
+    the_pi_row = next(r for r in resp.certs.rows if r.handle == "@the_pi")
+    assert the_pi_row.group == "hallett"
+    assert any(c.code == "TCPS_2" and c.status == "ok" for c in the_pi_row.certs)
+
+
+def test_cert_panel_skips_archived_labs(isolated, tmp_path):
+    _seed_registrar(isolated)
+    lab_dir = _seed_lab_with_compliance(
+        tmp_path, lab_id="hallett", pi="the_pi",
+        members=[("the_pi", "pi", ["TCPS_2:2030-12-31"])],
+    )
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
+    registrar.archive_lab("hallett")
+    resp = rs.build_registrar_response("the_pi", today=_dt.date(2026, 5, 12))
+    assert resp.certs.rows == []
+    assert resp.certs.aggregate.members_total == 0
+
+
+def test_cert_panel_endpoint_returns_panel(isolated, tmp_path):
+    """The HTTP endpoint surfaces the cert panel in the JSON payload."""
+    _seed_registrar(isolated)
+    lab_dir = _seed_lab_with_compliance(
+        tmp_path, lab_id="hallett", pi="the_pi",
+        members=[("the_pi", "pi", ["TCPS_2:2030-12-31"])],
+    )
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
+    client = TestClient(create_app())
+    res = client.get("/api/registrar/dashboard")
+    assert res.status_code == 200
+    body = res.json()
+    assert "certs" in body
+    assert body["certs"]["cert_codes"] == ["TCPS_2"]
+    assert len(body["certs"]["rows"]) == 1
+
+
+def test_load_config_at_reads_arbitrary_path(tmp_path):
+    """The new load_config_at must work without env vars set."""
+    from wigamig.core import compliance
+    p = tmp_path / "compliance.md"
+    p.write_text(
+        "---\nrequired:\n"
+        "  - code: TCPS_2\n    name: TCPS 2\n    short: tcps2\n"
+        "    cadence_years: 3\n    audience: all\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    cfg = compliance.load_config_at(p)
+    assert len(cfg.required) == 1
+    assert cfg.required[0].code == "TCPS_2"
+
+
+def test_load_config_at_returns_default_when_missing(tmp_path):
+    from wigamig.core import compliance
+    cfg = compliance.load_config_at(tmp_path / "no_such_file.md")
+    # Falls back to the default set; should not raise.
+    assert isinstance(cfg.required, list)

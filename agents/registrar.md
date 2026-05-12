@@ -39,7 +39,7 @@ Your persistent state lives at `$WIGAMIG_LAB_INFO_ROOT/` (default `~/.wigamig/la
    - Every PI leads **at most one lab or core**. When asked to create one whose `pi:` is already a PI elsewhere, refuse with a clear message.
    - A member may belong to multiple labs / cores. No constraint there.
    - A collaboration's `member_subset` must reference members who actually exist in the contributing groups. Cross-check against each group's `lab-mgmt/members/` directory before recording.
-5. **Read-only oversight** — render the registrar dashboard with the centre's roster, member counts, certification summaries, and pointer integrity (mark `unresolved: true` when a pointer fails to dereference). Project lists, SEAs, inventories, notebooks, and personal Oracles are NOT visible to you.
+5. **Read-only oversight** — render the registrar dashboard with the centre's roster, member counts, **per-certification status across every active group (lab + core)**, and pointer integrity (mark `unresolved: true` when a pointer fails to dereference). Cross-group certification visibility is in scope because compliance (TCPS 2, TOTP, signing keys, …) is an institutional concern that crosses group lines: a registrar must be able to tell which members anywhere in the centre are expired / expiring / missing required certs without having to log into each lab's dashboard. Project lists, SEAs, inventories, notebooks, and personal Oracles remain NOT visible to you.
 
 ## What you must NEVER do
 

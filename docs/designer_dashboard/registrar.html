@@ -202,6 +202,20 @@
       return '<span class="' + cls + '">' + escapeHTML(status) + '</span>';
     }
 
+    function renderCertCell(cell) {
+      const status = cell.status || "missing";
+      let cls = "pill ";
+      let label = status;
+      if (status === "ok") { cls += "pill-active"; }
+      else if (status === "one_time") { cls += "pill-active"; label = "ok"; }
+      else if (status === "expiring") { cls += "pill-warn"; }
+      else if (status === "expired") { cls += "pill-archived"; }
+      else if (status === "missing") { cls += "pill-archived"; }
+      else if (status === "n/a") { cls = "pill"; label = "n/a"; }
+      const expiry = cell.expires ? ' <span class="mono muted" style="font-size:10px;">' + escapeHTML(cell.expires) + '</span>' : '';
+      return '<span class="' + cls + '">' + escapeHTML(label) + '</span>' + expiry;
+    }
+
     function renderMembers(members) {
       if (!members || !members.length) {
         return '<div class="muted" style="font-style:italic;">No members on file.</div>';
@@ -338,6 +352,51 @@
       } else {
         html += '<table><thead><tr><th>name</th><th>PIs</th><th>groups</th><th>created</th><th>status</th></tr></thead><tbody>';
         for (const c of data.collaborations) html += renderCollab(c);
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+
+      // -- Certifications panel (centre-wide compliance view) --
+      const certs = data.certs || { aggregate: {}, rows: [], cert_codes: [] };
+      const a = certs.aggregate || {};
+      html += '<div class="panel"><header>'
+        + '<h2>Certifications</h2>'
+        + '<span class="meta">'
+        + (certs.rows || []).length + ' member-group rows · '
+        + (a.members_with_issues || 0) + ' / ' + (a.members_total || 0) + ' with issues'
+        + '</span>'
+        + '</header>';
+      if ((certs.rows || []).length === 0) {
+        html += '<div class="empty">No certifications to report. Make sure each lab\'s <code>compliance.md</code> declares a <code>required:</code> list and members\' <code>certifications:</code> frontmatter is populated.</div>';
+      } else {
+        // Mini stat row inside the panel
+        html += '<div style="display:flex; gap:14px; padding:10px 16px; background:var(--paper); border-bottom:1px solid var(--rule); font-size:12px;">'
+          + '<span><strong style="color:var(--red);">' + (a.expired_count || 0) + '</strong> <span class="muted">expired</span></span>'
+          + '<span><strong style="color:#8a560f;">' + (a.expiring_count || 0) + '</strong> <span class="muted">expiring</span></span>'
+          + '<span><strong style="color:var(--purple-deep);">' + (a.missing_count || 0) + '</strong> <span class="muted">missing</span></span>'
+          + '</div>';
+        const codes = certs.cert_codes || [];
+        html += '<table><thead><tr>'
+          + '<th>group</th><th>handle</th><th>name</th><th>role</th>';
+        for (const code of codes) html += '<th class="mono">' + escapeHTML(code) + '</th>';
+        html += '</tr></thead><tbody>';
+        for (const r of certs.rows) {
+          const cellByCode = {};
+          for (const c of r.certs || []) cellByCode[c.code] = c;
+          const rowAttn = r.has_expired ? ' style="background:rgba(178,58,43,0.04);"'
+                        : r.has_expiring ? ' style="background:rgba(240,167,87,0.06);"'
+                        : '';
+          html += '<tr' + rowAttn + '>'
+            + '<td class="mono">' + escapeHTML(r.group) + ' <span class="muted">(' + escapeHTML(r.group_kind) + ')</span></td>'
+            + '<td class="mono">' + escapeHTML(r.handle) + '</td>'
+            + '<td>' + escapeHTML(r.full_name || "") + '</td>'
+            + '<td class="mono muted">' + escapeHTML(r.role) + '</td>';
+          for (const code of codes) {
+            const cell = cellByCode[code];
+            html += '<td>' + (cell ? renderCertCell(cell) : '<span class="muted">—</span>') + '</td>';
+          }
+          html += '</tr>';
+        }
         html += '</tbody></table>';
       }
       html += '</div>';
