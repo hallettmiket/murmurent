@@ -97,4 +97,6 @@ Code style, data storage, documentation standards, and project structure convent
 
 ## Slack Notifications
 
-After every `git push`, post to `#claude-test` Slack channel (channel ID `C0B3D9DS6SE`) via `mcp__slack__slack_post_message` with: repo name, branch, commit hash, commit message, and a one-line summary of changes. (Used to be `#claude-code` — moved 2026-05-12 because that channel got too noisy for non-dev members.)
+After every `git push`, post to `#claude-test` Slack channel (channel ID `C0B3D9DS6SE`) via `mcp__claude_ai_Slack__slack_send_message` with: repo name, branch, commit hash, commit message, and a one-line summary of changes. (Used to be `#claude-code` — moved 2026-05-12 because that channel got too noisy for non-dev members.)
+
+Tool note: there are two Slack MCP servers wired up. Use `mcp__claude_ai_Slack__slack_send_message` — the bot for that integration has been invited to `#claude-test`. The other one (`mcp__slack__slack_post_message`) is a different bot identity that returns `not_in_channel` for this channel.
