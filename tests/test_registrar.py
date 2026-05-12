@@ -1051,6 +1051,224 @@ def test_lab_dashboard_is_registrar_false_for_non_registrar(isolated, tmp_path, 
 
 
 # ---------------------------------------------------------------------------
+# Phase E: cores (parallel to labs, different terminology)
+# ---------------------------------------------------------------------------
+
+
+def test_create_core_scaffolds_files(isolated):
+    _seed_registrar(isolated)
+    entry = registrar.create_core(
+        name="imaging", display_name="Imaging Core",
+        leader_handle="dlee", leader_full_name="Diane Lee",
+        slack_workspace="T01ABC",
+    )
+    assert entry.name == "imaging"
+    assert entry.pi == "@dlee"
+    assert entry.slack_workspace == "T01ABC"
+    core_dir = registrar.lab_info_root() / "cores" / "imaging" / "lab-mgmt"
+    assert (core_dir / "lab.md").is_file()
+    assert (core_dir / "members" / "dlee.md").is_file()
+
+
+def test_create_core_lab_md_declares_core_short_id(isolated):
+    """The frontmatter uses ``core:`` (not ``lab:``) for the short ID."""
+    _seed_registrar(isolated)
+    registrar.create_core(
+        name="imaging", display_name="Imaging Core", leader_handle="dlee",
+    )
+    from wigamig.core.frontmatter import parse_file
+    meta = parse_file(
+        registrar.lab_info_root() / "cores" / "imaging" / "lab-mgmt" / "lab.md"
+    ).meta
+    assert meta["core"] == "imaging"
+    assert meta["name"] == "Imaging Core"
+    assert meta["pi"] == "@dlee"
+
+
+def test_create_core_member_file_uses_core_leader_role(isolated):
+    _seed_registrar(isolated)
+    registrar.create_core(
+        name="imaging", display_name="Imaging Core",
+        leader_handle="dlee", leader_full_name="Diane Lee",
+    )
+    from wigamig.core.frontmatter import parse_file
+    member_md = registrar.lab_info_root() / "cores" / "imaging" / "lab-mgmt" / "members" / "dlee.md"
+    meta = parse_file(member_md).meta
+    assert meta["handle"] == "@dlee"
+    assert meta["role"] == "core_leader"
+    assert meta["lab"] == "imaging"  # group field; lab key shared with labs for plumbing
+
+
+def test_create_core_name_collides_with_existing_lab(isolated):
+    """Cores and labs share the same name namespace — a name can be one
+    or the other, not both. This avoids ambiguity in collaborations."""
+    _seed_registrar(isolated)
+    registrar.create_lab(name="hallett", display_name="Hallett Lab", pi_handle="the_pi")
+    with pytest.raises(registrar.LabAlreadyExists, match="collides"):
+        registrar.create_core(name="hallett", display_name="Hallett Core", leader_handle="other")
+
+
+def test_create_core_refuses_when_leader_already_runs_a_lab(isolated):
+    """One-leader-per-active-group spans both labs AND cores."""
+    _seed_registrar(isolated)
+    registrar.create_lab(name="hallett", display_name="Hallett Lab", pi_handle="the_pi")
+    with pytest.raises(registrar.PIAlreadyLeadsAnother, match="lab 'hallett'"):
+        registrar.create_core(name="imaging", display_name="Imaging Core", leader_handle="the_pi")
+
+
+def test_create_core_frees_after_archive_of_lab(isolated):
+    """Archive a lab → its PI can now lead a core."""
+    _seed_registrar(isolated)
+    registrar.create_lab(name="hallett", display_name="Hallett Lab", pi_handle="the_pi")
+    registrar.archive_lab("hallett")
+    entry = registrar.create_core(name="imaging", display_name="Imaging Core", leader_handle="the_pi")
+    assert entry.pi == "@the_pi"
+
+
+def test_archive_unarchive_core_round_trip(isolated):
+    _seed_registrar(isolated)
+    registrar.create_core(name="imaging", display_name="Imaging Core", leader_handle="dlee")
+    archived = registrar.archive_core("imaging")
+    assert archived.status == "archived"
+    unarchived = registrar.unarchive_core("imaging")
+    assert unarchived.status == "active"
+
+
+def test_unarchive_core_refuses_when_leader_now_runs_another(isolated):
+    _seed_registrar(isolated)
+    registrar.create_core(name="imaging", display_name="Imaging Core", leader_handle="dlee")
+    registrar.archive_core("imaging")
+    registrar.create_lab(name="hallett", display_name="Hallett Lab", pi_handle="dlee")
+    with pytest.raises(registrar.PIAlreadyLeadsAnother):
+        registrar.unarchive_core("imaging")
+
+
+def test_update_core_metadata(isolated):
+    _seed_registrar(isolated)
+    registrar.create_core(
+        name="imaging", display_name="Imaging Core", leader_handle="dlee",
+        slack_workspace="T01ABC",
+    )
+    registrar.update_core_metadata("imaging", display_name="Imaging Facility", slack_workspace="")
+    entry = next(c for c in registrar.read_registry().cores if c.name == "imaging")
+    assert entry.slack_workspace is None
+    from wigamig.core.frontmatter import parse_file
+    meta = parse_file(
+        registrar.lab_info_root() / "cores" / "imaging" / "lab-mgmt" / "lab.md"
+    ).meta
+    assert meta["name"] == "Imaging Facility"
+    assert "slack_workspace" not in meta
+
+
+def test_update_core_leader_handoff_creates_new_member_file(isolated):
+    _seed_registrar(isolated)
+    registrar.create_core(name="imaging", display_name="Imaging Core", leader_handle="dlee")
+    registrar.update_core_metadata("imaging", leader_handle="kpark", leader_full_name="Kim Park")
+    members_dir = registrar.lab_info_root() / "cores" / "imaging" / "lab-mgmt" / "members"
+    assert (members_dir / "dlee.md").is_file()  # untouched
+    assert (members_dir / "kpark.md").is_file()  # new
+    from wigamig.core.frontmatter import parse_file
+    meta = parse_file(members_dir / "kpark.md").meta
+    assert meta["role"] == "core_leader"
+    assert meta["full_name"] == "Kim Park"
+
+
+# Phase E endpoints
+# -----------------
+
+
+def _client_as_registrar_phase_e(isolated):
+    _seed_registrar(isolated)
+    return TestClient(create_app())
+
+
+def test_endpoint_create_core_403_when_not_registrar(isolated):
+    client = TestClient(create_app())
+    res = client.post("/api/registrar/core", json={
+        "name": "imaging", "display_name": "Imaging Core", "leader_handle": "dlee",
+    })
+    assert res.status_code == 403
+
+
+def test_endpoint_create_core_409_on_lab_namespace_collision(isolated):
+    client = _client_as_registrar_phase_e(isolated)
+    client.post("/api/registrar/lab", json={
+        "name": "hallett", "display_name": "Hallett Lab", "pi_handle": "the_pi",
+    })
+    res = client.post("/api/registrar/core", json={
+        "name": "hallett", "display_name": "Hallett Core", "leader_handle": "other",
+    })
+    assert res.status_code == 409
+
+
+def test_endpoint_core_archive_unarchive_round_trip(isolated):
+    client = _client_as_registrar_phase_e(isolated)
+    client.post("/api/registrar/core", json={
+        "name": "imaging", "display_name": "Imaging Core", "leader_handle": "dlee",
+    })
+    r1 = client.post("/api/registrar/core/imaging/archive")
+    assert r1.status_code == 200
+    assert r1.json()["core"]["status"] == "archived"
+    r2 = client.post("/api/registrar/core/imaging/unarchive")
+    assert r2.status_code == 200
+    assert r2.json()["core"]["status"] == "active"
+
+
+def test_endpoint_core_edit_preserves_unsent_fields(isolated):
+    client = _client_as_registrar_phase_e(isolated)
+    client.post("/api/registrar/core", json={
+        "name": "imaging", "display_name": "Imaging Core",
+        "leader_handle": "dlee", "github_org": "imaging-core",
+    })
+    res = client.post("/api/registrar/core/imaging/edit", json={"display_name": "Renamed"})
+    assert res.status_code == 200
+    body = res.json()["core"]
+    assert body["leader"] == "@dlee"
+    assert body["github_org"] == "imaging-core"
+
+
+def test_dashboard_payload_renders_core_with_leader_field(isolated):
+    """The contract field is ``leader`` (not ``pi``) for cores —
+    matches the UI's "Core leader" label."""
+    client = _client_as_registrar_phase_e(isolated)
+    client.post("/api/registrar/core", json={
+        "name": "imaging", "display_name": "Imaging Core",
+        "leader_handle": "dlee", "slack_workspace": "T01ABC",
+    })
+    body = client.get("/api/registrar/dashboard").json()
+    cores = body["cores"]
+    assert len(cores) == 1
+    assert cores[0]["leader"] == "@dlee"
+    assert cores[0]["slack_workspace"] == "T01ABC"
+    assert cores[0]["display_name"] == "Imaging Core"
+    # And the stats counter sees it.
+    assert body["stats"]["total_cores"] == 1
+
+
+def test_collaboration_can_span_lab_and_core(isolated, tmp_path):
+    """Cores participate in collaborations the same way labs do."""
+    _seed_registrar(isolated)
+    # One lab the registrar-on-this-machine isn't tied to.
+    lab_dir = _make_lab_mgmt(
+        tmp_path, lab_id="hallett", pi="the_pi",
+        members=[("the_pi", "pi"), ("allie", "postdoc")],
+    )
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
+    # And a core created via the registrar.
+    registrar.create_core(name="imaging", display_name="Imaging Core", leader_handle="dlee")
+    collab = registrar.create_collaboration(
+        name="dcis_imaging",
+        pis=["@the_pi", "@dlee"],
+        groups=["hallett", "imaging"],
+        member_subset={
+            "hallett": ["@the_pi"],
+            "imaging": ["@dlee"],
+        },
+    )
+    assert collab.groups == ["hallett", "imaging"]
+
+
+# ---------------------------------------------------------------------------
 # Phase D: collaborations (multi-PI, multi-group)
 # ---------------------------------------------------------------------------
 

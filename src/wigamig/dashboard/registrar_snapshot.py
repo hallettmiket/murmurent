@@ -134,18 +134,40 @@ def _coerce_lab(entry: _reg.LabEntry) -> C.RegistrarLabRow:
 
 def _coerce_core(entry: _reg.CoreEntry) -> C.RegistrarCoreRow:
     lab_path = Path(entry.lab_mgmt_path).expanduser()
+    display_name = entry.name.title() + " Core"
     members: list[C.RegistrarMemberRow] = []
-    unresolved = not lab_path.is_dir()
-    reason = f"core path does not exist: {lab_path}" if unresolved else None
-    if not unresolved:
+    unresolved = False
+    reason: str | None = None
+    if not lab_path.is_dir():
+        unresolved = True
+        reason = f"core path does not exist: {lab_path}"
+    else:
+        # Cores write their metadata to ``lab.md`` (shared filename for
+        # plumbing reasons) — the frontmatter declares ``core:`` instead
+        # of ``lab:``. We honour either short-ID field for parity.
+        lab_md = lab_path / "lab.md"
+        if lab_md.is_file():
+            try:
+                meta = parse_file(lab_md).meta or {}
+                display_name = str(meta.get("name") or display_name)
+            except Exception as exc:
+                unresolved = True
+                reason = f"core lab.md unparseable: {exc}"
+        else:
+            unresolved = True
+            reason = f"no lab.md at {lab_md}"
         members = _load_members_for(lab_path)
+
     return C.RegistrarCoreRow(
         name=entry.name,
-        display_name=entry.name.title() + " Core",
-        pi=entry.pi,
+        display_name=display_name,
+        leader=entry.pi,
         status=entry.status,  # type: ignore[arg-type]
         created=entry.created,
         lab_mgmt_path=str(lab_path),
+        slack_workspace=entry.slack_workspace,
+        github_org=entry.github_org,
+        oracle_vault=entry.oracle_vault,
         members=members,
         member_count=len(members),
         unresolved=unresolved,
