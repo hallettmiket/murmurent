@@ -193,6 +193,37 @@ class RegistrarLabEditBody(BaseModel):
     department: str | None = None
 
 
+class RegistrarCoreCreateBody(BaseModel):
+    """JSON body for ``POST /api/registrar/core`` (Phase E).
+
+    Mirrors the lab create body except the lead's field is called
+    ``leader_handle`` (cores have core-leaders, not PIs).
+    """
+
+    name: str
+    display_name: str
+    leader_handle: str
+    leader_full_name: str | None = None
+    slack_workspace: str | None = None
+    github_org: str | None = None
+    oracle_vault: str | None = None
+    institution: str | None = None
+    department: str | None = None
+
+
+class RegistrarCoreEditBody(BaseModel):
+    """JSON body for ``POST /api/registrar/core/{name}/edit``."""
+
+    display_name: str | None = None
+    leader_handle: str | None = None
+    leader_full_name: str | None = None
+    slack_workspace: str | None = None
+    github_org: str | None = None
+    oracle_vault: str | None = None
+    institution: str | None = None
+    department: str | None = None
+
+
 class RegistrarCollabCreateBody(BaseModel):
     """JSON body for ``POST /api/registrar/collaboration`` (Phase D)."""
 
@@ -1516,6 +1547,93 @@ def create_app() -> FastAPI:
         except _reg.PIAlreadyLeadsAnother as exc:
             raise HTTPException(status_code=409, detail=str(exc))
         return {"ok": True, "lab": _lab_entry_to_dict(entry)}
+
+    def _core_entry_to_dict(entry) -> dict:
+        return {
+            "name": entry.name,
+            "leader": entry.pi,            # surfaced under the right label
+            "lab_mgmt_path": entry.lab_mgmt_path,
+            "status": entry.status,
+            "slack_workspace": entry.slack_workspace,
+            "github_org": entry.github_org,
+            "oracle_vault": entry.oracle_vault,
+        }
+
+    @app.post("/api/registrar/core")
+    def registrar_create_core(
+        body: RegistrarCoreCreateBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Phase E: registrar creates a new core."""
+        from ..core import registrar as _reg
+        _require_registrar(user)
+        try:
+            entry = _reg.create_core(
+                name=body.name,
+                display_name=body.display_name,
+                leader_handle=body.leader_handle,
+                leader_full_name=body.leader_full_name,
+                slack_workspace=body.slack_workspace,
+                github_org=body.github_org,
+                oracle_vault=body.oracle_vault,
+                institution=body.institution,
+                department=body.department,
+            )
+        except _reg.InvalidLabName as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except (_reg.LabAlreadyExists, _reg.PIAlreadyLeadsAnother) as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except _reg.RegistrarError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"ok": True, "core": _core_entry_to_dict(entry)}
+
+    @app.post("/api/registrar/core/{name}/archive")
+    def registrar_archive_core(
+        name: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        from ..core import registrar as _reg
+        _require_registrar(user)
+        try:
+            entry = _reg.archive_core(name)
+        except _reg.LabNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True, "core": _core_entry_to_dict(entry)}
+
+    @app.post("/api/registrar/core/{name}/unarchive")
+    def registrar_unarchive_core(
+        name: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        from ..core import registrar as _reg
+        _require_registrar(user)
+        try:
+            entry = _reg.unarchive_core(name)
+        except _reg.LabNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _reg.PIAlreadyLeadsAnother as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"ok": True, "core": _core_entry_to_dict(entry)}
+
+    @app.post("/api/registrar/core/{name}/edit")
+    def registrar_edit_core(
+        name: str,
+        body: RegistrarCoreEditBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        from ..core import registrar as _reg
+        _require_registrar(user)
+        sent = body.model_fields_set
+        kwargs = {k: getattr(body, k) for k in type(body).model_fields if k in sent}
+        try:
+            entry = _reg.update_core_metadata(name, **kwargs)
+        except _reg.LabNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _reg.PIAlreadyLeadsAnother as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except _reg.RegistrarError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"ok": True, "core": _core_entry_to_dict(entry)}
 
     def _collab_entry_to_dict(entry) -> dict:
         return {

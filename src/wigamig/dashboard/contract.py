@@ -638,15 +638,20 @@ class RegistrarLabRow(BaseModel):
 
 
 class RegistrarCoreRow(BaseModel):
-    """One core facility. Phase A schema matches a lab; Phase E will
-    extend with core-specific fields."""
+    """One core facility. Same shape as :class:`RegistrarLabRow` but the
+    lead's field is ``leader`` (cores have core-leaders, not PIs).
+    Phase E ships parity; later phases will add core-specific structure
+    (accountant agent, SEA cost tracking, inventory)."""
 
     name: str
     display_name: str
-    pi: str
+    leader: str                              # @handle of the core leader
     status: Literal["active", "archived"] = "active"
     created: str | None = None
     lab_mgmt_path: str
+    slack_workspace: str | None = None
+    github_org: str | None = None
+    oracle_vault: str | None = None
     members: list[RegistrarMemberRow] = []
     member_count: int = 0
     unresolved: bool = False

@@ -273,6 +273,39 @@
         + '</div></details></td></tr>';
     }
 
+    function renderCoreRow(c) {
+      const unresolvedBanner = c.unresolved
+        ? '<div class="error" style="margin-bottom:6px;">⚠ ' + escapeHTML(c.unresolved_reason || "pointer unresolved") + '</div>'
+        : '';
+      const coreNameEsc = escapeHTML(c.name);
+      const isActive = c.status === "active";
+      const actionButtons = ''
+        + '<button class="btn core-action" data-action="edit" data-core="' + coreNameEsc + '">edit</button> '
+        + (isActive
+            ? '<button class="btn core-action" data-action="archive" data-core="' + coreNameEsc + '">archive</button>'
+            : '<button class="btn core-action" data-action="unarchive" data-core="' + coreNameEsc + '">unarchive</button>');
+      return ''
+        + '<tr>'
+        + '<td><strong>' + escapeHTML(c.display_name) + '</strong> <span class="mono muted">' + escapeHTML(c.name) + '</span></td>'
+        + '<td class="mono">' + escapeHTML(c.leader || "") + '</td>'
+        + '<td class="mono">' + (c.member_count || 0) + '</td>'
+        + '<td class="mono muted">' + escapeHTML(c.created || "—") + '</td>'
+        + '<td>' + pill(c.status) + (c.unresolved ? ' <span class="pill pill-warn">unresolved</span>' : '') + '</td>'
+        + '<td style="text-align:right; white-space:nowrap;">' + actionButtons + '</td>'
+        + '</tr>'
+        + '<tr><td colspan="6" style="padding:0;">'
+        + '<details><summary class="mono muted" style="padding:6px 14px;">▸ details</summary>'
+        + '<div class="lab-detail">'
+        + unresolvedBanner
+        + '<h4>core lab-mgmt path</h4><div class="mono">' + escapeHTML(c.lab_mgmt_path) + '</div>'
+        + (c.slack_workspace ? '<h4>slack workspace</h4><div class="mono">' + escapeHTML(c.slack_workspace) + '</div>' : '')
+        + (c.github_org ? '<h4>github org</h4><div class="mono">' + escapeHTML(c.github_org) + '</div>' : '')
+        + (c.oracle_vault ? '<h4>oracle vault</h4><div class="mono">' + escapeHTML(c.oracle_vault) + '</div>' : '')
+        + '<h4>members</h4>'
+        + renderMembers(c.members)
+        + '</div></details></td></tr>';
+    }
+
     function renderCollab(c) {
       const groups = (c.groups || []).join(", ");
       const pis = (c.pis || []).join(", ");
@@ -344,18 +377,16 @@
       }
       html += '</div>';
 
-      html += '<div class="panel"><header><h2>Cores</h2><span class="meta">' + (data.cores || []).length + ' total</span></header>';
+      html += '<div class="panel"><header><h2>Cores</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + (data.cores || []).length + ' total'
+        + '<button class="btn" id="btn-new-core">＋ new core</button>'
+        + '</span></header>';
       if ((data.cores || []).length === 0) {
-        html += '<div class="empty">No cores registered yet. Phase E will add a creation flow with core-specific schema.</div>';
+        html += '<div class="empty">No cores registered yet. Cores are like labs but their primary purpose is OFFERING SEAs to the rest of the centre; their lead is called the <strong>core leader</strong> rather than PI.</div>';
       } else {
-        html += '<table><thead><tr><th>name</th><th>PI</th><th>members</th><th>created</th><th>status</th></tr></thead><tbody>';
-        for (const c of data.cores) {
-          html += '<tr><td><strong>' + escapeHTML(c.display_name) + '</strong> <span class="mono muted">' + escapeHTML(c.name) + '</span></td>'
-            + '<td class="mono">' + escapeHTML(c.pi) + '</td>'
-            + '<td class="mono">' + (c.member_count || 0) + '</td>'
-            + '<td class="mono muted">' + escapeHTML(c.created || "—") + '</td>'
-            + '<td>' + pill(c.status) + '</td></tr>';
-        }
+        html += '<table><thead><tr><th>name</th><th>core leader</th><th>members</th><th>created</th><th>status</th><th style="text-align:right;">actions</th></tr></thead><tbody>';
+        for (const c of data.cores) html += renderCoreRow(c);
         html += '</tbody></table>';
       }
       html += '</div>';
@@ -454,6 +485,20 @@
           if (action === "edit") openEditCollabModal(name, (data.collaborations || []).find(c => c.name === name), data);
           else if (action === "archive" || action === "unarchive") {
             confirmCollabAction(action, name);
+          }
+        });
+      });
+
+      // Phase E: core controls.
+      const newCoreBtn = document.getElementById("btn-new-core");
+      if (newCoreBtn) newCoreBtn.addEventListener("click", openNewCoreModal);
+      root.querySelectorAll(".core-action").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const action = btn.getAttribute("data-action");
+          const name = btn.getAttribute("data-core");
+          if (action === "edit") openEditCoreModal(name, (data.cores || []).find(c => c.name === name));
+          else if (action === "archive" || action === "unarchive") {
+            confirmCoreAction(action, name);
           }
         });
       });
@@ -928,6 +973,155 @@
     }
 
     async function _submitCollab(wrap, prefix, method, urlBase, payload) {
+      const msg = document.getElementById(prefix + "-msg");
+      const submitBtn = document.getElementById(prefix + "-submit");
+      msg.textContent = "saving…";
+      msg.className = "form-msg";
+      submitBtn.disabled = true;
+      try {
+        const url = urlBase + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const res = await fetch(url, {
+          method: method,
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          let detail = "HTTP " + res.status;
+          try { detail = (await res.json()).detail || detail; } catch (_) {}
+          throw new Error(detail);
+        }
+        msg.textContent = "saved";
+        msg.className = "form-msg ok";
+        setTimeout(() => { wrap.remove(); load(); }, 600);
+      } catch (ex) {
+        msg.textContent = String(ex.message || ex);
+        msg.className = "form-msg error";
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+
+    // -----------------------------------------------------------
+    // Phase E: core modals (parallel to lab modals; terminology swapped)
+    // -----------------------------------------------------------
+
+    async function confirmCoreAction(action, name) {
+      const verb = action === "archive" ? "archive" : "unarchive";
+      if (!confirm(`${verb} core "${name}"?\n\nFiles will be preserved; reversible.`)) return;
+      const url = "/api/registrar/core/" + encodeURIComponent(name) + "/" + action
+        + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+      let res;
+      try {
+        res = await fetch(url, { method: "POST", credentials: "same-origin" });
+      } catch (ex) {
+        alert("network error: " + (ex.message || ex));
+        return;
+      }
+      if (!res.ok) {
+        let detail = "HTTP " + res.status;
+        try { detail = (await res.json()).detail || detail; } catch (_) {}
+        alert(verb + " failed: " + detail);
+        return;
+      }
+      load();
+    }
+
+    function openNewCoreModal() {
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      wrap.innerHTML =
+        '<form class="modal" id="new-core-form" autocomplete="off">' +
+          '<h2>Create a new core</h2>' +
+          '<p class="muted">Cores share the lab data model (members, projects, full agent fleet) but their primary purpose is to OFFER SEAs. The lead is called the <strong>core leader</strong>. Invariant: one active group (lab OR core) per leader.</p>' +
+          '<label>short ID (snake_case)</label>' +
+          '<input name="name" required placeholder="e.g. imaging" />' +
+          '<label>display name</label>' +
+          '<input name="display_name" required placeholder="e.g. Imaging Core" />' +
+          '<label>Core leader Western netname</label>' +
+          '<input name="leader_handle" required placeholder="e.g. dlee" />' +
+          '<label>Core leader full name (optional)</label>' +
+          '<input name="leader_full_name" placeholder="e.g. Dr. Diane Lee" />' +
+          '<label>Slack workspace ID (optional)</label>' +
+          '<input name="slack_workspace" placeholder="e.g. T01ABC23DE" />' +
+          '<label>GitHub org (optional)</label>' +
+          '<input name="github_org" placeholder="e.g. imaging-core" />' +
+          '<label>Obsidian vault name (optional)</label>' +
+          '<input name="oracle_vault" placeholder="e.g. wigamig-vault-imaging" />' +
+          '<label>institution (optional)</label>' +
+          '<input name="institution" placeholder="e.g. Western University" />' +
+          '<label>department (optional)</label>' +
+          '<input name="department" />' +
+          '<div class="actions">' +
+            '<span class="form-msg" id="new-core-msg"></span>' +
+            '<button type="button" class="btn ghost" id="new-core-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="new-core-submit">create</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("new-core-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("new-core-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const payload = {};
+        for (const [k, v] of fd.entries()) {
+          const trimmed = String(v).trim();
+          if (trimmed) payload[k] = trimmed;
+        }
+        await _submitCore(wrap, "new-core", "POST", "/api/registrar/core", payload);
+      });
+    }
+
+    function openEditCoreModal(name, core) {
+      if (!core) return;
+      const v = (k) => escapeHTML(core[k] || "");
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      wrap.innerHTML =
+        '<form class="modal" id="edit-core-form" autocomplete="off">' +
+          '<h2>Edit core — <code style="font-family:var(--mono); font-size:14px;">' + escapeHTML(name) + '</code></h2>' +
+          '<p class="muted">Empty a field to clear it. Short ID is not editable. Leader handoff re-enforces the one-leader-per-active-group invariant.</p>' +
+          '<label>display name</label>' +
+          '<input name="display_name" value="' + v("display_name") + '" />' +
+          '<label>Core leader Western netname</label>' +
+          '<input name="leader_handle" value="' + escapeHTML((core.leader || "").replace(/^@/, "")) + '" />' +
+          '<label>Core leader full name (only used when handoff lands a new member file)</label>' +
+          '<input name="leader_full_name" placeholder="(optional)" />' +
+          '<label>Slack workspace ID</label>' +
+          '<input name="slack_workspace" value="' + v("slack_workspace") + '" />' +
+          '<label>GitHub org</label>' +
+          '<input name="github_org" value="' + v("github_org") + '" />' +
+          '<label>Obsidian vault name</label>' +
+          '<input name="oracle_vault" value="' + v("oracle_vault") + '" />' +
+          '<div class="actions">' +
+            '<span class="form-msg" id="edit-core-msg"></span>' +
+            '<button type="button" class="btn ghost" id="edit-core-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="edit-core-submit">save</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("edit-core-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("edit-core-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const payload = {};
+        for (const [k, val] of fd.entries()) payload[k] = String(val);
+        // Drop fields that didn't change (so the request body uses the
+        // partial-POST semantics the endpoint expects).
+        if (payload.display_name === (core.display_name || "")) delete payload.display_name;
+        if (payload.leader_handle === ((core.leader || "").replace(/^@/, ""))) delete payload.leader_handle;
+        if (!payload.leader_full_name) delete payload.leader_full_name;
+        if (payload.slack_workspace === (core.slack_workspace || "")) delete payload.slack_workspace;
+        if (payload.github_org === (core.github_org || "")) delete payload.github_org;
+        if (payload.oracle_vault === (core.oracle_vault || "")) delete payload.oracle_vault;
+        await _submitCore(wrap, "edit-core", "POST",
+          "/api/registrar/core/" + encodeURIComponent(name) + "/edit", payload);
+      });
+    }
+
+    async function _submitCore(wrap, prefix, method, urlBase, payload) {
       const msg = document.getElementById(prefix + "-msg");
       const submitBtn = document.getElementById(prefix + "-submit");
       msg.textContent = "saving…";
