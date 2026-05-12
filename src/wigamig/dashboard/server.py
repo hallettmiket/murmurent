@@ -1325,6 +1325,29 @@ def create_app() -> FastAPI:
             "created": result.created,
         }
 
+    # -----------------------------------------------------------------
+    # Registrar (Phase A, read-only). Gated on is_registrar(); the
+    # registrar's handle is the first line of ``~/.wigamig/registrar``.
+    # -----------------------------------------------------------------
+
+    @app.get("/api/registrar/dashboard", response_model=C.RegistrarResponse)
+    def get_registrar_dashboard(
+        user: str = Query("", description="Override the resolved user (Western username)."),
+    ) -> C.RegistrarResponse:
+        from ..core import registrar as _reg
+        from . import registrar_snapshot as _reg_snap
+
+        actor = _resolve_actor(user)
+        if not _reg.is_registrar(actor):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    "registrar role required; declare your handle in "
+                    f"{_reg.REGISTRAR_SENTINEL} to act as registrar."
+                ),
+            )
+        return _reg_snap.build_registrar_response(actor)
+
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
@@ -1361,6 +1384,13 @@ def create_app() -> FastAPI:
         def index() -> HTMLResponse:
             return HTMLResponse(
                 (STATIC_DIR / "Wigamig Dashboard Hi-Fi.html").read_text(encoding="utf-8")
+            )
+
+        @app.get("/registrar", response_class=HTMLResponse)
+        def registrar_index() -> HTMLResponse:
+            """Phase A registrar dashboard — separate route from the lab UI."""
+            return HTMLResponse(
+                (STATIC_DIR / "registrar.html").read_text(encoding="utf-8")
             )
 
         # The hi-fi HTML loads its sibling JSX files via relative paths

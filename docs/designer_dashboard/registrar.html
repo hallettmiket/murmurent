@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>wigamig · Registrar dashboard</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700&family=Courier+Prime:ital,wght@0,400;0,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --purple:        #4F2683;
+        --purple-deep:   #201436;
+        --purple-soft:   #6F4DA8;
+        --tiger:         #F0A757;
+        --paper:         #FAF8F5;
+        --paper-2:       #F1ECE3;
+        --card:          #FFFFFF;
+        --rule:          #E0DAD0;
+        --rule-strong:   #C7BFB1;
+        --ink:           #1A1A1A;
+        --muted:         #5B5B5B;
+        --green:         #4F6B3A;
+        --red:           #B23A2B;
+        --serif: "EB Garamond", Georgia, serif;
+        --mono:  "Courier Prime", "IBM Plex Mono", Menlo, monospace;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--paper); color: var(--ink);
+                   font-family: var(--serif); }
+      .banner {
+        background: var(--purple); color: white;
+        padding: 12px 28px; display: flex; align-items: baseline;
+        justify-content: space-between; gap: 24px;
+        border-bottom: 4px solid var(--tiger);
+      }
+      .banner h1 { margin: 0; font-size: 22px; font-weight: 600; }
+      .banner .meta {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+        text-transform: uppercase; opacity: 0.9;
+      }
+      .container { max-width: 1200px; margin: 24px auto; padding: 0 28px; }
+      .stats { display: flex; gap: 20px; margin-bottom: 24px; }
+      .stat {
+        background: var(--card); border: 1px solid var(--rule-strong);
+        border-radius: 2px; padding: 14px 18px; flex: 1;
+      }
+      .stat .label {
+        font-family: var(--mono); font-size: 10px; letter-spacing: 1.2px;
+        text-transform: uppercase; color: var(--muted);
+      }
+      .stat .value {
+        font-family: var(--serif); font-size: 32px; font-weight: 600;
+        color: var(--purple-deep); line-height: 1.1;
+      }
+      .panel {
+        background: var(--card); border: 1px solid var(--rule-strong);
+        border-radius: 2px; margin-bottom: 22px;
+      }
+      .panel > header {
+        padding: 12px 18px; border-bottom: 1px solid var(--rule);
+        display: flex; align-items: baseline; justify-content: space-between;
+        background: var(--paper-2);
+      }
+      .panel > header h2 {
+        margin: 0; font-family: var(--serif); font-size: 17px; color: var(--purple-deep);
+      }
+      .panel > header .meta {
+        font-family: var(--mono); font-size: 11px; color: var(--muted);
+        letter-spacing: 1px; text-transform: uppercase;
+      }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th {
+        text-align: left; font-family: var(--mono); font-size: 10px;
+        letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted);
+        padding: 9px 14px; border-bottom: 1px solid var(--rule);
+        background: var(--paper);
+      }
+      td { padding: 9px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+      tr:last-child td { border-bottom: 0; }
+      .mono { font-family: var(--mono); font-size: 12px; }
+      .pill {
+        display: inline-block; padding: 1px 8px; border-radius: 999px;
+        font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      .pill-active { background: rgba(79,107,58,0.12); color: var(--green); }
+      .pill-archived { background: rgba(178,58,43,0.12); color: var(--red); }
+      .pill-warn { background: rgba(240,167,87,0.20); color: #8a560f; }
+      .lab-detail { padding: 6px 14px 14px; background: var(--paper); }
+      .lab-detail h4 {
+        margin: 4px 0 6px; font-family: var(--mono); font-size: 10px;
+        letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
+      }
+      details > summary { cursor: pointer; padding: 6px 0; }
+      .muted { color: var(--muted); }
+      .empty {
+        padding: 16px 18px; color: var(--muted); font-style: italic;
+      }
+      .error {
+        padding: 12px 18px; background: rgba(178,58,43,0.08);
+        color: var(--red); border-left: 4px solid var(--red);
+        font-family: var(--mono); font-size: 12px;
+      }
+      footer.land-ack {
+        margin: 32px auto 16px; max-width: 1200px;
+        padding: 0 28px; color: var(--muted); font-size: 12px;
+        line-height: 1.5;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="banner">
+      <h1>Registrar dashboard</h1>
+      <div class="meta" id="banner-meta">loading…</div>
+    </div>
+
+    <div class="container" id="content">
+      <p class="muted">Loading registry from <code>~/.wigamig/lab_info/_registry.yaml</code>…</p>
+    </div>
+
+    <footer class="land-ack">
+      We acknowledge that Western University is located on the traditional lands of
+      the Anishinaabek (Ah-nish-in-a-bek), Haudenosaunee (Ho-den-no-show-nee),
+      Lūnaapéewak (Len-ah-pay-wuk), and Chonnonton (Chun-ongk-ton) Nations.
+    </footer>
+
+    <script>
+    "use strict";
+
+    // Read ?user=<override> the same way the main dashboard does so
+    // developers can switch identities without writing the sentinel.
+    const params = new URLSearchParams(window.location.search);
+    const userOverride = params.get("user");
+
+    const banner = document.getElementById("banner-meta");
+    const root = document.getElementById("content");
+
+    function escapeHTML(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    function renderError(detail) {
+      banner.textContent = "registrar dashboard";
+      root.innerHTML =
+        '<div class="error">' +
+        '<strong>Cannot load registrar dashboard.</strong><br/>' +
+        escapeHTML(detail) +
+        '<br/><br/>Declare your handle in <code>~/.wigamig/registrar</code> ' +
+        '(one line, no @) and reload, or pass <code>?user=&lt;netname&gt;</code>.' +
+        '</div>';
+    }
+
+    function pill(status) {
+      const cls = status === "active" ? "pill pill-active" : "pill pill-archived";
+      return '<span class="' + cls + '">' + escapeHTML(status) + '</span>';
+    }
+
+    function renderMembers(members) {
+      if (!members || !members.length) {
+        return '<div class="muted" style="font-style:italic;">No members on file.</div>';
+      }
+      let html = '<table style="background:var(--card);">';
+      html += '<thead><tr><th>handle</th><th>name</th><th>role</th><th>certs</th><th>status</th></tr></thead>';
+      html += '<tbody>';
+      for (const m of members) {
+        html += '<tr>'
+          + '<td class="mono">' + escapeHTML(m.handle) + '</td>'
+          + '<td>' + escapeHTML(m.full_name) + '</td>'
+          + '<td class="mono">' + escapeHTML(m.role) + '</td>'
+          + '<td class="mono muted">' + escapeHTML(m.cert_summary) + '</td>'
+          + '<td>' + pill(m.member_status) + '</td>'
+          + '</tr>';
+      }
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function renderLabRow(lab) {
+      const unresolvedBanner = lab.unresolved
+        ? '<div class="error" style="margin-bottom:6px;">⚠ ' + escapeHTML(lab.unresolved_reason || "pointer unresolved") + '</div>'
+        : '';
+      return ''
+        + '<tr>'
+        + '<td><strong>' + escapeHTML(lab.display_name) + '</strong> <span class="mono muted">' + escapeHTML(lab.name) + '</span></td>'
+        + '<td class="mono">' + escapeHTML(lab.pi) + '</td>'
+        + '<td class="mono">' + (lab.member_count || 0) + '</td>'
+        + '<td class="mono muted">' + escapeHTML(lab.created || "—") + '</td>'
+        + '<td>' + pill(lab.status) + (lab.unresolved ? ' <span class="pill pill-warn">unresolved</span>' : '') + '</td>'
+        + '</tr>'
+        + '<tr><td colspan="5" style="padding:0;">'
+        + '<details><summary class="mono muted" style="padding:6px 14px;">▸ details</summary>'
+        + '<div class="lab-detail">'
+        + unresolvedBanner
+        + '<h4>lab-mgmt path</h4><div class="mono">' + escapeHTML(lab.lab_mgmt_path) + '</div>'
+        + (lab.slack_workspace ? '<h4>slack workspace</h4><div class="mono">' + escapeHTML(lab.slack_workspace) + '</div>' : '')
+        + (lab.github_org ? '<h4>github org</h4><div class="mono">' + escapeHTML(lab.github_org) + '</div>' : '')
+        + (lab.oracle_vault ? '<h4>oracle vault</h4><div class="mono">' + escapeHTML(lab.oracle_vault) + '</div>' : '')
+        + '<h4>members</h4>'
+        + renderMembers(lab.members)
+        + '</div></details></td></tr>';
+    }
+
+    function renderCollab(c) {
+      const groups = (c.groups || []).join(", ");
+      const pis = (c.pis || []).join(", ");
+      const subsetLines = Object.keys(c.member_subset || {}).map(g =>
+        '<div class="mono"><span class="muted">' + escapeHTML(g) + ':</span> ' +
+        (c.member_subset[g] || []).map(escapeHTML).join(", ") + '</div>'
+      ).join("");
+      return ''
+        + '<tr>'
+        + '<td><strong>' + escapeHTML(c.name) + '</strong></td>'
+        + '<td class="mono">' + escapeHTML(pis) + '</td>'
+        + '<td class="mono">' + escapeHTML(groups) + '</td>'
+        + '<td class="mono muted">' + escapeHTML(c.created || "—") + '</td>'
+        + '<td>' + pill(c.status) + '</td>'
+        + '</tr>'
+        + (subsetLines
+          ? '<tr><td colspan="5" class="lab-detail"><h4>member subset</h4>' + subsetLines + '</td></tr>'
+          : "");
+    }
+
+    async function load() {
+      const url = "/api/registrar/dashboard" + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+      let res;
+      try {
+        res = await fetch(url, { credentials: "same-origin" });
+      } catch (ex) {
+        renderError(String(ex.message || ex));
+        return;
+      }
+      if (!res.ok) {
+        let detail = "HTTP " + res.status;
+        try { detail = (await res.json()).detail || detail; } catch (_) {}
+        renderError(detail);
+        return;
+      }
+      const data = await res.json();
+      banner.textContent = "signed in as " + data.registrar_handle + " · " + data.today.pretty;
+
+      const s = data.stats || {};
+      let html = ""
+        + '<div class="stats">'
+        + '<div class="stat"><div class="label">labs</div><div class="value">' + (s.total_labs || 0) + '</div></div>'
+        + '<div class="stat"><div class="label">cores</div><div class="value">' + (s.total_cores || 0) + '</div></div>'
+        + '<div class="stat"><div class="label">collaborations</div><div class="value">' + (s.total_collaborations || 0) + '</div></div>'
+        + '<div class="stat"><div class="label">members</div><div class="value">' + (s.total_members || 0) + '</div></div>'
+        + '</div>';
+
+      html += '<div class="panel"><header><h2>Labs</h2><span class="meta">' + (data.labs || []).length + ' total</span></header>';
+      if ((data.labs || []).length === 0) {
+        html += '<div class="empty">No labs registered yet. Seed via <code>wigamig.core.registrar.bootstrap_from_existing_lab_mgmt(...)</code> or hand-edit <code>~/.wigamig/lab_info/_registry.yaml</code>.</div>';
+      } else {
+        html += '<table><thead><tr><th>name</th><th>PI</th><th>members</th><th>created</th><th>status</th></tr></thead><tbody>';
+        for (const lab of data.labs) html += renderLabRow(lab);
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+
+      html += '<div class="panel"><header><h2>Cores</h2><span class="meta">' + (data.cores || []).length + ' total</span></header>';
+      if ((data.cores || []).length === 0) {
+        html += '<div class="empty">No cores registered yet. Phase E will add a creation flow with core-specific schema.</div>';
+      } else {
+        html += '<table><thead><tr><th>name</th><th>PI</th><th>members</th><th>created</th><th>status</th></tr></thead><tbody>';
+        for (const c of data.cores) {
+          html += '<tr><td><strong>' + escapeHTML(c.display_name) + '</strong> <span class="mono muted">' + escapeHTML(c.name) + '</span></td>'
+            + '<td class="mono">' + escapeHTML(c.pi) + '</td>'
+            + '<td class="mono">' + (c.member_count || 0) + '</td>'
+            + '<td class="mono muted">' + escapeHTML(c.created || "—") + '</td>'
+            + '<td>' + pill(c.status) + '</td></tr>';
+        }
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+
+      html += '<div class="panel"><header><h2>Collaborations</h2><span class="meta">' + (data.collaborations || []).length + ' total</span></header>';
+      if ((data.collaborations || []).length === 0) {
+        html += '<div class="empty">No collaborations registered yet. Phase D will add multi-PI, multi-group create flow.</div>';
+      } else {
+        html += '<table><thead><tr><th>name</th><th>PIs</th><th>groups</th><th>created</th><th>status</th></tr></thead><tbody>';
+        for (const c of data.collaborations) html += renderCollab(c);
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+
+      root.innerHTML = html;
+    }
+
+    load();
+    </script>
+  </body>
+</html>

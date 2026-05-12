@@ -1,7 +1,7 @@
 [project]
 name = "wigamig"
-version = "0.1.0"
-description = "Group-level agentic infrastructure for the Hallett bioconvergence center."
+version = "1.0.0"
+description = "Multi-group agentic infrastructure for a bioconvergence centre — with the v1 registrar layer above any single lab."
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [
