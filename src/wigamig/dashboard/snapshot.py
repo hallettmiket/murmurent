@@ -29,10 +29,12 @@ from ..core import cross_group as xgroup
 from ..core import membership as membership_core
 from ..core.repo import lab_mgmt_repo_root, wigamig_repo_root
 from ..core import requests as req_core
+from ..core import lab_vm as _lab_vm
 from ..core import sea_catalog as catalog_core
 from ..core.sea import Sea, iter_seas
 from . import audit_log
 from . import contract as C
+from . import machine_settings as _machine_settings_mod
 
 def _pi_handle() -> str:
     """Resolve the PI handle from lab.md (fresh per call for tests)."""
@@ -40,6 +42,9 @@ def _pi_handle() -> str:
     return _resolved()
 NOTEBOOK_DIR_NAME = "lab-notebook"
 PERSONAL_ORACLE_DIR = Path.home() / ".claude" / "agent-memory" / "oracle"
+# Per-machine installation manifests, written by the install wizard.
+# One YAML per project; see ``wigamig.dashboard.contract.InstallationRow``.
+INSTALLATIONS_DIR = Path.home() / ".wigamig" / "installations"
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +96,9 @@ def build_response(
         member=member_block,
         pi=_pi_identity(),
         member_settings=_member_settings(member_profile),
+        machine_settings=_machine_settings_mod.load(
+            legacy_obsidian=member_profile.get("obsidian") if isinstance(member_profile, dict) else None,
+        ),
         lab_settings=_lab_settings(lab_name),
         agents=_agents(),
         oracle_recent=_oracle_recent(limit=8),
@@ -124,6 +132,7 @@ def build_response(
         heatmap=_heatmap(project_summaries, today_d, persona=effective_persona, member_handle=norm),
         inventory=_inventory(snap),
         notebook=_notebook(handle, today_d),
+        installations=_installations(norm, effective_persona),
     )
 
 
@@ -396,6 +405,8 @@ def _lab_settings(lab_name: str) -> C.LabSettings:
                 notebook_large_files_path=meta.get("notebook_large_files_path") or None,
                 lab_oracle_vault=meta.get("lab_oracle_vault") or _lab_oracle_folder(lab_name),
                 admins=list(meta.get("admins") or []),
+                github_org=str(meta.get("github_org") or "hallettmiket"),
+                git_repos_subpath=str(meta.get("git_repos_subpath") or "git_repos"),
             )
     except Exception:
         pass
@@ -830,9 +841,10 @@ def _projects(
                 d = _date_or_none(ts)
                 if d and (last_activity is None or d > last_activity):
                     last_activity = d
-        # Project artefact paths. Slack URL only filled when lab.md
-        # declares the workspace, otherwise just the channel name.
+        # Slack channel: name derived; real ID from CHARTER.md slack_channel_id field.
         from ..core.lab import load_lab_config as _load_lab
+        import re as _re
+        import subprocess as _sp
         slack_channel = f"proj_{p.name}"
         ws = _load_lab().slack_workspace
         slack_url = (
@@ -840,6 +852,47 @@ def _projects(
             if ws and ws != "<set-on-first-publish>"
             else None
         )
+        # Read Slack ID, repo_kind, and remote_url from CHARTER.md if present.
+        charter_path = Path(f"~/repos/{p.name}/CHARTER.md").expanduser()
+        slack_channel_id: str | None = None
+        repo_kind: str = "github"
+        charter_remote_url: str | None = None
+        if charter_path.is_file():
+            try:
+                charter_text = charter_path.read_text(encoding="utf-8")
+                m = _re.search(r"^slack_channel_id:\s*(\S+)", charter_text, _re.MULTILINE)
+                if m:
+                    slack_channel_id = m.group(1)
+                m = _re.search(r"^repo_kind:\s*(\S+)", charter_text, _re.MULTILINE)
+                if m:
+                    repo_kind = m.group(1).strip().strip("'\"") or "github"
+                m = _re.search(r"^remote_url:\s*['\"]?([^'\"]+?)['\"]?\s*$", charter_text, _re.MULTILINE)
+                if m:
+                    charter_remote_url = m.group(1)
+            except OSError:
+                pass
+        # Remote presence: ``git remote get-url origin`` works for both
+        # github- and local-kind projects; the URL form just differs.
+        local_repo = Path(f"~/repos/{p.name}").expanduser()
+        github_pushed = False
+        remote_url: str | None = None
+        if (local_repo / ".git").is_dir():
+            try:
+                out = _sp.check_output(
+                    ["git", "-C", str(local_repo), "remote", "get-url", "origin"],
+                    stderr=_sp.DEVNULL,
+                )
+                remote_url = out.decode(errors="replace").strip() or None
+                github_pushed = bool(remote_url)
+            except (_sp.CalledProcessError, FileNotFoundError):
+                pass
+        # If git didn't find a remote (e.g. .git not present on this machine)
+        # but the charter recorded one, prefer the charter value.
+        if remote_url is None:
+            remote_url = charter_remote_url
+        # Installation: check whether raw/refined dirs exist on this machine.
+        raw_path = _lab_vm.project_raw_dir(p.name)
+        refined_path = _lab_vm.project_refined_dir(p.name)
         rows.append(
             C.ProjectRow(
                 name=p.name,
@@ -850,10 +903,16 @@ def _projects(
                 open_seas=open_seas,
                 last_activity=_humanize(last_activity, today_d),
                 github_repo=f"hallettmiket/{p.name}",
+                github_pushed=github_pushed,
                 slack_channel=slack_channel,
+                slack_channel_id=slack_channel_id,
                 slack_url=slack_url,
-                refined_path=f"/data/lab_vm/refined/{p.name}",
-                raw_path=f"/data/lab_vm/raw/{p.name}",
+                repo_kind=repo_kind,  # type: ignore[arg-type]
+                remote_url=remote_url,
+                raw_path=str(raw_path),
+                refined_path=str(refined_path),
+                raw_exists=raw_path.is_dir(),
+                refined_exists=refined_path.is_dir(),
             )
         )
     return rows
@@ -1510,17 +1569,43 @@ def _inventory(snap: DashboardSnapshot) -> C.InventoryBlock:
 
 
 def _notebook_folder(handle: str) -> Path:
-    """Resolve the daily-notes folder.
+    """Resolve the daily-notes folder for ``handle``.
 
-    Delegates to :func:`notebook_actions.notebook_folder` so the
-    dashboard reads from the same place the editor writes to. That
-    means the user's registered Obsidian vault when one is
-    discoverable; otherwise ``~/lab-notebook/`` (or
-    ``$WIGAMIG_NOTEBOOK_DIR`` when set).
+    Resolution order:
+      1. Member profile ``obsidian.vault_path`` + ``notebook_subfolder``
+         — lets per-user vault config drive the path without a global env var.
+      2. :func:`notebook_actions.notebook_folder` (env var / system vault).
+      In both cases, if a ``<handle>/`` subdirectory exists inside the
+      resolved folder it is used, enabling multi-user demo layouts.
     """
     from . import notebook_actions
 
-    return notebook_actions.notebook_folder()
+    # Try member profile first
+    profile = _load_member_profile(handle)
+    obsidian = profile.get("obsidian") if isinstance(profile, dict) else None
+    obsidian_d = obsidian if isinstance(obsidian, dict) else {}
+    vault_path_str = obsidian_d.get("vault_path") or profile.get("obsidian_vault_path")
+    notebook_sub = (
+        obsidian_d.get("notebook_subfolder")
+        or profile.get("notebook_subfolder")
+        or "lab-notebook"
+    )
+    if vault_path_str:
+        vault_path = Path(str(vault_path_str)).expanduser()
+        if vault_path.is_dir():
+            base = vault_path / notebook_sub
+            per_user = base / handle
+            if per_user.is_dir():
+                return per_user
+            if base.is_dir():
+                return base
+
+    # Fallback to env-var / system vault
+    base = notebook_actions.notebook_folder()
+    per_user = base / handle
+    if per_user.is_dir():
+        return per_user
+    return base
 
 
 def _notebook(handle: str, today_d: _dt.date) -> C.NotebookBlock:
@@ -1528,9 +1613,9 @@ def _notebook(handle: str, today_d: _dt.date) -> C.NotebookBlock:
     days = _notebook_days(folder, today_d)
     today_entry = _notebook_today(folder, today_d)
     yesterday = _notebook_yesterday(folder, today_d)
-    # Short display — vault-name/notebook-dir/ is enough to identify location;
-    # full path lives in the hint popup ("where does this save?").
-    display_folder = f"{folder.parent.name}/{folder.name}/"
+    # Two-level display: vault/notebook/ or vault/notebook/handle/
+    parts = [folder.parent.name, folder.name]
+    display_folder = "/".join(parts) + "/"
     return C.NotebookBlock(
         folder=display_folder,
         days=days,
@@ -1720,3 +1805,38 @@ def _parse_markdown_blocks(body: str):
             i += 1
         blocks.append(C.NbParagraph(kind="p", text=" ".join(buf3)))
     return blocks
+
+
+def _installations(viewer_handle: str, persona: str) -> list[C.InstallationRow]:
+    """Load per-machine installation manifests from ``~/.wigamig/installations/``.
+
+    Each YAML file (one per installed project on this machine) is parsed
+    into an :class:`InstallationRow`. Member personas see only their own
+    rows; the PI sees every row written on **this** machine. Cross-machine
+    aggregation is intentionally out of scope here — a future "publish"
+    step could push selected manifests into lab-mgmt for the PI to see
+    every member's installs from any vantage point.
+    """
+    if not INSTALLATIONS_DIR.is_dir():
+        return []
+
+    import yaml
+
+    expected_member = f"@{viewer_handle.lstrip('@')}".lower()
+    rows: list[C.InstallationRow] = []
+    for path in sorted(INSTALLATIONS_DIR.glob("*.yaml")):
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        try:
+            row = C.InstallationRow(**data)
+        except Exception:
+            # Don't crash the whole dashboard for one bad manifest.
+            continue
+        if persona != "pi" and row.member.lower() != expected_member:
+            continue
+        rows.append(row)
+    return rows

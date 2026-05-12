@@ -133,6 +133,9 @@ def cmd_new(
     data_residency: str | None = None,
     lead: str | None = None,
     skip_github: bool = False,
+    repo_kind: str = "github",
+    local_repo_root: str | None = None,
+    github_org: str = "hallettmiket",
 ) -> ProjectSummary:
     """``wigamig project new`` — scaffold the local project repo + GitHub repo.
 
@@ -184,6 +187,7 @@ def cmd_new(
                 reb_expires=reb_expires,
                 data_residency=data_residency,
                 created=_today(),
+                repo_kind=repo_kind,
             )
     except CharterError as exc:
         raise click.ClickException(str(exc)) from exc
@@ -247,9 +251,16 @@ def cmd_new(
     if not registry_path.exists():
         registry_path.write_text(render_registry_entry(summary, today=_today()), encoding="utf-8")
 
-    if not skip_github and _gh_available():
-        _ensure_github_repo(name)
-        _ensure_origin_and_push(repo_dir, name)
+    if not skip_github:
+        if repo_kind == "local":
+            if not local_repo_root:
+                raise click.ClickException(
+                    "cmd_new(repo_kind='local') requires --local-repo-root"
+                )
+            bare_path = Path(local_repo_root).expanduser() / f"{name}.git"
+            ensure_remote(repo_dir, name, kind="local", bare_repo_path=bare_path)
+        elif _gh_available():
+            ensure_remote(repo_dir, name, kind="github", org=github_org)
 
     return summary
 
@@ -415,8 +426,12 @@ def _ensure_github_repo(name: str, *, org: str = "hallettmiket") -> None:
     )
 
 
-def _ensure_origin_and_push(repo_dir: Path, name: str, *, org: str = "hallettmiket") -> None:
-    remote_url = f"git@github.com:{org}/{name}.git"
+def _set_origin_and_push(repo_dir: Path, remote_url: str) -> None:
+    """Set ``origin`` to ``remote_url`` (add or update) and push main.
+
+    Common tail for both ``github`` and ``local`` provisioning — only
+    the URL form differs.
+    """
     existing = subprocess.run(
         ["git", "remote", "get-url", "origin"],
         cwd=str(repo_dir),
@@ -435,3 +450,53 @@ def _ensure_origin_and_push(repo_dir: Path, name: str, *, org: str = "hallettmik
             check=False,
         )
     subprocess.run(["git", "push", "-u", "origin", "main"], cwd=str(repo_dir), check=False)
+
+
+def _ensure_origin_and_push(repo_dir: Path, name: str, *, org: str = "hallettmiket") -> None:
+    """Legacy GitHub-specific entry point. Kept for callers that haven't
+    migrated to :func:`ensure_remote` yet."""
+    _set_origin_and_push(repo_dir, f"git@github.com:{org}/{name}.git")
+
+
+def ensure_remote(
+    repo_dir: Path,
+    name: str,
+    *,
+    kind: str = "github",
+    org: str = "hallettmiket",
+    bare_repo_path: Path | str | None = None,
+) -> str | None:
+    """Provision the project's git origin and push, kind-aware.
+
+    Returns the URL that was set as ``origin`` (so callers can persist
+    it in CHARTER.md). Returns ``None`` if provisioning was skipped
+    (e.g. ``kind="github"`` but ``gh`` CLI is missing).
+
+    - ``kind="github"``: ``gh repo create <org>/<name>`` (idempotent),
+      then ``origin = git@github.com:<org>/<name>.git``.
+    - ``kind="local"``: ``git init --bare <bare_repo_path>`` (idempotent),
+      then ``origin = <bare_repo_path>``.
+    """
+    if kind == "github":
+        if not _gh_available():
+            return None
+        _ensure_github_repo(name, org=org)
+        url = f"git@github.com:{org}/{name}.git"
+        _set_origin_and_push(repo_dir, url)
+        return url
+
+    if kind == "local":
+        if bare_repo_path is None:
+            raise ValueError("ensure_remote(kind='local') requires bare_repo_path")
+        bare = Path(bare_repo_path).expanduser()
+        bare.parent.mkdir(parents=True, exist_ok=True)
+        # ``git init --bare`` is idempotent: re-running on an existing
+        # bare repo prints "Reinitialized…" and leaves it alone.
+        if not (bare / "HEAD").exists():
+            subprocess.run(
+                ["git", "init", "--bare", str(bare)], check=False
+            )
+        _set_origin_and_push(repo_dir, str(bare))
+        return str(bare)
+
+    raise ValueError(f"unknown repo kind: {kind!r}")

@@ -103,11 +103,18 @@ def render_charter(
     reb_expires: str | None = None,
     data_residency: str | None = None,
     created: str | None = None,
+    repo_kind: str = "github",
+    remote_url: str | None = None,
 ) -> str:
     """Render a CHARTER.md markdown document with validated frontmatter.
 
     Parameters mirror the design's CHARTER frontmatter. Clinical projects must
     pass ``reb_number``, ``reb_expires``, and ``data_residency``.
+
+    ``repo_kind`` records where the project's git origin lives —
+    ``"github"`` (the historic default) or ``"local"`` (a bare repo on
+    the lab VM). ``remote_url`` is stored alongside so a future reader
+    knows where to ``git clone`` from without inspecting ``.git/config``.
     """
     members_list = list(members)
     meta: dict[str, Any] = {
@@ -145,6 +152,12 @@ def render_charter(
         )
     if created is not None:
         extra_lines.append(f"created: {created}")
+    # repo_kind is always emitted (even for the github default) so any
+    # downstream reader can rely on its presence; remote_url is only
+    # emitted when we know it (post-push).
+    extra_lines.append(f"repo_kind: {repo_kind}")
+    if remote_url is not None:
+        extra_lines.append(f"remote_url: {remote_url!r}")
 
     extra = ("\n".join(extra_lines) + "\n") if extra_lines else ""
 
