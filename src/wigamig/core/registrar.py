@@ -348,6 +348,86 @@ def bootstrap_from_existing_lab_mgmt(
 
 
 # -----------------------------------------------------------------
+# Registrar profile — centre-level contact / location for the role itself
+# -----------------------------------------------------------------
+
+
+PROFILE_FILENAME = "registrar.md"
+
+
+def profile_path(env: dict[str, str] | None = None) -> Path:
+    """Return ``<lab_info_root>/registrar.md`` — the registrar's own profile."""
+    return lab_info_root(env) / PROFILE_FILENAME
+
+
+def read_profile(env: dict[str, str] | None = None) -> dict:
+    """Return the registrar's profile frontmatter as a plain dict.
+
+    Missing file returns ``{}`` — that's the legitimate "fresh install,
+    not yet filled in" state. Malformed files also return ``{}`` so the
+    dashboard never breaks on a hand-edit typo.
+    """
+    from .frontmatter import parse_file as _pf
+
+    path = profile_path(env)
+    if not path.is_file():
+        return {}
+    try:
+        parsed = _pf(path)
+    except Exception:
+        return {}
+    return dict(parsed.meta or {})
+
+
+def write_profile(
+    updates: dict,
+    *,
+    env: dict[str, str] | None = None,
+) -> Path:
+    """Apply ``updates`` to ``registrar.md`` frontmatter and commit.
+
+    ``updates`` is a partial dict — keys present get set / cleared
+    (empty string clears, ``None`` is skipped); keys absent are
+    preserved. The file body is left alone if it exists, or seeded with
+    a minimal header if the file is being created.
+    """
+    from .frontmatter import dump_document as _dump, parse_file as _pf
+
+    path = profile_path(env)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    if path.is_file():
+        parsed = _pf(path)
+        meta = dict(parsed.meta or {})
+        body = parsed.body or ""
+    else:
+        meta = {}
+        body = (
+            "# Registrar profile\n\n"
+            "Centre-level contact for the wigamig registrar role. Edit through "
+            "the `/registrar` dashboard's profile button, or hand-edit this "
+            "frontmatter directly.\n"
+        )
+
+    for key, value in updates.items():
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            meta.pop(key, None)
+        else:
+            meta[key] = value
+
+    path.write_text(_dump(meta, body), encoding="utf-8")
+
+    # Audit trail commit.
+    root = lab_info_root(env)
+    _git_init_if_needed(root)
+    changed = ", ".join(sorted(updates.keys())) or "no-op"
+    _git_commit_all(root, f"registrar: update profile ({changed})")
+    return path
+
+
+# -----------------------------------------------------------------
 # Git-backed audit trail for the registrar data directory
 # -----------------------------------------------------------------
 

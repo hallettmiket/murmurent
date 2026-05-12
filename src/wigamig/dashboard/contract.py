@@ -68,6 +68,9 @@ class IdentityBlock(BaseModel):
     # Auto-detected from PI handle today; ``project lead → can_pi`` is v2.
     can_pi: bool = False
     is_active: bool = True  # Phase 13: deactivated members can read but not act
+    # Phase A+: True iff this handle matches ``~/.wigamig/registrar``.
+    # The lab dashboard uses this to show a cross-link to /registrar.
+    is_registrar: bool = False
 
 
 class MemberSettings(BaseModel):
@@ -669,6 +672,32 @@ class RegistrarStats(BaseModel):
     total_members: int = 0                   # deduped across labs
 
 
+class RegistrarProfile(BaseModel):
+    """The registrar's own contact + location, stored centre-level.
+
+    Lives at ``<lab_info_root>/registrar.md`` (frontmatter), so it
+    follows the registrar role rather than any lab they happen to also
+    belong to. A registrar who is also a lab PI has both this profile
+    (centre admin contact) and their lab's ``members/<handle>.md``
+    profile (lab contact) — these are intentionally separate.
+    """
+
+    handle: str = ""                         # ``@netname``, set by snapshot
+    full_name: str = ""
+    title: str = ""                          # e.g. "VP Research", "Centre Director"
+    # Contact
+    email: str | None = None
+    orcid: str | None = None
+    website: str | None = None
+    github: str | None = None
+    # Location
+    office: str | None = None
+    address: str | None = None
+    city: str | None = None
+    department: str | None = None
+    institution: str | None = None
+
+
 # -- Phase C+: cross-group certification visibility ---------------
 
 
@@ -737,6 +766,7 @@ class RegistrarResponse(BaseModel):
 
     registrar_handle: str                    # the actor (``@mhallet`` in dev)
     today: TodayBlock
+    profile: RegistrarProfile = RegistrarProfile()
     labs: list[RegistrarLabRow] = []
     cores: list[RegistrarCoreRow] = []
     collaborations: list[RegistrarCollaborationRow] = []

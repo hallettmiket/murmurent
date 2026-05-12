@@ -163,6 +163,10 @@
       <p class="muted">Loading registry from <code>~/.wigamig/lab_info/_registry.yaml</code>…</p>
     </div>
 
+    <footer class="container" id="footer-meta" style="margin-top:32px; padding:0 28px;">
+      <!-- populated by renderFooter() — registrar's own profile + edit button -->
+    </footer>
+
     <footer class="land-ack">
       We acknowledge that Western University is located on the traditional lands of
       the Anishinaabek (Ah-nish-in-a-bek), Haudenosaunee (Ho-den-no-show-nee),
@@ -424,6 +428,139 @@
             confirmLabAction(action, lab);
           }
         });
+      });
+
+      renderFooter(data);
+    }
+
+    // -----------------------------------------------------------
+    // Footer: registrar profile + cross-link to lab dashboard
+    // -----------------------------------------------------------
+
+    function renderFooter(data) {
+      const footer = document.getElementById("footer-meta");
+      if (!footer) return;
+      const p = data.profile || {};
+      const contactBits = [
+        p.email   ? '<span class="mono">' + escapeHTML(p.email)   + '</span>' : null,
+        p.orcid   ? 'ORCID: <span class="mono">' + escapeHTML(p.orcid) + '</span>' : null,
+        p.website ? '<a href="' + escapeHTML(p.website) + '" target="_blank" rel="noopener">website</a>' : null,
+        p.github  ? 'GitHub: <span class="mono">' + escapeHTML(p.github)  + '</span>' : null,
+      ].filter(Boolean).join(" · ");
+      const locationBits = [
+        p.office  ? "Office: " + escapeHTML(p.office) : null,
+        p.address ? escapeHTML(p.address) : null,
+        p.city    ? escapeHTML(p.city) : null,
+      ].filter(Boolean).join(" · ");
+      const titleLine = p.title
+        ? '<div class="mono muted" style="font-size:11px;">' + escapeHTML(p.title) + '</div>'
+        : '<div class="mono muted" style="font-size:11px;">role: registrar</div>';
+      const departmentLine = p.department
+        ? '<div class="muted" style="font-size:12px; margin-top:6px;">' + escapeHTML(p.department) + '</div>'
+        : '';
+      const institutionLine = p.institution
+        ? '<div class="muted" style="font-size:12px;">' + escapeHTML(p.institution) + '</div>'
+        : '';
+
+      footer.innerHTML =
+        '<div class="panel">'
+        + '<header><h2>' + escapeHTML(p.full_name || data.registrar_handle) + ' '
+          + '<span class="mono muted" style="font-size:12px; font-weight:normal;">' + escapeHTML(data.registrar_handle) + '</span>'
+          + '</h2>'
+          + '<div style="display:flex; gap:8px; align-items:center;">'
+            + '<a class="btn" href="/" title="Open the lab dashboard (PI / member view) for the same handle">→ Lab dashboard</a>'
+            + '<button class="btn" id="btn-edit-profile">⚙ profile</button>'
+          + '</div>'
+        + '</header>'
+        + '<div style="padding:14px 18px;">'
+          + titleLine
+          + (contactBits ? '<div class="row" style="margin-top:8px;">' + contactBits + '</div>' : '')
+          + (locationBits ? '<div class="row" style="margin-top:4px;">' + locationBits + '</div>' : '')
+          + departmentLine
+          + institutionLine
+          + (!contactBits && !locationBits && !p.department && !p.institution
+              ? '<div class="muted" style="margin-top:8px; font-size:12px; font-style:italic;">Click <strong>⚙ profile</strong> to fill in your contact and location.</div>'
+              : '')
+        + '</div>'
+        + '</div>';
+      const editBtn = document.getElementById("btn-edit-profile");
+      if (editBtn) editBtn.addEventListener("click", () => openProfileModal(p));
+    }
+
+    function openProfileModal(profile) {
+      const p = profile || {};
+      const v = (k) => escapeHTML(p[k] || "");
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      wrap.innerHTML =
+        '<form class="modal" id="reg-profile-form" autocomplete="off">' +
+          '<h2>Registrar profile</h2>' +
+          '<p class="muted">Saved to <code>~/.wigamig/lab_info/registrar.md</code>. This is the centre-level admin contact for the registrar role — separate from any lab membership you also hold.</p>' +
+          '<label>full name</label>' +
+          '<input name="full_name" value="' + v("full_name") + '" placeholder="e.g. Mike Hallett" />' +
+          '<label>title (admin role)</label>' +
+          '<input name="title" value="' + v("title") + '" placeholder="e.g. Centre Director, VP Research" />' +
+          '<label>email</label>' +
+          '<input name="email" value="' + v("email") + '" />' +
+          '<label>ORCID</label>' +
+          '<input name="orcid" value="' + v("orcid") + '" />' +
+          '<label>website</label>' +
+          '<input name="website" value="' + v("website") + '" placeholder="https://" />' +
+          '<label>GitHub</label>' +
+          '<input name="github" value="' + v("github") + '" />' +
+          '<label>office</label>' +
+          '<input name="office" value="' + v("office") + '" placeholder="e.g. MSB-360" />' +
+          '<label>address</label>' +
+          '<input name="address" value="' + v("address") + '" />' +
+          '<label>city</label>' +
+          '<input name="city" value="' + v("city") + '" />' +
+          '<label>department</label>' +
+          '<input name="department" value="' + v("department") + '" />' +
+          '<label>institution</label>' +
+          '<input name="institution" value="' + v("institution") + '" />' +
+          '<div class="actions">' +
+            '<span class="form-msg" id="reg-profile-msg"></span>' +
+            '<button type="button" class="btn ghost" id="reg-profile-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="reg-profile-submit">save</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("reg-profile-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("reg-profile-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById("reg-profile-msg");
+        const submitBtn = document.getElementById("reg-profile-submit");
+        const fd = new FormData(e.target);
+        // Send every field so the server can clear ones the user blanked.
+        const payload = {};
+        for (const [k, val] of fd.entries()) payload[k] = String(val);
+
+        msg.textContent = "saving…";
+        msg.className = "form-msg";
+        submitBtn.disabled = true;
+        try {
+          const url = "/api/registrar/profile" + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+          const res = await fetch(url, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            let detail = "HTTP " + res.status;
+            try { detail = (await res.json()).detail || detail; } catch (_) {}
+            throw new Error(detail);
+          }
+          msg.textContent = "saved";
+          msg.className = "form-msg ok";
+          setTimeout(() => { wrap.remove(); load(); }, 600);
+        } catch (ex) {
+          msg.textContent = String(ex.message || ex);
+          msg.className = "form-msg error";
+        } finally {
+          submitBtn.disabled = false;
+        }
       });
     }
 
