@@ -226,6 +226,13 @@
       const unresolvedBanner = lab.unresolved
         ? '<div class="error" style="margin-bottom:6px;">⚠ ' + escapeHTML(lab.unresolved_reason || "pointer unresolved") + '</div>'
         : '';
+      const labNameEsc = escapeHTML(lab.name);
+      const isActive = lab.status === "active";
+      const actionButtons = ''
+        + '<button class="btn lab-action" data-action="edit" data-lab="' + labNameEsc + '">edit</button> '
+        + (isActive
+            ? '<button class="btn lab-action" data-action="archive" data-lab="' + labNameEsc + '">archive</button>'
+            : '<button class="btn lab-action" data-action="unarchive" data-lab="' + labNameEsc + '">unarchive</button>');
       return ''
         + '<tr>'
         + '<td><strong>' + escapeHTML(lab.display_name) + '</strong> <span class="mono muted">' + escapeHTML(lab.name) + '</span></td>'
@@ -233,8 +240,9 @@
         + '<td class="mono">' + (lab.member_count || 0) + '</td>'
         + '<td class="mono muted">' + escapeHTML(lab.created || "—") + '</td>'
         + '<td>' + pill(lab.status) + (lab.unresolved ? ' <span class="pill pill-warn">unresolved</span>' : '') + '</td>'
+        + '<td style="text-align:right; white-space:nowrap;">' + actionButtons + '</td>'
         + '</tr>'
-        + '<tr><td colspan="5" style="padding:0;">'
+        + '<tr><td colspan="6" style="padding:0;">'
         + '<details><summary class="mono muted" style="padding:6px 14px;">▸ details</summary>'
         + '<div class="lab-detail">'
         + unresolvedBanner
@@ -302,7 +310,7 @@
       if ((data.labs || []).length === 0) {
         html += '<div class="empty">No labs registered yet. Seed via <code>wigamig.core.registrar.bootstrap_from_existing_lab_mgmt(...)</code> or hand-edit <code>~/.wigamig/lab_info/_registry.yaml</code>.</div>';
       } else {
-        html += '<table><thead><tr><th>name</th><th>PI</th><th>members</th><th>created</th><th>status</th></tr></thead><tbody>';
+        html += '<table><thead><tr><th>name</th><th>PI</th><th>members</th><th>created</th><th>status</th><th style="text-align:right;">actions</th></tr></thead><tbody>';
         for (const lab of data.labs) html += renderLabRow(lab);
         html += '</tbody></table>';
       }
@@ -337,6 +345,18 @@
       root.innerHTML = html;
       const newLabBtn = document.getElementById("btn-new-lab");
       if (newLabBtn) newLabBtn.addEventListener("click", openNewLabModal);
+      // Phase C action buttons (archive / unarchive / edit) — delegate
+      // via a single listener so re-render replaces them cleanly.
+      root.querySelectorAll(".lab-action").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const action = btn.getAttribute("data-action");
+          const lab = btn.getAttribute("data-lab");
+          if (action === "edit") openEditLabModal(lab, data.labs.find(l => l.name === lab));
+          else if (action === "archive" || action === "unarchive") {
+            confirmLabAction(action, lab);
+          }
+        });
+      });
     }
 
     // -----------------------------------------------------------
@@ -405,6 +425,111 @@
             throw new Error(detail);
           }
           msg.textContent = "created — refreshing…";
+          msg.className = "form-msg ok";
+          setTimeout(() => { wrap.remove(); load(); }, 600);
+        } catch (ex) {
+          msg.textContent = String(ex.message || ex);
+          msg.className = "form-msg error";
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
+    async function confirmLabAction(action, name) {
+      const verb = action === "archive" ? "archive" : "unarchive";
+      if (!confirm(`${verb} lab "${name}"?\n\nFiles will be preserved; this is reversible.`)) return;
+      const url = "/api/registrar/lab/" + encodeURIComponent(name) + "/" + action
+        + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+      let res;
+      try {
+        res = await fetch(url, { method: "POST", credentials: "same-origin" });
+      } catch (ex) {
+        alert("network error: " + (ex.message || ex));
+        return;
+      }
+      if (!res.ok) {
+        let detail = "HTTP " + res.status;
+        try { detail = (await res.json()).detail || detail; } catch (_) {}
+        alert(verb + " failed: " + detail);
+        return;
+      }
+      load();
+    }
+
+    function openEditLabModal(name, lab) {
+      const labData = lab || {};
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      const v = (k) => escapeHTML(labData[k] || "");
+      wrap.innerHTML =
+        '<form class="modal" id="edit-lab-form" autocomplete="off">' +
+          '<h2>Edit lab — <code style="font-family:var(--mono); font-size:14px;">' + escapeHTML(name) + '</code></h2>' +
+          '<p class="muted">Empty a field to clear it. The short ID is not editable. PI handoff re-enforces the one-PI-per-active-lab invariant.</p>' +
+          '<label>display name</label>' +
+          '<input name="display_name" value="' + v("display_name") + '" />' +
+          '<label>PI Western netname</label>' +
+          '<input name="pi_handle" value="' + escapeHTML((labData.pi || "").replace(/^@/, "")) + '" />' +
+          '<label>PI full name (only used when introducing a new PI)</label>' +
+          '<input name="pi_full_name" placeholder="(used only when pi handoff lands a new member file)" />' +
+          '<label>Slack workspace ID</label>' +
+          '<input name="slack_workspace" value="' + v("slack_workspace") + '" />' +
+          '<label>GitHub org</label>' +
+          '<input name="github_org" value="' + v("github_org") + '" />' +
+          '<label>Obsidian vault name</label>' +
+          '<input name="oracle_vault" value="' + v("oracle_vault") + '" />' +
+          '<div class="actions">' +
+            '<span class="form-msg" id="edit-lab-msg"></span>' +
+            '<button type="button" class="btn ghost" id="edit-lab-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="edit-lab-submit">save</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("edit-lab-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("edit-lab-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById("edit-lab-msg");
+        const submitBtn = document.getElementById("edit-lab-submit");
+        const fd = new FormData(e.target);
+        // Send every field present (even empty strings — empty means
+        // "clear this field"). model_fields_set on the server only
+        // picks up keys actually in the JSON body.
+        const payload = {};
+        for (const [k, val] of fd.entries()) {
+          payload[k] = String(val);
+        }
+        // Drop fields that didn't change; otherwise we'd commit no-op edits.
+        if (payload.display_name === (labData.display_name || "")) delete payload.display_name;
+        if (payload.pi_handle === ((labData.pi || "").replace(/^@/, ""))) delete payload.pi_handle;
+        if (!payload.pi_full_name) delete payload.pi_full_name;
+        if (payload.slack_workspace === (labData.slack_workspace || "")) delete payload.slack_workspace;
+        if (payload.github_org === (labData.github_org || "")) delete payload.github_org;
+        if (payload.oracle_vault === (labData.oracle_vault || "")) delete payload.oracle_vault;
+
+        if (Object.keys(payload).length === 0) {
+          msg.textContent = "nothing changed";
+          msg.className = "form-msg";
+          return;
+        }
+        msg.textContent = "saving…";
+        msg.className = "form-msg";
+        submitBtn.disabled = true;
+        try {
+          const url = "/api/registrar/lab/" + encodeURIComponent(name) + "/edit"
+            + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+          const res = await fetch(url, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            let detail = "HTTP " + res.status;
+            try { detail = (await res.json()).detail || detail; } catch (_) {}
+            throw new Error(detail);
+          }
+          msg.textContent = "saved — refreshing…";
           msg.className = "form-msg ok";
           setTimeout(() => { wrap.remove(); load(); }, 600);
         } catch (ex) {

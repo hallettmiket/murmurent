@@ -176,6 +176,23 @@ class RegistrarLabCreateBody(BaseModel):
     department: str | None = None
 
 
+class RegistrarLabEditBody(BaseModel):
+    """JSON body for ``POST /api/registrar/lab/{name}/edit`` (Phase C).
+
+    Every field is optional; ``None`` means "don't touch", an empty
+    string means "clear this field". ``name`` is not editable.
+    """
+
+    display_name: str | None = None
+    pi_handle: str | None = None
+    pi_full_name: str | None = None
+    slack_workspace: str | None = None
+    github_org: str | None = None
+    oracle_vault: str | None = None
+    institution: str | None = None
+    department: str | None = None
+
+
 class CatalogEntryBody(BaseModel):
     """JSON body for ``POST /api/sea_catalog`` (upsert)."""
 
@@ -1408,6 +1425,85 @@ def create_app() -> FastAPI:
                 "created": entry.created,
             },
         }
+
+    def _require_registrar(user: str) -> str:
+        """Resolve the actor and refuse unless they're the registrar."""
+        from ..core import registrar as _reg
+        actor = _resolve_actor(user)
+        if not _reg.is_registrar(actor):
+            raise HTTPException(status_code=403, detail="registrar role required")
+        return actor
+
+    def _lab_entry_to_dict(entry) -> dict:
+        return {
+            "name": entry.name,
+            "pi": entry.pi,
+            "lab_mgmt_path": entry.lab_mgmt_path,
+            "status": entry.status,
+            "slack_workspace": entry.slack_workspace,
+            "github_org": entry.github_org,
+            "oracle_vault": entry.oracle_vault,
+        }
+
+    @app.post("/api/registrar/lab/{name}/archive")
+    def registrar_archive_lab(
+        name: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Soft-delete a lab: ``status -> archived``. Files are preserved."""
+        from ..core import registrar as _reg
+        _require_registrar(user)
+        try:
+            entry = _reg.archive_lab(name)
+        except _reg.LabNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True, "lab": _lab_entry_to_dict(entry)}
+
+    @app.post("/api/registrar/lab/{name}/unarchive")
+    def registrar_unarchive_lab(
+        name: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Restore an archived lab: ``status -> active``.
+
+        Refuses if the lab's PI now leads another active lab/core.
+        """
+        from ..core import registrar as _reg
+        _require_registrar(user)
+        try:
+            entry = _reg.unarchive_lab(name)
+        except _reg.LabNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _reg.PIAlreadyLeadsAnother as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"ok": True, "lab": _lab_entry_to_dict(entry)}
+
+    @app.post("/api/registrar/lab/{name}/edit")
+    def registrar_edit_lab(
+        name: str,
+        body: RegistrarLabEditBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Update lab metadata (display_name, PI handoff, slack, github, …).
+
+        Renames are not supported. PI handoff re-enforces the
+        one-PI-per-active-lab/core invariant.
+        """
+        from ..core import registrar as _reg
+        _require_registrar(user)
+        # Forward only fields the request actually sent (model_fields_set)
+        # so a partial POST doesn't blank untouched values.
+        sent = body.model_fields_set
+        kwargs = {k: getattr(body, k) for k in _reg._EDITABLE_FIELDS if k in sent}
+        try:
+            entry = _reg.update_lab_metadata(name, **kwargs)
+        except _reg.LabNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _reg.PIAlreadyLeadsAnother as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except _reg.RegistrarError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"ok": True, "lab": _lab_entry_to_dict(entry)}
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
