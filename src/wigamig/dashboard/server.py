@@ -248,6 +248,19 @@ class RegistrarCollabEditBody(BaseModel):
     oracle_vault: str | None = None
 
 
+class HostAddBody(BaseModel):
+    """JSON body for ``POST /api/hosts`` (Item 3 R4, dashboard host CRUD)."""
+
+    name: str
+    ssh_host: str
+    remote_user: str = ""
+    project_root: str = "~/repos"
+    lab_vm_root: str = "~/lab_vm"
+    vault_root: str = "~/Obsidian"
+    mount_point: str = ""
+    description: str = ""
+
+
 class LoginSelectBody(BaseModel):
     """JSON body for ``POST /api/login/select``.
 
@@ -649,31 +662,79 @@ def create_app() -> FastAPI:
     ) -> dict:
         """Open VSCode + per-agent iTerm windows for a project.
 
-        Pass ``project`` (the basename of a local project repo under
-        ``~/repos``) and ``agents`` (a list of agent names). Optionally
-        ``sea_id`` to focus on a specific SEA. The server spawns
-        ``scripts/start_workspace.sh`` in the background; the actual
-        windows pop up locally.
+        For local projects: spawns ``scripts/start_workspace.sh`` which
+        opens VSCode (multi-root) + iTerm windows. For **remote** projects
+        (host != local — the working tree lives on lab-server or similar),
+        the laptop can't start agent shells over there; we just launch
+        VSCode in Remote-SSH mode via the ``vscode-remote://`` URL and let
+        the user open agent terminals inside VSCode themselves.
+
+        Pass ``project`` (the basename of a project under ``~/repos``) and
+        ``agents`` (used only for local projects). Optionally ``sea_id``.
         """
         import os
         import subprocess
         from ..core.repo import wigamig_repo_root
-        from ..core.projects import find_project as _find_project
+        from ..core.projects import (
+            find_project as _find_project,
+            project_path,
+            read_remote_pointer,
+        )
         from . import workspace_file as _workspace_file
 
         actor = _resolve_actor(user)
         _require_active(actor)
 
-        if not body.agents:
-            raise HTTPException(status_code=422, detail="at least one agent required")
         if _find_project(body.project) is None:
             raise HTTPException(status_code=404, detail=f"project not found: {body.project}")
+
+        # ---- Remote project: VSCode Remote-SSH launch ----
+        pointer = read_remote_pointer(project_path(body.project))
+        if pointer is not None:
+            host_name, remote_path = pointer
+            from ..core import hosts as _hosts
+            try:
+                host = _hosts.resolve(host_name)
+                ssh_host = host.ssh_host or host_name
+            except _hosts.HostNotFound:
+                ssh_host = host_name
+            vscode_url = f"vscode-remote://ssh-remote+{ssh_host}{remote_path}"
+            # On macOS the `open` command dispatches the URL to VSCode if
+            # it's the default handler; if VSCode isn't installed the
+            # client falls back to the URL string we returned.
+            try:
+                subprocess.Popen(  # noqa: S603
+                    ["open", vscode_url],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    close_fds=True,
+                )
+                launched = True
+            except OSError:
+                launched = False  # Linux / no `open` — UI falls back to URL
+            return {
+                "ok": True,
+                "project": body.project,
+                "host": host_name,
+                "remote_path": remote_path,
+                "vscode_url": vscode_url,
+                "launched": launched,
+                "note": (
+                    "Project lives on " + host_name + " — launched VSCode Remote-SSH. "
+                    "Open agent terminals inside VSCode (the laptop can't spawn "
+                    "iTerm windows on the remote host)."
+                ),
+            }
+
+        # ---- Local project: existing multi-root + iTerm flow ----
+        if not body.agents:
+            raise HTTPException(status_code=422, detail="at least one agent required")
 
         script = wigamig_repo_root() / "scripts" / "start_workspace.sh"
         if not script.is_file():
             raise HTTPException(status_code=500, detail=f"launcher missing: {script}")
 
-        from ..core.projects import project_path
         project_dir = project_path(body.project)
         agents_csv = ",".join(body.agents)
         cmd: list[str] = [str(script), str(project_dir), agents_csv]
@@ -1117,27 +1178,167 @@ def create_app() -> FastAPI:
     # Hosts (Item 3 R3 — install-target registry)
     # -----------------------------------------------------------------
 
+    def _host_row(h) -> dict:
+        return {
+            "name": h.name,
+            "kind": h.kind,
+            "ssh_host": h.ssh_host,
+            "remote_user": h.remote_user,
+            "project_root": h.project_root,
+            "lab_vm_root": h.lab_vm_root,
+            "vault_root": h.vault_root,
+            "mount_point": h.mount_point,
+            "description": h.description,
+            "is_remote": h.is_remote(),
+        }
+
     @app.get("/api/hosts")
     def get_hosts() -> dict:
         """Return the registered install hosts so the New Project modal
         can populate its host dropdown. The 'local' host is always present.
         """
         from ..core import hosts as _hosts
-        registry = _hosts.read()
-        rows = [
-            {
-                "name": h.name,
-                "kind": h.kind,
-                "ssh_host": h.ssh_host,
-                "remote_user": h.remote_user,
-                "project_root": h.project_root,
-                "lab_vm_root": h.lab_vm_root,
-                "description": h.description,
-                "is_remote": h.is_remote(),
-            }
-            for h in registry.values()
-        ]
-        return {"hosts": rows}
+        return {"hosts": [_host_row(h) for h in _hosts.read().values()]}
+
+    @app.post("/api/hosts")
+    def post_host(body: HostAddBody) -> dict:
+        """Register a new SSH host. Refuses duplicates.
+
+        Item 3 R4: dashboard equivalent of ``wigamig host add`` so the
+        user can register lab-server without dropping to a terminal.
+        """
+        from ..core import hosts as _hosts
+        host = _hosts.Host(
+            name=body.name,
+            kind="ssh" if body.ssh_host else "local",
+            ssh_host=body.ssh_host,
+            remote_user=body.remote_user,
+            project_root=body.project_root,
+            lab_vm_root=body.lab_vm_root,
+            vault_root=body.vault_root,
+            mount_point=body.mount_point,
+            description=body.description,
+        )
+        try:
+            _hosts.add(host)
+        except _hosts.HostAlreadyExists as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except _hosts.HostError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True, "host": _host_row(host)}
+
+    @app.delete("/api/hosts/{name}")
+    def delete_host(name: str) -> dict:
+        """Drop a host from the registry. ``local`` cannot be removed."""
+        from ..core import hosts as _hosts
+        try:
+            _hosts.remove(name)
+        except _hosts.HostNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except _hosts.HostError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True, "removed": name}
+
+    @app.post("/api/hosts/{name}/test")
+    def post_host_test(name: str) -> dict:
+        """Run the four probes against a registered host.
+
+        Each probe returns ``ok``, ``warn``, or ``fail``:
+          - ssh (required): can we authenticate non-interactively?
+          - wigamig (required): is `wigamig --version` reachable on host?
+          - lab_vm (warn-only): do /data/lab_vm/{raw,refined} exist?
+          - gh_auth (warn-only): is `gh auth status` happy?
+
+        Returns a structured dict the UI can render row-by-row.
+        """
+        from ..core import hosts as _hosts
+        from ..core import remote as _remote
+        try:
+            host = _hosts.resolve(name)
+        except _hosts.HostNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        results: list[dict] = []
+        remote = _remote.Remote(host)
+
+        # Local hosts skip ssh — they're always reachable.
+        if host.is_remote():
+            res = remote.probe()
+            results.append({
+                "name": "ssh",
+                "status": "ok" if res.ok else "fail",
+                "detail": res.stderr.strip() or ("connected" if res.ok else "connection failed"),
+                "required": True,
+            })
+            if not res.ok:
+                # No point running the rest — they'll all time out.
+                return {"host": name, "overall": "fail", "probes": results}
+        else:
+            results.append({"name": "ssh", "status": "ok", "detail": "local host", "required": True})
+
+        try:
+            version = remote.wigamig_version()
+            results.append({
+                "name": "wigamig",
+                "status": "ok",
+                "detail": version,
+                "required": True,
+            })
+        except _remote.RemoteError as exc:
+            err_text = exc.stderr.strip() or str(exc)
+            results.append({
+                "name": "wigamig",
+                "status": "fail",
+                "detail": f"{err_text} — run scripts/install_remote.sh {name}",
+                "required": True,
+            })
+
+        # lab_vm dirs (warn-only)
+        lab_vm = host.lab_vm_root
+        try:
+            res = remote.run(
+                f"test -d {lab_vm}/raw && test -d {lab_vm}/refined",
+                check=False, timeout=10,
+            )
+            results.append({
+                "name": "lab_vm",
+                "status": "ok" if res.ok else "warn",
+                "detail": (
+                    f"{lab_vm}/{{raw,refined}} present" if res.ok else
+                    f"{lab_vm}/{{raw,refined}} missing — wigamig will mkdir on first project"
+                ),
+                "required": False,
+            })
+        except _remote.RemoteError as exc:
+            results.append({
+                "name": "lab_vm", "status": "warn",
+                "detail": str(exc), "required": False,
+            })
+
+        # gh auth (warn-only)
+        try:
+            res = remote.run(
+                "command -v gh >/dev/null 2>&1 && gh auth status 2>&1",
+                check=False, timeout=15,
+            )
+            results.append({
+                "name": "gh_auth",
+                "status": "ok" if res.ok else "warn",
+                "detail": (
+                    "authenticated" if res.ok else
+                    "run `gh auth login` on the host before --repo-kind github"
+                ),
+                "required": False,
+            })
+        except _remote.RemoteError as exc:
+            results.append({
+                "name": "gh_auth", "status": "warn",
+                "detail": str(exc), "required": False,
+            })
+
+        required_failed = any(p["status"] == "fail" and p["required"] for p in results)
+        overall = "fail" if required_failed else "ok"
+        return {"host": name, "overall": overall, "probes": results}
 
     # -----------------------------------------------------------------
     # Login / role-selection landing (Item 1)

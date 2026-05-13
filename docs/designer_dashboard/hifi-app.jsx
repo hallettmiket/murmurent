@@ -256,7 +256,12 @@ function InstallationsBox({ span = "c-12" }) {
         project: inst.project,
         agents:  inst.agents || [],
       });
-      setRowMsg(m => ({ ...m, [i]: `opened ${r.agents.length} pane(s)` }));
+      // Remote project: backend returns vscode_url (no agents field).
+      // Local project: backend returns agents = list of panes opened.
+      const msg = r.vscode_url
+        ? `opened VSCode Remote-SSH on ${r.host}`
+        : `opened ${(r.agents || []).length} pane(s)`;
+      setRowMsg(m => ({ ...m, [i]: msg }));
       setTimeout(() => setRowMsg(m => ({ ...m, [i]: null })), 3000);
     } catch (ex) {
       setRowMsg(m => ({ ...m, [i]: String(ex.message || ex) }));
@@ -3135,6 +3140,278 @@ function MemberProfileModal({ onClose }) {
   );
 }
 
+/* ───────── Hosts modal (R4: register + probe install targets) ─────────
+   Lets the user register a remote SSH host (lab-server is the canonical
+   first one), test connectivity, and remove. Once a host is registered
+   it shows up in the New Project modal's host dropdown. */
+function HostsModal({ onClose }) {
+  const [hosts, setHosts] = useState([]);
+  const [loadErr, setLoadErr] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [testing, setTesting] = useState({});  // {hostName: bool}
+  const [results, setResults] = useState({});  // {hostName: probeBlock}
+
+  const refresh = async () => {
+    try {
+      const r = await fetch("/api/hosts", { headers: { Accept: "application/json" } });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      setHosts(j.hosts || []);
+      setLoadErr(null);
+    } catch (ex) {
+      setLoadErr(String(ex.message || ex));
+    }
+  };
+  useEffect(() => { refresh(); }, []);
+
+  const runTest = async (name) => {
+    setTesting(t => ({ ...t, [name]: true }));
+    try {
+      const r = await fetch("/api/hosts/" + encodeURIComponent(name) + "/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+      });
+      const j = await r.json();
+      if (!r.ok) {
+        setResults(rs => ({ ...rs, [name]: {
+          overall: "fail", probes: [],
+          error: j.detail || ("HTTP " + r.status),
+        }}));
+      } else {
+        setResults(rs => ({ ...rs, [name]: j }));
+      }
+    } catch (ex) {
+      setResults(rs => ({ ...rs, [name]: {
+        overall: "fail", probes: [], error: String(ex.message || ex),
+      }}));
+    } finally {
+      setTesting(t => ({ ...t, [name]: false }));
+    }
+  };
+
+  const removeHost = async (name) => {
+    if (!window.confirm(`Remove host ${name}? (local cannot be removed)`)) return;
+    try {
+      const r = await fetch("/api/hosts/" + encodeURIComponent(name), { method: "DELETE" });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.detail || ("HTTP " + r.status));
+      }
+      setResults(rs => { const o = {...rs}; delete o[name]; return o; });
+      await refresh();
+    } catch (ex) {
+      alert("remove failed: " + (ex.message || ex));
+    }
+  };
+
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"flex-start", justifyContent:"center",
+      zIndex:200, padding:"40px 20px", overflowY:"auto",
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:18, width:"min(720px, 96vw)",
+        display:"flex", flexDirection:"column", gap:10,
+      }}>
+        <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:20, color:"var(--purple-deep)"}}>
+            Install hosts
+          </h2>
+          <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
+        </div>
+        <p className="muted" style={{fontSize:12, margin:0}}>
+          Hosts you can install projects on. <code>local</code> is always this laptop;
+          register an SSH host (e.g. <code>lab-server</code>) to enable the
+          <em> New Project → host=&lt;name&gt;</em> deploy flow.
+          Saved to <code>~/.wigamig/hosts.yaml</code>.
+        </p>
+
+        {loadErr && (
+          <div style={{color:"var(--red)", fontSize:12}}>load failed: {loadErr}</div>
+        )}
+
+        <table className="dt" style={{marginTop:6}}>
+          <thead><tr>
+            <th>name</th><th>kind</th><th>target</th><th>project_root</th>
+            <th>lab_vm_root</th><th style={{width:200}}>actions</th>
+          </tr></thead>
+          <tbody>
+            {hosts.map(h => (
+              <React.Fragment key={h.name}>
+                <tr>
+                  <td><strong>{h.name}</strong></td>
+                  <td><Pill tone={h.kind === "ssh" ? "purple" : "green"}>{h.kind}</Pill></td>
+                  <td className="mono" style={{fontSize:11}}>
+                    {h.is_remote ? h.ssh_host : "(this laptop)"}
+                  </td>
+                  <td className="mono" style={{fontSize:11}}>{h.project_root}</td>
+                  <td className="mono" style={{fontSize:11}}>{h.lab_vm_root}</td>
+                  <td>
+                    <button className="btn sm" disabled={testing[h.name]}
+                            onClick={() => runTest(h.name)}>
+                      {testing[h.name] ? "…" : "test"}
+                    </button>
+                    {h.name !== "local" && (
+                      <button className="btn sm" onClick={() => removeHost(h.name)}
+                              style={{marginLeft:4, color:"var(--red)"}}>remove</button>
+                    )}
+                  </td>
+                </tr>
+                {results[h.name] && (
+                  <tr>
+                    <td colSpan={6} style={{
+                      background:"var(--paper-2)", padding:"10px 14px",
+                      borderBottom:"1px solid var(--rule)",
+                    }}>
+                      {results[h.name].error ? (
+                        <div style={{color:"var(--red)", fontSize:12}}>
+                          {results[h.name].error}
+                        </div>
+                      ) : (
+                        <>
+                          <div style={{fontSize:12, marginBottom:6}}>
+                            overall: <Pill tone={results[h.name].overall === "ok" ? "green" : "red"}>
+                              {results[h.name].overall}
+                            </Pill>
+                          </div>
+                          {results[h.name].probes.map(p => (
+                            <div key={p.name} style={{fontSize:12, fontFamily:"var(--mono)", display:"flex", gap:8, alignItems:"baseline"}}>
+                              <span style={{
+                                color: p.status === "ok" ? "var(--green)" :
+                                       p.status === "warn" ? "var(--tiger)" : "var(--red)",
+                                width: 14,
+                              }}>
+                                {p.status === "ok" ? "✓" : p.status === "warn" ? "!" : "✗"}
+                              </span>
+                              <span style={{width:80, color:"var(--muted)"}}>{p.name}</span>
+                              <span style={{flex:1, color:"var(--ink)"}}>{p.detail}</span>
+                            </div>
+                          ))}
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+
+        <div style={{marginTop:8}}>
+          {showAdd ? (
+            <HostAddForm onCancel={() => setShowAdd(false)} onAdded={async () => {
+              setShowAdd(false);
+              await refresh();
+            }} />
+          ) : (
+            <button className="btn sm" onClick={() => setShowAdd(true)}>+ Add SSH host</button>
+          )}
+        </div>
+
+        <div className="muted" style={{fontSize:11, marginTop:10, lineHeight:1.55}}>
+          <strong>Once a host is registered:</strong>
+          <ol style={{margin:"4px 0 0 18px", padding:0}}>
+            <li>Run <code>bash scripts/install_remote.sh &lt;name&gt;</code> from the wigamig repo to install <code>uv</code> + <code>wigamig</code> on the host.</li>
+            <li>Click <strong>test</strong> above — the four probes should all be ✓ or warn.</li>
+            <li>Open <strong>New Project</strong> and pick the host from the dropdown.</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HostAddForm({ onCancel, onAdded }) {
+  const [form, setForm] = useState({
+    name: "lab-server", ssh_host: "lab-server", remote_user: "",
+    project_root: "~/repos", lab_vm_root: "~/lab_vm",
+    vault_root: "~/Obsidian", description: "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState(null);
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim() || !form.ssh_host.trim()) {
+      setErr("name and ssh_host required"); return;
+    }
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch("/api/hosts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.detail || ("HTTP " + r.status));
+      }
+      onAdded();
+    } catch (ex) {
+      setErr(String(ex.message || ex));
+    } finally { setBusy(false); }
+  };
+
+  const inp = {padding:"5px 8px", border:"1px solid var(--rule-strong)", borderRadius:2,
+               fontFamily:"var(--mono)", fontSize:12, width:"100%", boxSizing:"border-box"};
+  const lbl = {fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+               textTransform:"uppercase", color:"var(--muted)", marginTop:6, marginBottom:2};
+
+  return (
+    <form onSubmit={submit} style={{
+      border:"1px solid var(--rule-strong)", borderRadius:2,
+      padding:"10px 14px", background:"var(--paper)",
+    }}>
+      <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+        <strong style={{fontFamily:"var(--serif)"}}>Register SSH host</strong>
+        <button type="button" className="btn sm ghost" onClick={onCancel}>cancel</button>
+      </div>
+      <div className="row" style={{gap:10, marginTop:6}}>
+        <div style={{flex:1}}>
+          <div style={lbl}>name (short id)</div>
+          <input style={inp} value={form.name} onChange={set("name")} />
+        </div>
+        <div style={{flex:2}}>
+          <div style={lbl}>ssh_host (alias in ~/.ssh/config or full hostname)</div>
+          <input style={inp} value={form.ssh_host} onChange={set("ssh_host")} />
+        </div>
+      </div>
+      <div className="row" style={{gap:10, marginTop:4}}>
+        <div style={{flex:1}}>
+          <div style={lbl}>remote_user (netname on host)</div>
+          <input style={inp} value={form.remote_user} onChange={set("remote_user")}
+                 placeholder="the_pi" />
+        </div>
+        <div style={{flex:1}}>
+          <div style={lbl}>project_root</div>
+          <input style={inp} value={form.project_root} onChange={set("project_root")} />
+        </div>
+      </div>
+      <div className="row" style={{gap:10, marginTop:4}}>
+        <div style={{flex:1}}>
+          <div style={lbl}>lab_vm_root (raw/ + refined/ live here)</div>
+          <input style={inp} value={form.lab_vm_root} onChange={set("lab_vm_root")} />
+        </div>
+        <div style={{flex:1}}>
+          <div style={lbl}>vault_root</div>
+          <input style={inp} value={form.vault_root} onChange={set("vault_root")} />
+        </div>
+      </div>
+      <div style={lbl}>description (free text)</div>
+      <input style={inp} value={form.description} onChange={set("description")} />
+      <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:10, alignItems:"baseline"}}>
+        {err && <span style={{color:"var(--red)", fontSize:11, marginRight:"auto"}}>{err}</span>}
+        <button type="submit" className="btn sm primary" disabled={busy}>
+          {busy ? "…" : "register"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /* ───────── Machine settings modal (per-machine: Obsidian paths) ───────── */
 /* These four fields live in ~/.wigamig/machine.yaml because they differ
    between a user's laptop and the lab server. Editing happens here so
@@ -3394,6 +3671,7 @@ function FooterMeta() {
   const canEditLab = isPI || (ls.admins || []).map(h => h.toLowerCase()).includes(myHandle);
   const [showLabSettings, setShowLabSettings] = useState(false);
   const [showMachine, setShowMachine] = useState(false);
+  const [showHosts, setShowHosts] = useState(false);
 
   // Build the office/dry-lab/wet-labs line, dropping any blank pieces.
   const officeBits = [
@@ -3407,6 +3685,7 @@ function FooterMeta() {
       {showProfile    && <MemberProfileModal  onClose={() => setShowProfile(false)} />}
       {showMachine    && <MachineSettingsModal onClose={() => setShowMachine(false)} />}
       {showLabSettings && <LabSettingsModal   onClose={() => setShowLabSettings(false)} />}
+      {showHosts      && <HostsModal           onClose={() => setShowHosts(false)} />}
       <div className="grid">
         <div>
           <h5>
@@ -3433,6 +3712,17 @@ function FooterMeta() {
                   fontSize:11, color:"var(--purple)",
                 }}>
                 ⚙ machine
+              </button>
+              <button
+                type="button"
+                title="Install hosts — register lab-server / other SSH targets for remote project deploys"
+                onClick={() => setShowHosts(true)}
+                style={{
+                  background:"transparent", border:"1px solid var(--rule-strong)",
+                  borderRadius:2, padding:"1px 6px", cursor:"pointer",
+                  fontSize:11, color:"var(--purple)",
+                }}>
+                ⚙ hosts
               </button>
               {canEditLab && (
                 <button
