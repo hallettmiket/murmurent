@@ -92,6 +92,10 @@ class JoinRequest:
     # is consulted only when kind="local".
     repo_kind: str | None = None
     local_repo_root: str | None = None
+    # Item 3 (R2/R3): which registered host this project should live on.
+    # Default ``"local"`` preserves pre-R2 behaviour; any other value
+    # (e.g. ``"lab-server"``) routes the approval to ``cmd_new_remote``.
+    host: str | None = None
 
     def to_meta(self) -> dict[str, Any]:
         meta: dict[str, Any] = {
@@ -112,6 +116,7 @@ class JoinRequest:
             ("proposed_lead", self.proposed_lead),
             ("repo_kind", self.repo_kind),
             ("local_repo_root", self.local_repo_root),
+            ("host", self.host),
         ):
             if value is not None:
                 meta[key] = value
@@ -156,6 +161,7 @@ def parse_request(path: Path) -> JoinRequest:
         proposed_lead=_opt_str(meta.get("proposed_lead")),
         repo_kind=_opt_str(meta.get("repo_kind")),
         local_repo_root=_opt_str(meta.get("local_repo_root")),
+        host=_opt_str(meta.get("host")),
         body=parsed.body,
         path=path,
     )
@@ -297,6 +303,7 @@ def file_create_request(
     today: _dt.date | None = None,
     repo_kind: str = "github",
     local_repo_root: str | None = None,
+    host: str = "local",
 ) -> JoinRequest:
     """File a ``project-create`` request.
 
@@ -330,6 +337,7 @@ def file_create_request(
         proposed_lead=_at(proposed_lead) if proposed_lead else _at(requester),
         repo_kind=repo_kind or "github",
         local_repo_root=local_repo_root,
+        host=(host or "local"),
     )
     write_request(req)
     return req
@@ -346,6 +354,20 @@ def _create_project_from_request(req: JoinRequest) -> None:
     # Reuse the CLI command's logic — it already handles charter,
     # MEMBERS file, lab-VM dirs, and the lab-mgmt registry entry.
     from ..commands import project_cmd as _project_cmd
+    host = (req.host or "local").strip() or "local"
+    if host != "local":
+        # Item 3 (R3): remote install. The dispatcher SSHes the host,
+        # scaffolds there, and leaves a local pointer dir + lab-mgmt entry.
+        _project_cmd.cmd_new_remote(
+            req.project,
+            host_name=host,
+            members_csv=members_csv,
+            description=description,
+            sensitivity=sensitivity,
+            lead=lead,
+            skip_github=True,
+        )
+        return
     _project_cmd.cmd_new(
         req.project,
         charter_path=None,

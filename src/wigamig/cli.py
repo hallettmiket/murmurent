@@ -160,6 +160,66 @@ def preference_validate() -> None:
 
 
 # ---------------------------------------------------------------------------
+# host
+# ---------------------------------------------------------------------------
+
+
+@cli.group("host", help="Manage remote install targets (laptops, lab-server, …).")
+def host_group() -> None:
+    """Hosts are registered in ~/.wigamig/hosts.yaml; ``local`` is built-in."""
+
+
+@host_group.command("list", help="Print every registered host.")
+def host_list_cmd() -> None:
+    from .commands import host_cmd as _host_cmd
+    raise SystemExit(_host_cmd.cmd_list())
+
+
+@host_group.command("add", help="Register a new SSH host as an install target.")
+@click.argument("name")
+@click.option(
+    "--ssh-host",
+    required=True,
+    help="Alias in ~/.ssh/config (e.g. 'lab-server'). Omit to register a local host.",
+)
+@click.option("--remote-user", default="", help="Username on the remote host.")
+@click.option("--project-root", default="~/repos", show_default=True,
+              help="Where projects live on the remote host.")
+@click.option("--lab-vm-root", default="/data/lab_vm", show_default=True,
+              help="Where /data/lab_vm/{raw,refined} live on the remote host.")
+@click.option("--vault-root", default="~/Obsidian", show_default=True,
+              help="Where the user's Obsidian vault lives on the remote host.")
+@click.option("--mount-point", default="",
+              help="Optional SSHFS mount point on the laptop (for Obsidian).")
+@click.option("--description", default="", help="Free-form note for `host list`.")
+def host_add_cmd(
+    name: str, ssh_host: str, remote_user: str,
+    project_root: str, lab_vm_root: str, vault_root: str,
+    mount_point: str, description: str,
+) -> None:
+    from .commands import host_cmd as _host_cmd
+    raise SystemExit(_host_cmd.cmd_add(
+        name=name, ssh_host=ssh_host, remote_user=remote_user,
+        project_root=project_root, lab_vm_root=lab_vm_root, vault_root=vault_root,
+        mount_point=mount_point, description=description,
+    ))
+
+
+@host_group.command("remove", help="Drop a host from the registry. 'local' cannot be removed.")
+@click.argument("name")
+def host_remove_cmd(name: str) -> None:
+    from .commands import host_cmd as _host_cmd
+    raise SystemExit(_host_cmd.cmd_remove(name))
+
+
+@host_group.command("test", help="Probe SSH + wigamig + lab_vm + gh on a registered host.")
+@click.argument("name")
+def host_test_cmd(name: str) -> None:
+    from .commands import host_cmd as _host_cmd
+    raise SystemExit(_host_cmd.cmd_test(name))
+
+
+# ---------------------------------------------------------------------------
 # group
 # ---------------------------------------------------------------------------
 
@@ -273,6 +333,15 @@ def project_describe(name: str) -> None:
 @click.option("--reb-expires", "reb_expires", default=None)
 @click.option("--data-residency", "data_residency", default=None)
 @click.option("--skip-github", is_flag=True, help="Skip the gh repo create + push step.")
+@click.option(
+    "--host",
+    "host_name",
+    default="local",
+    show_default=True,
+    help="Install target. 'local' = this laptop; any other registered host (see "
+         "`wigamig host list`) scaffolds the project on that machine over SSH "
+         "and leaves a remote-pointer placeholder in ~/repos/<name>/.",
+)
 def project_new(
     name: str,
     charter_path: str | None,
@@ -285,7 +354,27 @@ def project_new(
     reb_expires: str | None,
     data_residency: str | None,
     skip_github: bool,
+    host_name: str,
 ) -> None:
+    if host_name and host_name != "local":
+        if charter_path is not None:
+            raise click.ClickException(
+                "--charter is not yet supported with --host; pass --description instead."
+            )
+        project_cmd.cmd_new_remote(
+            name,
+            host_name=host_name,
+            members_csv=members_list,
+            description=description,
+            sensitivity=sensitivity,
+            choreography=choreography,
+            reb_number=reb_number,
+            reb_expires=reb_expires,
+            data_residency=data_residency,
+            lead=lead,
+            skip_github=skip_github,
+        )
+        return
     project_cmd.cmd_new(
         name,
         charter_path=charter_path,

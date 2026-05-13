@@ -1139,6 +1139,27 @@ function ProjectDetailRows({ proj: p }) {
         {errs.github && <span style={{color:"var(--red)", fontSize:11}}>{errs.github}</span>}
       </div>
 
+      {/* Host — remote install pointer (Item 3 R3). */}
+      {p.host && p.host !== "local" && (
+        <div style={row}>
+          <span style={lbl}>host</span>
+          <span className="mono" style={{fontSize:12}}>
+            {p.host}{p.remote_ssh_host && p.remote_ssh_host !== p.host
+              ? " (ssh " + p.remote_ssh_host + ")"
+              : ""}:{p.remote_path}
+          </span>
+          {p.remote_ssh_host && p.remote_path && (
+            <a
+              href={"vscode://vscode-remote/ssh-remote+" + p.remote_ssh_host + p.remote_path}
+              className="btn sm"
+              title="Open the project in VSCode Remote-SSH"
+              style={{textDecoration:"none"}}>
+              Open in VSCode Remote
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Slack — project identity */}
       <div style={row}>
         <span style={lbl}>slack</span>
@@ -1212,7 +1233,23 @@ function ProjectsPanel({ projects, span="c-5" }) {
               <React.Fragment key={p.name}>
                 <tr style={{cursor:"pointer"}} onClick={() => setOpenProj(openProj === p.name ? null : p.name)}>
                   <td>
-                    <div style={{fontWeight:500}}>{p.name}</div>
+                    <div style={{fontWeight:500, display:"inline-flex", alignItems:"center", gap:6}}>
+                      {p.name}
+                      {p.host && p.host !== "local" && (
+                        <span
+                          title={"This project's working tree lives on " + p.host +
+                                 (p.remote_path ? " at " + p.remote_path : "") +
+                                 ". Local ~/repos/" + p.name + "/ is a pointer placeholder."}
+                          style={{
+                            fontFamily:"var(--mono)", fontSize:10, letterSpacing:0.5,
+                            padding:"1px 5px", borderRadius:2,
+                            color:"var(--green)", background:"rgba(79,107,58,0.10)",
+                            border:"1px solid rgba(79,107,58,0.30)",
+                          }}>
+                          🌐 {p.host}
+                        </span>
+                      )}
+                    </div>
                     <div className="mono muted" style={{fontSize:11}}>{p.choreo}</div>
                   </td>
                   <td><Pill tone={p.sens==="clinical"?"red":""}>{p.sens}</Pill></td>
@@ -1798,6 +1835,19 @@ function NewProjectModal({ onClose }) {
     ? ms.lab_base.replace(/\/$/, "") + "/" + ls.git_repos_subpath
     : (ms.lab_base ? ms.lab_base.replace(/\/$/, "") + "/git_repos" : "");
   const [localRepoRoot, setLocalRepoRoot] = useState(defaultLocalRoot);
+  // Item 3 (R3): install target. Populated from /api/hosts on mount.
+  // Defaults to "local"; selecting a remote host (e.g. lab-server) makes
+  // approval scaffold the project on that machine over SSH.
+  const [hosts, setHosts] = useState([{ name: "local", kind: "local", is_remote: false, description: "this laptop" }]);
+  const [host, setHost] = useState("local");
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/hosts", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))
+      .then(j => { if (!cancelled && Array.isArray(j.hosts) && j.hosts.length) setHosts(j.hosts); })
+      .catch(err => console.warn("[wigamig] /api/hosts failed; defaulting to local", err));
+    return () => { cancelled = true; };
+  }, []);
 
   const addFromDropdown = (handle) => {
     if (!handle) return;
@@ -1829,6 +1879,7 @@ function NewProjectModal({ onClose }) {
         justification: justification.trim(),
         repo_kind: repoKind,
         local_repo_root: repoKind === "local" ? (localRepoRoot.trim() || null) : null,
+        host,
       });
       if (typeof window.__wigamigFetchData === "function") {
         await window.__wigamigFetchData(window.DATA.persona);
@@ -1911,6 +1962,26 @@ function NewProjectModal({ onClose }) {
           <option value="restricted">restricted</option>
           <option value="clinical">clinical</option>
         </select>
+
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>install on host</label>
+        <select value={host} onChange={e => setHost(e.target.value)}
+                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}>
+          {hosts.map(h => (
+            <option key={h.name} value={h.name}>
+              {h.name}{h.is_remote ? " (" + (h.ssh_host || h.name) + ")" : " — this laptop"}
+            </option>
+          ))}
+        </select>
+        {host !== "local" && (
+          <div className="muted" style={{fontSize:11, marginTop:-4}}>
+            On approval, wigamig will SSH into <code>{host}</code> and
+            scaffold the project at
+            <code> {(hosts.find(h => h.name === host) || {}).project_root || "~/repos"}/{name.trim() || "<project>"}</code>.
+            A local placeholder dir is created at <code>~/repos/{name.trim() || "<project>"}/</code>
+            so the dashboard can render the project (working tree lives on the remote host).
+          </div>
+        )}
+
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>repo destination</label>
         <div className="row" style={{gap:14, alignItems:"flex-start", marginTop:2}}>
           <label style={{display:"flex", alignItems:"center", gap:6, cursor:"pointer", fontSize:12}}>

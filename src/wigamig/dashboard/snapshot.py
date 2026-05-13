@@ -22,7 +22,12 @@ from ..core import dashboard as core_dashboard
 from ..core import inventory as inventory_core
 from ..core.dashboard import DashboardSnapshot, _load_member_meta, _parse_certifications
 from ..core.frontmatter import parse_file
-from ..core.projects import ProjectSummary, iter_local_projects, load_summary
+from ..core.projects import (
+    ProjectSummary,
+    iter_local_projects,
+    load_summary,
+    read_remote_pointer,
+)
 from ..core.agents import load_registry as load_agent_registry
 from ..core import compliance as compliance_core
 from ..core import cross_group as xgroup
@@ -900,6 +905,21 @@ def _projects(
         # Installation: check whether raw/refined dirs exist on this machine.
         raw_path = _lab_vm.project_raw_dir(p.name)
         refined_path = _lab_vm.project_refined_dir(p.name)
+        # Item 3 (R2/R3): if this project is a remote-pointer dir, surface
+        # the host so the dashboard can render a 🌐 chip + a vscode-remote://
+        # link instead of a local file:// path.
+        host = "local"
+        remote_path: str | None = None
+        remote_ssh_host: str | None = None
+        pointer = read_remote_pointer(p.path)
+        if pointer is not None:
+            host, remote_path = pointer
+            try:
+                from ..core import hosts as _hosts
+                resolved = _hosts.resolve(host)
+                remote_ssh_host = resolved.ssh_host or host
+            except Exception:
+                remote_ssh_host = host  # best-effort fallback
         rows.append(
             C.ProjectRow(
                 name=p.name,
@@ -920,6 +940,9 @@ def _projects(
                 refined_path=str(refined_path),
                 raw_exists=raw_path.is_dir(),
                 refined_exists=refined_path.is_dir(),
+                host=host,
+                remote_path=remote_path,
+                remote_ssh_host=remote_ssh_host,
             )
         )
     return rows
