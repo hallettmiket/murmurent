@@ -38,6 +38,10 @@
         border-bottom: 4px solid var(--tiger);
       }
       .banner h1 { margin: 0; font-size: 22px; font-weight: 600; }
+      .banner h1 small {
+        font-family: var(--mono); font-size: 11px; font-weight: 400;
+        letter-spacing: 1px; opacity: 0.75; margin-left: 6px;
+      }
       .banner .meta {
         font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
         text-transform: uppercase; opacity: 0.9;
@@ -105,10 +109,44 @@
         color: var(--red); border-left: 4px solid var(--red);
         font-family: var(--mono); font-size: 12px;
       }
-      footer.land-ack {
-        margin: 32px auto 16px; max-width: 1200px;
-        padding: 0 28px; color: var(--muted); font-size: 12px;
-        line-height: 1.5;
+      /* Dark-purple branding footer — mirrors the user dashboard Footer
+         (lab logo, Schulich + Western marks, contact line, land ack) so
+         both dashboards land on the same closing brand. */
+      .footer {
+        margin-top: 36px;
+        padding: 14px 28px;
+        background: var(--purple-deep);
+        color: rgba(255,255,255,0.85);
+        border-top: 3px solid var(--tiger);
+        font-family: var(--serif); font-size: 13px;
+      }
+      .footer .bar {
+        max-width: 1200px; margin: 0 auto;
+        display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+      }
+      .footer img.lab-logo-mini { height: 28px; border-radius: 2px; }
+      .footer img.schulich-mini {
+        height: 22px; filter: brightness(0) invert(1); opacity: 0.85;
+      }
+      .footer img.western-mini { height: 18px; }
+      .footer .dept {
+        font-size: 12px; color: rgba(255,255,255,0.7);
+        flex-grow: 1;
+      }
+      .footer .links { display: flex; gap: 18px; }
+      .footer a {
+        color: var(--tiger); border-bottom: 1px dotted var(--tiger);
+        text-decoration: none;
+      }
+      .footer .links a {
+        font-size: 12px; color: rgba(255,255,255,0.85);
+        border-bottom: 0;
+      }
+      .footer .links a:hover { color: var(--tiger); }
+      .footer .ack {
+        max-width: 1200px; margin: 10px auto 0;
+        font-style: italic; font-size: 12px;
+        color: rgba(255,255,255,0.75); line-height: 1.55;
       }
       /* New-lab form (Phase B) */
       .modal-backdrop {
@@ -155,7 +193,7 @@
   </head>
   <body>
     <div class="banner">
-      <h1>Registrar dashboard</h1>
+      <h1>wigamig <small>v1.0.0</small> &middot; Registrar dashboard</h1>
       <div class="meta" id="banner-meta">loading…</div>
     </div>
 
@@ -167,10 +205,25 @@
       <!-- populated by renderFooter() — registrar's own profile + edit button -->
     </footer>
 
-    <footer class="land-ack">
-      We acknowledge that Western University is located on the traditional lands of
-      the Anishinaabek (Ah-nish-in-a-bek), Haudenosaunee (Ho-den-no-show-nee),
-      Lūnaapéewak (Len-ah-pay-wuk), and Chonnonton (Chun-ongk-ton) Nations.
+    <footer class="footer">
+      <div class="bar">
+        <img class="lab-logo-mini" src="assets/lab-logo-hi-res.jpg" alt="Hallett Lab" />
+        <a href="https://www.schulich.uwo.ca/biochem/" target="_blank" rel="noopener">
+          <img class="schulich-mini" src="assets/Schulich_horizontal_CMYK.png" alt="Schulich School of Dentristy and Medicine" />
+        </a>
+        <a href="https://www.uwo.ca/" target="_blank" rel="noopener">
+          <img class="western-mini" src="assets/western_longWhite.png" alt="Western University" />
+        </a>
+        <span class="dept">Department of Biochemistry &middot; London, ON, Canada</span>
+        <div class="links">
+          <a href="mailto:michael.hallett@example.edu">Contact</a>
+          <a href="https://hallettmiket.github.io" target="_blank" rel="noopener">Join Us</a>
+        </div>
+      </div>
+      <div class="ack">
+        We acknowledge that Western University is located on the traditional lands of
+        the Anishinaabek, Haudenosaunee, Lūnaapéewak and Attawandaron peoples.
+      </div>
     </footer>
 
     <script>
@@ -541,7 +594,8 @@
           + '<span class="mono muted" style="font-size:12px; font-weight:normal;">' + escapeHTML(data.registrar_handle) + '</span>'
           + '</h2>'
           + '<div style="display:flex; gap:8px; align-items:center;">'
-            + '<a class="btn" href="/" title="Open the lab dashboard (PI / member view) for the same handle">→ Lab dashboard</a>'
+            + '<a class="btn" href="/dashboard?user=' + encodeURIComponent(data.registrar_handle.replace(/^@/, "")) + '&persona=member" title="Open the lab dashboard (PI / member view) for the same handle">→ Lab dashboard</a>'
+            + '<a class="btn" href="/" title="Switch user or role — returns to the sign-in page">↺ switch</a>'
             + '<button class="btn" id="btn-edit-profile">⚙ profile</button>'
           + '</div>'
         + '</header>'

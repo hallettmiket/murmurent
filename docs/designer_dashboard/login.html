@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>wigamig · Sign in</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700&family=Courier+Prime:ital,wght@0,400;0,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --purple:        #4F2683;
+        --purple-deep:   #201436;
+        --purple-soft:   #6F4DA8;
+        --tiger:         #F0A757;
+        --paper:         #FAF8F5;
+        --paper-2:       #F1ECE3;
+        --card:          #FFFFFF;
+        --rule:          #E0DAD0;
+        --rule-strong:   #C7BFB1;
+        --ink:           #1A1A1A;
+        --muted:         #5B5B5B;
+        --green:         #4F6B3A;
+        --red:           #B23A2B;
+        --serif: "EB Garamond", Georgia, serif;
+        --mono:  "Courier Prime", "IBM Plex Mono", Menlo, monospace;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body {
+        margin: 0; min-height: 100vh;
+        background: var(--paper); color: var(--ink);
+        font-family: var(--serif);
+      }
+      .banner {
+        background: var(--purple); color: white;
+        padding: 12px 28px; display: flex; align-items: baseline;
+        justify-content: space-between; gap: 24px;
+        border-bottom: 4px solid var(--tiger);
+      }
+      .banner h1 { margin: 0; font-size: 22px; font-weight: 600; }
+      .banner h1 small {
+        font-family: var(--mono); font-size: 11px; font-weight: 400;
+        letter-spacing: 1px; opacity: 0.75; margin-left: 6px;
+      }
+      .banner .meta {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+        text-transform: uppercase; opacity: 0.9;
+      }
+
+      .wrap {
+        max-width: 560px; margin: 48px auto; padding: 0 28px;
+      }
+      .card {
+        background: var(--card); border: 1px solid var(--rule-strong);
+        border-radius: 2px; padding: 24px 28px;
+      }
+      .card h2 {
+        margin: 0 0 4px; font-size: 22px; color: var(--purple-deep);
+        font-weight: 600;
+      }
+      .card .lede {
+        margin: 0 0 18px; color: var(--muted); font-size: 14px;
+        line-height: 1.5;
+      }
+      .field {
+        margin: 14px 0;
+      }
+      .field label {
+        display: block; font-family: var(--mono); font-size: 10px;
+        letter-spacing: 1.2px; text-transform: uppercase;
+        color: var(--muted); margin-bottom: 6px;
+      }
+      .field input[type=text] {
+        width: 100%; padding: 8px 10px;
+        font-family: var(--mono); font-size: 13px;
+        border: 1px solid var(--rule-strong); border-radius: 2px;
+        background: var(--paper);
+      }
+      .field input[type=text]:focus {
+        outline: none; border-color: var(--purple);
+        box-shadow: 0 0 0 2px rgba(79, 38, 131, 0.18);
+      }
+      .roles {
+        margin-top: 6px; display: flex; flex-direction: column; gap: 8px;
+      }
+      .role-row {
+        border: 1px solid var(--rule); border-radius: 2px;
+        padding: 10px 14px; display: flex; align-items: center; gap: 12px;
+        cursor: pointer; background: var(--paper);
+        transition: border-color 0.12s, background 0.12s;
+      }
+      .role-row:hover  { border-color: var(--purple-soft); }
+      .role-row.active { border-color: var(--purple); background: #fff; }
+      .role-row.disabled {
+        opacity: 0.45; cursor: not-allowed; background: transparent;
+      }
+      .role-row .label { font-size: 16px; color: var(--purple-deep); }
+      .role-row .why {
+        margin-left: auto; font-family: var(--mono); font-size: 10px;
+        letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
+      }
+      .role-row .why.ok { color: var(--green); }
+      .role-row .why.deny { color: var(--red); }
+      .remember {
+        margin-top: 6px; font-size: 13px; color: var(--muted);
+        display: flex; align-items: center; gap: 6px;
+      }
+      .actions {
+        margin-top: 18px; display: flex; justify-content: flex-end; gap: 8px;
+        align-items: center;
+      }
+      .btn {
+        padding: 7px 16px; font-family: var(--mono); font-size: 12px;
+        letter-spacing: 0.5px; cursor: pointer; border-radius: 2px;
+        border: 1px solid var(--rule-strong); background: var(--card);
+      }
+      .btn:hover { border-color: var(--purple); color: var(--purple); }
+      .btn.primary {
+        background: var(--purple); color: white; border-color: var(--purple);
+      }
+      .btn.primary:hover { background: var(--purple-deep); }
+      .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+      .msg { font-size: 12px; margin-right: auto; }
+      .msg.error { color: var(--red); }
+      .msg.ok { color: var(--green); }
+      .footer-note {
+        max-width: 560px; margin: 12px auto 0; padding: 0 28px;
+        color: var(--muted); font-size: 12px; line-height: 1.55;
+      }
+      .footer-note code {
+        font-family: var(--mono); font-size: 11px;
+        background: var(--paper-2); padding: 1px 4px; border-radius: 2px;
+      }
+
+      /* Dark-purple brand footer, mirrors the user + registrar pages. */
+      .footer {
+        margin-top: 36px;
+        padding: 14px 28px;
+        background: var(--purple-deep);
+        color: rgba(255,255,255,0.85);
+        border-top: 3px solid var(--tiger);
+        font-family: var(--serif); font-size: 13px;
+      }
+      .footer .bar {
+        max-width: 1200px; margin: 0 auto;
+        display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+      }
+      .footer img.lab-logo-mini { height: 28px; border-radius: 2px; }
+      .footer img.schulich-mini {
+        height: 22px; filter: brightness(0) invert(1); opacity: 0.85;
+      }
+      .footer img.western-mini { height: 18px; }
+      .footer .dept {
+        font-size: 12px; color: rgba(255,255,255,0.7); flex-grow: 1;
+      }
+      .footer .links { display: flex; gap: 18px; }
+      .footer a {
+        color: var(--tiger); border-bottom: 1px dotted var(--tiger);
+        text-decoration: none;
+      }
+      .footer .links a {
+        font-size: 12px; color: rgba(255,255,255,0.85); border-bottom: 0;
+      }
+      .footer .links a:hover { color: var(--tiger); }
+      .footer .ack {
+        max-width: 1200px; margin: 10px auto 0;
+        font-style: italic; font-size: 12px;
+        color: rgba(255,255,255,0.75); line-height: 1.55;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="banner">
+      <h1>wigamig <small>v1.0.0</small> &middot; Sign in</h1>
+      <div class="meta">Hallett Lab &middot; Western University</div>
+    </div>
+
+    <div class="wrap">
+      <div class="card">
+        <h2>Who is using this dashboard?</h2>
+        <p class="lede">
+          We picked up <code id="inferred-handle">…</code> from
+          <code>~/.wigamig/user</code>. Use a different netname if you're not
+          that person, then pick the lens you want to work in.
+        </p>
+
+        <form id="login-form" autocomplete="off">
+          <div class="field">
+            <label>Western netname</label>
+            <input type="text" id="handle-input" name="handle"
+                   placeholder="e.g. the_pi" />
+          </div>
+
+          <div class="field">
+            <label>Log in as</label>
+            <div class="roles" id="roles">
+              <!-- populated by renderRoles() -->
+            </div>
+          </div>
+
+          <label class="remember">
+            <input type="checkbox" id="remember" checked />
+            Remember this netname on this machine
+          </label>
+
+          <div class="actions">
+            <span class="msg" id="msg"></span>
+            <button type="submit" class="btn primary" id="submit" disabled>
+              Continue &rarr;
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <div class="footer-note">
+        <strong>Security note.</strong> wigamig is a local desktop tool.
+        Member status is read from <code>lab-mgmt/members/</code>; PI status
+        from <code>lab.md</code>; registrar status from
+        <code>_registry.yaml:registrars:</code> — all git-tracked. Every
+        role choice is appended to <code>~/.wigamig/role_audit.log</code>.
+      </div>
+    </div>
+
+    <footer class="footer">
+      <div class="bar">
+        <img class="lab-logo-mini" src="assets/lab-logo-hi-res.jpg" alt="Hallett Lab" />
+        <a href="https://www.schulich.uwo.ca/biochem/" target="_blank" rel="noopener">
+          <img class="schulich-mini" src="assets/Schulich_horizontal_CMYK.png" alt="Schulich School of Dentristy and Medicine" />
+        </a>
+        <a href="https://www.uwo.ca/" target="_blank" rel="noopener">
+          <img class="western-mini" src="assets/western_longWhite.png" alt="Western University" />
+        </a>
+        <span class="dept">Department of Biochemistry &middot; London, ON, Canada</span>
+        <div class="links">
+          <a href="mailto:michael.hallett@example.edu">Contact</a>
+          <a href="https://hallettmiket.github.io" target="_blank" rel="noopener">Join Us</a>
+        </div>
+      </div>
+      <div class="ack">
+        We acknowledge that Western University is located on the traditional lands of
+        the Anishinaabek, Haudenosaunee, Lūnaapéewak and Attawandaron peoples.
+      </div>
+    </footer>
+
+    <script>
+    "use strict";
+
+    const ROLE_LABELS = {
+      member:    "Member view",
+      pi:        "PI view",
+      registrar: "Registrar view",
+    };
+    const ROLE_DESCRIPTIONS = {
+      member:    "everyone in lab-mgmt/members",
+      pi:        "the lab's named PI",
+      registrar: "centre-level administrator",
+    };
+
+    const inferredEl = document.getElementById("inferred-handle");
+    const handleInput = document.getElementById("handle-input");
+    const rolesEl = document.getElementById("roles");
+    const submitBtn = document.getElementById("submit");
+    const msgEl = document.getElementById("msg");
+    const rememberEl = document.getElementById("remember");
+    const form = document.getElementById("login-form");
+
+    let selectedRole = null;
+    let lastResolved = null;
+
+    function escapeHTML(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    function setMessage(text, kind) {
+      msgEl.textContent = text || "";
+      msgEl.className = "msg" + (kind ? " " + kind : "");
+    }
+
+    function renderRoles(resolved) {
+      lastResolved = resolved;
+      const handle = resolved && resolved.handle ? resolved.handle : "";
+      const flags = {
+        member:    !!(resolved && resolved.is_member),
+        pi:        !!(resolved && resolved.is_pi),
+        registrar: !!(resolved && resolved.is_registrar),
+      };
+      // Unknown handles can still pick "member" — they'll see an empty
+      // dashboard, but we don't punish a typo with a 403.
+      const allowed = {
+        member:    true,
+        pi:        flags.pi,
+        registrar: flags.registrar,
+      };
+      const defaultRole = (resolved && resolved.default_role) || "member";
+      selectedRole = allowed[defaultRole] ? defaultRole : "member";
+
+      const rows = ["member", "pi", "registrar"].map(role => {
+        const isAllowed = allowed[role];
+        const why = role === "member"
+          ? (handle ? "available" : "claim a netname first")
+          : (isAllowed ? "you hold this role" : "not authorised");
+        const cls = isAllowed
+          ? "ok"
+          : "deny";
+        return (
+          '<div class="role-row ' +
+            (isAllowed ? "" : "disabled ") +
+            (role === selectedRole ? "active" : "") +
+            '" data-role="' + role + '" data-allowed="' + (isAllowed ? "1" : "0") + '">' +
+          '<span class="label">' + escapeHTML(ROLE_LABELS[role]) + '</span>' +
+          '<span class="why ' + cls + '">' + escapeHTML(why) + '</span>' +
+          '</div>'
+        );
+      });
+      rolesEl.innerHTML = rows.join("");
+      rolesEl.querySelectorAll(".role-row").forEach(row => {
+        row.addEventListener("click", () => {
+          if (row.dataset.allowed !== "1") return;
+          rolesEl.querySelectorAll(".role-row").forEach(r => r.classList.remove("active"));
+          row.classList.add("active");
+          selectedRole = row.dataset.role;
+          updateSubmitState();
+        });
+      });
+      updateSubmitState();
+    }
+
+    function updateSubmitState() {
+      const handle = (handleInput.value || "").trim().replace(/^@/, "");
+      submitBtn.disabled = !(handle && selectedRole);
+    }
+
+    let resolveTimer = null;
+    function scheduleResolve() {
+      if (resolveTimer) clearTimeout(resolveTimer);
+      resolveTimer = setTimeout(doResolve, 200);
+    }
+
+    function doResolve() {
+      const handle = (handleInput.value || "").trim().replace(/^@/, "");
+      if (!handle) {
+        renderRoles({ handle: "", is_member: false, is_pi: false, is_registrar: false, default_role: "member" });
+        return;
+      }
+      setMessage("checking…");
+      fetch("/api/login/resolve?user=" + encodeURIComponent(handle), {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      })
+        .then(r => r.json())
+        .then(data => {
+          setMessage("");
+          renderRoles(data);
+        })
+        .catch(err => {
+          console.warn("resolve failed", err);
+          setMessage("Could not check this netname — proceeding will still try.", "error");
+        });
+    }
+
+    handleInput.addEventListener("input", scheduleResolve);
+
+    form.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      const handle = (handleInput.value || "").trim().replace(/^@/, "");
+      if (!handle || !selectedRole) return;
+      submitBtn.disabled = true;
+      setMessage("signing in…");
+      fetch("/api/login/select", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          handle: handle,
+          role: selectedRole,
+          remember_user: rememberEl.checked,
+        }),
+      })
+        .then(r => r.json().then(j => ({ ok: r.ok, status: r.status, body: j })))
+        .then(({ ok, status, body }) => {
+          if (!ok) {
+            const detail = (body && body.detail) || ("HTTP " + status);
+            setMessage(detail, "error");
+            submitBtn.disabled = false;
+            return;
+          }
+          window.location.href = body.next;
+        })
+        .catch(err => {
+          setMessage("Network error: " + (err && err.message ? err.message : err), "error");
+          submitBtn.disabled = false;
+        });
+    });
+
+    // Initial state — fetch the inferred handle from the server's
+    // resolve endpoint (no ?user= → server returns whatever WIGAMIG_USER
+    // or ~/.wigamig/user resolves to).
+    fetch("/api/login/resolve", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(r => r.json())
+      .then(data => {
+        const h = data && data.handle ? data.handle : "";
+        inferredEl.textContent = h ? "@" + h : "(no saved netname)";
+        handleInput.value = h;
+        renderRoles(data);
+      })
+      .catch(err => {
+        inferredEl.textContent = "(could not resolve)";
+        renderRoles({ handle: "", is_member: false, is_pi: false, is_registrar: false, default_role: "member" });
+      });
+    </script>
+  </body>
+</html>

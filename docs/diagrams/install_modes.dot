@@ -1,0 +1,128 @@
+// Purpose: Side-by-side comparison of local vs remote (lab-server) project
+//          install. Shows where every artefact lives (Obsidian vault, repos,
+//          lab-VM data) and which arrows cross the SSH boundary.
+// Author:  Mike Hallett (with Claude Code)
+// Date:    2026-05-13
+// Render:  bash scripts/render_diagrams.sh
+
+digraph install_modes {
+  rankdir=LR;
+  bgcolor="#FAF8F5";
+  fontname="EB Garamond";
+  labelloc="t";
+  label=<<B>wigamig &middot; project install modes</B><BR/><FONT POINT-SIZE="11">where does each artefact live? &middot; local laptop vs lab-server</FONT>>;
+  fontsize=18;
+  fontcolor="#201436";
+  compound=true;
+  nodesep=0.5;
+  ranksep=0.65;
+
+  node [
+    shape=box,
+    style="filled,rounded",
+    fontname="EB Garamond",
+    fontsize=11,
+    fillcolor="#FFFFFF",
+    color="#C7BFB1",
+    fontcolor="#1A1A1A",
+    margin="0.18,0.10",
+  ];
+  edge [
+    color="#5B5B5B",
+    fontname="Courier Prime",
+    fontsize=9,
+    fontcolor="#5B5B5B",
+    arrowsize=0.7,
+  ];
+
+  // GitHub on the right — both modes push to the same place.
+  github [label="GitHub\nhallettmiket / &lt;org&gt;",
+          shape=cylinder, fillcolor="#EEF2FF", color="#6F4DA8"];
+
+  // -----------------------------------------------------------------
+  // Mode A — Local install (everything on the laptop)
+  // -----------------------------------------------------------------
+  subgraph cluster_local {
+    label=<<B>Mode A &middot; Local install</B><BR/><FONT POINT-SIZE="9">simplest; default for new projects</FONT>>;
+    fontsize=12;
+    fontcolor="#4F2683";
+    color="#4F2683";
+    style="rounded,filled";
+    fillcolor="#F1ECE3";
+
+    L_laptop [label=<<B>laptop (macOS)</B>>,
+              shape=plaintext, fillcolor="transparent"];
+
+    L_dashboard [label="wigamig dashboard\n(uvicorn :8770)",
+                 fillcolor="#FFE9CC", color="#F0A757"];
+    L_repo      [label="~/repos/&lt;project&gt;\n(working tree)"];
+    L_vault     [label="Obsidian vault\n~/Documents/Obsidian/&lt;vault&gt;",
+                 fillcolor="#E9DEFA", color="#6F4DA8"];
+    L_lab_vm    [label="~/lab_vm/data/{raw,refined}\n(simulated)"];
+    L_vscode    [label="VSCode + CC\n(local)",
+                 shape=hexagon, fillcolor="#FFF1DB"];
+
+    L_dashboard -> L_repo;
+    L_vscode    -> L_repo;
+    L_repo      -> L_lab_vm  [label="reads / writes"];
+    L_dashboard -> L_vault   [label="notebook"];
+  }
+
+  // -----------------------------------------------------------------
+  // Mode B — Remote install on lab-server
+  // -----------------------------------------------------------------
+  subgraph cluster_remote {
+    label=<<B>Mode B &middot; lab-server install</B><BR/><FONT POINT-SIZE="9">project + data + vault all on lab-server.example.edu</FONT>>;
+    fontsize=12;
+    fontcolor="#4F6B3A";
+    color="#4F6B3A";
+    style="rounded,filled";
+    fillcolor="#E1EBD6";
+
+    // Laptop side
+    R_laptop [label=<<B>laptop (macOS)</B>>,
+              shape=plaintext, fillcolor="transparent"];
+    R_dashboard [label="wigamig dashboard\n(uvicorn :8770)",
+                 fillcolor="#FFE9CC", color="#F0A757"];
+    R_vscode_remote [label="VSCode Remote-SSH\nclient",
+                     shape=hexagon, fillcolor="#FFF1DB"];
+    R_obs_local [label="Obsidian (GUI)\n→ opens SSHFS mount",
+                 fillcolor="#E9DEFA", color="#6F4DA8"];
+
+    // lab-server side
+    R_lab-server [label=<<B>lab-server.example.edu</B><BR/><FONT POINT-SIZE="9">Ubuntu &middot; 203.0.113.10</FONT>>,
+                 shape=plaintext, fillcolor="transparent"];
+    R_repo      [label="/home/&lt;user&gt;/repos/&lt;project&gt;\n(working tree)",
+                 fillcolor="#FFFFFF"];
+    R_lab_vm    [label="/data/lab_vm/{raw,refined}/&lt;project&gt;\n(real data plane)",
+                 fillcolor="#FFFFFF"];
+    R_vault     [label="/home/&lt;user&gt;/Obsidian/&lt;vault&gt;\n(authoritative copy)",
+                 fillcolor="#FFFFFF"];
+    R_wigamig   [label="wigamig CLI on lab-server\n(uv tool install)",
+                 fillcolor="#FFFFFF"];
+
+    // Local-to-remote arrows that cross the SSH boundary
+    R_dashboard -> R_wigamig   [label="ssh lab-server  ", style=bold, color="#4F2683"];
+    R_vscode_remote -> R_repo  [label="vscode-remote://", style=bold, color="#4F2683"];
+    R_obs_local -> R_vault     [label="SSHFS mount",     style=bold, color="#4F2683"];
+
+    // On lab-server
+    R_wigamig -> R_repo        [label="project new"];
+    R_repo    -> R_lab_vm      [label="reads / writes"];
+  }
+
+  // Both modes push to the same GitHub.
+  L_repo -> github [label="git push", style=dashed];
+  R_repo -> github [label="git push", style=dashed];
+
+  // Legend / one-vault rule called out below.
+  legend [shape=note, fillcolor="#FFF8E6", color="#F0A757",
+          label=<
+<TABLE BORDER="0" CELLBORDER="0" CELLPADDING="2">
+<TR><TD ALIGN="LEFT"><B>Invariant:</B> exactly one Obsidian vault per user.</TD></TR>
+<TR><TD ALIGN="LEFT">Choose Mode A <I>or</I> Mode B &mdash; never both at once.</TD></TR>
+<TR><TD ALIGN="LEFT">Migration: <FONT FACE="Courier Prime">wigamig notebook move-to &lt;host&gt;</FONT></TD></TR>
+</TABLE>
+          >];
+  legend -> R_vault [style=invis];
+}

@@ -142,12 +142,13 @@ function TopBar() {
 }
 
 function CmdBar({ query, setQuery }) {
-  // The persona is derived from lab.md (the PI handle), not chosen by the
-  // user. The role badge below the search is informational, not interactive.
+  // The persona arrives via ?persona= from the /login landing page; the
+  // role badge below the search is informational (it reflects the lens
+  // the user picked at sign-in).
   const persona = window.DATA.persona || "member";
   return (
     <div className="cmdbar">
-      <div className="home">wigamig <small>v0.7</small></div>
+      <div className="home">wigamig <small>v1.0.0</small></div>
       <div className="search">
         <span className="mono muted" style={{fontSize:12}}>›</span>
         <input
@@ -166,6 +167,19 @@ function CmdBar({ query, setQuery }) {
           {persona === "pi" ? "PI VIEW" : "MEMBER VIEW"}
         </span>
       </div>
+      <a
+        href="/"
+        className="switch-role"
+        title="Switch user or role — returns to the sign-in page"
+        style={{
+          marginLeft: 12, fontFamily: "var(--mono)", fontSize: 11,
+          letterSpacing: 1, textTransform: "uppercase",
+          color: "var(--purple)", textDecoration: "none",
+          border: "1px solid var(--rule-strong)", borderRadius: 2,
+          padding: "3px 8px",
+        }}>
+        ↺ switch
+      </a>
     </div>
   );
 }
@@ -3338,8 +3352,8 @@ function FooterMeta() {
               )}
               {m.is_registrar && (
                 <a
-                  href="/registrar"
-                  title="Switch to the centre's registrar dashboard (you're declared as registrar in ~/.wigamig/registrar)"
+                  href={"/registrar?user=" + encodeURIComponent((m.handle || "").replace(/^@/, ""))}
+                  title="Switch to the centre's registrar dashboard (you're listed as a registrar in _registry.yaml)"
                   style={{
                     background:"transparent", border:"1px solid var(--purple)",
                     borderRadius:2, padding:"1px 6px", cursor:"pointer",

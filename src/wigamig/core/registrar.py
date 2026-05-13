@@ -96,9 +96,13 @@ def _normalize(handle: str) -> str:
 def registrar_handle() -> str | None:
     """Return the registrar's handle from ``~/.wigamig/registrar``, or ``None``.
 
-    The file contains exactly the Western netname on the first non-blank
-    line. Absent file means no one on this machine has been declared
-    the registrar yet — every ``is_registrar`` check then returns False.
+    The file contains the Western netname on the first non-blank line.
+    This is the **per-machine sentinel** — the human at this laptop says
+    "I am one of the centre's registrars." Whether the claim is honoured
+    is decided by :func:`is_registrar`, which cross-checks the
+    authoritative list in ``_registry.yaml:registrars:``.
+
+    Used for git commit identity on the lab_info root (audit trail).
     """
     if not REGISTRAR_SENTINEL.is_file():
         return None
@@ -113,12 +117,55 @@ def registrar_handle() -> str | None:
     return None
 
 
-def is_registrar(handle: str) -> bool:
-    """Return True iff ``handle`` matches the declared registrar."""
-    declared = registrar_handle()
-    if declared is None:
+def registrars(env: dict[str, str] | None = None) -> list[str]:
+    """Return the authoritative registrar handles from ``_registry.yaml``.
+
+    The centre may have more than one registrar (e.g. a director + a
+    backup admin). The list lives in the registry — committed,
+    git-tracked, audited — not in any per-machine file. Returns an empty
+    list if the registry is missing or has no ``registrars:`` key.
+    """
+    path = registry_path(env)
+    if not path.is_file():
+        return []
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    raw = data.get("registrars") or []
+    if not isinstance(raw, list):
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        norm = _normalize(str(item))
+        if norm and norm not in seen:
+            seen.add(norm)
+            out.append(norm)
+    return out
+
+
+def is_registrar(handle: str, env: dict[str, str] | None = None) -> bool:
+    """Return True iff ``handle`` is an authoritative centre registrar.
+
+    Truth lives in ``_registry.yaml:registrars:`` (committed, git-tracked).
+    If that list is empty (fresh install, pre-Phase-A), fall back to the
+    per-machine ``~/.wigamig/registrar`` sentinel for backward compat —
+    so existing single-registrar installs keep working without a migration.
+    """
+    norm = _normalize(handle)
+    if not norm:
         return False
-    return _normalize(handle) == declared
+    declared = registrars(env)
+    if declared:
+        return norm in declared
+    # Fallback: legacy single-handle sentinel.
+    legacy = registrar_handle()
+    if legacy is None:
+        return False
+    return norm == legacy
 
 
 # -----------------------------------------------------------------
@@ -183,6 +230,7 @@ class Registry:
     labs: list[LabEntry] = field(default_factory=list)
     cores: list[CoreEntry] = field(default_factory=list)
     collaborations: list[CollaborationEntry] = field(default_factory=list)
+    registrars: list[str] = field(default_factory=list)
 
 
 def _coerce_lab(name: str, data: dict[str, Any]) -> LabEntry:
@@ -268,10 +316,21 @@ def read_registry(env: dict[str, str] | None = None) -> Registry:
                 continue
         return out
 
+    raw_registrars = data.get("registrars") or []
+    registrar_list: list[str] = []
+    if isinstance(raw_registrars, list):
+        seen: set[str] = set()
+        for item in raw_registrars:
+            norm = _normalize(str(item))
+            if norm and norm not in seen:
+                seen.add(norm)
+                registrar_list.append(norm)
+
     return Registry(
         labs=_walk(labs_dict, _coerce_lab),
         cores=_walk(cores_dict, _coerce_core),
         collaborations=_walk(collabs_dict, _coerce_collab),
+        registrars=registrar_list,
     )
 
 
@@ -283,7 +342,13 @@ def write_registry(reg: Registry, env: dict[str, str] | None = None) -> Path:
     """
     path = registry_path(env)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload: dict[str, Any] = {"version": 1, "labs": {}, "cores": {}, "collaborations": {}}
+    payload: dict[str, Any] = {
+        "version": 1,
+        "registrars": list(reg.registrars),
+        "labs": {},
+        "cores": {},
+        "collaborations": {},
+    }
     for lab in reg.labs:
         payload["labs"][lab.name] = {
             k: v for k, v in {

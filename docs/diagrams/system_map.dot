@@ -1,0 +1,159 @@
+// Purpose: One-page system map of wigamig — identity & launch, the three
+//          tiers (Commons / Guilds / Project namespaces), and the per-project
+//          data plane. Companion to docs/diagrams/install_modes.dot which
+//          drills into local-vs-lab-server placement.
+// Author:  Mike Hallett (with Claude Code)
+// Date:    2026-05-13
+// Render:  bash scripts/render_diagrams.sh
+
+digraph wigamig_system_map {
+  rankdir=TB;
+  bgcolor="#FAF8F5";
+  fontname="EB Garamond";
+  labelloc="t";
+  label=<<B>wigamig &middot; system map</B><BR/><FONT POINT-SIZE="11">v1.0.0 &middot; bioconvergence centre infrastructure</FONT>>;
+  fontsize=18;
+  fontcolor="#201436";
+  splines=ortho;
+  nodesep=0.45;
+  ranksep=0.55;
+
+  // Default node styling — squared-off, EB Garamond, Western purple/cream.
+  node [
+    shape=box,
+    style="filled,rounded",
+    fontname="EB Garamond",
+    fontsize=11,
+    fillcolor="#FFFFFF",
+    color="#C7BFB1",
+    fontcolor="#1A1A1A",
+    margin="0.18,0.10",
+  ];
+  edge [
+    color="#5B5B5B",
+    fontname="Courier Prime",
+    fontsize=9,
+    fontcolor="#5B5B5B",
+    arrowsize=0.7,
+  ];
+
+  // -----------------------------------------------------------------
+  // Lane 1 — Identity & launch
+  // -----------------------------------------------------------------
+  subgraph cluster_launch {
+    label=<<B>1. Identity &amp; launch</B>>;
+    fontsize=12;
+    fontcolor="#4F2683";
+    color="#4F2683";
+    style="rounded,dashed";
+    bgcolor="#F1ECE3";
+
+    icon       [label="Wigamig\nDashboard.app",       fillcolor="#FFE9CC", color="#F0A757"];
+    launcher   [label="zsh launcher\n(create_mac_app.sh)"];
+    uvicorn    [label="uvicorn :8770\nFastAPI app"];
+    sentinel_user [label="~/.wigamig/user\n(saved netname)",     shape=note, fillcolor="#FFF8E6"];
+    sentinel_reg  [label="~/.wigamig/registrar\n(legacy sentinel)", shape=note, fillcolor="#FFF8E6"];
+    audit         [label="~/.wigamig/role_audit.log\n(append-only)", shape=note, fillcolor="#FFF8E6"];
+
+    icon -> launcher -> uvicorn;
+    launcher -> sentinel_user [style=dashed, label="reads"];
+    uvicorn  -> audit         [style=dashed, label="appends"];
+    uvicorn  -> sentinel_reg  [style=dashed, label="reads (fallback)"];
+  }
+
+  // -----------------------------------------------------------------
+  // Lane 2 — Three tiers
+  // -----------------------------------------------------------------
+  subgraph cluster_tiers {
+    label=<<B>2. The three tiers</B>>;
+    fontsize=12;
+    fontcolor="#4F2683";
+    color="#4F2683";
+    style="rounded,dashed";
+    bgcolor="#F1ECE3";
+
+    // Commons (Tier 1)
+    subgraph cluster_commons {
+      label=<<B>Tier 1 &middot; Commons</B><BR/><FONT POINT-SIZE="9">~/.claude/ via symlinks</FONT>>;
+      fontsize=11;
+      color="#6F4DA8";
+      style="rounded,filled";
+      fillcolor="#E9DEFA";
+      oracle      [label="Oracle"];
+      bookworm    [label="Bookworm"];
+      blacksmith  [label="Blacksmith"];
+      artist      [label="Artist"];
+      adversary   [label="Adversary"];
+      conscience  [label="Conscience"];
+      saul        [label="Saul Goodman"];
+    }
+
+    // Guilds (Tier 2)
+    subgraph cluster_guilds {
+      label=<<B>Tier 2 &middot; Guilds</B><BR/><FONT POINT-SIZE="9">guilds/&lt;group&gt;/agents/</FONT>>;
+      fontsize=11;
+      color="#F0A757";
+      style="rounded,filled";
+      fillcolor="#FFE9CC";
+      medchem     [label="MedChem\n(chemistry)"];
+      segmenter   [label="Segmenter\n(imaging)"];
+      cohort      [label="Cohort\n(clinical)"];
+    }
+
+    // Projects (Tier 3)
+    subgraph cluster_projects {
+      label=<<B>Tier 3 &middot; Project namespaces</B><BR/><FONT POINT-SIZE="9">projects/&lt;name&gt;/</FONT>>;
+      fontsize=11;
+      color="#4F6B3A";
+      style="rounded,filled";
+      fillcolor="#E1EBD6";
+      proj1       [label="dcis_imaging_genomics\n(g2 + g3 + g5)"];
+      proj2       [label="drug_discovery_litl\n(g1 + g4)"];
+    }
+  }
+
+  // -----------------------------------------------------------------
+  // Lane 3 — Per-project data plane
+  // -----------------------------------------------------------------
+  subgraph cluster_data {
+    label=<<B>3. Per-project data plane</B>>;
+    fontsize=12;
+    fontcolor="#4F2683";
+    color="#4F2683";
+    style="rounded,dashed";
+    bgcolor="#F1ECE3";
+
+    lab_mgmt    [label="lab-mgmt repo\n(charter, MEMBERS, audit)",            fillcolor="#FFFFFF"];
+    registry    [label="lab_info/_registry.yaml\n(centre registry, registrars:)", fillcolor="#FFFFFF"];
+    proj_repo   [label="project repo\n(per-project, GH-hosted)",              fillcolor="#FFFFFF"];
+    lab_vm      [label="/data/lab_vm/{raw,refined}/&lt;project&gt;",         fillcolor="#FFFFFF"];
+    vault       [label="Obsidian vault\n(one per user)",                      fillcolor="#FFFFFF"];
+  }
+
+  // -----------------------------------------------------------------
+  // External / sidebar nodes
+  // -----------------------------------------------------------------
+  github   [label="GitHub orgs\nhallettmiket / &lt;centre&gt;",      shape=cylinder, fillcolor="#EEF2FF"];
+  slack    [label="Slack workspace\n(mirror + distill)",              shape=cylinder, fillcolor="#EEF2FF"];
+  mcp      [label="MCP servers\nClinicalTrials / PubMed / bioRxiv",   shape=cylinder, fillcolor="#EEF2FF"];
+  vscode   [label="VSCode + CC sessions\n(per project)",              shape=hexagon, fillcolor="#FFF1DB"];
+
+  // -----------------------------------------------------------------
+  // Connections across lanes
+  // -----------------------------------------------------------------
+  uvicorn  -> oracle       [lhead=cluster_commons, label="reads agents/", style=dotted];
+  uvicorn  -> proj1        [lhead=cluster_projects, label="renders dashboard", style=dotted];
+
+  proj1 -> lab_mgmt   [label="charter"];
+  proj1 -> proj_repo  [label="code/data"];
+  proj1 -> lab_vm     [label="raw / refined"];
+  proj1 -> vault      [label="lab notebook"];
+  proj_repo -> github [label="push"];
+
+  registry -> lab_mgmt [style=dashed, label="points to"];
+  oracle   -> registry [style=dotted];
+
+  vscode  -> proj_repo  [style=dotted, label="dev"];
+  slack   -> oracle     [style=dotted, label="mirror"];
+  mcp     -> bookworm   [style=dotted, label="queries"];
+}
