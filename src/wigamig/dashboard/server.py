@@ -1986,12 +1986,23 @@ def create_app() -> FastAPI:
                 name="assets",
             )
 
+        # Cache-Control: no-cache means the browser must revalidate every
+        # request before reusing a cached copy. Required for our HTML
+        # routes because (a) ``/`` switched from dashboard to login in
+        # Item 1 — without revalidation, returning users would see the
+        # old cached dashboard when navigating to ``/`` and think the
+        # "↺ switch" link did nothing, and (b) the embedded JSX evolves
+        # frequently; we never want a hard-cached HTML pinning users to
+        # stale script references.
+        _NO_CACHE = {"Cache-Control": "no-cache, must-revalidate"}
+
         @app.get("/", response_class=HTMLResponse)
         def index() -> HTMLResponse:
             """Login landing page — always shown at app launch so the
             user explicitly picks their role for this session."""
             return HTMLResponse(
-                (STATIC_DIR / "login.html").read_text(encoding="utf-8")
+                (STATIC_DIR / "login.html").read_text(encoding="utf-8"),
+                headers=_NO_CACHE,
             )
 
         @app.get("/dashboard", response_class=HTMLResponse)
@@ -1999,14 +2010,16 @@ def create_app() -> FastAPI:
             """Member / PI lab dashboard. Reached from the login page
             with ``?user=<handle>&persona=member|pi``."""
             return HTMLResponse(
-                (STATIC_DIR / "Wigamig Dashboard Hi-Fi.html").read_text(encoding="utf-8")
+                (STATIC_DIR / "Wigamig Dashboard Hi-Fi.html").read_text(encoding="utf-8"),
+                headers=_NO_CACHE,
             )
 
         @app.get("/registrar", response_class=HTMLResponse)
         def registrar_index() -> HTMLResponse:
             """Phase A registrar dashboard — separate route from the lab UI."""
             return HTMLResponse(
-                (STATIC_DIR / "registrar.html").read_text(encoding="utf-8")
+                (STATIC_DIR / "registrar.html").read_text(encoding="utf-8"),
+                headers=_NO_CACHE,
             )
 
         # The hi-fi HTML loads its sibling JSX files via relative paths

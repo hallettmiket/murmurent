@@ -313,3 +313,25 @@ def test_dashboard_route_serves_hifi(isolated):
     res = client.get("/dashboard")
     assert res.status_code == 200
     assert "hifi-app.jsx" in res.text
+
+
+# ---------------------------------------------------------------------------
+# Cache headers — required so that returning users see the new ``/`` (login)
+# instead of a stale cached dashboard, which makes the "↺ switch" link and
+# the registrar's "→ Lab dashboard" link appear to do nothing.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("path", ["/", "/dashboard", "/registrar"])
+def test_html_routes_set_no_cache(isolated, path):
+    """Every HTML route must tell browsers to revalidate.
+
+    Without this, the launcher's existing browser tab keeps showing the
+    pre-Phase-F dashboard (which used to live at ``/``) and clicking the
+    new "↺ switch" link silently returns the stale page from disk cache
+    — the symptom that prompted this fix.
+    """
+    client = TestClient(create_app())
+    res = client.get(path)
+    cache_control = res.headers.get("cache-control", "")
+    assert "no-cache" in cache_control, f"{path} sent cache-control={cache_control!r}"
