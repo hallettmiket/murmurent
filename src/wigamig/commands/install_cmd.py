@@ -29,6 +29,16 @@ HOOK_REGISTRATIONS: list[dict[str, Any]] = [
         "label": "wigamig-raw-guard",
     },
     {
+        # Refined data + Obsidian notebook are write-once: new files OK,
+        # overwriting / deleting existing files denied (lab versioning
+        # convention: write file_2.csv, never overwrite file.csv).
+        "event": "PreToolUse",
+        "matcher": "Write|Edit|Bash|NotebookEdit",
+        "module": "wigamig.hooks.protected_paths",
+        "env": {},
+        "label": "wigamig-protected-paths",
+    },
+    {
         "event": "PreToolUse",
         "matcher": "Bash|WebFetch|WebSearch|mcp__slack__.*|mcp__claude_ai_Slack__.*",
         "module": "wigamig.hooks.phi_check",
