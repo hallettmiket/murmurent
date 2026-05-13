@@ -1,0 +1,307 @@
+"""Tests for Item 3 R4 — dashboard host CRUD + remote workspace launch.
+
+Covers:
+  - POST /api/hosts adds a host; refuses duplicate (409)
+  - DELETE /api/hosts/{name} removes; 400 on 'local'; 404 on unknown
+  - POST /api/hosts/{name}/test runs probes and returns structured rows
+    (mocked SSH so no real network)
+  - POST /api/workspace/launch for a remote-pointer project returns a
+    vscode-remote URL (and doesn't invoke start_workspace.sh)
+  - POST /api/workspace/launch for a local project still requires agents
+"""
+
+from __future__ import annotations
+
+import subprocess
+from pathlib import Path
+
+import pytest
+from fastapi.testclient import TestClient
+
+from wigamig.core import hosts as _hosts
+from wigamig.core import remote as _remote
+from wigamig.dashboard.server import create_app
+
+
+@pytest.fixture
+def world(monkeypatch, tmp_path):
+    repos = tmp_path / "repos"
+    lab_mgmt = tmp_path / "lab-mgmt"
+    lab_vm = tmp_path / "lab_vm"
+    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(repos))
+    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_mgmt))
+    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(lab_vm))
+    monkeypatch.setenv("WIGAMIG_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
+    monkeypatch.setenv("WIGAMIG_REMOTE_AUDIT_LOG", str(tmp_path / "remote_audit.log"))
+    monkeypatch.setenv("WIGAMIG_USER", "mhallet")
+    (lab_mgmt / "projects").mkdir(parents=True)
+    (lab_mgmt / "members").mkdir(parents=True)
+    (lab_mgmt / "requests").mkdir(parents=True)
+    (lab_mgmt / "lab.md").write_text(
+        "---\nlab: hallett\nname: 'Hallett Lab'\npi: '@mhallet'\n---\n",
+        encoding="utf-8",
+    )
+    (lab_mgmt / "members" / "mhallet.md").write_text(
+        "---\nhandle: '@mhallet'\nfull_name: 'Mike Hallett'\nrole: pi\nstatus: active\nlab: hallett\n---\n",
+        encoding="utf-8",
+    )
+    return {"tmp": tmp_path, "repos": repos, "lab_mgmt": lab_mgmt}
+
+
+# ---------------------------------------------------------------------------
+# POST /api/hosts
+# ---------------------------------------------------------------------------
+
+
+def test_post_host_adds(world):
+    client = TestClient(create_app())
+    res = client.post("/api/hosts", json={
+        "name": "biodatsci",
+        "ssh_host": "biodatsci",
+        "remote_user": "mhallet",
+        "project_root": "~/repos",
+        "lab_vm_root": "/data/lab_vm",
+    })
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["ok"] is True
+    assert body["host"]["name"] == "biodatsci"
+    # And it shows up in subsequent GETs.
+    listing = client.get("/api/hosts").json()
+    names = {h["name"] for h in listing["hosts"]}
+    assert {"local", "biodatsci"} <= names
+
+
+def test_post_host_duplicate_409(world):
+    client = TestClient(create_app())
+    body = {"name": "biodatsci", "ssh_host": "biodatsci"}
+    res1 = client.post("/api/hosts", json=body)
+    assert res1.status_code == 200
+    res2 = client.post("/api/hosts", json=body)
+    assert res2.status_code == 409
+
+
+def test_post_host_local_is_re_derivable(world):
+    """The built-in 'local' row is always re-derivable — posting it again
+    is a no-op rather than a 409. This matches the core hosts.add() rule
+    that lets read() always synthesise 'local' regardless of what's
+    been written to the file."""
+    client = TestClient(create_app())
+    res = client.post("/api/hosts", json={"name": "local", "ssh_host": ""})
+    assert res.status_code == 200
+
+
+# ---------------------------------------------------------------------------
+# DELETE /api/hosts/{name}
+# ---------------------------------------------------------------------------
+
+
+def test_delete_host_removes(world):
+    client = TestClient(create_app())
+    client.post("/api/hosts", json={"name": "biodatsci", "ssh_host": "biodatsci"})
+    res = client.delete("/api/hosts/biodatsci")
+    assert res.status_code == 200
+    listing = client.get("/api/hosts").json()
+    assert "biodatsci" not in {h["name"] for h in listing["hosts"]}
+
+
+def test_delete_local_refused(world):
+    client = TestClient(create_app())
+    res = client.delete("/api/hosts/local")
+    assert res.status_code == 400
+
+
+def test_delete_unknown_404(world):
+    client = TestClient(create_app())
+    res = client.delete("/api/hosts/nope")
+    assert res.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# POST /api/hosts/{name}/test
+# ---------------------------------------------------------------------------
+
+
+def _ok(stdout: str = "ok") -> subprocess.CompletedProcess:
+    return subprocess.CompletedProcess([], 0, stdout=stdout, stderr="")
+
+
+def _fail(rc: int = 1, stderr: str = "boom") -> subprocess.CompletedProcess:
+    return subprocess.CompletedProcess([], rc, stdout="", stderr=stderr)
+
+
+def test_host_test_all_ok(world, monkeypatch):
+    client = TestClient(create_app())
+    client.post("/api/hosts", json={
+        "name": "biodatsci", "ssh_host": "biodatsci", "lab_vm_root": "/data/lab_vm",
+    })
+
+    # Probe sequence: ssh (true), wigamig --version, test -d lab_vm dirs, gh auth status
+    sequence = iter([
+        _ok(),                            # ssh probe (true)
+        _ok("wigamig 1.0.0"),             # wigamig --version
+        _ok(),                            # lab_vm test -d
+        _ok("Logged in to github.com"),   # gh auth status
+    ])
+    monkeypatch.setattr(_remote.subprocess, "run", lambda *a, **k: next(sequence))
+
+    res = client.post("/api/hosts/biodatsci/test")
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["overall"] == "ok"
+    statuses = {p["name"]: p["status"] for p in body["probes"]}
+    assert statuses == {"ssh": "ok", "wigamig": "ok", "lab_vm": "ok", "gh_auth": "ok"}
+
+
+def test_host_test_wigamig_missing_fails(world, monkeypatch):
+    client = TestClient(create_app())
+    client.post("/api/hosts", json={"name": "biodatsci", "ssh_host": "biodatsci"})
+    sequence = iter([
+        _ok(),                              # ssh probe
+        _fail(127, "wigamig: command not found"),  # wigamig --version
+        _ok(),                              # lab_vm
+        _fail(1, "not authenticated"),      # gh auth
+    ])
+    monkeypatch.setattr(_remote.subprocess, "run", lambda *a, **k: next(sequence))
+
+    body = client.post("/api/hosts/biodatsci/test").json()
+    assert body["overall"] == "fail"
+    by_name = {p["name"]: p for p in body["probes"]}
+    assert by_name["wigamig"]["status"] == "fail"
+    assert by_name["wigamig"]["required"] is True
+    assert "install_remote.sh" in by_name["wigamig"]["detail"]
+    # lab_vm and gh_auth are warn-only — their failures don't change overall=fail
+    # but their statuses are reported correctly.
+    assert by_name["gh_auth"]["status"] == "warn"
+
+
+def test_host_test_ssh_fails_short_circuits(world, monkeypatch):
+    client = TestClient(create_app())
+    client.post("/api/hosts", json={"name": "biodatsci", "ssh_host": "biodatsci"})
+
+    call_count = {"n": 0}
+
+    def fake_run(*a, **k):
+        call_count["n"] += 1
+        return _fail(255, "permission denied (publickey)")
+
+    monkeypatch.setattr(_remote.subprocess, "run", fake_run)
+    body = client.post("/api/hosts/biodatsci/test").json()
+    # Only the ssh probe was issued — no point continuing.
+    assert call_count["n"] == 1
+    assert body["overall"] == "fail"
+    assert body["probes"][0]["name"] == "ssh"
+    assert body["probes"][0]["status"] == "fail"
+
+
+def test_host_test_local_returns_ok_without_ssh_call(world, monkeypatch):
+    """The local host has nothing to ssh into, but the test endpoint
+    still runs wigamig --version + the lab_vm/gh probes via bash -lc."""
+    client = TestClient(create_app())
+    sequence = iter([
+        _ok("wigamig 1.0.0"),
+        _fail(),  # lab_vm missing locally — warn
+        _ok("Logged in"),
+    ])
+    monkeypatch.setattr(_remote.subprocess, "run", lambda *a, **k: next(sequence))
+
+    body = client.post("/api/hosts/local/test").json()
+    # No required failure, even though lab_vm is warn — overall ok.
+    assert body["overall"] == "ok"
+    statuses = {p["name"]: p["status"] for p in body["probes"]}
+    assert statuses["ssh"] == "ok"          # synthetic "local host"
+    assert statuses["wigamig"] == "ok"
+    assert statuses["lab_vm"] == "warn"
+
+
+# ---------------------------------------------------------------------------
+# Workspace launch for remote project
+# ---------------------------------------------------------------------------
+
+
+def _seed_remote_pointer(repos: Path, lab_mgmt: Path, name: str = "candi") -> None:
+    p = repos / name
+    p.mkdir(parents=True)
+    p.joinpath(".wigamig-remote-pointer").write_text("", encoding="utf-8")
+    p.joinpath("CHARTER.md").write_text(
+        "---\n"
+        f"project: {name}\n"
+        "sensitivity: standard\n"
+        "lead: '@mhallet'\n"
+        "created: 2026-05-13\n"
+        "host: biodatsci\n"
+        f"remote_path: /home/mhallet/repos/{name}\n"
+        "members:\n  - '@mhallet'\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    lab_mgmt.joinpath("projects", f"{name}.md").write_text(
+        "---\n"
+        f"project: {name}\n"
+        f"path: {p}\n"
+        "sensitivity: standard\n"
+        "lead: '@mhallet'\n"
+        "host: biodatsci\n"
+        f"remote_path: /home/mhallet/repos/{name}\n"
+        "created: 2026-05-13\n"
+        "members:\n  - '@mhallet'\n"
+        "---\n",
+        encoding="utf-8",
+    )
+
+
+def test_workspace_launch_remote_returns_vscode_url(world, monkeypatch):
+    _hosts.add(_hosts.Host(
+        name="biodatsci", kind="ssh", ssh_host="biodatsci",
+        project_root="/home/mhallet/repos",
+    ))
+    _seed_remote_pointer(world["repos"], world["lab_mgmt"])
+    launched = {"argv": None}
+
+    def fake_popen(argv, **kwargs):
+        launched["argv"] = argv
+        class _Stub:
+            pass
+        return _Stub()
+
+    monkeypatch.setattr("subprocess.Popen", fake_popen)
+
+    client = TestClient(create_app())
+    res = client.post("/api/workspace/launch?user=mhallet", json={
+        "project": "candi",
+        "agents": [],  # agents irrelevant for remote
+    })
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["host"] == "biodatsci"
+    assert body["remote_path"] == "/home/mhallet/repos/candi"
+    assert body["vscode_url"] == "vscode-remote://ssh-remote+biodatsci/home/mhallet/repos/candi"
+    # And the laptop fired `open <url>` (or fell back gracefully).
+    if launched["argv"] is not None:
+        assert launched["argv"][0] == "open"
+        assert launched["argv"][1] == body["vscode_url"]
+
+
+def test_workspace_launch_remote_falls_back_when_open_fails(world, monkeypatch):
+    """If `open` isn't available (Linux dev box), we still return the URL."""
+    _hosts.add(_hosts.Host(name="biodatsci", kind="ssh", ssh_host="biodatsci"))
+    _seed_remote_pointer(world["repos"], world["lab_mgmt"])
+
+    def fake_popen(argv, **kwargs):
+        raise OSError("no open command")
+    monkeypatch.setattr("subprocess.Popen", fake_popen)
+
+    client = TestClient(create_app())
+    body = client.post("/api/workspace/launch?user=mhallet", json={
+        "project": "candi", "agents": [],
+    }).json()
+    assert body["launched"] is False
+    assert body["vscode_url"].startswith("vscode-remote://ssh-remote+biodatsci")
+
+
+def test_workspace_launch_unknown_project_404(world):
+    client = TestClient(create_app())
+    res = client.post("/api/workspace/launch?user=mhallet", json={
+        "project": "ghost", "agents": ["blacksmith"],
+    })
+    assert res.status_code == 404
