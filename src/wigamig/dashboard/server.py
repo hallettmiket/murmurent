@@ -22,7 +22,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.requests import Request
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -241,6 +242,20 @@ class RegistrarCollabEditBody(BaseModel):
     groups: list[str] | None = None
     member_subset: dict[str, list[str]] | None = None
     oracle_vault: str | None = None
+
+
+class LoginSelectBody(BaseModel):
+    """JSON body for ``POST /api/login/select``.
+
+    The login landing page posts the (handle, role) the user picked.
+    Server validates the role is one they actually hold, logs the
+    transition to ``~/.wigamig/role_audit.log``, and returns the URL
+    the client should navigate to (``/dashboard`` or ``/registrar``).
+    """
+
+    handle: str
+    role: str  # "member" | "pi" | "registrar"
+    remember_user: bool = False
 
 
 class RegistrarProfileBody(BaseModel):
@@ -1094,6 +1109,147 @@ def create_app() -> FastAPI:
         return {"ok": True, "created": created, "already_existed": [str(d) for d in (raw, refined) if d not in [Path(x) for x in created]]}
 
     # -----------------------------------------------------------------
+    # Login / role-selection landing (Item 1)
+    # -----------------------------------------------------------------
+    #
+    # The Mac app icon launches the server and opens "/" — the login
+    # landing page. Once the user picks a role, the page calls
+    # POST /api/login/select which records the choice in the local
+    # role_audit.log and redirects the browser into either /dashboard
+    # (member or PI persona) or /registrar (registrar role).
+    #
+    # Role authority sources:
+    #   - "member": handle exists in lab-mgmt/members/<handle>.md
+    #               (any one of the registered labs)
+    #   - "pi":     handle equals the active lab's PI_HANDLE (lab.md:pi)
+    #   - "registrar": handle is listed in _registry.yaml:registrars:
+    #                  (or, fallback, in the local ~/.wigamig/registrar
+    #                   sentinel — legacy single-registrar installs)
+    # Each /api/login/select call is appended to ~/.wigamig/role_audit.log
+    # with timestamp, source IP, and whether the role was granted.
+
+    def _resolve_roles(handle: str) -> dict[str, object]:
+        from ..core import membership as _mem
+        from ..core import registrar as _reg
+
+        norm = (handle or "").strip().lstrip("@").lower()
+        if not norm:
+            return {
+                "handle": "",
+                "is_member": False,
+                "is_pi": False,
+                "is_registrar": False,
+                "pi_lab": None,
+                "registrar_centres": [],
+                "default_role": "member",
+            }
+        # member?
+        try:
+            rec = _mem.get(norm)
+            is_member = rec.status == _mem.ACTIVE
+        except _mem.MemberNotFound:
+            is_member = False
+        # pi? (one lab per install today; future: walk every lab)
+        try:
+            from ..core import dashboard as _dash
+            pi_handle_now = _dash._pi_handle().lstrip("@").lower()
+        except Exception:
+            pi_handle_now = ""
+        is_pi_role = bool(pi_handle_now) and norm == pi_handle_now
+        # registrar?
+        is_reg = _reg.is_registrar(norm)
+        # default lens: highest privilege the user holds
+        if is_reg:
+            default = "registrar"
+        elif is_pi_role:
+            default = "pi"
+        elif is_member:
+            default = "member"
+        else:
+            default = "member"  # unknown handle — still let them try
+        return {
+            "handle": norm,
+            "is_member": is_member,
+            "is_pi": is_pi_role,
+            "is_registrar": is_reg,
+            "pi_lab": pi_handle_now or None,
+            "registrar_centres": _reg.registrars() or (
+                [_reg.registrar_handle()] if _reg.registrar_handle() else []
+            ),
+            "default_role": default,
+        }
+
+    @app.get("/api/login/resolve")
+    def get_login_resolve(
+        user: str = Query("", description="Western netname to resolve roles for"),
+    ) -> dict:
+        """Return the role flags for ``user`` so the landing page knows
+        which radio buttons to render. No state change."""
+        handle = (user or "").strip().lstrip("@")
+        if not handle:
+            identity = resolve_identity(allow_unknown=True)
+            handle = identity.handle if identity.source != "unknown" else ""
+        return _resolve_roles(handle)
+
+    @app.post("/api/login/select")
+    def post_login_select(body: LoginSelectBody, request: Request) -> dict:
+        """Validate (handle, role), audit-log, and return the next URL.
+
+        The client is responsible for following the returned URL — we
+        don't 302 here so that the JSON contract stays inspectable from
+        tests and the page can show a friendly error on rejection.
+        """
+        from ..core import role_audit
+
+        handle = (body.handle or "").strip().lstrip("@").lower()
+        role = (body.role or "").strip().lower()
+        if not handle:
+            raise HTTPException(status_code=400, detail="handle is required")
+        if role not in role_audit.VALID_ROLES:
+            raise HTTPException(
+                status_code=400,
+                detail=f"role must be one of {sorted(role_audit.VALID_ROLES)}",
+            )
+        client_host = request.client.host if request.client else "unknown"
+        roles = _resolve_roles(handle)
+        allowed = bool(roles[f"is_{role}"]) if role != "member" else True
+        # Members are not gated server-side (unknown handles still get
+        # the member lens — they just won't see any projects). PI and
+        # registrar both require an authoritative match.
+        if not allowed:
+            role_audit.record(
+                handle=handle, role=role, source=client_host,
+                allowed=False, reason=f"not_{role}",
+            )
+            raise HTTPException(
+                status_code=403,
+                detail=f"@{handle} is not authorised for role '{role}'.",
+            )
+        role_audit.record(
+            handle=handle, role=role, source=client_host, allowed=True,
+        )
+        if body.remember_user:
+            try:
+                pref = Path.home() / ".wigamig" / "user"
+                pref.parent.mkdir(parents=True, exist_ok=True)
+                pref.write_text(handle + "\n", encoding="utf-8")
+            except OSError:
+                pass  # not fatal — they can still proceed this session
+
+        if role == "registrar":
+            next_url = f"/registrar?user={handle}"
+        elif role == "pi":
+            next_url = f"/dashboard?user={handle}&persona=pi"
+        else:
+            next_url = f"/dashboard?user={handle}&persona=member"
+        return {
+            "ok": True,
+            "handle": handle,
+            "role": role,
+            "next": next_url,
+        }
+
+    # -----------------------------------------------------------------
     # SEA catalog (Phase 10)
     # -----------------------------------------------------------------
 
@@ -1801,6 +1957,16 @@ def create_app() -> FastAPI:
 
         @app.get("/", response_class=HTMLResponse)
         def index() -> HTMLResponse:
+            """Login landing page — always shown at app launch so the
+            user explicitly picks their role for this session."""
+            return HTMLResponse(
+                (STATIC_DIR / "login.html").read_text(encoding="utf-8")
+            )
+
+        @app.get("/dashboard", response_class=HTMLResponse)
+        def dashboard_index() -> HTMLResponse:
+            """Member / PI lab dashboard. Reached from the login page
+            with ``?user=<handle>&persona=member|pi``."""
             return HTMLResponse(
                 (STATIC_DIR / "Wigamig Dashboard Hi-Fi.html").read_text(encoding="utf-8")
             )
