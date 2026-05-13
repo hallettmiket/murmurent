@@ -7,6 +7,19 @@ const D = window.DATA;
 function Pill({ tone="", children }) { return <span className={"pill "+tone}>{children}</span>; }
 function K({ children }) { return <kbd className="kbd">{children}</kbd>; }
 
+// Join a directory root with a project name. Used by the Installations
+// panel so users see the actual per-project subdir (e.g. ~/lab_vm/raw/candi)
+// instead of the bare root (~/lab_vm/raw) that's stored in the manifest.
+// Idempotent if the root already ends with /<project>.
+function _joinPath(root, project) {
+  if (!root) return root || "";
+  if (!project) return root;
+  const trimmed = root.replace(/\/+$/, "");
+  const tail = "/" + project;
+  if (trimmed.endsWith(tail)) return trimmed;
+  return trimmed + tail;
+}
+
 /* Phase 4: POST /api/sea/{project}/{id}/{action}, refetch on success.
  * Caller is the signed-in user (passed via ?user= if set on the URL,
  * otherwise the server resolves from $WIGAMIG_USER). */
@@ -331,8 +344,8 @@ function InstallationsBox({ span = "c-12" }) {
                           </div>
                           <div><span className="muted" style={{display:"inline-block",width:90}}>checked</span>{inst.last_checked}</div>
                           <div><span className="muted" style={{display:"inline-block",width:90}}>lab_base</span>{inst.lab_base}</div>
-                          <div><span className="muted" style={{display:"inline-block",width:90}}>raw/</span>{inst.raw_path}</div>
-                          <div><span className="muted" style={{display:"inline-block",width:90}}>refined/</span>{inst.refined_path}</div>
+                          <div><span className="muted" style={{display:"inline-block",width:90}}>raw/</span>{_joinPath(inst.raw_path, inst.project)}</div>
+                          <div><span className="muted" style={{display:"inline-block",width:90}}>refined/</span>{_joinPath(inst.refined_path, inst.project)}</div>
                           <div><span className="muted" style={{display:"inline-block",width:90}}>notebook/</span>{inst.notebook_path}</div>
                           <div><span className="muted" style={{display:"inline-block",width:90}}>components</span>{(inst.components||[]).join(", ")}</div>
                           <div><span className="muted" style={{display:"inline-block",width:90}}>agents</span>{(inst.agents||[]).join(", ")}</div>
@@ -555,6 +568,19 @@ function InstallModal({ initialProject, onClose }) {
               {/* ── step 1: who & what ── */}
               {step === 1 && (
                 <>
+                  <div style={{
+                    background:"rgba(240,167,87,0.12)", borderLeft:"3px solid var(--tiger)",
+                    padding:"8px 12px", borderRadius:2, fontSize:11,
+                    color:"var(--ink-2)", marginBottom:6,
+                  }}>
+                    <strong>Heads up:</strong> this wizard records an installation
+                    <em> on the machine that is currently running this dashboard</em>.
+                    It will <code>mkdir</code> the project's raw/refined folders
+                    here, not on a remote host. To deploy a project <em>onto</em>
+                    a different machine (e.g. biodatsci), use the&nbsp;
+                    <strong>New Project</strong> form with a registered host
+                    (see <code>wigamig host add</code> on the CLI).
+                  </div>
                   <p className="muted" style={{fontSize:12, margin:0}}>
                     Which project do you want to install on this machine?
                   </p>
