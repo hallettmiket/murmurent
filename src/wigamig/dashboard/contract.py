@@ -236,6 +236,13 @@ class ProjectRow(BaseModel):
     raw_path: str | None = None          # e.g. ~/lab_vm/data/raw/<project>
     raw_exists: bool = False
     refined_exists: bool = False
+    # Item 3 (R2/R3): host on which the project's working tree actually
+    # lives. ``"local"`` (default) means this laptop; anything else (e.g.
+    # ``"biodatsci"``) means the project is a remote-pointer placeholder
+    # locally and the real tree is at ``remote_path`` on ``remote_ssh_host``.
+    host: str = "local"
+    remote_path: str | None = None
+    remote_ssh_host: str | None = None  # ssh alias for "Open in VSCode Remote"
 
 
 class PeerRow(BaseModel):

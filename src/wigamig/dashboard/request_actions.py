@@ -99,6 +99,7 @@ def file_create_request(
     justification: str = "",
     repo_kind: str = "github",
     local_repo_root: str | None = None,
+    host: str = "local",
 ) -> FileResult:
     """Propose creating a new project. PI approval scaffolds the repo."""
     if not actor:
@@ -113,6 +114,7 @@ def file_create_request(
             justification=justification,
             repo_kind=repo_kind,
             local_repo_root=local_repo_root,
+            host=host,
         )
     except RequestError as exc:
         msg = str(exc)

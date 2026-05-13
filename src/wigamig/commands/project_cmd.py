@@ -30,6 +30,7 @@ from ..core.charter import (
 from ..core.frontmatter import parse_file
 from ..core.identity import resolve as resolve_identity
 from ..core.projects import (
+    REMOTE_POINTER_FILE,
     ProjectSummary,
     find_project,
     iter_local_projects,
@@ -263,6 +264,180 @@ def cmd_new(
             ensure_remote(repo_dir, name, kind="github", org=github_org)
 
     return summary
+
+
+# ---------------------------------------------------------------------------
+# Remote install (R2 — Item 3, phase R2)
+# ---------------------------------------------------------------------------
+
+
+def _shellquote(s: str) -> str:
+    """Quote ``s`` for inclusion in a remote bash -lc command."""
+    import shlex
+    return shlex.quote(s)
+
+
+def cmd_new_remote(
+    name: str,
+    *,
+    host_name: str,
+    members_csv: str,
+    description: str | None = None,
+    sensitivity: str | None = None,
+    choreography: str | None = None,
+    reb_number: str | None = None,
+    reb_expires: str | None = None,
+    data_residency: str | None = None,
+    lead: str | None = None,
+    skip_github: bool = False,
+    github_org: str = "hallettmiket",
+) -> str:
+    """Create a project on a remote SSH host and leave a local pointer.
+
+    Flow on the laptop:
+      1. Resolve and probe the host.
+      2. SSH the host and run ``wigamig project new <name> ...`` there,
+         scaffolding the working tree + git init + GitHub remote + the
+         host's own lab-VM dirs.
+      3. Write a *remote-pointer* directory at ``~/repos/<name>/``: just a
+         CHARTER.md (with ``host:`` + ``remote_path:`` frontmatter) and a
+         ``.wigamig-remote-pointer`` marker. The dashboard's existing
+         ``iter_local_projects`` picks this up and renders a 🌐 chip.
+      4. Write the lab-mgmt registry entry with ``host:`` + ``remote_path:``.
+
+    Returns the remote project path (``<project_root>/<name>`` on host).
+    """
+    from ..core import hosts as _hosts
+    from ..core import remote as _remote
+
+    members = [m.strip() for m in members_csv.split(",") if m.strip()]
+    if not members:
+        raise click.ClickException("--members must list at least one handle")
+    if lead is None:
+        lead = members[0]
+    members = [_at(h) for h in members]
+    lead = _at(lead)
+
+    if sensitivity is None:
+        raise click.ClickException(
+            "--sensitivity is required for remote project creation"
+        )
+
+    try:
+        host = _hosts.resolve(host_name)
+    except _hosts.HostNotFound as exc:
+        raise click.ClickException(
+            f"{exc}. Register it first with `wigamig host add`."
+        ) from exc
+    if not host.is_remote():
+        raise click.ClickException(
+            f"host {host_name!r} is local; use `wigamig project new` (no --host) instead."
+        )
+
+    rclient = _remote.Remote(host)
+    probe = rclient.probe()
+    if not probe.ok:
+        raise click.ClickException(
+            f"cannot reach host {host_name!r} ({host.ssh_host}): "
+            f"{probe.stderr.strip() or 'ssh failed'}. Check ~/.ssh/config."
+        )
+
+    # Build the remote `wigamig project new` invocation.
+    remote_argv = [
+        "wigamig", "project", "new", _shellquote(name),
+        "--members", _shellquote(",".join(members)),
+        "--sensitivity", _shellquote(sensitivity),
+        "--lead", _shellquote(lead),
+    ]
+    if description:    remote_argv += ["--description", _shellquote(description)]
+    if choreography:   remote_argv += ["--choreography", _shellquote(choreography)]
+    if reb_number:     remote_argv += ["--reb-number", _shellquote(reb_number)]
+    if reb_expires:    remote_argv += ["--reb-expires", _shellquote(reb_expires)]
+    if data_residency: remote_argv += ["--data-residency", _shellquote(data_residency)]
+    if skip_github:    remote_argv += ["--skip-github"]
+    cmd = " ".join(remote_argv)
+    click.echo(f"→ creating project on {host_name} (this may take a moment)…")
+    try:
+        result = rclient.run(cmd, timeout=180)
+    except _remote.RemoteError as exc:
+        raise click.ClickException(
+            f"remote wigamig failed on {host_name!r} (rc={exc.returncode}):\n"
+            f"{exc.stderr.strip() or exc.stdout.strip() or 'no output'}"
+        ) from exc
+    click.echo(result.stdout.rstrip() or f"  (no stdout from remote wigamig)")
+
+    remote_path = f"{host.project_root.rstrip('/')}/{name}"
+
+    # Local pointer dir — minimal, no git.
+    pointer_dir = project_path(name)
+    if pointer_dir.exists():
+        if not (pointer_dir / REMOTE_POINTER_FILE).is_file():
+            raise click.ClickException(
+                f"{pointer_dir} already exists and is not a remote pointer; refusing to overwrite."
+            )
+    pointer_dir.mkdir(parents=True, exist_ok=True)
+    (pointer_dir / REMOTE_POINTER_FILE).write_text(
+        f"# wigamig remote project pointer\n"
+        f"# host: {host_name}\n"
+        f"# remote_path: {remote_path}\n"
+        f"# Do not run git here — the working tree lives on {host_name}.\n",
+        encoding="utf-8",
+    )
+    summary = _shadow_summary(
+        name=name, members=members, lead=lead, sensitivity=sensitivity,
+        choreography=choreography, local_path=pointer_dir,
+    )
+    charter_text = render_charter(
+        project=name, lead=lead, members=members,
+        sensitivity=sensitivity,
+        description=description or f"Project {name} (hosted on {host_name}).",
+        choreography=choreography,
+        reb_number=reb_number, reb_expires=reb_expires,
+        data_residency=data_residency,
+        created=_today(),
+        repo_kind="github",
+    )
+    # Splice the host + remote_path into the rendered charter frontmatter.
+    if "---\n" in charter_text:
+        head, sep, rest = charter_text.partition("---\n")
+        body, sep2, tail = rest.partition("---\n")
+        body = body + f"host: {host_name}\nremote_path: {remote_path}\n"
+        charter_text = head + sep + body + sep2 + tail
+    (pointer_dir / "CHARTER.md").write_text(charter_text, encoding="utf-8")
+
+    # Lab-mgmt registry entry with host fields.
+    registry_path = lab_mgmt_project_registry_path(name)
+    registry_path.parent.mkdir(parents=True, exist_ok=True)
+    registry_path.write_text(
+        render_registry_entry(
+            summary, today=_today(),
+            host_name=host_name, remote_path=remote_path,
+        ),
+        encoding="utf-8",
+    )
+
+    click.echo(
+        f"Project {name!r} created on {host_name} at {remote_path}.\n"
+        f"Open in VSCode Remote-SSH:  vscode-remote://ssh-remote+{host.ssh_host}{remote_path}"
+    )
+    return remote_path
+
+
+def _shadow_summary(
+    *,
+    name: str,
+    members: list[str],
+    lead: str,
+    sensitivity: str,
+    choreography: str | None,
+    local_path: Path,
+) -> ProjectSummary:
+    """Build a :class:`ProjectSummary` for a remote pointer."""
+    return ProjectSummary(
+        name=name, path=local_path,
+        sensitivity=sensitivity, lead=lead,
+        members=tuple(members), choreography=choreography,
+    )
 
 
 def cmd_admit(name: str, member: str) -> int:

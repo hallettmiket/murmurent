@@ -71,6 +71,10 @@ class CreateProjectRequestBody(BaseModel):
     # server-side from machine + lab settings.
     repo_kind: C.RepoDestination = "github"
     local_repo_root: str | None = None
+    # Item 3 (R2/R3): which registered host this project should live on.
+    # Defaults to "local" (this laptop); set to "biodatsci" (or any name
+    # in ~/.wigamig/hosts.yaml) to scaffold the project on that machine.
+    host: str = "local"
 
 
 class AddMemberBody(BaseModel):
@@ -545,6 +549,7 @@ def create_app() -> FastAPI:
                 justification=body.justification,
                 repo_kind=body.repo_kind,
                 local_repo_root=body.local_repo_root,
+                host=body.host,
             )
         except request_actions.RequestForbidden as exc:
             raise HTTPException(status_code=403, detail=str(exc))
@@ -1107,6 +1112,32 @@ def create_app() -> FastAPI:
                 d.mkdir(parents=True, exist_ok=True)
                 created.append(str(d))
         return {"ok": True, "created": created, "already_existed": [str(d) for d in (raw, refined) if d not in [Path(x) for x in created]]}
+
+    # -----------------------------------------------------------------
+    # Hosts (Item 3 R3 — install-target registry)
+    # -----------------------------------------------------------------
+
+    @app.get("/api/hosts")
+    def get_hosts() -> dict:
+        """Return the registered install hosts so the New Project modal
+        can populate its host dropdown. The 'local' host is always present.
+        """
+        from ..core import hosts as _hosts
+        registry = _hosts.read()
+        rows = [
+            {
+                "name": h.name,
+                "kind": h.kind,
+                "ssh_host": h.ssh_host,
+                "remote_user": h.remote_user,
+                "project_root": h.project_root,
+                "lab_vm_root": h.lab_vm_root,
+                "description": h.description,
+                "is_remote": h.is_remote(),
+            }
+            for h in registry.values()
+        ]
+        return {"hosts": rows}
 
     # -----------------------------------------------------------------
     # Login / role-selection landing (Item 1)

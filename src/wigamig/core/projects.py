@@ -135,10 +135,30 @@ def lab_mgmt_project_registry_path(name: str, env: dict[str, str] | None = None)
     return lab_mgmt_repo_root(env) / PROJECT_REGISTRY_DIR / f"{name}.md"
 
 
-def render_registry_entry(summary: ProjectSummary, *, today: str) -> str:
-    """Render a markdown registry entry for ``lab-mgmt-repo/projects/<name>.md``."""
+REMOTE_POINTER_FILE = ".wigamig-remote-pointer"
+
+
+def render_registry_entry(
+    summary: ProjectSummary,
+    *,
+    today: str,
+    host_name: str = "local",
+    remote_path: str = "",
+) -> str:
+    """Render a markdown registry entry for ``lab-mgmt-repo/projects/<name>.md``.
+
+    ``host_name`` defaults to ``"local"``; pass a registered host name
+    (e.g. ``"biodatsci"``) when the working tree lives on a remote host.
+    ``remote_path`` is the absolute path on that host and is required
+    when ``host_name`` is anything other than ``"local"``.
+    """
     members_yaml = "\n".join(f"  - {m!r}" for m in summary.members)
     chor_line = f"choreography: {summary.choreography}\n" if summary.choreography else ""
+    host_lines = ""
+    if host_name and host_name != "local":
+        if not remote_path:
+            raise ValueError("remote_path is required when host_name is non-local")
+        host_lines = f"host: {host_name}\nremote_path: {remote_path}\n"
     return (
         "---\n"
         f"project: {summary.name}\n"
@@ -146,6 +166,7 @@ def render_registry_entry(summary: ProjectSummary, *, today: str) -> str:
         f"sensitivity: {summary.sensitivity}\n"
         f"lead: {summary.lead!r}\n"
         f"{chor_line}"
+        f"{host_lines}"
         f"created: {today}\n"
         "members:\n"
         f"{members_yaml}\n"
@@ -154,3 +175,37 @@ def render_registry_entry(summary: ProjectSummary, *, today: str) -> str:
         "Auto-generated registry entry. Edit the project repo's `CHARTER.md` to change\n"
         "the canonical metadata; this file mirrors it for cross-project lookups.\n"
     )
+
+
+def is_remote_pointer(project_dir: Path) -> bool:
+    """True if ``project_dir`` is a remote-project pointer (no working tree).
+
+    Remote-pointer dirs contain a single ``.wigamig-remote-pointer`` marker
+    file alongside a CHARTER.md whose frontmatter carries ``host:`` and
+    ``remote_path:``. Calls into git here would all fail; the dashboard
+    surfaces them with a 🌐 chip and the "Open in VSCode" button generates
+    a ``vscode-remote://ssh-remote+<host><path>`` URL instead.
+    """
+    return (project_dir / REMOTE_POINTER_FILE).is_file()
+
+
+def read_remote_pointer(project_dir: Path) -> tuple[str, str] | None:
+    """Return ``(host_name, remote_path)`` for a remote pointer, else ``None``.
+
+    Reads CHARTER.md frontmatter. Returns ``None`` if the dir isn't a
+    pointer, the charter is missing, or required fields are absent.
+    """
+    if not is_remote_pointer(project_dir):
+        return None
+    charter = project_dir / CHARTER_FILENAME
+    if not charter.is_file():
+        return None
+    try:
+        meta = parse_file(charter).meta
+    except Exception:
+        return None
+    host = str(meta.get("host", "")).strip()
+    remote_path = str(meta.get("remote_path", "")).strip()
+    if not host or host == "local" or not remote_path:
+        return None
+    return host, remote_path
