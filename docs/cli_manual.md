@@ -103,10 +103,10 @@ Experiments follow the lab project structure: `exp/<integer>_<slug>/` in the pro
 
 | Command | Effect |
 |---|---|
-| `wigamig experiment new --project <project> --name <slug>` | Scaffold `exp/<next-int>_<slug>/` with `README.md`, `run_all.py` skeleton, `notebook.md` template; create `/data/lab_vm/raw/<project>/<exp>/` and `/data/lab_vm/refined/<project>/<exp>/`; open `notebook.md` in Obsidian |
+| `wigamig experiment new --project <project> --name <slug>` | Scaffold `exp/<next-int>_<slug>/` with `README.md`, `run_all.py` skeleton, `notebook.md` template; create `/data/lab_vm/wigamig/raw/<project>/<exp>/` and `/data/lab_vm/wigamig/refined/<project>/<exp>/`; open `notebook.md` in Obsidian |
 | `wigamig experiment list [--project <project>]` | List experiments and their `status` |
 | `wigamig experiment status <project> <slug> --set <state>` | Update the `status` field on a notebook entry |
-| `wigamig experiment ingest <project> <slug> <source> [--instrument <t>] [--accept] [--dry-run]` | Classify files in `<source>` as raw vs derived (instrument profile + generic patterns), present for mandatory review, then copy: raw → `/data/lab_vm/raw/<project>/<slug>/` (chmod a-w), derived → `.../refined/<project>/<slug>/instrument_outputs/`. Compute SHA-256; update `raw_data:`, `instrument_outputs:`, `checksums:` in `notebook.md`. See [Ingest classification](group_level.md#ingest-classification-raw-vs-derived). |
+| `wigamig experiment ingest <project> <slug> <source> [--instrument <t>] [--accept] [--dry-run]` | Classify files in `<source>` as raw vs derived (instrument profile + generic patterns), present for mandatory review, then copy: raw → `/data/lab_vm/wigamig/raw/<project>/<slug>/` (chmod a-w), derived → `.../refined/<project>/<slug>/instrument_outputs/`. Compute SHA-256; update `raw_data:`, `instrument_outputs:`, `checksums:` in `notebook.md`. See [Ingest classification](group_level.md#ingest-classification-raw-vs-derived). |
 | `wigamig experiment attach <project> <slug> <file>` | Place a documentation file (photo of paper notebook page, sketch) into the appropriate subfolder; downsamples camera photos; never used for data files |
 
 ### Inventory
@@ -228,7 +228,7 @@ Note: `provision` is no longer a CLI command; it is a tool on the `inventory` MC
 |---|---|
 | `wigamig push <project> [--message <m>]` | Push current branch as `member/<handle>/<topic>` (direct, no review) |
 | `wigamig push <project> --finalize` | Open a PR from the personal branch to `main`; trigger bot + human reviews per path rules |
-| `wigamig push <project> --refined <exp>` | Recompute checksums in `/data/lab_vm/refined/<project>/<exp>/`, update notebook `refined_data` + `checksums`, push to personal branch |
+| `wigamig push <project> --refined <exp>` | Recompute checksums in `/data/lab_vm/wigamig/refined/<project>/<exp>/`, update notebook `refined_data` + `checksums`, push to personal branch |
 | `wigamig pull <project>` | Fetch latest |
 | `wigamig cite <reference>` | Resolve and insert a citation; checks group oracle |
 | `wigamig audit <target>` | Invoke `adversary` on a path or PR |
@@ -252,7 +252,7 @@ Installing agents (profile: student): bookworm, adversary, blacksmith, artist
   artist:      personal (copied)
 Configuring MCP servers: inventory, oracle, request_board
 Generated age key. Public key: age1...
-Opened PR #87 in hallett-lab-mgmt: "Onboard @newuser"
+Opened PR #87 in lab_mgmt: "Onboard @newuser"
 
 # (PI approves PR and runs `wigamig project admit` for each project in onboarding issue)
 
@@ -279,7 +279,7 @@ Triggered: adversary (src/**), security_guard (always)
 
 ```
 $ wigamig push dcis_imaging --refined 3_titration
-Recomputed SHA-256 for 5 files in /data/lab_vm/refined/dcis_imaging/3_titration/
+Recomputed SHA-256 for 5 files in /data/lab_vm/wigamig/refined/dcis_imaging/3_titration/
 Updated exp/3_titration/notebook.md (refined_data, checksums).
 Pushed to member/mike.hallett/3_titration-analysis (direct).
 ```
@@ -292,8 +292,8 @@ Created exp/3_titration/
   README.md, run_all.py, notebook.md
   pages/, sketches/, data/
   notebook.md frontmatter pre-filled: experiment=3_titration, date=2026-05-06, performer=@mike.hallett
-Created /data/lab_vm/raw/dcis_imaging/3_titration/
-Created /data/lab_vm/refined/dcis_imaging/3_titration/
+Created /data/lab_vm/wigamig/raw/dcis_imaging/3_titration/
+Created /data/lab_vm/wigamig/refined/dcis_imaging/3_titration/
 Opening notebook.md in Obsidian.
 ```
 
@@ -301,9 +301,9 @@ Opening notebook.md in Obsidian.
 
 ```
 $ wigamig experiment ingest dcis_imaging 3_titration ~/Downloads/scope_export
-Copied 12 files to /data/lab_vm/raw/dcis_imaging/3_titration/
+Copied 12 files to /data/lab_vm/wigamig/raw/dcis_imaging/3_titration/
 Computed SHA-256 checksums.
-Set /data/lab_vm/raw/dcis_imaging/3_titration/ to chmod a-w (read-only).
+Set /data/lab_vm/wigamig/raw/dcis_imaging/3_titration/ to chmod a-w (read-only).
 Updated raw_data and checksums in exp/3_titration/notebook.md.
 ```
 
@@ -325,14 +325,14 @@ OK:         3 items in stock and within shelf life
 ```
 $ wigamig publish notes/abcb1_finding.md --to group
 Published to hallett group oracle as findings/2026-05-05_abcb1.md
-Audit entry written to hallett-lab-mgmt/oracle-publish.log
+Audit entry written to lab_mgmt/oracle-publish.log
 ```
 
 ### PI assigns a role
 
 ```
 $ wigamig role assign lab_manager @lauren.smith
-Opened transition issue #42 in hallett-lab-mgmt
+Opened transition issue #42 in lab_mgmt
 Awaiting acknowledgement from @lauren.smith and handoff from @prev_admin.
 ```
 
@@ -352,7 +352,7 @@ $ wigamig project new dcis_imaging \
 Created repo hallettmiket/dcis_imaging
 MEMBERS:    3
 Lab VM ACL synced.
-Registered in hallett-lab-mgmt/projects/dcis_imaging.md
+Registered in lab_mgmt/projects/dcis_imaging.md
 ```
 
 ## Open

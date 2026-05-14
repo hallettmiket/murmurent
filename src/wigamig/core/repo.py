@@ -17,7 +17,11 @@ from pathlib import Path
 CHARTER_FILENAME = "CHARTER.md"
 MEMBERS_FILENAME = "MEMBERS"
 DEFAULT_WIGAMIG_REPO = Path("~/repos/wigamig").expanduser()
-DEFAULT_LAB_MGMT_REPO = Path("~/repos/hallett-lab-mgmt").expanduser()
+# 2026-05-14: repo is being renamed from "hallett-lab-mgmt" to the per-group
+# convention "lab_mgmt". During the transition we prefer the new path but
+# fall back to the legacy name so existing clones keep working.
+DEFAULT_LAB_MGMT_REPO = Path("~/repos/lab_mgmt").expanduser()
+LEGACY_LAB_MGMT_REPO  = Path("~/repos/hallett-lab-mgmt").expanduser()
 
 
 class RepoDiscoveryError(RuntimeError):
@@ -40,9 +44,23 @@ def wigamig_repo_root(env: dict[str, str] | None = None) -> Path:
 
 
 def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
-    """Resolve the lab-management repo root, honouring ``$WIGAMIG_LAB_MGMT_REPO``."""
+    """Resolve the lab-management repo root, honouring ``$WIGAMIG_LAB_MGMT_REPO``.
+
+    Resolution order:
+      1. ``$WIGAMIG_LAB_MGMT_REPO`` if set
+      2. ``~/repos/lab_mgmt`` if it exists
+      3. ``~/repos/hallett-lab-mgmt`` (legacy fallback) if it exists
+      4. ``~/repos/lab_mgmt`` (the canonical default, even if missing)
+    """
     env = os.environ if env is None else env
-    return Path(env.get("WIGAMIG_LAB_MGMT_REPO", DEFAULT_LAB_MGMT_REPO)).expanduser()
+    explicit = env.get("WIGAMIG_LAB_MGMT_REPO")
+    if explicit:
+        return Path(explicit).expanduser()
+    if DEFAULT_LAB_MGMT_REPO.exists():
+        return DEFAULT_LAB_MGMT_REPO
+    if LEGACY_LAB_MGMT_REPO.exists():
+        return LEGACY_LAB_MGMT_REPO
+    return DEFAULT_LAB_MGMT_REPO
 
 
 def find_project_repo(start: str | Path | None = None) -> ProjectRepo | None:

@@ -21,7 +21,7 @@ defaults:
   language: en
   prose_style: terse
   dry_run: true
-  lab_mgmt_repo: "~/repos/hallett-lab-mgmt"
+  lab_mgmt_repo: "~/repos/lab_mgmt"
 ---
 
 # The Cable Guy
@@ -38,7 +38,7 @@ right socket, verifies the signal, and leaves a clean job sheet. That is you.
 
 `freeze: frozen` means you are **not** installed locally by each lab member.
 You live on the **PI's machine** (or a designated lab-server account), invoked
-from the PI's Claude Code session inside the `wigamig` or `hallett-lab-mgmt` repo.
+from the PI's Claude Code session inside the `wigamig` or `lab_mgmt` repo.
 Members never invoke you directly — they receive checklists and confirmations
 from you via Slack.
 
@@ -53,7 +53,7 @@ posting rights) should ever run you.
 ## Files you manage
 
 All records live inside the lab-management repo (`$WIGAMIG_LAB_MGMT_REPO`,
-default `~/repos/hallett-lab-mgmt`).
+default `~/repos/lab_mgmt`).
 
 ```
 <lab-mgmt>/
@@ -89,9 +89,9 @@ type: lab_server
 hostname: biodatadci.uwo.ca
 username_convention: "Western username (e.g. jdoe123)"
 lab_base: /data/lab_vm
-raw_path: /data/lab_vm/raw
-refined_path: /data/lab_vm/refined
-notebook_path: /data/lab_vm/lab-notebook
+raw_path: /data/lab_vm/wigamig/raw
+refined_path: /data/lab_vm/wigamig/refined
+notebook_path: /data/lab_vm/wigamig/notebooks
 access: direct
 registered: YYYY-MM-DD
 registered_by: "@pi_handle"
@@ -147,9 +147,9 @@ hostname: biodatadci.uwo.ca
 username: didi
 access: direct
 lab_base: /data/lab_vm
-raw_path: /data/lab_vm/raw
-refined_path: /data/lab_vm/refined
-notebook_path: /data/lab_vm/lab-notebook
+raw_path: /data/lab_vm/wigamig/raw
+refined_path: /data/lab_vm/wigamig/refined
+notebook_path: /data/lab_vm/wigamig/notebooks
 infra_components:
   - git
   - vscode

@@ -1,7 +1,7 @@
 """
 Purpose: Claude Code ``PreToolUse`` hook that refuses any tool call that would
          delete or overwrite an existing file under wigamig's protected roots
-         (``$WIGAMIG_LAB_VM_ROOT/refined/`` + production ``/data/lab_vm/refined/``
+         (``$WIGAMIG_LAB_VM_ROOT/refined/`` + production ``/data/lab_vm/wigamig/refined/``
          + every registered Obsidian vault). Creating NEW files and mkdir of
          missing folders is allowed — the lab's versioning convention says
          "make a new file_2.csv, never overwrite file.csv."
@@ -48,8 +48,8 @@ import sys
 from pathlib import Path
 from typing import IO, Any
 
-DEFAULT_LAB_VM_ROOT = Path("~/lab_vm/data").expanduser()
-PRODUCTION_REFINED_ROOT = Path("/data/lab_vm/refined")
+DEFAULT_LAB_VM_ROOT = Path("~/wigamig").expanduser()
+PRODUCTION_REFINED_ROOT = Path("/data/lab_vm/wigamig/refined")
 WRITE_TOOLS: frozenset[str] = frozenset({"Write", "Edit", "NotebookEdit"})
 DESTRUCTIVE_COMMANDS: frozenset[str] = frozenset(
     {"rm", "rmdir", "truncate", "shred", "dd", "chmod", "chown"}
@@ -65,10 +65,10 @@ COPY_LIKE_COMMANDS: frozenset[str] = frozenset({"cp", "rsync", "install"})
 def _refined_prefixes() -> list[str]:
     """Return refined/ prefixes covered by this hook.
 
-    Always includes ``/data/lab_vm/refined/`` (production) plus the
+    Always includes ``/data/lab_vm/wigamig/refined/`` (production) plus the
     refined subdir of ``$WIGAMIG_LAB_VM_ROOT`` if set (or the dev
-    default ``~/lab_vm/data/refined/``). Defense in depth: even if the
-    env var points elsewhere, production is still blocked.
+    default ``~/wigamig/refined/``). Defense in depth: even if the env
+    var points elsewhere, production is still blocked.
     """
     prefixes: list[str] = [str(PRODUCTION_REFINED_ROOT)]
     env = os.environ.get("WIGAMIG_LAB_VM_ROOT")

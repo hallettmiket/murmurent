@@ -16,7 +16,7 @@ Members can create projects and experiments, ingest fake instrument data with th
 ## Preconditions
 
 - Phase 1 PR merged to `main` of `wigamig`
-- `hallett-lab-mgmt` exists locally and on GitHub
+- `lab_mgmt` exists locally and on GitHub
 - Member files for the four personas exist
 - `gh` authenticated
 

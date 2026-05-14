@@ -182,11 +182,13 @@ def test_lab_settings_reads_github_org_from_labmd(world):
 
 
 def test_lab_settings_github_org_falls_back(world):
-    """Missing ``github_org`` falls back to the historic literal."""
+    """Missing ``github_org`` falls back to the historic literal; missing
+    ``git_repos_subpath`` falls back to the 2026-05-14 default ``repos``
+    (was ``git_repos`` before the lab_base umbrella refactor)."""
     from wigamig.dashboard import snapshot
     s = snapshot._lab_settings("hallett")
     assert s.github_org == "hallettmiket"
-    assert s.git_repos_subpath == "git_repos"
+    assert s.git_repos_subpath == "repos"
 
 
 # ---------------------------------------------------------------------------

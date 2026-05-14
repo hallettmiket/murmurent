@@ -396,10 +396,11 @@ def _personal_oracle_excerpt(text: str, *, max_len: int = 120) -> str:
 def _lab_oracle_folder(lab_name: str) -> str:
     """Short display path for the lab oracle vault root.
 
-    Example: ``wigamig-vault-hallett/`` for the Hallett lab.
+    Always ``lab_oracle/`` under the new 2026-05-14 umbrella layout —
+    individual users get subfolders inside it. The ``lab_name`` argument
+    is retained for callers but no longer parameterizes the folder name.
     """
-    name = (lab_name or "hallett").strip() or "hallett"
-    return f"wigamig-vault-{name}/"
+    return "lab_oracle/"
 
 
 def _lab_settings(lab_name: str) -> C.LabSettings:
@@ -414,11 +415,12 @@ def _lab_settings(lab_name: str) -> C.LabSettings:
                 display_name=str(meta.get("display_name") or f"{lab_name.capitalize()} Lab"),
                 pi_handle=str(meta.get("pi") or _pi_handle()),
                 website=meta.get("website") or None,
+                admins=list(meta.get("admins") or []),
+                lab_base=meta.get("lab_base") or None,
+                github_org=str(meta.get("github_org") or "hallettmiket"),
+                git_repos_subpath=str(meta.get("git_repos_subpath") or "repos"),
                 notebook_large_files_path=meta.get("notebook_large_files_path") or None,
                 lab_oracle_vault=meta.get("lab_oracle_vault") or _lab_oracle_folder(lab_name),
-                admins=list(meta.get("admins") or []),
-                github_org=str(meta.get("github_org") or "hallettmiket"),
-                git_repos_subpath=str(meta.get("git_repos_subpath") or "git_repos"),
             )
     except Exception:
         pass

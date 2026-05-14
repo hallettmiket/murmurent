@@ -37,7 +37,7 @@ Stand up the Python package, CLI skeleton, agent registry, frontmatter and repo-
    - The `defaults` block uses the controlled vocabulary in `docs/group_level.md` "Tool preferences"
 
 3. **Core utilities** at `src/wigamig/core/`
-   - `repo.py` — walk cwd to find active project (marker: `CHARTER.md`); read `MEMBERS`; locate lab-management repo at `~/repos/hallett-lab-mgmt`
+   - `repo.py` — walk cwd to find active project (marker: `CHARTER.md`); read `MEMBERS`; locate lab-management repo at `~/repos/lab_mgmt`
    - `frontmatter.py` — parse YAML frontmatter; validate required fields per the design
    - `identity.py` — resolve current user (env var `WIGAMIG_USER` preferred for testing; fall back to `gh api user`)
    - Tests for each
@@ -45,8 +45,8 @@ Stand up the Python package, CLI skeleton, agent registry, frontmatter and repo-
 4. **`wigamig agent list`** working — reads `agents/*.md`, prints name + freeze flag in a table
 
 5. **Seed script v1** at `scripts/seed_tutorial.py` (idempotent)
-   - Creates `~/repos/hallett-lab-mgmt/` locally
-   - Creates `hallettmiket/hallett-lab-mgmt` private GitHub repo via `gh repo create --private`
+   - Creates `~/repos/lab_mgmt/` locally
+   - Creates `hallettmiket/lab_mgmt` private GitHub repo via `gh repo create --private`
    - Member profile files for `mike`, `allie`, `bob`, `cassie` at `members/<handle>.md` (frontmatter: handle, role, status, certifications)
    - Generates dummy age key pairs per persona; commits public keys to `keys/<handle>.age`; private keys saved locally outside the repo (e.g. `~/.config/wigamig/keys/<handle>.age-private`)
    - Empty `inventory/`, `projects/`, `dashboards/`, `audit/`, `roles/`, `onboarding/` directories with `.gitkeep`
@@ -57,7 +57,7 @@ Stand up the Python package, CLI skeleton, agent registry, frontmatter and repo-
 - [ ] `wigamig --help` prints the full command tree
 - [ ] `pytest` passes
 - [ ] `wigamig agent list` lists eight agents with freeze flags
-- [ ] `python scripts/seed_tutorial.py` completes without error and creates `hallett-lab-mgmt` locally and on GitHub
+- [ ] `python scripts/seed_tutorial.py` completes without error and creates `lab_mgmt` locally and on GitHub
 - [ ] `black` and `isort` clean
 - [ ] PR opened on `hallettmiket/wigamig` from a `feat/phase-1-foundation` branch
 

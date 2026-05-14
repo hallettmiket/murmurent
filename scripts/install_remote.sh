@@ -136,7 +136,7 @@ ssh_run 'mkdir -p $HOME/.wigamig'
 ok "~/.wigamig present"
 
 # Lab-VM data directories — warn but don't fail.
-if ssh_run 'test -d /data/lab_vm/raw && test -d /data/lab_vm/refined'; then
+if ssh_run 'test -d /data/lab_vm/wigamig/raw && test -d /data/lab_vm/wigamig/refined'; then
   ok "/data/lab_vm/{raw,refined} present"
 else
   warn "/data/lab_vm/{raw,refined} not found on ${HOST}. wigamig will fall back"

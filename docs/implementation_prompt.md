@@ -112,7 +112,7 @@ All four repos live at `~/repos/<name>/` locally **and** are pushed to GitHub un
 | Local | GitHub | State |
 |---|---|---|
 | `~/repos/wigamig/` | `hallettmiket/wigamig` | Already exists (currently has design docs + assets); add the CLI, agents, choreographies, scripts on a feature branch, PR to main when ready |
-| `~/repos/hallett-lab-mgmt/` | `hallettmiket/hallett-lab-mgmt` | New; created by seed script via `gh repo create --private` |
+| `~/repos/lab_mgmt/` | `hallettmiket/lab_mgmt` | New; created by seed script via `gh repo create --private` |
 | `~/repos/dcis_sc_tutorial/` | `hallettmiket/dcis_sc_tutorial` | New; created by seed script; private |
 | `~/repos/bbb_drug_screen/` | `hallettmiket/bbb_drug_screen` | New; created by seed script; private |
 
@@ -160,11 +160,11 @@ Inventory MCP at `src/wigamig/mcp/inventory_server.py`. Tools:
 - `inventory_add(name, vendor, catalog_no, ...)` — lab_manager only.
 - `inventory_order(name)` — lab_manager only; opens an order issue file.
 
-Register in `~/.claude/settings.json` under `mcpServers`. Wraps the markdown files in `hallett-lab-mgmt/inventory/`.
+Register in `~/.claude/settings.json` under `mcpServers`. Wraps the markdown files in `lab_mgmt/inventory/`.
 
 ### Dashboard
 
-- **Snapshot generator** (Python script): walks lab-mgmt repo, both project repos, and the simulated lab VM; produces `hallett-lab-mgmt/dashboards/<handle>.md` for each member with all panels populated. Idempotent.
+- **Snapshot generator** (Python script): walks lab-mgmt repo, both project repos, and the simulated lab VM; produces `lab_mgmt/dashboards/<handle>.md` for each member with all panels populated. Idempotent.
 - **Streamlit viewer**: reads the snapshot, calls inventory MCP live for the inventory panel; renders Outstanding analysis (yellow at >2 weeks since `complete` and not `examined`; red at >2 months); renders Security and compliance with red for missing required.
 - Member view by default; PI view auto-enabled when run as `@mike` (env var `WIGAMIG_USER`).
 - `wigamig dashboard` opens Streamlit on localhost.
@@ -175,8 +175,8 @@ Register in `~/.claude/settings.json` under `mcpServers`. Wraps the markdown fil
 
 `scripts/seed_tutorial.py`. Idempotent. Run once to populate everything locally **and** push to GitHub:
 
-- Creates the three new GitHub repos (`hallett-lab-mgmt`, `dcis_sc_tutorial`, `bbb_drug_screen`) under `hallettmiket` via `gh repo create --private` if they don't already exist.
-- `~/repos/hallett-lab-mgmt/` with all directories (`members/`, `keys/`, `inventory/`, `projects/`, `dashboards/`, `audit/`, `roles/`, `onboarding/`).
+- Creates the three new GitHub repos (`lab_mgmt`, `dcis_sc_tutorial`, `bbb_drug_screen`) under `hallettmiket` via `gh repo create --private` if they don't already exist.
+- `~/repos/lab_mgmt/` with all directories (`members/`, `keys/`, `inventory/`, `projects/`, `dashboards/`, `audit/`, `roles/`, `onboarding/`).
 - Member files for the four personas.
 - Dummy age public keys (use `age-keygen` once per persona; commit publics, store privates locally).
 - Project registry entries.
@@ -226,7 +226,7 @@ The smoke test passes when each of these stories runs end-to-end:
 5. As any persona, attempt to write to a file under `$WIGAMIG_LAB_VM_ROOT/raw/dcis_sc_tutorial/` — the raw-data guard refuses with a clear message.
 6. Inside CC in any persona's session, ask "what reagents do we have low or expiring?" — CC calls `inventory_list` via the MCP and reports correctly: `4_oht` expired, `nebnext_kit` low, `livedead_stain` expiring soon.
 7. As @mike, run `wigamig dashboard` and see the PI compliance grid surface @cassie's missing TCPS 2 certification in red.
-8. All four repos are visible at `https://github.com/hallettmiket/{wigamig, hallett-lab-mgmt, dcis_sc_tutorial, bbb_drug_screen}` (the latter three private), with the seed content committed.
+8. All four repos are visible at `https://github.com/hallettmiket/{wigamig, lab_mgmt, dcis_sc_tutorial, bbb_drug_screen}` (the latter three private), with the seed content committed.
 
 ## Build order
 

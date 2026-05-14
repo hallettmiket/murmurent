@@ -127,7 +127,7 @@ def test_group_oracle_missing_dir_dropped(world):
     folders = wf.gather_folders(
         project="proj_a",
         obsidian_vault_path=None,
-        lab_oracle_vault="wigamig-vault-hallett/",  # display string, no real dir
+        lab_oracle_vault="lab_oracle/",  # display string, no real dir
     )
     assert all(f.name != "Group Oracle" for f in folders)
 

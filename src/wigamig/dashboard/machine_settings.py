@@ -60,6 +60,7 @@ def load(*, legacy_obsidian: dict | None = None) -> C.MachineSettings:
         return default
 
     return C.MachineSettings(
+        wigamig_base=data.get("wigamig_base") or None,
         obsidian_vault_path=_pick("obsidian_vault_path", "vault_path"),
         obsidian_vault_name=_pick("obsidian_vault_name", "vault_name"),
         notebook_subfolder=_pick("notebook_subfolder", "notebook_subfolder", "lab-notebook"),
@@ -79,6 +80,7 @@ def write(settings: C.MachineSettings) -> Path:
     """
     MACHINE_FILE.parent.mkdir(parents=True, exist_ok=True)
     payload = {
+        "wigamig_base": settings.wigamig_base,
         "obsidian_vault_path": settings.obsidian_vault_path,
         "obsidian_vault_name": settings.obsidian_vault_name,
         "notebook_subfolder": settings.notebook_subfolder,
