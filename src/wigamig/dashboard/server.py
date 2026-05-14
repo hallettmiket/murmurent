@@ -561,6 +561,66 @@ def create_app() -> FastAPI:
             },
         }
 
+    @app.get("/api/decommissions")
+    def list_decommission_reports(
+        kind: str = Query("", description="Filter by entity kind (project/machine/user/installation/sea)."),
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """List decommission reports on this machine, newest first.
+
+        PI-only — the report dir is per-machine local state, so this is
+        scoped to "what's been decommissioned from wigamig on the
+        computer running the dashboard." Reports are NOT pulled
+        cross-machine; each laptop / lab server has its own history.
+        """
+        from ..core import decommission as _deco
+        from ..core.frontmatter import parse_file as _pf
+
+        _require_pi(user)
+        kind_filter = (kind or "").strip().lower() or None
+        rows: list[dict] = []
+        for path in _deco.list_reports(kind=kind_filter):
+            meta: dict = {}
+            try:
+                parsed = _pf(path)
+                meta = parsed.meta or {}
+            except Exception:
+                pass
+            rows.append({
+                "file": path.name,
+                "kind": meta.get("kind") or "unknown",
+                "name": meta.get("name") or path.stem,
+                "decommissioned_by": meta.get("decommissioned_by") or "",
+                "decommissioned_at": meta.get("decommissioned_at") or "",
+                "reversible": bool(meta.get("reversible", True)),
+            })
+        return {"reports": rows}
+
+    @app.get("/api/decommissions/{filename}")
+    def get_decommission_report(
+        filename: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Return one decommission report's body so the UI can preview it.
+
+        Rejects any filename containing a path separator or ``..`` — the
+        only legitimate values come from /api/decommissions which always
+        returns plain filenames inside the report dir.
+        """
+        from ..core import decommission as _deco
+
+        _require_pi(user)
+        if "/" in filename or "\\" in filename or ".." in filename:
+            raise HTTPException(status_code=400, detail="invalid report filename")
+        path = _deco._decommission_dir() / filename
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail=f"no report {filename!r}")
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+        return {"file": filename, "body": text}
+
     @app.post("/api/sea/{project}/{sea_id}/archive")
     def archive_sea_endpoint(
         project: str,
