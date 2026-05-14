@@ -343,6 +343,28 @@ def build_registrar_response(
         institution=profile_meta.get("institution") or None,
     )
 
+    # Item #9: PI-proposed collaboration requests. Surfaced as loose
+    # dicts in the registrar payload so the centre's pending queue is
+    # visible alongside live collaborations.
+    from ..core import collaboration_requests as _creq
+    collab_req_rows: list[dict] = []
+    for r in _creq.iter_requests():
+        collab_req_rows.append({
+            "id": r.id,
+            "requester": r.requester,
+            "proposed_name": r.proposed_name,
+            "proposed_groups": list(r.proposed_groups),
+            "proposed_pis": list(r.proposed_pis),
+            "proposed_member_subset": {k: list(v) for k, v in r.proposed_member_subset.items()},
+            "proposed_oracle_vault": r.proposed_oracle_vault,
+            "justification": r.justification,
+            "state": r.state,
+            "created_at": r.created_at,
+            "resolved_at": r.resolved_at,
+            "resolved_by": r.resolved_by,
+            "decline_reason": r.decline_reason,
+        })
+
     return C.RegistrarResponse(
         registrar_handle=f"@{handle.lstrip('@')}",
         today=_today_block(today_d),
@@ -350,6 +372,7 @@ def build_registrar_response(
         labs=lab_rows,
         cores=core_rows,
         collaborations=collab_rows,
+        collaboration_requests=collab_req_rows,
         stats=C.RegistrarStats(
             total_labs=sum(1 for l in lab_rows if l.status == "active"),
             total_cores=sum(1 for c in core_rows if c.status == "active"),

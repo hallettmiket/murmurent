@@ -361,6 +361,41 @@
         + '</div></details></td></tr>';
     }
 
+    function renderCollabRequest(r) {
+      // One row in the "Pending collaboration requests" panel.
+      // Approve invokes /api/registrar/collaboration_request/<id>/approve,
+      // which delegates to create_collaboration (so all invariants run).
+      // Decline pops a prompt for the reason text.
+      const idAttr = String(r.id);
+      const partners = (r.proposed_groups || []).join(" + ")
+        + " · " + (r.proposed_pis || []).join(", ");
+      const justification = r.justification
+        ? '<div class="mono muted" style="white-space:normal; max-width:400px;">'
+          + escapeHTML(r.justification) + '</div>'
+        : '';
+      const declineInfo = r.decline_reason
+        ? '<div class="mono muted" style="font-size:11px;">reason: ' + escapeHTML(r.decline_reason) + '</div>'
+        : '';
+      const actions = r.state === "pending"
+        ? '<button class="btn collabreq-action" data-action="approve" data-reqid="' + idAttr + '">approve</button> '
+        + '<button class="btn collabreq-action" data-action="decline" data-reqid="' + idAttr + '">decline</button>'
+        : '<span class="muted mono" style="font-size:11px;">'
+          + (r.resolved_by ? "by " + escapeHTML(r.resolved_by) + " " : "")
+          + (r.resolved_at ? "@ " + escapeHTML(r.resolved_at.slice(0,10)) : "")
+          + '</span>';
+      return ''
+        + '<tr>'
+        + '<td><strong>' + escapeHTML(r.proposed_name) + '</strong>'
+        + '<div class="mono muted" style="font-size:11px;">#' + idAttr + '</div>'
+        + justification + '</td>'
+        + '<td>' + pill(r.state) + declineInfo + '</td>'
+        + '<td class="mono">' + escapeHTML(r.requester) + '</td>'
+        + '<td class="mono">' + escapeHTML(partners) + '</td>'
+        + '<td class="mono muted">' + escapeHTML((r.created_at || "").slice(0,10)) + '</td>'
+        + '<td style="text-align:right; white-space:nowrap;">' + actions + '</td>'
+        + '</tr>';
+    }
+
     function renderCollab(c) {
       const groups = (c.groups || []).join(", ");
       const pis = (c.pis || []).join(", ");
@@ -460,6 +495,30 @@
       }
       html += '</div>';
 
+      // Pending collaboration requests (PIs propose; registrar approves).
+      // Rendered as a panel below Collaborations so the queue is right
+      // next to the live registry. Approve flips the request to
+      // "approved" AND creates the collab entry above. Decline records
+      // a free-text reason.
+      const collabReqs = data.collaboration_requests || [];
+      const pendingCollab = collabReqs.filter(r => r.state === "pending");
+      const historicalCollab = collabReqs.filter(r => r.state !== "pending");
+      html += '<div class="panel"><header><h2>Pending collaboration requests</h2>'
+        + '<span class="meta">'
+        + pendingCollab.length + ' pending'
+        + (historicalCollab.length > 0 ? ' · ' + historicalCollab.length + ' historical' : '')
+        + '</span></header>';
+      if (pendingCollab.length === 0 && historicalCollab.length === 0) {
+        html += '<div class="empty">No collaboration requests filed. PIs propose new collaborations from their own dashboards; they appear here for approval.</div>';
+      } else {
+        html += '<table><thead><tr><th>name</th><th>state</th><th>requester</th><th>partners</th><th>filed</th><th style="text-align:right;">actions</th></tr></thead><tbody>';
+        for (const r of pendingCollab.concat(historicalCollab)) {
+          html += renderCollabRequest(r);
+        }
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+
       // -- Certifications panel (centre-wide compliance view) --
       const certs = data.certs || { aggregate: {}, rows: [], cert_specs: [] };
       const a = certs.aggregate || {};
@@ -540,6 +599,52 @@
           if (action === "edit") openEditCollabModal(name, (data.collaborations || []).find(c => c.name === name), data);
           else if (action === "archive" || action === "unarchive") {
             confirmCollabAction(action, name);
+          }
+        });
+      });
+
+      // Pending-collab-request approve/decline (item #9).
+      // Approve: POST .../approve — server delegates to create_collaboration.
+      // Decline: prompt for a reason, then POST .../decline.
+      root.querySelectorAll(".collabreq-action").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const action = btn.getAttribute("data-action");
+          const reqId  = btn.getAttribute("data-reqid");
+          if (!action || !reqId) return;
+          if (action === "approve") {
+            if (!window.confirm("Approve collaboration request #" + reqId + "?\n\n" +
+                                "This creates the collaboration in _registry.yaml.")) return;
+            btn.disabled = true;
+            try {
+              const userParam = userOverride ? "?user=" + encodeURIComponent(userOverride) : "";
+              const r = await fetch("/api/registrar/collaboration_request/" + reqId + "/approve" + userParam,
+                                    { method: "POST", headers: { Accept: "application/json" } });
+              const j = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+              await load();
+            } catch (ex) {
+              alert("Approve failed: " + (ex.message || ex));
+              btn.disabled = false;
+            }
+          } else if (action === "decline") {
+            const reason = window.prompt("Decline collaboration request #" + reqId + "\n\n" +
+                                         "Reason (visible to the proposing PI):");
+            if (reason === null) return;  // user cancelled the prompt
+            btn.disabled = true;
+            try {
+              const userParam = userOverride ? "?user=" + encodeURIComponent(userOverride) : "";
+              const r = await fetch("/api/registrar/collaboration_request/" + reqId + "/decline" + userParam, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ reason: reason }),
+              });
+              const j = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+              await load();
+            } catch (ex) {
+              alert("Decline failed: " + (ex.message || ex));
+              btn.disabled = false;
+            }
           }
         });
       });
