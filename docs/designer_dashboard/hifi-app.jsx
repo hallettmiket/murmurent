@@ -124,6 +124,8 @@ function SeaActionButton({ sea, action, label, tone, needsDelivery }) {
 
 function SeaActionMore({ sea }) {
   const [open, setOpen] = useState(false);
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
   const onDecline = async () => {
     const reason = window.prompt("Decline reason:");
     if (!reason || !reason.trim()) return;
@@ -137,6 +139,37 @@ function SeaActionMore({ sea }) {
       alert("Decline failed: " + (ex.message || ex));
     }
   };
+
+  // Archive = soft-delete (orthogonal to the decline/conclude lifecycle).
+  // PI-only; writes a decommission report and hides the SEA from queues.
+  const onArchive = async () => {
+    if (!window.confirm(
+      `Archive SEA #${sea.id} in project "${sea.project}"?\n\n` +
+      "wigamig will:\n" +
+      "  • flip the SEA's archived flag in its markdown file\n" +
+      "  • write a decommission report\n\n" +
+      "The SEA file is preserved; you can unarchive later. Not the same\n" +
+      "as decline — archive is for SEAs that should no longer appear in\n" +
+      "active queues regardless of their workflow state."
+    )) return;
+    setOpen(false);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const userParam = params.get("user");
+      const url = "/api/sea/" + encodeURIComponent(sea.project)
+                + "/" + sea.id + "/archive"
+                + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+      const r = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+    } catch (ex) {
+      alert("Archive failed: " + (ex.message || ex));
+    }
+  };
+
   return (
     <span style={{position:"relative"}}>
       <button className="btn sm ghost" onClick={() => setOpen(o => !o)}>⋯</button>
@@ -150,6 +183,12 @@ function SeaActionMore({ sea }) {
           <button className="btn sm danger" style={{width:"100%", textAlign:"left"}} onClick={onDecline}>
             decline…
           </button>
+          {isPI && (
+            <button className="btn sm" style={{width:"100%", textAlign:"left", color:"var(--red)"}}
+                    onClick={onArchive}>
+              archive (PI)
+            </button>
+          )}
           <button className="btn sm ghost" style={{width:"100%", textAlign:"left"}} onClick={() => setOpen(false)}>
             cancel
           </button>
@@ -302,6 +341,40 @@ function InstallationsBox({ span = "c-12" }) {
     }
   };
 
+  // Decommission an installation: delete the manifest at ~/.wigamig/
+  // installations/<project>.yaml and write a manual-cleanup report.
+  // The on-target paths (raw/, refined/, notebook/) are never touched.
+  const removeRow = async (inst) => {
+    const ok = window.confirm(
+      `Disconnect the "${inst.project}" installation on ` +
+      (inst.machine_type === "lab_server"
+        ? `${inst.username}@${inst.hostname}`
+        : `laptop (${inst.username})`) + "?\n\n" +
+      "wigamig will:\n" +
+      "  • remove ~/.wigamig/installations/" + inst.project + ".yaml\n" +
+      "  • write a report at ~/.wigamig/decommissions/ listing the\n" +
+      "    raw/, refined/, and notebook/ paths on the machine\n\n" +
+      "wigamig will NOT delete those directories. You can reinstall\n" +
+      "later via the ＋ install button."
+    );
+    if (!ok) return;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const userParam = params.get("user");
+      const url = "/api/installations/" + encodeURIComponent(inst.project)
+                + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+      const r = await fetch(url, { method: "DELETE" });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      window.alert("Installation '" + inst.project + "' disconnected.\n\nReport: " + j.report);
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+    } catch (ex) {
+      window.alert("Disconnect failed: " + (ex.message || ex));
+    }
+  };
+
   return (
     <div className={"card " + span}>
       <header className="card-header" style={{display:"flex", alignItems:"center", justifyContent:"space-between"}}>
@@ -391,6 +464,20 @@ function InstallationsBox({ span = "c-12" }) {
                               <span style={{display:"inline-block",width:90}}>issues</span>{inst.issues.join("; ")}
                             </div>
                           )}
+                        </div>
+                        <div style={{marginTop:8, paddingTop:6, borderTop:"1px dashed var(--rule)",
+                                     display:"flex", justifyContent:"flex-end"}}>
+                          <button
+                            type="button"
+                            onClick={() => removeRow(inst)}
+                            title="Disconnect this installation. Writes a manual-cleanup report; does NOT delete files on the target machine."
+                            style={{
+                              background:"transparent", border:"1px solid var(--rule-strong)",
+                              borderRadius:2, padding:"2px 8px", cursor:"pointer",
+                              fontSize:11, color:"var(--red)", fontFamily:"var(--mono)",
+                            }}>
+                            × disconnect from wigamig
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -1663,11 +1750,23 @@ function LabMembersPanel({ peers, span="c-6" }) {
   const onToggle = async (peer) => {
     const action = peer.status === "active" ? "deactivate" : "activate";
     if (action === "deactivate" && !window.confirm(
-      `Deactivate @${peer.handle}? They'll be unable to run wigamig actions but their history stays. ` +
-      `You can reactivate any time.`)) return;
+      `Deactivate @${peer.handle}?\n\n` +
+      "wigamig will:\n" +
+      "  • flip the member's status to inactive in members/" + peer.handle + ".md\n" +
+      "  • write a decommission report listing the member's project\n" +
+      "    memberships, age key, and slack pointer for review\n\n" +
+      "wigamig will NOT remove them from any project MEMBERS file, rotate\n" +
+      "their key, or kick them from Slack — review the report and decide.\n\n" +
+      "You can reactivate at any time."
+    )) return;
     setBusyHandle(peer.handle);
-    try { await postMemberStatus(peer.handle, action); await refresh(); }
-    catch (ex) { alert(ex.message || ex); }
+    try {
+      const result = await postMemberStatus(peer.handle, action);
+      if (action === "deactivate" && result && result.report) {
+        window.alert("Member @" + peer.handle + " deactivated.\n\nReport: " + result.report);
+      }
+      await refresh();
+    } catch (ex) { alert(ex.message || ex); }
     finally { setBusyHandle(null); }
   };
 
