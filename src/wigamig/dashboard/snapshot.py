@@ -86,7 +86,27 @@ def build_response(
     can_pi = is_pi
 
     snap = core_dashboard.build_snapshot(handle, today=today_d)
-    project_summaries = [load_summary(repo) for repo in iter_local_projects()]
+
+    # Scope projects to the viewer's lab so a laptop hosting multiple labs'
+    # ``~/repos/<project>`` clones doesn't leak across groups (e.g. @the_pi
+    # must not see @core_lead's vp1/vp2). A project belongs to the viewer if
+    # CHARTER.md's ``lab:`` matches the viewer's lab, OR the viewer is a
+    # named member of the project. Projects without a ``lab:`` field
+    # (legacy charters from before this scoping) only appear when the
+    # viewer is explicitly a member — that way a stale @the_pi-led project
+    # without a ``lab:`` doesn't surface in @core_lead's dashboard.
+    member_profile_for_lab = _load_member_profile(norm)
+    viewer_lab = str(member_profile_for_lab.get("lab") or "")
+    all_project_summaries = [load_summary(repo) for repo in iter_local_projects()]
+    def _is_member(p) -> bool:
+        return any(m.lstrip("@").lower() == norm for m in p.members)
+    def _visible_to_viewer(p) -> bool:
+        if p.lab and viewer_lab and p.lab.lower() == viewer_lab.lower():
+            return True
+        return _is_member(p)
+    project_summaries_all_visible = [p for p in all_project_summaries if _visible_to_viewer(p)]
+    project_summaries = [p for p in project_summaries_all_visible if p.status != "archived"]
+    archived_summaries = [p for p in project_summaries_all_visible if p.status == "archived"]
     all_seas = list(_iter_all_seas())
 
     # Cross-link gate: True when this handle is the centre's registrar.
@@ -131,6 +151,7 @@ def build_response(
         spark=_spark(all_seas, today_d),
         spark_labels=_spark_labels(today_d),
         projects=_projects(project_summaries, all_seas, today_d),
+        archived_projects=_projects(archived_summaries, all_seas, today_d),
         peers=_peers(
             snap,
             project_summaries,
@@ -945,6 +966,9 @@ def _projects(
                 host=host,
                 remote_path=remote_path,
                 remote_ssh_host=remote_ssh_host,
+                status=p.status,
+                decommissioned_at=p.decommissioned_at,
+                decommissioned_by=p.decommissioned_by,
             )
         )
     return rows

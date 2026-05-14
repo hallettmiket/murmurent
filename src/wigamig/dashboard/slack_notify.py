@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 
 _SLACK_API_URL = "https://slack.com/api/chat.postMessage"
 _SLACK_API_CREATE = "https://slack.com/api/conversations.create"
+_SLACK_API_LIST   = "https://slack.com/api/conversations.list"
 _TOKEN_FILE = Path("~/.config/wigamig/slack-token").expanduser()
 
 # Fallback channel IDs. ``_CHAN_DEFAULT`` is where wigamig-generated
@@ -89,12 +90,56 @@ def _write_charter_channel_id(project_slug: str, channel_id: str) -> None:
         log.warning("Could not write slack_channel_id to %s: %s", charter_path, exc)
 
 
+def _lookup_channel_id_by_name(name: str) -> str | None:
+    """Look up an existing Slack channel ID by exact channel name.
+
+    Pages through ``conversations.list`` (public + private). Returns the
+    channel ID on first match, or ``None`` if no match or no token. The
+    pre-existing CHARTER.md-only lookup couldn't recover from the case
+    where a channel had been created out-of-band — this fills that gap.
+    """
+    tok = _token()
+    if not tok:
+        return None
+    try:
+        import httpx
+
+        cursor = ""
+        for _ in range(10):  # cap pagination to avoid runaway loops
+            params = {"types": "public_channel,private_channel", "limit": 1000}
+            if cursor:
+                params["cursor"] = cursor
+            r = httpx.get(
+                _SLACK_API_LIST,
+                headers={"Authorization": f"Bearer {tok}"},
+                params=params,
+                timeout=8,
+            )
+            data = r.json()
+            if not data.get("ok"):
+                log.warning("Slack conversations.list failed: %s", data.get("error"))
+                return None
+            for ch in data.get("channels", []):
+                if ch.get("name") == name:
+                    return ch.get("id")
+            cursor = (data.get("response_metadata") or {}).get("next_cursor") or ""
+            if not cursor:
+                break
+        return None
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Slack lookup_channel_id_by_name error: %s", exc)
+        return None
+
+
 def create_project_channel(project_slug: str) -> str | None:
     """Create a Slack channel for a project and return its ID.
 
-    Channel name is ``proj-{project_slug}`` (hyphens, lowercase).  If the
-    channel already exists the existing ID is retrieved from CHARTER.md.
-    Returns None when no token is configured or the API call fails.
+    Channel name is ``proj-{project_slug}`` (hyphens, lowercase). If the
+    channel already exists, the existing ID is recovered in this order:
+    (1) ``slack_channel_id`` in the project's CHARTER.md, (2) a live
+    lookup against Slack's ``conversations.list``. The found ID is then
+    written back to CHARTER.md so subsequent calls are O(1). Returns
+    ``None`` when no token is configured or the API call fails.
     """
     tok = _token()
     if not tok:
@@ -110,17 +155,32 @@ def create_project_channel(project_slug: str) -> str | None:
             timeout=5,
         )
         data = r.json()
-        if not data.get("ok"):
-            err = data.get("error", "")
-            if err == "name_taken":
-                log.info("Slack channel %s already exists", channel_name)
-                existing = _project_channel_id(project_slug)
-                return existing if existing != _CHAN_CLAUDE_CODE else None
+        if data.get("ok"):
+            channel_id: str = data["channel"]["id"]
+            log.info("Created Slack channel %s → %s", channel_name, channel_id)
+            return channel_id
+
+        err = data.get("error", "")
+        if err != "name_taken":
             log.warning("Slack create channel %s failed: %s", channel_name, err)
             return None
-        channel_id: str = data["channel"]["id"]
-        log.info("Created Slack channel %s → %s", channel_name, channel_id)
-        return channel_id
+
+        # Channel already exists out-of-band. Recover its ID — first from
+        # CHARTER, then via Slack's API.
+        log.info("Slack channel %s already exists; recovering ID", channel_name)
+        existing = _project_channel_id(project_slug)
+        if existing and existing != _CHAN_CLAUDE_CODE:
+            return existing
+        looked_up = _lookup_channel_id_by_name(channel_name)
+        if looked_up:
+            log.info("Recovered Slack channel %s → %s via list lookup",
+                     channel_name, looked_up)
+            return looked_up
+        log.warning(
+            "Slack channel %s exists but the bot can't see it. Likely "
+            "needs to be invited to the channel.", channel_name,
+        )
+        return None
     except Exception as exc:  # noqa: BLE001
         log.warning("Slack create_project_channel error: %s", exc)
         return None

@@ -239,7 +239,7 @@ class RegistrarCollabCreateBody(BaseModel):
     pis: list[str]                             # >=2 @handles
     groups: list[str]                          # >=2 lab/core short IDs
     member_subset: dict[str, list[str]] = {}   # group -> [@handles]
-    oracle_vault: str | None = None            # defaults to "wigamig-collab-<name>"
+    oracle_vault: str | None = None            # defaults to "wigamig_collab_<name>"
 
 
 class RegistrarCollabEditBody(BaseModel):
@@ -385,7 +385,16 @@ def create_app() -> FastAPI:
                     "No user resolved. Set $WIGAMIG_USER or pass ?user=<handle>."
                 ),
             )
-        return snap_mod.build_response(handle, persona=persona)
+        # Cross-lab scoping: look up which lab this handle belongs to via the
+        # registrar registry and point lab_mgmt_repo_root() at that lab's
+        # lab-mgmt repo for the duration of the request. Falls through to
+        # the default (single-lab install) when the registry doesn't claim
+        # this handle.
+        from ..core import registrar as _registrar
+        from ..core.repo import use_lab_mgmt_root
+        match = _registrar.lab_mgmt_path_for_handle(handle)
+        with use_lab_mgmt_root(match[1] if match else None):
+            return snap_mod.build_response(handle, persona=persona)
 
     @app.get("/api/sea/{project}/{sea_id}")
     def get_sea(project: str, sea_id: int) -> dict:
@@ -1139,7 +1148,19 @@ def create_app() -> FastAPI:
                 if not local_repo_root:
                     raise HTTPException(
                         status_code=400,
-                        detail="CHARTER.md says repo_kind=local but local_repo_root is missing",
+                        detail=(
+                            f"Project '{project}' is configured for a private "
+                            "bare-repo remote (repo_kind=local) but CHARTER.md "
+                            "is missing the local_repo_root field that names "
+                            "where bare repos live on this machine. Either "
+                            "add `local_repo_root: <path>` to CHARTER.md (e.g. "
+                            "`local_repo_root: /data/lab_vm/wigamig/repos` on "
+                            "the lab server), or change `repo_kind:` to "
+                            "`github` to use a GitHub remote instead. The "
+                            "SSH-mounted bare-repo flow for laptop users is "
+                            "not wired up yet — it lands with the cross-lab "
+                            "multi-machine work."
+                        ),
                     )
                 bare = Path(local_repo_root).expanduser() / f"{project}.git"
                 url = _project_cmd.ensure_remote(
@@ -1164,6 +1185,44 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=f"provisioning failed: {detail}")
         except Exception as exc:  # noqa: BLE001 — surface to the user
             raise HTTPException(status_code=500, detail=f"provisioning failed: {exc}")
+
+    @app.post("/api/project/{project}/archive")
+    def archive_project_endpoint(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Soft-delete (decommission) a project. PI only.
+
+        Files on disk are NOT touched. The project's CHARTER.md frontmatter
+        flips to ``status: archived`` with a timestamp; a markdown report
+        is written to ``~/.wigamig/decommissions/`` listing what the user
+        may want to clean up manually (working clone, GitHub repo, Slack
+        channel, lab-base raw/refined dirs, etc.). Reversible via
+        ``unarchive``.
+        """
+        from ..core import projects as _projects
+
+        actor = _require_pi(user)
+        try:
+            report = _projects.archive_project(project, by_handle=actor)
+        except _projects.ProjectNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True, "report": str(report)}
+
+    @app.post("/api/project/{project}/unarchive")
+    def unarchive_project_endpoint(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Bring a previously-archived project back to active. PI only."""
+        from ..core import projects as _projects
+
+        _require_pi(user)
+        try:
+            _projects.unarchive_project(project)
+        except _projects.ProjectNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True}
 
     @app.post("/api/project/{project}/provision/install")
     def provision_install(
@@ -1245,16 +1304,71 @@ def create_app() -> FastAPI:
         return {"ok": True, "host": _host_row(host)}
 
     @app.delete("/api/hosts/{name}")
-    def delete_host(name: str) -> dict:
-        """Drop a host from the registry. ``local`` cannot be removed."""
+    def delete_host(
+        name: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Disconnect a host (machine) from wigamig.
+
+        The host's row in ``~/.wigamig/hosts.yaml`` is removed (that file
+        is a local-only registry — removing the row doesn't touch
+        anything on the actual machine). A decommission report is
+        written to ``~/.wigamig/decommissions/`` listing the paths on
+        that machine the user may want to clean up by hand (wigamig_base
+        directories, vault, etc.). ``local`` cannot be removed.
+        """
         from ..core import hosts as _hosts
+        from ..core import decommission as _deco
+
+        # Capture host details BEFORE removal so the report has data.
+        try:
+            host = _hosts.resolve(name)
+        except _hosts.HostNotFound:
+            host = None
+        except _hosts.HostError:
+            host = None
+
         try:
             _hosts.remove(name)
         except _hosts.HostNotFound as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except _hosts.HostError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return {"ok": True, "removed": name}
+
+        actor = (user or "").strip().lstrip("@") or "unknown"
+        items: list[_deco.CleanupItem] = []
+        if host is not None:
+            ssh_target = (host.ssh_host or name) if host.is_remote else None
+            if ssh_target:
+                items.append(_deco.CleanupItem(
+                    path=f"{host.remote_user + '@' if host.remote_user else ''}{ssh_target}",
+                    note="SSH target — wigamig no longer reaches this machine, but your ~/.ssh/config entry is untouched.",
+                ))
+            if host.project_root:
+                items.append(_deco.CleanupItem(
+                    path=f"{ssh_target or 'localhost'}:{host.project_root}",
+                    note="wigamig_base / project root on the host. Working clones live here. Inspect before deleting.",
+                    severity="private",
+                ))
+            if host.lab_vm_root:
+                items.append(_deco.CleanupItem(
+                    path=f"{ssh_target or 'localhost'}:{host.lab_vm_root}",
+                    note="Lab-VM root on the host (raw/, refined/). Usually retained — review per data policy.",
+                    severity="private",
+                ))
+            if host.vault_root:
+                items.append(_deco.CleanupItem(
+                    path=f"{ssh_target or 'localhost'}:{host.vault_root}",
+                    note="Obsidian vault path on the host (personal oracle / notebooks).",
+                ))
+        report = _deco.write_report(_deco.DecommissionRecord(
+            kind="machine",
+            name=name,
+            decommissioned_by=f"@{actor}",
+            cleanup_items=items,
+            extra_meta={"host_kind": host.kind if host else ""},
+        ))
+        return {"ok": True, "removed": name, "report": str(report)}
 
     @app.post("/api/hosts/{name}/test")
     def post_host_test(name: str) -> dict:
@@ -1380,6 +1494,7 @@ def create_app() -> FastAPI:
     def _resolve_roles(handle: str) -> dict[str, object]:
         from ..core import membership as _mem
         from ..core import registrar as _reg
+        from ..core.repo import use_lab_mgmt_root
 
         norm = (handle or "").strip().lstrip("@").lower()
         if not norm:
@@ -1392,20 +1507,29 @@ def create_app() -> FastAPI:
                 "registrar_centres": [],
                 "default_role": "member",
             }
-        # member?
-        try:
-            rec = _mem.get(norm)
-            is_member = rec.status == _mem.ACTIVE
-        except _mem.MemberNotFound:
-            is_member = False
-        # pi? (one lab per install today; future: walk every lab)
-        try:
-            from ..core import dashboard as _dash
-            pi_handle_now = _dash._pi_handle().lstrip("@").lower()
-        except Exception:
-            pi_handle_now = ""
+        # Find which lab/core this handle belongs to (PI OR member). The
+        # registry walk supports multi-lab logins — @core_lead is recognised
+        # as PI of the core_lead lab even though @the_pi's lab_mgmt is the
+        # default on this machine.
+        match = _reg.lab_mgmt_path_for_handle(norm)
+        lab_name = match[0] if match else None
+        lab_mgmt_override = match[1] if match else None
+
+        with use_lab_mgmt_root(lab_mgmt_override):
+            # member? — checked against the matched lab's members/ dir
+            try:
+                rec = _mem.get(norm)
+                is_member = rec.status == _mem.ACTIVE
+            except _mem.MemberNotFound:
+                is_member = False
+            # pi? — read the matched lab's lab.md:pi field
+            try:
+                from ..core import dashboard as _dash
+                pi_handle_now = _dash._pi_handle().lstrip("@").lower()
+            except Exception:
+                pi_handle_now = ""
         is_pi_role = bool(pi_handle_now) and norm == pi_handle_now
-        # registrar?
+        # registrar? (centre-level — independent of lab)
         is_reg = _reg.is_registrar(norm)
         # default lens: highest privilege the user holds
         if is_reg:
@@ -1421,7 +1545,7 @@ def create_app() -> FastAPI:
             "is_member": is_member,
             "is_pi": is_pi_role,
             "is_registrar": is_reg,
-            "pi_lab": pi_handle_now or None,
+            "pi_lab": lab_name or pi_handle_now or None,
             "registrar_centres": _reg.registrars() or (
                 [_reg.registrar_handle()] if _reg.registrar_handle() else []
             ),

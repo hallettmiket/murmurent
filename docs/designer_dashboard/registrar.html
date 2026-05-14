@@ -208,7 +208,7 @@
     <footer class="footer">
       <div class="bar">
         <img class="lab-logo-mini" src="assets/lab-logo-hi-res.jpg" alt="Hallett Lab" />
-        <a href="https://www.schulich.uwo.ca/biochem/" target="_blank" rel="noopener">
+        <a href="https://www.schulich.uwo.ca/" target="_blank" rel="noopener">
           <img class="schulich-mini" src="assets/Schulich_horizontal_CMYK.png" alt="Schulich School of Dentristy and Medicine" />
         </a>
         <a href="https://www.uwo.ca/" target="_blank" rel="noopener">
@@ -216,7 +216,7 @@
         </a>
         <span class="dept">Department of Biochemistry &middot; London, ON, Canada</span>
         <div class="links">
-          <a href="mailto:michael.hallett@example.edu">Contact</a>
+          <a href="mailto:michael.hallett@example.edu" target="_blank" rel="noopener">Contact</a>
           <a href="https://hallettmiket.github.io" target="_blank" rel="noopener">Join Us</a>
         </div>
       </div>
@@ -318,9 +318,11 @@
         + '<div class="lab-detail">'
         + unresolvedBanner
         + '<h4>lab-mgmt path</h4><div class="mono">' + escapeHTML(lab.lab_mgmt_path) + '</div>'
-        + (lab.slack_workspace ? '<h4>slack workspace</h4><div class="mono">' + escapeHTML(lab.slack_workspace) + '</div>' : '')
         + (lab.github_org ? '<h4>github org</h4><div class="mono">' + escapeHTML(lab.github_org) + '</div>' : '')
-        + (lab.oracle_vault ? '<h4>oracle vault</h4><div class="mono">' + escapeHTML(lab.oracle_vault) + '</div>' : '')
+        // slack_workspace + oracle_vault intentionally not surfaced here:
+        // those are lab-internal operational settings; the registrar shouldn't
+        // need to see them in the read view. The edit form still carries them
+        // for cases where the registrar must set them on a new lab.
         + '<h4>members</h4>'
         + renderMembers(lab.members)
         + '</div></details></td></tr>';
@@ -436,7 +438,7 @@
         + '<button class="btn" id="btn-new-core">＋ new core</button>'
         + '</span></header>';
       if ((data.cores || []).length === 0) {
-        html += '<div class="empty">No cores registered yet. Cores are like labs but their primary purpose is OFFERING SEAs to the rest of the centre; their lead is called the <strong>core leader</strong> rather than PI.</div>';
+        html += '<div class="empty">No cores registered yet.</div>';
       } else {
         html += '<table><thead><tr><th>name</th><th>core leader</th><th>members</th><th>created</th><th>status</th><th style="text-align:right;">actions</th></tr></thead><tbody>';
         for (const c of data.cores) html += renderCoreRow(c);
@@ -594,7 +596,7 @@
           + '<span class="mono muted" style="font-size:12px; font-weight:normal;">' + escapeHTML(data.registrar_handle) + '</span>'
           + '</h2>'
           + '<div style="display:flex; gap:8px; align-items:center;">'
-            + '<a class="btn" href="/dashboard?user=' + encodeURIComponent(data.registrar_handle.replace(/^@/, "")) + '&persona=member" title="Open the lab dashboard (PI / member view) for the same handle">→ Lab dashboard</a>'
+            + '<a class="btn" target="_blank" rel="noopener" href="/dashboard?user=' + encodeURIComponent(data.registrar_handle.replace(/^@/, "")) + '&persona=member" title="Open the lab dashboard (PI / member view) for the same handle in a new tab">→ Lab dashboard</a>'
             + '<a class="btn" href="/" title="Switch user or role — returns to the sign-in page">↺ switch</a>'
             + '<button class="btn" id="btn-edit-profile">⚙ profile</button>'
           + '</div>'
@@ -639,8 +641,8 @@
           '<input name="office" value="' + v("office") + '" placeholder="e.g. MSB-360" />' +
           '<label>address</label>' +
           '<input name="address" value="' + v("address") + '" />' +
-          '<label>city</label>' +
-          '<input name="city" value="' + v("city") + '" />' +
+          '<label>city, province</label>' +
+          '<input name="city" value="' + v("city") + '" placeholder="London, ON N6A 3K7" />' +
           '<label>department</label>' +
           '<input name="department" value="' + v("department") + '" />' +
           '<label>institution</label>' +
@@ -715,7 +717,7 @@
           '<label>GitHub org (optional)</label>' +
           '<input name="github_org" placeholder="e.g. ortegalab" />' +
           '<label>Obsidian vault name (optional)</label>' +
-          '<input name="oracle_vault" placeholder="e.g. wigamig-vault-ortega" />' +
+          '<input name="oracle_vault" placeholder="e.g. wigamig_vault_ortega" />' +
           '<label>institution (optional)</label>' +
           '<input name="institution" placeholder="e.g. Western University" />' +
           '<label>department (optional)</label>' +
@@ -740,6 +742,8 @@
           const trimmed = String(v).trim();
           if (trimmed) payload[k] = trimmed;
         }
+        // Short ID is lowercase snake_case; silently normalise.
+        if (payload.name) payload.name = payload.name.toLowerCase();
         msg.textContent = "creating…";
         msg.className = "form-msg";
         submitBtn.disabled = true;
@@ -948,8 +952,8 @@
         + '<input name="pis" value="' + escapeHTML((initial.pis || []).join(", ")) + '" placeholder="e.g. @the_pi, @jortega" />'
         + '<label>member subset (one group per line: <code>group: @h1, @h2</code>)</label>'
         + '<textarea name="member_subset" rows="4" style="width:100%; padding:6px 8px; border:1px solid var(--rule-strong); border-radius:2px; font-family:var(--mono); font-size:12px; box-sizing:border-box;" placeholder="hallett: @the_pi, @bob&#10;ortega: @jortega">' + escapeHTML(_serializeSubset(initial.member_subset || {})) + '</textarea>'
-        + '<label>oracle vault (optional; defaults to wigamig-collab-&lt;name&gt;)</label>'
-        + '<input name="oracle_vault" value="' + v("oracle_vault") + '" placeholder="wigamig-collab-…" />';
+        + '<label>oracle vault (optional; defaults to wigamig_collab_&lt;name&gt;)</label>'
+        + '<input name="oracle_vault" value="' + v("oracle_vault") + '" placeholder="wigamig_collab_…" />';
     }
 
     function openNewCollabModal(data) {
@@ -977,7 +981,8 @@
         e.preventDefault();
         const fd = new FormData(e.target);
         const payload = {
-          name: String(fd.get("name") || "").trim(),
+          // Short ID is lowercase snake_case; silently normalise.
+          name: String(fd.get("name") || "").trim().toLowerCase(),
           groups: _parseGroupsField(fd.get("groups")),
           pis: _parseHandlesField(fd.get("pis")),
           member_subset: _parseSubsetField(fd.get("member_subset")),
@@ -1101,7 +1106,7 @@
           '<label>GitHub org (optional)</label>' +
           '<input name="github_org" placeholder="e.g. imaging-core" />' +
           '<label>Obsidian vault name (optional)</label>' +
-          '<input name="oracle_vault" placeholder="e.g. wigamig-vault-imaging" />' +
+          '<input name="oracle_vault" placeholder="e.g. wigamig_vault_imaging" />' +
           '<label>institution (optional)</label>' +
           '<input name="institution" placeholder="e.g. Western University" />' +
           '<label>department (optional)</label>' +
@@ -1123,6 +1128,9 @@
           const trimmed = String(v).trim();
           if (trimmed) payload[k] = trimmed;
         }
+        // Short ID must be lowercase + snake_case; silently normalise so the
+        // user can type "Imaging" and not be told to fix it themselves.
+        if (payload.name) payload.name = payload.name.toLowerCase();
         await _submitCore(wrap, "new-core", "POST", "/api/registrar/core", payload);
       });
     }

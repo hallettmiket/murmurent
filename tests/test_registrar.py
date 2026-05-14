@@ -313,7 +313,7 @@ def test_create_lab_scaffolds_files_and_registry(isolated):
         name="ortega", display_name="Ortega Lab",
         pi_handle="jortega", pi_full_name="Jane Ortega",
         slack_workspace="T01ABC", github_org="ortegalab",
-        oracle_vault="wigamig-vault-ortega",
+        oracle_vault="wigamig_vault_ortega",
     )
     assert entry.name == "ortega"
     assert entry.pi == "@jortega"
@@ -1302,7 +1302,7 @@ def test_create_collaboration_scaffolds_and_registers(isolated, tmp_path):
     )
     assert entry.name == "dcis_imaging"
     assert entry.pis == ["@the_pi", "@jortega"]
-    assert entry.oracle_vault == "wigamig-collab-dcis_imaging"
+    assert entry.oracle_vault == "wigamig_collab_dcis_imaging"
     collab_md = registrar.lab_info_root() / "collaborations" / "dcis_imaging" / "collaboration.md"
     assert collab_md.is_file()
     # projects/ and oracle/ scaffolded
@@ -1537,15 +1537,15 @@ def test_endpoint_edit_collaboration_partial(isolated, tmp_path):
         "pis": ["@the_pi", "@jortega"],
         "groups": ["hallett", "ortega"],
         "member_subset": {"hallett": ["@the_pi"], "ortega": ["@jortega"]},
-        "oracle_vault": "wigamig-collab-dcis",
+        "oracle_vault": "wigamig_collab_dcis",
     })
     # Change just the oracle vault.
     r = client.post("/api/registrar/collaboration/dcis_imaging/edit", json={
-        "oracle_vault": "wigamig-collab-dcis-renamed",
+        "oracle_vault": "wigamig_collab_dcis-renamed",
     })
     assert r.status_code == 200
     body = r.json()["collaboration"]
-    assert body["oracle_vault"] == "wigamig-collab-dcis-renamed"
+    assert body["oracle_vault"] == "wigamig_collab_dcis-renamed"
     assert body["pis"] == ["@the_pi", "@jortega"]  # untouched
     assert body["groups"] == ["hallett", "ortega"]  # untouched
 

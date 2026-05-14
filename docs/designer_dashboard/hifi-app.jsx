@@ -1105,12 +1105,68 @@ function ProjectDetailRows({ proj: p }) {
 function ProjectsPanel({ projects, span="c-5" }) {
   const [openProj, setOpenProj] = useState(null);
   const [showNewProj, setShowNewProj] = useState(false);
+  const [showDecom, setShowDecom] = useState(false);
+  const [busyDecom, setBusyDecom] = useState(null);  // project name currently being archived
   const persona = window.DATA.persona || "member";
   const isPI = persona === "pi";
+  const archived = window.DATA.archived_projects || [];
   // Pending project-create requests — shown as an approval queue for the PI.
   const pendingCreate = (window.DATA.requests_pending || []).filter(
     r => r.kind === "project-create"
   );
+
+  // Soft-delete a project: POST to /api/project/<name>/archive. The PI is
+  // shown a confirm dialog because the action is reversible but emits a
+  // decommission report — best to opt in deliberately.
+  const archiveProj = async (name) => {
+    const ok = window.confirm(
+      `Decommission project "${name}"?\n\n` +
+      "wigamig will:\n" +
+      `  • flip the project's status to "archived" in CHARTER.md\n` +
+      "  • write a decommission report to ~/.wigamig/decommissions/\n\n" +
+      "wigamig will NOT delete any files (working clone, lab-base raw/refined, " +
+      "Slack channel, GitHub repo are all left alone — review the report).\n\n" +
+      "You can unarchive at any time from the Decommissioned section."
+    );
+    if (!ok) return;
+    setBusyDecom(name);
+    try {
+      const r = await fetch(
+        "/api/project/" + encodeURIComponent(name) + "/archive",
+        { method: "POST", headers: { Accept: "application/json" } },
+      );
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      window.alert("Project '" + name + "' decommissioned.\n\nReport: " + j.report);
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+    } catch (ex) {
+      window.alert("Archive failed: " + (ex.message || ex));
+    } finally {
+      setBusyDecom(null);
+    }
+  };
+
+  const unarchiveProj = async (name) => {
+    setBusyDecom(name);
+    try {
+      const r = await fetch(
+        "/api/project/" + encodeURIComponent(name) + "/unarchive",
+        { method: "POST", headers: { Accept: "application/json" } },
+      );
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+    } catch (ex) {
+      window.alert("Unarchive failed: " + (ex.message || ex));
+    } finally {
+      setBusyDecom(null);
+    }
+  };
+
   return (
     <div className={"panel "+span}>
       <header>
@@ -1122,6 +1178,19 @@ function ProjectsPanel({ projects, span="c-5" }) {
               <span> · <strong style={{color:"var(--tiger-deep)"}}>
                 {pendingCreate.length} pending
               </strong></span>
+            )}
+            {archived.length > 0 && (
+              <span> · <button
+                type="button"
+                onClick={() => setShowDecom(s => !s)}
+                style={{
+                  background:"transparent", border:0, padding:0,
+                  color:"var(--muted)", cursor:"pointer",
+                  textDecoration:"underline", fontFamily:"var(--mono)",
+                  fontSize:11, letterSpacing:0.5,
+                }}>
+                {archived.length} decommissioned {showDecom ? "▾" : "▸"}
+              </button></span>
             )}
           </span>
           <button className="btn sm" onClick={() => setShowNewProj(true)}>＋ new project</button>
@@ -1143,6 +1212,7 @@ function ProjectsPanel({ projects, span="c-5" }) {
           <thead><tr>
             <th>project</th><th style={{width:70}}>sens.</th><th style={{width:90}}>lead</th>
             <th style={{width:60}} className="num">team</th><th style={{width:90}} className="num">open SEAs</th><th style={{width:80}}>activity</th>
+            {isPI && <th style={{width:60}}></th>}
           </tr></thead>
           <tbody>
             {projects.map(p => (
@@ -1173,10 +1243,26 @@ function ProjectsPanel({ projects, span="c-5" }) {
                   <td className="num">{p.members}</td>
                   <td className="num"><strong>{p.open_seas}</strong></td>
                   <td className="muted" style={{fontSize:12}}>{p.last_activity}</td>
+                  {isPI && (
+                    <td style={{textAlign:"right"}} onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type="button"
+                        title="Decommission this project (soft delete; reversible). Writes a manual-cleanup report."
+                        disabled={busyDecom === p.name}
+                        onClick={() => archiveProj(p.name)}
+                        style={{
+                          background:"transparent", border:"1px solid var(--rule-strong)",
+                          borderRadius:2, padding:"1px 6px", cursor:"pointer",
+                          fontSize:11, color:"var(--red)", fontFamily:"var(--mono)",
+                        }}>
+                        {busyDecom === p.name ? "…" : "archive"}
+                      </button>
+                    </td>
+                  )}
                 </tr>
                 {openProj === p.name && (
                   <tr>
-                    <td colSpan={6} style={{
+                    <td colSpan={isPI ? 7 : 6} style={{
                       background:"var(--paper-2)",
                       padding:"10px 12px",
                       fontSize:12, fontFamily:"var(--mono)",
@@ -1192,6 +1278,62 @@ function ProjectsPanel({ projects, span="c-5" }) {
             ))}
           </tbody>
         </table>
+        {showDecom && archived.length > 0 && (
+          <div style={{
+            borderTop:"2px dashed var(--rule)",
+            background:"var(--paper-2)",
+            padding:"8px 12px",
+          }}>
+            <div className="mono muted" style={{
+              fontSize:10, letterSpacing:1, textTransform:"uppercase",
+              marginBottom:6,
+            }}>
+              Decommissioned ({archived.length})
+            </div>
+            <table className="dt" style={{background:"transparent"}}>
+              <tbody>
+                {archived.map(p => (
+                  <tr key={p.name}>
+                    <td>
+                      <div style={{fontWeight:500, color:"var(--muted)",
+                                   textDecoration:"line-through"}}>
+                        {p.name}
+                      </div>
+                      <div className="mono" style={{fontSize:11, color:"var(--muted)"}}>
+                        {p.decommissioned_at
+                          ? "decommissioned " + p.decommissioned_at.slice(0, 10)
+                          : "archived"}
+                        {p.decommissioned_by ? " by " + p.decommissioned_by : ""}
+                      </div>
+                    </td>
+                    <td style={{width:90, color:"var(--muted)"}}>
+                      <Pill tone={p.sens==="clinical"?"red":""}>{p.sens}</Pill>
+                    </td>
+                    <td className="mono" style={{fontSize:12, color:"var(--muted)"}}>
+                      {p.lead}
+                    </td>
+                    {isPI && (
+                      <td style={{width:90, textAlign:"right"}}>
+                        <button
+                          type="button"
+                          disabled={busyDecom === p.name}
+                          onClick={() => unarchiveProj(p.name)}
+                          title="Bring this project back to active. No files are touched."
+                          style={{
+                            background:"transparent", border:"1px solid var(--rule-strong)",
+                            borderRadius:2, padding:"1px 6px", cursor:"pointer",
+                            fontSize:11, color:"var(--green)", fontFamily:"var(--mono)",
+                          }}>
+                          {busyDecom === p.name ? "…" : "unarchive"}
+                        </button>
+                      </td>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -3004,8 +3146,9 @@ function MemberProfileModal({ onClose }) {
           <input style={inputStyle} value={form.wet_labs} onChange={update("wet_labs")} />
           <div style={labelStyle}>address</div>
           <input style={inputStyle} value={form.address} onChange={update("address")} />
-          <div style={labelStyle}>city</div>
-          <input style={inputStyle} value={form.city} onChange={update("city")} />
+          <div style={labelStyle}>city, province</div>
+          <input style={inputStyle} value={form.city} onChange={update("city")}
+                 placeholder="London, ON N6A 3K7" />
           <div style={labelStyle}>department</div>
           <input style={inputStyle} value={form.department} onChange={update("department")} />
         </div>
@@ -3455,12 +3598,11 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
         <input style={inputStyle} value={form.obsidian_vault_path}
                onChange={update("obsidian_vault_path")}
                placeholder="/Users/you/.../obsidian-lab" />
-        <div style={labelStyle}>obsidian vault name (for obsidian:// URLs)</div>
-        <input style={inputStyle} value={form.obsidian_vault_name}
-               onChange={update("obsidian_vault_name")} placeholder="obsidian-lab" />
         <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
-          The Obsidian vault is typically in iCloud Drive and lives separately
-          from <code>wigamig_base</code>. It hosts your personal oracle.
+          The vault name (used by <code>obsidian://</code> URLs) is derived
+          automatically from the last segment of the path. The Obsidian vault is
+          typically in iCloud Drive and lives separately from <code>wigamig_base</code>.
+          It hosts your personal oracle.
         </div>
         <div className="row" style={{gap:10, marginTop:4}}>
           <div style={{flex:1}}>
@@ -3618,6 +3760,115 @@ function MachinesModal({ onClose }) {
 
 /* Backwards-compat alias: the FooterMeta still calls MachineSettingsModal. */
 const MachineSettingsModal = MachinesModal;
+
+/* ───────── MachinesPanel: inline content block ───────── */
+/* Same data as MachinesModal but rendered as a side-by-side panel that
+   sits next to Projects (below Installations). Replaces the old footer
+   "⚙ machines" button — machines are conceptually part of the dashboard's
+   content, not chrome. */
+function MachinesPanel({ span = "c-5" }) {
+  const ms = window.DATA.machine_settings || {};
+  const [thisMachine, setThisMachine] = useState({ short_hostname: "", kind: "host" });
+  const [hosts, setHosts] = useState([]);
+  const [loadErr, setLoadErr] = useState(null);
+  const [editingThis, setEditingThis] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/environment/this_machine")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setThisMachine(d); })
+      .catch(() => {});
+  }, []);
+
+  const refreshHosts = async () => {
+    try {
+      const r = await fetch("/api/hosts", { headers: { Accept: "application/json" } });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      setHosts(j.hosts || []);
+      setLoadErr(null);
+    } catch (ex) {
+      setLoadErr(String(ex.message || ex));
+    }
+  };
+  useEffect(() => { refreshHosts(); }, []);
+
+  const removeHost = async (name) => {
+    if (!window.confirm(`Remove machine "${name}"?`)) return;
+    try {
+      const r = await fetch("/api/hosts/" + encodeURIComponent(name), { method: "DELETE" });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.detail || ("HTTP " + r.status));
+      }
+      await refreshHosts();
+    } catch (ex) {
+      alert("remove failed: " + (ex.message || ex));
+    }
+  };
+
+  const thisCard = {
+    name: thisMachine.short_hostname || "this machine",
+    kind: "local",
+    wigamig_base:        ms.wigamig_base        || "",
+    obsidian_vault_path: ms.obsidian_vault_path || "",
+    obsidian_vault_name: ms.obsidian_vault_name || "",
+    description: "OS user: " + (thisMachine.local_user || "?"),
+  };
+  const remoteCards = hosts.filter(h => h.name !== "local").map(h => ({
+    name: h.name, kind: "ssh",
+    ssh_host: h.ssh_host, remote_user: h.remote_user || "",
+    wigamig_base: h.lab_vm_root || h.wigamig_base || "",
+    obsidian_vault_path: h.vault_root || "",
+    obsidian_vault_name: "",
+    description: h.description || "",
+  }));
+  const total = 1 + remoteCards.length;
+
+  return (
+    <div className={"panel " + span}>
+      <header>
+        <h2>Machines</h2>
+        <div className="row" style={{gap:6}}>
+          <span className="meta">
+            {total} total · 1 here · {remoteCards.length} remote
+          </span>
+          <button className="btn sm" onClick={() => setShowAdd(s => !s)}>
+            {showAdd ? "× cancel" : "＋ add machine"}
+          </button>
+        </div>
+      </header>
+      <div style={{padding:"10px 14px"}}>
+        {editingThis ? (
+          <ThisMachineEditor
+            initial={ms}
+            onSaved={() => setEditingThis(false)}
+            onCancel={() => setEditingThis(false)}
+          />
+        ) : (
+          <MachineCard machine={thisCard} isCurrent
+                       onEditClick={() => setEditingThis(true)} />
+        )}
+        {loadErr && (
+          <div style={{color:"var(--red)", fontSize:12, marginBottom:8}}>
+            load failed: {loadErr}
+          </div>
+        )}
+        {remoteCards.map(m => (
+          <MachineCard key={m.name} machine={m} isCurrent={false}
+                       onRemove={() => removeHost(m.name)} />
+        ))}
+        {showAdd && (
+          <HostAddForm onCancel={() => setShowAdd(false)} onAdded={async () => {
+            setShowAdd(false);
+            await refreshHosts();
+          }} />
+        )}
+      </div>
+    </div>
+  );
+}
 
 /* ───────── Lab settings modal (PI + admins only) ───────── */
 /* Split a lab_base "host:/abs/path" string into host and path components.
@@ -3888,17 +4139,10 @@ function FooterMeta() {
                 }}>
                 ⚙ profile
               </button>
-              <button
-                type="button"
-                title="Machines — this laptop and registered remote hosts"
-                onClick={() => setShowMachine(true)}
-                style={{
-                  background:"transparent", border:"1px solid var(--rule-strong)",
-                  borderRadius:2, padding:"1px 6px", cursor:"pointer",
-                  fontSize:11, color:"var(--purple)",
-                }}>
-                ⚙ machines
-              </button>
+              {/* ⚙ machines button moved into the Machines content block
+                  (next to Projects, below Installations). The MachinesModal
+                  state stays wired for back-compat in case external callers
+                  still trigger it. */}
               {canEditLab && (
                 <button
                   type="button"
@@ -3941,7 +4185,7 @@ function FooterMeta() {
           {c.email && (
             <div className="row">
               <span className="lbl">Email</span>
-              <a href={"mailto:" + c.email}>{c.email}</a>
+              <a href={"mailto:" + c.email} target="_blank" rel="noopener">{c.email}</a>
             </div>
           )}
           {c.orcid && (
@@ -3985,7 +4229,7 @@ function FooterMeta() {
         <div>
           <h5>Affiliations</h5>
           <div className="affil">
-            <a href="https://www.schulich.uwo.ca/biochem/" target="_blank" rel="noopener">
+            <a href="https://www.schulich.uwo.ca/" target="_blank" rel="noopener">
               <img className="schulich" src="assets/Schulich_horizontal_CMYK.png" alt="Schulich School of Dentristy and Medicine" />
             </a>
             <a href="https://www.uwo.ca/" target="_blank" rel="noopener">
@@ -4003,7 +4247,7 @@ function Footer() {
     <div className="footer">
       <div className="bar">
         <img className="lab-logo-mini" src="assets/lab-logo-hi-res.jpg" alt="Hallett Lab" />
-        <a href="https://www.schulich.uwo.ca/biochem/" target="_blank" rel="noopener">
+        <a href="https://www.schulich.uwo.ca/" target="_blank" rel="noopener">
           <img className="schulich-mini" src="assets/Schulich_horizontal_CMYK.png" alt="Schulich School of Dentristy and Medicine" />
         </a>
         <a href="https://www.uwo.ca/" target="_blank" rel="noopener">
@@ -4011,7 +4255,7 @@ function Footer() {
         </a>
         <span className="dept">Department of Biochemistry · London, ON, Canada</span>
         <div className="links">
-          <a href="mailto:michael.hallett@example.edu">Contact</a>
+          <a href="mailto:michael.hallett@example.edu" target="_blank" rel="noopener">Contact</a>
           <a href="https://hallettmiket.github.io" target="_blank" rel="noopener">Join Us</a>
         </div>
       </div>
@@ -4060,17 +4304,19 @@ function App() {
           <InstallationsBox span="c-12" />
         </div>
 
-        {/* Reference zone: projects + activity (sit high — context for the action zone below). */}
+        {/* Where you work: Projects + Machines (conceptually paired —
+            installations live at the intersection of the two). */}
         <div className="grid" style={{marginBottom:14}}>
           <ProjectsPanel projects={D.projects} span="c-7" />
-          <ActivityPanel span="c-5" />
+          <MachinesPanel span="c-5" />
         </div>
 
-        {/* Daily action zone: SEAs > Requests > Receptionist (PI). */}
+        {/* Activity feed sits below — context for the action zone. */}
         <div className="grid" style={{marginBottom:14}}>
-          <SeasPanel seas={D.seas} span="c-12" />
+          <ActivityPanel span="c-12" />
         </div>
 
+        {/* Daily action zone (order: Requests → Receptionist → All SEAs). */}
         <div className="grid" style={{marginBottom:14}}>
           <RequestsPanel
             pending={D.requests_pending}
@@ -4084,6 +4330,10 @@ function App() {
             <ReceptionistPanel inbound={D.inbound_requests} span="c-12" />
           </div>
         )}
+
+        <div className="grid" style={{marginBottom:14}}>
+          <SeasPanel seas={D.seas} span="c-12" />
+        </div>
 
         <div className="grid" style={{marginBottom:14}}>
           <PersonalOraclePanel data={D.personal_oracle} span="c-3" />
