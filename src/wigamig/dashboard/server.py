@@ -19,6 +19,7 @@ Open `http://localhost:8770/` in a browser.
 
 from __future__ import annotations
 
+import datetime as _dt
 from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException, Query
@@ -560,6 +561,77 @@ def create_app() -> FastAPI:
             },
         }
 
+    @app.post("/api/sea/{project}/{sea_id}/archive")
+    def archive_sea_endpoint(
+        project: str,
+        sea_id: int,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Soft-delete a SEA: hide it from active queues, preserve the file.
+
+        Orthogonal to the existing decline/conclude lifecycle — archive
+        is for "this SEA is no longer relevant and should stop appearing
+        in dashboards" regardless of where it sits in the workflow. PI
+        only. Reversible via the matching unarchive endpoint.
+        """
+        from ..core import sea as sea_core
+        from ..core.projects import find_project as _find_project
+        from ..core import decommission as _deco
+
+        actor = _require_pi(user)
+        repo = _find_project(project)
+        if repo is None:
+            raise HTTPException(status_code=404, detail=f"project not found: {project}")
+        path = sea_core.sea_path(repo, sea_id)
+        if not path.is_file():
+            raise HTTPException(status_code=404,
+                                detail=f"SEA #{sea_id} not found in {project}")
+        s = sea_core.parse_sea(path)
+        now = _dt.datetime.now(_dt.timezone.utc).isoformat()
+        s.archived = True
+        s.archived_at = now
+        s.archived_by = f"@{actor}"
+        sea_core.write_sea(repo, s)
+        report = _deco.write_report(_deco.DecommissionRecord(
+            kind="sea",
+            name=f"{project}_{sea_id}",
+            decommissioned_by=f"@{actor}",
+            cleanup_items=[
+                _deco.CleanupItem(
+                    path=str(path),
+                    note="SEA file preserved; flagged archived in frontmatter. Delete only if you're sure.",
+                ),
+            ],
+            extra_meta={"project": project, "sea_id": str(sea_id),
+                        "state": s.state, "kind": s.kind},
+        ))
+        return {"ok": True, "report": str(report), "archived": True}
+
+    @app.post("/api/sea/{project}/{sea_id}/unarchive")
+    def unarchive_sea_endpoint(
+        project: str,
+        sea_id: int,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Bring a previously-archived SEA back into active queues."""
+        from ..core import sea as sea_core
+        from ..core.projects import find_project as _find_project
+
+        _require_pi(user)
+        repo = _find_project(project)
+        if repo is None:
+            raise HTTPException(status_code=404, detail=f"project not found: {project}")
+        path = sea_core.sea_path(repo, sea_id)
+        if not path.is_file():
+            raise HTTPException(status_code=404,
+                                detail=f"SEA #{sea_id} not found in {project}")
+        s = sea_core.parse_sea(path)
+        s.archived = False
+        s.archived_at = None
+        s.archived_by = None
+        sea_core.write_sea(repo, s)
+        return {"ok": True, "archived": False}
+
     @app.post("/api/request/join")
     def request_join(
         body: JoinRequestBody,
@@ -1091,7 +1163,7 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422, detail=f"unknown action: {action}")
         new_status = _m.ACTIVE if action == "activate" else _m.INACTIVE
         try:
-            rec = _m.set_status(handle, new_status)
+            rec = _m.set_status(handle, new_status, by_handle=actor)
         except _m.MemberNotFound as exc:
             raise HTTPException(status_code=404, detail=str(exc))
         except _m.CannotDeactivatePI as exc:
@@ -1106,7 +1178,13 @@ def create_app() -> FastAPI:
             )
         except OSError:
             pass
-        return {"ok": True, "handle": rec.handle, "status": rec.status}
+        report = getattr(_m, "last_report_path", None)
+        return {
+            "ok": True,
+            "handle": rec.handle,
+            "status": rec.status,
+            "report": str(report) if report else None,
+        }
 
     # -----------------------------------------------------------------
     # Project provisioning (GitHub / Slack / installation dirs)
@@ -1207,6 +1285,69 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=f"provisioning failed: {detail}")
         except Exception as exc:  # noqa: BLE001 — surface to the user
             raise HTTPException(status_code=500, detail=f"provisioning failed: {exc}")
+
+    @app.delete("/api/installations/{project}")
+    def delete_installation(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Disconnect a per-machine installation manifest.
+
+        Removes ``~/.wigamig/installations/<project>.yaml`` (a wigamig-
+        local pointer, not user data) and writes a decommission report
+        listing the on-machine paths (raw/, refined/, notebook/) that
+        the user may want to inspect or clean up. No files in those
+        directories are touched.
+        """
+        import yaml
+        from .snapshot import INSTALLATIONS_DIR
+        from ..core import decommission as _deco
+
+        manifest_path = INSTALLATIONS_DIR / f"{project}.yaml"
+        if not manifest_path.is_file():
+            raise HTTPException(
+                status_code=404,
+                detail=f"no installation manifest for {project!r} on this machine",
+            )
+        try:
+            data = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError):
+            data = {}
+        actor = (user or "").strip().lstrip("@") or "unknown"
+
+        items: list[_deco.CleanupItem] = []
+        if isinstance(data, dict):
+            machine = (
+                data.get("hostname")
+                or ("this laptop" if data.get("machine_type") == "laptop" else "(unknown host)")
+            )
+            for k, severity in (
+                ("raw_path", "private"),
+                ("refined_path", "private"),
+                ("notebook_path", "review"),
+            ):
+                v = data.get(k)
+                if v:
+                    items.append(_deco.CleanupItem(
+                        path=f"{machine}:{v}",
+                        note=f"{k.replace('_path','')} dir on the target machine. wigamig won't delete data here.",
+                        severity=severity,
+                    ))
+            if data.get("ssh_remote") and data.get("mount_point"):
+                items.append(_deco.CleanupItem(
+                    path=str(data.get("mount_point")),
+                    note=f"sshfs mount pointing at {data.get('ssh_remote')}; unmount if you no longer need it.",
+                ))
+        report = _deco.write_report(_deco.DecommissionRecord(
+            kind="installation",
+            name=project,
+            decommissioned_by=f"@{actor}",
+            cleanup_items=items,
+            extra_meta={"machine": str(data.get("hostname") or "local"),
+                        "member": str(data.get("member") or "")},
+        ))
+        manifest_path.unlink()
+        return {"ok": True, "removed": project, "report": str(report)}
 
     @app.post("/api/project/{project}/sync_slack_members")
     def sync_project_slack_members(

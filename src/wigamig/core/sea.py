@@ -51,6 +51,13 @@ class Sea:
     decline_reason: str | None = None
     body: str = ""
     path: Path | None = None
+    # 2026-05-14: lifecycle "archived" flag — orthogonal to the workflow
+    # ``state`` above. An archived SEA is hidden from active queues but
+    # the file is preserved with its history. Set by the dashboard's
+    # /api/sea/<project>/<id>/archive endpoint.
+    archived: bool = False
+    archived_at: str | None = None
+    archived_by: str | None = None
 
     def to_meta(self) -> dict[str, Any]:
         """Render to the frontmatter dict used by ``render_sea`` / ``write_sea``."""
@@ -72,6 +79,12 @@ class Sea:
         ):
             if value is not None:
                 meta[key] = value
+        if self.archived:
+            meta["archived"] = True
+            if self.archived_at:
+                meta["archived_at"] = self.archived_at
+            if self.archived_by:
+                meta["archived_by"] = self.archived_by
         return meta
 
 
@@ -102,6 +115,9 @@ def parse_sea(path: Path) -> Sea:
         concluded_at=_opt_str(meta.get("concluded_at")),
         delivery=_opt_str(meta.get("delivery")),
         decline_reason=_opt_str(meta.get("decline_reason")),
+        archived=bool(meta.get("archived", False)),
+        archived_at=_opt_str(meta.get("archived_at")),
+        archived_by=_opt_str(meta.get("archived_by")),
         body=parsed.body,
         path=path,
     )

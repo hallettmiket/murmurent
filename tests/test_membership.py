@@ -23,6 +23,9 @@ def world(monkeypatch, tmp_path):
     monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
     monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
     monkeypatch.setenv("WIGAMIG_USER", "the_pi")
+    # Redirect decommission reports into tmp_path so set_status(INACTIVE)
+    # doesn't pollute the real ~/.wigamig/decommissions/.
+    monkeypatch.setenv("WIGAMIG_DECOMMISSION_DIR", str(tmp_path / "decommissions"))
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "projects").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "lab.md").write_text(
