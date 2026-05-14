@@ -1094,10 +1094,68 @@ function ProjectDetailRows({ proj: p }) {
             {busy.slack ? "…" : (errs.slack ? "Retry Slack setup" : "Create Slack channel")}
           </button>
         )}
+        {isPI && p.slack_channel_id && (
+          <SlackSyncButton project={p.name} userParam={userParam} />
+        )}
         {done.slack && <Pill tone="green">done — refresh to see channel</Pill>}
         {errs.slack && <span style={{color:"var(--red)", fontSize:11}}>{errs.slack}</span>}
       </div>
     </div>
+  );
+}
+
+/* Slack-sync button (item #11) — invite every project member to the
+   project's Slack channel. Idempotent. After clicking, shows a compact
+   summary: invited / already-in / unresolved. */
+function SlackSyncButton({ project, userParam }) {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const [err, setErr] = useState(null);
+  const run = async () => {
+    setBusy(true); setErr(null); setResult(null);
+    try {
+      const q = userParam ? "?user=" + encodeURIComponent(userParam) : "";
+      const r = await fetch(
+        "/api/project/" + encodeURIComponent(project) + "/sync_slack_members" + q,
+        { method: "POST", headers: { Accept: "application/json" } },
+      );
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      setResult(j);
+    } catch (ex) {
+      setErr(String(ex.message || ex));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <span style={{display:"inline-flex", alignItems:"center", gap:6, marginLeft:6}}>
+      <button className="btn sm" disabled={busy}
+        title="Add every project member to the channel (idempotent)"
+        onClick={run}>
+        {busy ? "…" : "sync members"}
+      </button>
+      {result && (
+        <span style={{fontSize:11, color:"var(--muted)"}}>
+          {result.invited && result.invited.length > 0 && (
+            <> invited <strong style={{color:"var(--green)"}}>{result.invited.length}</strong></>
+          )}
+          {result.already_in && result.already_in.length > 0 && (
+            <> · already in <strong>{result.already_in.length}</strong></>
+          )}
+          {result.unresolved && result.unresolved.length > 0 && (
+            <> · <span style={{color:"var(--red)"}}
+                 title={result.unresolved.map(u => u.handle + ': ' + u.reason).join('\n')}>
+              {result.unresolved.length} unresolved
+            </span></>
+          )}
+          {result.error && (
+            <span style={{color:"var(--red)"}}> · {result.error}</span>
+          )}
+        </span>
+      )}
+      {err && <span style={{color:"var(--red)", fontSize:11}}>{err}</span>}
+    </span>
   );
 }
 
@@ -2478,6 +2536,224 @@ function SeaCatalogPanel({ entries, span="c-12" }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+/* ───────── Collaborations (item #9: PI proposes; registrar approves) ─────────
+   PIs use this panel to request a new cross-lab collaboration; the
+   registrar's dashboard has the matching approve/decline UI. Members
+   see only collabs they're a party to (read-only). The registry of
+   live collaborations isn't shown here — only the request lifecycle —
+   because the day-to-day work of a collab lives in the collab's own
+   projects/oracle, which surface elsewhere. */
+
+function CollaborationsPanel({ span="c-12" }) {
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
+  const m = window.DATA.member || {};
+  const myHandle = (m.handle || "").toLowerCase();
+  const [rows, setRows] = useState(null);     // null = loading; [] = empty
+  const [showPropose, setShowPropose] = useState(false);
+
+  const refresh = async () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const userParam = params.get("user") || myHandle;
+      const r = await fetch(
+        "/api/collaboration/requests?user=" + encodeURIComponent(userParam),
+        { headers: { Accept: "application/json" } },
+      );
+      const j = await r.json();
+      setRows(j.requests || []);
+    } catch (_) { setRows([]); }
+  };
+  useEffect(() => { refresh(); }, []);
+
+  const pending  = (rows || []).filter(r => r.state === "pending");
+  const recent   = (rows || []).filter(r => r.state !== "pending").slice(0, 5);
+
+  return (
+    <div className={"panel " + span}>
+      <header>
+        <h2>Collaborations</h2>
+        <div className="row" style={{gap:6}}>
+          <span className="meta">
+            {pending.length} pending
+            {recent.length > 0 && <span> · {recent.length} recent</span>}
+          </span>
+          {isPI && (
+            <button className="btn sm" onClick={() => setShowPropose(true)}>
+              ＋ propose collaboration
+            </button>
+          )}
+        </div>
+      </header>
+      {showPropose && (
+        <ProposeCollaborationModal onClose={() => setShowPropose(false)} onFiled={refresh} />
+      )}
+      <div className="body" style={{padding:0}}>
+        {rows === null ? (
+          <div style={{padding:"14px 18px", color:"var(--muted)", fontSize:12}}>loading…</div>
+        ) : rows.length === 0 ? (
+          <div style={{padding:"14px 18px", color:"var(--muted)", fontSize:12}}>
+            No collaboration requests yet.
+            {isPI && " Use “propose collaboration” to file the first one."}
+          </div>
+        ) : (
+          <table className="dt">
+            <thead><tr>
+              <th>name</th>
+              <th style={{width:100}}>state</th>
+              <th>groups</th>
+              <th>PIs</th>
+              <th style={{width:110}}>filed</th>
+            </tr></thead>
+            <tbody>
+              {pending.concat(recent).map(r => (
+                <tr key={r.id}>
+                  <td>
+                    <strong>{r.proposed_name}</strong>
+                    <div className="mono muted" style={{fontSize:11}}>
+                      #{r.id} · by {r.requester}
+                    </div>
+                  </td>
+                  <td>
+                    <Pill tone={
+                      r.state === "approved" ? "green"
+                      : r.state === "declined" ? "red"
+                      : ""
+                    }>{r.state}</Pill>
+                  </td>
+                  <td className="mono" style={{fontSize:12}}>
+                    {(r.proposed_groups || []).join(" + ")}
+                  </td>
+                  <td className="mono" style={{fontSize:12}}>
+                    {(r.proposed_pis || []).join(", ")}
+                  </td>
+                  <td className="muted" style={{fontSize:11}}>
+                    {r.created_at ? r.created_at.slice(0,10) : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProposeCollaborationModal({ onClose, onFiled }) {
+  const [form, setForm] = useState({
+    proposed_name: "",
+    partner_groups: "",     // comma-separated; viewer's lab pre-appended on submit
+    partner_pis: "",        // comma-separated handles
+    justification: "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const m = window.DATA.member || {};
+  const myLab = (window.DATA.lab_settings || {}).name || "";
+
+  const update = (k) => (e) => setForm(p => ({...p, [k]: e.target.value}));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true); setErr(null);
+    try {
+      const partnerGroups = form.partner_groups
+        .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
+      const partnerPis = form.partner_pis
+        .split(",").map(s => s.trim()).filter(Boolean)
+        .map(s => s.startsWith("@") ? s : "@" + s);
+      // Include the viewer's own lab + PI handle so the registrar sees the
+      // full group/PI set. The viewer is always a partner — they're the proposer.
+      const myGroupSlug = String(myLab).toLowerCase().replace(/\s+lab$/i, "");
+      const groups = Array.from(new Set([myGroupSlug, ...partnerGroups])).filter(Boolean);
+      const pis = Array.from(new Set(["@" + (m.handle || ""), ...partnerPis])).filter(s => s !== "@");
+
+      const params = new URLSearchParams(window.location.search);
+      const userParam = params.get("user") || m.handle;
+      const r = await fetch("/api/collaboration/propose?user=" + encodeURIComponent(userParam), {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          proposed_name: form.proposed_name.trim().toLowerCase(),
+          proposed_groups: groups,
+          proposed_pis: pis,
+          proposed_member_subset: {},  // registrar can fill via edit flow
+          justification: form.justification.trim(),
+        }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      if (onFiled) await onFiled();
+      onClose();
+    } catch (ex) {
+      setErr(String(ex.message || ex));
+    } finally { setBusy(false); }
+  };
+
+  const lbl = { fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+                textTransform:"uppercase", color:"var(--muted)", marginTop:8, marginBottom:2 };
+  const inp = { padding:"5px 8px", border:"1px solid var(--rule-strong)", borderRadius:2,
+                fontFamily:"var(--mono)", fontSize:12, width:"100%", boxSizing:"border-box" };
+
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"flex-start", justifyContent:"center",
+      zIndex:200, padding:"40px 20px", overflowY:"auto",
+    }}>
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:18, width:"min(560px, 96vw)",
+      }}>
+        <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
+            Propose a collaboration
+          </h2>
+          <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
+        </div>
+        <p className="muted" style={{fontSize:12, margin:"4px 0 10px"}}>
+          Files a request to the registrar. Your lab is included automatically;
+          list the partner labs + their PIs. The registrar can adjust the
+          member subset before approving.
+        </p>
+
+        <div style={lbl}>short ID (snake_case)</div>
+        <input style={inp} value={form.proposed_name}
+               onChange={update("proposed_name")}
+               placeholder="e.g. dcis_imaging" required />
+
+        <div style={lbl}>partner lab IDs (comma-separated)</div>
+        <input style={inp} value={form.partner_groups}
+               onChange={update("partner_groups")}
+               placeholder="e.g. core_lead, imaging_core" required />
+        <div style={{fontSize:11, color:"var(--muted)", marginTop:2}}>
+          Your own lab (<code>{myLab}</code>) is added automatically.
+        </div>
+
+        <div style={lbl}>partner PIs (comma-separated handles)</div>
+        <input style={inp} value={form.partner_pis}
+               onChange={update("partner_pis")}
+               placeholder="e.g. @core_lead, @dlee" required />
+
+        <div style={lbl}>justification (optional)</div>
+        <textarea style={{...inp, minHeight:60, resize:"vertical"}}
+                  value={form.justification}
+                  onChange={update("justification")}
+                  placeholder="What is the collaboration for?" />
+
+        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:14, alignItems:"baseline"}}>
+          {err && <span style={{color:"var(--red)", fontSize:11, marginRight:"auto"}}>{err}</span>}
+          <button type="button" className="btn sm ghost" onClick={onClose}>cancel</button>
+          <button type="submit" className="btn sm primary" disabled={busy}>
+            {busy ? "…" : "file request"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }
@@ -4330,6 +4606,10 @@ function App() {
             <ReceptionistPanel inbound={D.inbound_requests} span="c-12" />
           </div>
         )}
+
+        <div className="grid" style={{marginBottom:14}}>
+          <CollaborationsPanel span="c-12" />
+        </div>
 
         <div className="grid" style={{marginBottom:14}}>
           <SeasPanel seas={D.seas} span="c-12" />

@@ -302,6 +302,28 @@ class RegistrarProfileBody(BaseModel):
     institution: str | None = None
 
 
+class ProposeCollaborationBody(BaseModel):
+    """JSON body for ``POST /api/collaboration/propose`` (item #9).
+
+    A PI of any lab fills this in to propose a new cross-group
+    collaboration. The registrar approves/declines via the registrar
+    dashboard's pending-requests panel.
+    """
+
+    proposed_name: str
+    proposed_groups: list[str]
+    proposed_pis: list[str]
+    proposed_member_subset: dict[str, list[str]] = {}
+    proposed_oracle_vault: str | None = None
+    justification: str = ""
+
+
+class DeclineCollabRequestBody(BaseModel):
+    """JSON body for ``POST /api/registrar/collaboration_request/<id>/decline``."""
+
+    reason: str = ""
+
+
 class CatalogEntryBody(BaseModel):
     """JSON body for ``POST /api/sea_catalog`` (upsert)."""
 
@@ -1185,6 +1207,58 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=500, detail=f"provisioning failed: {detail}")
         except Exception as exc:  # noqa: BLE001 — surface to the user
             raise HTTPException(status_code=500, detail=f"provisioning failed: {exc}")
+
+    @app.post("/api/project/{project}/sync_slack_members")
+    def sync_project_slack_members(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Invite every project member to the project's Slack channel.
+
+        Reads the project's members list from CHARTER.md + MEMBERS, looks
+        up each member's email in their lab_mgmt profile, resolves the
+        email to a Slack user_id, and invites the diff (members not
+        already in the channel). PI only — but anyone whose membership
+        in this project would be visible to them can call without harm
+        because the action is idempotent. Returns a breakdown so the UI
+        can show ✓/already/✗ per member.
+        """
+        from ..core import projects as _projects
+        from ..core import membership as _mem
+        from . import slack_notify as _notify
+
+        actor = _require_pi(user)
+        repo = _projects.find_project(project)
+        if repo is None:
+            raise HTTPException(status_code=404, detail=f"no project named {project!r}")
+        summary = _projects.load_summary(repo)
+        handles = [h.lstrip("@") for h in summary.members]
+        email_map: dict[str, str] = {}
+        for h in handles:
+            try:
+                rec = _mem.get(h)
+            except _mem.MemberNotFound:
+                continue
+            email = ""
+            # The MemberRecord doesn't pre-extract email; pull from the
+            # member file's frontmatter directly. This keeps the
+            # membership module schema-narrow.
+            if rec.path and rec.path.is_file():
+                try:
+                    from ..core.frontmatter import parse_file as _pf
+                    meta = (_pf(rec.path).meta or {})
+                    contact = meta.get("contact") or {}
+                    if isinstance(contact, dict):
+                        email = str(contact.get("email") or "")
+                except Exception:
+                    email = ""
+            if email:
+                email_map[h.lower()] = email
+        result = _notify.sync_project_channel_members(
+            project, handles, member_email_map=email_map,
+        )
+        result["actor"] = actor
+        return result
 
     @app.post("/api/project/{project}/archive")
     def archive_project_endpoint(
@@ -2249,6 +2323,119 @@ def create_app() -> FastAPI:
         except _reg.RegistrarError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         return {"ok": True, "collaboration": _collab_entry_to_dict(entry)}
+
+    # ── Collaboration request flow (PI proposes → registrar approves) ──
+    #
+    # The earlier ``/api/registrar/collaboration`` endpoint above creates
+    # a collab unilaterally — registrar-driven. Item #9 in the 2026-05-14
+    # testing list flipped that ownership: PIs should propose; the
+    # registrar approves or declines. Requests live in
+    # ``~/.wigamig/lab_info/collaboration_requests/`` (centre-scoped,
+    # shared with the registrar). On approval the existing
+    # ``create_collaboration`` is invoked so all the invariants run.
+
+    @app.post("/api/collaboration/propose")
+    def propose_collaboration(
+        body: ProposeCollaborationBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """File a new collaboration request. Any PI may call this."""
+        from ..core import collaboration_requests as _creq
+
+        actor = _require_pi(user)
+        try:
+            req = _creq.file_request(
+                requester=actor,
+                proposed_name=body.proposed_name,
+                proposed_groups=body.proposed_groups,
+                proposed_pis=body.proposed_pis,
+                proposed_member_subset=body.proposed_member_subset or {},
+                proposed_oracle_vault=body.proposed_oracle_vault,
+                justification=body.justification,
+            )
+        except _creq.CollabRequestError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"ok": True, "id": req.id, "state": req.state}
+
+    @app.get("/api/collaboration/requests")
+    def list_collaboration_requests(
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """List collab requests. Registrar sees everything; a PI sees
+        their own + any where they're a named partner. Members see only
+        approved/declined records that involve their lab (read-only)."""
+        from ..core import collaboration_requests as _creq
+        from ..core import registrar as _reg
+
+        handle = (user or "").strip().lstrip("@").lower()
+        all_requests = _creq.iter_requests()
+        is_registrar = _reg.is_registrar(handle) if handle else False
+        rows: list[dict] = []
+        for r in all_requests:
+            requester_norm = (r.requester or "").lstrip("@").lower()
+            partner_pis = {p.lstrip("@").lower() for p in r.proposed_pis}
+            visible = (
+                is_registrar
+                or handle == requester_norm
+                or handle in partner_pis
+            )
+            if not visible:
+                continue
+            rows.append({
+                "id": r.id,
+                "requester": r.requester,
+                "proposed_name": r.proposed_name,
+                "proposed_groups": list(r.proposed_groups),
+                "proposed_pis": list(r.proposed_pis),
+                "proposed_member_subset": {k: list(v) for k, v in r.proposed_member_subset.items()},
+                "proposed_oracle_vault": r.proposed_oracle_vault,
+                "justification": r.justification,
+                "state": r.state,
+                "created_at": r.created_at,
+                "resolved_at": r.resolved_at,
+                "resolved_by": r.resolved_by,
+                "decline_reason": r.decline_reason,
+            })
+        return {"requests": rows}
+
+    @app.post("/api/registrar/collaboration_request/{req_id}/approve")
+    def approve_collaboration_request(
+        req_id: int,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Registrar approves a pending collab request → creates the
+        collaboration entry in _registry.yaml via the existing flow."""
+        from ..core import collaboration_requests as _creq
+        from ..core import registrar as _reg
+
+        actor = _require_registrar(user)
+        try:
+            entry = _creq.approve(req_id, by_handle=actor)
+        except _creq.CollabRequestNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _creq.CollabRequestStateError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except _reg.RegistrarError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"ok": True, "collaboration": _collab_entry_to_dict(entry)}
+
+    @app.post("/api/registrar/collaboration_request/{req_id}/decline")
+    def decline_collaboration_request(
+        req_id: int,
+        body: DeclineCollabRequestBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Registrar declines a pending collab request with a reason."""
+        from ..core import collaboration_requests as _creq
+
+        actor = _require_registrar(user)
+        try:
+            req = _creq.decline(req_id, by_handle=actor, reason=body.reason)
+        except _creq.CollabRequestNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _creq.CollabRequestStateError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"ok": True, "state": req.state}
 
     @app.post("/api/registrar/profile")
     def registrar_edit_profile(

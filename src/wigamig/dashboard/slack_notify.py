@@ -23,6 +23,9 @@ log = logging.getLogger(__name__)
 _SLACK_API_URL = "https://slack.com/api/chat.postMessage"
 _SLACK_API_CREATE = "https://slack.com/api/conversations.create"
 _SLACK_API_LIST   = "https://slack.com/api/conversations.list"
+_SLACK_API_INVITE = "https://slack.com/api/conversations.invite"
+_SLACK_API_MEMBERS = "https://slack.com/api/conversations.members"
+_SLACK_API_LOOKUP_BY_EMAIL = "https://slack.com/api/users.lookupByEmail"
 _TOKEN_FILE = Path("~/.config/wigamig/slack-token").expanduser()
 
 # Fallback channel IDs. ``_CHAN_DEFAULT`` is where wigamig-generated
@@ -286,3 +289,171 @@ def member_added(
     """Post a new member addition to Slack."""
     text = f":tada: *{full_name}* (@{handle}) added to the lab as *{role}*."
     _post(channel, text)
+
+
+# ---------------------------------------------------------------------------
+# Channel-member sync (item #11)
+# ---------------------------------------------------------------------------
+
+
+def _channel_member_ids(channel_id: str) -> set[str]:
+    """Return the set of user IDs currently in ``channel_id`` (empty on failure).
+
+    Pages through ``conversations.members`` so private channels with
+    hundreds of members still resolve correctly. Best-effort: any HTTP
+    or auth error returns an empty set rather than raising — the caller
+    is doing a diff, and an empty "existing" set just means we try to
+    invite everyone (Slack itself dedupes via ``already_in_channel``).
+    """
+    tok = _token()
+    if not tok:
+        return set()
+    out: set[str] = set()
+    try:
+        import httpx
+
+        cursor = ""
+        for _ in range(20):
+            params: dict[str, str | int] = {"channel": channel_id, "limit": 1000}
+            if cursor:
+                params["cursor"] = cursor
+            r = httpx.get(
+                _SLACK_API_MEMBERS,
+                headers={"Authorization": f"Bearer {tok}"},
+                params=params,
+                timeout=8,
+            )
+            data = r.json()
+            if not data.get("ok"):
+                log.warning("Slack conversations.members(%s) failed: %s",
+                            channel_id, data.get("error"))
+                return out
+            out.update(data.get("members", []) or [])
+            cursor = (data.get("response_metadata") or {}).get("next_cursor") or ""
+            if not cursor:
+                break
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Slack conversations.members error: %s", exc)
+    return out
+
+
+def _lookup_user_id_by_email(email: str) -> str | None:
+    """Return the Slack user_id for ``email`` (None if not in the workspace)."""
+    tok = _token()
+    if not tok or not email:
+        return None
+    try:
+        import httpx
+
+        r = httpx.get(
+            _SLACK_API_LOOKUP_BY_EMAIL,
+            headers={"Authorization": f"Bearer {tok}"},
+            params={"email": email},
+            timeout=8,
+        )
+        data = r.json()
+        if not data.get("ok"):
+            return None
+        return (data.get("user") or {}).get("id")
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Slack users.lookupByEmail error: %s", exc)
+        return None
+
+
+def sync_project_channel_members(
+    project_slug: str,
+    member_handles: list[str],
+    *,
+    member_email_map: dict[str, str] | None = None,
+) -> dict:
+    """Add every handle in ``member_handles`` to the project's Slack channel.
+
+    ``member_email_map`` maps a handle to a verified email; the helper
+    resolves each handle's email to a Slack user_id and invites them.
+    Handles without an email mapping or without a Slack workspace
+    account are reported in the result's ``unresolved`` list.
+
+    Returns a structured summary the dashboard can render:
+      ``{"channel_id", "invited": [...], "already_in": [...],
+        "unresolved": [{"handle", "reason"}, ...], "error": str | None}``
+
+    Idempotent: members already in the channel are a no-op.
+    """
+    tok = _token()
+    if not tok:
+        return {"channel_id": None, "invited": [], "already_in": [],
+                "unresolved": [{"handle": h, "reason": "no slack token configured"}
+                               for h in member_handles],
+                "error": "no slack token configured"}
+
+    channel_id = _project_channel_id(project_slug)
+    if channel_id == _CHAN_CLAUDE_CODE:
+        # No channel ID in CHARTER → try to look it up by name (same recovery
+        # path as create_project_channel's name_taken branch).
+        channel_name = f"proj-{project_slug.lower().replace('_', '-')}"[:80]
+        looked_up = _lookup_channel_id_by_name(channel_name)
+        if looked_up:
+            channel_id = looked_up
+            _write_charter_channel_id(project_slug, channel_id)
+        else:
+            return {"channel_id": None, "invited": [], "already_in": [],
+                    "unresolved": [{"handle": h, "reason": "project has no slack channel yet"}
+                                   for h in member_handles],
+                    "error": f"no slack channel for project {project_slug!r}"}
+
+    existing = _channel_member_ids(channel_id)
+    email_map = member_email_map or {}
+    invited: list[str] = []
+    already_in: list[str] = []
+    unresolved: list[dict] = []
+    user_ids_to_invite: list[str] = []
+    handle_for_uid: dict[str, str] = {}
+
+    for handle in member_handles:
+        norm = handle.lstrip("@").lower()
+        email = email_map.get(norm) or email_map.get(handle)
+        if not email:
+            unresolved.append({"handle": handle, "reason": "no email on record"})
+            continue
+        uid = _lookup_user_id_by_email(email)
+        if not uid:
+            unresolved.append({"handle": handle,
+                               "reason": f"no slack account for {email}"})
+            continue
+        if uid in existing:
+            already_in.append(handle)
+            continue
+        user_ids_to_invite.append(uid)
+        handle_for_uid[uid] = handle
+
+    if user_ids_to_invite:
+        try:
+            import httpx
+
+            r = httpx.post(
+                _SLACK_API_INVITE,
+                headers={"Authorization": f"Bearer {tok}",
+                         "Content-Type": "application/json"},
+                json={"channel": channel_id, "users": ",".join(user_ids_to_invite)},
+                timeout=10,
+            )
+            data = r.json()
+            if data.get("ok"):
+                invited.extend(handle_for_uid[u] for u in user_ids_to_invite)
+            else:
+                err = data.get("error", "")
+                # ``already_in_channel`` means some of the batch were
+                # already members; treat as success for those.
+                if err == "already_in_channel":
+                    already_in.extend(handle_for_uid[u] for u in user_ids_to_invite)
+                else:
+                    return {"channel_id": channel_id, "invited": [],
+                            "already_in": already_in, "unresolved": unresolved,
+                            "error": f"slack invite failed: {err}"}
+        except Exception as exc:  # noqa: BLE001
+            return {"channel_id": channel_id, "invited": [],
+                    "already_in": already_in, "unresolved": unresolved,
+                    "error": f"slack invite error: {exc}"}
+
+    return {"channel_id": channel_id, "invited": invited,
+            "already_in": already_in, "unresolved": unresolved, "error": None}

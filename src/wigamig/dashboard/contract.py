@@ -817,6 +817,10 @@ class RegistrarResponse(BaseModel):
     labs: list[RegistrarLabRow] = []
     cores: list[RegistrarCoreRow] = []
     collaborations: list[RegistrarCollaborationRow] = []
+    # 2026-05-14: PI-proposed collaboration requests (item #9). Loose dicts
+    # rather than a typed row so the schema can evolve without breaking
+    # the registrar UI's existing read paths.
+    collaboration_requests: list[dict] = []
     stats: RegistrarStats = RegistrarStats()
     certs: RegistrarCertPanel = RegistrarCertPanel()
 
