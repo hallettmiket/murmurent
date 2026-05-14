@@ -170,13 +170,20 @@ def build_response(
 
 
 def _iter_all_seas():
-    """Yield ``(project_name, Sea)`` for every SEA in every local project."""
+    """Yield ``(project_name, Sea)`` for every *active* SEA in every local project.
+
+    Archived SEAs (``archived: true`` in frontmatter) are skipped — they're
+    soft-deleted via /api/sea/<project>/<id>/archive but the file is
+    preserved, so they're still parseable.
+    """
     for repo in iter_local_projects():
         try:
             summary = load_summary(repo)
         except Exception:
             continue
         for s in iter_seas(repo):
+            if getattr(s, "archived", False):
+                continue
             yield summary.name, s
 
 

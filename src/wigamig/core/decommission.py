@@ -21,13 +21,30 @@ Why a "decommission report" instead of `rm -rf`?
 from __future__ import annotations
 
 import datetime as _dt
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 
-DECOMMISSION_DIR = Path("~/.wigamig/decommissions").expanduser()
+
+def _decommission_dir() -> Path:
+    """Resolve the report dir, env-overridable for test isolation.
+
+    ``$WIGAMIG_DECOMMISSION_DIR`` lets pytest redirect the output to a
+    tmp_path so test runs don't pollute the user's real ``~/.wigamig/``.
+    """
+    env = os.environ.get("WIGAMIG_DECOMMISSION_DIR")
+    if env:
+        return Path(env).expanduser()
+    return Path("~/.wigamig/decommissions").expanduser()
+
+
+# Resolved at import time for back-compat with anything that reads
+# ``DECOMMISSION_DIR`` directly; the *write paths* re-resolve via
+# ``_decommission_dir()`` on every call so monkeypatch.setenv works.
+DECOMMISSION_DIR = _decommission_dir()
 
 
 @dataclass(frozen=True)
@@ -70,12 +87,12 @@ def report_path(record: DecommissionRecord, *, today: _dt.date | None = None) ->
     """
     day = (today or _dt.date.today()).isoformat()
     stem = f"{day}_{_slug(record.kind)}_{_slug(record.name)}"
-    candidate = DECOMMISSION_DIR / f"{stem}.md"
+    candidate = _decommission_dir() / f"{stem}.md"
     if not candidate.exists():
         return candidate
     n = 2
     while True:
-        candidate = DECOMMISSION_DIR / f"{stem}_{n}.md"
+        candidate = _decommission_dir() / f"{stem}_{n}.md"
         if not candidate.exists():
             return candidate
         n += 1
@@ -93,7 +110,7 @@ def write_report(
     easy to grep + machine-readable. The body is a checklist the user
     can tick off as they handle each cleanup item.
     """
-    DECOMMISSION_DIR.mkdir(parents=True, exist_ok=True)
+    _decommission_dir().mkdir(parents=True, exist_ok=True)
     path = report_path(record, today=today)
     ts = (now or _dt.datetime.now(_dt.timezone.utc)).isoformat()
     meta = {
@@ -157,9 +174,9 @@ def list_reports(*, kind: str | None = None) -> list[Path]:
     Pass ``kind`` to filter to one entity type. Used by the UI's
     "Decommissioned" section to render the history.
     """
-    if not DECOMMISSION_DIR.is_dir():
+    if not _decommission_dir().is_dir():
         return []
-    out = sorted(DECOMMISSION_DIR.glob("*.md"), reverse=True)
+    out = sorted(_decommission_dir().glob("*.md"), reverse=True)
     if kind is None:
         return out
     needle = f"_{_slug(kind)}_"

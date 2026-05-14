@@ -44,6 +44,11 @@ from .repo import lab_mgmt_repo_root
 MEMBERS_SUBDIR = "members"
 ACTIVE = "active"
 INACTIVE = "inactive"
+
+# Set by ``set_status`` to the path of the decommission report it just
+# wrote (or ``None`` for activations). Lets the API endpoint surface the
+# path back to the caller without changing set_status's return shape.
+last_report_path: "Path | None" = None
 VALID_STATUSES: tuple[str, ...] = (ACTIVE, INACTIVE)
 VALID_ROLES: tuple[str, ...] = (
     "pi",
@@ -191,9 +196,22 @@ def add(
 
 
 def set_status(
-    handle: str, status: str, *, today: _dt.date | None = None
-) -> MemberRecord:
-    """Flip a member's ``status:``. Refuses to deactivate the PI."""
+    handle: str, status: str, *, today: _dt.date | None = None,
+    by_handle: str | None = None,
+):
+    """Flip a member's ``status:``. Refuses to deactivate the PI.
+
+    When ``status == INACTIVE`` a decommission report is written to
+    ``~/.wigamig/decommissions/`` listing the things tied to this
+    member that the user may want to clean up by hand (personal vault,
+    project memberships, slack DMs, signing key, etc.). The member file
+    on disk is preserved — only the status flag flips. Reactivation
+    via ``set_status(..., ACTIVE)`` is the reverse, no report.
+
+    The report path (when written) is stashed on the module attribute
+    ``last_report_path`` so the API endpoint can surface it back to the
+    caller without changing this function's return type.
+    """
     if status not in VALID_STATUSES:
         raise MembershipError(f"status must be one of {VALID_STATUSES}; got {status!r}")
     norm = _strip_at(handle)
@@ -206,6 +224,42 @@ def set_status(
     rec.status = status
     rec.deactivated_at = today.isoformat() if status == INACTIVE else None
     _write(rec)
+
+    global last_report_path
+    last_report_path = None
+    if status == INACTIVE:
+        from .decommission import CleanupItem, DecommissionRecord, write_report
+        from .projects import iter_local_projects, load_summary
+
+        items: list[CleanupItem] = []
+        # Project memberships — list each project where this handle appears,
+        # since the PI may want to remove them from project MEMBERS files.
+        for repo in iter_local_projects():
+            try:
+                summary = load_summary(repo)
+            except Exception:
+                continue
+            if any(m.lstrip("@").lower() == norm for m in summary.members):
+                items.append(CleanupItem(
+                    path=f"projects/{summary.name}/MEMBERS",
+                    note=f"{summary.name} lists @{norm} as a member — remove if you want them dropped from the project.",
+                ))
+        items.append(CleanupItem(
+            path=f"keys/{norm}.age",
+            note="age signing key on lab-mgmt — rotate if compromised; otherwise leave so historical signatures verify.",
+        ))
+        items.append(CleanupItem(
+            path=f"slack: @{norm}",
+            note="Slack workspace membership — out of scope for wigamig; remove via Slack admin if needed.",
+        ))
+        actor = (by_handle or "system").lstrip("@")
+        last_report_path = write_report(DecommissionRecord(
+            kind="user",
+            name=norm,
+            decommissioned_by=f"@{actor}",
+            cleanup_items=items,
+            extra_meta={"role": rec.role, "deactivated_at": rec.deactivated_at or ""},
+        ))
     return rec
 
 
