@@ -29,8 +29,8 @@ import sys
 from pathlib import Path
 from typing import IO, Any
 
-DEFAULT_RAW_ROOT = Path("~/lab_vm/data/raw").expanduser()
-PRODUCTION_RAW_ROOT = Path("/data/lab_vm/raw")
+DEFAULT_RAW_ROOT = Path("~/wigamig/raw").expanduser()
+PRODUCTION_RAW_ROOT = Path("/data/lab_vm/wigamig/raw")
 DESTRUCTIVE_COMMANDS: frozenset[str] = frozenset(
     {"rm", "mv", "tee", "dd", "chmod", "chown", "truncate", "shred"}
 )
@@ -42,7 +42,7 @@ def _raw_prefixes() -> tuple[str, ...]:
     """Return the set of path prefixes that count as 'raw'.
 
     Always honours ``$WIGAMIG_LAB_VM_ROOT`` (so the smoke-test setup is covered)
-    and always also blocks the production ``/data/lab_vm/raw/`` path even when
+    and always also blocks the production ``/data/lab_vm/wigamig/raw/`` path even when
     the env var points elsewhere — defense in depth.
     """
     prefixes: list[str] = [str(PRODUCTION_RAW_ROOT)]

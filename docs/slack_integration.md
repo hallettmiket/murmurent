@@ -60,7 +60,7 @@ Slack admin UI.
 ## Storage layout in lab-mgmt
 
 ```
-~/repos/hallett-lab-mgmt/
+~/repos/lab_mgmt/
 ├── slack/
 │   ├── proj_dcis_sc_tutorial/
 │   │   ├── 2026-05-08.md           ← raw mirror (one file per day)

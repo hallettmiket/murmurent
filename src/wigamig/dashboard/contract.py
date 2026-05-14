@@ -111,15 +111,27 @@ class MachineSettings(BaseModel):
     cannot live in the git-synced ``<lab-mgmt>/members/<handle>.md``.
     The dashboard reads this file once per request and exposes it as
     :attr:`DashboardResponse.machine_settings`.
+
+    2026-05-14 layout: ``wigamig_base`` is the per-machine root for
+    wigamig data and repos. The four sibling subfolders ``raw``,
+    ``refined``, ``lab_notebooks``, ``repos`` live under it. The
+    Obsidian vault is intentionally *not* under ``wigamig_base`` — it
+    typically lives in the user's iCloud Drive and is treated as a
+    separate, user-managed location that wigamig points into.
     """
 
+    # Per-machine wigamig umbrella. Default ``~/wigamig``; on a lab
+    # server this may resolve to ``/data/lab_vm/wigamig``.
+    wigamig_base: str | None = None
+    # Obsidian vault — separate from wigamig_base.
     obsidian_vault_path: str | None = None      # absolute path on this machine
     obsidian_vault_name: str | None = None      # for obsidian:// URLs
     notebook_subfolder: str = "lab-notebook"    # subfolder within the vault
     oracle_subfolder: str = "oracle"            # personal oracle subfolder
-    # Where the lab VM is mounted on this machine. Local (kind="local")
-    # bare repos are written under ``<lab_base>/<git_repos_subpath>/``.
-    lab_base: str | None = None                 # e.g. /data/lab_vm, or laptop mount
+    # Legacy field: the server-side lab_base value as seen from this
+    # machine. Retained so the install wizard's old fallback still
+    # works; new code should use ``wigamig_base``.
+    lab_base: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -303,22 +315,38 @@ class PersonalOracleBlock(BaseModel):
 
 
 class LabSettings(BaseModel):
-    """Lab-wide configuration — editable only by the PI or a designated admin."""
+    """Lab-wide configuration — editable only by the PI or a designated admin.
+
+    Storage layout convention (2026-05-14): ``lab_base`` is a ``host:/path``
+    string ending in ``/wigamig`` (e.g.
+    ``lab-server.example.edu:/data/lab_vm/wigamig``). All wigamig data
+    lives under it as siblings: ``raw/``, ``refined/``, ``notebooks/``,
+    ``lab_oracle/``, ``repos/``. Projects are subfolders of raw/refined;
+    users are subfolders of notebooks/lab_oracle; ``repos/`` holds bare
+    git repos used as private remotes for sensitive projects.
+    """
 
     name: str = "hallett"                      # short identifier, used in paths
     display_name: str = "Hallett Lab"          # human label shown in the UI
     pi_handle: str = ""
     website: str | None = None                 # e.g. https://mikehallett.science
-    notebook_large_files_path: str | None = None  # e.g. /data/lab_vm/obsidian-lab/notebooks
-    lab_oracle_vault: str | None = None        # wigamig-vault-<name>/ on lab base
     admins: list[str] = []                     # handles with PI-level settings edit rights
-    # Project-repo defaults at lab scope. ``github_org`` was previously
-    # hard-coded as "hallettmiket"; now read from lab.md so multi-lab
-    # support stops requiring code edits. ``git_repos_subpath`` lets a
-    # lab choose whether local bare repos live under ``git_repos/``,
-    # ``repos/``, ``bare/``, …
-    github_org: str = "hallettmiket"           # used when repo_kind="github"
-    git_repos_subpath: str = "git_repos"       # used when repo_kind="local"
+    # Canonical server-side wigamig umbrella. Example:
+    # ``lab-server.example.edu:/data/lab_vm/wigamig``. When unset the
+    # dashboard shows the four storage paths as "—".
+    lab_base: str | None = None
+    # GitHub org that hosts this lab's repos (``lab_mgmt``, project repos
+    # for non-sensitive projects). ``hallettmiket`` is the default for
+    # the Hallett lab.
+    github_org: str = "hallettmiket"
+    # Subpath under lab_base where bare git repos live. Defaults to
+    # ``repos`` per the 2026-05-14 layout (was ``git_repos``).
+    git_repos_subpath: str = "repos"
+    # Deprecated fields kept on the model for backwards-compat with older
+    # lab.md frontmatters. Not surfaced in the redesigned UI; will be
+    # removed once the migration completes.
+    notebook_large_files_path: str | None = None
+    lab_oracle_vault: str | None = None
 
 
 class TrainingCertSpec(BaseModel):

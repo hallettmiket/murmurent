@@ -115,6 +115,7 @@ class WorkspaceInitializeBody(BaseModel):
 class MachineSettingsBody(BaseModel):
     """JSON body for ``POST /api/machine/settings``."""
 
+    wigamig_base: str | None = None
     obsidian_vault_path: str | None = None
     obsidian_vault_name: str | None = None
     notebook_subfolder: str = "lab-notebook"
@@ -160,11 +161,13 @@ class LabSettingsBody(BaseModel):
     display_name: str | None = None                  # e.g. "Hallett Lab"
     pi_handle: str | None = None                     # ``@handle``
     website: str | None = None
+    admins: list[str] | None = None
+    lab_base: str | None = None                      # host:/path/to/wigamig
+    github_org: str | None = None                    # e.g. "hallettmiket"
+    git_repos_subpath: str | None = None             # default "repos"
+    # Deprecated: still accepted for backwards-compat but ignored on output.
     notebook_large_files_path: str | None = None
     lab_oracle_vault: str | None = None
-    admins: list[str] | None = None
-    github_org: str | None = None                    # e.g. "hallettmiket"
-    git_repos_subpath: str | None = None             # default "git_repos"
 
 
 class RegistrarLabCreateBody(BaseModel):
@@ -255,7 +258,11 @@ class HostAddBody(BaseModel):
     ssh_host: str
     remote_user: str = ""
     project_root: str = "~/repos"
-    lab_vm_root: str = "~/lab_vm"
+    # ``wigamig_base`` is the canonical 2026-05-14 name for the per-machine
+    # wigamig umbrella. ``lab_vm_root`` is kept as an alias on input for
+    # backwards-compat with older clients; new code writes ``wigamig_base``.
+    wigamig_base: str | None = None
+    lab_vm_root: str = "~/wigamig"
     vault_root: str = "~/Obsidian"
     mount_point: str = ""
     description: str = ""
@@ -977,6 +984,8 @@ def create_app() -> FastAPI:
             updates["pi"] = pi if pi.startswith("@") else f"@{pi}"
         if body.website is not None:
             updates["website"] = body.website or None
+        if body.lab_base is not None:
+            updates["lab_base"] = body.lab_base or None
         if body.notebook_large_files_path is not None:
             updates["notebook_large_files_path"] = body.notebook_large_files_path or None
         if body.lab_oracle_vault is not None:
@@ -1185,6 +1194,11 @@ def create_app() -> FastAPI:
             "ssh_host": h.ssh_host,
             "remote_user": h.remote_user,
             "project_root": h.project_root,
+            # ``wigamig_base`` is the canonical 2026-05-14 name; ``lab_vm_root``
+            # is the legacy field still persisted under the old key in
+            # ``~/.wigamig/hosts.yaml``. Expose both so the UI can use the new
+            # name while older code that reads ``lab_vm_root`` keeps working.
+            "wigamig_base": h.lab_vm_root,
             "lab_vm_root": h.lab_vm_root,
             "vault_root": h.vault_root,
             "mount_point": h.mount_point,
@@ -1208,13 +1222,16 @@ def create_app() -> FastAPI:
         user can register lab-server without dropping to a terminal.
         """
         from ..core import hosts as _hosts
+        # Accept either ``wigamig_base`` (new canonical name) or
+        # ``lab_vm_root`` (legacy). Prefer the new name when both are set.
+        wb = body.wigamig_base if body.wigamig_base is not None else body.lab_vm_root
         host = _hosts.Host(
             name=body.name,
             kind="ssh" if body.ssh_host else "local",
             ssh_host=body.ssh_host,
             remote_user=body.remote_user,
             project_root=body.project_root,
-            lab_vm_root=body.lab_vm_root,
+            lab_vm_root=wb,
             vault_root=body.vault_root,
             mount_point=body.mount_point,
             description=body.description,
@@ -2169,6 +2186,32 @@ def create_app() -> FastAPI:
         """
         import getpass
         return {"local_user": getpass.getuser()}
+
+    @app.get("/api/environment/this_machine")
+    def environment_this_machine() -> dict[str, str]:
+        """Return identifying info for the machine running the dashboard.
+
+        Used by the Machines block in Member Profile to highlight the
+        current host. ``short_hostname`` is the bare name (e.g. "lab-server"
+        on the lab server, "mike-mbp" on a laptop), suitable for matching
+        against the user's machine list.
+        """
+        import getpass
+        import platform
+        import socket
+        full = ""
+        try:
+            full = socket.gethostname()
+        except OSError:
+            full = platform.node() or ""
+        short = full.split(".", 1)[0] if full else ""
+        return {
+            "local_user": getpass.getuser(),
+            "hostname": full,
+            "short_hostname": short,
+            "kind": "laptop" if short and not short.endswith("server") else "host",
+            "platform": platform.system().lower(),
+        }
 
     if STATIC_DIR.is_dir():
         app.mount(

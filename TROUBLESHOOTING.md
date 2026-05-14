@@ -83,7 +83,7 @@ re-enable. The design refuses to bypass this from CC.
 
 ```bash
 python scripts/generate_dashboard.py
-ls ~/repos/hallett-lab-mgmt/dashboards/
+ls ~/repos/lab_mgmt/dashboards/
 ```
 
 The Streamlit app reads from these files. If you haven't seeded yet:
@@ -124,7 +124,7 @@ git clone git@github.com:hallettmiket/wigamig
 cd wigamig
 uv sync --extra dev --extra mcp --extra dashboard
 uv pip install -e .
-git clone git@github.com:hallettmiket/hallett-lab-mgmt ~/repos/
+git clone git@github.com:hallettmiket/lab_mgmt ~/repos/
 git clone git@github.com:hallettmiket/dcis_sc_tutorial ~/repos/
 git clone git@github.com:hallettmiket/bbb_drug_screen ~/repos/
 wigamig install --hooks

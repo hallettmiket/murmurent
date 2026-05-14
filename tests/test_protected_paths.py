@@ -11,7 +11,7 @@ Contract this hook must enforce:
   - Bash `> path` redirect into an EXISTING protected file → DENY
   - Bash `>> path` append to a protected file → DENY (modifies)
   - Reads / Glob / Grep / outside-of-protected calls → ALLOW
-  - The production ``/data/lab_vm/refined/`` is protected regardless of env
+  - The production ``/data/lab_vm/wigamig/refined/`` is protected regardless of env
 """
 
 from __future__ import annotations
@@ -344,7 +344,7 @@ def test_glob_on_protected_allowed(refined):
 
 
 def test_production_refined_blocked_even_with_env(monkeypatch, tmp_path):
-    """A Write to /data/lab_vm/refined/<existing>/ would deny IF that file
+    """A Write to /data/lab_vm/wigamig/refined/<existing>/ would deny IF that file
     actually exists. The path can't reliably exist on a CI box, so we
     instead verify that the lexical protection is in place (Write to a
     well-known production subpath that has no special status today still
@@ -352,7 +352,7 @@ def test_production_refined_blocked_even_with_env(monkeypatch, tmp_path):
     monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "alt"))
     monkeypatch.delenv("WIGAMIG_NOTEBOOK_ROOT", raising=False)
     prefixes = pp._refined_prefixes()
-    assert "/data/lab_vm/refined" in prefixes  # always present
+    assert "/data/lab_vm/wigamig/refined" in prefixes  # always present
 
 
 # ---------------------------------------------------------------------------

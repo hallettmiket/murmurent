@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Blacksmith — Oracle split + Member profile modal</title>
+<style>
+  :root {
+    --purple: #4f2683;
+    --purple-deep: #3b1c64;
+    --tiger: #c2a45a;
+    --tiger-deep: #8a6f2c;
+    --rule: #e6e1ee;
+    --rule-strong: #c9bfd8;
+    --paper: #faf8fc;
+    --paper-2: #f3effb;
+    --ink: #1f1530;
+    --muted: #6c5c87;
+    --green: #2f7a3e;
+    --red: #b03a2e;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue",
+                  Arial, sans-serif;
+    color: var(--ink);
+    background: var(--paper);
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 30px 24px 80px;
+    line-height: 1.55;
+  }
+  h1 { font-family: Georgia, "Iowan Old Style", serif; color: var(--purple-deep); margin-top: 0; }
+  h2 { font-family: Georgia, "Iowan Old Style", serif; color: var(--purple-deep);
+       border-bottom: 2px solid var(--rule-strong); padding-bottom: 4px; margin-top: 36px; }
+  h3 { color: var(--purple); margin-top: 22px; }
+  code, pre, .mono { font-family: "JetBrains Mono", Menlo, Consolas, monospace; font-size: 13px; }
+  pre {
+    background: var(--paper-2);
+    border-left: 3px solid var(--purple);
+    border-radius: 2px;
+    padding: 12px 14px;
+    overflow-x: auto;
+    font-size: 12px;
+  }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 18px; }
+  th, td { padding: 6px 10px; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+  th { background: var(--paper-2); font-size: 12px; letter-spacing: 0.5px;
+       text-transform: uppercase; color: var(--muted); }
+  .meta { color: var(--muted); font-size: 13px; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 2px;
+          font-family: "JetBrains Mono", monospace; font-size: 11px;
+          background: var(--paper-2); border: 1px solid var(--rule-strong); }
+  .pill.green { background: #e6f3ea; color: var(--green); border-color: #b9d9c1; }
+  .pill.red { background: #f9e6e2; color: var(--red); border-color: #e3b6ad; }
+  .pill.tiger { background: #f6efd7; color: var(--tiger-deep); border-color: #d9c98a; }
+  .col-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .panel { background: white; border: 1px solid var(--rule); border-radius: 2px;
+           padding: 14px 18px; }
+  .label { font-family: "JetBrains Mono", monospace; font-size: 10px;
+           letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); }
+  .num { font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+  .sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  ul { padding-left: 22px; }
+  li { margin-bottom: 4px; }
+  .ok { color: var(--green); font-weight: 500; }
+  .warn { color: var(--tiger-deep); font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div class="label">Blacksmith report · Phase 15</div>
+<h1>Oracle split + Member profile modal</h1>
+<p class="meta">
+  <strong>Round:</strong> Phase 15 · two related dashboard features.
+  <strong>Date:</strong> 2026-05-10 · <strong>Repo:</strong> <code>wigamig</code> ·
+  <strong>Branch:</strong> <code>main</code>.
+</p>
+
+<p>
+  This round delivers two new pieces to the wigamig researcher dashboard:
+</p>
+<ol>
+  <li>An <strong>Oracle split</strong> — separating the existing lab-wide curated
+      <em>Lab Oracle</em> from a new <em>Personal Oracle</em> that lives in
+      each member's own Obsidian vault, with no draft/approval flow.</li>
+  <li>A <strong>Member profile modal</strong> — a single scrollable form
+      reachable from a gear button next to the member's name in the footer,
+      backed by a new <code>MemberSettings</code> contract block.</li>
+</ol>
+
+<h2>1 · Files touched</h2>
+
+<table>
+  <thead>
+    <tr><th style="width:55%">File</th><th>Change</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>src/wigamig/dashboard/contract.py</code></td>
+      <td>+ <code>PersonalOracleEntry</code>, <code>PersonalOracleBlock</code>,
+          <code>MemberSettings</code>; extended <code>DashboardResponse</code>.</td>
+    </tr>
+    <tr>
+      <td><code>src/wigamig/dashboard/snapshot.py</code></td>
+      <td>+ <code>_member_settings</code>, <code>_personal_oracle</code>,
+          <code>_lab_oracle_folder</code>, <code>_personal_oracle_excerpt</code>;
+          all wired into <code>build_response</code>.</td>
+    </tr>
+    <tr>
+      <td><code>docs/designer_dashboard/hifi-data.jsx</code></td>
+      <td>+ mock <code>personal_oracle</code>, <code>lab_oracle_folder</code>,
+          <code>member_settings</code>.</td>
+    </tr>
+    <tr>
+      <td><code>docs/designer_dashboard/hifi-app.jsx</code></td>
+      <td>+ <code>PersonalOraclePanel</code>, + <code>MemberProfileModal</code>;
+          updated <code>LabOraclePanel</code> signature, modified
+          <code>FooterMeta</code> to host the gear icon, replaced the
+          notebook+oracle row with a 3-column layout.</td>
+    </tr>
+    <tr>
+      <td><code>agents/oracle.md</code></td>
+      <td>changed <code>freeze</code> from <code>frozen</code> to <code>personal</code>;
+          rewrote the "Where you run" section.</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>2 · Feature 1 — Oracle split</h2>
+
+<h3>2.1 Naming convention</h3>
+<table>
+  <thead><tr><th>Term</th><th>Scope</th><th><code>freeze</code></th><th>Backed by</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Oracle</strong> (personal)</td>
+      <td>per-member</td>
+      <td><span class="pill">personal</span></td>
+      <td>member's own Obsidian vault, <code>oracle/</code> subfolder</td>
+    </tr>
+    <tr>
+      <td><strong>Lab Oracle</strong></td>
+      <td>per-lab/group</td>
+      <td><span class="pill tiger">frozen</span></td>
+      <td><code>wigamig-vault-&lt;lab&gt;/</code> on lab-server</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>2.2 New contract models</h3>
+<pre><code>class PersonalOracleEntry(BaseModel):
+    title: str
+    excerpt: str
+    date: str          # ISO date or human-readable
+    path: str          # e.g. "oracle/memory_entry.md" for click-to-open
+
+class PersonalOracleBlock(BaseModel):
+    folder: str         # short display path, e.g. "obsidian-lab/oracle/"
+    entry_count: int = 0
+    recent: list[PersonalOracleEntry] = []
+</code></pre>
+
+<p>
+  Added to <code>DashboardResponse</code>:
+</p>
+<pre><code>personal_oracle: PersonalOracleBlock = PersonalOracleBlock(folder="oracle/")
+lab_oracle_folder: str = ""   # e.g. "wigamig-vault-hallett/"
+</code></pre>
+
+<h3>2.3 Snapshot helpers</h3>
+<ul>
+  <li><code>_personal_oracle(limit=5)</code> reads <code>~/.claude/agent-memory/oracle/</code>,
+      sorts files by mtime (descending), returns <code>entry_count</code> and the
+      five most-recent entries. Each entry's <em>excerpt</em> is the first 120
+      chars of useful (non-frontmatter, non-heading) prose; <em>title</em> is
+      the file stem; <em>date</em> is the file's mtime as an ISO date.</li>
+  <li><code>_lab_oracle_folder(lab_name)</code> renders the short display
+      <code>wigamig-vault-&lt;lab&gt;/</code> using the member's
+      <code>lab</code> field (defaulting to <code>hallett</code> when blank).</li>
+</ul>
+
+<h3>2.4 UI: <code>PersonalOraclePanel</code></h3>
+<p>
+  Modeled after the existing <code>LabOraclePanel</code>, with these differences:
+</p>
+<ul>
+  <li>Header reads <em>"Oracle · personal"</em>, meta shows <code>{entry_count} entries</code>.</li>
+  <li>Sub-row shows <code>{block.folder}</code> in muted mono — e.g.
+      <code>obsidian-lab/oracle/</code>.</li>
+  <li>No drafts/published split, no approval queue — each entry shows
+      title (purple-deep), excerpt, file path.</li>
+  <li>Default span <code>c-3</code> on the dashboard's three-column row.</li>
+</ul>
+
+<h3>2.5 UI: <code>LabOraclePanel</code> changes</h3>
+<p>
+  Signature changed from <code>{ entries, drafts, span }</code> to
+  <code>{ entries, drafts, labFolder, span }</code>. When <code>labFolder</code>
+  is non-empty, a muted subtitle row renders directly under the
+  <code>&lt;header&gt;</code> showing
+  <code>&lt;code className="mono"&gt;{labFolder}&lt;/code&gt;</code>.
+  All existing draft / published behaviour is preserved verbatim.
+</p>
+
+<h3>2.6 Layout change</h3>
+
+<div class="col-2">
+  <div class="panel">
+    <div class="label">before</div>
+    <pre><code>&lt;NotebookPanel span="c-7" /&gt;
+&lt;LabOraclePanel
+  entries={D.oracle_recent}
+  drafts={D.oracle_drafts}
+  span="c-5" /&gt;</code></pre>
+  </div>
+  <div class="panel">
+    <div class="label">after</div>
+    <pre><code>&lt;PersonalOraclePanel
+  data={D.personal_oracle}
+  span="c-3" /&gt;
+&lt;NotebookPanel span="c-5" /&gt;
+&lt;LabOraclePanel
+  entries={D.oracle_recent}
+  drafts={D.oracle_drafts}
+  labFolder={D.lab_oracle_folder}
+  span="c-4" /&gt;</code></pre>
+  </div>
+</div>
+
+<h3>2.7 <code>agents/oracle.md</code></h3>
+<p>
+  Frontmatter <code>freeze</code> flipped from <code>frozen</code> to
+  <code>personal</code>. The body's <em>"Where you run"</em> section is
+  rewritten to explain the agent runs on the individual member's machine
+  and stores memory under <code>oracle/</code> within the member's
+  Obsidian vault. Core operations (REMEMBER / RECALL / CROSS-REFERENCE /
+  SUMMARIZE) and voice section are preserved.
+</p>
+
+<h2>3 · Feature 2 — Member profile modal</h2>
+
+<h3>3.1 New contract model</h3>
+<pre><code>class MemberSettings(BaseModel):
+    obsidian_vault_path: str | None = None
+    obsidian_vault_name: str | None = None
+    notebook_subfolder: str = "lab-notebook"
+    oracle_subfolder:   str = "oracle"
+    email:    str | None = None
+    orcid:    str | None = None
+    bluesky:  str | None = None
+    github:   str | None = None
+    osf:      str | None = None
+    website:  str | None = None
+    office:   str | None = None
+    dry_lab:  str | None = None
+    wet_labs: str | None = None
+    address:  str | None = None
+    city:     str | None = None
+    department: str | None = None
+</code></pre>
+
+<p>
+  Added to <code>DashboardResponse</code>:
+  <code>member_settings: MemberSettings = MemberSettings()</code>.
+</p>
+
+<h3>3.2 Snapshot wiring</h3>
+<p>
+  <code>_member_settings(profile)</code> sources values from the member's
+  YAML/Markdown frontmatter dict
+  (<code>&lt;lab-mgmt&gt;/members/&lt;handle&gt;.md</code>). It looks for
+  an optional <code>obsidian:</code> sub-block, plus the existing
+  <code>contact:</code> and <code>location:</code> blocks; falls back to
+  legacy flat keys (<code>obsidian_vault_path</code>, etc.) when present.
+  Notebook and oracle subfolder names default to <code>lab-notebook</code>
+  and <code>oracle</code> when unset.
+</p>
+
+<h3>3.3 UI: <code>MemberProfileModal</code></h3>
+<p>
+  A single scrollable overlay with four sections, in order:
+</p>
+<table>
+  <thead><tr><th>Section</th><th>Mode</th><th>Fields</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Identity</strong></td>
+      <td>read-only</td>
+      <td>handle, name, role, lab, vault (short form)</td>
+    </tr>
+    <tr>
+      <td><strong>Obsidian &amp; notebook</strong></td>
+      <td>editable</td>
+      <td>vault path (full), vault name, notebook subfolder, oracle subfolder</td>
+    </tr>
+    <tr>
+      <td><strong>Contact</strong></td>
+      <td>editable</td>
+      <td>email, ORCID, Bluesky, GitHub, OSF, website</td>
+    </tr>
+    <tr>
+      <td><strong>Location</strong></td>
+      <td>editable</td>
+      <td>office, dry lab, wet labs, address, city, department</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>
+  Local form state is initialised from <code>D.member_settings</code> via
+  <code>useState</code>. <em>Save</em> POSTs JSON to
+  <code>/api/member/settings</code>; on 4xx/5xx the modal stays open and
+  surfaces the status code as a muted hint, on network failure shows
+  <em>"offline — local only"</em>. <em>Close</em> dismisses without saving;
+  clicks on the dimmed backdrop also dismiss (matches every other modal
+  in the dashboard).
+</p>
+
+<h3>3.4 <code>FooterMeta</code> conversion</h3>
+<p>
+  Converted the plain <code>FooterMeta()</code> function into a stateful
+  one. Added <code>const [showProfile, setShowProfile] = useState(false);</code>
+  near the top, then inside the <code>&lt;div className="footer-meta"&gt;</code>:
+</p>
+<ul>
+  <li>Modal mount: <code>{showProfile &amp;&amp; &lt;MemberProfileModal onClose={() =&gt; setShowProfile(false)} /&gt;}</code></li>
+  <li>Member name + a small ⚙ gear button rendered as a sibling, both wrapped
+      in an inline-flex span; clicking the gear opens the modal.</li>
+  <li>The handle/role line is preserved as a muted mono row underneath.</li>
+  <li>The original <em>Location</em> &lt;h5&gt; is reattached after the new
+      header block; all subsequent contact / affiliations sub-grids are
+      unchanged.</li>
+</ul>
+
+<h2>4 · Mock data updates (<code>hifi-data.jsx</code>)</h2>
+
+<pre><code>member_settings: {
+  obsidian_vault_path: "/Users/mth/Library/Mobile Documents/iCloud~md~obsidian/Documents/obsidian-lab",
+  obsidian_vault_name: "obsidian-lab",
+  notebook_subfolder: "lab-notebook",
+  oracle_subfolder: "oracle",
+  email: "hallett.mike.t@gmail.com",
+  orcid: "0000-0002-1234-5678",
+  bluesky: "@hallett.bsky.social",
+  github: "hallettmiket",
+  osf: null,
+  website: "https://hallettlab.ca",
+  office: "Biological &amp; Geological Sciences 307",
+  dry_lab: "BGS 310",
+  wet_labs: "MSB B112, B130",
+  address: "1 Example Avereet",
+  city: "London, ON  N6A 5C1",
+  department: "Biochemistry, Schulich School of Medicine &amp; Dentistry",
+},
+
+personal_oracle: {
+  folder: "obsidian-lab/oracle/",
+  entry_count: 12,
+  recent: [
+    { title: "ABCB1 expression in DCIS", excerpt: "Multi-cohort analysis confirms elevated ABCB1...",
+      date: "2026-05-09", path: "oracle/abcb1_dcis.md" },
+    { title: "scRNA clustering best practices", excerpt: "Leiden resolution 0.3–0.6 works well for...",
+      date: "2026-05-07", path: "oracle/scrna_clustering.md" },
+    { title: "Lab server SSH config", excerpt: "Use lab-server.example.edu port 22, key in ~/.ssh/id_ed25519...",
+      date: "2026-05-05", path: "oracle/ssh_config.md" },
+  ],
+},
+lab_oracle_folder: "wigamig-vault-hallett/",</code></pre>
+
+<h2>5 · Verification</h2>
+
+<table>
+  <thead><tr><th>Check</th><th>Result</th></tr></thead>
+  <tbody>
+    <tr><td>Curly brace balance in <code>hifi-app.jsx</code></td>
+        <td><span class="ok">1994 = 1994</span> ✓</td></tr>
+    <tr><td>Parenthesis balance in <code>hifi-app.jsx</code></td>
+        <td><span class="ok">1461 = 1461</span> ✓</td></tr>
+    <tr><td>Total lines, <code>hifi-app.jsx</code></td>
+        <td>2,881 → 3,154 (+ 273 lines)</td></tr>
+    <tr><td>Mock data block <code>personal_oracle</code></td>
+        <td><span class="ok">present at line 122</span></td></tr>
+    <tr><td>Mock data block <code>lab_oracle_folder</code></td>
+        <td><span class="ok">present at line 131</span></td></tr>
+    <tr><td>Mock data block <code>member_settings</code></td>
+        <td><span class="ok">present at line 35</span></td></tr>
+    <tr><td>Component <code>PersonalOraclePanel</code></td>
+        <td><span class="ok">defined at line 2415</span></td></tr>
+    <tr><td>Component <code>MemberProfileModal</code></td>
+        <td><span class="ok">defined at line 2725</span></td></tr>
+    <tr><td>Layout uses 3-column grid</td>
+        <td><span class="ok">PersonalOraclePanel (c-3) + NotebookPanel (c-5) + LabOraclePanel (c-4)</span></td></tr>
+    <tr><td><code>agents/oracle.md</code> freeze field</td>
+        <td><span class="ok">freeze: personal</span> ✓</td></tr>
+  </tbody>
+</table>
+
+<h2>6 · Hand-off notes</h2>
+<ul>
+  <li>The <code>POST /api/member/settings</code> endpoint is referenced by the
+      modal but <strong>not yet implemented</strong> on the backend. The modal
+      handles 4xx/5xx and network errors gracefully — adding the FastAPI route
+      that writes <code>&lt;lab-mgmt&gt;/members/&lt;handle&gt;.md</code>
+      frontmatter is the obvious next phase.</li>
+  <li><code>_personal_oracle</code> reads from
+      <code>~/.claude/agent-memory/oracle/</code>. When a user has switched
+      their personal Oracle to live in their Obsidian vault directly, this
+      path resolution should follow the
+      <code>notebook_actions.notebook_folder()</code> pattern (Obsidian-vault-aware,
+      env-overrideable). Easy follow-up.</li>
+  <li>The <code>FooterMeta</code> gear button is currently styled as a tiny
+      monochrome outline button. If the design team wants something more
+      prominent, the styling is encapsulated to that single component.</li>
+</ul>
+
+<p class="meta" style="margin-top:30px; border-top:1px solid var(--rule); padding-top:14px;">
+  Generated by <strong>Blacksmith</strong> · the computational engine of the
+  wigamig research team. Source: <code>/Users/mth/repos/wigamig/outputs/blacksmith/</code>.
+</p>
+
+</body>
+</html>

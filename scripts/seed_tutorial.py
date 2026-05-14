@@ -5,11 +5,11 @@ Purpose: Seed the wigamig smoke-test tutorial. Phase 1 scope: lab-mgmt repo +
          experiments, lab-VM dirs, and clearly-fake instrument data.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-07
-Input: ``WIGAMIG_LAB_MGMT_REPO`` env var (default ``~/repos/hallett-lab-mgmt``);
+Input: ``WIGAMIG_LAB_MGMT_REPO`` env var (default ``~/repos/lab_mgmt``);
        ``WIGAMIG_LAB_VM_ROOT`` env var (default ``~/lab_vm/data``);
        ``gh`` CLI authenticated against the ``hallettmiket`` org;
        ``age-keygen`` available on PATH.
-Output: ``~/repos/hallett-lab-mgmt/`` populated with members/, keys/, inventory/,
+Output: ``~/repos/lab_mgmt/`` populated with members/, keys/, inventory/,
         projects/, dashboards/, audit/, roles/, onboarding/. Private age keys
         saved at ``~/.config/wigamig/keys/<handle>.age-private`` (mode 0600).
         ``~/repos/dcis_sc_tutorial/`` and ``~/repos/bbb_drug_screen/`` populated
@@ -57,7 +57,7 @@ import fake_data  # type: ignore[import-not-found]  # noqa: E402
 # ---------------------------------------------------------------------------
 
 GITHUB_ORG = "hallettmiket"
-LAB_MGMT_NAME = "hallett-lab-mgmt"
+LAB_MGMT_NAME = "lab_mgmt"
 DEFAULT_LAB_MGMT_PATH = Path("~/repos") / LAB_MGMT_NAME
 DEFAULT_KEYS_DIR = Path("~/.config/wigamig/keys")
 TODAY = "2026-05-07"

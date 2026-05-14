@@ -200,7 +200,7 @@ For verbs not in this day-to-day table, see:
 ## Privacy and access
 
 - **Personal**: lives in the person's vault and `~/.claude/agent-memory/`. Never leaves their machine.
-- **Project-scoped**: lives in a private GitHub repo (one per project) with a checked-in `MEMBERS` file as the source of truth. Filesystem ACL on `/data/lab_vm/refined/<project>/` is synced from MEMBERS.
+- **Project-scoped**: lives in a private GitHub repo (one per project) with a checked-in `MEMBERS` file as the source of truth. Filesystem ACL on `/data/lab_vm/wigamig/refined/<project>/` is synced from MEMBERS.
 - **Group-shared**: agent definitions in the wigamig repo; curated findings in a group oracle; readable to all group members.
 - **Sensitive artefacts that must travel** (cloud, email, off-VM): wrap in `age` with MEMBERS as the recipient list. Re-encrypt on membership change.
 
@@ -286,7 +286,7 @@ A project has a lifecycle of distinct events. Each event is auditable and produc
 ### Birth
 
 - A proposer (PI or designate) submits a **charter**: a one-paragraph statement of why the project exists, expected scope, choreography type, **sensitivity tier** (`standard` / `restricted` / `clinical`; see [Sensitivity tiers](#sensitivity-tiers-and-project-level-controls)), and an initial MEMBERS list. `clinical` charters require additional fields (REB number, REB expiry, data residency).
-- PI approval creates: a private GitHub repo named for the project, scaffolded to the lab's standard project layout (`exp/`, `src/`, `findings/`, `obsolete/`, `data/`); `MEMBERS` populated; both `/data/lab_vm/raw/<project>/` and `/data/lab_vm/refined/<project>/` directories with ACL synced from MEMBERS; an entry in the group's project registry.
+- PI approval creates: a private GitHub repo named for the project, scaffolded to the lab's standard project layout (`exp/`, `src/`, `findings/`, `obsolete/`, `data/`); `MEMBERS` populated; both `/data/lab_vm/wigamig/raw/<project>/` and `/data/lab_vm/wigamig/refined/<project>/` directories with ACL synced from MEMBERS; an entry in the group's project registry.
 - Charter is committed as `CHARTER.md` in the new repo. Significant scope changes later are themselves auditable amendments to that file.
 
 ### Active
@@ -312,7 +312,7 @@ A project has a lifecycle of distinct events. Each event is auditable and produc
 ### Archive
 
 - Repo archived on GitHub (read-only).
-- Data on lab VM moved to `/data/lab_vm/refined/<project>/ARCHIVE-YYYY-MM-DD/`.
+- Data on lab VM moved to `/data/lab_vm/wigamig/refined/<project>/ARCHIVE-YYYY-MM-DD/`.
 - MEMBERS frozen as the final access list. Former members retain read access for citation and recall.
 - Any `age`-encrypted bundles re-encrypted once with the frozen MEMBERS list and a long-lived archive key.
 
@@ -332,7 +332,7 @@ A project has a lifecycle of distinct events. Each event is auditable and produc
 
 Lab notebooks contain photos, drawings, sketches, numbers, text, and small data files. All experiments performed in a project must sit together, accessible to every MEMBER, with no platform lock-in (no Notion) and no schema rigidity (no SQL).
 
-**Decision: each experiment is a folder inside the project repo, following the lab's standard project structure.** Data files (raw measurements, large outputs) live on the lab VM under `/data/lab_vm/raw/` and `/data/lab_vm/refined/`, never in the repo. The notebook entry **links** to data files; it does not embed them.
+**Decision: each experiment is a folder inside the project repo, following the lab's standard project structure.** Data files (raw measurements, large outputs) live on the lab VM under `/data/lab_vm/wigamig/raw/` and `/data/lab_vm/wigamig/refined/`, never in the repo. The notebook entry **links** to data files; it does not embed them.
 
 This aligns with the lab's global rules: `~/.claude/rules/data-storage.md` and `~/.claude/rules/project-structure.md`.
 
@@ -369,8 +369,8 @@ Experiment folders follow the lab's `<integer>_<good_name>/` convention; date li
 
 Per the lab's data-storage rule, data does **not** live in the repo:
 
-- **Raw data:** `/data/lab_vm/raw/<project>/<experiment>/...`. Read-only. Never modified by code; only copied from instrument/collaborator. Names preserved verbatim.
-- **Refined data:** `/data/lab_vm/refined/<project>/<experiment>/...`. Outputs of `run_all` and other analyses. Mirrors the repo's `exp/` layout one-to-one.
+- **Raw data:** `/data/lab_vm/wigamig/raw/<project>/<experiment>/...`. Read-only. Never modified by code; only copied from instrument/collaborator. Names preserved verbatim.
+- **Refined data:** `/data/lab_vm/wigamig/refined/<project>/<experiment>/...`. Outputs of `run_all` and other analyses. Mirrors the repo's `exp/` layout one-to-one.
 - **Versioning:** integer suffix on filenames; largest = newest (per lab convention).
 - **`src/ready_to_delete.md`:** tracks refined files safe to delete; checked when refined storage gets tight.
 
@@ -387,9 +387,9 @@ The notebook entry links to data; it never holds it.
 | `protocol` | wikilink | Protocol used (`src/protocols/<name>.md`) |
 | `equipment` | list[str] | Instruments used |
 | `reagents` | list | Names from `inventory/`; matched by the inventory MCP |
-| `raw_data` | list[path] | Files in `/data/lab_vm/raw/...` consumed by this experiment |
-| `refined_data` | list[path] | Files in `/data/lab_vm/refined/...` produced by this experiment's analyses |
-| `instrument_outputs` | list[path] | Instrument-derived files (thumbnails, PDFs, QC reports) in `/data/lab_vm/refined/<project>/<experiment>/instrument_outputs/`. Populated by `experiment ingest`. |
+| `raw_data` | list[path] | Files in `/data/lab_vm/wigamig/raw/...` consumed by this experiment |
+| `refined_data` | list[path] | Files in `/data/lab_vm/wigamig/refined/...` produced by this experiment's analyses |
+| `instrument_outputs` | list[path] | Instrument-derived files (thumbnails, PDFs, QC reports) in `/data/lab_vm/wigamig/refined/<project>/<experiment>/instrument_outputs/`. Populated by `experiment ingest`. |
 | `checksums` | dict | SHA-256 for each file in `raw_data`, `refined_data`, `instrument_outputs` (auto-computed) |
 | `status` | enum | Operational: `planned` / `running` / `complete` / `failed` / `inconclusive` |
 | `analysis_status` | enum | Intellectual: `not_started` / `examined` / `concluded`. See [The finalisation choreography](#the-finalisation-choreography). |
@@ -420,8 +420,8 @@ For raw instrument data: `wigamig experiment ingest <project> <exp> <source>` co
 
 Instrument export folders rarely contain only true raw data. They typically mix:
 
-- **True raw** — `scan_001.czi`, `run_001.fastq.gz`. Goes to `/data/lab_vm/raw/<project>/<experiment>/`, immutable.
-- **Instrument-derived** — thumbnails, summary PDFs, QC HTML reports. Goes to `/data/lab_vm/refined/<project>/<experiment>/instrument_outputs/`. Stays writable (regeneratable).
+- **True raw** — `scan_001.czi`, `run_001.fastq.gz`. Goes to `/data/lab_vm/wigamig/raw/<project>/<experiment>/`, immutable.
+- **Instrument-derived** — thumbnails, summary PDFs, QC HTML reports. Goes to `/data/lab_vm/wigamig/refined/<project>/<experiment>/instrument_outputs/`. Stays writable (regeneratable).
 - **Ambiguous** — metadata XML, software-aligned BAMs, instrument-software overlays. Depends on the instrument and the lab's convention.
 
 Because raw is immutable once committed, classification has to happen *before* the `chmod a-w`. Three layers, in order:
@@ -463,9 +463,9 @@ Before any copy or `chmod`, the CLI shows the proposed classification and waits 
 $ wigamig experiment ingest dcis_imaging 3_titration ~/Downloads/scope_export
 Detected instrument: zeiss-confocal (from .czi files)
 Proposed classification:
-  → /data/lab_vm/raw/dcis_imaging/3_titration/
+  → /data/lab_vm/wigamig/raw/dcis_imaging/3_titration/
     scan_001.czi   scan_002.czi   scan_003.czi   metadata.xml
-  → /data/lab_vm/refined/dcis_imaging/3_titration/instrument_outputs/
+  → /data/lab_vm/wigamig/refined/dcis_imaging/3_titration/instrument_outputs/
     thumbnail_001.png   summary.pdf   qc_report.html
 [a]ccept  [r]eview file-by-file  [c]ancel ?
 ```
@@ -482,8 +482,8 @@ Review is non-negotiable. The cost of a misclassification — a derived file per
 
 #### After acceptance
 
-- Raw files → `/data/lab_vm/raw/<project>/<experiment>/`; directory then `chmod a-w`.
-- Derived files → `/data/lab_vm/refined/<project>/<experiment>/instrument_outputs/`; remain writable.
+- Raw files → `/data/lab_vm/wigamig/raw/<project>/<experiment>/`; directory then `chmod a-w`.
+- Derived files → `/data/lab_vm/wigamig/refined/<project>/<experiment>/instrument_outputs/`; remain writable.
 - SHA-256 computed for both groups.
 - `notebook.md` updated: `raw_data:` lists raw files, new `instrument_outputs:` field lists the derived files, `checksums:` covers both.
 
@@ -496,8 +496,8 @@ Review is non-negotiable. The cost of a misclassification — a derived file per
 
 `wigamig experiment new --project dcis_imaging --name titration` scaffolds:
 - `exp/<next-int>_titration/` in the project repo with `README.md`, `run_all.py` skeleton, `notebook.md` template (auto-filled `experiment`, `date`, `performer`), `pages/`, `sketches/`, `data/` subfolders.
-- `/data/lab_vm/raw/dcis_imaging/<next-int>_titration/` (writeable until raw is loaded; then `chmod a-w`).
-- `/data/lab_vm/refined/dcis_imaging/<next-int>_titration/`.
+- `/data/lab_vm/wigamig/raw/dcis_imaging/<next-int>_titration/` (writeable until raw is loaded; then `chmod a-w`).
+- `/data/lab_vm/wigamig/refined/dcis_imaging/<next-int>_titration/`.
 
 Then opens `notebook.md` in Obsidian.
 
@@ -553,9 +553,9 @@ When a PR merges to `main`, a merge Action runs:
 
 ### Refined-data updates
 
-When an analysis produces new files in `/data/lab_vm/refined/<project>/<exp>/`, the notebook's `refined_data:` and `checksums:` fields need updating. This is a frequent operation; it should not require PR review.
+When an analysis produces new files in `/data/lab_vm/wigamig/refined/<project>/<exp>/`, the notebook's `refined_data:` and `checksums:` fields need updating. This is a frequent operation; it should not require PR review.
 
-- `wigamig push <project> --refined <exp>` recomputes checksums for files in `/data/lab_vm/refined/<project>/<exp>/`, updates the notebook's `refined_data:` and `checksums:` fields, and pushes to the member's personal branch.
+- `wigamig push <project> --refined <exp>` recomputes checksums for files in `/data/lab_vm/wigamig/refined/<project>/<exp>/`, updates the notebook's `refined_data:` and `checksums:` fields, and pushes to the member's personal branch.
 - The eventual `--finalize` PR rolls all those personal-branch updates into `main` along with the status flip to `complete`.
 
 ### Why path-based, not all-PR or all-direct
@@ -1010,7 +1010,7 @@ Both share a templated body:
 **Mechanism:** a freeze creates an immutable snapshot consisting of three parts:
 - **Git tag** on the project repo: `freeze/<purpose>-<YYYY-MM-DD>` (e.g. `freeze/paper-submission-2026-05-06`).
 - **Manifest** at `<project repo>/freezes/<tag>.md`, recording: tag name, reason, repo SHA, project MEMBERS at the time, choreography in effect (if any), per-experiment list of `raw_data` and `refined_data` paths with SHA-256 per file.
-- **Encrypted bundle** at `/data/lab_vm/refined/<project>/freezes/<tag>.tar.age` — refined data tarballed and encrypted with `age` to current MEMBERS plus the lab archive key. Optionally also `<tag>-raw.tar.age` for full archival (`--include-raw`).
+- **Encrypted bundle** at `/data/lab_vm/wigamig/refined/<project>/freezes/<tag>.tar.age` — refined data tarballed and encrypted with `age` to current MEMBERS plus the lab archive key. Optionally also `<tag>-raw.tar.age` for full archival (`--include-raw`).
 
 Freezes are immutable. Re-freezing under the same purpose produces a new dated tag, never overwrites.
 
@@ -1194,7 +1194,7 @@ Each member has a dashboard. The PI gets an enhanced version of it. Two implemen
 - **Security and compliance**: per-project sensitivity badge (`standard` / `restricted` / `clinical`), the controls required for that tier, and your compliance status (TCPS 2 certified ✓, TOTP enrolled ✓, signing key registered ✓, etc.). Missing required controls render in red with a one-click action to resolve. Includes an **Elected upgrades** subsection where you toggle stricter-than-required controls (always-on 2FA, always age-encrypted off-VM transfers, etc.). Required and elected stay distinct: you can layer stricter controls but cannot opt out of required ones. See [Sensitivity tiers](#sensitivity-tiers-and-project-level-controls).
 - **Quick MCP queries**: inventory search bar (low / expiring shortcuts), oracle latest, request board.
 - **Recent activity**: your commits, your PRs, oracle publishes touching projects you're in.
-- **Storage / compute**: your workspace size, your share of `/data/lab_vm/refined/`, GitHub Action minutes consumed.
+- **Storage / compute**: your workspace size, your share of `/data/lab_vm/wigamig/refined/`, GitHub Action minutes consumed.
 - **Notifications**: PR reviews waiting on you, SEAs assigned, role transitions to ack, oracle digests.
 - **Quick actions**: new experiment, push, request SEA, open a project repo.
 
@@ -1221,7 +1221,7 @@ We have several layers of access control designed but the assistant-level layer 
 
 ### What is designed
 
-- **Filesystem ACLs** on `/data/lab_vm/raw/<project>/` and `/data/lab_vm/refined/<project>/`, synced from MEMBERS.
+- **Filesystem ACLs** on `/data/lab_vm/wigamig/raw/<project>/` and `/data/lab_vm/wigamig/refined/<project>/`, synced from MEMBERS.
 - **Branch protection** on `main` of project repos, per-path rules.
 - **MCP server-level permissions**: read = group, write = role-restricted (e.g. `lab_manager`).
 - **age encryption** for off-VM artefacts; recipients = current MEMBERS.
@@ -1230,7 +1230,7 @@ We have several layers of access control designed but the assistant-level layer 
 
 ### What is missing — and important
 
-- **Claude Code hooks** (`PreToolUse`, `PostToolUse`, `Stop`, `UserPromptSubmit`). The assistant-level gate. Not yet designed. Necessary for: refusing a Read of a file outside the current project's MEMBERS; refusing a Bash that touches `/data/lab_vm/raw/`; logging every tool call to an audit stream; injecting current-project context on `UserPromptSubmit`.
+- **Claude Code hooks** (`PreToolUse`, `PostToolUse`, `Stop`, `UserPromptSubmit`). The assistant-level gate. Not yet designed. Necessary for: refusing a Read of a file outside the current project's MEMBERS; refusing a Bash that touches `/data/lab_vm/wigamig/raw/`; logging every tool call to an audit stream; injecting current-project context on `UserPromptSubmit`.
 - **`settings.json` allowlists** per agent. We should specify the minimum tool set each agent needs and refuse the rest.
 - **Secret management**. We've gestured at 1Password for shared secrets and at age private keys for individual ones; we have not specified where API keys and lab VM tokens live, how they're rotated, or how access is revoked.
 - **Lab VM authentication**: SSH vs SSO, key rotation cadence, revocation procedure on member release.
@@ -1266,12 +1266,12 @@ This is computed once per CC session and cached. Most hooks short-circuit when n
 
 ### Hook 1: Raw-data guard (`PreToolUse`)
 
-**Purpose:** prevent any modification of `/data/lab_vm/raw/`. The lab's data-storage rule is absolute: raw data is read-only, ever.
+**Purpose:** prevent any modification of `/data/lab_vm/wigamig/raw/`. The lab's data-storage rule is absolute: raw data is read-only, ever.
 
 **Trigger:** `Write`, `Edit`, `Bash`, `NotebookEdit`.
 
 **Logic:**
-- For `Write` / `Edit` / `NotebookEdit`: deny if the target path is inside `/data/lab_vm/raw/`.
+- For `Write` / `Edit` / `NotebookEdit`: deny if the target path is inside `/data/lab_vm/wigamig/raw/`.
 - For `Bash`: parse the command. Deny if it contains output redirection (`>`, `>>`, `tee`) into a raw path, or destructive operations (`rm`, `mv`, `cp <src> <raw-target>`, `chmod +w`) targeting raw.
 - `Read`, `Glob`, `Grep` against raw are explicitly allowed (raw is meant to be read).
 
@@ -1279,7 +1279,7 @@ This is computed once per CC session and cached. Most hooks short-circuit when n
 
 ```python
 import json, sys, re, shlex
-RAW_PREFIX = "/data/lab_vm/raw/"
+RAW_PREFIX = "/data/lab_vm/wigamig/raw/"
 DESTRUCTIVE = {"rm", "mv", "cp", "tee", "dd", "chmod"}
 call = json.load(sys.stdin)
 tool, args = call["tool_name"], call["tool_input"]
@@ -1483,9 +1483,9 @@ A bookworm should never need Bash; if a session is running bookworm and somehow 
   "Bash(git push -f *)",
   "Bash(curl * | sh)",
   "Bash(wget * | sh)",
-  "Write(/data/lab_vm/raw/**)",
-  "Edit(/data/lab_vm/raw/**)",
-  "Bash(chmod +w /data/lab_vm/raw/**)"
+  "Write(/data/lab_vm/wigamig/raw/**)",
+  "Edit(/data/lab_vm/wigamig/raw/**)",
+  "Bash(chmod +w /data/lab_vm/wigamig/raw/**)"
 ]
 ```
 

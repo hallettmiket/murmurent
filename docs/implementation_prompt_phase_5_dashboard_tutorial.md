@@ -72,7 +72,7 @@ All eight from `docs/implementation_prompt.md`:
 5. As any persona, attempt to write to a file under `$WIGAMIG_LAB_VM_ROOT/raw/dcis_sc_tutorial/` — raw-data guard refuses
 6. Inside CC in any persona's session, ask about reagents — CC calls `inventory_list` via the MCP and reports correctly
 7. As @mike, run `wigamig dashboard` and see the PI compliance grid surface @cassie's missing TCPS 2 in red
-8. All four repos visible at `https://github.com/hallettmiket/{wigamig, hallett-lab-mgmt, dcis_sc_tutorial, bbb_drug_screen}` with seed content committed
+8. All four repos visible at `https://github.com/hallettmiket/{wigamig, lab_mgmt, dcis_sc_tutorial, bbb_drug_screen}` with seed content committed
 
 Plus:
 - [ ] `TUTORIAL.md` walkthrough runs end-to-end without manual workarounds

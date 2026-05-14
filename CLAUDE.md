@@ -91,7 +91,7 @@ Code style, data storage, documentation standards, and project structure convent
 
 - **Versioning:** Integer suffixes, higher = newer (`file_1.csv`, `file_2.csv`)
 - **Project layout:** `exp/1_name/`, `exp/2_name/` with a `run_all` entry point per experiment
-- **Data locations:** Raw → `/data/lab_vm/raw/[project]/[experiment]/`; refined → `/data/lab_vm/refined/`
+- **Data locations:** Raw → `/data/lab_vm/wigamig/raw/[project]/[experiment]/`; refined → `/data/lab_vm/wigamig/refined/`
 - **Python style:** `black`, `isort`, `snake_case`, `pathlib`, type hints
 - **R style:** tidyverse, `<-` assignment, `|>` pipe, `snake_case`
 

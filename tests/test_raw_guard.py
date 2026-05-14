@@ -95,11 +95,11 @@ def test_read_tool_on_raw_allowed(monkeypatch, tmp_path):
 
 
 def test_production_path_blocked_even_with_env(monkeypatch, tmp_path):
-    """The production /data/lab_vm/raw is always blocked, regardless of env."""
+    """The production /data/lab_vm/wigamig/raw is always blocked, regardless of env."""
     monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path))
     payload = {
         "tool_name": "Write",
-        "tool_input": {"file_path": "/data/lab_vm/raw/some_proj/exp/x.fastq.gz"},
+        "tool_input": {"file_path": "/data/lab_vm/wigamig/raw/some_proj/exp/x.fastq.gz"},
     }
     assert _run(payload)["decision"] == "deny"
 
