@@ -156,6 +156,7 @@ HIFI_TOP_LEVEL_KEYS = {
     "spark",
     "spark_labels",
     "projects",
+    "archived_projects",
     "peers",
     "seas",
     "experiments",

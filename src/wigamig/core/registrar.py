@@ -334,6 +334,44 @@ def read_registry(env: dict[str, str] | None = None) -> Registry:
     )
 
 
+def lab_mgmt_path_for_handle(handle: str, env: dict[str, str] | None = None) -> tuple[str, str] | None:
+    """Look up which lab/core a handle belongs to and return its lab-mgmt path.
+
+    Walks every lab and core in ``_registry.yaml``: a handle counts as
+    "belonging to" a group if (a) it is the PI/leader of the group, or
+    (b) ``members/<handle>.md`` exists under that group's lab_mgmt_path.
+    The first match wins; PIs match first because they're checked
+    before the member-file check.
+
+    Returns ``(group_name, lab_mgmt_path)`` on a hit, or ``None`` if the
+    handle isn't claimed by any registered group. Callers that don't
+    care about the group_name can ignore the first element. ``None``
+    typically means the dashboard should fall back to its default
+    resolution (the legacy single-lab install).
+    """
+    norm = _normalize(handle)
+    if not norm:
+        return None
+    reg = read_registry(env)
+    entries: list[tuple[str, str, str]] = []
+    for lab in reg.labs:
+        entries.append((lab.name, _normalize(lab.pi), lab.lab_mgmt_path))
+    for core in reg.cores:
+        entries.append((core.name, _normalize(core.pi), core.lab_mgmt_path))
+    # PI match first (cheap).
+    for name, pi, path in entries:
+        if pi == norm and path:
+            return (name, path)
+    # Member-file probe (one disk stat per group).
+    for name, _pi, path in entries:
+        if not path:
+            continue
+        member_file = Path(path).expanduser() / "members" / f"{norm}.md"
+        if member_file.is_file():
+            return (name, path)
+    return None
+
+
 def write_registry(reg: Registry, env: dict[str, str] | None = None) -> Path:
     """Serialise ``reg`` to ``_registry.yaml``. Creates parent dirs.
 
@@ -585,6 +623,31 @@ def _git_commit_all(root: Path, message: str) -> None:
 _NAME_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
 
+def _invalid_name_message(kind: str, name: str | None) -> str:
+    """Return a precise explanation of why ``name`` doesn't fit ``_NAME_RE``.
+
+    The earlier "must be lowercase alphanumeric + underscore, starting with
+    a letter" wording was easy to misread as "must contain an underscore."
+    This helper identifies the *actual* offending character so the user can
+    fix it directly. The dashboard's create forms now also auto-lowercase
+    inputs so casing errors usually never reach the server.
+    """
+    if not name:
+        return f"{kind} name is required"
+    reasons: list[str] = []
+    if not name[0].isalpha() or not name[0].islower():
+        reasons.append(f"must start with a lowercase letter (got {name[0]!r})")
+    bad = sorted({c for c in name if not (c.islower() or c.isdigit() or c == "_")})
+    if bad:
+        reasons.append(
+            f"only lowercase letters, digits, and underscores are allowed "
+            f"(found: {', '.join(repr(c) for c in bad)})"
+        )
+    if not reasons:
+        reasons.append("name does not match the required form ^[a-z][a-z0-9_]*$")
+    return f"{kind} name {name!r} is invalid: " + "; ".join(reasons)
+
+
 def _normalize_pi(handle: str) -> str:
     """Return ``@<lowered, stripped, no leading @>``."""
     stripped = handle.strip().lstrip("@").lower()
@@ -598,10 +661,7 @@ def _enforce_create_invariants(
     existing: Registry,
 ) -> None:
     if not name or not _NAME_RE.match(name):
-        raise InvalidLabName(
-            f"lab name must be lowercase alphanumeric + underscore, "
-            f"starting with a letter; got {name!r}"
-        )
+        raise InvalidLabName(_invalid_name_message("lab", name))
     if any(l.name == name for l in existing.labs):
         raise LabAlreadyExists(f"lab already registered: {name}")
     if any(c.name == name for c in existing.cores):
@@ -1096,10 +1156,7 @@ def _enforce_core_create_invariants(
     """Validate a core-create spec. Same one-lead-per-active-group rule
     as labs (lab and core leads share the same namespace)."""
     if not name or not _NAME_RE.match(name):
-        raise InvalidLabName(
-            f"core name must be lowercase alphanumeric + underscore, "
-            f"starting with a letter; got {name!r}"
-        )
+        raise InvalidLabName(_invalid_name_message("core", name))
     # Cores share the name namespace with labs to avoid confusion in
     # collaborations and Slack channel naming.
     if any(c.name == name for c in existing.cores):
@@ -1462,8 +1519,7 @@ def _enforce_collab_invariants(
     """
     if not name or not _NAME_RE.match(name):
         raise InvalidLabName(
-            f"collaboration name must be lowercase alphanumeric + underscore, "
-            f"starting with a letter; got {name!r}"
+            _invalid_name_message("collaboration", name)
         )
     if check_duplicate and any(c.name == name for c in existing.collaborations):
         raise CollaborationAlreadyExists(f"collaboration already registered: {name}")
@@ -1597,7 +1653,7 @@ def create_collaboration(
         if not gitkeep.exists():
             gitkeep.write_text("", encoding="utf-8")
 
-    vault = oracle_vault or f"wigamig-collab-{name}"
+    vault = oracle_vault or f"wigamig_collab_{name}"
     (collab_dir / "collaboration.md").write_text(
         _render_collaboration_md(
             name=name, pis=norm_pis, groups=list(groups),

@@ -11,6 +11,8 @@ Output: Helpers that locate the wigamig repo, the lab-management repo, and the
 from __future__ import annotations
 
 import os
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,6 +24,14 @@ DEFAULT_WIGAMIG_REPO = Path("~/repos/wigamig").expanduser()
 # fall back to the legacy name so existing clones keep working.
 DEFAULT_LAB_MGMT_REPO = Path("~/repos/lab_mgmt").expanduser()
 LEGACY_LAB_MGMT_REPO  = Path("~/repos/hallett-lab-mgmt").expanduser()
+
+# Per-request lab-mgmt override. FastAPI dispatches sync handlers into a
+# threadpool, so thread-local state is request-scoped without env-var
+# contention. When a request resolves the viewer's lab (e.g. vdumeaux),
+# the dashboard sets this override so every downstream call to
+# ``lab_mgmt_repo_root()`` returns that lab's repo for the duration of
+# the request. See ``use_lab_mgmt_root`` below.
+_thread_local = threading.local()
 
 
 class RepoDiscoveryError(RuntimeError):
@@ -44,14 +54,20 @@ def wigamig_repo_root(env: dict[str, str] | None = None) -> Path:
 
 
 def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
-    """Resolve the lab-management repo root, honouring ``$WIGAMIG_LAB_MGMT_REPO``.
+    """Resolve the lab-management repo root.
 
     Resolution order:
-      1. ``$WIGAMIG_LAB_MGMT_REPO`` if set
-      2. ``~/repos/lab_mgmt`` if it exists
-      3. ``~/repos/hallett-lab-mgmt`` (legacy fallback) if it exists
-      4. ``~/repos/lab_mgmt`` (the canonical default, even if missing)
+      1. Thread-local override set by ``use_lab_mgmt_root()`` — used by the
+         FastAPI dashboard to point each request at the viewer's own lab
+         (so @vdumeaux sees her lab_mgmt, @mhallet sees his).
+      2. ``$WIGAMIG_LAB_MGMT_REPO`` env var
+      3. ``~/repos/lab_mgmt`` if it exists
+      4. ``~/repos/hallett-lab-mgmt`` (legacy fallback) if it exists
+      5. ``~/repos/lab_mgmt`` (the canonical default, even if missing)
     """
+    override = getattr(_thread_local, "lab_mgmt_root", None)
+    if override is not None:
+        return Path(override).expanduser()
     env = os.environ if env is None else env
     explicit = env.get("WIGAMIG_LAB_MGMT_REPO")
     if explicit:
@@ -61,6 +77,25 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
     if LEGACY_LAB_MGMT_REPO.exists():
         return LEGACY_LAB_MGMT_REPO
     return DEFAULT_LAB_MGMT_REPO
+
+
+@contextmanager
+def use_lab_mgmt_root(path: str | Path | None):
+    """Override ``lab_mgmt_repo_root()`` for the calling thread.
+
+    Used by per-request dashboard handlers: at request entry the server
+    resolves the viewer's lab via the registrar's ``_registry.yaml`` and
+    enters this context manager, then every downstream call to
+    ``iter_members()`` / ``members_dir()`` / ``compliance.md`` / etc.
+    automatically resolves to that lab's lab_mgmt repo. Pass ``None`` to
+    fall through to the env-var / default resolution.
+    """
+    previous = getattr(_thread_local, "lab_mgmt_root", None)
+    _thread_local.lab_mgmt_root = Path(path).expanduser() if path else None
+    try:
+        yield
+    finally:
+        _thread_local.lab_mgmt_root = previous
 
 
 def find_project_repo(start: str | Path | None = None) -> ProjectRepo | None:

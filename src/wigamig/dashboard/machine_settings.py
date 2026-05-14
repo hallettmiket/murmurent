@@ -72,17 +72,33 @@ def load(*, legacy_obsidian: dict | None = None) -> C.MachineSettings:
     )
 
 
+def _derive_vault_name(vault_path: str | None) -> str | None:
+    """The vault name (for ``obsidian://`` URLs) is the last path segment.
+
+    Always derived from the path so the UI doesn't ask the user to type the
+    same string twice. Returns ``None`` if the path is empty or unset.
+    """
+    if not vault_path:
+        return None
+    tail = Path(str(vault_path).rstrip("/")).name
+    return tail or None
+
+
 def write(settings: C.MachineSettings) -> Path:
     """Persist ``settings`` to ``~/.wigamig/machine.yaml`` (creating dirs).
 
     Returns the path written. The on-disk format is plain YAML so a user
-    can hand-edit it without going through the dashboard.
+    can hand-edit it without going through the dashboard. The
+    ``obsidian_vault_name`` is always re-derived from the path so the two
+    fields stay in sync; the client may send an explicit name (legacy) but
+    it's ignored.
     """
     MACHINE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    derived_name = _derive_vault_name(settings.obsidian_vault_path)
     payload = {
         "wigamig_base": settings.wigamig_base,
         "obsidian_vault_path": settings.obsidian_vault_path,
-        "obsidian_vault_name": settings.obsidian_vault_name,
+        "obsidian_vault_name": derived_name,
         "notebook_subfolder": settings.notebook_subfolder,
         "oracle_subfolder": settings.oracle_subfolder,
         "lab_base": settings.lab_base,

@@ -90,7 +90,9 @@ def test_machine_settings_round_trip(world):
     client = TestClient(create_app())
     payload = {
         "obsidian_vault_path": "/Users/me/vault",
-        "obsidian_vault_name": "my-vault",
+        # ``obsidian_vault_name`` is intentionally not sent — the server
+        # derives it from the path's basename. An explicit value, if sent,
+        # is ignored. See machine_settings._derive_vault_name.
         "notebook_subfolder": "notes",
         "oracle_subfolder": "memory",
     }
@@ -99,10 +101,10 @@ def test_machine_settings_round_trip(world):
     assert res.json()["ok"] is True
 
     on_disk = yaml.safe_load(world["machine_yaml"].read_text())
-    # Every field we sent must round-trip. Other fields with defaults
-    # (e.g. ``lab_base``) may also be present, set to ``None``.
     for k, v in payload.items():
         assert on_disk[k] == v
+    # Vault name is derived: basename of the path.
+    assert on_disk["obsidian_vault_name"] == "vault"
 
 
 def test_machine_settings_load_falls_back_to_legacy_obsidian(world):
@@ -117,6 +119,9 @@ def test_machine_settings_load_falls_back_to_legacy_obsidian(world):
 
 
 def test_machine_settings_wins_over_legacy_after_save(world):
+    # The client may send an explicit obsidian_vault_name (legacy clients
+    # still do), but the server always derives it from the path's basename.
+    # Re-loading reflects the derived name, not the originally-sent one.
     ms_mod.write(MachineSettings(
         obsidian_vault_path="/new/path", obsidian_vault_name="new-vault",
         notebook_subfolder="nb", oracle_subfolder="or",
@@ -124,7 +129,7 @@ def test_machine_settings_wins_over_legacy_after_save(world):
     legacy = {"vault_path": "/legacy/path", "vault_name": "legacy-vault"}
     s = ms_mod.load(legacy_obsidian=legacy)
     assert s.obsidian_vault_path == "/new/path"
-    assert s.obsidian_vault_name == "new-vault"
+    assert s.obsidian_vault_name == "path"  # basename of "/new/path"
 
 
 # ---------------------------------------------------------------------------
@@ -275,10 +280,11 @@ def test_lab_settings_pi_handle_normalised(world):
 
 
 def test_snapshot_response_includes_machine_settings(world):
-    """The dashboard payload must carry a MachineSettings block."""
+    """The dashboard payload must carry a MachineSettings block. The
+    vault name is always derived from the path's last segment."""
     ms_mod.write(MachineSettings(
         obsidian_vault_path="/my/laptop/vault",
-        obsidian_vault_name="laptop-vault",
+        obsidian_vault_name="ignored-on-write",
         notebook_subfolder="lab-notebook",
         oracle_subfolder="oracle",
     ))
@@ -287,4 +293,4 @@ def test_snapshot_response_includes_machine_settings(world):
     assert res.status_code == 200, res.text
     payload = res.json()
     assert payload["machine_settings"]["obsidian_vault_path"] == "/my/laptop/vault"
-    assert payload["machine_settings"]["obsidian_vault_name"] == "laptop-vault"
+    assert payload["machine_settings"]["obsidian_vault_name"] == "vault"

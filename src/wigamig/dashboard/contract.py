@@ -255,6 +255,13 @@ class ProjectRow(BaseModel):
     host: str = "local"
     remote_path: str | None = None
     remote_ssh_host: str | None = None  # ssh alias for "Open in VSCode Remote"
+    # 2026-05-14: lifecycle status. "active" projects appear in the main
+    # Projects list; "archived" projects move to the Decommissioned section
+    # and can be unarchived from there. Files on disk are never touched
+    # by archive/unarchive — only the CHARTER.md frontmatter changes.
+    status: str = "active"
+    decommissioned_at: str | None = None
+    decommissioned_by: str | None = None
 
 
 class PeerRow(BaseModel):
@@ -853,6 +860,9 @@ class DashboardResponse(BaseModel):
     spark: list[int]
     spark_labels: list[str]
     projects: list[ProjectRow]
+    # Archived (soft-deleted) projects — surfaced as a separate collapsed
+    # section in the UI so they don't visually disappear after decommission.
+    archived_projects: list[ProjectRow] = []
     peers: list[PeerRow]
     seas: list[SeaRow]
     experiments: list[ExperimentRow]
