@@ -2857,6 +2857,211 @@ function ProposeCollaborationModal({ onClose, onFiled }) {
   );
 }
 
+/* ───────── DecommissionsPanel — browse past soft-deletes ─────────
+   The dashboard's "where did X go?" panel. Lists every decommission
+   report on this machine, grouped by entity kind. Reports are local
+   to the machine (per ~/.wigamig/decommissions/) — there's no
+   cross-machine aggregation, by design. PI-only because the report
+   contents include private paths and project memberships. */
+
+function DecommissionsPanel({ span = "c-12" }) {
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
+  const [reports, setReports] = useState(null);  // null = not yet loaded
+  const [expanded, setExpanded] = useState(false);
+  const [openReport, setOpenReport] = useState(null);  // {file, body}
+  const [filter, setFilter] = useState("");
+
+  const fetchList = async () => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const userParam = params.get("user");
+      const r = await fetch(
+        "/api/decommissions" + (userParam ? "?user=" + encodeURIComponent(userParam) : ""),
+        { headers: { Accept: "application/json" } },
+      );
+      const j = await r.json();
+      if (!r.ok) {
+        setReports([]);
+        return;
+      }
+      setReports(j.reports || []);
+    } catch (_) { setReports([]); }
+  };
+
+  useEffect(() => { if (expanded && reports === null && isPI) fetchList(); }, [expanded]);
+
+  const viewReport = async (file) => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const userParam = params.get("user");
+      const r = await fetch(
+        "/api/decommissions/" + encodeURIComponent(file)
+        + (userParam ? "?user=" + encodeURIComponent(userParam) : ""),
+        { headers: { Accept: "application/json" } },
+      );
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      setOpenReport(j);
+    } catch (ex) {
+      window.alert("Could not load report: " + (ex.message || ex));
+    }
+  };
+
+  if (!isPI) return null;
+
+  const filtered = (reports || []).filter(
+    r => !filter || r.kind === filter,
+  );
+  const kindCounts = (reports || []).reduce((acc, r) => {
+    acc[r.kind] = (acc[r.kind] || 0) + 1; return acc;
+  }, {});
+
+  return (
+    <div className={"panel " + span}>
+      <header>
+        <h2>Decommissions</h2>
+        <div className="row" style={{gap:6}}>
+          <span className="meta">
+            {reports === null
+              ? "click to load"
+              : `${reports.length} report${reports.length === 1 ? "" : "s"} on this machine`}
+          </span>
+          <button className="btn sm" onClick={() => setExpanded(e => !e)}>
+            {expanded ? "▾ hide" : "▸ show"}
+          </button>
+        </div>
+      </header>
+      {expanded && (
+        <div className="body" style={{padding:0}}>
+          {reports === null ? (
+            <div style={{padding:"14px 18px", color:"var(--muted)", fontSize:12}}>loading…</div>
+          ) : reports.length === 0 ? (
+            <div style={{padding:"14px 18px", color:"var(--muted)", fontSize:12}}>
+              No decommission reports yet. They appear here when you archive a
+              project, disconnect an installation, deactivate a member, etc.
+              Stored at <code>~/.wigamig/decommissions/</code>.
+            </div>
+          ) : (
+            <>
+              <div style={{padding:"6px 14px", borderBottom:"1px solid var(--rule)",
+                           display:"flex", gap:6, alignItems:"center", flexWrap:"wrap"}}>
+                <span className="mono muted" style={{fontSize:10, letterSpacing:1,
+                                                     textTransform:"uppercase"}}>filter:</span>
+                <button
+                  type="button"
+                  onClick={() => setFilter("")}
+                  style={_filterStyle(filter === "")}>
+                  all ({reports.length})
+                </button>
+                {Object.keys(kindCounts).sort().map(k => (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setFilter(k)}
+                    style={_filterStyle(filter === k)}>
+                    {k} ({kindCounts[k]})
+                  </button>
+                ))}
+              </div>
+              <table className="dt">
+                <thead><tr>
+                  <th style={{width:90}}>kind</th>
+                  <th>name</th>
+                  <th>by</th>
+                  <th style={{width:160}}>when</th>
+                  <th style={{width:70}}></th>
+                </tr></thead>
+                <tbody>
+                  {filtered.map(r => (
+                    <tr key={r.file}>
+                      <td>
+                        <Pill tone={
+                          r.kind === "project" ? "purple"
+                          : r.kind === "machine" ? ""
+                          : r.kind === "user" ? "amber"
+                          : r.kind === "installation" ? ""
+                          : r.kind === "sea" ? ""
+                          : ""
+                        }>{r.kind}</Pill>
+                      </td>
+                      <td>
+                        <strong>{r.name}</strong>
+                        <div className="mono muted" style={{fontSize:10}}>{r.file}</div>
+                      </td>
+                      <td className="mono" style={{fontSize:12}}>{r.decommissioned_by}</td>
+                      <td className="muted" style={{fontSize:11}}>
+                        {r.decommissioned_at ? r.decommissioned_at.slice(0, 16).replace("T", " ") : ""}
+                      </td>
+                      <td style={{textAlign:"right"}}>
+                        <button
+                          type="button"
+                          onClick={() => viewReport(r.file)}
+                          style={{
+                            background:"transparent", border:"1px solid var(--rule-strong)",
+                            borderRadius:2, padding:"1px 8px", cursor:"pointer",
+                            fontSize:11, color:"var(--purple)", fontFamily:"var(--mono)",
+                          }}>
+                          view
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
+      )}
+      {openReport && (
+        <DecommissionReportModal report={openReport} onClose={() => setOpenReport(null)} />
+      )}
+    </div>
+  );
+}
+
+function _filterStyle(active) {
+  return {
+    fontFamily: "var(--mono)", fontSize: 11, padding: "1px 8px",
+    border: "1px solid var(--rule-strong)", borderRadius: 2,
+    cursor: "pointer",
+    background: active ? "var(--purple)" : "var(--card)",
+    color: active ? "white" : "var(--ink)",
+  };
+}
+
+function DecommissionReportModal({ report, onClose }) {
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"flex-start", justifyContent:"center",
+      zIndex:200, padding:"40px 20px", overflowY:"auto",
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:"18px 22px", width:"min(780px, 96vw)",
+      }}>
+        <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
+            Decommission report
+          </h2>
+          <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
+        </div>
+        <div className="mono muted" style={{fontSize:11, marginBottom:8}}>
+          ~/.wigamig/decommissions/{report.file}
+        </div>
+        <pre style={{
+          background:"var(--paper-2)", border:"1px solid var(--rule)",
+          borderRadius:2, padding:"12px 14px",
+          fontFamily:"var(--mono)", fontSize:12, lineHeight:1.5,
+          whiteSpace:"pre-wrap", wordBreak:"break-word",
+          maxHeight:"60vh", overflowY:"auto", margin:0,
+        }}>{report.body}</pre>
+      </div>
+    </div>
+  );
+}
+
 /* ───────── Receptionist (inbound cross-group SEA queue) ───────── */
 async function postInboundAction(id, action, body) {
   const params = new URLSearchParams(window.location.search);
@@ -4731,6 +4936,13 @@ function App() {
         <div className="grid" style={{marginBottom:14}}>
           <SeaCatalogPanel entries={D.sea_catalog} span="c-12" />
         </div>
+
+        {/* Decommissions — history of soft-deletes on this machine (PI only). */}
+        {persona === "pi" && (
+          <div className="grid" style={{marginBottom:14}}>
+            <DecommissionsPanel span="c-12" />
+          </div>
+        )}
 
         {/* Agents (large, low-frequency) lives toward the bottom. */}
         <div className="grid" style={{marginBottom:14}}>
