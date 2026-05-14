@@ -325,6 +325,17 @@ class DeclineCollabRequestBody(BaseModel):
     reason: str = ""
 
 
+class LinkSlackChannelBody(BaseModel):
+    """JSON body for ``POST /api/project/<name>/link_slack_channel``.
+
+    Manual escape hatch when the bot lacks ``channels:read`` and can't
+    auto-discover an existing channel by name. The PI pastes the
+    channel ID; wigamig writes it to CHARTER.md.
+    """
+
+    channel_id: str
+
+
 class CatalogEntryBody(BaseModel):
     """JSON body for ``POST /api/sea_catalog`` (upsert)."""
 
@@ -768,8 +779,15 @@ def create_app() -> FastAPI:
             from . import slack_notify as _notify
             from ..commands import project_cmd as _project_cmd
             _log = _logging.getLogger(__name__)
-            # Create Slack channel
-            ch = _notify.create_project_channel(req.project)
+            # Create Slack channel. Best-effort: the project-approval flow
+            # must succeed even when the Slack bot lacks scopes or is
+            # offline — the PI can link an existing channel later via
+            # /api/project/<name>/link_slack_channel.
+            try:
+                ch = _notify.create_project_channel(req.project)
+            except _notify.SlackScopeError as scope_exc:
+                _log.warning("Slack scope issue during project-approve: %s", scope_exc)
+                ch = None
             if ch:
                 _notify._write_charter_channel_id(req.project, ch)
                 _notify._post(ch, f":rocket: Project `{req.project}` approved! Welcome to the channel.")
@@ -1255,15 +1273,69 @@ def create_app() -> FastAPI:
         project: str,
         user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
     ) -> dict:
-        """Create the Slack channel for a project. PI only. Idempotent."""
+        """Create the Slack channel for a project. PI only. Idempotent.
+
+        When the channel already exists but the bot lacks the
+        ``channels:read`` scope to enumerate it, returns a structured
+        409 with ``recoverable=true`` so the UI can show the "Link
+        existing channel" affordance (paste the channel ID manually).
+        """
         actor = _require_pi(user)
         from . import slack_notify as _notify
-        channel_id = _notify.create_project_channel(project)
+        try:
+            channel_id = _notify.create_project_channel(project)
+        except _notify.SlackScopeError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "slack_scope_missing",
+                    "needed": exc.needed,
+                    "message": str(exc),
+                    "recoverable": True,
+                    "hint": (
+                        f"Paste the channel ID for #proj-{project.lower().replace('_','-')} "
+                        "into the 'Link existing channel' field."
+                    ),
+                },
+            )
         if not channel_id:
             raise HTTPException(status_code=500, detail="Slack channel creation failed — check server logs")
         _notify._write_charter_channel_id(project, channel_id)
         _notify._post(channel_id, f":rocket: Project `{project}` channel ready.")
         return {"ok": True, "channel_id": channel_id}
+
+    @app.post("/api/project/{project}/link_slack_channel")
+    def link_slack_channel(
+        project: str,
+        body: LinkSlackChannelBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Persist a known Slack channel ID for ``project`` to CHARTER.md.
+
+        Useful when the bot can't enumerate channels (no ``channels:read``
+        scope) but the user already knows the ID. Validates the ID
+        looks like a Slack ID (C/G/D prefix + alphanumerics) — doesn't
+        round-trip the API since the whole point of this path is that
+        the API can't see the channel from the bot's side. The dashboard
+        will start using the ID immediately; if it's wrong, posting will
+        fail and the user can re-link.
+        """
+        from . import slack_notify as _notify
+        import re as _re
+
+        _require_pi(user)
+        channel_id = (body.channel_id or "").strip()
+        if not _re.match(r"^[CGD][A-Z0-9]{6,}$", channel_id):
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    "channel_id must look like a Slack channel ID "
+                    "(C... / G... / D... followed by 6+ alphanumerics). "
+                    "Find it in Slack via channel settings → 'Copy link'."
+                ),
+            )
+        _notify._write_charter_channel_id(project, channel_id)
+        return {"ok": True, "channel_id": channel_id, "linked": True}
 
     @app.post("/api/project/{project}/provision/github")
     def provision_github(
