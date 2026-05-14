@@ -1087,16 +1087,28 @@ function ProjectDetailRows({ proj: p }) {
   const [errs, setErrs] = React.useState({});
   const [done, setDone] = React.useState({});
 
+  // recoverable flag: true → show "Link existing channel" escape hatch.
+  // Set when the slack-create endpoint returns 409 + recoverable=true
+  // because the bot can't enumerate channels to find an existing one.
+  const [recoverable, setRecoverable] = React.useState({});
+
   const provision = async (resource) => {
     setBusy(b => ({...b, [resource]: true}));
     setErrs(e => ({...e, [resource]: null}));
+    setRecoverable(r => ({...r, [resource]: false}));
     try {
       const q = userParam ? "?user=" + encodeURIComponent(userParam) : "";
       const r = await fetch("/api/project/" + encodeURIComponent(p.name) + "/provision/" + resource + q,
         {method: "POST"});
       if (!r.ok) {
         const d = await r.json().catch(() => ({}));
-        throw new Error(d.detail || r.statusText);
+        // 409 + recoverable: surface a more useful message and unlock
+        // the Link-existing-channel affordance below.
+        if (typeof d.detail === "object" && d.detail && d.detail.recoverable) {
+          setRecoverable(rec => ({...rec, [resource]: true}));
+          throw new Error(d.detail.message || d.detail.hint || "recoverable error");
+        }
+        throw new Error((typeof d.detail === "string" ? d.detail : null) || r.statusText);
       }
       setDone(d => ({...d, [resource]: true}));
       if (typeof window.__wigamigFetchData === "function") {
@@ -1106,6 +1118,42 @@ function ProjectDetailRows({ proj: p }) {
       setErrs(e => ({...e, [resource]: String(ex.message || ex)}));
     } finally {
       setBusy(b => ({...b, [resource]: false}));
+    }
+  };
+
+  // Manual link path: PI pastes the channel ID. Used when the bot
+  // lacks `channels:read` and can't auto-discover the existing channel.
+  const linkSlackChannel = async () => {
+    const cid = (window.prompt(
+      "Paste the Slack channel ID for #proj-" +
+      p.name.toLowerCase().replace(/_/g, "-") + ":\n\n" +
+      "Find it in Slack: click the channel name → 'View channel details' " +
+      "→ scroll to the bottom (Channel ID: Cxxxxxxxx)."
+    ) || "").trim();
+    if (!cid) return;
+    setBusy(b => ({...b, slack: true}));
+    setErrs(e => ({...e, slack: null}));
+    try {
+      const q = userParam ? "?user=" + encodeURIComponent(userParam) : "";
+      const r = await fetch(
+        "/api/project/" + encodeURIComponent(p.name) + "/link_slack_channel" + q,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ channel_id: cid }),
+        },
+      );
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.detail || r.statusText);
+      setRecoverable(rec => ({...rec, slack: false}));
+      setDone(dn => ({...dn, slack: true}));
+      if (typeof window.__wigamigFetchData === "function") {
+        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      }
+    } catch (ex) {
+      setErrs(e => ({...e, slack: String(ex.message || ex)}));
+    } finally {
+      setBusy(b => ({...b, slack: false}));
     }
   };
 
@@ -1181,11 +1229,23 @@ function ProjectDetailRows({ proj: p }) {
             {busy.slack ? "…" : (errs.slack ? "Retry Slack setup" : "Create Slack channel")}
           </button>
         )}
+        {isPI && !p.slack_channel_id && recoverable.slack && (
+          <button className="btn sm" disabled={busy.slack}
+            title="The bot can't auto-find an existing channel due to missing Slack scopes. Paste the channel ID instead."
+            onClick={linkSlackChannel}>
+            Link existing channel…
+          </button>
+        )}
         {isPI && p.slack_channel_id && (
           <SlackSyncButton project={p.name} userParam={userParam} />
         )}
         {done.slack && <Pill tone="green">done — refresh to see channel</Pill>}
-        {errs.slack && <span style={{color:"var(--red)", fontSize:11}}>{errs.slack}</span>}
+        {errs.slack && (
+          <span style={{color:"var(--red)", fontSize:11,
+                        maxWidth:520, lineHeight:1.4}}>
+            {errs.slack}
+          </span>
+        )}
       </div>
     </div>
   );

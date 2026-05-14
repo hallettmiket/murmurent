@@ -93,13 +93,28 @@ def _write_charter_channel_id(project_slug: str, channel_id: str) -> None:
         log.warning("Could not write slack_channel_id to %s: %s", charter_path, exc)
 
 
+class SlackScopeError(RuntimeError):
+    """Slack denied the call with ``missing_scope`` — the bot needs more permissions.
+
+    Distinct from generic errors so the dashboard can offer a manual
+    escape hatch ("paste the channel ID") rather than just saying "check
+    server logs."
+    """
+
+    def __init__(self, needed: str, message: str) -> None:
+        super().__init__(message)
+        self.needed = needed
+
+
 def _lookup_channel_id_by_name(name: str) -> str | None:
     """Look up an existing Slack channel ID by exact channel name.
 
     Pages through ``conversations.list`` (public + private). Returns the
-    channel ID on first match, or ``None`` if no match or no token. The
-    pre-existing CHARTER.md-only lookup couldn't recover from the case
-    where a channel had been created out-of-band — this fills that gap.
+    channel ID on first match, or ``None`` if no match or no token.
+    Raises :class:`SlackScopeError` when the bot lacks the scopes
+    required to enumerate channels — that case can't be solved here
+    (the user needs to either add the scope in Slack admin OR paste the
+    channel ID manually).
     """
     tok = _token()
     if not tok:
@@ -120,7 +135,20 @@ def _lookup_channel_id_by_name(name: str) -> str | None:
             )
             data = r.json()
             if not data.get("ok"):
-                log.warning("Slack conversations.list failed: %s", data.get("error"))
+                err = data.get("error", "")
+                log.warning("Slack conversations.list failed: %s", err)
+                if err == "missing_scope":
+                    needed = data.get("needed") or "channels:read,groups:read"
+                    raise SlackScopeError(
+                        needed=str(needed),
+                        message=(
+                            "Slack bot lacks the scope to enumerate channels "
+                            f"(needed: {needed}). Either add the scope to the "
+                            "bot in Slack admin and reinstall, or paste the "
+                            "channel ID manually via the 'Link existing "
+                            "channel' button."
+                        ),
+                    )
                 return None
             for ch in data.get("channels", []):
                 if ch.get("name") == name:
@@ -129,6 +157,8 @@ def _lookup_channel_id_by_name(name: str) -> str | None:
             if not cursor:
                 break
         return None
+    except SlackScopeError:
+        raise
     except Exception as exc:  # noqa: BLE001
         log.warning("Slack lookup_channel_id_by_name error: %s", exc)
         return None
@@ -184,6 +214,10 @@ def create_project_channel(project_slug: str) -> str | None:
             "needs to be invited to the channel.", channel_name,
         )
         return None
+    except SlackScopeError:
+        # Let the endpoint surface this to the user with an actionable
+        # error rather than the generic "check server logs."
+        raise
     except Exception as exc:  # noqa: BLE001
         log.warning("Slack create_project_channel error: %s", exc)
         return None
