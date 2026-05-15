@@ -1222,6 +1222,27 @@ def create_app() -> FastAPI:
             for label, path in (("raw", raw_proj), ("refined", refined_proj)):
                 probes.append(_pf._ensure_dir(path, label=label, required=False))
 
+        # Layer-2 CC bootstrap for *local* installs. The remote branch
+        # above already runs the equivalent inside its batched shell
+        # snippet (see core.remote_install); both paths converge on the
+        # same on-disk shape — symlinks into the wigamig commons + a
+        # CLAUDE.md stub. Skipped for remote-only installs (no working
+        # tree on this machine) and when this project's working tree
+        # isn't actually present locally.
+        if not body.ssh_remote:
+            from ..core import project_cc_init as _cci
+            from ..core.repo import wigamig_repo_root as _wig
+            local_project = Path(f"~/repos/{body.project}").expanduser()
+            for p in _cci.bootstrap_local(
+                local_project, _wig(),
+                agents=list(body.agents or []),
+                project_name=body.project,
+                raw_path=body.raw_path,
+                refined_path=body.refined_path,
+                notebook_path=body.notebook_path,
+            ):
+                probes.append(p)
+
         # If any required probe failed, refuse to write the manifest —
         # the user asked for "all issues attended to before final
         # installation". Return probes so the UI can render them.
