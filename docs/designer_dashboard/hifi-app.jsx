@@ -1229,9 +1229,9 @@ function ProjectDetailRows({ proj: p }) {
             {busy.slack ? "…" : (errs.slack ? "Retry Slack setup" : "Create Slack channel")}
           </button>
         )}
-        {isPI && !p.slack_channel_id && recoverable.slack && (
+        {isPI && !p.slack_channel_id && !done.slack && (
           <button className="btn sm" disabled={busy.slack}
-            title="The bot can't auto-find an existing channel due to missing Slack scopes. Paste the channel ID instead."
+            title="If the channel already exists in Slack, paste its channel ID here instead of creating a new one."
             onClick={linkSlackChannel}>
             Link existing channel…
           </button>
