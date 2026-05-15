@@ -420,6 +420,36 @@ def create_app() -> FastAPI:
         version="0.1.0",
     )
 
+    # Weekly repo-inventory refresh. Wigamig-internal cron: at startup
+    # we check the cached report's mtime; if it's stale, fire a fresh
+    # scan in a daemon thread so the user's first dashboard load isn't
+    # blocked on SSH + ``gh repo list``. The scan writes to
+    # ``~/.wigamig/inventory/`` and the dashboard reads from there.
+    @app.on_event("startup")
+    def _schedule_inventory_refresh() -> None:  # pragma: no cover (timing)
+        import logging as _logging
+        import threading
+        _log = _logging.getLogger(__name__)
+        try:
+            from ..core import repo_inventory as _inv
+            from ..core import hosts as _hosts
+            if not _inv.report_is_stale(_inv.latest_report_path()):
+                return
+            def _run() -> None:
+                try:
+                    lab = snap_mod._lab_settings("hallett")
+                    host_names = [h.name for h in _hosts.read().values()]
+                    _inv.scan_and_cache(
+                        github_org=lab.github_org or "hallettmiket",
+                        host_names=host_names,
+                    )
+                    _log.info("repo inventory: weekly refresh complete")
+                except Exception as exc:  # noqa: BLE001 — best-effort
+                    _log.warning("repo inventory background scan failed: %s", exc)
+            threading.Thread(target=_run, name="wigamig-inventory-refresh", daemon=True).start()
+        except Exception as exc:  # noqa: BLE001
+            _log.warning("could not schedule inventory refresh: %s", exc)
+
     @app.get("/api/dashboard", response_model=C.DashboardResponse)
     def get_dashboard(
         user: str = Query("", description="Override the resolved user (Western username)."),
@@ -1633,6 +1663,72 @@ def create_app() -> FastAPI:
         result = _mf.run(lab_base, create=True)
         _mf.cache_save(lab_name, result)
         return {"lab": lab_name, "from_cache": False, **result}
+
+    # -----------------------------------------------------------------
+    # Repo inventory — cross-machine + GitHub git-repo audit
+    # -----------------------------------------------------------------
+
+    def _inventory_host_names() -> list[str]:
+        """Return every registered host name (incl. ``local``).
+
+        Hosts that haven't been registered via Member Profile → ⚙
+        machines aren't scanned — biodatsci-style remotes need an
+        explicit ssh_host alias to reach them.
+        """
+        try:
+            from ..core import hosts as _hosts
+            return [h.name for h in _hosts.read().values()]
+        except Exception:
+            return ["local"]
+
+    @app.get("/api/inventory/repos")
+    def get_inventory(
+        refresh: bool = Query(False, description="Run a fresh scan instead of returning the cached report."),
+    ) -> dict:
+        """Return the cross-machine + GitHub repo inventory.
+
+        Default mode reads the most recent cached report from
+        ``~/.wigamig/inventory/`` so the panel loads instantly. Pass
+        ``?refresh=true`` to force a live re-scan — that hits ``gh
+        repo list`` plus one SSH session per registered host. The
+        result is also written to the cache so subsequent reads are
+        cheap.
+        """
+        from ..core import repo_inventory as _inv
+        lab_settings = snap_mod._lab_settings("hallett")
+        org = lab_settings.github_org or "hallettmiket"
+
+        cached_path = _inv.latest_report_path()
+        if refresh or cached_path is None:
+            report = _inv.scan_and_cache(
+                github_org=org,
+                host_names=_inventory_host_names(),
+            )
+            return {"from_cache": False, **report.to_dict()}
+        cached = _inv.load_report(cached_path)
+        if cached is None:
+            # Cache corrupt — re-scan rather than fail the request.
+            report = _inv.scan_and_cache(
+                github_org=org,
+                host_names=_inventory_host_names(),
+            )
+            return {"from_cache": False, **report.to_dict()}
+        return {"from_cache": True, "cache_path": str(cached_path), **cached}
+
+    @app.post("/api/inventory/repos/refresh")
+    def post_inventory_refresh() -> dict:
+        """Explicit live re-scan. Same as GET with ?refresh=true; kept
+        as a separate POST so the JSX can disable the button while it
+        runs without worrying about caching.
+        """
+        from ..core import repo_inventory as _inv
+        lab_settings = snap_mod._lab_settings("hallett")
+        org = lab_settings.github_org or "hallettmiket"
+        report = _inv.scan_and_cache(
+            github_org=org,
+            host_names=_inventory_host_names(),
+        )
+        return {"from_cache": False, **report.to_dict()}
 
     # -----------------------------------------------------------------
     # Membership (PI-only roster mgmt)

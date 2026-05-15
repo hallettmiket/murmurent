@@ -300,6 +300,214 @@ const INFRA_ITEMS = [
   { id: "obsidian",    label: "Obsidian",          note: "lab-notebook vault" },
 ];
 
+/* ── RepoInventoryPanel: cross-machine + GitHub repo audit.
+
+   Loads /api/inventory/repos (cached) on mount; the dashboard's
+   startup hook runs a fresh scan weekly. Refresh button forces a live
+   re-scan (one ``gh repo list`` + one SSH ``find .git`` per registered
+   host). Per-row "Install on <machine>" opens the existing
+   InstallModal with project + machine pre-filled so the user gets
+   every safeguard the install wizard already has. */
+function RepoInventoryPanel({ span = "c-12" }) {
+  const [report, setReport] = useState(null);
+  const [busy, setBusy] = useState(true);
+  const [err, setErr] = useState(null);
+  const [showAllGithub, setShowAllGithub] = useState(false);
+  const [installCtx, setInstallCtx] = useState(null);  // {project, machine}
+  // Hosts the user has registered. Sourced once on mount so the table
+  // columns are stable across refreshes. The inventory report also
+  // returns hosts_scanned; we use the registered list (which includes
+  // hosts that errored on this scan) so columns don't disappear.
+  const [knownHosts, setKnownHosts] = useState([]);
+
+  const load = async (refresh) => {
+    setBusy(true); setErr(null);
+    try {
+      const url = refresh
+        ? "/api/inventory/repos/refresh"
+        : "/api/inventory/repos";
+      const r = await fetch(url, { method: refresh ? "POST" : "GET" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      setReport(await r.json());
+    } catch (ex) {
+      setErr(String(ex.message || ex));
+    } finally { setBusy(false); }
+  };
+
+  useEffect(() => {
+    load(false);
+    fetch("/api/hosts", { headers: { Accept: "application/json" } })
+      .then(r => r.ok ? r.json() : { hosts: [] })
+      .then(j => setKnownHosts((j.hosts || []).map(h => h.name)))
+      .catch(() => setKnownHosts(["local"]));
+  }, []);
+
+  // Stats line for the panel header.
+  const stats = report
+    ? (() => {
+        const rows = report.rows || [];
+        const cloned = rows.filter(r => r.clones && r.clones.length > 0).length;
+        const ghOnly = rows.filter(r => r.github && (!r.clones || r.clones.length === 0)).length;
+        const local = rows.filter(r => r.local_only).length;
+        return { total: rows.length, cloned, ghOnly, local };
+      })()
+    : null;
+
+  // Display order: show rows with at least one clone first, then any
+  // GitHub-only rows (only when the user toggles them in — usually a
+  // long list).
+  const visibleRows = (() => {
+    if (!report) return [];
+    const rows = report.rows || [];
+    if (showAllGithub) return rows;
+    return rows.filter(r => r.clones && r.clones.length > 0);
+  })();
+
+  return (
+    <div className={"card " + span}>
+      <header className="card-header" style={{display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:8}}>
+        <h3>Repos</h3>
+        <div style={{display:"flex", alignItems:"center", gap:10, flexWrap:"wrap"}}>
+          {stats && (
+            <span className="mono muted" style={{fontSize:11, letterSpacing:0.5}}>
+              {stats.cloned} cloned · {stats.ghOnly} GitHub-only · {stats.local} local-only · {stats.total} total
+            </span>
+          )}
+          {report && report.generated_at && (
+            <span className="mono muted" style={{fontSize:10.5}}>
+              scanned {report.generated_at.slice(0, 16).replace("T", " ")}
+              {report.from_cache ? " (cached)" : ""}
+            </span>
+          )}
+          <button className="btn sm" disabled={busy} onClick={() => load(true)}>
+            {busy ? "…" : "Refresh"}
+          </button>
+          <label style={{fontSize:11, display:"inline-flex", alignItems:"center", gap:4}}>
+            <input type="checkbox" checked={showAllGithub}
+                   onChange={e => setShowAllGithub(e.target.checked)} />
+            include {stats ? stats.ghOnly : "?"} GitHub-only rows
+          </label>
+        </div>
+      </header>
+      <div className="body" style={{padding:0}}>
+        {err && (
+          <div style={{padding:"10px 14px", color:"var(--red)", fontSize:12}}>
+            {err}
+          </div>
+        )}
+        {report && report.errors && report.errors.length > 0 && (
+          <div style={{padding:"8px 14px", fontSize:11, color:"var(--tiger)"}}>
+            <strong>warnings:</strong> {report.errors.join(" · ")}
+          </div>
+        )}
+        {!busy && visibleRows.length === 0 && !err && (
+          <div style={{padding:"14px 16px", color:"var(--muted)", fontSize:12, fontFamily:"var(--mono)"}}>
+            No cloned repos found. Click Refresh to scan, or toggle
+            "include GitHub-only rows" to see the {stats ? stats.ghOnly : "—"} repos on
+            GitHub that aren't cloned anywhere.
+          </div>
+        )}
+        {visibleRows.length > 0 && (
+          <table className="dt">
+            <thead><tr>
+              <th>repo</th>
+              <th style={{width:90}}>github</th>
+              {knownHosts.map(h => (
+                <th key={h} style={{width:120, textAlign:"left"}}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {visibleRows.map((r, i) => (
+                <RepoInventoryRow
+                  key={r.key + ":" + i}
+                  row={r}
+                  knownHosts={knownHosts}
+                  onInstall={(project, machine) => setInstallCtx({project, machine})}
+                />
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      {installCtx && (
+        <InstallModal
+          initialProject={installCtx.project}
+          initialMachine={installCtx.machine}
+          onClose={() => {
+            setInstallCtx(null);
+            // After the install wizard closes, refresh the inventory
+            // so a newly-cloned repo shows up immediately.
+            load(true);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function RepoInventoryRow({ row, knownHosts, onInstall }) {
+  const gh = row.github;
+  const cloneByHost = {};
+  for (const c of (row.clones || [])) cloneByHost[c.host] = c;
+
+  // GitHub cell: green link if visible, dash otherwise.
+  const ghCell = gh ? (
+    <a href={`https://github.com/${gh.full_name}`} target="_blank" rel="noopener"
+       className="mono" style={{fontSize:11}}>
+      ✓ {gh.visibility[0]}
+    </a>
+  ) : (
+    <span className="muted" style={{fontSize:11}}>—</span>
+  );
+
+  // Per-host cell. Three states:
+  //   ✓ wig — cloned + wigamig-installed (CHARTER + .claude/agents/)
+  //   • clone — cloned but not wigamig-initialized
+  //   + install — not cloned; clickable if a GitHub origin exists
+  //   — — not applicable (no github origin to clone from)
+  const hostCell = (host) => {
+    const c = cloneByHost[host];
+    if (c) {
+      const wig = c.is_wigamig_installed;
+      return (
+        <span title={c.path} style={{
+          fontSize:11, color: wig ? "var(--green)" : "var(--muted)",
+          fontFamily:"var(--mono)",
+        }}>
+          {wig ? "✓ wigamig" : "• clone"}
+        </span>
+      );
+    }
+    if (gh && !row.local_only) {
+      return (
+        <button className="btn sm" style={{fontSize:11, padding:"2px 6px"}}
+                onClick={() => onInstall(gh.name, host === "local" ? "this" : host)}>
+          + install
+        </button>
+      );
+    }
+    return <span className="muted" style={{fontSize:11}}>—</span>;
+  };
+
+  return (
+    <tr>
+      <td style={{fontSize:12}}>
+        <strong>{row.name}</strong>
+        {row.local_only && (
+          <span className="muted" style={{fontSize:10, marginLeft:6}}>
+            (local-only — no GitHub origin)
+          </span>
+        )}
+        {gh && gh.archived && (
+          <span className="muted" style={{fontSize:10, marginLeft:6}}>(archived)</span>
+        )}
+      </td>
+      <td>{ghCell}</td>
+      {knownHosts.map(h => <td key={h}>{hostCell(h)}</td>)}
+    </tr>
+  );
+}
+
 /* ── InstallationsBox: persistent panel — always visible.
    Members see only their own rows; PI sees all.
    Each row has an "open workspace" button that launches with that
@@ -602,7 +810,7 @@ function InstallCleanupModal({ cleanup, onClose }) {
    selected machine's wigamig_base and the selected project's metadata
    (including sensitivity → which git remote to clone from). The user only
    has to pick the machine and project; everything else is derived. ── */
-function InstallModal({ initialProject, onClose }) {
+function InstallModal({ initialProject, initialMachine, onClose }) {
   const who = "@" + ((window.DATA.member || {}).handle || "");
   const projects = window.DATA.projects || [];
   const ls       = window.DATA.lab_settings   || {};
@@ -612,7 +820,7 @@ function InstallModal({ initialProject, onClose }) {
      running the dashboard) plus every registered SSH host. Loaded async. */
   const [machines, setMachines] = useState([]);
   const [thisMachine, setThisMachine] = useState({ short_hostname: "", local_user: "" });
-  const [selectedMachine, setSelectedMachine] = useState("this");
+  const [selectedMachine, setSelectedMachine] = useState(initialMachine || "this");
   const [project, setProject] = useState(initialProject || projects[0]?.name || "");
 
   /* Default infra + agent set so the wizard can submit immediately. The user
@@ -5636,6 +5844,14 @@ function App() {
         {/* Installations: always-visible — open workspace or install from here. */}
         <div className="grid" style={{marginBottom:14}}>
           <InstallationsBox span="c-12" />
+        </div>
+
+        {/* Repo inventory: cross-machine + GitHub audit. Cached weekly,
+            on-demand refresh. Per-row "Install on <machine>" pre-fills
+            the install wizard for repos that exist on GitHub but
+            aren't cloned/initialized on a chosen host. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <RepoInventoryPanel span="c-12" />
         </div>
 
         {/* Where you work: Projects + Machines (conceptually paired —
