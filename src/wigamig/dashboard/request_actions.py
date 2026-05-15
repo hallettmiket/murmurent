@@ -160,6 +160,7 @@ def file_create_request(
     repo_kind: str = "github",
     local_repo_root: str | None = None,
     host: str = "local",
+    slack_channel_name: str | None = None,
 ) -> FileResult:
     """Propose creating a new project. PI approval scaffolds the repo."""
     if not actor:
@@ -175,6 +176,7 @@ def file_create_request(
             repo_kind=repo_kind,
             local_repo_root=local_repo_root,
             host=host,
+            slack_channel_name=slack_channel_name,
         )
     except RequestError as exc:
         msg = str(exc)

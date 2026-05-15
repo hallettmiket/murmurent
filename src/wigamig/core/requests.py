@@ -96,6 +96,10 @@ class JoinRequest:
     # Default ``"local"`` preserves pre-R2 behaviour; any other value
     # (e.g. ``"lab-server"``) routes the approval to ``cmd_new_remote``.
     host: str | None = None
+    # 2026-05-15: optional override for the Slack channel name. ``None``
+    # → wigamig uses the conventional ``proj-<project>``. Persisted so
+    # the PI's approve flow knows what to ask Slack to create.
+    slack_channel_name: str | None = None
 
     def to_meta(self) -> dict[str, Any]:
         meta: dict[str, Any] = {
@@ -117,6 +121,7 @@ class JoinRequest:
             ("repo_kind", self.repo_kind),
             ("local_repo_root", self.local_repo_root),
             ("host", self.host),
+            ("slack_channel_name", self.slack_channel_name),
         ):
             if value is not None:
                 meta[key] = value
@@ -162,6 +167,7 @@ def parse_request(path: Path) -> JoinRequest:
         repo_kind=_opt_str(meta.get("repo_kind")),
         local_repo_root=_opt_str(meta.get("local_repo_root")),
         host=_opt_str(meta.get("host")),
+        slack_channel_name=_opt_str(meta.get("slack_channel_name")),
         body=parsed.body,
         path=path,
     )
@@ -304,6 +310,7 @@ def file_create_request(
     repo_kind: str = "github",
     local_repo_root: str | None = None,
     host: str = "local",
+    slack_channel_name: str | None = None,
 ) -> JoinRequest:
     """File a ``project-create`` request.
 
@@ -338,6 +345,7 @@ def file_create_request(
         repo_kind=repo_kind or "github",
         local_repo_root=local_repo_root,
         host=(host or "local"),
+        slack_channel_name=(slack_channel_name.strip() if isinstance(slack_channel_name, str) and slack_channel_name.strip() else None),
     )
     write_request(req)
     return req
