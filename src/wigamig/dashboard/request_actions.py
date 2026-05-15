@@ -72,9 +72,28 @@ def file_join_request(
     project: str,
     justification: str = "",
 ) -> FileResult:
-    """Anyone can file a request — no PI gate. Audited."""
+    """Anyone can file a request — no PI gate. Audited.
+
+    Phase 5: before filing, check that the actor has a ``git_logins``
+    entry for the project's git provider. Without one, the eventual
+    approve flow can't add them as a collaborator on the project's
+    remote, so the join is essentially DOA — better to surface that
+    here than after approval.
+    """
     if not actor:
         raise RequestForbidden("no actor identity resolved")
+
+    # Provider gate. Reads the project's git_provider id (or legacy
+    # repo_kind value) from its CHARTER.md and looks for a matching
+    # git_logins[<provider_id>] on the actor's member profile.
+    missing = _check_member_login_for_project(actor, project)
+    if missing is not None:
+        raise RequestBadRequest(
+            f"You need to register your {missing!r} username in Member Profile → "
+            "Git logins before joining this project. (The PI can't add you as a "
+            f"collaborator on the {missing} remote until then.)"
+        )
+
     try:
         req = req_core.file_request(
             requester=actor, project=project, justification=justification
@@ -87,6 +106,47 @@ def file_join_request(
         raise RequestBadRequest(msg) from exc
     _log("request.file", req, actor, summary=_file_summary(req))
     return FileResult(request=req)
+
+
+def _check_member_login_for_project(actor: str, project: str) -> str | None:
+    """Return the provider id the actor needs a login for, or ``None``
+    when they're already good.
+
+    The check is best-effort: if we can't resolve the project's
+    provider (missing CHARTER, missing lab.md, etc.) we let the
+    request through rather than block on what might be transient
+    state. Hard-fails (provider declared, login missing) raise.
+    """
+    try:
+        from ..core import git_providers as _gp
+        from ..core.frontmatter import parse_file
+        from ..core.projects import project_path
+        from ..core.repo import lab_mgmt_repo_root
+    except Exception:
+        return None
+    try:
+        charter = project_path(project) / "CHARTER.md"
+        if not charter.is_file():
+            return None
+        meta = parse_file(charter).meta or {}
+        provider_id = (
+            str(meta.get("git_provider") or meta.get("repo_kind") or "github").strip()
+        )
+        # ``local`` / ``local-bare`` providers don't have per-user
+        # logins — filesystem permissions on the bare repo are the
+        # access control. Skip the gate.
+        if provider_id in ("local", "local-bare"):
+            return None
+        member_file = lab_mgmt_repo_root() / "members" / f"{actor.lstrip('@')}.md"
+        if not member_file.is_file():
+            return None
+        member_meta = parse_file(member_file).meta or {}
+        logins = _gp.parse_logins(member_meta)
+        if logins.get(provider_id):
+            return None
+        return provider_id
+    except Exception:
+        return None
 
 
 def file_create_request(

@@ -102,6 +102,13 @@ class MemberSettings(BaseModel):
     obsidian_vault_name: str | None = None
     notebook_subfolder: str = "lab-notebook"
     oracle_subfolder: str = "oracle"
+    # Phase 3 (2026-05-15): per-provider usernames. Keys are
+    # :attr:`LabSettings.git_providers[*].id`; values are the user's
+    # username on that provider. e.g. ``{"github": "hallettmiket"}``.
+    # On read, the resolver back-fills ``git_logins["github"]`` from the
+    # legacy ``contact.github`` field so older member.md files keep
+    # working until they get re-saved.
+    git_logins: dict[str, str] = {}
 
 
 class MachineSettings(BaseModel):
@@ -321,16 +328,34 @@ class PersonalOracleBlock(BaseModel):
     recent: list[PersonalOracleEntry] = []
 
 
+class GitProvider(BaseModel):
+    """One git origin server the lab supports for project repos.
+
+    The lab declares a list of these (Phase 2 of the 2026-05-15
+    providers refactor). Each member then registers their identity per
+    provider (Phase 3, ``MemberSettings.git_logins``). Each project
+    picks one provider id (Phase 4, charter ``git_provider:``). Today's
+    flat ``LabSettings.github_org`` is preserved as a fallback when the
+    lab.md has no ``git_providers`` block yet (migration path).
+    """
+
+    id: str                           # short kebab/underscore id; referenced from members + projects
+    kind: str = "github"              # "github" | "gitea" | "local-bare"
+    label: str = ""                   # human label, e.g. "GitHub (hallettmiket org)"
+    # github: org name; gitea: base URL like https://lab-server/gitea;
+    # local-bare: absolute server-side directory like
+    # /data/lab_vm/wigamig/repos.
+    target: str = ""
+
+
 class LabSettings(BaseModel):
     """Lab-wide configuration — editable only by the PI or a designated admin.
 
-    Storage layout convention (2026-05-14): ``lab_base`` is a ``host:/path``
-    string ending in ``/wigamig`` (e.g.
-    ``lab-server.example.edu:/data/lab_vm/wigamig``). All wigamig data
-    lives under it as siblings: ``raw/``, ``refined/``, ``notebooks/``,
-    ``lab_oracle/``, ``repos/``. Projects are subfolders of raw/refined;
-    users are subfolders of notebooks/lab_oracle; ``repos/`` holds bare
-    git repos used as private remotes for sensitive projects.
+    Storage layout convention (2026-05-15): ``lab_base`` is a ``host:/path``
+    string ending in ``/wigamig``. Four data subdirs live underneath
+    (``raw``, ``refined``, ``notebooks``, ``lab_oracle``) — no ``repos/``
+    subdir (working clones live in each user's ``~/repos/``; git origins
+    are managed by the declared :class:`GitProvider` list).
     """
 
     name: str = "hallett"                      # short identifier, used in paths
@@ -342,12 +367,16 @@ class LabSettings(BaseModel):
     # ``lab-server.example.edu:/data/lab_vm/wigamig``. When unset the
     # dashboard shows the four storage paths as "—".
     lab_base: str | None = None
-    # GitHub org that hosts this lab's repos (``lab_mgmt``, project repos
-    # for non-sensitive projects). ``hallettmiket`` is the default for
-    # the Hallett lab.
+    # Phase 2 (2026-05-15): the lab's menu of git origin servers. Empty
+    # list = pre-migration; the resolver auto-derives a single GitHub
+    # entry from ``github_org`` to keep older lab.md files working.
+    git_providers: list[GitProvider] = []
+    # Legacy: single flat GitHub org. Kept for backwards-compat with
+    # lab.md files that pre-date ``git_providers``. New code should
+    # iterate ``git_providers`` instead.
     github_org: str = "hallettmiket"
-    # Subpath under lab_base where bare git repos live. Defaults to
-    # ``repos`` per the 2026-05-14 layout (was ``git_repos``).
+    # Subpath under lab_base where bare git repos live (used by the
+    # ``local-bare`` provider kind, if the lab declares one).
     git_repos_subpath: str = "repos"
     # Deprecated fields kept on the model for backwards-compat with older
     # lab.md frontmatters. Not surfaced in the redesigned UI; will be
@@ -875,3 +904,9 @@ class DashboardResponse(BaseModel):
     inventory: InventoryBlock
     notebook: NotebookBlock
     installations: list[InstallationRow] = []
+    # Cached status of the lab's master folders on its lab_base server.
+    # Rendered as a persistent green/yellow/red pill on the dashboard so
+    # the user can see at a glance whether lab-server has been
+    # bootstrapped. Empty dict when never probed — the pill shows "?"
+    # and prompts the PI to click "check" inside Lab Settings.
+    master_folders: dict = {}

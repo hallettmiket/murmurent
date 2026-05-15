@@ -153,6 +153,22 @@ class MemberSettingsBody(BaseModel):
     obsidian_vault_name: str | None = None
     notebook_subfolder: str | None = None
     oracle_subfolder: str | None = None
+    # Phase 3 (2026-05-15): per-provider usernames. ``None`` = "don't
+    # touch"; ``{}`` clears all; values with empty strings drop that
+    # specific provider's login. Keys must match an entry in the lab's
+    # ``git_providers`` list, but we don't enforce that at the
+    # endpoint — the lab list can grow over time and stale member
+    # entries are harmless until cleaned up.
+    git_logins: dict[str, str] | None = None
+
+
+class GitProviderBody(BaseModel):
+    """One git provider entry in the ``POST /api/lab/settings`` body."""
+
+    id: str
+    kind: str = "github"
+    label: str = ""
+    target: str = ""
 
 
 class LabSettingsBody(BaseModel):
@@ -164,7 +180,10 @@ class LabSettingsBody(BaseModel):
     website: str | None = None
     admins: list[str] | None = None
     lab_base: str | None = None                      # host:/path/to/wigamig
-    github_org: str | None = None                    # e.g. "hallettmiket"
+    # Phase 2 (2026-05-15): lab's menu of git providers. ``None`` means
+    # "don't touch"; an empty list means "clear the list".
+    git_providers: list[GitProviderBody] | None = None
+    github_org: str | None = None                    # legacy: single GitHub org
     git_repos_subpath: str | None = None             # default "repos"
     # Deprecated: still accepted for backwards-compat but ignored on output.
     notebook_large_files_path: str | None = None
@@ -774,10 +793,13 @@ def create_app() -> FastAPI:
         except request_actions.RequestBadRequest as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         req = result.request
+        probes: list[dict] = []
         if action == "approve" and req.kind == "project-create":
             import logging as _logging
             from . import slack_notify as _notify
-            from ..commands import project_cmd as _project_cmd
+            from ..core import project_provision as _pp
+            from ..core.preflight import Probe as _Probe
+            from ..core.repo import lab_mgmt_repo_root as _lmgmt
             _log = _logging.getLogger(__name__)
             # Create Slack channel. Best-effort: the project-approval flow
             # must succeed even when the Slack bot lacks scopes or is
@@ -785,43 +807,70 @@ def create_app() -> FastAPI:
             # /api/project/<name>/link_slack_channel.
             try:
                 ch = _notify.create_project_channel(req.project)
+                if ch:
+                    _notify._write_charter_channel_id(req.project, ch)
+                    _notify._post(ch, f":rocket: Project `{req.project}` approved! Welcome to the channel.")
+                    probes.append(_Probe(
+                        name="slack channel", status="ok",
+                        detail=f"channel id {ch}", required=False,
+                    ).to_dict())
+                else:
+                    probes.append(_Probe(
+                        name="slack channel", status="warn",
+                        detail="slack returned no channel id — link an existing one from the panel",
+                        required=False,
+                    ).to_dict())
             except _notify.SlackScopeError as scope_exc:
                 _log.warning("Slack scope issue during project-approve: %s", scope_exc)
-                ch = None
-            if ch:
-                _notify._write_charter_channel_id(req.project, ch)
-                _notify._post(ch, f":rocket: Project `{req.project}` approved! Welcome to the channel.")
-            else:
-                _log.warning("Slack channel creation failed for project %s", req.project)
-            # Provision the git origin per the request's repo_kind.
+                probes.append(_Probe(
+                    name="slack channel", status="warn",
+                    detail=f"slack scope: {scope_exc}", required=False,
+                ).to_dict())
+
+            # Provision the git origin. Phase 4: resolve the project's
+            # ``repo_kind`` (which is now a provider id) against the
+            # lab's git_providers list. Falls back to the legacy
+            # github/local synthesized provider when the id matches
+            # those literals — keeps pre-refactor charters working.
+            from ..core import git_providers as _gpr2
             local_repo = Path(f"~/repos/{req.project}").expanduser()
-            if (local_repo / ".git").is_dir():
-                kind = req.repo_kind or "github"
-                try:
-                    if kind == "local":
-                        if not req.local_repo_root:
-                            _log.warning(
-                                "local repo provisioning skipped for %s: no local_repo_root",
-                                req.project,
-                            )
-                        else:
-                            bare = Path(req.local_repo_root).expanduser() / f"{req.project}.git"
-                            _project_cmd.ensure_remote(
-                                local_repo, req.project, kind="local", bare_repo_path=bare,
-                            )
-                    else:
-                        # kind="github" — read org from lab.md, fall back to historic literal.
-                        lab_name = "hallett"
-                        org = snap_mod._lab_settings(lab_name).github_org or "hallettmiket"
-                        _project_cmd.ensure_remote(
-                            local_repo, req.project, kind="github", org=org,
-                        )
-                except Exception as _exc:
-                    _log.warning(
-                        "remote provisioning (kind=%s) failed for %s: %s",
-                        kind, req.project, _exc,
-                    )
-        return _request_response(result.request)
+            kind_or_id = req.repo_kind or "github"
+            lab_settings = snap_mod._lab_settings("hallett")
+            provider = _gpr2.find_provider(
+                [_pp._GP.GitProvider(**p.model_dump()) for p in lab_settings.git_providers],
+                kind_or_id,
+            )
+            ctx = _pp.ProvisionContext(
+                project=req.project,
+                local_repo=local_repo,
+                kind=kind_or_id,
+                org=lab_settings.github_org or "hallettmiket",
+                bare_repo_path=(
+                    Path(req.local_repo_root).expanduser() / f"{req.project}.git"
+                    if kind_or_id == "local" and req.local_repo_root else None
+                ),
+                members=list(req.proposed_members or []),
+                lab_mgmt_root=_lmgmt(),
+                provider=provider,
+                provider_id=kind_or_id,
+            )
+            try:
+                probes.extend(p.to_dict() for p in _pp.provision_project_remote(ctx))
+            except Exception as exc:  # noqa: BLE001
+                _log.warning("remote provisioning failed for %s: %s", req.project, exc)
+                probes.append(_Probe(
+                    name="remote provisioning", status="fail",
+                    detail=str(exc), required=True,
+                ).to_dict())
+        response = _request_response(result.request)
+        if probes:
+            from ..core import preflight as _pf2
+            from ..core.preflight import Probe as _Probe2
+            response["probes"] = probes
+            response["overall"] = _pf2.overall_status(
+                [_Probe2(**p) for p in probes]
+            )
+        return response
 
     def _request_response(req) -> dict:
         return {
@@ -877,9 +926,56 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail=f"project not found: {body.project}")
 
         # ---- Remote project: VSCode Remote-SSH launch ----
-        pointer = read_remote_pointer(project_path(body.project))
-        if pointer is not None:
-            host_name, remote_path = pointer
+        # Two routing sources, in priority order:
+        #   1. Installation manifest at ~/.wigamig/installations/<project>.yaml
+        #      with ``ssh_remote`` set. This is the canonical "this machine
+        #      installed mp1 on lab-server" signal — written by
+        #      workspace_initialize. Wins because the user may have a local
+        #      working tree AND a remote install for the same project.
+        #   2. Legacy ``.wigamig-remote-pointer`` marker in the local clone
+        #      (the older "pure-remote pointer" design). Still honoured for
+        #      back-compat with projects scaffolded before installations
+        #      manifests existed.
+        host_name: str | None = None
+        remote_path: str | None = None
+        from .snapshot import INSTALLATIONS_DIR as _INST_DIR
+        manifest_path = _INST_DIR / f"{body.project}.yaml"
+        if manifest_path.is_file():
+            try:
+                import yaml as _yaml_lp
+                m = _yaml_lp.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+            except (OSError, _yaml_lp.YAMLError):
+                m = {}
+            ssh_r = (m.get("ssh_remote") or "").strip() if isinstance(m, dict) else ""
+            if ssh_r:
+                host_name = ssh_r
+                # Resolve the per-project working clone path on the remote.
+                # The host's ``project_root`` is the parent dir ("~/repos"
+                # by convention); the project basename gives us the leaf.
+                from ..core import hosts as _hosts_lp
+                try:
+                    h = _hosts_lp.resolve(ssh_r)
+                    project_root = h.project_root or "~/repos"
+                except Exception:
+                    project_root = "~/repos"
+                rp = f"{project_root.rstrip('/')}/{body.project}"
+                # VSCode Remote-SSH needs an absolute path — tildes don't
+                # expand. Use the ``remote_home`` we captured at install
+                # time (e.g. /home/UWO/the_pi on lab-server, which the
+                # Ubuntu-default /home/<user> heuristic would have got
+                # wrong). Fall back to leaving the tilde if no manifest
+                # data (legacy installs).
+                rh = (m.get("remote_home") or "").strip() if isinstance(m, dict) else ""
+                if rh and rp.startswith("~/"):
+                    rp = f"{rh.rstrip('/')}/" + rp[2:]
+                remote_path = rp
+
+        if host_name is None:
+            pointer = read_remote_pointer(project_path(body.project))
+            if pointer is not None:
+                host_name, remote_path = pointer
+
+        if host_name is not None:
             from ..core import hosts as _hosts
             try:
                 host = _hosts.resolve(host_name)
@@ -887,20 +983,52 @@ def create_app() -> FastAPI:
             except _hosts.HostNotFound:
                 ssh_host = host_name
             vscode_url = f"vscode-remote://ssh-remote+{ssh_host}{remote_path}"
-            # On macOS the `open` command dispatches the URL to VSCode if
-            # it's the default handler; if VSCode isn't installed the
-            # client falls back to the URL string we returned.
-            try:
-                subprocess.Popen(  # noqa: S603
-                    ["open", vscode_url],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    stdin=subprocess.DEVNULL,
-                    close_fds=True,
-                )
-                launched = True
-            except OSError:
-                launched = False  # Linux / no `open` — UI falls back to URL
+            # Prefer the ``code`` CLI directly with ``--folder-uri`` —
+            # works without LaunchServices having to register the
+            # ``vscode-remote://`` scheme. Fall back to ``open`` only
+            # when ``code`` isn't found (Linux without the install, or
+            # an old VSCode that didn't bundle the CLI). The launcher
+            # path inside the app bundle is the canonical place — the
+            # PATH-installed ``code`` shim points back to it.
+            import shutil as _sh
+            launched = False
+            launch_err: str | None = None
+            code_bin: str | None = None
+            for cand in (
+                "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+                "/Applications/Visual Studio Code - Insiders.app/Contents/Resources/app/bin/code",
+                _sh.which("code") or "",
+            ):
+                if cand and Path(cand).is_file():
+                    code_bin = cand
+                    break
+            if code_bin:
+                try:
+                    subprocess.Popen(  # noqa: S603
+                        [code_bin, "--folder-uri", vscode_url, "--new-window"],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        stdin=subprocess.DEVNULL,
+                        close_fds=True,
+                    )
+                    launched = True
+                except OSError as exc:
+                    launch_err = f"code launcher failed: {exc}"
+            else:
+                # Last resort: try the URL handler. On macOS this errors
+                # with kLSApplicationNotFoundErr when no app claims the
+                # scheme — surface that so the UI can suggest the fix.
+                try:
+                    res = subprocess.run(  # noqa: S603
+                        ["open", vscode_url],
+                        capture_output=True, text=True, timeout=10,
+                    )
+                    if res.returncode == 0:
+                        launched = True
+                    else:
+                        launch_err = (res.stderr or res.stdout or "").strip()
+                except (OSError, subprocess.TimeoutExpired) as exc:
+                    launch_err = str(exc)
             return {
                 "ok": True,
                 "project": body.project,
@@ -908,10 +1036,15 @@ def create_app() -> FastAPI:
                 "remote_path": remote_path,
                 "vscode_url": vscode_url,
                 "launched": launched,
+                "launcher": code_bin or "open",
+                "error": launch_err,
                 "note": (
-                    "Project lives on " + host_name + " — launched VSCode Remote-SSH. "
-                    "Open agent terminals inside VSCode (the laptop can't spawn "
-                    "iTerm windows on the remote host)."
+                    f"Project lives on {host_name} — launched VSCode Remote-SSH."
+                    if launched else
+                    "Could not launch VSCode automatically. Open VSCode manually "
+                    "and paste this into the command palette: 'Remote-SSH: Connect "
+                    f"to Host…' then enter '{ssh_host}', then File > Open Folder "
+                    f"and enter '{remote_path}'. Or copy: {vscode_url}"
                 ),
             }
 
@@ -983,33 +1116,135 @@ def create_app() -> FastAPI:
     ) -> dict:
         """Provision a project on this machine: mkdir raw/refined + write manifest.
 
-        Minimal scope by design. Does not clone the repo, install agents,
-        or run any shell beyond ``mkdir -p`` — those steps stay as a user
-        checklist. The manifest at ``~/.wigamig/installations/<project>.yaml``
-        is what makes the installation appear in the dashboard's
-        Installations panel on the next refresh.
+        Runs a preflight first — the user wanted to see green/yellow/red
+        rows for "is the project here", "can I reach the SSH host", "are
+        raw/refined/notebook present (mkdir if not)", "any unresolved
+        issues on the prior manifest". The manifest is **only** written
+        when no required probe fails; otherwise the response carries the
+        probes and a 422 so the UI can show what to fix.
         """
         import datetime as _dt
         import yaml as _yaml
         from .snapshot import INSTALLATIONS_DIR
+        from ..core import preflight as _pf
+        from ..core.preflight import Probe as _Probe
 
         actor = _resolve_actor(user)
         _require_active(actor)
+
+        probes: list[_Probe] = []
 
         # Validate project exists locally before scribbling any state.
         from ..core.projects import project_path as _pp
         if not _pp(body.project).is_dir():
             raise HTTPException(status_code=404, detail=f"project not found: {body.project}")
+        probes.append(_Probe(
+            name="project", status="ok",
+            detail=f"local clone at {_pp(body.project)}", required=True,
+        ))
 
-        # Create raw + refined dirs for this project. ``mkdir -p`` is idempotent.
-        try:
-            raw_proj = Path(body.raw_path).expanduser() / body.project
-            refined_proj = Path(body.refined_path).expanduser() / body.project
-            raw_proj.mkdir(parents=True, exist_ok=True)
-            refined_proj.mkdir(parents=True, exist_ok=True)
-        except OSError as exc:
-            raise HTTPException(status_code=500, detail=f"mkdir failed: {exc}")
+        # Carry forward any unresolved issues from a previous installation
+        # on this machine — installing on top of an unresolved issue is
+        # almost always a mistake (e.g. last install couldn't reach the
+        # SSH mount; user fixes it and re-installs).
+        prior_manifest = INSTALLATIONS_DIR / f"{body.project}.yaml"
+        if prior_manifest.is_file():
+            try:
+                prior = _yaml.safe_load(prior_manifest.read_text(encoding="utf-8")) or {}
+            except (OSError, _yaml.YAMLError):
+                prior = {}
+            open_issues = [i for i in (prior.get("issues") or []) if i]
+            if open_issues:
+                probes.append(_Probe(
+                    name="prior issues", status="warn",
+                    detail=f"{len(open_issues)} unresolved on prior install: " + "; ".join(map(str, open_issues[:3])),
+                    required=False,
+                ))
+            else:
+                probes.append(_Probe(
+                    name="prior issues", status="ok",
+                    detail="no unresolved issues on prior install", required=False,
+                ))
 
+        # Remote install: one batched SSH session does wigamig probe +
+        # mkdir raw/refined/notebook + git-clone-if-missing. Combined
+        # with the user's ControlMaster socket, this is typically zero
+        # additional auth handshakes — matters on lab-server where 3
+        # failed auths costs 30 minutes. See core.remote_install.
+        if body.ssh_remote:
+            from ..core import hosts as _hosts
+            from ..core import remote_install as _ri
+            try:
+                host_obj = _hosts.resolve(body.ssh_remote)
+            except Exception:
+                host_obj = _hosts.Host(
+                    name=body.ssh_remote, kind="ssh", ssh_host=body.ssh_remote,
+                    remote_user="", project_root="~/repos", lab_vm_root=body.lab_base or "~/wigamig",
+                    vault_root="~/Obsidian", mount_point=body.mount_point or "",
+                    description="ad-hoc workspace_initialize target",
+                )
+            # Derive the canonical GitHub URL for this project from the
+            # lab's settings. Sensitive projects (kind=local) bypass this
+            # by leaving repo_url blank — the user's existing manual
+            # workflow for those is preserved until the local-bare-repo
+            # remote-clone path lands.
+            from ..core.frontmatter import parse_file as _parse_charter
+            repo_url: str | None = None
+            try:
+                charter = Path(f"~/repos/{body.project}/CHARTER.md").expanduser()
+                kind = "github"
+                if charter.is_file():
+                    meta = _parse_charter(charter).meta or {}
+                    kind = str(meta.get("repo_kind") or "github")
+                if kind == "github":
+                    org = snap_mod._lab_settings("hallett").github_org or "hallettmiket"
+                    repo_url = f"git@github.com:{org}/{body.project}.git"
+            except Exception:
+                repo_url = None
+
+            targets = _ri.InstallTargets(
+                project=body.project,
+                raw_path=body.raw_path,
+                refined_path=body.refined_path,
+                notebook_path=body.notebook_path,
+                repo_url=repo_url,
+                agents=list(body.agents or []),
+            )
+            for p in _ri.install(host_obj, targets):
+                probes.append(p)
+
+        # Local raw + refined dirs. These exist either way (the dashboard
+        # writes the manifest locally even for SSH installs), but they're
+        # only the *user's* data dirs when has_direct_access=True.
+        raw_proj = Path(body.raw_path).expanduser() / body.project
+        refined_proj = Path(body.refined_path).expanduser() / body.project
+        if body.has_direct_access or not body.ssh_remote:
+            for label, path in (("raw", raw_proj), ("refined", refined_proj)):
+                probes.append(_pf._ensure_dir(path, label=label, required=False))
+
+        # If any required probe failed, refuse to write the manifest —
+        # the user asked for "all issues attended to before final
+        # installation". Return probes so the UI can render them.
+        overall = _pf.overall_status(probes)
+        if overall == "fail":
+            return {
+                "ok": False,
+                "project": body.project,
+                "overall": overall,
+                "probes": [p.to_dict() for p in probes],
+                "manifest": None,
+            }
+
+        # Pluck the remote ``$HOME`` out of the probes if the install
+        # script printed one (only the SSH path does). Used at launch
+        # time to expand ``~/repos/<project>`` into an absolute path for
+        # VSCode Remote-SSH — lab-server's home is /home/UWO/<user>, not
+        # the Ubuntu-default /home/<user>, so we can't hardcode it.
+        remote_home: str | None = None
+        for p in probes:
+            if p.name == "homedir" and p.status == "ok" and p.detail:
+                remote_home = p.detail.strip()
+                break
         member_at = body.member if body.member.startswith("@") else f"@{body.member}"
         today_iso = _dt.date.today().isoformat()
         manifest = {
@@ -1025,6 +1260,7 @@ def create_app() -> FastAPI:
             "refined_path": body.refined_path,
             "notebook_path": body.notebook_path,
             "ssh_remote": body.ssh_remote,
+            "remote_home": remote_home,
             "mount_point": body.mount_point,
             "components": body.infra_components,
             "agents": body.agents,
@@ -1050,6 +1286,8 @@ def create_app() -> FastAPI:
             "manifest": str(manifest_path),
             "raw_dir": str(raw_proj),
             "refined_dir": str(refined_proj),
+            "overall": overall,
+            "probes": [p.to_dict() for p in probes],
         }
 
     # -----------------------------------------------------------------
@@ -1058,15 +1296,42 @@ def create_app() -> FastAPI:
 
     @app.post("/api/machine/settings")
     def save_machine_settings(body: MachineSettingsBody) -> dict:
-        """Persist per-machine settings to ``~/.wigamig/machine.yaml``.
+        """Persist per-machine settings and report folder preflight.
 
         Not gated on identity: the file is in the user's home dir, so
-        the OS already enforces who can write it. Returns the path so
-        the UI can display where the value landed.
+        the OS already enforces who can write it. After writing, runs
+        the wigamig_base + Obsidian-vault probes so the UI can render
+        green/yellow/red rows for the user (auto-creates the standard
+        subfolders if they're missing).
+
+        Refuses outright (HTTP 422) if ``wigamig_base`` points inside a
+        protected lab-VM subtree (``/data/lab_vm/raw|refined``) — those
+        paths are governed by the raw_guard / protected_paths hooks and
+        re-routing writes through wigamig would bypass them.
         """
         from . import machine_settings as _ms
+        from ..core import preflight as _pf
+
+        blocked = _pf.is_lab_vm_protected(body.wigamig_base or "")
+        if blocked:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"wigamig_base cannot be set under {blocked} — that subtree "
+                    "is protected by lab policy. Use /data/lab_vm itself, or a "
+                    "different parent."
+                ),
+            )
+
         path = _ms.write(C.MachineSettings(**body.model_dump()))
-        return {"ok": True, "path": str(path)}
+        probes = _pf.probe_wigamig_base(body.wigamig_base)
+        probes.append(_pf.probe_obsidian_vault(body.obsidian_vault_path))
+        return {
+            "ok": True,
+            "path": str(path),
+            "overall": _pf.overall_status(probes),
+            "probes": [p.to_dict() for p in probes],
+        }
 
     @app.post("/api/member/settings")
     def save_member_settings(
@@ -1121,12 +1386,55 @@ def create_app() -> FastAPI:
         _merge("contact", {k: getattr(body, k) for k in contact_keys if k in sent})
         _merge("location", {k: getattr(body, k) for k in location_keys if k in sent})
 
+        # Phase 3: per-provider git_logins map. Replaces the flat
+        # ``contact.github`` for new code, but we keep contact.github
+        # in sync with git_logins["github"] so legacy readers keep
+        # working through the migration.
+        if "git_logins" in sent and body.git_logins is not None:
+            from ..core import git_providers as _gpr
+            existing = meta.get("git_logins") if isinstance(meta.get("git_logins"), dict) else {}
+            merged = dict(existing or {})
+            for k, v in body.git_logins.items():
+                if v is None or (isinstance(v, str) and not v.strip()):
+                    merged.pop(k, None)
+                else:
+                    merged[str(k)] = str(v).strip().lstrip("@")
+            cleaned = _gpr.dump_logins(merged)
+            if cleaned:
+                meta["git_logins"] = cleaned
+            else:
+                meta.pop("git_logins", None)
+            # Mirror github login back into contact.github for legacy
+            # readers (the JSX still surfaces it as a contact link).
+            gh = cleaned.get("github")
+            contact_block = meta.get("contact") if isinstance(meta.get("contact"), dict) else {}
+            contact_block = dict(contact_block or {})
+            if gh:
+                contact_block["github"] = gh
+            elif "github" in (existing or {}):
+                contact_block.pop("github", None)
+            if contact_block:
+                meta["contact"] = contact_block
+            else:
+                meta.pop("contact", None)
+
         try:
             member_path.write_text(dump_document(meta, parsed.body or ""), encoding="utf-8")
         except OSError as exc:
             raise HTTPException(status_code=500, detail=f"write failed: {exc}")
 
-        return {"ok": True, "path": str(member_path)}
+        # Commit + push so re-seeds / pulls don't silently overwrite
+        # the save. Best-effort: a push failure leaves the local commit
+        # in place and surfaces a yellow probe. See git_persist for
+        # why each step can degrade independently.
+        from ..core import git_persist as _gp
+        probes = _gp.commit_and_push(
+            member_path, message=f"profile: @{actor}", push=True,
+        )
+        return {
+            "ok": True, "path": str(member_path),
+            "probes": [p.to_dict() for p in probes],
+        }
 
     @app.post("/api/lab/settings")
     def save_lab_settings(
@@ -1177,6 +1485,38 @@ def create_app() -> FastAPI:
             updates["github_org"] = body.github_org or None
         if body.git_repos_subpath is not None:
             updates["git_repos_subpath"] = body.git_repos_subpath or None
+        if body.git_providers is not None:
+            # Validate kinds + ids before persisting. An empty list
+            # explicitly clears the providers block (so the resolver
+            # falls back to deriving from github_org).
+            from ..core import git_providers as _gpr
+            for entry in body.git_providers:
+                if not entry.id.strip():
+                    raise HTTPException(status_code=422, detail="git_providers[*].id is required")
+                if entry.kind not in _gpr.VALID_KINDS:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"git_providers[*].kind must be one of {_gpr.VALID_KINDS}",
+                    )
+            seen_ids: set[str] = set()
+            for entry in body.git_providers:
+                if entry.id in seen_ids:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"duplicate git_provider id: {entry.id}",
+                    )
+                seen_ids.add(entry.id)
+            providers = [
+                _gpr.GitProvider(
+                    id=e.id.strip(), kind=e.kind, label=e.label, target=e.target,
+                )
+                for e in body.git_providers
+            ]
+            # Empty providers list explicitly clears the block so the
+            # resolver falls back to deriving from github_org. The
+            # generic loop below treats ``None`` as "drop key"; non-empty
+            # lists are written as-is.
+            updates["git_providers"] = _gpr.dump_providers(providers) if providers else None
 
         for k, v in updates.items():
             if v in (None, ""):
@@ -1189,7 +1529,80 @@ def create_app() -> FastAPI:
         except OSError as exc:
             raise HTTPException(status_code=500, detail=f"write failed: {exc}")
 
-        return {"ok": True, "path": str(lab_path)}
+        from ..core import git_persist as _gp
+        probes = _gp.commit_and_push(
+            lab_path, message="lab settings update", push=True,
+        )
+        return {
+            "ok": True, "path": str(lab_path),
+            "probes": [p.to_dict() for p in probes],
+        }
+
+    # -----------------------------------------------------------------
+    # Master folders on the lab server (lab_base/{raw,refined,...})
+    # -----------------------------------------------------------------
+
+    def _resolve_lab_base() -> tuple[str, str | None]:
+        """Return ``(lab_name, lab_base)`` for the current viewer's lab.
+
+        Reads ``lab.md`` via the dashboard helpers — same source the
+        settings modal uses. Used by both endpoints so we never disagree
+        on which lab we're talking about.
+        """
+        # Cheap lookup: read the current lab's name then its settings.
+        lab_name = "hallett"  # placeholder; today's dashboard is single-lab
+        try:
+            ls = snap_mod._lab_settings(lab_name)
+            return lab_name, ls.lab_base
+        except Exception:
+            return lab_name, None
+
+    @app.get("/api/lab/master_folders")
+    def get_master_folders(
+        refresh: bool = Query(False, description="Re-probe over SSH; otherwise return cached status."),
+    ) -> dict:
+        """Return the master-folders status for the current lab.
+
+        Default mode reads the cache so the dashboard's persistent
+        green-light pill loads instantly. ``?refresh=true`` forces a
+        fresh SSH probe (no mkdir — that takes an explicit POST).
+        """
+        from ..core import master_folders as _mf
+        lab_name, lab_base = _resolve_lab_base()
+        if refresh:
+            result = _mf.run(lab_base, create=False)
+            _mf.cache_save(lab_name, result)
+            return {"lab": lab_name, "from_cache": False, **result}
+        cached = _mf.cached_summary(lab_name)
+        if cached is None:
+            # Never probed yet — return a minimal shape the UI can
+            # render as "click to check".
+            return {
+                "lab": lab_name, "from_cache": True,
+                "host": None, "path": lab_base,
+                "overall": "unknown",
+                "checked": None,
+                "probes": [],
+            }
+        return {"lab": lab_name, "from_cache": True, **cached, "probes": []}
+
+    @app.post("/api/lab/master_folders/init")
+    def post_master_folders_init(
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Create any missing master folders on the lab server.
+
+        PI-only — directory creation on a shared multi-user machine is
+        not a member-level operation. Idempotent: re-running on an
+        already-bootstrapped lab returns all-green probes with no side
+        effects.
+        """
+        from ..core import master_folders as _mf
+        _require_pi(user)
+        lab_name, lab_base = _resolve_lab_base()
+        result = _mf.run(lab_base, create=True)
+        _mf.cache_save(lab_name, result)
+        return {"lab": lab_name, "from_cache": False, **result}
 
     # -----------------------------------------------------------------
     # Membership (PI-only roster mgmt)
@@ -1418,6 +1831,70 @@ def create_app() -> FastAPI:
         except Exception as exc:  # noqa: BLE001 — surface to the user
             raise HTTPException(status_code=500, detail=f"provisioning failed: {exc}")
 
+    @app.post("/api/project/{project}/sync_remote")
+    def sync_project_remote(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Run the full provisioning pipeline with traffic-light progress.
+
+        Idempotent re-run of the work done at approve-time: verify the
+        GitHub repo, push main, sync each project member as a
+        collaborator. PI-only because it issues GitHub-side membership
+        changes. Returns the same ``{probes, overall}`` shape the
+        machine-settings endpoint uses, so the UI renders rows the same
+        way.
+        """
+        from ..core import preflight as _pf
+        from ..core import project_provision as _pp
+        from ..core.frontmatter import parse_file as _parse
+        from ..core.repo import lab_mgmt_repo_root as _lmgmt
+
+        _require_pi(user)
+        local_repo = Path(f"~/repos/{project}").expanduser()
+        if not (local_repo / ".git").is_dir():
+            raise HTTPException(status_code=404, detail=f"No local git repo at {local_repo}")
+
+        # Pull repo_kind + members from CHARTER.md so the panel can
+        # re-sync without re-collecting the inputs the user already gave.
+        charter = local_repo / "CHARTER.md"
+        kind = "github"
+        local_repo_root: str | None = None
+        members: list[str] = []
+        if charter.is_file():
+            meta = _parse(charter).meta or {}
+            kind = str(meta.get("repo_kind") or "github")
+            local_repo_root = meta.get("local_repo_root") or None
+            members = [str(m) for m in (meta.get("members") or [])]
+
+        from ..core import git_providers as _gpr3
+        lab_settings = snap_mod._lab_settings("hallett")
+        provider = _gpr3.find_provider(
+            [_pp._GP.GitProvider(**p.model_dump()) for p in lab_settings.git_providers],
+            kind,
+        )
+        ctx = _pp.ProvisionContext(
+            project=project,
+            local_repo=local_repo,
+            kind=kind,
+            org=lab_settings.github_org or "hallettmiket",
+            bare_repo_path=(
+                Path(local_repo_root).expanduser() / f"{project}.git"
+                if kind == "local" and local_repo_root else None
+            ),
+            members=members,
+            lab_mgmt_root=_lmgmt(),
+            provider=provider,
+            provider_id=kind,
+        )
+        probes = _pp.provision_project_remote(ctx)
+        return {
+            "ok": True,
+            "project": project,
+            "overall": _pf.overall_status(probes),
+            "probes": [p.to_dict() for p in probes],
+        }
+
     @app.delete("/api/installations/{project}")
     def delete_installation(
         project: str,
@@ -1479,7 +1956,18 @@ def create_app() -> FastAPI:
                         "member": str(data.get("member") or "")},
         ))
         manifest_path.unlink()
-        return {"ok": True, "removed": project, "report": str(report)}
+        # Return cleanup items inline so the UI can render a structured
+        # "what you need to delete by hand" popup instead of just
+        # pointing the user at the report file.
+        return {
+            "ok": True,
+            "removed": project,
+            "report": str(report),
+            "cleanup_items": [
+                {"path": i.path, "note": i.note, "severity": i.severity}
+                for i in items
+            ],
+        }
 
     @app.post("/api/project/{project}/sync_slack_members")
     def sync_project_slack_members(

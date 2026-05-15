@@ -166,6 +166,7 @@ def build_response(
         inventory=_inventory(snap),
         notebook=_notebook(handle, today_d),
         installations=_installations(norm, effective_persona),
+        master_folders=_master_folders_summary(),
     )
 
 
@@ -326,6 +327,7 @@ def _member_settings(profile: dict) -> C.MemberSettings:
         s = str(value).strip()
         return s or None
 
+    from ..core import git_providers as _gp
     return C.MemberSettings(
         obsidian_vault_path=_s(vault_path),
         obsidian_vault_name=_s(vault_name),
@@ -343,6 +345,7 @@ def _member_settings(profile: dict) -> C.MemberSettings:
         address=_s(location_d.get("address")),
         city=_s(location_d.get("city")),
         department=_s(location_d.get("department")),
+        git_logins=_gp.parse_logins(profile if isinstance(profile, dict) else {}),
     )
 
 
@@ -431,13 +434,35 @@ def _lab_oracle_folder(lab_name: str) -> str:
     return "lab_oracle/"
 
 
+def _master_folders_summary() -> dict:
+    """Return the cached master-folders status for the current lab.
+
+    The dashboard pill reads this on every refresh; live SSH probes
+    only happen when the user clicks "check" or "init" in Lab Settings.
+    Returns an empty dict when nothing has been cached yet so the JSX
+    can render "?" + a prompt.
+    """
+    try:
+        from ..core import master_folders as _mf
+        lab_name = "hallett"  # single-lab today; resolves via lab.md later
+        summary = _mf.cached_summary(lab_name)
+        return summary or {}
+    except Exception:
+        return {}
+
+
 def _lab_settings(lab_name: str) -> C.LabSettings:
     """Read lab-wide settings from ``<lab-mgmt>/lab.md`` frontmatter."""
+    from ..core import git_providers as _gp
     try:
         root = lab_mgmt_repo_root()
         lab_file = root / "lab.md"
         if lab_file.is_file():
             meta = parse_file(lab_file).meta or {}
+            providers = [
+                C.GitProvider(**p.to_dict())
+                for p in _gp.resolve_providers(meta)
+            ]
             return C.LabSettings(
                 name=str(meta.get("name") or lab_name),
                 display_name=str(meta.get("display_name") or f"{lab_name.capitalize()} Lab"),
@@ -445,6 +470,7 @@ def _lab_settings(lab_name: str) -> C.LabSettings:
                 website=meta.get("website") or None,
                 admins=list(meta.get("admins") or []),
                 lab_base=meta.get("lab_base") or None,
+                git_providers=providers,
                 github_org=str(meta.get("github_org") or "hallettmiket"),
                 git_repos_subpath=str(meta.get("git_repos_subpath") or "repos"),
                 notebook_large_files_path=meta.get("notebook_large_files_path") or None,
