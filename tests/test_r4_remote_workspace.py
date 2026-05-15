@@ -276,10 +276,18 @@ def test_workspace_launch_remote_returns_vscode_url(world, monkeypatch):
     assert body["host"] == "biodatsci"
     assert body["remote_path"] == "/home/mhallet/repos/candi"
     assert body["vscode_url"] == "vscode-remote://ssh-remote+biodatsci/home/mhallet/repos/candi"
-    # And the laptop fired `open <url>` (or fell back gracefully).
+    # Two acceptable launchers (2026-05-15 refactor): the ``code`` CLI
+    # invoked with ``--folder-uri`` (preferred — works without macOS
+    # LaunchServices registering the vscode-remote scheme), or ``open``
+    # as a fallback. Either way the URL must be present in argv.
     if launched["argv"] is not None:
-        assert launched["argv"][0] == "open"
-        assert launched["argv"][1] == body["vscode_url"]
+        argv0 = launched["argv"][0]
+        if argv0 == "open":
+            assert launched["argv"][1] == body["vscode_url"]
+        else:
+            assert argv0.endswith("/code")
+            assert "--folder-uri" in launched["argv"]
+            assert body["vscode_url"] in launched["argv"]
 
 
 def test_workspace_launch_remote_falls_back_when_open_fails(world, monkeypatch):
