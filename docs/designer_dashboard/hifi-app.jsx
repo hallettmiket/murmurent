@@ -1241,13 +1241,25 @@ function ProjectDetailRows({ proj: p }) {
   // Set when the slack-create endpoint returns 409 + recoverable=true
   // because the bot can't enumerate channels to find an existing one.
   const [recoverable, setRecoverable] = React.useState({});
+  // Optional Slack channel-name override the PI can type in before
+  // pressing "Create Slack channel". Empty → server uses the wigamig
+  // default (proj-<slug>) or the slack_channel_name already stored in
+  // CHARTER. The placeholder shows whichever default would be used.
+  const [slackChannelDraft, setSlackChannelDraft] = React.useState("");
 
-  const provision = async (resource) => {
+  const provision = async (resource, extraQuery) => {
     setBusy(b => ({...b, [resource]: true}));
     setErrs(e => ({...e, [resource]: null}));
     setRecoverable(r => ({...r, [resource]: false}));
     try {
-      const q = userParam ? "?user=" + encodeURIComponent(userParam) : "";
+      const params = new URLSearchParams();
+      if (userParam) params.set("user", userParam);
+      if (extraQuery) {
+        for (const [k, v] of Object.entries(extraQuery)) {
+          if (v) params.set(k, v);
+        }
+      }
+      const q = params.toString() ? "?" + params.toString() : "";
       const r = await fetch("/api/project/" + encodeURIComponent(p.name) + "/provision/" + resource + q,
         {method: "POST"});
       if (!r.ok) {
@@ -1374,8 +1386,25 @@ function ProjectDetailRows({ proj: p }) {
           <span style={{color:"var(--muted)"}}>no channel</span>
         )}
         {isPI && !p.slack_channel_id && !done.slack && (
+          <input
+            type="text"
+            value={slackChannelDraft}
+            onChange={e => setSlackChannelDraft(e.target.value)}
+            placeholder={
+              "proj-" + p.name.toLowerCase().replace(/_/g, "-") +
+              "   (default — leave blank to use)"
+            }
+            style={{
+              padding:"3px 6px", border:"1px solid var(--rule)",
+              borderRadius:2, fontFamily:"var(--mono)", fontSize:11,
+              minWidth: 280,
+            }}
+            title="Override the wigamig-conventional proj-<project> name. Leave blank to use the default."
+          />
+        )}
+        {isPI && !p.slack_channel_id && !done.slack && (
           <button className="btn sm" disabled={busy.slack}
-            onClick={() => provision("slack")}>
+            onClick={() => provision("slack", { channel_name: slackChannelDraft.trim() })}>
             {busy.slack ? "…" : (errs.slack ? "Retry Slack setup" : "Create Slack channel")}
           </button>
         )}
@@ -2260,6 +2289,11 @@ function NewProjectModal({ onClose }) {
     ? ms.lab_base.replace(/\/$/, "") + "/" + ls.git_repos_subpath
     : (ms.lab_base ? ms.lab_base.replace(/\/$/, "") + "/git_repos" : "");
   const [localRepoRoot, setLocalRepoRoot] = useState(defaultLocalRoot);
+  // Slack channel name override. Empty = wigamig default of
+  // ``proj-<project>``. The placeholder updates live as the user types
+  // the project name so it's obvious what will be created if they
+  // leave this blank. Validation is server-side (normalize_channel_name).
+  const [slackChannelName, setSlackChannelName] = useState("");
   // Item 3 (R3): install target. Populated from /api/hosts on mount.
   // Defaults to "local"; selecting a remote host (e.g. biodatsci) makes
   // approval scaffold the project on that machine over SSH.
@@ -2305,6 +2339,7 @@ function NewProjectModal({ onClose }) {
         repo_kind: repoKind,
         local_repo_root: repoKind === "local" ? (localRepoRoot.trim() || null) : null,
         host,
+        slack_channel_name: slackChannelName.trim() || null,
       });
       if (typeof window.__wigamigFetchData === "function") {
         await window.__wigamigFetchData(window.DATA.persona);
@@ -2336,6 +2371,21 @@ function NewProjectModal({ onClose }) {
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>name (snake_case)</label>
         <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. dcis_imaging_genomics"
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
+
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>slack channel (optional)</label>
+        <input value={slackChannelName}
+               onChange={e => setSlackChannelName(e.target.value)}
+               placeholder={
+                 (name.trim()
+                   ? "proj-" + name.trim().toLowerCase().replace(/_/g, "-")
+                   : "proj-<project>") + "   (default — leave blank to use)"
+               }
+               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
+        <div className="muted" style={{fontSize:11, marginTop:-2, lineHeight:1.5}}>
+          Override only when the lab already has a channel that doesn't follow
+          the <code>proj-&lt;project&gt;</code> convention. Lowercase, max 80
+          chars, only letters / digits / <code>-</code> / <code>_</code>.
+        </div>
 
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>proposed members</label>
         {/* chips: already-selected handles */}

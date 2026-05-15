@@ -76,6 +76,11 @@ class CreateProjectRequestBody(BaseModel):
     # Defaults to "local" (this laptop); set to "biodatsci" (or any name
     # in ~/.wigamig/hosts.yaml) to scaffold the project on that machine.
     host: str = "local"
+    # 2026-05-15: optional override for the auto-derived Slack channel
+    # name. ``None`` / "" → wigamig defaults to ``proj-<project>``.
+    # Useful when the lab already has a channel that doesn't follow
+    # the convention, or wants a different name at create time.
+    slack_channel_name: str | None = None
 
 
 class AddMemberBody(BaseModel):
@@ -763,6 +768,7 @@ def create_app() -> FastAPI:
                 repo_kind=body.repo_kind,
                 local_repo_root=body.local_repo_root,
                 host=body.host,
+                slack_channel_name=body.slack_channel_name,
             )
         except request_actions.RequestForbidden as exc:
             raise HTTPException(status_code=403, detail=str(exc))
@@ -806,9 +812,12 @@ def create_app() -> FastAPI:
             # offline — the PI can link an existing channel later via
             # /api/project/<name>/link_slack_channel.
             try:
-                ch = _notify.create_project_channel(req.project)
+                ch = _notify.create_project_channel(
+                    req.project, channel_name=req.slack_channel_name,
+                )
                 if ch:
-                    _notify._write_charter_channel_id(req.project, ch)
+                    # create_project_channel persists id+name internally;
+                    # no need to re-write here.
                     _notify._post(ch, f":rocket: Project `{req.project}` approved! Welcome to the channel.")
                     probes.append(_Probe(
                         name="slack channel", status="ok",
@@ -1705,9 +1714,17 @@ def create_app() -> FastAPI:
     @app.post("/api/project/{project}/provision/slack")
     def provision_slack(
         project: str,
+        channel_name: str = Query("", description="Optional Slack channel name override; defaults to proj-<project>."),
         user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
     ) -> dict:
         """Create the Slack channel for a project. PI only. Idempotent.
+
+        ``channel_name`` (optional) overrides the wigamig-conventional
+        ``proj-<project>`` default — useful when the lab already has a
+        channel with a different name. Empty / omitted → uses the
+        stored ``slack_channel_name`` in CHARTER.md if present, else
+        the default. Validation: lowercase letters / digits / ``-`` /
+        ``_``, max 80 chars, must start with letter or digit.
 
         When the channel already exists but the bot lacks the
         ``channels:read`` scope to enumerate it, returns a structured
@@ -1716,8 +1733,21 @@ def create_app() -> FastAPI:
         """
         actor = _require_pi(user)
         from . import slack_notify as _notify
+        override = channel_name.strip() if channel_name else None
+        if override is not None:
+            cleaned = _notify.normalize_channel_name(override)
+            if cleaned is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"channel_name {override!r} isn't a valid Slack channel name. "
+                        "Use lowercase letters / digits / '-' / '_'; max 80 chars; "
+                        "must start with a letter or digit."
+                    ),
+                )
+            override = cleaned
         try:
-            channel_id = _notify.create_project_channel(project)
+            channel_id = _notify.create_project_channel(project, channel_name=override)
         except _notify.SlackScopeError as exc:
             raise HTTPException(
                 status_code=409,
@@ -1727,16 +1757,15 @@ def create_app() -> FastAPI:
                     "message": str(exc),
                     "recoverable": True,
                     "hint": (
-                        f"Paste the channel ID for #proj-{project.lower().replace('_','-')} "
+                        f"Paste the channel ID for #{override or _notify.default_channel_name(project)} "
                         "into the 'Link existing channel' field."
                     ),
                 },
             )
         if not channel_id:
             raise HTTPException(status_code=500, detail="Slack channel creation failed — check server logs")
-        _notify._write_charter_channel_id(project, channel_id)
         _notify._post(channel_id, f":rocket: Project `{project}` channel ready.")
-        return {"ok": True, "channel_id": channel_id}
+        return {"ok": True, "channel_id": channel_id, "channel_name": override or _notify.default_channel_name(project)}
 
     @app.post("/api/project/{project}/link_slack_channel")
     def link_slack_channel(

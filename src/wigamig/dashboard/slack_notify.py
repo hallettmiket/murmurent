@@ -68,29 +68,71 @@ def _project_channel_id(project_slug: str) -> str:
     return _CHAN_CLAUDE_CODE
 
 
-def _write_charter_channel_id(project_slug: str, channel_id: str) -> None:
-    """Persist slack_channel_id into the project's CHARTER.md frontmatter."""
+def _write_charter_channel_id(
+    project_slug: str,
+    channel_id: str,
+    *,
+    channel_name: str | None = None,
+) -> None:
+    """Persist slack_channel_id (and optionally slack_channel_name) into
+    the project's CHARTER.md frontmatter.
+
+    Storing the name alongside the id lets future channel-lookup
+    operations (e.g. recovery after a name_taken error) target the
+    actual name in use rather than the ``proj-<slug>`` default —
+    necessary when the lab opted for a non-conventional name at
+    create time.
+    """
     charter_path = Path(f"~/repos/{project_slug}/CHARTER.md").expanduser()
     if not charter_path.is_file():
         return
     try:
         text = charter_path.read_text(encoding="utf-8")
-        if "slack_channel_id:" in text:
-            text = re.sub(r"^slack_channel_id:.*", f"slack_channel_id: {channel_id}", text, flags=re.MULTILINE)
-        else:
-            lines = text.splitlines(keepends=True)
-            in_front = False
-            for i, line in enumerate(lines):
-                if line.strip() == "---":
-                    if not in_front:
-                        in_front = True
-                    else:
-                        lines.insert(i, f"slack_channel_id: {channel_id}\n")
-                        break
-            text = "".join(lines)
+        text = _upsert_frontmatter_field(text, "slack_channel_id", channel_id)
+        if channel_name is not None:
+            text = _upsert_frontmatter_field(text, "slack_channel_name", channel_name)
         charter_path.write_text(text, encoding="utf-8")
     except OSError as exc:
         log.warning("Could not write slack_channel_id to %s: %s", charter_path, exc)
+
+
+def _upsert_frontmatter_field(text: str, field: str, value: str) -> str:
+    """Set ``field: value`` in a YAML frontmatter block. Idempotent.
+
+    If the field already exists, replaces its value. Otherwise inserts
+    a new line just before the closing ``---``. Pure text rewrite —
+    avoids the full-yaml round-trip so a malformed frontmatter doesn't
+    eat the user's other fields.
+    """
+    pattern = rf"^{re.escape(field)}:.*"
+    if re.search(pattern, text, re.MULTILINE):
+        return re.sub(pattern, f"{field}: {value}", text, flags=re.MULTILINE, count=1)
+    lines = text.splitlines(keepends=True)
+    in_front = False
+    for i, line in enumerate(lines):
+        if line.strip() == "---":
+            if not in_front:
+                in_front = True
+            else:
+                lines.insert(i, f"{field}: {value}\n")
+                break
+    return "".join(lines)
+
+
+def _read_charter_channel_name(project_slug: str) -> str | None:
+    """Read ``slack_channel_name`` from the project's CHARTER.md, or
+    ``None`` when missing / unreadable. Used so a re-run of channel
+    creation/recovery targets the same name that was provisioned the
+    first time."""
+    charter_path = Path(f"~/repos/{project_slug}/CHARTER.md").expanduser()
+    if not charter_path.is_file():
+        return None
+    try:
+        text = charter_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    m = re.search(r"^slack_channel_name:\s*(\S+)", text, re.MULTILINE)
+    return m.group(1) if m else None
 
 
 class SlackScopeError(RuntimeError):
@@ -164,20 +206,69 @@ def _lookup_channel_id_by_name(name: str) -> str | None:
         return None
 
 
-def create_project_channel(project_slug: str) -> str | None:
+def default_channel_name(project_slug: str) -> str:
+    """Return the wigamig-conventional channel name for a project slug.
+
+    ``proj-{slug}`` with underscores → hyphens, lowercased, capped at
+    80 chars (Slack's hard limit). Exposed as a module-level helper so
+    UIs can render the same default in their placeholders.
+    """
+    return f"proj-{project_slug.lower().replace('_', '-')}"[:80]
+
+
+_CHANNEL_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,79}$")
+
+
+def normalize_channel_name(raw: str) -> str | None:
+    """Normalize a user-typed channel name and reject anything Slack
+    would refuse.
+
+    Slack channels are lowercase, max 80 chars, ``[a-z0-9_-]`` (must
+    start with a letter or digit, no leading ``-`` / ``_``). Returns
+    the cleaned name or ``None`` when it doesn't satisfy the rules so
+    the caller can return a 422 rather than send a doomed API call.
+    """
+    if not raw:
+        return None
+    cleaned = raw.strip().lstrip("#").lower().replace(" ", "-")
+    cleaned = cleaned[:80]
+    return cleaned if _CHANNEL_NAME_RE.match(cleaned) else None
+
+
+def create_project_channel(
+    project_slug: str,
+    channel_name: str | None = None,
+) -> str | None:
     """Create a Slack channel for a project and return its ID.
 
-    Channel name is ``proj-{project_slug}`` (hyphens, lowercase). If the
-    channel already exists, the existing ID is recovered in this order:
-    (1) ``slack_channel_id`` in the project's CHARTER.md, (2) a live
-    lookup against Slack's ``conversations.list``. The found ID is then
-    written back to CHARTER.md so subsequent calls are O(1). Returns
+    Channel name defaults to ``proj-{project_slug}`` (see
+    :func:`default_channel_name`). Pass ``channel_name`` to override —
+    useful when the lab already has a channel that doesn't follow the
+    convention, or wants a different name at create time. The chosen
+    name is persisted alongside the resolved ID in CHARTER.md so
+    future recovery calls target the right name.
+
+    If the channel already exists, the existing ID is recovered in
+    this order: (1) ``slack_channel_id`` in the project's CHARTER.md,
+    (2) a live lookup against Slack's ``conversations.list``. Returns
     ``None`` when no token is configured or the API call fails.
     """
     tok = _token()
     if not tok:
         return None
-    channel_name = f"proj-{project_slug.lower().replace('_', '-')}"[:80]
+    # Resolution order for the channel name we actually try:
+    #   1. explicit caller-supplied override (validated)
+    #   2. ``slack_channel_name`` already saved in CHARTER.md
+    #   3. wigamig default ``proj-<slug>``
+    if channel_name is not None:
+        validated = normalize_channel_name(channel_name)
+        if validated is None:
+            log.warning("Slack create_project_channel: invalid name %r", channel_name)
+            return None
+        channel_name = validated
+    else:
+        stored = _read_charter_channel_name(project_slug)
+        channel_name = stored if stored else default_channel_name(project_slug)
     try:
         import httpx
 
@@ -191,6 +282,7 @@ def create_project_channel(project_slug: str) -> str | None:
         if data.get("ok"):
             channel_id: str = data["channel"]["id"]
             log.info("Created Slack channel %s → %s", channel_name, channel_id)
+            _write_charter_channel_id(project_slug, channel_id, channel_name=channel_name)
             return channel_id
 
         err = data.get("error", "")
@@ -199,15 +291,18 @@ def create_project_channel(project_slug: str) -> str | None:
             return None
 
         # Channel already exists out-of-band. Recover its ID — first from
-        # CHARTER, then via Slack's API.
+        # CHARTER, then via Slack's API. Persist the resolved
+        # (id, name) tuple back to CHARTER so the next recovery is O(1).
         log.info("Slack channel %s already exists; recovering ID", channel_name)
         existing = _project_channel_id(project_slug)
         if existing and existing != _CHAN_CLAUDE_CODE:
+            _write_charter_channel_id(project_slug, existing, channel_name=channel_name)
             return existing
         looked_up = _lookup_channel_id_by_name(channel_name)
         if looked_up:
             log.info("Recovered Slack channel %s → %s via list lookup",
                      channel_name, looked_up)
+            _write_charter_channel_id(project_slug, looked_up, channel_name=channel_name)
             return looked_up
         log.warning(
             "Slack channel %s exists but the bot can't see it. Likely "
