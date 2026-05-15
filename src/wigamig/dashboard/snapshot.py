@@ -806,6 +806,32 @@ def _date_or_none(value) -> _dt.date | None:
         return None
 
 
+def _datetime_or_none(value) -> _dt.datetime | None:
+    """Parse an ISO datetime; assume UTC if naive. Returns None on garbage.
+
+    Used by _notifs_from_sea_timestamps so the fallback notif builder can
+    pass a real datetime (not just a date) into audit_log.humanize and
+    keep the time-string format consistent with the audit-backed path.
+    """
+    if not value:
+        return None
+    s = str(value)
+    try:
+        # `fromisoformat` handles "...+00:00" and "...Z" (3.11+) when present.
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        dt = _dt.datetime.fromisoformat(s)
+    except ValueError:
+        # Fall back: maybe it's just a date string. Anchor to UTC midnight.
+        d = _date_or_none(value)
+        if d is None:
+            return None
+        return _dt.datetime.combine(d, _dt.time(0, 0), _dt.timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=_dt.timezone.utc)
+    return dt
+
+
 def _notebook_stats(handle: str, today_d: _dt.date) -> C.NotebookStats:
     folder = _notebook_folder(handle)
     if not folder.is_dir():
@@ -1509,8 +1535,16 @@ def _notifs_from_audit(today_d: _dt.date) -> list[C.Notif]:
 def _notifs_from_sea_timestamps(
     all_seas: list[tuple[str, Sea]], today_d: _dt.date
 ) -> list[C.Notif]:
-    """Pre-Phase-5 fallback: derive notifs from SEA file timestamps."""
-    events: list[tuple[_dt.date, str, str]] = []
+    """Pre-Phase-5 fallback: derive notifs from SEA file timestamps.
+
+    Uses ``audit_log.humanize`` so the time strings stay TZ-aware and
+    match the audit-backed path's output ("just now" / "Nm ago" /
+    "HH:MM" / "yesterday" / "Nd ago"). Earlier this used a naïve
+    ``d == today_d`` string compare that broke during the UTC/local
+    boundary hours (local says 2026-05-14, SEA timestamp is
+    2026-05-15T00:08Z, mismatch → fallback to ISO date).
+    """
+    events: list[tuple[_dt.datetime, str, str]] = []
     for name, s in all_seas:
         for state, ts in (
             ("claimed", s.claimed_at),
@@ -1518,19 +1552,25 @@ def _notifs_from_sea_timestamps(
             ("examined", s.examined_at),
             ("concluded", s.concluded_at),
         ):
-            d = _date_or_none(ts)
-            if d is None:
+            when = _datetime_or_none(ts)
+            if when is None:
                 continue
             events.append(
                 (
-                    d,
-                    "today" if d == today_d else d.isoformat(),
+                    when,
                     f"{s.to_handle if state in {'claimed', 'complete'} else s.from_handle} "
                     f"{state} SEA #{s.id} ({name})",
+                    when,
                 )
             )
     events.sort(key=lambda r: r[0], reverse=True)
-    return [C.Notif(time=time, text=text) for _d, time, text in events[:5]]
+    # Anchor "now" to the snapshot's today_d so test runs with a pinned
+    # today stay deterministic; otherwise drift to current wall-clock UTC.
+    now = _dt.datetime.combine(today_d, _dt.time(23, 59, 59), _dt.timezone.utc)
+    return [
+        C.Notif(time=audit_log.humanize(when, now=now), text=text)
+        for when, text, _orig in events[:5]
+    ]
 
 
 # ---------------------------------------------------------------------------

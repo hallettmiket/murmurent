@@ -119,8 +119,17 @@ def read_recent(
     """Return the most recent ``limit`` events across the last ``days`` days.
 
     Newest first. Missing files / unreadable lines are skipped silently.
+
+    The "today" default is UTC-anchored to match ``write_event``, which
+    files rows under their UTC date. Mixing local + UTC dates here would
+    drop newly-written rows for the few hours each night where local
+    and UTC are on different calendar days (bit-rot observed
+    2026-05-14 23:08 EDT → 2026-05-15 00:08 UTC; events written under
+    the 15th, but a local ``date.today()`` reader was looking back from
+    the 14th). The explicit ``today=`` kwarg is preserved for tests
+    that pin a specific date.
     """
-    today = today or _dt.date.today()
+    today = today or _dt.datetime.now(_dt.timezone.utc).date()
     files = []
     for offset in range(days):
         d = today - _dt.timedelta(days=offset)
@@ -153,9 +162,10 @@ def has_any_events(*, days: int = 30, today: _dt.date | None = None) -> bool:
     """Return True if the audit chain has at least one row in ``days``.
 
     Cheap probe used by ``snapshot._notifs`` to decide between the
-    audit-backed feed and the SEA-timestamp fallback.
+    audit-backed feed and the SEA-timestamp fallback. UTC-anchored to
+    match ``write_event`` (see read_recent for the rationale).
     """
-    today = today or _dt.date.today()
+    today = today or _dt.datetime.now(_dt.timezone.utc).date()
     for offset in range(days):
         d = today - _dt.timedelta(days=offset)
         if (audit_dir() / f"{d.strftime(AUDIT_DATE_FMT)}.jsonl").is_file():
