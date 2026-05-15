@@ -130,6 +130,15 @@ if [[ -z "$WIGAMIG_VERSION" ]]; then
 fi
 ok "wigamig installed: ${WIGAMIG_VERSION}"
 
+# ── Step 4b: wire wigamig into the remote ~/.claude/ as the default ─────────
+# Same script that runs locally — re-points ~/.claude/agents at the
+# wigamig commons, links ~/.claude/CLAUDE.md, runs `wigamig install
+# --hooks`. Idempotent. Preserves any user-authored agents (non-symlinks).
+step "4b/5 wiring ~/.claude/ on ${HOST}"
+ssh_run 'export PATH=$HOME/.local/bin:$PATH; bash ~/repos/wigamig/scripts/setup.sh' \
+  && ok "~/.claude/ wired into wigamig commons on ${HOST}" \
+  || warn "setup.sh on ${HOST} reported issues — inspect manually if needed"
+
 # ── Step 5: sanity probes ────────────────────────────────────────────────────
 step "5/5 sanity probes on ${HOST}"
 ssh_run 'mkdir -p $HOME/.wigamig'

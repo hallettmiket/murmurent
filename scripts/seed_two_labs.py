@@ -480,10 +480,15 @@ def main() -> None:
     print(f"=== Seeding two-lab testing setup (today = {TODAY.isoformat()}) ===\n")
 
     # ── Wipe hallett lab_mgmt data (preserve config + spec) ─────────────
-    print("[1/5] Wiping hallett lab data (keeping lab.md, compliance.md, README.md)")
+    # The members/ wipe used to take everyone with it; the real PI's
+    # profile file (mhallet.md) is now preserved across reseeds because
+    # the dashboard pushes user-edits to it (contact + location). Fake
+    # personas (mu1/mu2/mu3) are still wiped + reseeded.
+    print("[1/5] Wiping hallett lab data (keeping lab.md, compliance.md, README.md, members/mhallet.md)")
     for sub in ("members", "projects", "audit", "dashboards",
                 "inventory", "keys", "requests"):
-        wipe_dir_contents(HALLETT_REPO / sub)
+        keep = {"mhallet.md"} if sub == "members" else None
+        wipe_dir_contents(HALLETT_REPO / sub, keep=keep)
     # Also clear stale untracked stragglers we don't want.
     for stale in ("oracle-publish.log",):
         p = HALLETT_REPO / stale
@@ -502,8 +507,15 @@ def main() -> None:
     # ── Re-seed hallett members + projects ─────────────────────────────
     print("[3/5] Seeding hallett lab members + projects")
     for handle in ("mhallet", "mu1", "mu2", "mu3"):
-        write(HALLETT_REPO / "members" / f"{handle}.md",
-              render_member(handle, MEMBER_SPECS[handle]))
+        target = HALLETT_REPO / "members" / f"{handle}.md"
+        # Preserve the real PI's profile if the user has already edited
+        # it. Re-running the seed should never silently overwrite
+        # dashboard-saved contact/location/handle fields. Fake personas
+        # (mu1/mu2/mu3) are always rewritten — they're test fixtures.
+        if handle == "mhallet" and target.is_file():
+            print(f"  preserved {target} (existing real-PI profile)")
+            continue
+        write(target, render_member(handle, MEMBER_SPECS[handle]))
     for proj in ("mp1", "mp2"):
         write(HALLETT_REPO / "projects" / f"{proj}.md",
               render_project(proj, PROJECT_SPECS[proj]))

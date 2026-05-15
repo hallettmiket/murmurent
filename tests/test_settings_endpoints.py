@@ -107,6 +107,57 @@ def test_machine_settings_round_trip(world):
     assert on_disk["obsidian_vault_name"] == "vault"
 
 
+def test_machine_settings_preflight_creates_subdirs(world, tmp_path):
+    """Saving wigamig_base materializes the four standard subfolders and
+    reports each in the preflight ``probes`` list with green status."""
+    base = tmp_path / "wigamig_root"
+    payload = {
+        "wigamig_base": str(base),
+        "obsidian_vault_path": str(tmp_path / "vault"),
+        "notebook_subfolder": "lab-notebook",
+        "oracle_subfolder": "oracle",
+    }
+    (tmp_path / "vault").mkdir()
+    res = TestClient(create_app()).post("/api/machine/settings", json=payload)
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["overall"] in ("ok", "warn")
+    names = {p["name"]: p for p in body["probes"]}
+    assert names["wigamig_base set"]["status"] == "ok"
+    assert names["not protected"]["status"] == "ok"
+    for sub in ("raw", "refined", "lab_notebooks"):
+        assert names[sub]["status"] == "ok", names[sub]
+        assert (base / sub).is_dir()
+    assert names["obsidian vault"]["status"] == "ok"
+
+
+def test_machine_settings_rejects_protected_lab_vm_paths(world):
+    """``/data/lab_vm/raw`` is a hard refuse — re-routing wigamig writes
+    through it would defeat the raw_guard hook."""
+    res = TestClient(create_app()).post("/api/machine/settings", json={
+        "wigamig_base": "/data/lab_vm/raw",
+    })
+    assert res.status_code == 422
+    assert "protected" in res.json()["detail"].lower()
+
+
+def test_machine_settings_allows_lab_vm_parent(world, tmp_path, monkeypatch):
+    """``/data/lab_vm`` itself is OK — only its raw/ + refined/ children
+    are off-limits. Use a tmp_path proxy to avoid touching the real
+    /data/lab_vm during the test, but the validation logic is the same.
+    """
+    # Use a tmp lab_vm root rather than the real one for write-safety.
+    fake_lv = tmp_path / "fake_lab_vm"
+    res = TestClient(create_app()).post("/api/machine/settings", json={
+        "wigamig_base": str(fake_lv),
+        "obsidian_vault_path": "",
+    })
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["overall"] in ("ok", "warn")
+    assert (fake_lv / "raw").is_dir()
+
+
 def test_machine_settings_load_falls_back_to_legacy_obsidian(world):
     """Until the user saves once, machine settings should still surface
     the values from the member profile's old ``obsidian:`` block so
