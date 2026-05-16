@@ -125,6 +125,97 @@ def test_malformed_yaml_falls_back_to_local_only(isolated):
     assert list(hosts.read().keys()) == ["local"]
 
 
+def test_scan_dirs_round_trip_absolute_and_relative(isolated):
+    """User-declared scan dirs (mixed $HOME-relative + absolute) must
+    survive a write → read cycle so the repo-inventory scanner sees
+    them on every load."""
+    h = hosts.Host(
+        name="lab-server", kind="ssh", ssh_host="lab-server",
+        scan_dirs=("repos", "work/clones", "/srv/projects"),
+    )
+    hosts.add(h)
+    reread = hosts.read()["lab-server"]
+    assert reread.scan_dirs == ("repos", "work/clones", "/srv/projects")
+
+
+def test_scan_dirs_default_is_empty_tuple(isolated):
+    """A host with no scan_dirs in YAML reads back as () so the inventory
+    scanner knows to apply its built-in defaults."""
+    hosts.add(hosts.Host(name="bio", kind="ssh", ssh_host="bio"))
+    assert hosts.read()["bio"].scan_dirs == ()
+
+
+def test_scan_dirs_drops_non_string_entries(isolated):
+    """A YAML scan_dirs list with junk entries (None, ints) keeps the
+    valid strings instead of rejecting the whole host."""
+    path = hosts.hosts_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "version: 1\nhosts:\n"
+        "  bio:\n"
+        "    kind: ssh\n"
+        "    ssh_host: bio\n"
+        "    scan_dirs: [repos, null, 42, '/srv/projects', '  ']\n",
+        encoding="utf-8",
+    )
+    assert hosts.read()["bio"].scan_dirs == ("repos", "/srv/projects")
+
+
+def test_scan_dirs_omitted_from_yaml_when_empty(isolated):
+    """We don't want every host row to grow a noisy ``scan_dirs: []``
+    after write — only persist the field when the user has set it."""
+    hosts.add(hosts.Host(name="bio", kind="ssh", ssh_host="bio"))
+    raw = hosts.hosts_file().read_text(encoding="utf-8")
+    assert "scan_dirs" not in raw
+
+
+def test_update_scan_dirs_preserves_other_fields(isolated):
+    """Editing scan_dirs from the dashboard must not blank out
+    ssh_host, remote_user, wigamig_base, etc."""
+    hosts.add(hosts.Host(
+        name="bio", kind="ssh", ssh_host="bio.example",
+        remote_user="the_pi", lab_vm_root="/srv/wigamig",
+        vault_root="/home/the_pi/Obsidian", description="schulich",
+    ))
+    updated = hosts.update_scan_dirs("bio", ["repos", "/srv/projects"])
+    assert updated.scan_dirs == ("repos", "/srv/projects")
+    assert updated.ssh_host == "bio.example"
+    assert updated.remote_user == "the_pi"
+    assert updated.lab_vm_root == "/srv/wigamig"
+    assert updated.description == "schulich"
+    # Round-trip verifies write persisted scan_dirs without losing the
+    # original fields.
+    reread = hosts.read()["bio"]
+    assert reread.scan_dirs == ("repos", "/srv/projects")
+    assert reread.ssh_host == "bio.example"
+
+
+def test_update_scan_dirs_can_clear(isolated):
+    """Passing an empty list reverts the host to inventory defaults."""
+    hosts.add(hosts.Host(
+        name="bio", kind="ssh", ssh_host="bio",
+        scan_dirs=("repos", "/srv/projects"),
+    ))
+    hosts.update_scan_dirs("bio", [])
+    assert hosts.read()["bio"].scan_dirs == ()
+
+
+def test_update_scan_dirs_materialises_local(isolated):
+    """``local`` is auto-derived on read when missing from YAML — calling
+    update_scan_dirs on it must actually persist a local row so the
+    setting survives a restart."""
+    hosts.update_scan_dirs("local", ["repos", "work/clones"])
+    raw = hosts.hosts_file().read_text(encoding="utf-8")
+    assert "local" in raw
+    assert "work/clones" in raw
+    assert hosts.read()["local"].scan_dirs == ("repos", "work/clones")
+
+
+def test_update_scan_dirs_unknown_raises(isolated):
+    with pytest.raises(hosts.HostNotFound):
+        hosts.update_scan_dirs("ghost", ["repos"])
+
+
 # ---------------------------------------------------------------------------
 # Remote.run argv construction
 # ---------------------------------------------------------------------------

@@ -314,6 +314,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
   const [err, setErr] = useState(null);
   const [showAllGithub, setShowAllGithub] = useState(false);
   const [installCtx, setInstallCtx] = useState(null);  // {project, machine}
+  const [adoptCtx,   setAdoptCtx]   = useState(null);  // {name, path, origin}
   // Hosts the user has registered. Sourced once on mount so the table
   // columns are stable across refreshes. The inventory report also
   // returns hosts_scanned; we use the registered list (which includes
@@ -423,6 +424,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
                   row={r}
                   knownHosts={knownHosts}
                   onInstall={(project, machine) => setInstallCtx({project, machine})}
+                  onAdopt={(ctx) => setAdoptCtx(ctx)}
                 />
               ))}
             </tbody>
@@ -441,11 +443,20 @@ function RepoInventoryPanel({ span = "c-12" }) {
           }}
         />
       )}
+      {adoptCtx && (
+        <AdoptCloneModal
+          clone={adoptCtx}
+          onClose={(adopted) => {
+            setAdoptCtx(null);
+            if (adopted) load(true);
+          }}
+        />
+      )}
     </div>
   );
 }
 
-function RepoInventoryRow({ row, knownHosts, onInstall }) {
+function RepoInventoryRow({ row, knownHosts, onInstall, onAdopt }) {
   const gh = row.github;
   const cloneByHost = {};
   for (const c of (row.clones || [])) cloneByHost[c.host] = c;
@@ -460,21 +471,48 @@ function RepoInventoryRow({ row, knownHosts, onInstall }) {
     <span className="muted" style={{fontSize:11}}>—</span>
   );
 
-  // Per-host cell. Three states:
-  //   ✓ wig — cloned + wigamig-installed (CHARTER + .claude/agents/)
-  //   • clone — cloned but not wigamig-initialized
+  // Per-host cell. Four states:
+  //   ✓ wig — cloned + wigamig-initialized (CHARTER + .claude/agents/)
+  //   • clone + ↑ adopt — cloned but missing CHARTER.md or .claude/agents/.
+  //     The "adopt" button (local hosts only) opens a modal that writes
+  //     CHARTER.md and runs the layer-2 bootstrap, promoting the clone
+  //     to a wigamig project. Remote-host adopt is not wired yet (would
+  //     need an SSH equivalent of the charter writer).
   //   + install — not cloned; clickable if a GitHub origin exists
   //   — — not applicable (no github origin to clone from)
   const hostCell = (host) => {
     const c = cloneByHost[host];
     if (c) {
       const wig = c.is_wigamig_installed;
+      if (wig) {
+        return (
+          <span title={c.path} style={{
+            fontSize:11, color:"var(--green)", fontFamily:"var(--mono)",
+          }}>
+            ✓ wigamig
+          </span>
+        );
+      }
+      // Cloned but not initialized. Local hosts get an adopt button;
+      // remote hosts still show the dim badge (no SSH adopt path yet).
       return (
-        <span title={c.path} style={{
-          fontSize:11, color: wig ? "var(--green)" : "var(--muted)",
-          fontFamily:"var(--mono)",
-        }}>
-          {wig ? "✓ wigamig" : "• clone"}
+        <span style={{display:"inline-flex", alignItems:"center", gap:5}}>
+          <span title={c.path} style={{
+            fontSize:11, color:"var(--muted)", fontFamily:"var(--mono)",
+          }}>
+            • clone
+          </span>
+          {host === "local" && onAdopt && (
+            <button className="btn sm" style={{fontSize:10.5, padding:"1px 5px"}}
+                    title="Promote this clone to a wigamig project"
+                    onClick={() => onAdopt({
+                      name: row.name,
+                      path: c.path,
+                      origin: c.origin_url || "",
+                    })}>
+              ↑ adopt
+            </button>
+          )}
         </span>
       );
     }
@@ -505,6 +543,199 @@ function RepoInventoryRow({ row, knownHosts, onInstall }) {
       <td>{ghCell}</td>
       {knownHosts.map(h => <td key={h}>{hostCell(h)}</td>)}
     </tr>
+  );
+}
+
+/* ── AdoptCloneModal: promote a plain git clone to a wigamig project.
+   Pops from the Repo Inventory's "↑ adopt" button on • clone rows
+   for the local host. POSTs /api/inventory/adopt which writes
+   CHARTER.md + runs the layer-2 CC bootstrap. Returns probes which
+   we render inline so the user sees what landed and what didn't. */
+function AdoptCloneModal({ clone, onClose }) {
+  // Pre-fill from the row + the logged-in member so the common case
+  // (lead = me, members = [me], sensitivity = standard) is one click.
+  const myHandle = window.DATA.member?.handle
+    ? "@" + window.DATA.member.handle
+    : "@" + (window.DATA.persona === "pi" ? "pi" : "you");
+  const [form, setForm] = useState({
+    project:        clone.name || "",
+    lead:           myHandle,
+    members_text:   myHandle,
+    sensitivity:    "standard",
+    choreography:   "",
+    description:    "",
+    agents_text:    "",
+    reb_number:     "",
+    reb_expires:    "",
+    data_residency: "",
+  });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState(null);
+  const [probes, setProbes] = useState(null);
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true); setErr(null); setProbes(null);
+    try {
+      const members = form.members_text
+        .split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+      const agents = form.agents_text
+        .split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+      const payload = {
+        clone_path:  clone.path,
+        project:     form.project.trim(),
+        lead:        form.lead.trim(),
+        members,
+        sensitivity: form.sensitivity,
+        description: form.description,
+        agents,
+      };
+      if (form.choreography) payload.choreography = form.choreography;
+      if (form.sensitivity === "clinical") {
+        payload.reb_number     = form.reb_number;
+        payload.reb_expires    = form.reb_expires;
+        payload.data_residency = form.data_residency;
+      }
+      const r = await fetch("/api/inventory/adopt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(body.detail || ("HTTP " + r.status));
+      setProbes(body.probes || []);
+      // Auto-close on success after a beat so the user sees what landed.
+      setTimeout(() => onClose(true), 1400);
+    } catch (ex) {
+      setErr(String(ex.message || ex));
+    } finally { setBusy(false); }
+  };
+
+  const inp = {padding:"5px 8px", border:"1px solid var(--rule-strong)",
+               borderRadius:2, fontFamily:"var(--mono)", fontSize:12,
+               width:"100%", boxSizing:"border-box"};
+  const lbl = {fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+               textTransform:"uppercase", color:"var(--muted)",
+               marginTop:8, marginBottom:2};
+
+  return (
+    <div onClick={() => onClose(false)} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"flex-start", justifyContent:"center",
+      zIndex:200, padding:"40px 20px", overflowY:"auto",
+    }}>
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:18, width:"min(640px, 96vw)",
+        display:"flex", flexDirection:"column", gap:2,
+      }}>
+        <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18,
+                      color:"var(--purple-deep)"}}>
+            Adopt clone as wigamig project
+          </h2>
+          <button type="button" className="btn sm ghost"
+                  onClick={() => onClose(false)}>✕ close</button>
+        </div>
+        <p className="muted" style={{fontSize:12, margin:"4px 0 6px"}}>
+          Writes <code>CHARTER.md</code> at <code className="mono">{clone.path}</code>
+          {" "}and bootstraps <code>.claude/agents/</code>. After this, the
+          Repo Inventory will show <strong style={{color:"var(--green)"}}>✓ wigamig</strong> for
+          this clone.
+        </p>
+
+        <div className="row" style={{gap:10}}>
+          <div style={{flex:1}}>
+            <div style={lbl}>project name</div>
+            <input style={inp} value={form.project} onChange={set("project")} required />
+          </div>
+          <div style={{flex:1}}>
+            <div style={lbl}>lead (handle)</div>
+            <input style={inp} value={form.lead} onChange={set("lead")} required
+                   placeholder="@the_pi" />
+          </div>
+        </div>
+
+        <div style={lbl}>members (space- or comma-separated handles)</div>
+        <input style={inp} value={form.members_text} onChange={set("members_text")}
+               placeholder="@the_pi @alice" required />
+
+        <div className="row" style={{gap:10}}>
+          <div style={{flex:1}}>
+            <div style={lbl}>sensitivity</div>
+            <select style={inp} value={form.sensitivity} onChange={set("sensitivity")}>
+              <option value="standard">standard</option>
+              <option value="restricted">restricted</option>
+              <option value="clinical">clinical</option>
+            </select>
+          </div>
+          <div style={{flex:1}}>
+            <div style={lbl}>choreography (optional)</div>
+            <select style={inp} value={form.choreography} onChange={set("choreography")}>
+              <option value="">— none —</option>
+              <option value="drug_discovery_litl">drug_discovery_litl</option>
+              <option value="clinical_cohort">clinical_cohort</option>
+              <option value="method_benchmarking">method_benchmarking</option>
+              <option value="imaging_phenotyping">imaging_phenotyping</option>
+            </select>
+          </div>
+        </div>
+
+        {form.sensitivity === "clinical" && (
+          <div className="row" style={{gap:10}}>
+            <div style={{flex:1}}>
+              <div style={lbl}>reb_number</div>
+              <input style={inp} value={form.reb_number} onChange={set("reb_number")} required />
+            </div>
+            <div style={{flex:1}}>
+              <div style={lbl}>reb_expires (YYYY-MM-DD)</div>
+              <input style={inp} value={form.reb_expires} onChange={set("reb_expires")} required />
+            </div>
+            <div style={{flex:1}}>
+              <div style={lbl}>data_residency</div>
+              <input style={inp} value={form.data_residency} onChange={set("data_residency")} required />
+            </div>
+          </div>
+        )}
+
+        <div style={lbl}>description (one line for the CHARTER body)</div>
+        <input style={inp} value={form.description} onChange={set("description")}
+               placeholder="Personal hockey analytics." />
+
+        <div style={lbl}>
+          agents to symlink (optional; space- or comma-separated; valid:
+          adversary, artist, blacksmith, bookworm, cable_guy, conscience,
+          oracle, receptionist, registrar, saul_goodman, security_guard)
+        </div>
+        <input style={inp} value={form.agents_text} onChange={set("agents_text")}
+               placeholder="blacksmith adversary" />
+
+        {probes && (
+          <div style={{marginTop:10, fontSize:11, fontFamily:"var(--mono)",
+                       border:"1px solid var(--rule)", borderRadius:2, padding:"6px 8px"}}>
+            {probes.map((p, i) => (
+              <div key={i} style={{
+                color: p.status === "ok"   ? "var(--green)"
+                     : p.status === "warn" ? "var(--tiger)"
+                     :                       "var(--red)",
+              }}>
+                {p.status === "ok" ? "✓" : p.status === "warn" ? "!" : "✗"} {p.name}: {p.detail}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:10, alignItems:"baseline"}}>
+          {err && <span style={{color:"var(--red)", fontSize:11, marginRight:"auto"}}>{err}</span>}
+          <button type="button" className="btn sm ghost"
+                  onClick={() => onClose(false)} disabled={busy}>cancel</button>
+          <button type="submit" className="btn sm primary" disabled={busy}>
+            {busy ? "adopting…" : "adopt"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 
@@ -4545,6 +4776,7 @@ function HostAddForm({ onCancel, onAdded }) {
     name: "lab-server", ssh_host: "lab-server", remote_user: "",
     project_root: "~/repos", wigamig_base: "~/wigamig",
     vault_root: "~/Obsidian", description: "",
+    scan_dirs_text: "",
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState(null);
@@ -4557,10 +4789,13 @@ function HostAddForm({ onCancel, onAdded }) {
     }
     setBusy(true); setErr(null);
     try {
+      const { scan_dirs_text, ...rest } = form;
+      const scan_dirs = scan_dirs_text
+        .split("\n").map(s => s.trim()).filter(Boolean);
       const r = await fetch("/api/hosts", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...rest, scan_dirs }),
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
@@ -4619,6 +4854,13 @@ function HostAddForm({ onCancel, onAdded }) {
       </div>
       <div style={lbl}>description (free text)</div>
       <input style={inp} value={form.description} onChange={set("description")} />
+      <div style={lbl}>
+        scan dirs (one per line; absolute paths used verbatim, others under <code>$HOME</code>;
+        leave blank for default <code>~/repo</code> + <code>~/repos</code>)
+      </div>
+      <textarea style={{...inp, fontFamily:"var(--mono)", minHeight:54, resize:"vertical"}}
+                value={form.scan_dirs_text} onChange={set("scan_dirs_text")}
+                placeholder={"repos\nwork/clones\n/srv/projects"} />
       <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:10, alignItems:"baseline"}}>
         {err && <span style={{color:"var(--red)", fontSize:11, marginRight:"auto"}}>{err}</span>}
         <button type="submit" className="btn sm primary" disabled={busy}>
@@ -4645,8 +4887,55 @@ function _joinUnder(base, sub) {
   return trimmed + "/" + String(sub).replace(/^\/+/, "");
 }
 
-function MachineCard({ machine, isCurrent, onEditClick, onRemove }) {
+/* Inline editor for a single host's scan_dirs. Stays put inside the
+   MachineCard so the rest of the card (wigamig_base, vault, etc.)
+   keeps its layout. Save → PATCH /api/hosts/{name}/scan-dirs → parent
+   re-fetches /api/hosts via onSaved. */
+function ScanDirsEditor({ hostName, initial, onSaved, onCancel }) {
+  const [text, setText] = useState((initial || []).join("\n"));
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState(null);
+  const save = async () => {
+    const scan_dirs = text.split("\n").map(s => s.trim()).filter(Boolean);
+    setBusy(true); setErr(null);
+    try {
+      const r = await fetch(
+        "/api/hosts/" + encodeURIComponent(hostName) + "/scan-dirs",
+        { method: "PATCH",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ scan_dirs }) });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.detail || ("HTTP " + r.status));
+      }
+      await onSaved();
+    } catch (ex) {
+      setErr(String(ex.message || ex));
+    } finally { setBusy(false); }
+  };
+  const inp = {padding:"5px 8px", border:"1px solid var(--rule-strong)", borderRadius:2,
+               fontFamily:"var(--mono)", fontSize:12, width:"100%",
+               boxSizing:"border-box", minHeight:64, resize:"vertical"};
+  return (
+    <div style={{marginTop:6, padding:"6px 8px",
+                 border:"1px dashed var(--rule-strong)", borderRadius:2}}>
+      <textarea style={inp} value={text} onChange={e => setText(e.target.value)}
+                placeholder={"repos\nwork/clones\n/srv/projects"} />
+      <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:6, alignItems:"baseline"}}>
+        {err && <span style={{color:"var(--red)", fontSize:11, marginRight:"auto"}}>{err}</span>}
+        <button type="button" className="btn sm ghost" onClick={onCancel} disabled={busy}>cancel</button>
+        <button type="button" className="btn sm primary" onClick={save} disabled={busy}>
+          {busy ? "…" : "save"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MachineCard({ machine, isCurrent, onEditClick, onRemove, onScanDirsSaved }) {
   const wb = machine.wigamig_base;
+  const scanDirs = machine.scan_dirs || [];
+  const [editingScan, setEditingScan] = useState(false);
   const labelStyle = {
     fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
     textTransform:"uppercase", color:"var(--muted)",
@@ -4701,6 +4990,34 @@ function MachineCard({ machine, isCurrent, onEditClick, onRemove }) {
             </div>
           </div>
         )}
+        {/* scan_dirs: where the Repo Inventory looks for git clones on
+            this host. Empty = defaults (~/repo + ~/repos). Editable for
+            any host whose parent passed onScanDirsSaved. */}
+        <div style={{marginTop:4, paddingTop:4, borderTop:"1px dashed var(--rule)"}}>
+          <div className="row" style={{alignItems:"baseline", gap:6}}>
+            <span style={labelStyle}>scan dirs</span>
+            <code className="mono" style={{flex:1}}>
+              {scanDirs.length === 0
+                ? <span className="muted">default (~/repo + ~/repos)</span>
+                : scanDirs.join(", ")}
+            </code>
+            {onScanDirsSaved && !editingScan && (
+              <button type="button" className="btn sm ghost"
+                      onClick={() => setEditingScan(true)}>edit</button>
+            )}
+          </div>
+          {editingScan && (
+            <ScanDirsEditor
+              hostName={machine.name}
+              initial={scanDirs}
+              onCancel={() => setEditingScan(false)}
+              onSaved={async () => {
+                setEditingScan(false);
+                await onScanDirsSaved();
+              }}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -4905,14 +5222,21 @@ function MachinesModal({ onClose }) {
     }
   };
 
-  // Synthesise a card for "this machine" from machine_settings.
+  // Synthesise a card for "this machine" from machine_settings. The
+  // local row from /api/hosts contributes scan_dirs (the only field
+  // we surface there today); the rest of the local-machine knobs are
+  // owned by machine.yaml.
+  const localHost = hosts.find(h => h.name === "local");
   const thisCard = {
-    name: thisMachine.short_hostname || "this machine",
+    // Use the "local" key so onScanDirsSaved PATCHes the right row.
+    name: "local",
     kind: "local",
     wigamig_base:        ms.wigamig_base        || "",
     obsidian_vault_path: ms.obsidian_vault_path || "",
     obsidian_vault_name: ms.obsidian_vault_name || "",
-    description: "OS user: " + (thisMachine.local_user || "?"),
+    description: (thisMachine.short_hostname ? thisMachine.short_hostname + " · " : "")
+                 + "OS user: " + (thisMachine.local_user || "?"),
+    scan_dirs: localHost ? (localHost.scan_dirs || []) : [],
   };
 
   // Map remote hosts onto the same shape. The legacy hosts.yaml field
@@ -4925,6 +5249,7 @@ function MachinesModal({ onClose }) {
     obsidian_vault_path: h.vault_root || "",
     obsidian_vault_name: "",
     description: h.description || "",
+    scan_dirs: h.scan_dirs || [],
   }));
 
   return (
@@ -4960,7 +5285,8 @@ function MachinesModal({ onClose }) {
           />
         ) : (
           <MachineCard machine={thisCard} isCurrent
-                       onEditClick={() => setEditingThis(true)} />
+                       onEditClick={() => setEditingThis(true)}
+                       onScanDirsSaved={refreshHosts} />
         )}
 
         {loadErr && (
@@ -4969,7 +5295,8 @@ function MachinesModal({ onClose }) {
 
         {remoteCards.map(m => (
           <MachineCard key={m.name} machine={m} isCurrent={false}
-                       onRemove={() => removeHost(m.name)} />
+                       onRemove={() => removeHost(m.name)}
+                       onScanDirsSaved={refreshHosts} />
         ))}
 
         <div style={{marginTop:6}}>
@@ -5039,13 +5366,16 @@ function MachinesPanel({ span = "c-5" }) {
     }
   };
 
+  const localHost = hosts.find(h => h.name === "local");
   const thisCard = {
-    name: thisMachine.short_hostname || "this machine",
+    name: "local",
     kind: "local",
     wigamig_base:        ms.wigamig_base        || "",
     obsidian_vault_path: ms.obsidian_vault_path || "",
     obsidian_vault_name: ms.obsidian_vault_name || "",
-    description: "OS user: " + (thisMachine.local_user || "?"),
+    description: (thisMachine.short_hostname ? thisMachine.short_hostname + " · " : "")
+                 + "OS user: " + (thisMachine.local_user || "?"),
+    scan_dirs: localHost ? (localHost.scan_dirs || []) : [],
   };
   const remoteCards = hosts.filter(h => h.name !== "local").map(h => ({
     name: h.name, kind: "ssh",
@@ -5054,6 +5384,7 @@ function MachinesPanel({ span = "c-5" }) {
     obsidian_vault_path: h.vault_root || "",
     obsidian_vault_name: "",
     description: h.description || "",
+    scan_dirs: h.scan_dirs || [],
   }));
   const total = 1 + remoteCards.length;
 
@@ -5079,7 +5410,8 @@ function MachinesPanel({ span = "c-5" }) {
           />
         ) : (
           <MachineCard machine={thisCard} isCurrent
-                       onEditClick={() => setEditingThis(true)} />
+                       onEditClick={() => setEditingThis(true)}
+                       onScanDirsSaved={refreshHosts} />
         )}
         {loadErr && (
           <div style={{color:"var(--red)", fontSize:12, marginBottom:8}}>
@@ -5088,7 +5420,8 @@ function MachinesPanel({ span = "c-5" }) {
         )}
         {remoteCards.map(m => (
           <MachineCard key={m.name} machine={m} isCurrent={false}
-                       onRemove={() => removeHost(m.name)} />
+                       onRemove={() => removeHost(m.name)}
+                       onScanDirsSaved={refreshHosts} />
         ))}
         {showAdd && (
           <HostAddForm onCancel={() => setShowAdd(false)} onAdded={async () => {
@@ -5846,14 +6179,6 @@ function App() {
           <InstallationsBox span="c-12" />
         </div>
 
-        {/* Repo inventory: cross-machine + GitHub audit. Cached weekly,
-            on-demand refresh. Per-row "Install on <machine>" pre-fills
-            the install wizard for repos that exist on GitHub but
-            aren't cloned/initialized on a chosen host. */}
-        <div className="grid" style={{marginBottom:14}}>
-          <RepoInventoryPanel span="c-12" />
-        </div>
-
         {/* Where you work: Projects + Machines (conceptually paired —
             installations live at the intersection of the two). */}
         <div className="grid" style={{marginBottom:14}}>
@@ -5900,6 +6225,16 @@ function App() {
         <div className="grid" style={{marginBottom:14}}>
           <LabMembersPanel peers={D.peers} span="c-6" />
           <InventoryPanel inv={D.inventory} span="c-6" />
+        </div>
+
+        {/* Repo inventory: cross-machine + GitHub audit. Cached weekly,
+            on-demand refresh. Per-row "Install on <machine>" pre-fills
+            the install wizard for repos that exist on GitHub but
+            aren't cloned/initialized on a chosen host. Sits below
+            Lab Members + Inventory — same "things you check, but not
+            every day" tier. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <RepoInventoryPanel span="c-12" />
         </div>
 
         {/* SEAs we offer (catalog) - every member sees; PI edits. */}

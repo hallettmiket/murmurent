@@ -3,8 +3,10 @@ Purpose: Cross-machine + cross-GitHub git-repo inventory for the dashboard.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-15
 Input: Lab's GitHub org (``lab.md:github_org``), registered hosts
-       (``~/.wigamig/hosts.yaml``), each host's ``~/repo`` + ``~/repos``
-       (laptop or SSH), and any existing wigamig install manifests at
+       (``~/.wigamig/hosts.yaml``), each host's scan dirs (defaults to
+       ``~/repo`` + ``~/repos``; overridable per-host via the host's
+       ``scan_dirs:`` field, which accepts both ``$HOME``-relative and
+       absolute paths), and any existing wigamig install manifests at
        ``~/.wigamig/installations/<project>.yaml``.
 Output: ``InventoryReport`` — list of rows keyed by canonical origin URL,
         each row carrying per-host presence + wigamig-init signals.
@@ -177,6 +179,12 @@ def _scan_script(scan_dirs: tuple[str, ...]) -> str:
     """Bash snippet that lists every git repo under each scan dir +
     prints one record per line.
 
+    Each entry in ``scan_dirs`` may be absolute (starts with ``/``) or
+    ``$HOME``-relative. Absolute entries are used verbatim on the
+    remote; relative ones are resolved against the host's ``$HOME``.
+    This lets a host scan both ``~/repos`` and a shared mount like
+    ``/srv/projects`` in the same pass.
+
     Output format: ``<path>|<origin>|<has_charter>|<has_claude_agents>``
     where ``has_charter`` and ``has_claude_agents`` are ``1`` or ``0``.
     Uses ``|`` because git remote URLs can contain ``:`` (ssh form).
@@ -184,9 +192,12 @@ def _scan_script(scan_dirs: tuple[str, ...]) -> str:
     quoted = " ".join(shlex.quote(d) for d in scan_dirs)
     return (
         f'for base in {quoted}; do '
-        '  full="$HOME/$base"; '
+        '  case "$base" in '
+        '    /*) full="$base" ;; '
+        '    *)  full="$HOME/$base" ;; '
+        '  esac; '
         '  [ -d "$full" ] || continue; '
-        # Find .git dirs at depth 2 (i.e. ~/repo/<name>/.git). Depth 3
+        # Find .git dirs at depth 2 (i.e. <full>/<name>/.git). Depth 3
         # could catch nested but slows things down — depth 2 matches
         # the convention.
         '  find "$full" -mindepth 2 -maxdepth 3 -name .git -type d 2>/dev/null | '
@@ -202,6 +213,16 @@ def _scan_script(scan_dirs: tuple[str, ...]) -> str:
         '  done; '
         'done'
     )
+
+
+def _effective_scan_dirs(host: _hosts.Host) -> tuple[str, ...]:
+    """Return the scan dirs to use for ``host``.
+
+    Falls back to :data:`DEFAULT_SCAN_DIRS` when the host has none
+    configured, so existing registries keep their current behaviour
+    without an explicit ``scan_dirs:`` field.
+    """
+    return host.scan_dirs or DEFAULT_SCAN_DIRS
 
 
 def list_machine_repos(host_name: str) -> tuple[list[RepoOnHost], str | None]:
@@ -220,7 +241,7 @@ def list_machine_repos(host_name: str) -> tuple[list[RepoOnHost], str | None]:
         return [], str(exc)
     remote = _remote.Remote(host)
     try:
-        res = remote.run(_scan_script(DEFAULT_SCAN_DIRS), check=False, timeout=60)
+        res = remote.run(_scan_script(_effective_scan_dirs(host)), check=False, timeout=60)
     except _remote.RemoteError as exc:
         return [], (exc.stderr or str(exc)).strip() or "ssh failed"
     if not res.ok:
