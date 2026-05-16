@@ -80,6 +80,12 @@ class Host:
     vault_root: str = "~/Documents/Obsidian"
     mount_point: str = ""  # SSHFS mount path on the laptop, for ssh kind
     description: str = ""
+    # Extra directories to scan for git clones during repo-inventory.
+    # Entries beginning with "/" are treated as absolute on the remote
+    # host; others are resolved relative to $HOME. Empty tuple means
+    # "use whatever the inventory scanner's default is" (currently
+    # ~/repo + ~/repos).
+    scan_dirs: tuple[str, ...] = ()
 
     def is_remote(self) -> bool:
         return self.kind == "ssh"
@@ -105,6 +111,23 @@ def _str(value: Any, default: str = "") -> str:
     return str(value).strip() if value is not None else default
 
 
+def _coerce_scan_dirs(raw: Any) -> tuple[str, ...]:
+    """Accept a list/tuple of strings; silently drop empties + non-strs
+    rather than rejecting the whole host. Trims surrounding whitespace
+    so ``- repos `` is treated the same as ``- repos``.
+    """
+    if not isinstance(raw, (list, tuple)):
+        return ()
+    out: list[str] = []
+    for entry in raw:
+        if not isinstance(entry, str):
+            continue
+        s = entry.strip()
+        if s:
+            out.append(s)
+    return tuple(out)
+
+
 def _coerce_host(name: str, raw: dict[str, Any]) -> Host:
     kind = _str(raw.get("kind"), "local") or "local"
     if kind not in VALID_KINDS:
@@ -122,6 +145,7 @@ def _coerce_host(name: str, raw: dict[str, Any]) -> Host:
         vault_root=_str(raw.get("vault_root"), "~/Documents/Obsidian") or "~/Documents/Obsidian",
         mount_point=_str(raw.get("mount_point")),
         description=_str(raw.get("description")),
+        scan_dirs=_coerce_scan_dirs(raw.get("scan_dirs")),
     )
 
 
@@ -201,6 +225,7 @@ def write(hosts: dict[str, Host], env: dict[str, str] | None = None) -> Path:
         row["vault_root"]    = host.vault_root
         if host.mount_point: row["mount_point"] = host.mount_point
         if host.description: row["description"] = host.description
+        if host.scan_dirs:   row["scan_dirs"]   = list(host.scan_dirs)
         payload["hosts"][name] = row
     path.write_text(
         yaml.safe_dump(payload, sort_keys=False, allow_unicode=True),
@@ -231,6 +256,41 @@ def remove(name: str, env: dict[str, str] | None = None) -> Path:
     return write(registry, env)
 
 
+def update_scan_dirs(
+    name: str,
+    scan_dirs: tuple[str, ...] | list[str],
+    env: dict[str, str] | None = None,
+) -> Host:
+    """Replace ``name``'s ``scan_dirs`` field, leaving every other field
+    untouched. Returns the updated :class:`Host`.
+
+    Works for every kind including ``local`` — when the user sets scan
+    dirs for the laptop, this materialises the auto-derived ``local``
+    row into ``hosts.yaml`` so the value actually persists across
+    process restarts.
+    """
+    cleaned = _coerce_scan_dirs(scan_dirs)
+    registry = read(env)
+    if name not in registry:
+        raise HostNotFound(f"no host registered as {name!r}")
+    current = registry[name]
+    updated = Host(
+        name=current.name,
+        kind=current.kind,
+        ssh_host=current.ssh_host,
+        remote_user=current.remote_user,
+        project_root=current.project_root,
+        lab_vm_root=current.lab_vm_root,
+        vault_root=current.vault_root,
+        mount_point=current.mount_point,
+        description=current.description,
+        scan_dirs=cleaned,
+    )
+    registry[name] = updated
+    write(registry, env)
+    return updated
+
+
 __all__ = [
     "Host",
     "HostError",
@@ -245,4 +305,5 @@ __all__ = [
     "write",
     "add",
     "remove",
+    "update_scan_dirs",
 ]

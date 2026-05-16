@@ -291,6 +291,38 @@ class HostAddBody(BaseModel):
     vault_root: str = "~/Obsidian"
     mount_point: str = ""
     description: str = ""
+    scan_dirs: list[str] = []
+
+
+class HostScanDirsBody(BaseModel):
+    """JSON body for ``PATCH /api/hosts/{name}/scan-dirs``."""
+
+    scan_dirs: list[str]
+
+
+class AdoptCloneBody(BaseModel):
+    """JSON body for ``POST /api/inventory/adopt``.
+
+    Promotes an existing local git clone (one that shows up as
+    ``• clone`` in the Repo Inventory) into a wigamig project by
+    writing a CHARTER.md and bootstrapping ``.claude/agents/``. Local
+    hosts only for v1 — remote adopt would need an SSH equivalent
+    of the charter writer.
+    """
+
+    clone_path: str                # absolute path on this machine
+    project: str                   # CHARTER project name
+    lead: str                      # e.g. "@mhallet"
+    members: list[str]             # at least one handle
+    sensitivity: str = "standard"  # standard | restricted | clinical
+    description: str = ""
+    choreography: str | None = None
+    agents: list[str] = []
+    # Clinical-only fields. Required when sensitivity == "clinical";
+    # render_charter() will raise if they're missing.
+    reb_number: str | None = None
+    reb_expires: str | None = None
+    data_residency: str | None = None
 
 
 class LoginSelectBody(BaseModel):
@@ -1730,6 +1762,83 @@ def create_app() -> FastAPI:
         )
         return {"from_cache": False, **report.to_dict()}
 
+    @app.post("/api/inventory/adopt")
+    def post_inventory_adopt(body: AdoptCloneBody) -> dict:
+        """Adopt an existing local git clone as a wigamig project.
+
+        Writes a CHARTER.md from the supplied metadata and runs the
+        layer-2 CC bootstrap (``.claude/agents/`` symlinks + CLAUDE.md
+        stub). After this, the Repo Inventory will show ``✓ wigamig``
+        for the clone.
+
+        Refuses when:
+          - clone_path isn't inside ``~/repos/`` (escape guard)
+          - clone_path isn't a git working tree
+          - a CHARTER.md already exists (don't silently overwrite —
+            user should edit by hand, or remove and re-adopt)
+        """
+        from ..core import charter as _charter
+        from ..core import preflight as _pf
+        from ..core import project_cc_init as _cci
+        from ..core.repo import wigamig_repo_root as _wig
+
+        clone = Path(body.clone_path).expanduser().resolve()
+        repos_root = (Path.home() / "repos").resolve()
+        try:
+            clone.relative_to(repos_root)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"clone_path must live under {repos_root} (got {clone})",
+            )
+        if not (clone / ".git").exists():
+            raise HTTPException(
+                status_code=400,
+                detail=f"not a git working tree: {clone}",
+            )
+        charter_path = clone / "CHARTER.md"
+        if charter_path.exists():
+            raise HTTPException(
+                status_code=409,
+                detail=(f"{charter_path} already exists — "
+                        "edit by hand instead of re-adopting"),
+            )
+
+        try:
+            charter_text = _charter.render_charter(
+                project=body.project,
+                lead=body.lead,
+                members=body.members,
+                sensitivity=body.sensitivity,
+                description=body.description or f"Adopted clone at {clone}.",
+                choreography=body.choreography,
+                reb_number=body.reb_number,
+                reb_expires=body.reb_expires,
+                data_residency=body.data_residency,
+                created=_dt.date.today().isoformat(),
+                repo_kind="github",
+            )
+        except _charter.CharterError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+        charter_path.write_text(charter_text, encoding="utf-8")
+        probes = [_pf.Probe(
+            name="charter", status="ok",
+            detail=f"wrote {charter_path}", required=True,
+        )]
+        for p in _cci.bootstrap_local(
+            clone, _wig(),
+            agents=list(body.agents or []),
+            project_name=body.project,
+        ):
+            probes.append(p)
+        return {
+            "ok": True,
+            "project": body.project,
+            "clone_path": str(clone),
+            "probes": [p.to_dict() for p in probes],
+        }
+
     # -----------------------------------------------------------------
     # Membership (PI-only roster mgmt)
     # -----------------------------------------------------------------
@@ -2243,6 +2352,7 @@ def create_app() -> FastAPI:
             "vault_root": h.vault_root,
             "mount_point": h.mount_point,
             "description": h.description,
+            "scan_dirs": list(h.scan_dirs),
             "is_remote": h.is_remote(),
         }
 
@@ -2275,6 +2385,7 @@ def create_app() -> FastAPI:
             vault_root=body.vault_root,
             mount_point=body.mount_point,
             description=body.description,
+            scan_dirs=tuple(body.scan_dirs),
         )
         try:
             _hosts.add(host)
@@ -2350,6 +2461,22 @@ def create_app() -> FastAPI:
             extra_meta={"host_kind": host.kind if host else ""},
         ))
         return {"ok": True, "removed": name, "report": str(report)}
+
+    @app.patch("/api/hosts/{name}/scan-dirs")
+    def patch_host_scan_dirs(name: str, body: HostScanDirsBody) -> dict:
+        """Replace ``name``'s ``scan_dirs`` list. Each entry is either a
+        ``$HOME``-relative path (``repos``, ``work/clones``) or absolute
+        (``/srv/projects``). The repo-inventory scanner picks up the
+        change on the next run.
+        """
+        from ..core import hosts as _hosts
+        try:
+            updated = _hosts.update_scan_dirs(name, body.scan_dirs)
+        except _hosts.HostNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except _hosts.HostError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True, "host": _host_row(updated)}
 
     @app.post("/api/hosts/{name}/test")
     def post_host_test(name: str) -> dict:

@@ -82,6 +82,63 @@ def test_hosts_endpoint_includes_registered_ssh_hosts(world):
     assert by_name["biodatsci"]["ssh_host"] == "biodatsci"
 
 
+def test_hosts_endpoint_includes_scan_dirs(world):
+    """``GET /api/hosts`` must surface ``scan_dirs`` so the Machines panel
+    can render per-host repo locations and the Repo Inventory knows which
+    dirs each host was scanned with."""
+    _hosts.add(_hosts.Host(
+        name="biodatsci", kind="ssh", ssh_host="biodatsci",
+        scan_dirs=("repos", "/srv/projects"),
+    ))
+    client = TestClient(create_app())
+    body = client.get("/api/hosts").json()
+    by_name = {h["name"]: h for h in body["hosts"]}
+    assert by_name["biodatsci"]["scan_dirs"] == ["repos", "/srv/projects"]
+    # Hosts with no scan_dirs round-trip as an empty list (not missing key).
+    assert by_name["local"]["scan_dirs"] == []
+
+
+def test_post_host_accepts_scan_dirs(world):
+    """``POST /api/hosts`` must accept ``scan_dirs`` so the Add-Machine
+    form can register a host with custom repo locations in one round-trip."""
+    client = TestClient(create_app())
+    res = client.post("/api/hosts", json={
+        "name": "biodatsci", "ssh_host": "biodatsci",
+        "scan_dirs": ["repos", "/srv/projects"],
+    })
+    assert res.status_code == 200, res.text
+    # And the value really did land in hosts.yaml.
+    assert _hosts.resolve("biodatsci").scan_dirs == ("repos", "/srv/projects")
+
+
+def test_patch_host_scan_dirs_round_trip(world):
+    """``PATCH /api/hosts/{name}/scan-dirs`` must replace the list and
+    persist it. Existing fields (ssh_host, remote_user, …) must survive
+    untouched — this is the only way to edit a registered host today."""
+    _hosts.add(_hosts.Host(
+        name="biodatsci", kind="ssh", ssh_host="biodatsci",
+        remote_user="mhallet", description="lab server",
+    ))
+    client = TestClient(create_app())
+    res = client.patch("/api/hosts/biodatsci/scan-dirs", json={
+        "scan_dirs": ["repos", "/srv/projects"],
+    })
+    assert res.status_code == 200, res.text
+    assert res.json()["host"]["scan_dirs"] == ["repos", "/srv/projects"]
+    h = _hosts.resolve("biodatsci")
+    assert h.scan_dirs == ("repos", "/srv/projects")
+    # Unrelated fields preserved.
+    assert h.remote_user == "mhallet"
+    assert h.description == "lab server"
+
+
+def test_patch_host_scan_dirs_unknown_host_404s(world):
+    """Touching an unregistered host returns 404, not a silent success."""
+    client = TestClient(create_app())
+    res = client.patch("/api/hosts/ghost/scan-dirs", json={"scan_dirs": ["x"]})
+    assert res.status_code == 404
+
+
 # ---------------------------------------------------------------------------
 # Remote-pointer detection in snapshot.ProjectRow
 # ---------------------------------------------------------------------------
