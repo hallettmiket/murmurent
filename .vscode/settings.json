@@ -1,0 +1,18 @@
+{
+  "//": "Per-folder VSCode settings for wigamig. Pairs with scripts/open_wigamig.sh + .claude/settings.json hooks. See CLAUDE.md > 'VSCode workflow' for the full layout recipe.",
+
+  "window.title": "Wigamig — ${rootName}${separator}${activeEditorMedium}${separator}${dirty}",
+  "window.titleSeparator": "  ·  ",
+
+  "workbench.activityBar.location": "end",
+  "workbench.sideBar.location": "right",
+
+  "terminal.integrated.defaultLocation": "editor",
+  "terminal.integrated.tabs.location": "right",
+
+  "files.exclude": {
+    "**/.pytest_cache": true,
+    "**/__pycache__": true,
+    "**/.venv": true
+  }
+}

@@ -33,6 +33,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CC_DIR="$HOME/.claude"
 AGENTS_SRC="$REPO_DIR/agents"
+RULES_SRC="$REPO_DIR/rules"
 CLAUDE_MD_SRC="$REPO_DIR/CLAUDE.md"
 
 # Traffic-light helpers — match the dashboard's probe pill semantics
@@ -49,7 +50,7 @@ fi
 
 mkdir -p "$CC_DIR/agents"
 
-echo "[1/3] Wiring ~/.claude/agents/ → $AGENTS_SRC/"
+echo "[1/4] Wiring ~/.claude/agents/ → $AGENTS_SRC/"
 swept_legacy=0
 created=0
 preserved=0
@@ -89,7 +90,38 @@ done
 echo "  -- migrated $swept_legacy generic_cc symlinks, created $created new, preserved $preserved user files."
 
 echo
-echo "[2/3] Wiring ~/.claude/CLAUDE.md → $CLAUDE_MD_SRC"
+echo "[2/4] Wiring ~/.claude/rules/ → $RULES_SRC/"
+# Same idempotent pattern as agents: replace existing wigamig symlinks,
+# preserve user-authored .md files, create missing ones. Skips the step
+# entirely when wigamig has no rules/ dir yet (back-compat with older
+# clones that pre-date the rules layer).
+if [[ -d "$RULES_SRC" ]]; then
+  mkdir -p "$CC_DIR/rules"
+  rules_created=0
+  rules_preserved=0
+  for src in "$RULES_SRC"/*.md; do
+    [[ -f "$src" ]] || continue
+    name="$(basename "$src")"
+    dest="$CC_DIR/rules/$name"
+    if [[ -L "$dest" ]]; then
+      ln -sfn "$src" "$dest"
+      ok "re-pointed rules/$name → wigamig"
+    elif [[ -f "$dest" ]]; then
+      warn "preserved user-authored rules/$name (not a symlink) — delete to use wigamig's version"
+      rules_preserved=$((rules_preserved + 1))
+    else
+      ln -sfn "$src" "$dest"
+      ok "created rules/$name → wigamig"
+      rules_created=$((rules_created + 1))
+    fi
+  done
+  echo "  -- created $rules_created new rules, preserved $rules_preserved user files."
+else
+  warn "no rules/ dir in wigamig — skipping"
+fi
+
+echo
+echo "[3/4] Wiring ~/.claude/CLAUDE.md → $CLAUDE_MD_SRC"
 if [[ ! -e "$CLAUDE_MD_SRC" ]]; then
   warn "$CLAUDE_MD_SRC is missing — skipping global CLAUDE.md link"
 elif [[ -L "$CC_DIR/CLAUDE.md" ]]; then
@@ -103,7 +135,7 @@ else
 fi
 
 echo
-echo "[3/3] Installing wigamig hooks + MCP into ~/.claude/settings.json"
+echo "[4/4] Installing wigamig hooks + MCP into ~/.claude/settings.json"
 # Prefer the user's wigamig binary if on PATH; fall back to module
 # invocation through the repo's venv. The --hooks flag is the only
 # phase implemented so far.

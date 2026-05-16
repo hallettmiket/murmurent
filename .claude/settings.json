@@ -31,5 +31,28 @@
       "/Users/mth/repos/chair_renewal",
       "/tmp"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mth/repos/wigamig/scripts/wigamig_log_agent_event.sh"
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mth/repos/wigamig/scripts/wigamig_log_agent_event.sh"
+          }
+        ]
+      }
+    ]
   }
 }
