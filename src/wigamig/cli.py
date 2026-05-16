@@ -1205,6 +1205,86 @@ def oracle_decline_cmd(slug: str, reason: str) -> None:
     click.echo(f"Declined {path}: {reason}")
 
 
+# -- Personal-vault → Lab Oracle promotion (different flow than the
+# Slack-distil one above; this one is initiated by the user, not by an
+# automated Slack mirror).
+
+
+@oracle_group.command("path", help="Print the personal Oracle dir on this machine.")
+def oracle_path_cmd() -> None:
+    """Used by the Oracle agent to resolve its vault without hardcoding
+    a per-machine path."""
+    from .core import oracle_publish as _op
+    try:
+        click.echo(str(_op.personal_oracle_dir()))
+    except _op.OracleError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+@oracle_group.command("vault-drafts", help="List personal-vault Oracle drafts awaiting publish.")
+def oracle_vault_drafts_cmd() -> None:
+    from .core import oracle_publish as _op
+    try:
+        drafts = _op.iter_vault_drafts()
+    except _op.OracleError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not drafts:
+        click.echo(f"No drafts in {_op.vault_drafts_dir()}")
+        return
+    console = Console()
+    table = Table(title=f"Vault drafts ({_op.vault_drafts_dir()})")
+    table.add_column("slug", style="bold")
+    table.add_column("title")
+    table.add_column("project")
+    table.add_column("sensitivity")
+    for path in drafts:
+        from .core.frontmatter import parse_file
+        meta = parse_file(path).meta or {}
+        table.add_row(
+            path.stem,
+            str(meta.get("title", path.stem)),
+            str(meta.get("project", "—")),
+            str(meta.get("sensitivity", "—")),
+        )
+    console.print(table)
+
+
+@oracle_group.command("publish", help="Publish a vault draft to the Lab Oracle.")
+@click.argument("slug")
+@click.option("--push/--no-push", default=False,
+              help="Run `git push` after the commit (default: commit-only).")
+@click.option("--dry-run", is_flag=True,
+              help="Validate + copy, but skip git commit. Use to preview the result.")
+def oracle_publish_cmd(slug: str, push: bool, dry_run: bool) -> None:
+    """Promote a draft from <vault>/oracle/drafts/<slug>.md to the Lab
+    Oracle. Refuses sensitivity=clinical|restricted entries.
+    """
+    from .core import oracle_publish as _op
+    from .core.identity import resolve as resolve_identity
+
+    try:
+        committer = resolve_identity(allow_unknown=False).handle
+    except Exception as exc:
+        raise click.ClickException(
+            f"could not resolve your handle (set WIGAMIG_USER): {exc}"
+        ) from exc
+
+    try:
+        result = _op.publish_draft(
+            slug, committer=committer, commit=not dry_run, push=push,
+        )
+    except _op.OracleError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Published {result.source.name} → {result.target}")
+    if result.commit_sha:
+        click.echo(f"  commit:  {result.commit_sha}")
+    if result.pushed:
+        click.echo("  pushed:  yes")
+    elif result.commit_sha:
+        click.echo("  pushed:  no (re-run with --push or `git push` manually)")
+
+
 # ---------------------------------------------------------------------------
 # member (Phase 13: roster mgmt)
 # ---------------------------------------------------------------------------

@@ -74,6 +74,14 @@ MCP_REGISTRATIONS: dict[str, dict[str, Any]] = {
         "args": ["-m", "wigamig.mcp.inventory_server"],
         "env": {},
     },
+    # Personal + Lab Oracle search/get/list/publish. Uses the same
+    # python so the server has access to wigamig.core.* (vault
+    # resolution, frontmatter parsing, publish flow).
+    "wigamig-oracle": {
+        "command": sys.executable,
+        "args": ["-m", "wigamig.mcp.oracle_server"],
+        "env": {},
+    },
 }
 
 

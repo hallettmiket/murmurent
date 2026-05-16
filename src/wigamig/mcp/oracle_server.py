@@ -1,0 +1,382 @@
+"""
+Purpose: Wigamig oracle MCP server. Exposes the personal Obsidian-vault
+         oracle and the lab-mgmt Lab Oracle as a unified set of search
+         tools so any CC agent (including the user's main session) can
+         recall structured knowledge without grepping by hand.
+Author: Mike Hallett (with Claude Code)
+Date: 2026-05-16
+Input: stdio MCP protocol (the canonical CC integration), or direct
+       calls into ``tool_search`` / ``tool_get`` / ``tool_list`` /
+       ``tool_publish_draft`` for the test harness.
+Output: JSON-serialisable dicts the MCP client renders for the model.
+
+Run as a server::
+
+    python -m wigamig.mcp.oracle_server
+
+The CLI never calls this server directly; ``wigamig install --hooks``
+registers it under ``mcpServers`` in ``~/.claude/settings.json``
+alongside the inventory server.
+
+Design notes:
+  - All tools are READ-first. Writes (``oracle_publish_draft``) wrap
+    the same ``core.oracle_publish.publish_draft`` the CLI uses, so
+    there's exactly one path for promotion semantics.
+  - Search is keyword + frontmatter filter, not embeddings. That's
+    deliberate for v1 — the schema is the index. A future
+    ``oracle_search_semantic`` tool can plug in alongside.
+  - ``kind`` parameter values: ``personal``, ``lab``, ``both``.
+    ``both`` is the default for queries (members care about whatever
+    answers their question); ``oracle_publish_draft`` is personal-only
+    by design.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import sys
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Iterable
+
+import yaml
+
+from ..core import oracle_publish as _op
+
+VALID_KINDS: tuple[str, ...] = ("personal", "lab", "both")
+
+
+# ---------------------------------------------------------------------------
+# Data shape
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class OracleEntry:
+    """One entry's metadata + body, normalised across personal/lab tiers."""
+
+    kind: str                  # "personal" | "lab"
+    path: str                  # absolute path on this machine
+    title: str
+    date: str
+    project: str
+    sensitivity: str
+    tags: list[str]
+    sources: list[str]
+    related: list[str]
+    body: str                  # markdown body (no frontmatter)
+
+    def to_dict(self, *, include_body: bool = True) -> dict[str, Any]:
+        d = asdict(self)
+        if not include_body:
+            d.pop("body", None)
+        return d
+
+
+# ---------------------------------------------------------------------------
+# Discovery + parsing
+# ---------------------------------------------------------------------------
+
+
+def _safe_personal_dir() -> Path | None:
+    """personal_oracle_dir() can raise if no vault is registered; tools
+    must degrade gracefully (return [] for that tier) instead."""
+    try:
+        return _op.personal_oracle_dir()
+    except _op.OracleError:
+        return None
+
+
+def _safe_lab_dir() -> Path | None:
+    try:
+        return _op.lab_oracle_dir()
+    except Exception:
+        return None
+
+
+def _iter_paths(kind: str) -> list[tuple[str, Path]]:
+    """Yield (kind, path) for every .md entry in the requested tier(s).
+
+    Excludes the personal vault's ``drafts/`` subdir (those are
+    not-yet-published and should not appear in lab-wide search).
+    Skips ``MEMORY.md`` and README-style index files.
+    """
+    out: list[tuple[str, Path]] = []
+    if kind in ("personal", "both"):
+        p = _safe_personal_dir()
+        if p and p.is_dir():
+            for f in p.rglob("*.md"):
+                if "drafts" in f.parts:
+                    continue
+                if f.name in {"MEMORY.md", "README.md"}:
+                    continue
+                out.append(("personal", f))
+    if kind in ("lab", "both"):
+        p = _safe_lab_dir()
+        if p and p.is_dir():
+            for f in p.glob("*.md"):
+                if f.name in {"MEMORY.md", "README.md"}:
+                    continue
+                out.append(("lab", f))
+    return out
+
+
+def _parse_entry(kind: str, path: Path) -> OracleEntry | None:
+    """Parse one file into an :class:`OracleEntry`.
+
+    Returns ``None`` for files without parseable frontmatter — those
+    are surfaced via ``oracle_lint`` if the user wants to fix them.
+    """
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    m = re.match(r"^---\n(.*?)\n---\n(.*)", text, re.DOTALL)
+    if not m:
+        return None
+    try:
+        meta = yaml.safe_load(m.group(1)) or {}
+    except yaml.YAMLError:
+        return None
+    if not isinstance(meta, dict):
+        return None
+    tags = meta.get("tags") or []
+    sources = meta.get("sources") or []
+    related = meta.get("related") or []
+    return OracleEntry(
+        kind=kind,
+        path=str(path),
+        title=str(meta.get("title") or path.stem),
+        date=str(meta.get("date") or ""),
+        project=str(meta.get("project") or ""),
+        sensitivity=str(meta.get("sensitivity") or "standard"),
+        tags=[str(t) for t in tags] if isinstance(tags, list) else [],
+        sources=[str(s) for s in sources] if isinstance(sources, list) else [],
+        related=[str(r) for r in related] if isinstance(related, list) else [],
+        body=m.group(2).strip(),
+    )
+
+
+def _load_entries(kind: str) -> list[OracleEntry]:
+    if kind not in VALID_KINDS:
+        raise ValueError(f"kind must be one of {VALID_KINDS}, got {kind!r}")
+    entries = []
+    for k, p in _iter_paths(kind):
+        e = _parse_entry(k, p)
+        if e is not None:
+            entries.append(e)
+    return entries
+
+
+# ---------------------------------------------------------------------------
+# Filters
+# ---------------------------------------------------------------------------
+
+
+def _matches_filters(
+    entry: OracleEntry,
+    *,
+    project: str | None,
+    tags: list[str] | None,
+    sensitivity: str | None,
+    source: str | None,
+) -> bool:
+    """All filters AND together. Tag filter uses set-overlap (any tag
+    in ``tags`` matches the entry's tag list)."""
+    if project and not _glob_match(entry.project, project):
+        return False
+    if sensitivity and entry.sensitivity != sensitivity:
+        return False
+    if source:
+        wanted = source.lower().lstrip("@")
+        if not any(wanted == s.lower().lstrip("@") for s in entry.sources):
+            return False
+    if tags:
+        wanted = {t.lower() for t in tags}
+        have = {t.lower() for t in entry.tags}
+        if not (wanted & have):
+            return False
+    return True
+
+
+def _glob_match(value: str, pattern: str) -> bool:
+    """Tiny glob: ``*`` matches any run of chars. Anchored. Used for
+    project filters like ``dcis_*``."""
+    rx = "^" + re.escape(pattern).replace(r"\*", ".*") + "$"
+    return re.match(rx, value or "") is not None
+
+
+def _score(entry: OracleEntry, query: str) -> int:
+    """Naive ranking: title hits > tag hits > body hits.
+
+    Good enough for v1 keyword search. Replace with embeddings when
+    we add ``oracle_search_semantic``.
+    """
+    q = query.lower()
+    score = 0
+    if q in entry.title.lower():
+        score += 10
+    if any(q in t.lower() for t in entry.tags):
+        score += 5
+    if q in entry.body.lower():
+        score += 1
+    return score
+
+
+# ---------------------------------------------------------------------------
+# Tool implementations
+# ---------------------------------------------------------------------------
+
+
+def tool_search(
+    query: str = "",
+    *,
+    kind: str = "both",
+    project: str | None = None,
+    tags: list[str] | None = None,
+    sensitivity: str | None = None,
+    source: str | None = None,
+    limit: int = 20,
+) -> list[dict[str, Any]]:
+    """Search across the requested tier(s).
+
+    Empty ``query`` is allowed — returns everything matching the
+    filters (useful for "show me all dcis entries" without keyword).
+    Results are sorted by score then by date (newest first), capped
+    at ``limit``.
+    """
+    entries = _load_entries(kind)
+    filtered = [
+        e for e in entries
+        if _matches_filters(
+            e, project=project, tags=tags, sensitivity=sensitivity, source=source,
+        )
+    ]
+    if query:
+        scored = [(_score(e, query), e) for e in filtered]
+        scored = [(s, e) for s, e in scored if s > 0]
+        scored.sort(key=lambda pair: (-pair[0], pair[1].date), reverse=False)
+        # Python's sort by negative score sorts descending; date sorts
+        # ascending. Reverse the whole list to get newest-first for ties.
+        result = [e for _, e in scored]
+    else:
+        result = sorted(filtered, key=lambda e: e.date, reverse=True)
+    return [e.to_dict(include_body=False) for e in result[:limit]]
+
+
+def tool_get(path: str) -> dict[str, Any]:
+    """Read one entry by absolute path. Includes body."""
+    p = Path(path)
+    if not p.is_file():
+        raise FileNotFoundError(f"no oracle entry at {path}")
+    # Determine kind by which dir contains the file.
+    kind = "lab"
+    personal = _safe_personal_dir()
+    if personal and _is_under(p, personal):
+        kind = "personal"
+    entry = _parse_entry(kind, p)
+    if entry is None:
+        raise ValueError(
+            f"{path}: no parseable YAML frontmatter — does the file conform "
+            f"to rules/oracle_schema.md?"
+        )
+    return entry.to_dict(include_body=True)
+
+
+def tool_list(kind: str = "both") -> list[dict[str, Any]]:
+    """One-line summary of every entry in the tier(s). Cheap to call —
+    no body parsing beyond what frontmatter needs."""
+    entries = _load_entries(kind)
+    entries.sort(key=lambda e: e.date, reverse=True)
+    return [e.to_dict(include_body=False) for e in entries]
+
+
+def tool_publish_draft(slug: str, *, push: bool = False) -> dict[str, Any]:
+    """Promote a personal-vault draft to the Lab Oracle.
+
+    Equivalent to ``wigamig oracle publish <slug>``. The committer
+    handle comes from :func:`wigamig.core.identity.resolve` — agents
+    cannot impersonate another user.
+    """
+    from ..core.identity import resolve as resolve_identity
+    committer = resolve_identity(allow_unknown=False).handle
+    result = _op.publish_draft(slug, committer=committer, commit=True, push=push)
+    return {
+        "source": str(result.source),
+        "target": str(result.target),
+        "commit_sha": result.commit_sha,
+        "pushed": result.pushed,
+    }
+
+
+def _is_under(child: Path, parent: Path) -> bool:
+    try:
+        child.resolve().relative_to(parent.resolve())
+        return True
+    except ValueError:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# MCP server wiring (lazy import; only required to actually run as server)
+# ---------------------------------------------------------------------------
+
+
+def _build_server():  # pragma: no cover - exercised only when mcp is installed
+    """Construct the MCP server. Imports the SDK lazily."""
+    from mcp.server.fastmcp import FastMCP  # type: ignore[import-not-found]
+
+    server = FastMCP(
+        name="wigamig-oracle",
+        instructions=(
+            "Wigamig oracle. Two tiers: personal (your Obsidian vault) "
+            "and lab (lab-mgmt repo). `oracle_search` filters across "
+            "both by query + project/tags/sensitivity/source. "
+            "`oracle_get(path)` fetches one entry. `oracle_list` "
+            "browses everything. `oracle_publish_draft(slug)` promotes "
+            "a vault draft to lab. See rules/oracle_schema.md."
+        ),
+    )
+
+    @server.tool(name="oracle_search", description="Search oracle entries by query + filters.")
+    def _search(
+        query: str = "",
+        kind: str = "both",
+        project: str | None = None,
+        tags: list[str] | None = None,
+        sensitivity: str | None = None,
+        source: str | None = None,
+        limit: int = 20,
+    ) -> str:
+        return json.dumps(tool_search(
+            query, kind=kind, project=project, tags=tags,
+            sensitivity=sensitivity, source=source, limit=limit,
+        ))
+
+    @server.tool(name="oracle_get", description="Read one oracle entry (full body) by absolute path.")
+    def _get(path: str) -> str:
+        return json.dumps(tool_get(path))
+
+    @server.tool(name="oracle_list", description="List every entry in the requested tier(s).")
+    def _list(kind: str = "both") -> str:
+        return json.dumps(tool_list(kind))
+
+    @server.tool(
+        name="oracle_publish_draft",
+        description="Promote a personal-vault draft to the Lab Oracle (commits to lab-mgmt).",
+    )
+    def _publish(slug: str, push: bool = False) -> str:
+        return json.dumps(tool_publish_draft(slug, push=push))
+
+    return server
+
+
+def main() -> int:  # pragma: no cover - run only as MCP server
+    server = _build_server()
+    server.run()
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    sys.exit(main())

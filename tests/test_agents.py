@@ -23,6 +23,7 @@ EXPECTED_AGENTS = {
     "bookworm",
     "cable_guy",
     "conscience",
+    "lab_oracle",
     "oracle",
     "receptionist",
     "registrar",
