@@ -68,13 +68,48 @@ silent overwrite of peer-reviewed content).
 The `wigamig-oracle` MCP server (registered by `wigamig install
 --hooks`) exposes:
 
-- `oracle_search(query, kind, tags, project, sensitivity, limit)`
+- `oracle_search(query, kind, tags, project, sensitivity, source, limit)`
 - `oracle_get(path)`
 - `oracle_list(kind)`
 - `oracle_publish_draft(slug, push=False)`
 
-`kind` ∈ {`personal`, `lab`, `both`}. Both tiers are searched in
-the same call when `kind=both`.
+### Three tiers, one query surface
+
+`kind` ∈ {`personal`, `lab`, `notebook`, `both`, `all`}:
+
+| kind | Reads from |
+|---|---|
+| `personal` | `<vault>/oracle/` (curated frontmatter-required entries) |
+| `lab` | `~/repos/lab_mgmt/oracle/` (curated, lab-shared) |
+| `notebook` | `<vault>/<notebook_subfolder>/` (daily entries; frontmatter optional) |
+| `both` | `personal + lab` (legacy default; preserved for back-compat) |
+| `all` | `personal + lab + notebook` |
+
+The **notebook tier** is permissive — daily lab notebook files
+don't need to conform to the Oracle schema. Missing fields are
+derived from path conventions:
+
+- `date`: from filename matching `YYYY-MM-DD` or `YYYY-MM-DD_<slug>`
+- `project`: from the parent dir name when notebooks are nested
+  per-project (`<vault>/lab-notebook/<project>/2026-05-15.md`); empty
+  for flat layouts (`<vault>/lab-notebook/2026-05-15.md`)
+- `title`: first `# heading` in the body, or the filename
+- `tags` / `sensitivity`: from frontmatter if present, else defaults
+
+This lets one MCP call (`kind=all`) return curated Oracle findings
+alongside the raw notebook mentions that surfaced them — useful for
+"what do I know about gene X?" queries that want both the distilled
+finding and the original context.
+
+### macOS Full Disk Access caveat
+
+If your vault lives under `~/Library/Mobile Documents/iCloud~md~obsidian/`,
+macOS may deny `ls`/`Read` on the notebook subdir even when Obsidian
+itself can see it. Grant Full Disk Access to your terminal app (and
+optionally the `claude` binary) in System Settings → Privacy & Security
+→ Full Disk Access. The MCP server tolerates permission denials
+gracefully — it just returns no notebook entries when blocked, rather
+than crashing.
 
 ## See also
 
