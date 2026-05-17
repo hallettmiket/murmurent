@@ -474,10 +474,9 @@ function RepoInventoryRow({ row, knownHosts, onInstall, onAdopt }) {
   // Per-host cell. Four states:
   //   ✓ wig — cloned + wigamig-initialized (CHARTER + .claude/agents/)
   //   • clone + ↑ adopt — cloned but missing CHARTER.md or .claude/agents/.
-  //     The "adopt" button (local hosts only) opens a modal that writes
-  //     CHARTER.md and runs the layer-2 bootstrap, promoting the clone
-  //     to a wigamig project. Remote-host adopt is not wired yet (would
-  //     need an SSH equivalent of the charter writer).
+  //     Adopt works for both local and SSH hosts: local writes CHARTER
+  //     on the filesystem; SSH writes CHARTER + bootstraps over a
+  //     single batched SSH session.
   //   + install — not cloned; clickable if a GitHub origin exists
   //   — — not applicable (no github origin to clone from)
   const hostCell = (host) => {
@@ -493,8 +492,9 @@ function RepoInventoryRow({ row, knownHosts, onInstall, onAdopt }) {
           </span>
         );
       }
-      // Cloned but not initialized. Local hosts get an adopt button;
-      // remote hosts still show the dim badge (no SSH adopt path yet).
+      // Cloned but not initialized — offer adopt regardless of host.
+      // The endpoint branches local vs SSH; the modal passes `host`
+      // through unchanged.
       return (
         <span style={{display:"inline-flex", alignItems:"center", gap:5}}>
           <span title={c.path} style={{
@@ -502,13 +502,16 @@ function RepoInventoryRow({ row, knownHosts, onInstall, onAdopt }) {
           }}>
             • clone
           </span>
-          {host === "local" && onAdopt && (
+          {onAdopt && (
             <button className="btn sm" style={{fontSize:10.5, padding:"1px 5px"}}
-                    title="Promote this clone to a wigamig project"
+                    title={host === "local"
+                      ? "Promote this clone to a wigamig project"
+                      : `Promote this clone on ${host} to a wigamig project (over SSH)`}
                     onClick={() => onAdopt({
                       name: row.name,
                       path: c.path,
                       origin: c.origin_url || "",
+                      host: host,
                     })}>
               ↑ adopt
             </button>
@@ -598,6 +601,7 @@ function AdoptCloneModal({ clone, onClose }) {
         sensitivity: form.sensitivity,
         description: form.description,
         agents,
+        host:        clone.host || "local",
       };
       if (form.choreography) payload.choreography = form.choreography;
       if (form.sensitivity === "clinical") {
@@ -653,10 +657,22 @@ function AdoptCloneModal({ clone, onClose }) {
                   onClick={() => onClose(false)}>✕ close</button>
         </div>
         <p className="muted" style={{fontSize:12, margin:"4px 0 6px"}}>
-          Writes <code>CHARTER.md</code> at <code className="mono">{clone.path}</code>
-          {" "}and bootstraps <code>.claude/agents/</code>. After this, the
-          Repo Inventory will show <strong style={{color:"var(--green)"}}>✓ wigamig</strong> for
-          this clone.
+          {clone.host && clone.host !== "local" ? (
+            <>
+              Writes <code>CHARTER.md</code> + bootstraps <code>.claude/agents/</code> on
+              {" "}<strong>{clone.host}</strong> over a single SSH session, at
+              {" "}<code className="mono">{clone.path}</code>. After this, the
+              Repo Inventory will show <strong style={{color:"var(--green)"}}>✓ wigamig</strong> for
+              this clone on {clone.host}, and a row appears in Projects + Installations.
+            </>
+          ) : (
+            <>
+              Writes <code>CHARTER.md</code> at <code className="mono">{clone.path}</code>
+              {" "}and bootstraps <code>.claude/agents/</code>. After this, the
+              Repo Inventory will show <strong style={{color:"var(--green)"}}>✓ wigamig</strong> for
+              this clone.
+            </>
+          )}
         </p>
 
         <div className="row" style={{gap:10}}>

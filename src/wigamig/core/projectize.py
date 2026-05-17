@@ -112,35 +112,63 @@ def make_wigamig_project(
     result = ProjectizeResult()
 
     # ---- 1. CHARTER.md --------------------------------------------------
+    # Render upfront — both local and SSH paths need the same body. If
+    # the metadata is invalid the schema check fires before we touch
+    # any filesystem (local or remote).
+    try:
+        charter_text = _charter.render_charter(
+            project=project,
+            lead=lead,
+            members=members,
+            sensitivity=sensitivity,
+            description=description or f"Adopted clone at {clone_path}.",
+            choreography=choreography,
+            reb_number=reb_number,
+            reb_expires=reb_expires,
+            data_residency=data_residency,
+            created=today,
+            repo_kind="github",
+        )
+    except _charter.CharterError as exc:
+        result.probes.append(_pf.Probe(
+            name="charter", status="fail",
+            detail=str(exc), required=True,
+        ))
+        return result
+
     charter_path = clone_path / "CHARTER.md"
     result.charter_path = charter_path
-    if charter_path.exists():
+    if ssh_remote:
+        # SSH branch: CHARTER + bootstrap happen in one batched session
+        # on the remote host. We collect those probes here so they
+        # render in the same place the local branch's probes do.
+        from . import hosts as _hosts_resolve
+        from . import remote_adopt as _radopt
+        try:
+            host_obj = _hosts_resolve.resolve(ssh_remote)
+        except _hosts_resolve.HostNotFound as exc:
+            result.probes.append(_pf.Probe(
+                name="ssh_host", status="fail",
+                detail=str(exc), required=True,
+            ))
+            # Fall through so the local manifest + registry still land —
+            # the user can re-run remote adopt after fixing the host.
+        else:
+            remote_probes = _radopt.adopt_remote_clone(
+                host=host_obj,
+                clone_path=str(clone_path),
+                project=project,
+                charter_text=charter_text,
+                agents=agents,
+            )
+            result.probes.extend(remote_probes)
+    elif charter_path.exists():
         result.probes.append(_pf.Probe(
             name="charter", status="ok",
             detail=f"{charter_path} (already exists, preserved)",
             required=True,
         ))
     else:
-        try:
-            charter_text = _charter.render_charter(
-                project=project,
-                lead=lead,
-                members=members,
-                sensitivity=sensitivity,
-                description=description or f"Adopted clone at {clone_path}.",
-                choreography=choreography,
-                reb_number=reb_number,
-                reb_expires=reb_expires,
-                data_residency=data_residency,
-                created=today,
-                repo_kind="github",
-            )
-        except _charter.CharterError as exc:
-            result.probes.append(_pf.Probe(
-                name="charter", status="fail",
-                detail=str(exc), required=True,
-            ))
-            return result
         charter_path.write_text(charter_text, encoding="utf-8")
         result.probes.append(_pf.Probe(
             name="charter", status="ok",

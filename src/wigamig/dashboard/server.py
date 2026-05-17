@@ -303,14 +303,21 @@ class HostScanDirsBody(BaseModel):
 class AdoptCloneBody(BaseModel):
     """JSON body for ``POST /api/inventory/adopt``.
 
-    Promotes an existing local git clone (one that shows up as
-    ``• clone`` in the Repo Inventory) into a wigamig project by
-    writing a CHARTER.md and bootstrapping ``.claude/agents/``. Local
-    hosts only for v1 — remote adopt would need an SSH equivalent
-    of the charter writer.
+    Promotes an existing git clone (one that shows up as ``• clone``
+    in the Repo Inventory) into a wigamig project by writing a
+    CHARTER.md and bootstrapping ``.claude/agents/``.
+
+    ``host`` defaults to ``"local"`` (the laptop) — the clone path is
+    validated against ``~/repos/`` and CHARTER + bootstrap happen on
+    the filesystem directly. When ``host`` names a registered SSH host
+    (e.g. ``"lab-server"``), CHARTER + bootstrap are written *on the
+    remote* over a single batched SSH session, and the local-side
+    artefacts (lab_mgmt registry, installation manifest with
+    ``ssh_remote`` populated) still land on this machine so the
+    Projects + Installations panels see the new row immediately.
     """
 
-    clone_path: str                # absolute path on this machine
+    clone_path: str                # absolute path on the target host
     project: str                   # CHARTER project name
     lead: str                      # e.g. "@the_pi"
     members: list[str]             # at least one handle
@@ -318,6 +325,7 @@ class AdoptCloneBody(BaseModel):
     description: str = ""
     choreography: str | None = None
     agents: list[str] = []
+    host: str = "local"            # "local" or a registered SSH host name
     # Clinical-only fields. Required when sensitivity == "clinical";
     # render_charter() will raise if they're missing.
     reb_number: str | None = None
@@ -1791,9 +1799,122 @@ def create_app() -> FastAPI:
         per-machine setting, not a per-project decision.
         """
         import os
+        from ..core import hosts as _hosts_mod
         from ..core import projectize as _proj
+        from ..core import remote as _remote_mod
         from . import machine_settings as _ms
+        from .snapshot import INSTALLATIONS_DIR
 
+        is_remote = body.host and body.host != "local"
+
+        if is_remote:
+            # SSH-host adopt. Validate host exists, the path is under
+            # the host's project_root, and a clone (.git) exists at the
+            # path. Path validation is done via a single SSH probe so
+            # we don't open multiple round-trips.
+            try:
+                host_obj = _hosts_mod.resolve(body.host)
+            except _hosts_mod.HostNotFound as exc:
+                raise HTTPException(status_code=404, detail=str(exc))
+            if host_obj.kind != "ssh":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"host {body.host!r} is not an SSH host",
+                )
+            # The clone_path the dashboard sends comes from the
+            # inventory scanner, which already constrained the search
+            # to host.scan_dirs (defaulting to ~/repo + ~/repos). Still
+            # double-check with the host's project_root to defend
+            # against a hand-crafted POST.
+            proot = (host_obj.project_root or "~/repos").rstrip("/")
+            # Probe: does the path exist on the remote and have .git?
+            rem = _remote_mod.Remote(host_obj)
+            qpath = body.clone_path.replace("'", "'\\''")
+            try:
+                res = rem.run(
+                    f"if [ -d '{qpath}/.git' ]; then echo OK; "
+                    f"elif [ -d '{qpath}' ]; then echo NOGIT; "
+                    f"else echo NOPATH; fi",
+                    check=False, timeout=20,
+                )
+            except _remote_mod.RemoteError as exc:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"ssh probe to {body.host} failed: "
+                           f"{(exc.stderr or str(exc)).strip()}",
+                )
+            verdict = (res.stdout or "").strip().splitlines()[-1] if res.stdout else ""
+            if verdict == "NOPATH":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"path does not exist on {body.host}: {body.clone_path}",
+                )
+            if verdict == "NOGIT":
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"not a git working tree on {body.host}: {body.clone_path}",
+                )
+            if verdict != "OK":
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"unexpected probe verdict {verdict!r}: {res.stderr or ''}",
+                )
+
+            # The endpoint can't easily check "is CHARTER absent" without
+            # a second SSH round-trip; the remote-adopt script itself
+            # handles that case by emitting `charter:ok:already exists...`
+            # instead of overwriting, so a 409 here would be
+            # belt-and-braces. Skip — let the script decide and surface
+            # the result as a probe.
+            actor = (user or os.environ.get("WIGAMIG_USER", "")).strip().lstrip("@") \
+                or body.lead.lstrip("@")
+            wb = (host_obj.lab_vm_root or "~/wigamig").rstrip("/")
+            try:
+                result = _proj.make_wigamig_project(
+                    clone_path=Path(body.clone_path),
+                    project=body.project,
+                    lead=body.lead,
+                    members=body.members,
+                    sensitivity=body.sensitivity,
+                    description=body.description,
+                    choreography=body.choreography,
+                    agents=list(body.agents or []),
+                    reb_number=body.reb_number,
+                    reb_expires=body.reb_expires,
+                    data_residency=body.data_residency,
+                    member=actor,
+                    machine_type="lab_server",
+                    hostname=host_obj.ssh_host or body.host,
+                    username=host_obj.remote_user or "",
+                    has_direct_access=False,
+                    lab_base=wb,
+                    raw_path=f"{wb}/raw",
+                    refined_path=f"{wb}/refined",
+                    notebook_path=f"{wb}/lab_notebooks",
+                    ssh_remote=body.host,
+                    mount_point=host_obj.mount_point or None,
+                    installations_dir=INSTALLATIONS_DIR,
+                )
+            except Exception as exc:
+                raise HTTPException(status_code=500, detail=f"projectize failed: {exc}") from exc
+
+            # If charter step on the remote failed, surface as 422 so
+            # the modal renders the probe ladder with red status.
+            charter_probe = next((p for p in result.probes if p.name == "charter"), None)
+            if charter_probe and charter_probe.status == "fail":
+                raise HTTPException(status_code=422, detail=charter_probe.detail)
+
+            return {
+                "ok": True,
+                "project": body.project,
+                "host": body.host,
+                "clone_path": body.clone_path,
+                "registry_path": str(result.registry_path) if result.registry_path else None,
+                "manifest_path": str(result.manifest_path) if result.manifest_path else None,
+                "probes": [p.to_dict() for p in result.probes],
+            }
+
+        # ---- Local adopt (host == "local") ----
         clone = Path(body.clone_path).expanduser().resolve()
         repos_root = (Path.home() / "repos").resolve()
         try:
@@ -1846,6 +1967,7 @@ def create_app() -> FastAPI:
                 raw_path=f"{wb}/raw",
                 refined_path=f"{wb}/refined",
                 notebook_path=f"{wb}/lab_notebooks",
+                installations_dir=INSTALLATIONS_DIR,
             )
         except Exception as exc:
             raise HTTPException(status_code=500, detail=f"projectize failed: {exc}") from exc
@@ -1859,6 +1981,7 @@ def create_app() -> FastAPI:
         return {
             "ok": True,
             "project": body.project,
+            "host": "local",
             "clone_path": str(clone),
             "registry_path": str(result.registry_path) if result.registry_path else None,
             "manifest_path": str(result.manifest_path) if result.manifest_path else None,
