@@ -24,10 +24,22 @@ recently opened vault), or `$WIGAMIG_OBSIDIAN_VAULT` if set.
 |---|---|---|
 | `oracle/` | Personal Oracle entries (per-entry .md files, `MEMORY.md` index) | `oracle` agent |
 | `oracle/drafts/` | Entries staged for `wigamig oracle publish` | `oracle` agent |
-| `lab_notebooks/<project>/` | Daily lab-notebook entries | the notebook tooling (`wigamig notebook ...`) |
+| `lab-notebook/` (default — see your `~/.wigamig/machine.yaml` `notebook_subfolder`) | Daily lab-notebook entries | the notebook tooling (`wigamig notebook ...`) |
 
 The rest of the vault is yours. Wigamig never writes outside the
 folders listed here.
+
+**Path naming gotcha.** There are two superficially-similar
+directories at different layers — don't confuse them:
+
+| Path | Purpose |
+|---|---|
+| `<vault>/lab-notebook/` (hyphen, singular) | Obsidian-side daily notebook entries. Configured per-machine via `~/.wigamig/machine.yaml: notebook_subfolder`. |
+| `$WIGAMIG_LAB_VM_ROOT/lab_notebooks/` (underscore, plural) | Wigamig data-storage layer's notebook directory under the lab-VM root. Part of the `raw/refined/lab_notebooks` triad. |
+
+The Obsidian one is where humans browse + edit. The lab-VM one is
+the staging/aggregation tier for cross-user notebook collation
+(future work).
 
 ## Personal vs lab Oracle storage
 
