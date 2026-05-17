@@ -162,11 +162,89 @@ def build_remote_adopt_script(
         '  else',
         '    echo "cc_claude_md:ok:already exists at $DEST/CLAUDE.md"',
         '  fi',
+        # VSCode chrome — same intent as bootstrap_local's local write.
+        # Heredoc is unquoted on the JSON delimiter so we keep the
+        # JSON exactly as authored; safe because the JSON contains no
+        # shell metacharacters that would expand.
+        '  if [ ! -f "$DEST/.vscode/settings.json" ]; then',
+        '    mkdir -p "$DEST/.vscode"',
+        "    cat > \"$DEST/.vscode/settings.json\" <<'__WIGAMIG_VSCODE_EOF__'",
+        _vscode_settings_for_ssh(),
+        '__WIGAMIG_VSCODE_EOF__',
+        '    echo "vscode_settings:ok:created $DEST/.vscode/settings.json"',
+        '  else',
+        '    echo "vscode_settings:ok:already exists at $DEST/.vscode/settings.json"',
+        '  fi',
+        # CC hooks settings — points at the remote's wigamig commons
+        # script (resolved at script-runtime via $WIG). On lab-server
+        # this expands to /home/UWO/the_pi/repos/wigamig/scripts/...
+        '  if [ ! -f "$DEST/.claude/settings.json" ]; then',
+        "    cat > \"$DEST/.claude/settings.json\" <<__WIGAMIG_CC_EOF__",
+        _cc_settings_for_ssh_template(),
+        '__WIGAMIG_CC_EOF__',
+        '    echo "cc_settings:ok:created $DEST/.claude/settings.json"',
+        '  else',
+        '    echo "cc_settings:ok:already exists at $DEST/.claude/settings.json"',
+        '  fi',
         'else',
         '  echo "cc_init:warn:skipped (clone missing or wigamig commons not at $WIG)"',
         'fi',
     ]
     return "\n".join(lines)
+
+
+def _vscode_settings_for_ssh() -> str:
+    """Same content :mod:`core.project_cc_init._vscode_settings_json`
+    emits — duplicated here so we don't reach across module
+    boundaries from the bash-script builder. Kept in sync by hand;
+    test :func:`tests/test_chrome_propagation.py::test_local_and_remote_vscode_match`
+    pins them."""
+    # Hard-coded to avoid the json import dance inside an f-string;
+    # the content is small and rarely changes.
+    return (
+        '{\n'
+        '  "//": "Per-folder VSCode settings for a wigamig project. Written by remote-adopt. Edit freely.",\n'
+        '  "window.title": "Wigamig — ${rootName}${separator}${activeEditorMedium}${separator}${dirty}",\n'
+        '  "window.titleSeparator": "  ·  ",\n'
+        '  "workbench.activityBar.location": "end",\n'
+        '  "workbench.sideBar.location": "right",\n'
+        '  "terminal.integrated.defaultLocation": "editor",\n'
+        '  "terminal.integrated.tabs.location": "right",\n'
+        '  "files.exclude": {\n'
+        '    "**/.pytest_cache": true,\n'
+        '    "**/__pycache__": true,\n'
+        '    "**/.venv": true\n'
+        '  }\n'
+        '}'
+    )
+
+
+def _cc_settings_for_ssh_template() -> str:
+    """JSON for ``.claude/settings.json`` with the hooks block. Written
+    via an *unquoted* heredoc on the remote so ``$WIG`` expands to
+    ``$HOME/repos/wigamig`` at runtime — the script sets ``WIG`` just
+    above this block. The hook path therefore comes out as e.g.
+    ``/home/UWO/the_pi/repos/wigamig/scripts/wigamig_log_agent_event.sh``,
+    which is what we want on every host."""
+    cmd = "$WIG/scripts/wigamig_log_agent_event.sh"
+    return (
+        '{\n'
+        '  "//": "Per-project CC hooks for the wigamig subagent reporter.",\n'
+        '  "hooks": {\n'
+        '    "PreToolUse": [\n'
+        '      {\n'
+        '        "matcher": "Agent",\n'
+        f'        "hooks": [{{"type": "command", "command": "{cmd}"}}]\n'
+        '      }\n'
+        '    ],\n'
+        '    "SubagentStop": [\n'
+        '      {\n'
+        f'        "hooks": [{{"type": "command", "command": "{cmd}"}}]\n'
+        '      }\n'
+        '    ]\n'
+        '  }\n'
+        '}'
+    )
 
 
 def parse_remote_adopt_output(stdout: str) -> list[_pf.Probe]:
