@@ -171,36 +171,60 @@ def bootstrap_local(
                 required=False,
             ))
 
-    # CC hooks settings — points at wigamig's hook handler script so
-    # subagent start/stop events for this project land in the shared
-    # ~/.wigamig/agents.log (which the BR pane tails). Only the hooks
-    # block is written; permissions accumulate per-project as the
-    # user grants them and live in .claude/settings.local.json.
-    cc_settings = project_dir / ".claude" / "settings.json"
-    if cc_settings.is_file():
-        probes.append(Probe(
-            name="cc_settings", status="ok",
-            detail=f"{cc_settings} (already exists, preserved)",
-            required=False,
-        ))
-    else:
-        try:
-            cc_settings.parent.mkdir(parents=True, exist_ok=True)
-            cc_settings.write_text(
-                _cc_settings_json(hook_path=wigamig_root / "scripts" / "wigamig_log_agent_event.sh"),
+    # CC hooks no longer live per-project — they're now merged into the
+    # user-global ~/.claude/settings.json by `wigamig install --hooks`
+    # so they fire for every project on this machine, sharing a single
+    # ~/.wigamig/agents.log. We don't write .claude/settings.json here
+    # any more.
+    #
+    # Defensive: if the user later creates a per-project
+    # .claude/settings.json (e.g. for project-specific permissions
+    # they don't want global), add it to the project's .gitignore so
+    # machine-absolute paths and per-machine grants don't escape to
+    # collaborators. Done once per project; idempotent.
+    gitignore = project_dir / ".gitignore"
+    ignore_line = ".claude/settings.json"
+    try:
+        if gitignore.is_file():
+            existing = gitignore.read_text(encoding="utf-8")
+            already = any(
+                line.strip() == ignore_line
+                for line in existing.splitlines()
+            )
+            if already:
+                probes.append(Probe(
+                    name="gitignore", status="ok",
+                    detail=f"{gitignore} already lists {ignore_line}",
+                    required=False,
+                ))
+            else:
+                sep = "" if existing.endswith("\n") else "\n"
+                gitignore.write_text(
+                    existing + sep + ignore_line + "\n",
+                    encoding="utf-8",
+                )
+                probes.append(Probe(
+                    name="gitignore", status="ok",
+                    detail=f"appended {ignore_line} to {gitignore}",
+                    required=False,
+                ))
+        else:
+            gitignore.write_text(
+                "# wigamig: machine-local CC settings (paths, grants)\n"
+                + ignore_line + "\n",
                 encoding="utf-8",
             )
             probes.append(Probe(
-                name="cc_settings", status="ok",
-                detail=f"created {cc_settings}",
+                name="gitignore", status="ok",
+                detail=f"created {gitignore} with {ignore_line}",
                 required=False,
             ))
-        except OSError as exc:
-            probes.append(Probe(
-                name="cc_settings", status="warn",
-                detail=f"write {cc_settings}: {exc}",
-                required=False,
-            ))
+    except OSError as exc:
+        probes.append(Probe(
+            name="gitignore", status="warn",
+            detail=f"write {gitignore}: {exc}",
+            required=False,
+        ))
 
     # CLAUDE.md stub. Skip if user already authored one.
     claude_md = project_dir / "CLAUDE.md"
@@ -309,34 +333,10 @@ def _vscode_settings_json() -> str:
     }, indent=2) + "\n"
 
 
-def _cc_settings_json(*, hook_path: Path) -> str:
-    """Minimal .claude/settings.json carrying just the hooks block so
-    subagent start/stop events from this project land in the BR-pane
-    log. No permissions — those grow per-project and live in the
-    sibling settings.local.json.
-
-    ``hook_path`` is an absolute path on this machine; the file is
-    therefore per-machine. Add ``.claude/settings.json`` to the
-    project's .gitignore if you don't want to share machine paths
-    across collaborators (or symlink to a portable equivalent later).
-    """
-    return json.dumps({
-        "//": (
-            "Per-project CC hooks for the wigamig subagent reporter. "
-            "Hook path is machine-specific; gitignore if you want to "
-            "share the project across users."
-        ),
-        "hooks": {
-            "PreToolUse": [
-                {
-                    "matcher": "Agent",
-                    "hooks": [{"type": "command", "command": str(hook_path)}],
-                }
-            ],
-            "SubagentStop": [
-                {
-                    "hooks": [{"type": "command", "command": str(hook_path)}],
-                }
-            ],
-        },
-    }, indent=2) + "\n"
+# NOTE: ``_cc_settings_json`` removed 2026-05-17 when the wigamig
+# subagent-reporter hooks moved from per-project ``.claude/settings.json``
+# into the user-global ``~/.claude/settings.json`` (single source of
+# truth, no machine-absolute paths leaking into project repos).
+# ``wigamig install --hooks`` is the canonical writer of the global
+# entry; bootstrap_local manages the project-level .gitignore so any
+# *user*-created .claude/settings.json doesn't escape to git.

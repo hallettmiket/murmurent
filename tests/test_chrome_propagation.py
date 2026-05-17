@@ -24,7 +24,6 @@ from pathlib import Path
 import pytest
 
 from wigamig.core.project_cc_init import (
-    _cc_settings_json,
     _vscode_settings_json,
     bootstrap_local,
 )
@@ -61,19 +60,15 @@ def test_bootstrap_writes_vscode_settings(world):
     assert data["terminal.integrated.defaultLocation"] == "editor"
 
 
-def test_bootstrap_writes_cc_settings_with_hook(world):
-    """`.claude/settings.json` carries the hooks block pointing at the
-    wigamig commons agent-reporter script."""
+def test_bootstrap_does_not_write_cc_settings(world):
+    """The wigamig subagent-reporter hooks moved out of per-project
+    .claude/settings.json into the user-global ~/.claude/settings.json
+    on 2026-05-17 (single source of truth, no machine-absolute paths
+    leaking into project repos). bootstrap_local must NOT write a
+    per-project hook stub any more — that would double-fire the
+    hook for every event."""
     bootstrap_local(world["project"], world["commons"], agents=[], project_name="demo")
-    f = world["project"] / ".claude" / "settings.json"
-    assert f.is_file()
-    data = json.loads(f.read_text())
-    assert "permissions" not in data, "hooks-only file — permissions grow per-project"
-    pre = data["hooks"]["PreToolUse"][0]
-    assert pre["matcher"] == "Agent"
-    assert pre["hooks"][0]["command"].endswith("/wigamig_log_agent_event.sh")
-    stop = data["hooks"]["SubagentStop"][0]
-    assert stop["hooks"][0]["command"].endswith("/wigamig_log_agent_event.sh")
+    assert not (world["project"] / ".claude" / "settings.json").exists()
 
 
 def test_bootstrap_preserves_existing_vscode_settings(world):
@@ -89,8 +84,11 @@ def test_bootstrap_preserves_existing_vscode_settings(world):
 
 
 def test_bootstrap_preserves_existing_cc_settings(world):
-    """Same for `.claude/settings.json` — the user may have added
-    permissions that we should not clobber."""
+    """If the user has manually authored a per-project
+    .claude/settings.json (e.g. for project-specific permissions),
+    bootstrap_local must NOT touch it. Even though we no longer
+    write the file ourselves, we still mustn't clobber user content
+    that happens to be there."""
     proj = world["project"]
     (proj / ".claude").mkdir(parents=True)
     custom = '{"permissions": {"allow": ["Bash(ls *)"]}}'
@@ -99,26 +97,58 @@ def test_bootstrap_preserves_existing_cc_settings(world):
     assert (proj / ".claude" / "settings.json").read_text() == custom
 
 
+def test_bootstrap_adds_cc_settings_to_gitignore(world):
+    """Defensive: bootstrap appends ``.claude/settings.json`` to the
+    project's .gitignore. This way a user-created per-project
+    settings file (machine-absolute paths, per-machine permissions)
+    can't accidentally escape to collaborators via git."""
+    proj = world["project"]
+    bootstrap_local(proj, world["commons"], agents=[], project_name="demo")
+    gi = proj / ".gitignore"
+    assert gi.is_file()
+    lines = [l.strip() for l in gi.read_text().splitlines()]
+    assert ".claude/settings.json" in lines
+
+
+def test_bootstrap_gitignore_is_idempotent(world):
+    """Re-running bootstrap must not duplicate the gitignore entry."""
+    proj = world["project"]
+    bootstrap_local(proj, world["commons"], agents=[], project_name="demo")
+    bootstrap_local(proj, world["commons"], agents=[], project_name="demo")
+    count = sum(
+        1 for line in (proj / ".gitignore").read_text().splitlines()
+        if line.strip() == ".claude/settings.json"
+    )
+    assert count == 1
+
+
+def test_bootstrap_appends_to_existing_gitignore(world):
+    """If the project already has a .gitignore with other patterns,
+    bootstrap appends without disturbing existing entries."""
+    proj = world["project"]
+    (proj / ".gitignore").write_text("__pycache__/\n*.pyc\n", encoding="utf-8")
+    bootstrap_local(proj, world["commons"], agents=[], project_name="demo")
+    text = (proj / ".gitignore").read_text()
+    assert "__pycache__/" in text
+    assert "*.pyc" in text
+    assert ".claude/settings.json" in text
+
+
 def test_bootstrap_reports_chrome_probes(world):
-    """The new probes (vscode_settings, cc_settings) appear in the
+    """The chrome probes (vscode_settings, gitignore) appear in the
     probes list with ok status — the dashboard renders them inline
-    alongside the existing cc_agent/cc_claude_md rows."""
+    alongside the existing cc_agent/cc_claude_md rows. ``cc_settings``
+    is no longer emitted (hooks are global now)."""
     probes = bootstrap_local(world["project"], world["commons"], agents=[], project_name="demo")
     names = {p.name for p in probes}
     assert "vscode_settings" in names
-    assert "cc_settings" in names
+    assert "gitignore" in names
+    assert "cc_settings" not in names
 
 
 def test_vscode_settings_json_is_valid_json():
     """Sanity: the helper produces parseable JSON."""
     json.loads(_vscode_settings_json())
-
-
-def test_cc_settings_json_includes_hook_path():
-    """The hook path is interpolated; sanity-check the produced JSON."""
-    j = _cc_settings_json(hook_path=Path("/wig/scripts/hook.sh"))
-    data = json.loads(j)
-    assert data["hooks"]["PreToolUse"][0]["hooks"][0]["command"] == "/wig/scripts/hook.sh"
 
 
 def test_ssh_chrome_writes_appear_in_remote_adopt_script():

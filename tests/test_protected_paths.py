@@ -385,5 +385,8 @@ def test_hook_is_registered_in_install_cmd():
     from wigamig.commands.install_cmd import HOOK_REGISTRATIONS
     labels = {h["label"] for h in HOOK_REGISTRATIONS}
     assert "wigamig-protected-paths" in labels
-    modules = {h["module"] for h in HOOK_REGISTRATIONS}
+    # ``module`` is only present on Python-module registrations; the
+    # bash-script registrations (e.g. the agent reporter) use
+    # ``command`` instead.
+    modules = {h["module"] for h in HOOK_REGISTRATIONS if "module" in h}
     assert "wigamig.hooks.protected_paths" in modules
