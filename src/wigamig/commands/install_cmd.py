@@ -22,6 +22,25 @@ DEFAULT_SETTINGS_PATH = Path("~/.claude/settings.json").expanduser()
 
 HOOK_REGISTRATIONS: list[dict[str, Any]] = [
     {
+        # wigamig agent reporter — writes coloured one-line events for
+        # PreToolUse(Agent) and SubagentStop to ~/.wigamig/agents.log,
+        # which the VSCode BR pane tails. Uses ``command`` rather than
+        # ``module`` because the hook is a bash script, not a Python
+        # entrypoint.
+        "event": "PreToolUse",
+        "matcher": "Agent",
+        "command": "<WIGAMIG_REPO>/scripts/wigamig_log_agent_event.sh",
+        "env": {},
+        "label": "wigamig-agent-report-pre",
+    },
+    {
+        "event": "SubagentStop",
+        "matcher": None,
+        "command": "<WIGAMIG_REPO>/scripts/wigamig_log_agent_event.sh",
+        "env": {},
+        "label": "wigamig-agent-report-stop",
+    },
+    {
         "event": "PreToolUse",
         "matcher": "Write|Edit|Bash|NotebookEdit",
         "module": "wigamig.hooks.raw_guard",
@@ -85,27 +104,50 @@ MCP_REGISTRATIONS: dict[str, dict[str, Any]] = {
 }
 
 
-def _hook_command(module: str, env: dict[str, str]) -> str:
-    """Render a shell command that invokes ``module`` with optional env vars."""
-    parts: list[str] = []
-    for k, v in env.items():
-        parts.append(f"{k}={v}")
-    parts.extend([sys.executable, "-m", module])
+def _resolve_command(reg: dict[str, Any]) -> str:
+    """Render the shell command for a hook registration.
+
+    Two registration shapes are supported:
+      - ``module``: a Python module entrypoint — gets ``$PYTHON -m <module>``
+        with optional env-var prefixes (the historic shape; covers
+        raw_guard, phi_check, audit, etc.).
+      - ``command``: a literal shell command — typically a path to a
+        bash script. Use ``<WIGAMIG_REPO>`` as a placeholder for the
+        wigamig clone root; it's expanded at install time so the
+        resulting absolute path is correct on this machine.
+    """
+    env = reg.get("env") or {}
+    if "command" in reg:
+        from ..core.repo import wigamig_repo_root
+        cmd = str(reg["command"]).replace("<WIGAMIG_REPO>", str(wigamig_repo_root()))
+        parts = [f"{k}={v}" for k, v in env.items()] + [cmd]
+        return " ".join(parts)
+    parts = [f"{k}={v}" for k, v in env.items()]
+    parts.extend([sys.executable, "-m", reg["module"]])
     return " ".join(parts)
 
 
 def _matches_existing(entry: dict[str, Any], reg: dict[str, Any]) -> bool:
-    """Decide whether ``entry`` corresponds to ``reg`` (so we can replace it)."""
-    if entry.get("matcher") != reg["matcher"]:
+    """Decide whether ``entry`` corresponds to ``reg`` (so we can replace it).
+
+    Identity carries through the ``label`` (always present) and the
+    body of the command — either the Python module name (``module``
+    registrations) or the script path (``command`` registrations).
+    """
+    if entry.get("matcher") != reg.get("matcher"):
         return False
+    body = reg.get("module") or reg.get("command") or ""
+    if "<WIGAMIG_REPO>" in body:
+        from ..core.repo import wigamig_repo_root
+        body = body.replace("<WIGAMIG_REPO>", str(wigamig_repo_root()))
     hooks = entry.get("hooks") or []
     for h in hooks:
         cmd = h.get("command", "")
         if isinstance(cmd, list):
             cmd = " ".join(cmd)
-        if reg["module"] in cmd:
+        if body and body in cmd:
             return True
-        if reg["label"] in cmd:
+        if reg.get("label") and reg["label"] in cmd:
             return True
     return False
 
@@ -118,11 +160,11 @@ def _ensure_hook(settings: dict[str, Any], reg: dict[str, Any]) -> bool:
     hooks = settings.setdefault("hooks", {})
     bucket = hooks.setdefault(reg["event"], [])
     new_entry = {
-        "matcher": reg["matcher"],
+        "matcher": reg.get("matcher"),
         "hooks": [
             {
                 "type": "command",
-                "command": _hook_command(reg["module"], reg["env"]),
+                "command": _resolve_command(reg),
                 "name": reg["label"],
             }
         ],
