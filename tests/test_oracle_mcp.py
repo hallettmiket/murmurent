@@ -467,3 +467,29 @@ def test_install_registers_oracle_mcp(tmp_path, monkeypatch):
     assert "wigamig-oracle" in data["mcpServers"]
     spec = data["mcpServers"]["wigamig-oracle"]
     assert spec["args"] == ["-m", "wigamig.mcp.oracle_server"]
+
+
+def test_install_does_not_emit_null_matcher(tmp_path):
+    """Regression test for the 2026-05-17 bug that left
+    ``matcher: null`` on the SubagentStop hook in ~/.claude/settings.json,
+    which CC's settings parser rejects with:
+
+        Settings file failed to parse … Expected strings, but received null.
+
+    The fix: matcher-less hooks (SubagentStop, Stop, …) must OMIT the
+    matcher key, not set it to null. This test fails if any
+    serialised hook entry carries a null matcher.
+    """
+    from wigamig.commands import install_cmd
+    settings = tmp_path / "settings.json"
+    settings.write_text("{}")
+    install_cmd.cmd_install(hooks=True, settings_path=settings, backup=False)
+    data = json.loads(settings.read_text())
+    for event, bucket in (data.get("hooks") or {}).items():
+        for entry in bucket:
+            assert entry.get("matcher") is not None or "matcher" not in entry, (
+                f"hooks.{event} contains an entry with matcher: null "
+                f"— CC's parser will reject the whole settings file. "
+                f"Either set a real matcher string or omit the key. "
+                f"Bad entry: {entry}"
+            )

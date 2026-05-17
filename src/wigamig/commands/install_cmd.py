@@ -134,7 +134,11 @@ def _matches_existing(entry: dict[str, Any], reg: dict[str, Any]) -> bool:
     body of the command — either the Python module name (``module``
     registrations) or the script path (``command`` registrations).
     """
-    if entry.get("matcher") != reg.get("matcher"):
+    # Matcher equality: both ``None`` and missing-key mean "no matcher"
+    # for our purposes; treat them as equivalent so we don't fail to
+    # match an existing entry just because the old shape stored
+    # ``matcher: null`` and the new shape omits the key.
+    if (entry.get("matcher") or None) != (reg.get("matcher") or None):
         return False
     body = reg.get("module") or reg.get("command") or ""
     if "<WIGAMIG_REPO>" in body:
@@ -156,11 +160,17 @@ def _ensure_hook(settings: dict[str, Any], reg: dict[str, Any]) -> bool:
     """Ensure ``reg`` is present under ``settings.hooks[reg.event]``.
 
     Returns True if anything changed.
+
+    The ``matcher`` key is only emitted when the registration carries
+    a non-None value. CC's settings parser rejects ``matcher: null``
+    (``Expected strings, but received null``), and events like
+    ``SubagentStop`` and ``Stop`` don't conceptually have a matcher —
+    they fire on every occurrence. Omitting the key is the right
+    encoding for matcher-less hooks.
     """
     hooks = settings.setdefault("hooks", {})
     bucket = hooks.setdefault(reg["event"], [])
-    new_entry = {
-        "matcher": reg.get("matcher"),
+    new_entry: dict[str, Any] = {
         "hooks": [
             {
                 "type": "command",
@@ -169,6 +179,14 @@ def _ensure_hook(settings: dict[str, Any], reg: dict[str, Any]) -> bool:
             }
         ],
     }
+    matcher = reg.get("matcher")
+    if matcher is not None:
+        new_entry["matcher"] = matcher
+    # Preserve insertion order for diff stability: when an entry has
+    # both matcher and hooks, put matcher first to match the existing
+    # on-disk shape.
+    if "matcher" in new_entry:
+        new_entry = {"matcher": new_entry["matcher"], "hooks": new_entry["hooks"]}
     for i, entry in enumerate(bucket):
         if _matches_existing(entry, reg):
             if entry == new_entry:
