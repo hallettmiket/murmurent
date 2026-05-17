@@ -1127,45 +1127,20 @@ def create_app() -> FastAPI:
                 ),
             }
 
-        # ---- Local project: existing multi-root + iTerm flow ----
-        if not body.agents:
-            raise HTTPException(status_code=422, detail="at least one agent required")
-
-        script = wigamig_repo_root() / "scripts" / "start_workspace.sh"
+        # ---- Local project: open via scripts/open_wigamig.sh ----
+        # The newer launcher (2026-05-17) detects monitors via JXA+AppKit
+        # and positions the window at 80% of the chosen display
+        # (external if attached, else laptop). It does NOT spawn iTerm
+        # agent-tail windows — that role moved into VSCode's BR pane
+        # via the wigamig agent-reporter hook. The old
+        # start_workspace.sh remains in the tree for the iTerm-windows
+        # workflow but is no longer the dashboard's default.
+        project_dir = project_path(body.project)
+        script = wigamig_repo_root() / "scripts" / "open_wigamig.sh"
         if not script.is_file():
             raise HTTPException(status_code=500, detail=f"launcher missing: {script}")
 
-        project_dir = project_path(body.project)
-        agents_csv = ",".join(body.agents)
-        cmd: list[str] = [str(script), str(project_dir), agents_csv]
-        if body.sea_id is not None:
-            cmd.append(str(body.sea_id))
-
-        # Generate the multi-root .code-workspace file so VSCode opens
-        # with repo + refined/ + notebook + Oracle visible together.
-        # Failures here are non-fatal — fall back to opening just the repo.
-        workspace_path: str | None = None
-        try:
-            member_profile = snap_mod._load_member_profile(actor)
-            settings = snap_mod._member_settings(member_profile)
-            lab_name = str(member_profile.get("lab") or "hallett")
-            lab_settings = snap_mod._lab_settings(lab_name)
-            written = _workspace_file.write_workspace_file(
-                project=body.project,
-                obsidian_vault_path=settings.obsidian_vault_path,
-                notebook_subfolder=settings.notebook_subfolder,
-                oracle_subfolder=settings.oracle_subfolder,
-                lab_oracle_vault=lab_settings.lab_oracle_vault,
-            )
-            workspace_path = str(written)
-        except Exception:
-            # Best-effort — never block the launch on a workspace-file glitch.
-            workspace_path = None
-
-        sub_env = os.environ.copy()
-        if workspace_path:
-            sub_env["WIGAMIG_WORKSPACE_FILE"] = workspace_path
-
+        cmd: list[str] = [str(script), str(project_dir)]
         try:
             subprocess.Popen(  # noqa: S603 — args are list, never shelled
                 cmd,
@@ -1173,7 +1148,6 @@ def create_app() -> FastAPI:
                 stderr=subprocess.DEVNULL,
                 stdin=subprocess.DEVNULL,
                 close_fds=True,
-                env=sub_env,
             )
         except OSError as exc:
             raise HTTPException(status_code=500, detail=f"launcher failed: {exc}")
@@ -1182,10 +1156,15 @@ def create_app() -> FastAPI:
             "ok": True,
             "project": body.project,
             "project_dir": str(project_dir),
-            "workspace_file": workspace_path,
+            "launcher": str(script),
             "agents": body.agents,
             "sea_id": body.sea_id,
             "cmd": cmd,
+            "note": (
+                "Launched via open_wigamig.sh — VSCode opens at 80% of "
+                "the chosen display. Arrange the 4 quadrants once and "
+                "VSCode persists the layout per folder."
+            ),
         }
 
     @app.post("/api/workspace/initialize")

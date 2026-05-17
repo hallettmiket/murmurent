@@ -250,6 +250,61 @@ def _seed_remote_pointer(repos: Path, lab_mgmt: Path, name: str = "candi") -> No
     )
 
 
+def _seed_local_for_launch(repos: Path, lab_mgmt: Path, name: str = "loc") -> None:
+    """Minimal local project so workspace_launch finds it via find_project."""
+    p = repos / name
+    p.mkdir(parents=True)
+    p.joinpath("CHARTER.md").write_text(
+        "---\n"
+        f"project: {name}\nsensitivity: standard\nlead: '@mhallet'\n"
+        "created: 2026-05-13\nmembers:\n  - '@mhallet'\n"
+        "---\n# loc\n",
+        encoding="utf-8",
+    )
+    lab_mgmt.joinpath("projects", f"{name}.md").write_text(
+        "---\n"
+        f"project: {name}\npath: {p}\nsensitivity: standard\nlead: '@mhallet'\n"
+        "created: 2026-05-13\nmembers:\n  - '@mhallet'\n---\n",
+        encoding="utf-8",
+    )
+
+
+def test_workspace_launch_local_uses_open_wigamig_sh(world, monkeypatch):
+    """The dashboard's local-project launch now invokes
+    scripts/open_wigamig.sh — the 80%-window launcher with monitor
+    detection — instead of the older scripts/start_workspace.sh that
+    spawned a VSCode + iTerm 65/35 split. The agent-log role moved
+    into VSCode's BR pane via the wigamig hook, so iTerm windows are
+    no longer needed for the local flow.
+    """
+    _seed_local_for_launch(world["repos"], world["lab_mgmt"])
+    launched = {"argv": None}
+
+    def fake_popen(argv, **kwargs):
+        launched["argv"] = list(argv)
+        class _Stub:
+            pass
+        return _Stub()
+
+    monkeypatch.setattr("subprocess.Popen", fake_popen)
+
+    client = TestClient(create_app())
+    res = client.post("/api/workspace/launch?user=mhallet", json={
+        "project": "loc",
+        # Local launch no longer requires an agent pick — the launcher
+        # opens the repo and CC hooks do their thing per-project.
+        "agents": [],
+    })
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body["ok"] is True
+    assert body["launcher"].endswith("/open_wigamig.sh")
+    # First argv element is the launcher; second is the project dir.
+    assert launched["argv"] is not None
+    assert launched["argv"][0].endswith("/open_wigamig.sh")
+    assert launched["argv"][1].endswith("/loc")
+
+
 def test_workspace_launch_remote_returns_vscode_url(world, monkeypatch):
     _hosts.add(_hosts.Host(
         name="biodatsci", kind="ssh", ssh_host="biodatsci",

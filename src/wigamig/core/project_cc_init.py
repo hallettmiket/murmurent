@@ -21,6 +21,7 @@ Two callers:
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -138,6 +139,69 @@ def bootstrap_local(
                 required=False,
             ))
 
+    # VSCode chrome — same settings wigamig uses for itself, so every
+    # wigamig project opens with the title template, activity bar on
+    # the right, and terminals defaulting to the editor area (the
+    # foundation for the 4-quadrant layout). Skipped if the project
+    # already has a .vscode/settings.json — preserves user edits.
+    vscode_dir = project_dir / ".vscode"
+    vscode_settings = vscode_dir / "settings.json"
+    if vscode_settings.is_file():
+        probes.append(Probe(
+            name="vscode_settings", status="ok",
+            detail=f"{vscode_settings} (already exists, preserved)",
+            required=False,
+        ))
+    else:
+        try:
+            vscode_dir.mkdir(parents=True, exist_ok=True)
+            vscode_settings.write_text(
+                _vscode_settings_json(),
+                encoding="utf-8",
+            )
+            probes.append(Probe(
+                name="vscode_settings", status="ok",
+                detail=f"created {vscode_settings}",
+                required=False,
+            ))
+        except OSError as exc:
+            probes.append(Probe(
+                name="vscode_settings", status="warn",
+                detail=f"write {vscode_settings}: {exc}",
+                required=False,
+            ))
+
+    # CC hooks settings — points at wigamig's hook handler script so
+    # subagent start/stop events for this project land in the shared
+    # ~/.wigamig/agents.log (which the BR pane tails). Only the hooks
+    # block is written; permissions accumulate per-project as the
+    # user grants them and live in .claude/settings.local.json.
+    cc_settings = project_dir / ".claude" / "settings.json"
+    if cc_settings.is_file():
+        probes.append(Probe(
+            name="cc_settings", status="ok",
+            detail=f"{cc_settings} (already exists, preserved)",
+            required=False,
+        ))
+    else:
+        try:
+            cc_settings.parent.mkdir(parents=True, exist_ok=True)
+            cc_settings.write_text(
+                _cc_settings_json(hook_path=wigamig_root / "scripts" / "wigamig_log_agent_event.sh"),
+                encoding="utf-8",
+            )
+            probes.append(Probe(
+                name="cc_settings", status="ok",
+                detail=f"created {cc_settings}",
+                required=False,
+            ))
+        except OSError as exc:
+            probes.append(Probe(
+                name="cc_settings", status="warn",
+                detail=f"write {cc_settings}: {exc}",
+                required=False,
+            ))
+
     # CLAUDE.md stub. Skip if user already authored one.
     claude_md = project_dir / "CLAUDE.md"
     if claude_md.is_file():
@@ -216,3 +280,63 @@ def _stub(
         "inherits from `~/.claude/` (Layer 1) AND overrides via `.claude/`\n"
         "here (Layer 2). See [[project-cc-commons-layered]] in lab oracle.\n"
     )
+
+
+def _vscode_settings_json() -> str:
+    """Same chrome wigamig uses for itself: window title, activity bar
+    on the right, sidebar on the right, terminals default to the editor
+    area (so the 4-quadrant layout works), and noise hidden from the
+    Explorer. ``${rootName}`` makes the title auto-customize per project
+    so we don't need a template — the same JSON works for every repo.
+    """
+    return json.dumps({
+        "//": (
+            "Per-folder VSCode settings for a wigamig project. Written by "
+            "core.project_cc_init.bootstrap_local. Edit freely — wigamig "
+            "preserves user-modified files on re-bootstrap."
+        ),
+        "window.title": "Wigamig — ${rootName}${separator}${activeEditorMedium}${separator}${dirty}",
+        "window.titleSeparator": "  ·  ",
+        "workbench.activityBar.location": "end",
+        "workbench.sideBar.location": "right",
+        "terminal.integrated.defaultLocation": "editor",
+        "terminal.integrated.tabs.location": "right",
+        "files.exclude": {
+            "**/.pytest_cache": True,
+            "**/__pycache__": True,
+            "**/.venv": True,
+        },
+    }, indent=2) + "\n"
+
+
+def _cc_settings_json(*, hook_path: Path) -> str:
+    """Minimal .claude/settings.json carrying just the hooks block so
+    subagent start/stop events from this project land in the BR-pane
+    log. No permissions — those grow per-project and live in the
+    sibling settings.local.json.
+
+    ``hook_path`` is an absolute path on this machine; the file is
+    therefore per-machine. Add ``.claude/settings.json`` to the
+    project's .gitignore if you don't want to share machine paths
+    across collaborators (or symlink to a portable equivalent later).
+    """
+    return json.dumps({
+        "//": (
+            "Per-project CC hooks for the wigamig subagent reporter. "
+            "Hook path is machine-specific; gitignore if you want to "
+            "share the project across users."
+        ),
+        "hooks": {
+            "PreToolUse": [
+                {
+                    "matcher": "Agent",
+                    "hooks": [{"type": "command", "command": str(hook_path)}],
+                }
+            ],
+            "SubagentStop": [
+                {
+                    "hooks": [{"type": "command", "command": str(hook_path)}],
+                }
+            ],
+        },
+    }, indent=2) + "\n"
