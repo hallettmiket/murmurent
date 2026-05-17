@@ -154,6 +154,13 @@ def make_wigamig_project(
             # Fall through so the local manifest + registry still land —
             # the user can re-run remote adopt after fixing the host.
         else:
+            # When ``ssh_remote`` is set, ``clone_path`` is interpreted
+            # as the path on the *remote host*, NOT the laptop. The
+            # caller is responsible for synthesizing the right value
+            # (typically ``<host.project_root>/<project>``). This keeps
+            # projectize stateless about which side owns which path —
+            # both branches treat ``clone_path`` as authoritative for
+            # the target host.
             remote_probes = _radopt.adopt_remote_clone(
                 host=host_obj,
                 clone_path=str(clone_path),

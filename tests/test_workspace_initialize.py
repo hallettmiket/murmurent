@@ -137,6 +137,94 @@ def test_initialize_writes_charter_for_bare_clone(isolated, tmp_path, monkeypatc
     assert (isolated["installs"] / "demo.yaml").is_file()
 
 
+def test_initialize_ssh_install_on_bare_repo_no_local_dir(isolated, tmp_path, monkeypatch):
+    """SSH install of a repo with no local presence at all — the
+    closes-the-loop case for #9: click `+ install` for biodatsci on a
+    GitHub repo you've never had locally and it ends up wigamig-ready
+    on biodatsci, in the Projects list, and in the Installations list.
+
+    Before this change, the 404 at line 1218 blocked any install
+    where the local ~/repos/<name> dir didn't exist, even though the
+    whole point of an SSH install is that the working tree lives on
+    the remote.
+    """
+    import wigamig.core.remote as _remote_mod
+    from wigamig.core import hosts as _hosts
+
+    # Register an SSH host so workspace_initialize can resolve it.
+    monkeypatch.setenv("WIGAMIG_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
+    _hosts.add(_hosts.Host(
+        name="biodatsci", kind="ssh", ssh_host="biodatsci",
+        remote_user="mhallet", project_root="/home/UWO/mhallet/repos",
+        lab_vm_root="/data/lab_vm/wigamig",
+    ))
+
+    # Mock every Remote.run so we don't actually SSH anywhere. Two
+    # round trips happen: the install probe (wigamig binary / clone)
+    # and the projectize-driven remote_adopt CHARTER write.
+    def fake_run(self, command, *, check=True, timeout=60):
+        if "wigamig --version" in command:
+            stdout = "wigamig 1.0.0\n"
+        elif "raw:" in command or "refined:" in command or "notebook:" in command:
+            stdout = "\n".join([
+                "wigamig:ok:1.0.0",
+                "homedir:ok:/home/UWO/mhallet",
+                "raw:ok:created /data/lab_vm/wigamig/raw",
+                "refined:ok:created /data/lab_vm/wigamig/refined",
+                "notebook:ok:created /data/lab_vm/wigamig/lab_notebooks",
+                "repo:ok:cloned git@github.com:hallettmiket/freshrepo.git into /home/UWO/mhallet/repos/freshrepo",
+                "cc_agent:ok:blacksmith -> wigamig/agents/blacksmith.md",
+                "cc_claude_md:ok:created /home/UWO/mhallet/repos/freshrepo/CLAUDE.md",
+            ]) + "\n"
+        else:
+            # The adopt_remote_clone script, identifiable by `DEST=` +
+            # the CHARTER heredoc marker.
+            stdout = "\n".join([
+                "charter:ok:wrote /home/UWO/mhallet/repos/freshrepo/CHARTER.md",
+                "cc_agent:ok:blacksmith -> wigamig/agents/blacksmith.md",
+                "cc_claude_md:ok:already exists at /home/UWO/mhallet/repos/freshrepo/CLAUDE.md",
+            ]) + "\n"
+        return _remote_mod.RemoteResult(
+            host="biodatsci", command=command, returncode=0,
+            stdout=stdout, stderr="",
+        )
+    monkeypatch.setattr(_remote_mod.Remote, "run", fake_run)
+
+    client = TestClient(create_app())
+    body = _initialize_body(
+        project="freshrepo",
+        ssh_remote="biodatsci",
+        has_direct_access=False,
+        raw_path="/data/lab_vm/wigamig/raw",
+        refined_path="/data/lab_vm/wigamig/refined",
+        notebook_path="/data/lab_vm/wigamig/lab_notebooks",
+    )
+    # Note: ~/repos/freshrepo does NOT exist locally — that's the test.
+    assert not (isolated["repos"] / "freshrepo").exists()
+
+    res = client.post("/api/workspace/initialize", json=body)
+    assert res.status_code == 200, res.text
+    payload = res.json()
+    assert payload["ok"] is True
+
+    # Lab-mgmt registry entry exists with the remote-host fields.
+    reg = isolated["tmp"] / "lab-mgmt" / "projects" / "freshrepo.md"
+    assert reg.is_file()
+    reg_text = reg.read_text()
+    assert "host: biodatsci" in reg_text
+    assert "/home/UWO/mhallet/repos/freshrepo" in reg_text
+
+    # Installation manifest reflects the SSH install.
+    manifest_p = isolated["installs"] / "freshrepo.yaml"
+    assert manifest_p.is_file()
+    m = yaml.safe_load(manifest_p.read_text())
+    assert m["ssh_remote"] == "biodatsci"
+    assert m["access"] == "ssh"
+    # And the CHARTER write fired remotely (visible in the probes).
+    probe_names = [p["name"] for p in payload["probes"]]
+    assert "charter" in probe_names
+
+
 def test_initialize_rejects_unknown_project(isolated):
     client = TestClient(create_app())
     res = client.post("/api/workspace/initialize", json=_initialize_body(project="nope"))

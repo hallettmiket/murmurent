@@ -1213,14 +1213,27 @@ def create_app() -> FastAPI:
 
         probes: list[_Probe] = []
 
-        # Validate project exists locally before scribbling any state.
+        # Validate project exists. For local installs the working tree
+        # must already be on this machine; for SSH installs the tree
+        # lives on the remote (remote_install will clone it if missing),
+        # so we don't require a local dir — projectize will write the
+        # lab_mgmt entry + manifest pointing at the remote path, and
+        # the SSH-side CHARTER write happens via projectize's SSH
+        # branch (-> remote_adopt.adopt_remote_clone).
         from ..core.projects import project_path as _pp
-        if not _pp(body.project).is_dir():
+        if not body.ssh_remote and not _pp(body.project).is_dir():
             raise HTTPException(status_code=404, detail=f"project not found: {body.project}")
-        probes.append(_Probe(
-            name="project", status="ok",
-            detail=f"local clone at {_pp(body.project)}", required=True,
-        ))
+        if body.ssh_remote:
+            probes.append(_Probe(
+                name="project", status="ok",
+                detail=f"SSH install on {body.ssh_remote} (remote tree)",
+                required=True,
+            ))
+        else:
+            probes.append(_Probe(
+                name="project", status="ok",
+                detail=f"local clone at {_pp(body.project)}", required=True,
+            ))
 
         # Carry forward any unresolved issues from a previous installation
         # on this machine — installing on top of an unresolved issue is
@@ -1343,7 +1356,22 @@ def create_app() -> FastAPI:
         from ..core import projectize as _proj
         from ..core.frontmatter import parse_file as _pcharter
         from ..core.projects import project_path as _pp_for_proj
-        clone_dir = _pp_for_proj(body.project)
+        # When ssh_remote is set, clone_path passed into projectize is
+        # the path *on the remote host* (used in the SSH script's
+        # ``$DEST=``). For local installs it's the laptop path. The
+        # registry's ``path:`` field will reflect whichever we pass;
+        # the registry's ``remote_path:`` field is computed inside
+        # projectize from remote_home.
+        if body.ssh_remote:
+            from ..core import hosts as _hosts_for_clone
+            try:
+                _h = _hosts_for_clone.resolve(body.ssh_remote)
+                _proot = (_h.project_root or "~/repos").rstrip("/")
+            except _hosts_for_clone.HostNotFound:
+                _proot = "~/repos"
+            clone_dir = Path(f"{_proot}/{body.project}")
+        else:
+            clone_dir = _pp_for_proj(body.project)
         charter_path = clone_dir / "CHARTER.md"
         try:
             meta = _pcharter(charter_path).meta or {} if charter_path.is_file() else {}
