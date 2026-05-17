@@ -34,7 +34,7 @@ reply with a ≤200-char verdict line (see
 | [`adversary`](agents/adversary.md) | Methodological audit + peer review |
 | [`artist`](agents/artist.md) | Visualization, communication, education |
 | [`conscience`](agents/conscience.md) | EDID + bias review |
-| [`saul_goodman`](agents/saul_goodman.md) | Patent counsel + FTO (the "lawyer" in the vision doc) |
+| [`lawyer`](agents/lawyer.md) | Patent counsel + freedom-to-operate (formerly `saul_goodman`) |
 | [`cable_guy`](agents/cable_guy.md) | Infrastructure provisioner |
 | [`receptionist`](agents/receptionist.md) | Routes inbound cross-group SEA requests |
 | [`registrar`](agents/registrar.md) | Centre-wide registry of labs/cores/collaborations |

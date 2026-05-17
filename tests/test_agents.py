@@ -27,7 +27,7 @@ EXPECTED_AGENTS = {
     "oracle",
     "receptionist",
     "registrar",
-    "saul_goodman",
+    "lawyer",
     "security_guard",
 }
 

@@ -128,7 +128,7 @@ EMOJI_artist="🎨"
 EMOJI_adversary="⚔"
 EMOJI_oracle="🔮"
 EMOJI_conscience="⚖"
-EMOJI_saul_goodman="⚖"
+EMOJI_lawyer="⚖"
 EMOJI_security_guard="🛡"
 EMOJI_receptionist="📞"
 

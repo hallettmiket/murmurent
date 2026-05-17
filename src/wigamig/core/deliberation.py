@@ -25,7 +25,7 @@ DEFAULT_AGENT_ROSTER: tuple[str, ...] = (
     "adversary",
     "artist",
     "conscience",
-    "saul_goodman",
+    "lawyer",
     "oracle",
     "security_guard",
 )
