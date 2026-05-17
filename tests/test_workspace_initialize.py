@@ -104,6 +104,39 @@ def test_initialize_creates_dirs_and_manifest(isolated, tmp_path):
     assert data["agents"] == ["oracle", "blacksmith"]
 
 
+def test_initialize_writes_charter_for_bare_clone(isolated, tmp_path, monkeypatch):
+    """A clone with no CHARTER.md must become a wigamig project end-to-end
+    when installed: CHARTER appears, the lab_mgmt registry gets an entry,
+    and the installation manifest is written. Before the projectize
+    refactor this would 404 on bare clones — only project-new'd repos
+    could be installed."""
+    # Point wigamig commons at a fake so bootstrap_local has agents to symlink.
+    commons = tmp_path / "wigamig_commons"
+    (commons / "agents").mkdir(parents=True)
+    (commons / "agents" / "oracle.md").write_text("# oracle\n")
+    (commons / "agents" / "blacksmith.md").write_text("# blacksmith\n")
+    monkeypatch.setenv("WIGAMIG_REPO_ROOT", str(commons))
+    # Make the demo dir a git working tree so projectize sees a real clone.
+    (isolated["repos"] / "demo" / ".git").mkdir()
+
+    client = TestClient(create_app())
+    body = _initialize_body(
+        raw_path=str(tmp_path / "lv2" / "raw"),
+        refined_path=str(tmp_path / "lv2" / "refined"),
+    )
+    res = client.post("/api/workspace/initialize", json=body)
+    assert res.status_code == 200, res.text
+
+    # CHARTER materialised with lead=member, sensitivity=standard.
+    charter = (isolated["repos"] / "demo" / "CHARTER.md").read_text()
+    assert "project: demo" in charter
+    assert "@the_pi" in charter
+    # Lab-mgmt registry entry too.
+    assert (isolated["tmp"] / "lab-mgmt" / "projects" / "demo.md").is_file()
+    # Manifest as before.
+    assert (isolated["installs"] / "demo.yaml").is_file()
+
+
 def test_initialize_rejects_unknown_project(isolated):
     client = TestClient(create_app())
     res = client.post("/api/workspace/initialize", json=_initialize_body(project="nope"))

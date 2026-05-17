@@ -557,6 +557,16 @@ function AdoptCloneModal({ clone, onClose }) {
   const myHandle = window.DATA.member?.handle
     ? "@" + window.DATA.member.handle
     : "@" + (window.DATA.persona === "pi" ? "pi" : "you");
+  // Default agent pick mirrors InstallModal: all non-disabled agents,
+  // minus `receptionist` for non-PI users (PI-only role).
+  const [pickedAgents, setPickedAgents] = useState(() => {
+    const all = (window.DATA.agents || []).filter(a => !a.disabled).map(a => a.name);
+    const p = window.DATA.persona || "member";
+    return p === "pi" ? all : all.filter(n => n !== "receptionist");
+  });
+  const toggleAgent = (name) => setPickedAgents(p =>
+    p.includes(name) ? p.filter(n => n !== name) : [...p, name]
+  );
   const [form, setForm] = useState({
     project:        clone.name || "",
     lead:           myHandle,
@@ -564,7 +574,6 @@ function AdoptCloneModal({ clone, onClose }) {
     sensitivity:    "standard",
     choreography:   "",
     description:    "",
-    agents_text:    "",
     reb_number:     "",
     reb_expires:    "",
     data_residency: "",
@@ -580,8 +589,7 @@ function AdoptCloneModal({ clone, onClose }) {
     try {
       const members = form.members_text
         .split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
-      const agents = form.agents_text
-        .split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
+      const agents = pickedAgents;
       const payload = {
         clone_path:  clone.path,
         project:     form.project.trim(),
@@ -605,6 +613,12 @@ function AdoptCloneModal({ clone, onClose }) {
       const body = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(body.detail || ("HTTP " + r.status));
       setProbes(body.probes || []);
+      // Refresh the whole dashboard snapshot (Projects, Installations,
+      // peers, etc.) since adopt now lands rows in multiple panels.
+      // The Repos panel re-fetches separately via onClose(true) below.
+      if (typeof window.__wigamigFetchData === "function") {
+        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      }
       // Auto-close on success after a beat so the user sees what landed.
       setTimeout(() => onClose(true), 1400);
     } catch (ex) {
@@ -704,12 +718,22 @@ function AdoptCloneModal({ clone, onClose }) {
                placeholder="Personal hockey analytics." />
 
         <div style={lbl}>
-          agents to symlink (optional; space- or comma-separated; valid:
-          adversary, artist, blacksmith, bookworm, cable_guy, conscience,
-          oracle, receptionist, registrar, saul_goodman, security_guard)
+          wigamig agents to symlink — defaults to your install-wizard pick;
+          click pills to deselect
         </div>
-        <input style={inp} value={form.agents_text} onChange={set("agents_text")}
-               placeholder="blacksmith adversary" />
+        <div style={{display:"flex", flexWrap:"wrap", gap:6}}>
+          {(window.DATA.agents || []).filter(a => !a.disabled).map(a => (
+            <button key={a.name} type="button" onClick={() => toggleAgent(a.name)}
+              className="mono" style={{
+                fontSize:11, padding:"4px 10px", border:"1px solid var(--rule-strong)",
+                borderRadius:2, cursor:"pointer",
+                background: pickedAgents.includes(a.name) ? "var(--purple)" : "var(--paper-2)",
+                color: pickedAgents.includes(a.name) ? "#fff" : "var(--ink-2)",
+              }}>
+              {a.name}
+            </button>
+          ))}
+        </div>
 
         {probes && (
           <div style={{marginTop:10, fontSize:11, fontFamily:"var(--mono)",
@@ -859,11 +883,28 @@ function InstallationsBox({ span = "c-12" }) {
                     {persona === "pi" && (
                       <td className="mono" style={{fontSize:12}}>{inst.member}</td>
                     )}
-                    <td style={{fontSize:12, cursor:"pointer"}}
+                    <td title="click to expand details" style={{
+                          fontSize:12, cursor:"pointer",
+                          textDecoration: openRow === i ? "none" : "underline",
+                          textDecorationColor: "var(--rule-strong)",
+                          textDecorationStyle: "dotted",
+                          textUnderlineOffset: "3px",
+                        }}
                         onClick={() => setOpenRow(openRow === i ? null : i)}>
-                      {inst.project}
+                      <span style={{
+                        display:"inline-block", width:12, color:"var(--muted)",
+                        transition:"transform 0.15s",
+                        transform: openRow === i ? "rotate(90deg)" : "none",
+                      }}>▸</span>
+                      {" "}{inst.project}
                     </td>
-                    <td className="mono" style={{fontSize:11, cursor:"pointer"}}
+                    <td className="mono" title="click to expand details" style={{
+                          fontSize:11, cursor:"pointer",
+                          textDecoration: openRow === i ? "none" : "underline",
+                          textDecorationColor: "var(--rule-strong)",
+                          textDecorationStyle: "dotted",
+                          textUnderlineOffset: "3px",
+                        }}
                         onClick={() => setOpenRow(openRow === i ? null : i)}>
                       {inst.machine_type === "lab_server"
                         ? `${inst.username}@${inst.hostname}`
