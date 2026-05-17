@@ -116,6 +116,35 @@ def world(monkeypatch, tmp_path):
     return {"vault": vault_oracle, "lab": lab_oracle, "lab_root": lab_root}
 
 
+@pytest.fixture
+def world_with_notebook(world, monkeypatch, tmp_path):
+    """Adds a notebook tier on top of ``world`` so notebook-specific
+    tests can exercise both the schema-required (personal+lab) path
+    and the schema-optional (notebook) path side by side."""
+    notebook_dir = tmp_path / "vault" / "lab-notebook"
+    notebook_dir.mkdir(parents=True)
+    # Flat daily entry — no project subdir, no frontmatter.
+    (notebook_dir / "2026-05-15.md").write_text(
+        "# Friday lab notes\n\n"
+        "Ran MMP11 expression analysis on the new DCIS samples.\n"
+        "Drift correction looks clean after the run_all fix.\n",
+        encoding="utf-8",
+    )
+    # Nested per-project entry with light frontmatter.
+    (notebook_dir / "dcis" / "2026-05-16.md").parent.mkdir()
+    (notebook_dir / "dcis" / "2026-05-16.md").write_text(
+        "---\ntags: [dcis, qc]\n---\n\n# DCIS run 18 QC review\n\n"
+        "Numbers came in. cohort comparable to run 17.\n",
+        encoding="utf-8",
+    )
+    # An index file that should be excluded.
+    (notebook_dir / "README.md").write_text("# Notebook index\n")
+    # Make _safe_notebook_dir return this tmp path. Monkeypatch the
+    # function directly — simpler than reaching into machine_settings.
+    monkeypatch.setattr(srv, "_safe_notebook_dir", lambda: notebook_dir)
+    return {**world, "notebook": notebook_dir}
+
+
 # ---------------------------------------------------------------------------
 # tool_list
 # ---------------------------------------------------------------------------
@@ -309,6 +338,116 @@ def test_missing_personal_dir_degrades_to_lab_only(monkeypatch, world):
     rows = srv.tool_list("both")
     kinds = {r["kind"] for r in rows}
     assert kinds == {"lab"}
+
+
+# ---------------------------------------------------------------------------
+# Notebook tier (kind="notebook" + kind="all")
+# ---------------------------------------------------------------------------
+
+
+def test_list_notebook_only(world_with_notebook):
+    """`kind="notebook"` returns just the daily-notebook entries.
+    The flat 2026-05-15 entry and the nested dcis/2026-05-16 entry
+    both appear; the README index is excluded."""
+    rows = srv.tool_list("notebook")
+    titles = sorted(r["title"] for r in rows)
+    assert "Friday lab notes" in titles
+    assert "DCIS run 18 QC review" in titles
+    assert "Notebook index" not in titles
+    assert all(r["kind"] == "notebook" for r in rows)
+
+
+def test_list_all_returns_three_tiers(world_with_notebook):
+    """`kind="all"` returns personal + lab + notebook in one call.
+    Existing callers using `kind="both"` (personal + lab only) still
+    see exactly 4 rows; `all` sees those plus the 2 notebooks."""
+    both_rows = srv.tool_list("both")
+    all_rows = srv.tool_list("all")
+    assert len(both_rows) == 4
+    assert len(all_rows) == 6
+    kinds = {r["kind"] for r in all_rows}
+    assert kinds == {"personal", "lab", "notebook"}
+
+
+def test_notebook_date_derived_from_filename(world_with_notebook):
+    """Notebooks without frontmatter still get a date — derived from
+    the YYYY-MM-DD filename convention. Without this, ordering and
+    date filters wouldn't work on legacy daily entries."""
+    rows = srv.tool_list("notebook")
+    friday = next(r for r in rows if r["title"] == "Friday lab notes")
+    assert friday["date"] == "2026-05-15"
+
+
+def test_notebook_project_derived_from_parent_dir(world_with_notebook):
+    """Nested-layout notebooks (lab-notebook/<project>/<date>.md)
+    inherit `project` from the parent directory when frontmatter
+    doesn't say. Flat-layout notebooks (lab-notebook/<date>.md) get
+    project="" — same as the schema doc allows."""
+    rows = srv.tool_list("notebook")
+    by_title = {r["title"]: r for r in rows}
+    assert by_title["DCIS run 18 QC review"]["project"] == "dcis"
+    assert by_title["Friday lab notes"]["project"] == ""
+
+
+def test_notebook_search_finds_keyword_in_body(world_with_notebook):
+    """`oracle_search("MMP11", kind="notebook")` returns the daily
+    that mentioned MMP11 even though the notebook has no `tags:` for
+    it. Body search is the main fallback for unstructured notebooks."""
+    rows = srv.tool_search("MMP11", kind="notebook")
+    titles = [r["title"] for r in rows]
+    assert "Friday lab notes" in titles
+
+
+def test_search_all_returns_personal_and_notebook_mentions(world_with_notebook):
+    """`kind="all"` lets one query stitch the curated Oracle finding
+    AND the raw notebook mention together. This is the whole point of
+    integrating notebooks — show structured + unstructured side by
+    side."""
+    rows = srv.tool_search("MMP11", kind="all")
+    kinds = {r["kind"] for r in rows}
+    titles = {r["title"] for r in rows}
+    assert "personal" in kinds          # the 2026-04-16_mmp11 entry
+    assert "notebook" in kinds          # the friday notebook mention
+    assert "MMP11 flagged for DCIS" in titles
+    assert "Friday lab notes" in titles
+
+
+def test_notebook_filter_by_tag(world_with_notebook):
+    """The nested notebook DOES have `tags: [dcis, qc]`. A tag
+    filter should match it; flat-no-frontmatter notebooks (no tags)
+    should not match."""
+    rows = srv.tool_search(tags=["qc"], kind="notebook")
+    titles = [r["title"] for r in rows]
+    assert "DCIS run 18 QC review" in titles
+    assert "Friday lab notes" not in titles
+
+
+def test_get_notebook_by_path_includes_body(world_with_notebook):
+    """`oracle_get(notebook_path)` works even on frontmatter-less
+    notebooks; the body is the full markdown."""
+    p = world_with_notebook["notebook"] / "2026-05-15.md"
+    entry = srv.tool_get(str(p))
+    assert entry["kind"] == "notebook"
+    assert "MMP11 expression" in entry["body"]
+
+
+def test_notebook_dir_unreadable_does_not_crash(monkeypatch, world):
+    """If the notebook dir exists but iCloud/sandbox denies reads
+    (the user's actual situation today), search must not crash —
+    just return no notebook entries."""
+    class _BoomPath:
+        """Stub that satisfies the ``is None`` check but raises on
+        rglob, mimicking a permission-denied iCloud-backed path."""
+        def __init__(self, *_a, **_kw): pass
+        def rglob(self, *_a):
+            raise PermissionError("Operation not permitted")
+        def exists(self): return True
+    monkeypatch.setattr(srv, "_safe_notebook_dir", lambda: _BoomPath())
+    rows = srv.tool_list("all")
+    # personal + lab still work; notebook tier silently returned []
+    kinds = {r["kind"] for r in rows}
+    assert "notebook" not in kinds
+    assert "personal" in kinds and "lab" in kinds
 
 
 # ---------------------------------------------------------------------------

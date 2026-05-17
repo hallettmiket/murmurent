@@ -44,7 +44,12 @@ import yaml
 
 from ..core import oracle_publish as _op
 
-VALID_KINDS: tuple[str, ...] = ("personal", "lab", "both")
+VALID_KINDS: tuple[str, ...] = ("personal", "lab", "notebook", "both", "all")
+# Backwards-compat: ``both`` originally meant {personal, lab}. ``all``
+# is the post-2026-05-17 superset that also includes ``notebook`` (the
+# user's daily lab-notebook entries in <vault>/<notebook_subfolder>/).
+# We keep ``both`` so existing callers (and the wigamig dashboard) work
+# unchanged. ``notebook`` queries the notebook tier in isolation.
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +100,33 @@ def _safe_lab_dir() -> Path | None:
         return None
 
 
+def _safe_notebook_dir() -> Path | None:
+    """Resolve ``<vault>/<notebook_subfolder>`` from the per-machine
+    settings. Returns ``None`` when no vault is registered, when the
+    notebook subdir is unset, or when the path doesn't exist on disk.
+
+    The path may exist but be unreadable (macOS Full Disk Access on
+    iCloud-backed vaults) — :func:`_iter_notebook_paths` handles
+    EPERM gracefully so a sandbox restriction never crashes the MCP
+    server."""
+    try:
+        from ..dashboard import machine_settings as _ms
+        s = _ms.load()
+    except Exception:
+        return None
+    vault = s.obsidian_vault_path or ""
+    sub = s.notebook_subfolder or ""
+    if not vault or not sub:
+        return None
+    p = Path(vault).expanduser() / sub
+    # Path may exist but be unreadable; ``is_dir()`` returns False on
+    # EPERM, so we use exists() + a follow-up listdir attempt instead.
+    try:
+        return p if p.exists() else None
+    except OSError:
+        return None
+
+
 def _iter_paths(kind: str) -> list[tuple[str, Path]]:
     """Yield (kind, path) for every .md entry in the requested tier(s).
 
@@ -103,7 +135,7 @@ def _iter_paths(kind: str) -> list[tuple[str, Path]]:
     Skips ``MEMORY.md`` and README-style index files.
     """
     out: list[tuple[str, Path]] = []
-    if kind in ("personal", "both"):
+    if kind in ("personal", "both", "all"):
         p = _safe_personal_dir()
         if p and p.is_dir():
             for f in p.rglob("*.md"):
@@ -112,35 +144,70 @@ def _iter_paths(kind: str) -> list[tuple[str, Path]]:
                 if f.name in {"MEMORY.md", "README.md"}:
                     continue
                 out.append(("personal", f))
-    if kind in ("lab", "both"):
+    if kind in ("lab", "both", "all"):
         p = _safe_lab_dir()
         if p and p.is_dir():
             for f in p.glob("*.md"):
                 if f.name in {"MEMORY.md", "README.md"}:
                     continue
                 out.append(("lab", f))
+    if kind in ("notebook", "all"):
+        p = _safe_notebook_dir()
+        if p is not None:
+            # Walk recursively — notebooks may be flat (lab-notebook/
+            # YYYY-MM-DD.md) or nested per-project (lab-notebook/<project>/
+            # YYYY-MM-DD.md). Catch OSError so macOS Full Disk Access
+            # denials don't crash the whole search.
+            try:
+                for f in p.rglob("*.md"):
+                    if f.name in {"MEMORY.md", "README.md", "index.md"}:
+                        continue
+                    out.append(("notebook", f))
+            except (OSError, PermissionError):
+                pass
     return out
 
 
 def _parse_entry(kind: str, path: Path) -> OracleEntry | None:
     """Parse one file into an :class:`OracleEntry`.
 
-    Returns ``None`` for files without parseable frontmatter — those
-    are surfaced via ``oracle_lint`` if the user wants to fix them.
+    For ``personal`` and ``lab`` tiers, requires the file to start
+    with YAML frontmatter conforming to rules/oracle_schema.md;
+    returns ``None`` for files that don't (those are surfaced via
+    ``oracle_lint`` if the user wants to fix them).
+
+    For ``notebook`` tier, frontmatter is *optional* — daily lab
+    notebooks are often free-form. Missing fields are synthesised
+    from filename + path conventions; missing frontmatter entirely
+    falls back to deriving everything from the path. This keeps
+    notebooks searchable without requiring the user to retrofit
+    every old daily entry with a schema block.
     """
     try:
         text = path.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, PermissionError):
+        # macOS sandbox / iCloud paths sometimes deny reads even
+        # after the dir lists — skip silently.
         return None
     m = re.match(r"^---\n(.*?)\n---\n(.*)", text, re.DOTALL)
-    if not m:
-        return None
-    try:
-        meta = yaml.safe_load(m.group(1)) or {}
-    except yaml.YAMLError:
-        return None
-    if not isinstance(meta, dict):
-        return None
+    if m:
+        try:
+            meta = yaml.safe_load(m.group(1)) or {}
+        except yaml.YAMLError:
+            meta = None
+        body = m.group(2).strip()
+    else:
+        meta = None
+        body = text
+    if meta is None or not isinstance(meta, dict):
+        if kind == "notebook":
+            meta = {}  # accept frontmatter-less notebooks
+        else:
+            return None  # personal + lab tiers require schema
+
+    if kind == "notebook":
+        return _parse_notebook_entry(path, meta, body)
+
     tags = meta.get("tags") or []
     sources = meta.get("sources") or []
     related = meta.get("related") or []
@@ -154,8 +221,73 @@ def _parse_entry(kind: str, path: Path) -> OracleEntry | None:
         tags=[str(t) for t in tags] if isinstance(tags, list) else [],
         sources=[str(s) for s in sources] if isinstance(sources, list) else [],
         related=[str(r) for r in related] if isinstance(related, list) else [],
-        body=m.group(2).strip(),
+        body=body,
     )
+
+
+# Filename pattern for date-stamped daily notebooks: YYYY-MM-DD.md or
+# YYYY-MM-DD_<slug>.md. Used to extract ``date`` when notebook
+# frontmatter doesn't carry it.
+_NOTEBOOK_DATE_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})(?:_(?P<slug>.+))?$")
+
+
+def _parse_notebook_entry(path: Path, meta: dict[str, Any], body: str) -> OracleEntry:
+    """Build an OracleEntry from a notebook file.
+
+    Notebook conventions assumed (in order of preference):
+      - ``<vault>/lab-notebook/<project>/<YYYY-MM-DD>.md`` (nested)
+      - ``<vault>/lab-notebook/<YYYY-MM-DD>.md`` (flat)
+      - Any other ``.md`` under ``lab-notebook/`` — uses the filename
+        stem as a fallback title; project + date stay empty.
+
+    Frontmatter, when present, takes precedence over path-derived
+    values. The notebook frontmatter may carry ``tags`` (per the
+    designer_dashboard HANDOFF doc), but doesn't need to.
+    """
+    # Date from filename, unless frontmatter overrides.
+    fname_match = _NOTEBOOK_DATE_RE.match(path.stem)
+    date_from_name = fname_match.group("date") if fname_match else ""
+    # Project from parent dir, unless flat-layout (parent is lab-notebook itself).
+    notebook_root = _safe_notebook_dir()
+    project_from_path = ""
+    if notebook_root is not None:
+        try:
+            rel = path.parent.resolve().relative_to(notebook_root.resolve())
+            parts = rel.parts
+            if parts and parts[0] not in ("", "."):
+                project_from_path = parts[0]
+        except (ValueError, OSError):
+            pass
+    # Title: frontmatter `title:` wins, then first H1 in body, then filename.
+    title = str(meta.get("title") or _first_h1(body) or path.stem)
+    tags = meta.get("tags") or []
+    return OracleEntry(
+        kind="notebook",
+        path=str(path),
+        title=title,
+        date=str(meta.get("date") or date_from_name),
+        project=str(meta.get("project") or project_from_path),
+        # Notebooks default to ``standard``; if a daily entry needs to be
+        # restricted/clinical the author should add the frontmatter
+        # explicitly. Conservative default avoids accidentally treating
+        # sensitive notes as broadly shareable.
+        sensitivity=str(meta.get("sensitivity") or "standard"),
+        tags=[str(t) for t in tags] if isinstance(tags, list) else [],
+        sources=[str(s) for s in (meta.get("sources") or [])] if isinstance(meta.get("sources"), list) else [],
+        related=[str(r) for r in (meta.get("related") or [])] if isinstance(meta.get("related"), list) else [],
+        body=body,
+    )
+
+
+def _first_h1(body: str) -> str:
+    """Return the first ``# heading`` line in ``body`` (without the
+    leading ``# ``), or empty string when none exists. Used for
+    notebook titles when frontmatter doesn't carry one."""
+    for line in (body or "").splitlines():
+        s = line.strip()
+        if s.startswith("# "):
+            return s[2:].strip()
+    return ""
 
 
 def _load_entries(kind: str) -> list[OracleEntry]:
@@ -266,14 +398,27 @@ def tool_search(
 
 
 def tool_get(path: str) -> dict[str, Any]:
-    """Read one entry by absolute path. Includes body."""
+    """Read one entry by absolute path. Includes body.
+
+    Tier inferred from where the file lives: personal vault →
+    ``personal``, notebook subdir → ``notebook``, anything else
+    (including the lab-mgmt oracle dir) → ``lab``. Notebooks are
+    permissive about missing frontmatter; personal + lab tiers
+    require it.
+    """
     p = Path(path)
     if not p.is_file():
         raise FileNotFoundError(f"no oracle entry at {path}")
-    # Determine kind by which dir contains the file.
+    # Determine kind by which dir contains the file. Notebook check
+    # must come first because it's the most specific (some notebooks
+    # could be inside the vault under the notebook subdir, which the
+    # personal check would otherwise claim).
     kind = "lab"
+    notebook = _safe_notebook_dir()
     personal = _safe_personal_dir()
-    if personal and _is_under(p, personal):
+    if notebook and _is_under(p, notebook):
+        kind = "notebook"
+    elif personal and _is_under(p, personal):
         kind = "personal"
     entry = _parse_entry(kind, p)
     if entry is None:
@@ -330,12 +475,18 @@ def _build_server():  # pragma: no cover - exercised only when mcp is installed
     server = FastMCP(
         name="wigamig-oracle",
         instructions=(
-            "Wigamig oracle. Two tiers: personal (your Obsidian vault) "
-            "and lab (lab-mgmt repo). `oracle_search` filters across "
-            "both by query + project/tags/sensitivity/source. "
-            "`oracle_get(path)` fetches one entry. `oracle_list` "
-            "browses everything. `oracle_publish_draft(slug)` promotes "
-            "a vault draft to lab. See rules/oracle_schema.md."
+            "Wigamig oracle. Three tiers, queryable separately or "
+            "together: `personal` (your Obsidian vault `oracle/`), "
+            "`lab` (lab-mgmt repo `oracle/`), `notebook` (your daily "
+            "lab-notebook entries in <vault>/<notebook_subfolder>/). "
+            "Use `kind=both` for {personal, lab} (default), `kind=all` "
+            "for {personal, lab, notebook}, or any single tier name. "
+            "`oracle_search` filters by query + project/tags/sensitivity/"
+            "source. `oracle_get(path)` fetches one entry (notebooks "
+            "tolerate missing frontmatter; personal + lab require it). "
+            "`oracle_list` browses everything. `oracle_publish_draft("
+            "slug)` promotes a vault draft to lab. Schema for the "
+            "structured tiers: rules/oracle_schema.md."
         ),
     )
 
