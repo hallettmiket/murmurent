@@ -68,6 +68,7 @@ Auto-loaded into every CC session via `~/.claude/rules/`:
 - [`docs/obsidian-layout.md`](docs/obsidian-layout.md) — vault-side conventions + cross-reference to vault's own `CLAUDE.md` and `maps-legends/`.
 - [`docs/vscode-workflow.md`](docs/vscode-workflow.md) — launcher, 4-quadrant layout, agent reporter, tmux copy-paste.
 - [`docs/setup.md`](docs/setup.md) — per-machine + per-project install steps.
+- [`docs/reconcile.md`](docs/reconcile.md) — `wigamig reconcile` drift-detection routine + daily `/routine` schedule.
 - [`docs/style/code-style.md`](docs/style/code-style.md) — Python/R style
   preferences (CC follows the same defaults; this is for human reference,
   not always-loaded).
