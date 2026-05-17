@@ -1293,26 +1293,12 @@ def create_app() -> FastAPI:
             for label, path in (("raw", raw_proj), ("refined", refined_proj)):
                 probes.append(_pf._ensure_dir(path, label=label, required=False))
 
-        # Layer-2 CC bootstrap for *local* installs. The remote branch
-        # above already runs the equivalent inside its batched shell
-        # snippet (see core.remote_install); both paths converge on the
-        # same on-disk shape — symlinks into the wigamig commons + a
-        # CLAUDE.md stub. Skipped for remote-only installs (no working
-        # tree on this machine) and when this project's working tree
-        # isn't actually present locally.
-        if not body.ssh_remote:
-            from ..core import project_cc_init as _cci
-            from ..core.repo import wigamig_repo_root as _wig
-            local_project = Path(f"~/repos/{body.project}").expanduser()
-            for p in _cci.bootstrap_local(
-                local_project, _wig(),
-                agents=list(body.agents or []),
-                project_name=body.project,
-                raw_path=body.raw_path,
-                refined_path=body.refined_path,
-                notebook_path=body.notebook_path,
-            ):
-                probes.append(p)
+        # NOTE: bootstrap + manifest + lab_mgmt registry are now all
+        # done in one go by core.projectize.make_wigamig_project, called
+        # below after the overall-status check. The previous separate
+        # bootstrap_local() call here was removed because projectize
+        # does the same work; doing it twice would re-sweep symlinks
+        # for no benefit.
 
         # If any required probe failed, refuse to write the manifest —
         # the user asked for "all issues attended to before final
@@ -1337,45 +1323,64 @@ def create_app() -> FastAPI:
             if p.name == "homedir" and p.status == "ok" and p.detail:
                 remote_home = p.detail.strip()
                 break
-        member_at = body.member if body.member.startswith("@") else f"@{body.member}"
-        today_iso = _dt.date.today().isoformat()
-        manifest = {
-            "member": member_at,
-            "project": body.project,
-            "machine_type": body.machine_type,
-            "hostname": body.hostname,
-            "username": body.username,
-            "access": "direct" if body.has_direct_access else "ssh",
-            "has_direct_access": body.has_direct_access,
-            "lab_base": body.lab_base,
-            "raw_path": body.raw_path,
-            "refined_path": body.refined_path,
-            "notebook_path": body.notebook_path,
-            "ssh_remote": body.ssh_remote,
-            "remote_home": remote_home,
-            "mount_point": body.mount_point,
-            "components": body.infra_components,
-            "agents": body.agents,
-            "status": "active",
-            "created": today_iso,
-            "last_checked": today_iso,
-            "issues": [],
-        }
-
-        INSTALLATIONS_DIR.mkdir(parents=True, exist_ok=True)
-        manifest_path = INSTALLATIONS_DIR / f"{body.project}.yaml"
+        # All the side effects (CHARTER if missing, lab_mgmt registry,
+        # installation manifest, .claude/agents bootstrap) flow through
+        # projectize so the install + adopt endpoints can't drift.
+        # Reads existing CHARTER if present — workspace_initialize
+        # required the project to exist at line ~1211, so the CHARTER
+        # is guaranteed to be there. The project lead/members/sens are
+        # parsed from CHARTER inside the (charter exists → skip)
+        # branch; we still pass them so projectize has them for the
+        # registry entry when the registry doesn't yet exist.
+        from ..core import projectize as _proj
+        from ..core.frontmatter import parse_file as _pcharter
+        from ..core.projects import project_path as _pp_for_proj
+        clone_dir = _pp_for_proj(body.project)
+        charter_path = clone_dir / "CHARTER.md"
         try:
-            manifest_path.write_text(
-                _yaml.safe_dump(manifest, sort_keys=False, allow_unicode=True),
-                encoding="utf-8",
+            meta = _pcharter(charter_path).meta or {} if charter_path.is_file() else {}
+        except Exception:
+            meta = {}
+        lead_from_charter = str(meta.get("lead") or body.member).strip().strip("'\"") or body.member
+        members_from_charter = list(meta.get("members") or [body.member])
+        sens_from_charter = str(meta.get("sensitivity") or "standard")
+
+        try:
+            pres = _proj.make_wigamig_project(
+                clone_path=clone_dir,
+                project=body.project,
+                lead=lead_from_charter,
+                members=members_from_charter,
+                sensitivity=sens_from_charter,
+                description="",
+                agents=list(body.agents or []),
+                member=body.member,
+                machine_type=body.machine_type,
+                hostname=body.hostname or "",
+                username=body.username,
+                has_direct_access=body.has_direct_access,
+                lab_base=body.lab_base,
+                raw_path=body.raw_path,
+                refined_path=body.refined_path,
+                notebook_path=body.notebook_path,
+                ssh_remote=body.ssh_remote,
+                remote_home=remote_home,
+                mount_point=body.mount_point,
+                infra_components=list(body.infra_components or []),
+                # Tests monkeypatch INSTALLATIONS_DIR on snapshot.py;
+                # honour it here so the manifest lands in the test
+                # filesystem, not the real ~/.wigamig.
+                installations_dir=INSTALLATIONS_DIR,
             )
-        except OSError as exc:
-            raise HTTPException(status_code=500, detail=f"manifest write failed: {exc}")
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"projectize failed: {exc}")
+        probes.extend(pres.probes)
 
         return {
             "ok": True,
             "project": body.project,
-            "manifest": str(manifest_path),
+            "manifest": str(pres.manifest_path) if pres.manifest_path else None,
+            "registry": str(pres.registry_path) if pres.registry_path else None,
             "raw_dir": str(raw_proj),
             "refined_dir": str(refined_proj),
             "overall": overall,
@@ -1763,24 +1768,31 @@ def create_app() -> FastAPI:
         return {"from_cache": False, **report.to_dict()}
 
     @app.post("/api/inventory/adopt")
-    def post_inventory_adopt(body: AdoptCloneBody) -> dict:
+    def post_inventory_adopt(
+        body: AdoptCloneBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
         """Adopt an existing local git clone as a wigamig project.
 
-        Writes a CHARTER.md from the supplied metadata and runs the
-        layer-2 CC bootstrap (``.claude/agents/`` symlinks + CLAUDE.md
-        stub). After this, the Repo Inventory will show ``✓ wigamig``
-        for the clone.
+        Delegates to :func:`core.projectize.make_wigamig_project` so the
+        clone ends up in **all three** dashboard panels (Repos shows
+        ✓ wigamig, Projects gets a lab_mgmt registry entry, Installations
+        gets a manifest pointing at this machine).
 
         Refuses when:
           - clone_path isn't inside ``~/repos/`` (escape guard)
           - clone_path isn't a git working tree
           - a CHARTER.md already exists (don't silently overwrite —
             user should edit by hand, or remove and re-adopt)
+
+        Defaults to this machine's settings for raw/refined/notebook
+        paths (read from ``~/.wigamig/machine.yaml``). The Repos-panel
+        adopt modal doesn't ask the user for those — they're a
+        per-machine setting, not a per-project decision.
         """
-        from ..core import charter as _charter
-        from ..core import preflight as _pf
-        from ..core import project_cc_init as _cci
-        from ..core.repo import wigamig_repo_root as _wig
+        import os
+        from ..core import projectize as _proj
+        from . import machine_settings as _ms
 
         clone = Path(body.clone_path).expanduser().resolve()
         repos_root = (Path.home() / "repos").resolve()
@@ -1796,47 +1808,61 @@ def create_app() -> FastAPI:
                 status_code=400,
                 detail=f"not a git working tree: {clone}",
             )
-        charter_path = clone / "CHARTER.md"
-        if charter_path.exists():
+        if (clone / "CHARTER.md").exists():
             raise HTTPException(
                 status_code=409,
-                detail=(f"{charter_path} already exists — "
+                detail=(f"{clone / 'CHARTER.md'} already exists — "
                         "edit by hand instead of re-adopting"),
             )
 
+        # Pull this-machine defaults from machine.yaml so the manifest
+        # carries real paths, not adopt-modal-was-too-lazy-to-ask blanks.
         try:
-            charter_text = _charter.render_charter(
+            ms = _ms.load()
+        except Exception:
+            ms = None
+        actor = (user or os.environ.get("WIGAMIG_USER", "")).strip().lstrip("@") or body.lead.lstrip("@")
+        wb = ((ms.wigamig_base if ms else None) or "~/wigamig").rstrip("/")
+
+        try:
+            result = _proj.make_wigamig_project(
+                clone_path=clone,
                 project=body.project,
                 lead=body.lead,
                 members=body.members,
                 sensitivity=body.sensitivity,
-                description=body.description or f"Adopted clone at {clone}.",
+                description=body.description,
                 choreography=body.choreography,
+                agents=list(body.agents or []),
                 reb_number=body.reb_number,
                 reb_expires=body.reb_expires,
                 data_residency=body.data_residency,
-                created=_dt.date.today().isoformat(),
-                repo_kind="github",
+                member=actor,
+                machine_type="laptop",
+                hostname=os.uname().nodename,
+                username=os.environ.get("USER", ""),
+                has_direct_access=True,
+                lab_base=wb,
+                raw_path=f"{wb}/raw",
+                refined_path=f"{wb}/refined",
+                notebook_path=f"{wb}/lab_notebooks",
             )
-        except _charter.CharterError as exc:
-            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"projectize failed: {exc}") from exc
 
-        charter_path.write_text(charter_text, encoding="utf-8")
-        probes = [_pf.Probe(
-            name="charter", status="ok",
-            detail=f"wrote {charter_path}", required=True,
-        )]
-        for p in _cci.bootstrap_local(
-            clone, _wig(),
-            agents=list(body.agents or []),
-            project_name=body.project,
-        ):
-            probes.append(p)
+        # If charter validation failed projectize reports it via a probe
+        # with status=fail+required=True; surface as 422 like before.
+        charter_probe = next((p for p in result.probes if p.name == "charter"), None)
+        if charter_probe and charter_probe.status == "fail":
+            raise HTTPException(status_code=422, detail=charter_probe.detail)
+
         return {
             "ok": True,
             "project": body.project,
             "clone_path": str(clone),
-            "probes": [p.to_dict() for p in probes],
+            "registry_path": str(result.registry_path) if result.registry_path else None,
+            "manifest_path": str(result.manifest_path) if result.manifest_path else None,
+            "probes": [p.to_dict() for p in result.probes],
         }
 
     # -----------------------------------------------------------------
