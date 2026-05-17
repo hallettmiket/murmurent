@@ -35,7 +35,7 @@ vocabulary:
 | `blacksmith` | `Done / Failed / Partial — <one-line what>` |
 | `artist` | `Rendered / Skipped / Failed — <one-line what>` |
 | `conscience` | `OK / Flagged — <one-line concern>` |
-| `saul_goodman` | `Clear / Conflict / Unknown — <one-line on patent landscape>` |
+| `lawyer` | `Clear / Conflict / Unknown — <one-line on patent landscape>` |
 | `cable_guy` | `Provisioned / Skipped / Failed — <one-line on what>` |
 | `receptionist` | `Routed / Held / Bounced — <one-line on who/why>` |
 | `registrar` | `Recorded / Conflict / Skipped — <one-line on what>` |
