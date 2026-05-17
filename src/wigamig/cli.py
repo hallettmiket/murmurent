@@ -20,6 +20,7 @@ from . import __version__
 from .commands import dashboard_cmd as dashboard_impl
 from .commands import experiment_cmd, install_cmd, project_cmd
 from .commands import push_cmd as push_impl
+from .commands import reconcile_cmd as reconcile_impl
 from .commands import sea_cmd
 from .core.agents import load_registry
 from .core.repo import wigamig_repo_root
@@ -1366,6 +1367,11 @@ def member_activate_cmd(handle: str) -> None:
     except _m.MembershipError as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(f"Activated @{rec.handle}.")
+
+
+# Register the `wigamig reconcile` subcommand. Kept at the bottom so
+# it sees the fully-built `cli` group object.
+reconcile_impl.add_to_cli(cli)
 
 
 if __name__ == "__main__":  # pragma: no cover
