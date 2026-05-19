@@ -116,6 +116,15 @@ class WorkspaceInitializeBody(BaseModel):
     mount_point: str | None = None
     infra_components: list[str] = []
     agents: list[str] = []
+    # One-shot clone-and-adopt for a brand-new repo (Repos panel "+ install"
+    # on a row with a GitHub origin but no clone anywhere yet). When
+    # ``clone_if_missing`` is true and the local clone is absent, the
+    # server runs ``git clone <repo_url> ~/repos/<project>`` before
+    # projectizing. For SSH installs, ``repo_url`` (when given) overrides
+    # the value derived from CHARTER — which won't exist yet for a
+    # never-adopted repo.
+    repo_url: str | None = None
+    clone_if_missing: bool = False
 
 
 class MachineSettingsBody(BaseModel):
@@ -1201,7 +1210,42 @@ def create_app() -> FastAPI:
         # branch (-> remote_adopt.adopt_remote_clone).
         from ..core.projects import project_path as _pp
         if not body.ssh_remote and not _pp(body.project).is_dir():
-            raise HTTPException(status_code=404, detail=f"project not found: {body.project}")
+            # One-shot "clone-then-adopt-then-install" path: triggered by
+            # the Repos panel "+ install" button on a row that has a
+            # GitHub origin but no clone on this host yet. Without this
+            # branch the user would have to git-clone manually then
+            # adopt then install — three round-trips for the common
+            # "give me this repo on my laptop" case.
+            if body.clone_if_missing and body.repo_url:
+                import subprocess as _sp
+                target = _pp(body.project)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    _sp.run(
+                        ["git", "clone", body.repo_url, str(target)],
+                        check=True, capture_output=True, text=True,
+                    )
+                    probes.append(_Probe(
+                        name="clone", status="ok",
+                        detail=f"cloned {body.repo_url} into {target}",
+                        required=True,
+                    ))
+                except _sp.CalledProcessError as exc:
+                    stderr = (exc.stderr or "").strip().replace("\n", " ")[:300]
+                    probes.append(_Probe(
+                        name="clone", status="fail",
+                        detail=f"git clone failed: {stderr}",
+                        required=True,
+                    ))
+                    return {
+                        "ok": False,
+                        "project": body.project,
+                        "overall": "fail",
+                        "probes": [p.to_dict() for p in probes],
+                        "manifest": None,
+                    }
+            else:
+                raise HTTPException(status_code=404, detail=f"project not found: {body.project}")
         if body.ssh_remote:
             probes.append(_Probe(
                 name="project", status="ok",
@@ -1272,6 +1316,12 @@ def create_app() -> FastAPI:
                     repo_url = f"git@github.com:{org}/{body.project}.git"
             except Exception:
                 repo_url = None
+            # Explicit override from the request body. Used by the Repos
+            # panel's clone-and-adopt path where the CHARTER doesn't
+            # exist yet on the remote — we know the URL from the GitHub
+            # row, no need to derive it.
+            if body.repo_url:
+                repo_url = body.repo_url
 
             targets = _ri.InstallTargets(
                 project=body.project,
@@ -2029,6 +2079,406 @@ def create_app() -> FastAPI:
             "handle": rec.handle, "full_name": rec.full_name,
             "role": rec.role, "status": rec.status, "created": rec.created,
         }}
+
+    def _fetch_and_consume_tier2(host_obj, *, lab_vm_root: str | None) -> list:
+        """SSH to the host, tar the latest snapshot dir, untar locally,
+        feed it through the Tier 2 consumer. Returns ``list[Finding]``.
+
+        Returns an empty list (silently) when no snapshot exists yet —
+        the dashboard then just shows Tier 1 plus the
+        ``POSIX-NOT-AUTHORITATIVE-01`` info hint that points the PI at
+        the ``Run sudo dump`` button.
+        """
+        import tarfile, tempfile, io as _io
+        from ..core import remote as _remote
+        from ..core import security_tier2 as _t2
+        from pathlib import Path as _P
+
+        remote = _remote.Remote(host_obj)
+        # Tar the latest snapshot dir from the remote. ``tar -C base/.snapshot
+        # -cf - latest/`` lets the latest symlink resolve to the real dir
+        # via ``-h``; we ship a small archive (single MB scale) over ssh.
+        snapshot_base = "/data/lab_vm/wigamig/.snapshot"
+        cmd = (
+            f"if [ -e {snapshot_base}/latest ]; then "
+            f"tar -C {snapshot_base} -hcf - latest | base64; "
+            f"else echo NO_SNAPSHOT >&2; exit 12; fi"
+        )
+        try:
+            res = remote.run(cmd, check=False, timeout=120)
+        except _remote.RemoteError:
+            return []
+        if res.returncode != 0 or not res.stdout.strip():
+            return []
+        try:
+            data = _io.BytesIO(__import__("base64").b64decode(res.stdout))
+            with tempfile.TemporaryDirectory() as td:
+                with tarfile.open(fileobj=data, mode="r:") as tf:
+                    tf.extractall(td)
+                snap_dir = _P(td) / "latest"
+                if not snap_dir.is_dir():
+                    return []
+                t2 = _t2.consume_snapshot(
+                    snap_dir, host=host_obj.name,
+                    lab_vm_root=(lab_vm_root or "/data/lab_vm"),
+                )
+                return t2.findings
+        except Exception:
+            return []
+
+    @app.get("/api/security/findings")
+    def security_findings_endpoint(
+        host: str = Query(..., description="Registered host name."),
+        refresh: bool = Query(False, description="Re-run the scan now."),
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Return security findings for ``host``.
+
+        Default behaviour: read the latest cached JSONL from
+        ``~/.wigamig/security/<host>/latest.jsonl``. With ``refresh=1``
+        runs a fresh scan over SSH first (can take 20s+ on lab-server).
+
+        Gated by ``lab_sudo`` (set via ``/api/members/<h>/lab_sudo``) or
+        by being the PI. Regular members hit /api/security/personal for
+        their own slice instead.
+        """
+        from ..core import hosts as _hosts
+        from ..core import membership as _m
+        from ..core import security_remote as _sr
+        from ..core.security_findings import read_jsonl
+        from pathlib import Path as _P
+        import datetime as _dt2
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        # Gate: PI or lab_sudo
+        try:
+            rec = _m.get(actor)
+            meta = _m.parse_member(rec.path).path  # ensure record exists
+        except Exception:
+            raise HTTPException(status_code=403, detail="member not found")
+        is_pi = actor.lower() == _m.pi_handle().lower()
+        from ..core.frontmatter import parse_file as _pf
+        meta_dict = _pf(rec.path).meta or {}
+        if not (is_pi or bool(meta_dict.get("lab_sudo"))):
+            raise HTTPException(
+                status_code=403,
+                detail="lab_sudo required (ask your PI to grant via the LabSudoPanel)",
+            )
+
+        try:
+            host_obj = _hosts.resolve(host)
+        except _hosts.HostNotFound:
+            raise HTTPException(status_code=404, detail=f"host not registered: {host}")
+
+        persist_dir = _P.home() / ".wigamig" / "security" / host
+        latest_path = persist_dir / "latest.jsonl"
+        if refresh:
+            # Resolve lab from the actor's frontmatter so the scanner
+            # knows which Unix group to expect (HOME-REPO-PRIVATE-01 etc.).
+            lab_group = ""
+            lab = str(meta_dict.get("lab") or "")
+            if lab:
+                lab_group = f"labgroup{lab}lab"  # convention; may not always apply
+            opts = _sr.ScanOptions(
+                lab_vm_root=host_obj.lab_vm_root or None,
+                projects_root=host_obj.project_root or None,
+                lab_group=lab_group or None,
+            )
+            res = _sr.scan(host_obj, opts, timeout=600)
+            if not res.ssh_ok:
+                raise HTTPException(status_code=502, detail=f"ssh failed: {res.ssh_error}")
+            # Tier 2 merge: if the host has a snapshot dir (left by the
+            # ``Run sudo dump`` button), pull it down via SSH and feed
+            # its contents through the Tier 2 consumer. Failures are
+            # reported as warnings — Tier 1 results still ship.
+            tier2_findings: list = []
+            try:
+                tier2_findings = _fetch_and_consume_tier2(host_obj, lab_vm_root=host_obj.lab_vm_root)
+            except Exception as _exc:
+                pass  # snapshot consumer is best-effort
+            # Persist
+            persist_dir.mkdir(parents=True, exist_ok=True)
+            date = _dt2.datetime.utcnow().strftime("%Y-%m-%d")
+            target = persist_dir / f"{date}.jsonl"
+            from ..core.security_findings import write_jsonl as _wj
+            _wj(target, res.findings + tier2_findings)
+            try:
+                if latest_path.is_symlink() or latest_path.exists():
+                    latest_path.unlink()
+                latest_path.symlink_to(target.name)
+            except OSError:
+                pass
+            findings = res.findings + tier2_findings
+            generated_at = _dt2.datetime.utcnow().isoformat() + "Z"
+            source = "live" + (" + tier2" if tier2_findings else "")
+            progress = res.progress
+        else:
+            findings = read_jsonl(latest_path)
+            try:
+                mtime = latest_path.stat().st_mtime if latest_path.exists() else 0
+                generated_at = _dt2.datetime.utcfromtimestamp(mtime).isoformat() + "Z" if mtime else ""
+            except OSError:
+                generated_at = ""
+            source = "cache"
+            progress = []
+        return {
+            "ok": True,
+            "host": host,
+            "generated_at": generated_at,
+            "source": source,
+            "findings": [f.to_dict() for f in findings],
+            "progress": progress,
+        }
+
+    @app.post("/api/security/dump")
+    def security_dump_endpoint(
+        body: dict,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Trigger the Tier-2 root-owned snapshot on a registered host.
+
+        Runs ``ssh <host> sudo -n /opt/wigamig/lab_sec_dump.sh``. The
+        ``-n`` flag means "fail rather than prompt for a password" — if
+        the sudoers entry isn't installed, the caller gets a clear
+        actionable error instead of a hang.
+
+        On success, the snapshot lives at
+        ``<host>:/data/lab_vm/wigamig/.snapshot/<UTC-date>/`` and is
+        group-readable for the lab. The next call to
+        ``GET /api/security/findings`` picks it up automatically (the
+        scan path also reads the snapshot when present and merges Tier 2
+        findings with Tier 1).
+        """
+        from ..core import hosts as _hosts
+        from ..core import membership as _m
+        from ..core import remote as _remote
+        from ..core.frontmatter import parse_file as _pf
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        try:
+            rec = _m.get(actor)
+        except _m.MemberNotFound:
+            raise HTTPException(status_code=403, detail="member not found")
+        is_pi = actor.lower() == _m.pi_handle().lower()
+        meta = _pf(rec.path).meta or {}
+        if not (is_pi or bool(meta.get("lab_sudo"))):
+            raise HTTPException(status_code=403, detail="lab_sudo required")
+
+        host_name = str(body.get("host") or "").strip()
+        if not host_name:
+            raise HTTPException(status_code=422, detail="host required")
+        try:
+            host_obj = _hosts.resolve(host_name)
+        except _hosts.HostNotFound:
+            raise HTTPException(status_code=404, detail=f"host not registered: {host_name}")
+
+        remote = _remote.Remote(host_obj)
+        try:
+            res = remote.run(
+                "sudo -n /opt/wigamig/lab_sec_dump.sh",
+                check=False, timeout=600,
+            )
+        except _remote.RemoteError as exc:
+            raise HTTPException(status_code=502, detail=f"ssh failed: {exc}")
+
+        # ``sudo -n`` returns 1 + "a password is required" message on
+        # stderr when the sudoers entry isn't installed. Translate to a
+        # clear actionable error.
+        if "password is required" in (res.stderr or "").lower():
+            return {
+                "ok": False,
+                "error": "sudoers entry not installed on " + host_name,
+                "remediation": (
+                    "Ask your sysadmin to install "
+                    "/etc/sudoers.d/wigamig_sec_dump from the template at "
+                    "scripts/sudoers.d/wigamig_sec_dump in this repo. "
+                    "See docs/security-dashboard.md#tier-2-setup."
+                ),
+                "stderr": res.stderr.strip()[:500],
+            }
+        if not res.ok:
+            return {
+                "ok": False,
+                "error": f"lab_sec_dump.sh exited with rc={res.returncode}",
+                "stderr": (res.stderr or "").strip()[:1000],
+                "stdout": (res.stdout or "").strip()[:1000],
+            }
+        return {
+            "ok": True,
+            "host": host_name,
+            "stdout": (res.stdout or "").strip(),
+            "note": "Snapshot written. Click 'Re-scan (live)' to merge "
+                    "Tier 2 findings into the table.",
+        }
+
+    @app.post("/api/security/agent_review")
+    def security_agent_review_endpoint(
+        body: dict,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Run the LLM-driven security review on a project.
+
+        Body: ``{project: str, host: str = "local", categories: [str]}``.
+        ``categories`` defaults to all three (code/secrets/cc) when omitted.
+
+        Same gate as /api/security/findings: PI or ``lab_sudo``. Merges
+        the resulting findings into the host's daily JSONL with
+        ``source="agent"`` so the dashboard table shows them inline
+        alongside deterministic rows.
+
+        Output: ``{ok, findings: [...], meta: {...}, errors: [...]}``.
+        """
+        from ..core import membership as _m
+        from ..core import projects as _proj
+        from ..core import security_agent_review as _agent
+        from ..core.frontmatter import parse_file as _pf
+        from ..core.security_findings import (
+            read_jsonl, write_jsonl, rollup_by_directory,
+        )
+        from pathlib import Path as _P
+        import datetime as _dt2
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        # PI-or-lab_sudo gate, same as findings endpoint.
+        try:
+            rec = _m.get(actor)
+        except _m.MemberNotFound:
+            raise HTTPException(status_code=403, detail="member not found")
+        is_pi = actor.lower() == _m.pi_handle().lower()
+        meta = _pf(rec.path).meta or {}
+        if not (is_pi or bool(meta.get("lab_sudo"))):
+            raise HTTPException(status_code=403, detail="lab_sudo required")
+
+        project_name = str(body.get("project") or "").strip()
+        if not project_name:
+            raise HTTPException(status_code=422, detail="project required")
+        host = str(body.get("host") or "local").strip()
+        cats = body.get("categories") or list(_agent.CATEGORIES)
+        if not isinstance(cats, list):
+            raise HTTPException(status_code=422, detail="categories must be a list")
+
+        # Resolve the project's working-tree path on the laptop. For
+        # remote-only projects this would need an SSH-side review path;
+        # MVP only handles local clones.
+        proj_path = _proj.project_path(project_name)
+        if not proj_path.is_dir():
+            raise HTTPException(
+                status_code=404,
+                detail=f"project clone not found locally at {proj_path}",
+            )
+
+        try:
+            res = _agent.review_project(
+                proj_path, host=host, categories=cats,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+
+        # Persist into the host's findings file so the main table picks
+        # them up. Use merge-by-id semantics: drop any prior agent-source
+        # findings for this project + category set, then append the new
+        # ones. Deterministic findings are preserved untouched.
+        date = _dt2.datetime.utcnow().strftime("%Y-%m-%d")
+        target = _P.home() / ".wigamig" / "security" / host / f"{date}.jsonl"
+        existing = read_jsonl(target) if target.is_file() else []
+        kept = [
+            f for f in existing
+            if not (f.source == "agent"
+                    and f.project == project_name
+                    and f.category in cats)
+        ]
+        # Run rollup again across the union so the table stays tidy.
+        merged = rollup_by_directory(kept + res.findings)
+        write_jsonl(target, merged)
+        latest = target.parent / "latest.jsonl"
+        try:
+            if latest.is_symlink() or latest.exists():
+                latest.unlink()
+            latest.symlink_to(target.name)
+        except OSError:
+            pass
+
+        return {
+            "ok": True,
+            "findings": [f.to_dict() for f in res.findings],
+            "meta": {
+                "model": res.meta.model,
+                "input_tokens": res.meta.input_tokens,
+                "output_tokens": res.meta.output_tokens,
+                "cache_hits": res.meta.cache_hits,
+                "cache_misses": res.meta.cache_misses,
+                "cost_estimate_usd": round(res.meta.cost_estimate_usd(), 4),
+            },
+            "errors": res.errors,
+        }
+
+    @app.get("/api/security/personal")
+    def security_personal_endpoint(
+        host: str = Query(..., description="Registered host name."),
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Return only the calling user's own findings (member dashboard
+        view). No lab_sudo gate; readable by any active member.
+
+        Filtering: ``owner_handle == @<actor>``. Findings without an
+        ``owner_handle`` (e.g. ``POSIX-NOT-AUTHORITATIVE-01``) are
+        excluded so members don't see lab-wide context they can't act on.
+        """
+        from ..core.security_findings import read_jsonl
+        from pathlib import Path as _P
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        latest_path = _P.home() / ".wigamig" / "security" / host / "latest.jsonl"
+        all_findings = read_jsonl(latest_path)
+        mine = [f.to_dict() for f in all_findings
+                if f.owner_handle and f.owner_handle.lstrip("@").lower() == actor.lower()]
+        return {"ok": True, "host": host, "findings": mine}
+
+    @app.post("/api/members/{handle}/lab_sudo")
+    def member_lab_sudo_endpoint(
+        handle: str,
+        body: dict,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Grant or revoke the ``lab_sudo`` flag on a lab member.
+
+        PI-only. ``lab_sudo`` is the wigamig-level flag that gates the
+        ``/security`` dashboard route. **Not** OS-level sudo on the
+        target host — see docs/security-dashboard.md#tier-2-setup for
+        the separate sysadmin grant flow.
+
+        Request body: ``{"grant": true|false}``.
+        """
+        from ..core import membership as _m
+        from . import audit_log as _audit
+
+        actor = _require_pi(user)
+        grant = bool(body.get("grant", False))
+        try:
+            path = _m.set_lab_sudo(handle, grant)
+        except _m.MembershipError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        verb = "granted" if grant else "revoked"
+        try:
+            _audit.write_event(
+                actor=actor, kind=f"member.lab_sudo.{verb}", project="",
+                target=f"member/{handle.lstrip('@')}",
+                summary=f"@{actor} {verb} lab_sudo for @{handle.lstrip('@')}",
+            )
+        except OSError:
+            pass
+        return {
+            "ok": True,
+            "handle": handle.lstrip("@"),
+            "lab_sudo": grant,
+            "path": str(path),
+        }
 
     @app.post("/api/members/{handle}/{action}")
     def member_status_endpoint(
@@ -3764,6 +4214,18 @@ def create_app() -> FastAPI:
             """Phase A registrar dashboard — separate route from the lab UI."""
             return HTMLResponse(
                 (STATIC_DIR / "registrar.html").read_text(encoding="utf-8"),
+                headers=_NO_CACHE,
+            )
+
+        @app.get("/security", response_class=HTMLResponse)
+        def security_index() -> HTMLResponse:
+            """Per-lab security dashboard. Gated by ``lab_sudo`` (set by
+            PI from the LabSudoPanel) or by being the PI. Pulls findings
+            from ``~/.wigamig/security/<host>/latest.jsonl``.
+            See docs/security-dashboard.md for the rule catalog.
+            """
+            return HTMLResponse(
+                (STATIC_DIR / "security.html").read_text(encoding="utf-8"),
                 headers=_NO_CACHE,
             )
 
