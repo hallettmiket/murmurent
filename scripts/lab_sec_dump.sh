@@ -29,7 +29,7 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="1"
+SCRIPT_VERSION="2"   # v2: auth_summary uses distinct_subnets (count) — no raw IPs
 LAB_GROUP="labgroup"     # owner group on lab_vm; readers of snapshot
 SNAPSHOT_BASE="/data/lab_vm/wigamig/.snapshot"
 V4_ROOT="/srv/acl-view/lab_vm"  # the sudo-only NFSv4 mount
@@ -179,24 +179,36 @@ if [[ -r "$AUTH_LOG" ]]; then
     # Python script source heredoc). Use ``python3 -c`` with the script
     # inline; sys.stdin reads the log.
     printf '%s' "${log_slice:-}" | python3 -c '
+# Privacy hygiene: this file lands at /data/lab_vm/wigamig/.snapshot/...
+# with group labgroup readable. We emit ONLY counts + a small
+# subnet hint (/16 bucket count) per user — never raw IPs. A lab
+# member reading the snapshot learns that user X had N publickey
+# logins from K distinct /16 buckets in the last 30 days; they do NOT
+# learn the IPs themselves (which would leak home networks, hotels,
+# etc.). The dashboard surfaces the same anonymised summary.
 import sys, json, re, collections
 out_path = sys.argv[1]
 text = sys.stdin.read()
-per_user = collections.defaultdict(lambda: {"publickey":0, "password":0, "failed":0, "ips":set()})
+per_user = collections.defaultdict(lambda: {"publickey":0, "password":0, "failed":0, "subnets":set()})
+def _bucket(ip):
+    # Coarse /16 bucket for IPv4; full address otherwise (rare in logs).
+    parts = ip.split(".")
+    return ".".join(parts[:2]) + ".0.0/16" if len(parts) == 4 else "non-v4"
 for line in text.splitlines():
     m = re.search(r"Accepted (publickey|password) for (\S+) from (\S+)", line)
     if m:
         method, user, ip = m.group(1), m.group(2), m.group(3)
         per_user[user][method] += 1
-        per_user[user]["ips"].add(ip)
+        per_user[user]["subnets"].add(_bucket(ip))
         continue
     m = re.search(r"Failed (\S+) for (?:invalid user )?(\S+) from (\S+)", line)
     if m:
         user = m.group(2)
         per_user[user]["failed"] += 1
-        per_user[user]["ips"].add(m.group(3))
+        per_user[user]["subnets"].add(_bucket(m.group(3)))
 out = {u: {"publickey": d["publickey"], "password": d["password"],
-            "failed": d["failed"], "ips": sorted(d["ips"])[:20]}
+            "failed": d["failed"],
+            "distinct_subnets": len(d["subnets"])}
        for u, d in per_user.items()}
 with open(out_path, "w") as fh:
     json.dump(out, fh, indent=2, sort_keys=True)

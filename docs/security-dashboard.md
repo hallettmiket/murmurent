@@ -246,27 +246,45 @@ ssh lab-server
 cd ~/repos/wigamig
 git pull
 
-# 2. Install the root-owned snapshot script.
+# 2. Verify the script's SHA256 matches what's recorded in the repo.
+#    Defence-in-depth: detects in-flight tampering before the script
+#    runs as root. Mismatch -> STOP, do not install.
+(cd scripts && shasum -a 256 -c lab_sec_dump.sh.sha256)
+(cd scripts/sudoers.d && shasum -a 256 -c wigamig_sec_dump.sha256)
+# Expected (both):
+#   lab_sec_dump.sh: OK
+#   wigamig_sec_dump: OK
+
+# 3. Install the root-owned snapshot script.
 sudo install -m 0755 -o root -g root \
     scripts/lab_sec_dump.sh /opt/wigamig/lab_sec_dump.sh
 
-# 3. Install the sudoers grant. Edit scripts/sudoers.d/wigamig_sec_dump
+# 4. Install the sudoers grant. Edit scripts/sudoers.d/wigamig_sec_dump
 #    first if the authorised handles need to change.
 sudo install -m 0440 -o root -g root \
     scripts/sudoers.d/wigamig_sec_dump /etc/sudoers.d/wigamig_sec_dump
 
-# 4. Validate the sudoers file (REQUIRED — a bad sudoers file can lock
+# 5. Validate the sudoers file (REQUIRED — a bad sudoers file can lock
 #    everyone out of sudo).
 sudo visudo -c -f /etc/sudoers.d/wigamig_sec_dump
 # Expected:
 #   /etc/sudoers.d/wigamig_sec_dump: parsed OK
 
-# 5. Smoke test — no password should be prompted.
+# 6. Smoke test — no password should be prompted.
 sudo -n /opt/wigamig/lab_sec_dump.sh
 # Expected: "lab_sec_dump: snapshot written to /data/lab_vm/wigamig/.snapshot/<UTC-date>"
 ls -la /data/lab_vm/wigamig/.snapshot/latest/
 # Expected files: manifest.json, acls_raw.txt, acls_refined.txt,
 #                  sshd_runtime.txt, ssh_keys.jsonl, auth_summary.json
+
+# 7. (Optional but recommended) Confirm the installed binary's hash
+#    matches the source. Anyone with root could later modify
+#    /opt/wigamig/lab_sec_dump.sh; running this periodically detects it.
+sudo shasum -a 256 /opt/wigamig/lab_sec_dump.sh
+diff <(sudo shasum -a 256 /opt/wigamig/lab_sec_dump.sh | awk '{print $1}') \
+     <(awk '{print $1}' scripts/lab_sec_dump.sh.sha256) \
+  && echo "installed binary matches source" \
+  || echo "MISMATCH — investigate"
 ```
 
 After step 5, the `/security` dashboard's **Run sudo dump** button works:
@@ -287,7 +305,7 @@ else). Files:
 | `acls_refined.txt` | `nfs4_getfacl -R /srv/acl-view/lab_vm/refined` |
 | `sshd_runtime.txt` | `sshd -T` (effective config, drop-ins resolved) |
 | `ssh_keys.jsonl` | Per (member, key) row: type, comment, mtime, mode. **NO key bodies.** |
-| `auth_summary.json` | 30-day per-user counts of publickey / password / failed auth + IP set |
+| `auth_summary.json` | 30-day per-user counts of publickey / password / failed auth + **distinct /16 subnet count** (raw IPs deliberately redacted — file is lab-group readable, so home networks etc. must not leak). For raw-IP detail, read `auth.log` directly on the host. |
 
 The dashboard consumer parses each section independently — missing
 sections only suppress that section's findings, never the whole audit.
