@@ -43,7 +43,7 @@ from .security_findings import (
 )
 
 
-SUPPORTED_SCRIPT_VERSIONS = ("1", "2", "3", "4", "5")
+SUPPORTED_SCRIPT_VERSIONS = ("1", "2", "3", "4", "5", "6")
 
 
 @dataclass
