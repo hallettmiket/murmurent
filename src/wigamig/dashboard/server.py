@@ -2099,7 +2099,13 @@ def create_app() -> FastAPI:
         # Tar the latest snapshot dir from the remote. ``tar -C base/.snapshot
         # -cf - latest/`` lets the latest symlink resolve to the real dir
         # via ``-h``; we ship a small archive (single MB scale) over ssh.
-        snapshot_base = "/data/lab_vm/wigamig/.snapshot"
+        #
+        # Snapshot lives on **local disk** at /var/lib/wigamig/.snapshot
+        # (script v4+) — OneFS NFSv4 ACLs deny root write under
+        # /data/lab_vm even via the v4 mount, so the snapshot can't live
+        # on the OneFS share. The mount path stays standard FHS
+        # (/var/lib/wigamig) so a sysadmin can find it without a docs trip.
+        snapshot_base = "/var/lib/wigamig/.snapshot"
         cmd = (
             f"if [ -e {snapshot_base}/latest ]; then "
             f"tar -C {snapshot_base} -hcf - latest | base64; "

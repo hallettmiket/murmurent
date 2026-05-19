@@ -29,16 +29,20 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="3"   # v3: write via /root/data4 to dodge NFSv3 root_squash;
-                     # consumers still read via /data (same inodes)
-LAB_GROUP="ssmd-ud-vmlab"     # owner group on lab_vm; readers of snapshot
-# We **write** the snapshot through the NFSv4 mount (root has real
-# permissions there) and the same files appear under ``/data`` for the
-# lab group to read via v3. OneFS exports the same inodes both ways.
-# Without this dual-mount trick, ``root`` on the v3 mount gets squashed
-# to ``nobody`` and ``mkdir`` returns "Read-only file system".
-WRITE_BASE="/root/data4/lab_vm/wigamig/.snapshot"   # for the script (v4)
-READ_BASE="/data/lab_vm/wigamig/.snapshot"          # for consumers (v3)
+SCRIPT_VERSION="4"   # v4: snapshot lives on local disk (/var/lib/wigamig);
+                     # OneFS NFSv4 ACLs deny root write under /data/lab_vm
+                     # even via the v4 mount, so the snapshot can't live
+                     # there. We still READ /root/data4 for ACL audits.
+LAB_GROUP="ssmd-ud-vmlab"     # owner group on snapshot dir; readers
+# Snapshot output is on LOCAL DISK (ext4) rather than OneFS:
+#  - Root on biodatsci isn't a principal in the OneFS ACLs, so even on
+#    the v4 mount we can't ``mkdir`` under /root/data4/lab_vm/wigamig/.
+#  - Local /var/lib/wigamig is plain POSIX — root writes freely; chgrp
+#    + chmod 0750 give the lab group real read access.
+# The v4 mount is still READ-only for our purposes: nfs4_getfacl needs
+# it to enumerate ACLs on raw/refined for the Tier-2 audit.
+WRITE_BASE="/var/lib/wigamig/.snapshot"
+READ_BASE="$WRITE_BASE"   # same path on local disk — no NFS view to map.
 V4_ROOT="/root/data4/lab_vm"  # the sudo-only NFSv4 mount (for ACL reads)
 LAB_MEMBERS_DIR="/data/lab_vm/wigamig"   # used for member-handle discovery
 SSHD_CONFIG="/etc/ssh/sshd_config"
@@ -72,6 +76,13 @@ if [[ ! -d "/root/data4/lab_vm" ]]; then
 fi
 
 # -- Prepare output dir -----------------------------------------------------
+# Ensure the parent ``/var/lib/wigamig/.snapshot`` exists with the right
+# ownership (root:LAB_GROUP, mode 0750). First-run-friendly: idempotent
+# on re-installs.
+mkdir -p "$WRITE_BASE"
+chgrp "$LAB_GROUP" "$(dirname "$WRITE_BASE")" "$WRITE_BASE" 2>/dev/null || true
+chmod 0750 "$(dirname "$WRITE_BASE")" "$WRITE_BASE"
+
 OUT_DIR="${WRITE_BASE}/${TODAY_UTC}"
 mkdir -p "$OUT_DIR"
 # Group ownership so the lab can read the snapshot through the v3 mount
