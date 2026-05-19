@@ -231,6 +231,54 @@ def test_initialize_rejects_unknown_project(isolated):
     assert res.status_code == 404
 
 
+def test_initialize_clone_if_missing_runs_git_clone(isolated, tmp_path, monkeypatch):
+    """One-shot clone+adopt+install: Repos-panel + install on a brand-new
+    repo. Server should git-clone, then projectize. No 404."""
+    # Provide a local bare repo as the "GitHub" origin so git clone works
+    # without network. Also set up commons so bootstrap_local doesn't bail.
+    commons = tmp_path / "wigamig_commons"
+    (commons / "agents").mkdir(parents=True)
+    (commons / "agents" / "oracle.md").write_text("# oracle\n")
+    monkeypatch.setenv("WIGAMIG_REPO_ROOT", str(commons))
+
+    import subprocess
+    origin = tmp_path / "origin" / "newcoin.git"
+    origin.parent.mkdir(parents=True)
+    subprocess.run(["git", "init", "--bare", str(origin)], check=True, capture_output=True)
+    # Seed the bare repo with one commit so `git clone` produces a working tree.
+    seed = tmp_path / "seed"
+    subprocess.run(["git", "init", str(seed)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.email", "t@t"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "config", "user.name", "t"], check=True, capture_output=True)
+    (seed / "README.md").write_text("seed\n")
+    subprocess.run(["git", "-C", str(seed), "add", "."], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "commit", "-m", "init"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "remote", "add", "origin", str(origin)], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(seed), "push", "origin", "HEAD:refs/heads/main"], check=True, capture_output=True)
+
+    body = _initialize_body(
+        project="newcoin",
+        agents=["oracle"],
+        raw_path=str(tmp_path / "lv" / "raw"),
+        refined_path=str(tmp_path / "lv" / "refined"),
+    )
+    body["clone_if_missing"] = True
+    body["repo_url"] = str(origin)
+
+    client = TestClient(create_app())
+    r = client.post("/api/workspace/initialize", json=body)
+    assert r.status_code == 200, r.text
+    assert r.json()["ok"] is True
+
+    # The clone landed under WIGAMIG_PROJECTS_ROOT/newcoin.
+    cloned = isolated["repos"] / "newcoin"
+    assert (cloned / ".git").is_dir()
+    # CHARTER.md was written by projectize after the clone.
+    assert (cloned / "CHARTER.md").is_file()
+    # Installation manifest exists.
+    assert (isolated["installs"] / "newcoin.yaml").is_file()
+
+
 def test_initialize_is_idempotent(isolated, tmp_path):
     """Re-running the wizard for the same project should not error."""
     client = TestClient(create_app())

@@ -29,10 +29,17 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="2"   # v2: auth_summary uses distinct_subnets (count) — no raw IPs
+SCRIPT_VERSION="3"   # v3: write via /srv/acl-view to dodge NFSv3 root_squash;
+                     # consumers still read via /data (same inodes)
 LAB_GROUP="labgroup"     # owner group on lab_vm; readers of snapshot
-SNAPSHOT_BASE="/data/lab_vm/wigamig/.snapshot"
-V4_ROOT="/srv/acl-view/lab_vm"  # the sudo-only NFSv4 mount
+# We **write** the snapshot through the NFSv4 mount (root has real
+# permissions there) and the same files appear under ``/data`` for the
+# lab group to read via v3. the NAS exports the same inodes both ways.
+# Without this dual-mount trick, ``root`` on the v3 mount gets squashed
+# to ``nobody`` and ``mkdir`` returns "Read-only file system".
+WRITE_BASE="/srv/acl-view/lab_vm/wigamig/.snapshot"   # for the script (v4)
+READ_BASE="/data/lab_vm/wigamig/.snapshot"          # for consumers (v3)
+V4_ROOT="/srv/acl-view/lab_vm"  # the sudo-only NFSv4 mount (for ACL reads)
 LAB_MEMBERS_DIR="/data/lab_vm/wigamig"   # used for member-handle discovery
 SSHD_CONFIG="/etc/ssh/sshd_config"
 AUTH_LOG="/var/log/auth.log"
@@ -53,8 +60,19 @@ if [[ "$(id -u)" -ne 0 ]]; then
     exit 77
 fi
 
+# -- Sanity: the v4 mount must be present -----------------------------------
+# Without the v4 mount, root on v3 is squashed to nobody and we can't
+# write the snapshot anywhere under /data/lab_vm. Fail with an explicit
+# message rather than a cryptic mkdir error.
+if [[ ! -d "/srv/acl-view/lab_vm" ]]; then
+    echo "lab_sec_dump: /srv/acl-view/lab_vm not mounted (the sudo-only NFSv4 mount)." >&2
+    echo "  Ask the sysadmin to add it to /etc/fstab — the script needs real root" >&2
+    echo "  permissions on the the NAS export, and the v3 /data mount squashes root." >&2
+    exit 78
+fi
+
 # -- Prepare output dir -----------------------------------------------------
-OUT_DIR="${SNAPSHOT_BASE}/${TODAY_UTC}"
+OUT_DIR="${WRITE_BASE}/${TODAY_UTC}"
 mkdir -p "$OUT_DIR"
 # Group ownership so the lab can read the snapshot through the v3 mount
 # (where they don't have sudo). The dir itself is 0750 — readable by
@@ -225,12 +243,14 @@ fi
 # script version, run timestamp.
 manifest_file="$OUT_DIR/manifest.json"
 attempts_json=$(IFS=,; echo "${manifest_attempts[*]}")
+READ_DIR="${READ_BASE}/${TODAY_UTC}"
 cat > "$manifest_file" <<EOF
 {
   "script_version": "$SCRIPT_VERSION",
   "generated_at": "$NOW_ISO",
   "hostname": "$(hostname -s 2>/dev/null || echo unknown)",
-  "output_dir": "$OUT_DIR",
+  "write_dir": "$OUT_DIR",
+  "read_dir": "$READ_DIR",
   "lab_group": "$LAB_GROUP",
   "v4_root": "$V4_ROOT",
   "attempts": [$attempts_json]
@@ -240,7 +260,9 @@ chmod 0640 "$manifest_file"
 chgrp "$LAB_GROUP" "$manifest_file" 2>/dev/null || true
 
 # -- 6. Refresh ``latest`` symlink for consumer convenience ----------------
-ln -sfn "$TODAY_UTC" "$SNAPSHOT_BASE/latest"
+# Symlink target is just the basename, so it resolves correctly when
+# read via either mount.
+ln -sfn "$TODAY_UTC" "$WRITE_BASE/latest"
 
-echo "lab_sec_dump: snapshot written to $OUT_DIR"
+echo "lab_sec_dump: snapshot written to $READ_DIR (via $OUT_DIR)"
 exit 0
