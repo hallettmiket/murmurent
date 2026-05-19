@@ -286,27 +286,33 @@ def diff_raw(acls: list[FileAcl], *, host: str,
                         now_iso=now_iso,
                         category="raw",
                     ))
-        # Unexpected principal (any ACE that names a user/group other
-        # than OWNER@/GROUP@/EVERYONE@/Administrators@/helpdesk).
-        for a in fa.aces:
-            if a.principal in ("OWNER@", "GROUP@", "EVERYONE@"):
-                continue
-            if a.principal.startswith("Administrators@") \
-               or a.principal.startswith("labgroup@") \
-               or a.principal.startswith("Users@"):
-                continue
-            findings.append(_finding(
-                rule="RAW-UNEXPECTED-PRINCIPAL-01",
-                severity=SEVERITY_INFO,
-                path=_map_to_v3(fa.path, lab_vm_root),
-                host=host,
-                current=f"named ACE: {a.to_text()}",
-                expected="standard principal allowlist (OWNER@, GROUP@, helpdesk, Admins, Users@example.edu)",
-                fix="vet whether the named principal is intentional",
-                project=project,
-                now_iso=now_iso,
-                category="raw",
-            ))
+        # Unexpected principal — only on directories, only for ACEs
+        # *declared* on this object (skip inherit-only ACEs that don't
+        # apply here). Files inherit their ACEs from a parent dir; we
+        # don't want the same principal observation repeated N times
+        # across every file in the subtree.
+        if is_dir:
+            for a in fa.aces:
+                if "i" in a.flags:
+                    continue  # inherit-only — doesn't apply to this dir
+                if a.principal in ("OWNER@", "GROUP@", "EVERYONE@"):
+                    continue
+                if (a.principal.startswith("Administrators@")
+                    or a.principal.startswith("labgroup@")
+                    or a.principal.startswith("Users@")):
+                    continue
+                findings.append(_finding(
+                    rule="RAW-UNEXPECTED-PRINCIPAL-01",
+                    severity=SEVERITY_INFO,
+                    path=_map_to_v3(fa.path, lab_vm_root),
+                    host=host,
+                    current=f"named ACE: {a.to_text()}",
+                    expected="standard principal allowlist (OWNER@, GROUP@, helpdesk, Admins, Users@example.edu)",
+                    fix="vet whether the named principal is intentional",
+                    project=project,
+                    now_iso=now_iso,
+                    category="raw",
+                ))
     return findings
 
 
@@ -380,25 +386,36 @@ def diff_refined(acls: list[FileAcl], *, host: str,
                         category="refined",
                     ))
                     break
-        for a in fa.aces:
-            if a.principal in ("OWNER@", "GROUP@", "EVERYONE@"):
-                continue
-            if (a.principal.startswith("Administrators@")
-                or a.principal.startswith("labgroup@")
-                or a.principal.startswith("Users@")):
-                continue
-            findings.append(_finding(
-                rule="ACL-UNEXPECTED-PRINCIPAL-01",
-                severity=SEVERITY_INFO,
-                path=_map_to_v3(fa.path, lab_vm_root),
-                host=host,
-                current=f"named ACE: {a.to_text()}",
-                expected="standard principal allowlist",
-                fix="vet whether the named principal is intentional",
-                project=project,
-                now_iso=now_iso,
-                category="refined",
-            ))
+        # Detect dir vs file the same way diff_raw does. Only emit the
+        # unexpected-principal observation on directories where the
+        # ACE is declared (not inherit-only) — files inherit, so
+        # repeating the same principal thousands of times is noise.
+        is_dir_refined = any(
+            ("d" in a.flags or "fd" in a.flags or "fdi" in a.flags)
+            for a in fa.aces
+        )
+        if is_dir_refined:
+            for a in fa.aces:
+                if "i" in a.flags:
+                    continue
+                if a.principal in ("OWNER@", "GROUP@", "EVERYONE@"):
+                    continue
+                if (a.principal.startswith("Administrators@")
+                    or a.principal.startswith("labgroup@")
+                    or a.principal.startswith("Users@")):
+                    continue
+                findings.append(_finding(
+                    rule="ACL-UNEXPECTED-PRINCIPAL-01",
+                    severity=SEVERITY_INFO,
+                    path=_map_to_v3(fa.path, lab_vm_root),
+                    host=host,
+                    current=f"named ACE: {a.to_text()}",
+                    expected="standard principal allowlist",
+                    fix="vet whether the named principal is intentional",
+                    project=project,
+                    now_iso=now_iso,
+                    category="refined",
+                ))
     return findings
 
 
@@ -429,14 +446,20 @@ def _finding(*, rule: str, severity: str, path: str, host: str,
 
 
 def _extract_project(path: str, kind: str) -> str | None:
-    """Extract the project name from ``.../lab_vm/<kind>/<project>/...``.
+    """Extract the project name from any ``.../<kind>/<project>/...`` path.
 
-    Returns None for the kind-root itself (``.../lab_vm/raw``).
+    Tolerates lab_vm prefixes that include a subdir (e.g.
+    ``/data/lab_vm/wigamig/raw/<project>/`` on lab-server where the
+    lab tree is rooted at ``/data/lab_vm/wigamig``, not bare
+    ``/data/lab_vm``). Returns None for the kind-root itself.
     """
-    marker = f"/lab_vm/{kind}/"
-    if marker not in path:
+    marker = f"/{kind}/"
+    # Find the **last** occurrence — defensive against unusual lab
+    # layouts that nest ``raw`` more than once.
+    pos = path.rfind(marker)
+    if pos < 0:
         return None
-    tail = path.split(marker, 1)[1].strip("/")
+    tail = path[pos + len(marker):].strip("/")
     if not tail:
         return None
     return tail.split("/", 1)[0]
