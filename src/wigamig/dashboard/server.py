@@ -2106,19 +2106,56 @@ def create_app() -> FastAPI:
         # on the OneFS share. The mount path stays standard FHS
         # (/var/lib/wigamig) so a sysadmin can find it without a docs trip.
         snapshot_base = "/var/lib/wigamig/.snapshot"
+        # **Sentinel-bracketed base64 stream**.
+        #
+        # ``bash -lc`` runs ~/.bashrc, which on biodatsci's Anaconda
+        # install (and many user setups) emits text to stdout before our
+        # ``tar`` runs — ``(base)``, ``Last login:``, MOTD residue, etc.
+        # Python's ``b64decode`` silently SKIPS invalid characters in
+        # default mode, so those prefix bytes don't crash the decode —
+        # they corrupt it. The decoded stream then starts with whatever
+        # ``base, login, …`` happened to base64-decode to, instead of
+        # the gzip magic ``\x1f\x8b``.
+        #
+        # Wrap the real output in unique sentinels so Python can extract
+        # only the bytes between them. Use ``validate=True`` on the
+        # decode + verify gzip magic so any future corruption surfaces
+        # immediately rather than as a downstream tar error.
+        BEGIN = "__WIGAMIG_TAR_BEGIN__"
+        END = "__WIGAMIG_TAR_END__"
         cmd = (
             f"if [ -e {snapshot_base}/latest ]; then "
-            f"tar -C {snapshot_base} -hcf - latest | base64; "
+            f"echo {BEGIN}; "
+            f"tar -C {snapshot_base} -hczf - latest | base64; "
+            f"echo {END}; "
             f"else echo NO_SNAPSHOT >&2; exit 12; fi"
         )
         try:
-            res = remote.run(cmd, check=False, timeout=120)
+            # Generous timeout — compressing + streaming a few hundred
+            # MB of ACL dumps takes longer than the original 120 s.
+            res = remote.run(cmd, check=False, timeout=600)
         except _remote.RemoteError:
             return []
-        if res.returncode != 0 or not res.stdout.strip():
+        if res.returncode != 0 or not res.stdout:
             return []
         try:
-            data = _io.BytesIO(__import__("base64").b64decode(res.stdout))
+            text = res.stdout
+            begin_at = text.find(BEGIN)
+            end_at = text.find(END)
+            if begin_at < 0 or end_at < 0 or end_at < begin_at:
+                import sys as _s
+                print(f"[tier2] sentinels missing in stdout "
+                      f"(begin={begin_at}, end={end_at})", file=_s.stderr)
+                return []
+            b64 = "".join(text[begin_at + len(BEGIN):end_at].split())
+            import base64 as _b64
+            raw = _b64.b64decode(b64, validate=True)
+            if raw[:2] != b"\x1f\x8b":
+                import sys as _s
+                print(f"[tier2] decoded stream isn't gzip "
+                      f"(first 8 bytes: {raw[:8]!r}, len={len(raw)})", file=_s.stderr)
+                return []
+            data = _io.BytesIO(raw)
             with tempfile.TemporaryDirectory() as td:
                 # **tarslip defence (CVE-2007-4559)**: ``extractall(filter=...)``
                 # rejects absolute paths, ``..`` traversal, dangerous link
@@ -2132,7 +2169,7 @@ def create_app() -> FastAPI:
                 # prevent. With the filter, the worst a malicious snapshot
                 # can do is land arbitrary file *content* inside the temp
                 # dir we then read; it can't escape.
-                with tarfile.open(fileobj=data, mode="r:") as tf:
+                with tarfile.open(fileobj=data, mode="r:gz") as tf:
                     try:
                         tf.extractall(td, filter="data")
                     except TypeError:
@@ -2147,7 +2184,12 @@ def create_app() -> FastAPI:
                     lab_vm_root=(lab_vm_root or "/data/lab_vm"),
                 )
                 return t2.findings
-        except Exception:
+        except Exception as exc:
+            # Log to stderr (dashboard terminal) so silent failures
+            # don't masquerade as "no tier 2 findings".
+            import sys, traceback
+            print(f"[tier2 fetch] {type(exc).__name__}: {exc}", file=sys.stderr)
+            traceback.print_exc(file=sys.stderr)
             return []
 
     def _safe_extract(tf, dest_dir: str) -> None:
@@ -2245,8 +2287,12 @@ def create_app() -> FastAPI:
             tier2_findings: list = []
             try:
                 tier2_findings = _fetch_and_consume_tier2(host_obj, lab_vm_root=host_obj.lab_vm_root)
+                import sys as _s
+                print(f"[tier2] consumer returned {len(tier2_findings)} findings", file=_s.stderr)
             except Exception as _exc:
-                pass  # snapshot consumer is best-effort
+                import sys as _s, traceback as _tb
+                print(f"[tier2] outer exception: {type(_exc).__name__}: {_exc}", file=_s.stderr)
+                _tb.print_exc(file=_s.stderr)
             # Persist
             persist_dir.mkdir(parents=True, exist_ok=True)
             date = _dt2.datetime.utcnow().strftime("%Y-%m-%d")
@@ -2259,7 +2305,14 @@ def create_app() -> FastAPI:
                 latest_path.symlink_to(target.name)
             except OSError:
                 pass
-            findings = res.findings + tier2_findings
+            # **Rollup Tier 1 + Tier 2 together** so the table doesn't
+            # show one row per file from raw/refined (which crashed the
+            # browser at hundreds of thousands of findings).
+            from ..core.security_findings import rollup_by_directory
+            findings = rollup_by_directory(res.findings + tier2_findings)
+            import sys as _s
+            print(f"[tier2] merged: {len(res.findings)} tier1 + {len(tier2_findings)} tier2 "
+                  f"→ {len(findings)} after rollup", file=_s.stderr)
             generated_at = _dt2.datetime.utcnow().isoformat() + "Z"
             source = "live" + (" + tier2" if tier2_findings else "")
             progress = res.progress
@@ -2272,12 +2325,33 @@ def create_app() -> FastAPI:
                 generated_at = ""
             source = "cache"
             progress = []
+        # **Hard cap** on the response so the browser doesn't OOM even
+        # in pathological cases (e.g. a future rule that emits per-file
+        # without rollup support). Surfaces the cap as one final info
+        # finding so the UI tells the user something was truncated.
+        MAX_FINDINGS_IN_RESPONSE = 2000
+        truncated = 0
+        if len(findings) > MAX_FINDINGS_IN_RESPONSE:
+            truncated = len(findings) - MAX_FINDINGS_IN_RESPONSE
+            findings = findings[:MAX_FINDINGS_IN_RESPONSE]
+        out = [f.to_dict() for f in findings]
+        if truncated:
+            from ..core.security_findings import Finding, SEVERITY_INFO
+            out.append(Finding(
+                severity=SEVERITY_INFO, category="meta",
+                rule="RESPONSE-TRUNCATED-01",
+                host=host, path=f"<{truncated} findings dropped>",
+                current_state=f"{len(out)} returned, {truncated} dropped",
+                expected_state=f"≤ {MAX_FINDINGS_IN_RESPONSE} findings",
+                suggested_fix="check ~/.wigamig/security/<host>/<date>.jsonl for the full set",
+                detected_at=generated_at or "",
+            ).to_dict())
         return {
             "ok": True,
             "host": host,
             "generated_at": generated_at,
             "source": source,
-            "findings": [f.to_dict() for f in findings],
+            "findings": out,
             "progress": progress,
         }
 
@@ -4286,8 +4360,16 @@ def create_app() -> FastAPI:
             _register_static_alias(app, asset, STATIC_DIR / asset)
 
         @app.get("/favicon.ico")
-        def favicon() -> JSONResponse:
-            return JSONResponse({}, status_code=204)
+        def favicon():
+            # 204 = "No Content" — body MUST be empty. Returning
+            # ``JSONResponse({}, status_code=204)`` was a protocol
+            # violation: the response carried Content-Length=2 (for
+            # ``{}``) but uvicorn refuses to ship a body on 204, so
+            # the bytes-sent vs Content-Length mismatch crashed every
+            # favicon request. ``Response(status_code=204)`` sends
+            # the right empty body with Content-Length=0.
+            from fastapi.responses import Response
+            return Response(status_code=204)
 
     else:  # pragma: no cover
 
