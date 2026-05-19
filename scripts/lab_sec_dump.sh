@@ -29,10 +29,9 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="4"   # v4: snapshot lives on local disk (/var/lib/wigamig);
-                     # the NAS NFSv4 ACLs deny root write under /data/lab_vm
-                     # even via the v4 mount, so the snapshot can't live
-                     # there. We still READ /srv/acl-view for ACL audits.
+SCRIPT_VERSION="5"   # v5: per-step timeouts + stderr progress so we don't
+                     # hang silently on nfs4_getfacl -R against a million
+                     # files. Snapshot still on local disk.
 LAB_GROUP="labgroup"     # owner group on snapshot dir; readers
 # Snapshot output is on LOCAL DISK (ext4) rather than the NAS:
 #  - Root on lab-server isn't a principal in the the NAS ACLs, so even on
@@ -92,10 +91,32 @@ chgrp "$LAB_GROUP" "$OUT_DIR" 2>/dev/null || true
 chmod 0750 "$OUT_DIR"
 
 manifest_attempts=()
+echo "[$(date -u +%H:%M:%S)] lab_sec_dump v${SCRIPT_VERSION} starting; out_dir=$OUT_DIR" >&2
 record_attempt() {
     # Append a small JSON-fragment line to the attempts list. We flatten
     # to JSON at the end.
     manifest_attempts+=("{\"step\":\"$1\",\"status\":\"$2\",\"detail\":\"$3\"}")
+}
+
+# Per-step progress goes to stderr so the user sees what's running even
+# when they ssh into the script. Without this the script could appear to
+# hang for many minutes while nfs4_getfacl walks a million files.
+log() { echo "[$(date -u +%H:%M:%S)] $*" >&2; }
+
+# Per-step timeouts. ACL walks can be slow on huge trees — give them a
+# generous budget but bound the worst case. Each step also gets its own
+# wall-clock measurement so the manifest carries useful diagnostics.
+TIMEOUT_ACL="${LAB_SEC_DUMP_TIMEOUT_ACL:-600}"      # 10 min per ACL walk
+TIMEOUT_SSHD="${LAB_SEC_DUMP_TIMEOUT_SSHD:-30}"
+TIMEOUT_JOURNAL="${LAB_SEC_DUMP_TIMEOUT_JOURNAL:-60}"
+TIMEOUT_KEYS="${LAB_SEC_DUMP_TIMEOUT_KEYS:-60}"
+
+# Run a command bounded by ``timeout(1)``. Returns 0 on success, 124 on
+# timeout, the command's rc otherwise. Stderr is preserved so caller can
+# capture diagnostics.
+bounded() {
+    local secs="$1"; shift
+    timeout --kill-after=10s "${secs}s" "$@"
 }
 
 # -- 1. NFSv4 ACLs on raw + refined -----------------------------------------
@@ -103,12 +124,20 @@ record_attempt() {
 # tree with thousands of files this is the slowest step (seconds-to-minutes).
 acls_raw_file="$OUT_DIR/acls_raw.txt"
 if [[ -d "$V4_ROOT/raw" ]]; then
-    if nfs4_getfacl -R "$V4_ROOT/raw" > "$acls_raw_file" 2>/dev/null; then
+    log "nfs4_getfacl -R raw (budget ${TIMEOUT_ACL}s) — may take minutes on large trees"
+    start=$SECONDS
+    if bounded "$TIMEOUT_ACL" nfs4_getfacl -R "$V4_ROOT/raw" > "$acls_raw_file" 2>"$OUT_DIR/acls_raw.stderr"; then
         chmod 0640 "$acls_raw_file"
         chgrp "$LAB_GROUP" "$acls_raw_file" 2>/dev/null || true
-        record_attempt "acls_raw" "ok" "$(wc -l < "$acls_raw_file") lines"
+        record_attempt "acls_raw" "ok" "$(wc -l < "$acls_raw_file") lines in $((SECONDS-start))s"
     else
-        record_attempt "acls_raw" "fail" "nfs4_getfacl returned non-zero"
+        rc=$?
+        if [[ $rc -eq 124 || $rc -eq 137 ]]; then
+            record_attempt "acls_raw" "timeout" "exceeded ${TIMEOUT_ACL}s; bump LAB_SEC_DUMP_TIMEOUT_ACL"
+            log "  TIMEOUT — partial output may be in $acls_raw_file"
+        else
+            record_attempt "acls_raw" "fail" "nfs4_getfacl rc=$rc"
+        fi
     fi
 else
     record_attempt "acls_raw" "skip" "$V4_ROOT/raw not present (mount missing?)"
@@ -116,12 +145,20 @@ fi
 
 acls_refined_file="$OUT_DIR/acls_refined.txt"
 if [[ -d "$V4_ROOT/refined" ]]; then
-    if nfs4_getfacl -R "$V4_ROOT/refined" > "$acls_refined_file" 2>/dev/null; then
+    log "nfs4_getfacl -R refined (budget ${TIMEOUT_ACL}s)"
+    start=$SECONDS
+    if bounded "$TIMEOUT_ACL" nfs4_getfacl -R "$V4_ROOT/refined" > "$acls_refined_file" 2>"$OUT_DIR/acls_refined.stderr"; then
         chmod 0640 "$acls_refined_file"
         chgrp "$LAB_GROUP" "$acls_refined_file" 2>/dev/null || true
-        record_attempt "acls_refined" "ok" "$(wc -l < "$acls_refined_file") lines"
+        record_attempt "acls_refined" "ok" "$(wc -l < "$acls_refined_file") lines in $((SECONDS-start))s"
     else
-        record_attempt "acls_refined" "fail" "nfs4_getfacl returned non-zero"
+        rc=$?
+        if [[ $rc -eq 124 || $rc -eq 137 ]]; then
+            record_attempt "acls_refined" "timeout" "exceeded ${TIMEOUT_ACL}s; bump LAB_SEC_DUMP_TIMEOUT_ACL"
+            log "  TIMEOUT — partial output may be in $acls_refined_file"
+        else
+            record_attempt "acls_refined" "fail" "nfs4_getfacl rc=$rc"
+        fi
     fi
 else
     record_attempt "acls_refined" "skip" "$V4_ROOT/refined not present"
@@ -130,14 +167,15 @@ fi
 # -- 2. sshd policy (authoritative via `sshd -T`) ---------------------------
 sshd_file="$OUT_DIR/sshd_runtime.txt"
 if command -v sshd >/dev/null 2>&1; then
-    if sshd -T -C "user=root,host=localhost,addr=127.0.0.1" 2>/dev/null \
+    log "sshd -T (budget ${TIMEOUT_SSHD}s)"
+    if bounded "$TIMEOUT_SSHD" sshd -T -C "user=root,host=localhost,addr=127.0.0.1" 2>/dev/null \
        | sort > "$sshd_file"; then
         chmod 0640 "$sshd_file"
         chgrp "$LAB_GROUP" "$sshd_file" 2>/dev/null || true
         record_attempt "sshd_runtime" "ok" "$(wc -l < "$sshd_file") effective settings"
     else
         # Some sshd versions reject -C with their config; retry plain -T.
-        if sshd -T > "$sshd_file" 2>/dev/null; then
+        if bounded "$TIMEOUT_SSHD" sshd -T > "$sshd_file" 2>/dev/null; then
             chmod 0640 "$sshd_file"
             chgrp "$LAB_GROUP" "$sshd_file" 2>/dev/null || true
             record_attempt "sshd_runtime" "ok" "$(wc -l < "$sshd_file") effective settings (no -C)"
@@ -154,6 +192,8 @@ fi
 # ~/.ssh/authorized_keys into structured rows (type, comment, mtime, mode).
 # We NEVER emit the key body — only metadata. This keeps the snapshot
 # safe to leave group-readable.
+log "ssh_keys walk (budget ${TIMEOUT_KEYS}s)"
+keys_start=$SECONDS
 keys_file="$OUT_DIR/ssh_keys.jsonl"
 : > "$keys_file"
 key_count=0
@@ -161,6 +201,13 @@ key_count=0
 # Member discovery: iterate /home/UWO/ (lab-server LDAP convention).
 # Adjust the glob if your site puts homes elsewhere.
 for home in /home/UWO/* /home/*; do
+    # Cheap soft-stop if the whole walk runs over budget — homes can be
+    # numerous on shared hosts and a single hung NFS-mounted home would
+    # otherwise stall everything.
+    [[ $((SECONDS - keys_start)) -ge $TIMEOUT_KEYS ]] && {
+        log "  ssh_keys walk hit budget at $home — truncating"
+        break
+    }
     [[ -d "$home" ]] || continue
     ak="$home/.ssh/authorized_keys"
     [[ -f "$ak" ]] || continue
@@ -198,11 +245,12 @@ if [[ -r "$AUTH_LOG" ]]; then
     # Window: last 30 days. journalctl is more reliable than parsing
     # syslog timestamps which span year boundaries; fall back to auth.log
     # if journald isn't there.
+    log "auth.log/journal slice (budget ${TIMEOUT_JOURNAL}s)"
     if command -v journalctl >/dev/null 2>&1; then
-        log_slice=$(journalctl --since="30 days ago" _COMM=sshd --no-pager 2>/dev/null || true)
+        log_slice=$(bounded "$TIMEOUT_JOURNAL" journalctl --since="30 days ago" _COMM=sshd --no-pager 2>/dev/null || true)
     fi
     if [[ -z "${log_slice:-}" ]]; then
-        log_slice="$(tail -n 100000 "$AUTH_LOG" 2>/dev/null || true)"
+        log_slice="$(bounded "$TIMEOUT_JOURNAL" tail -n 100000 "$AUTH_LOG" 2>/dev/null || true)"
     fi
     # Pass the log slice via stdin (heredoc was conflicting with the
     # Python script source heredoc). Use ``python3 -c`` with the script
