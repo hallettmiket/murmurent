@@ -20,6 +20,7 @@ Open `http://localhost:8770/` in a browser.
 from __future__ import annotations
 
 import datetime as _dt
+import os
 from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException, Query
@@ -2113,8 +2114,25 @@ def create_app() -> FastAPI:
         try:
             data = _io.BytesIO(__import__("base64").b64decode(res.stdout))
             with tempfile.TemporaryDirectory() as td:
+                # **tarslip defence (CVE-2007-4559)**: ``extractall(filter=...)``
+                # rejects absolute paths, ``..`` traversal, dangerous link
+                # targets, etc. Added in Python 3.12; the ``data`` filter is
+                # the safest preset (refuses devices, FIFOs, setuid bits, and
+                # any path that would escape ``td``).
+                #
+                # Without the filter, a compromised root on the remote could
+                # ship a tar that writes to absolute paths on the laptop —
+                # exactly the kind of foothold this audit is supposed to
+                # prevent. With the filter, the worst a malicious snapshot
+                # can do is land arbitrary file *content* inside the temp
+                # dir we then read; it can't escape.
                 with tarfile.open(fileobj=data, mode="r:") as tf:
-                    tf.extractall(td)
+                    try:
+                        tf.extractall(td, filter="data")
+                    except TypeError:
+                        # Python < 3.12: re-implement the data filter
+                        # manually rather than fall back to unsafe extract.
+                        _safe_extract(tf, td)
                 snap_dir = _P(td) / "latest"
                 if not snap_dir.is_dir():
                     return []
@@ -2125,6 +2143,32 @@ def create_app() -> FastAPI:
                 return t2.findings
         except Exception:
             return []
+
+    def _safe_extract(tf, dest_dir: str) -> None:
+        """Backport of tarfile's ``data`` filter for Python < 3.12.
+
+        Refuses members whose resolved path escapes ``dest_dir`` (the
+        classic tarslip pattern) plus device / FIFO / setuid entries.
+        Symlinks are allowed only if their target also lands inside
+        ``dest_dir`` after resolution.
+        """
+        import os.path as _osp
+        dest_real = _osp.realpath(dest_dir)
+        for member in tf.getmembers():
+            # No devices, FIFOs, sockets — only regular files, dirs, symlinks.
+            if not (member.isfile() or member.isdir() or member.issym() or member.islnk()):
+                continue
+            # Strip setuid/setgid/sticky from the member mode.
+            member.mode &= 0o777
+            target = _osp.realpath(_osp.join(dest_dir, member.name))
+            if not (target == dest_real or target.startswith(dest_real + os.sep)):
+                continue  # tarslip — skip silently
+            if member.issym() or member.islnk():
+                # Resolve the link target the same way; refuse if it escapes.
+                link_target = _osp.realpath(_osp.join(_osp.dirname(target), member.linkname))
+                if not (link_target == dest_real or link_target.startswith(dest_real + os.sep)):
+                    continue
+            tf.extract(member, dest_dir)
 
     @app.get("/api/security/findings")
     def security_findings_endpoint(

@@ -43,7 +43,7 @@ from .security_findings import (
 )
 
 
-SUPPORTED_SCRIPT_VERSIONS = ("1",)
+SUPPORTED_SCRIPT_VERSIONS = ("1", "2")
 
 
 @dataclass
@@ -309,12 +309,22 @@ def _eval_ssh_keys(path: Path, *, host: str, now_iso: str) -> list[Finding]:
 # ---------------------------------------------------------------------------
 
 def _eval_auth_summary(summary: dict, *, host: str, now_iso: str) -> list[Finding]:
+    """Aggregate per-user auth events from the snapshot.
+
+    The snapshot deliberately redacts raw IPs (see lab_sec_dump.sh) —
+    we only see counts + ``distinct_subnets`` (/16 bucket count). That's
+    enough to flag brute-force patterns ("250 failed attempts from a
+    single /16") without leaking lab members' home networks. Legacy
+    snapshots with an ``ips`` list still parse — we accept either.
+    """
     findings: list[Finding] = []
     for user, stats in sorted(summary.items()):
         if not isinstance(stats, dict):
             continue
         pwd = int(stats.get("password", 0))
         failed = int(stats.get("failed", 0))
+        subnets = int(stats.get("distinct_subnets")
+                       or len(stats.get("ips") or []))
         if pwd > 0:
             findings.append(_meta_finding(
                 rule="AUTH-PWD-ATTEMPTS-01",
@@ -333,11 +343,12 @@ def _eval_auth_summary(summary: dict, *, host: str, now_iso: str) -> list[Findin
                 severity=SEVERITY_INFO,
                 host=host,
                 path=f"@{user}",
-                current=f"{user}: {failed} failed-auth attempts in last 30d "
-                         f"from IPs {', '.join(stats.get('ips', [])[:5])}",
+                current=(f"{user}: {failed} failed-auth attempts in last 30d "
+                          f"across {subnets} distinct /16 subnet(s)"),
                 expected="< 100",
-                fix="review for brute-force; consider fail2ban or a "
-                    "TCP-level rate limit",
+                fix="review auth.log on the host for raw IP detail "
+                    "(IPs are deliberately redacted from the snapshot); "
+                    "consider fail2ban or a TCP-level rate limit",
                 now_iso=now_iso,
             ))
     return findings
