@@ -29,9 +29,9 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="5"   # v5: per-step timeouts + stderr progress so we don't
-                     # hang silently on nfs4_getfacl -R against a million
-                     # files. Snapshot still on local disk.
+SCRIPT_VERSION="6"   # v6: refined walked per-project so one big subdir
+                     # only times itself out. raw still walked globally
+                     # (typically fast enough).
 LAB_GROUP="ssmd-ud-vmlab"     # owner group on snapshot dir; readers
 # Snapshot output is on LOCAL DISK (ext4) rather than OneFS:
 #  - Root on biodatsci isn't a principal in the OneFS ACLs, so even on
@@ -144,22 +144,53 @@ else
 fi
 
 acls_refined_file="$OUT_DIR/acls_refined.txt"
+: > "$acls_refined_file"
+# Per-project budget for refined. User report (v5): a global ``-R``
+# over refined timed out at 600s — refined has many large project
+# subdirs and we don't want one giant project to block the rest. Walk
+# each top-level subdir separately so each gets its own budget and one
+# slow project only times itself out. Budget is per-project, not global.
+TIMEOUT_ACL_PER_PROJECT="${LAB_SEC_DUMP_TIMEOUT_ACL_PER_PROJECT:-300}"  # 5 min default
 if [[ -d "$V4_ROOT/refined" ]]; then
-    log "nfs4_getfacl -R refined (budget ${TIMEOUT_ACL}s)"
-    start=$SECONDS
-    if bounded "$TIMEOUT_ACL" nfs4_getfacl -R "$V4_ROOT/refined" > "$acls_refined_file" 2>"$OUT_DIR/acls_refined.stderr"; then
-        chmod 0640 "$acls_refined_file"
-        chgrp "$LAB_GROUP" "$acls_refined_file" 2>/dev/null || true
-        record_attempt "acls_refined" "ok" "$(wc -l < "$acls_refined_file") lines in $((SECONDS-start))s"
-    else
-        rc=$?
-        if [[ $rc -eq 124 || $rc -eq 137 ]]; then
-            record_attempt "acls_refined" "timeout" "exceeded ${TIMEOUT_ACL}s; bump LAB_SEC_DUMP_TIMEOUT_ACL"
-            log "  TIMEOUT — partial output may be in $acls_refined_file"
+    log "nfs4_getfacl -R refined — per-project walk (${TIMEOUT_ACL_PER_PROJECT}s each)"
+    refined_ok=0
+    refined_timeout=0
+    refined_fail=0
+    refined_total_start=$SECONDS
+    # First, dump the refined root ACL itself (cheap, no recursion).
+    nfs4_getfacl "$V4_ROOT/refined" >> "$acls_refined_file" 2>"$OUT_DIR/acls_refined.stderr" || true
+    # Then walk each project subdir under its own timeout.
+    for proj_dir in "$V4_ROOT/refined"/*/; do
+        [[ -d "$proj_dir" ]] || continue
+        proj=$(basename "$proj_dir")
+        log "  refined/$proj"
+        proj_start=$SECONDS
+        if bounded "$TIMEOUT_ACL_PER_PROJECT" nfs4_getfacl -R "$proj_dir" \
+           >> "$acls_refined_file" 2>>"$OUT_DIR/acls_refined.stderr"; then
+            refined_ok=$((refined_ok + 1))
+            log "    ok ($((SECONDS-proj_start))s)"
         else
-            record_attempt "acls_refined" "fail" "nfs4_getfacl rc=$rc"
+            rc=$?
+            if [[ $rc -eq 124 || $rc -eq 137 ]]; then
+                refined_timeout=$((refined_timeout + 1))
+                log "    TIMEOUT — partial output kept"
+            else
+                refined_fail=$((refined_fail + 1))
+                log "    FAIL rc=$rc"
+            fi
         fi
+    done
+    chmod 0640 "$acls_refined_file"
+    chgrp "$LAB_GROUP" "$acls_refined_file" 2>/dev/null || true
+    if [[ $refined_timeout -eq 0 && $refined_fail -eq 0 ]]; then
+        status="ok"
+    elif [[ $refined_ok -gt 0 ]]; then
+        status="partial"
+    else
+        status="fail"
     fi
+    record_attempt "acls_refined" "$status" \
+        "$refined_ok ok, $refined_timeout timeout, $refined_fail fail (total $((SECONDS-refined_total_start))s)"
 else
     record_attempt "acls_refined" "skip" "$V4_ROOT/refined not present"
 fi
