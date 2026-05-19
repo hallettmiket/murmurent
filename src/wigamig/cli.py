@@ -22,6 +22,7 @@ from .commands import experiment_cmd, install_cmd, project_cmd
 from .commands import push_cmd as push_impl
 from .commands import reconcile_cmd as reconcile_impl
 from .commands import sea_cmd
+from .commands import security_cmd as security_impl
 from .core.agents import load_registry
 from .core.repo import wigamig_repo_root
 
@@ -1372,6 +1373,7 @@ def member_activate_cmd(handle: str) -> None:
 # Register the `wigamig reconcile` subcommand. Kept at the bottom so
 # it sees the fully-built `cli` group object.
 reconcile_impl.add_to_cli(cli)
+security_impl.add_to_cli(cli)
 
 
 if __name__ == "__main__":  # pragma: no cover

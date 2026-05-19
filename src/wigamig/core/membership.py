@@ -263,6 +263,61 @@ def set_status(
     return rec
 
 
+def set_lab_sudo(handle: str, grant: bool) -> Path:
+    """Grant or revoke the ``lab_sudo`` flag on a member's frontmatter.
+
+    Wigamig-level "lab security admin" flag — gates access to the
+    ``/security`` dashboard route. **Not OS-level sudo** — the OS sudo
+    grant for the Tier 2 root-owned ACL dump script is a separate
+    one-time sysadmin action (see docs/security-dashboard.md).
+
+    Merges into ``<lab-mgmt>/members/<handle>.md`` frontmatter without
+    disturbing other fields (contact, location, lab, certifications, …).
+    When ``grant=False`` and the flag was set, the key is removed
+    entirely rather than written as ``false`` — keeps frontmatter
+    minimal.
+
+    Raises :class:`MembershipError` if the member file doesn't exist.
+    Caller is responsible for checking that ``handle`` is in the same
+    lab as the granting PI and that the PI is actually the PI; this
+    function trusts its input.
+    """
+    from .frontmatter import dump_document, parse_file
+    norm = _strip_at(handle)
+    path = member_path(norm)
+    if not path.is_file():
+        raise MembershipError(f"member file not found: {path}")
+    parsed = parse_file(path)
+    meta = dict(parsed.meta or {})
+    if grant:
+        meta["lab_sudo"] = True
+    else:
+        meta.pop("lab_sudo", None)
+    path.write_text(dump_document(meta, parsed.body or ""), encoding="utf-8")
+    return path
+
+
+def lab_sudo_handles() -> list[str]:
+    """Return all member handles with ``lab_sudo: true`` set.
+
+    The PI is **not** included implicitly — call sites that want
+    "everyone authorised to view /security including the PI" need to
+    add ``pi_handle()`` to the result themselves. This function only
+    reports the explicitly-granted set so the PI grant UI can show
+    "you've granted lab_sudo to N members" accurately.
+    """
+    from .frontmatter import parse_file
+    out: list[str] = []
+    for rec in iter_members(include_inactive=False):
+        try:
+            meta = parse_file(rec.path).meta or {}
+        except Exception:
+            continue
+        if meta.get("lab_sudo"):
+            out.append(rec.handle)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------

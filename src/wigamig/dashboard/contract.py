@@ -71,6 +71,12 @@ class IdentityBlock(BaseModel):
     # Phase A+: True iff this handle matches ``~/.wigamig/registrar``.
     # The lab dashboard uses this to show a cross-link to /registrar.
     is_registrar: bool = False
+    # Wigamig-level "lab security admin" flag — set by the PI from the
+    # LabSudoPanel. Controls visibility of the /security dashboard
+    # route. **Not** OS-level sudo; the OS sudo grant (for the Tier 2
+    # root-owned ACL dump script) is a separate one-time sysadmin
+    # action — see docs/security-dashboard.md#tier-2-setup.
+    lab_sudo: bool = False
 
 
 class MemberSettings(BaseModel):
@@ -287,6 +293,10 @@ class PeerRow(BaseModel):
     # leave / departed; cannot run wigamig actions but historical refs
     # (audit, SEAs, projects) still resolve to their handle.
     status: Literal["active", "inactive"] = "active"
+    # PI's SecurityAccessPanel reads this to render the grantee list +
+    # the grant-candidates list. False by default; True when the
+    # member's frontmatter has ``lab_sudo: true``.
+    lab_sudo: bool = False
 
 
 class AgentRow(BaseModel):

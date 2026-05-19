@@ -114,9 +114,15 @@ def build_response(
     is_registrar_handle = _registrar_mod.is_registrar(norm)
 
     member_block = _identity(snap.member, snap.full_name, snap.role)
+    # ``lab_sudo`` comes from the member frontmatter — controls /security
+    # route visibility. The PI is always implicit lab_sudo (otherwise no
+    # one could ever be the first grantee in a fresh lab).
+    member_profile_for_sudo = _load_member_profile(norm)
+    lab_sudo = bool(member_profile_for_sudo.get("lab_sudo", False)) or is_pi
     member_block = member_block.model_copy(update={
         "can_pi": can_pi,
         "is_registrar": is_registrar_handle,
+        "lab_sudo": lab_sudo,
     })
 
     member_profile = _load_member_profile(norm)
@@ -1140,6 +1146,11 @@ def _peers(
         role = _peer_role(peer)
         open_seas = sum(open_seas_index.get((p, peer), 0) for p in unique_projects)
         experiments = sum(exp_index.get((p, peer), 0) for p in unique_projects)
+        # Pull lab_sudo from member frontmatter so the PI's
+        # SecurityAccessPanel can render grantee/candidate lists without
+        # a separate round-trip. Cheap (one frontmatter parse per peer
+        # which already happened above for full_name / certs).
+        peer_profile = _load_member_profile(peer)
         rows.append(
             C.PeerRow(
                 handle=peer,
@@ -1154,6 +1165,7 @@ def _peers(
                 open_seas=open_seas,
                 experiments=experiments,
                 status="inactive" if member_status == "inactive" else "active",  # type: ignore[arg-type]
+                lab_sudo=bool(peer_profile.get("lab_sudo", False)),
             )
         )
     return rows

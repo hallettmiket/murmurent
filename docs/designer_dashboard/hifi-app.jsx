@@ -251,6 +251,24 @@ function CmdBar({ query, setQuery }) {
           {persona === "pi" ? "PI VIEW" : "MEMBER VIEW"}
         </span>
       </div>
+      {/* /security link — shown for the PI (implicit) and any lab member
+          with ``lab_sudo: true``. Members without the grant see no link,
+          so the route remains discoverable only after the PI grants it. */}
+      {(window.DATA.member && window.DATA.member.lab_sudo) && (
+        <a
+          href={`/security?user=${encodeURIComponent(window.DATA.member.handle || "")}`}
+          title="Open the per-lab security dashboard (/security)"
+          target="_blank" rel="noopener"
+          style={{
+            marginLeft: 10, fontFamily: "var(--mono)", fontSize: 11,
+            letterSpacing: 1, textTransform: "uppercase",
+            color: "var(--tiger)", textDecoration: "none",
+            border: "1px solid var(--tiger)", borderRadius: 2,
+            padding: "3px 8px",
+          }}>
+          ⚿ security ↗
+        </a>
+      )}
       <a
         href="/"
         className="switch-role"
@@ -391,6 +409,38 @@ function RepoInventoryPanel({ span = "c-12" }) {
         </div>
       </header>
       <div className="body" style={{padding:0}}>
+        <div style={{
+          padding:"10px 14px", fontSize:11.5, lineHeight:1.55,
+          background:"var(--paper-2)", borderBottom:"1px solid var(--rule)",
+          color:"var(--ink-2)",
+        }}>
+          <strong style={{fontFamily:"var(--mono)", color:"var(--purple-deep)"}}>
+            clone · adopt · install · open
+          </strong>{" — each host cell shows what's there now and offers the next step:"}
+          <ul style={{margin:"4px 0 0 18px", padding:0}}>
+            <li>
+              <span className="mono" style={{color:"var(--muted)"}}>—</span>{" "}
+              <em>nothing here.</em> Repo isn't on this host and has no GitHub origin to clone from.
+            </li>
+            <li>
+              <span className="mono">+ install</span> — repo lives on GitHub but isn't on this host.
+              <em> One click does</em> <strong>clone</strong> (git clone into <code>~/repos/&lt;name&gt;</code>) +
+              <strong> adopt</strong> (write CHARTER.md, lab_mgmt registry entry, <code>.claude/agents/</code>) +
+              <strong> install</strong> (mkdir raw/refined, write installation manifest).
+              You become the lead; sensitivity defaults to <code>standard</code> — edit CHARTER.md after.
+            </li>
+            <li>
+              <span className="mono">• clone</span> + <span className="mono">↑ adopt</span> — repo is on
+              this host but never made wigamig-ready. <strong>Adopt</strong> writes CHARTER + registry + manifest
+              + bootstraps <code>.claude/agents/</code>. The modal asks for lead, members, and sensitivity.
+            </li>
+            <li>
+              <span className="mono" style={{color:"var(--green)"}}>✓ wigamig</span> — fully wigamig-ready.
+              See it in <em>Projects</em> and <em>Installations</em>; <strong>open</strong> it from the
+              Installations row's launcher.
+            </li>
+          </ul>
+        </div>
         {err && (
           <div style={{padding:"10px 14px", color:"var(--red)", fontSize:12}}>
             {err}
@@ -423,7 +473,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
                   key={r.key + ":" + i}
                   row={r}
                   knownHosts={knownHosts}
-                  onInstall={(project, machine) => setInstallCtx({project, machine})}
+                  onInstall={(project, machine, repoUrl) => setInstallCtx({project, machine, repoUrl})}
                   onAdopt={(ctx) => setAdoptCtx(ctx)}
                 />
               ))}
@@ -435,6 +485,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
         <InstallModal
           initialProject={installCtx.project}
           initialMachine={installCtx.machine}
+          initialRepoUrl={installCtx.repoUrl}
           onClose={() => {
             setInstallCtx(null);
             // After the install wizard closes, refresh the inventory
@@ -520,9 +571,14 @@ function RepoInventoryRow({ row, knownHosts, onInstall, onAdopt }) {
       );
     }
     if (gh && !row.local_only) {
+      // GitHub URL passed through so the InstallModal can do a one-shot
+      // clone+adopt+install without round-tripping through ↑ adopt
+      // first. The server clones into ~/repos/<name> (local) or
+      // ~/repos/<name> on the remote host (SSH) before projectizing.
+      const cloneUrl = `git@github.com:${gh.full_name}.git`;
       return (
         <button className="btn sm" style={{fontSize:11, padding:"2px 6px"}}
-                onClick={() => onInstall(gh.name, host === "local" ? "this" : host)}>
+                onClick={() => onInstall(gh.name, host === "local" ? "this" : host, cloneUrl)}>
           + install
         </button>
       );
@@ -1098,7 +1154,7 @@ function InstallCleanupModal({ cleanup, onClose }) {
    selected machine's wigamig_base and the selected project's metadata
    (including sensitivity → which git remote to clone from). The user only
    has to pick the machine and project; everything else is derived. ── */
-function InstallModal({ initialProject, initialMachine, onClose }) {
+function InstallModal({ initialProject, initialMachine, initialRepoUrl, onClose }) {
   const who = "@" + ((window.DATA.member || {}).handle || "");
   const projects = window.DATA.projects || [];
   const ls       = window.DATA.lab_settings   || {};
@@ -1110,6 +1166,13 @@ function InstallModal({ initialProject, initialMachine, onClose }) {
   const [thisMachine, setThisMachine] = useState({ short_hostname: "", local_user: "" });
   const [selectedMachine, setSelectedMachine] = useState(initialMachine || "this");
   const [project, setProject] = useState(initialProject || projects[0]?.name || "");
+
+  /* "New project" mode: the user clicked + install on a Repos-panel row
+     whose repo has never been adopted anywhere. Project name comes from
+     the GitHub repo name; install does clone + adopt + install in one
+     server round-trip. The project dropdown is suppressed because the
+     project doesn't exist in lab_mgmt yet. */
+  const isNewProject = !!(initialProject && !projects.some(p => p.name === initialProject));
 
   /* Default infra + agent set so the wizard can submit immediately. The user
      can untick things in the advanced section. */
@@ -1226,6 +1289,12 @@ function InstallModal({ initialProject, initialMachine, onClose }) {
           ssh_remote: machineConfig.is_remote ? machineConfig.hostname : null,
           mount_point: null,
           infra_components: infra, agents: pickedAgents,
+          // Repos-panel "+ install" on a never-adopted repo: the server
+          // git-clones from this URL before projectizing. Ignored for
+          // already-registered projects (the server falls back to its
+          // CHARTER-derived URL).
+          repo_url: initialRepoUrl || null,
+          clone_if_missing: isNewProject,
         }),
       });
       if (!res.ok) {
@@ -1355,16 +1424,32 @@ function InstallModal({ initialProject, initialMachine, onClose }) {
 
               <div>
                 <label {...LBL}>Project</label>
-                <select value={project} onChange={e => setProject(e.target.value)} style={SEL.style}>
-                  {projects.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-                </select>
-                {projectMeta && projectMeta.name && (
-                  <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
-                    sensitivity: <Pill tone={isSensitive ? "red" : "green"}>{sens}</Pill>
-                    {projectMeta.repo_kind === "local" && (
-                      <> · repo is local (forced sensitive)</>
+                {isNewProject ? (
+                  <>
+                    <div style={derivedStyle}>
+                      <strong>{project}</strong> <span className="muted">(new — will be cloned & adopted)</span>
+                    </div>
+                    <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
+                      one-shot clone + adopt + install: CHARTER, lab_mgmt registry,
+                      installation manifest, and <code>.claude/agents/</code> all
+                      land in one round-trip. You become the lead; sensitivity
+                      defaults to <code>standard</code> (edit CHARTER.md after).
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <select value={project} onChange={e => setProject(e.target.value)} style={SEL.style}>
+                      {projects.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
+                    </select>
+                    {projectMeta && projectMeta.name && (
+                      <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
+                        sensitivity: <Pill tone={isSensitive ? "red" : "green"}>{sens}</Pill>
+                        {projectMeta.repo_kind === "local" && (
+                          <> · repo is local (forced sensitive)</>
+                        )}
+                      </div>
                     )}
-                  </div>
+                  </>
                 )}
               </div>
 
@@ -2577,6 +2662,129 @@ function LabMembersPanel({ peers, span="c-6" }) {
               : "No peers in your projects."}
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+/* ───────── security access panel (PI only) ─────────
+   Grant / revoke the wigamig-level ``lab_sudo`` flag for lab members.
+   Gates /security dashboard visibility. NOT the same as OS-level sudo
+   on the lab server — that's a separate sysadmin grant. See
+   docs/security-dashboard.md#tier-2-setup for the full picture. */
+async function postLabSudo(handle, grant) {
+  const url = "/api/members/" + encodeURIComponent(handle) + "/lab_sudo";
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ grant }),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function SecurityAccessPanel({ peers, span = "c-12" }) {
+  // Compute lab_sudo set from the peers list. Peers carry ``lab_sudo``
+  // (boolean) when present in member frontmatter. PI is implicitly
+  // included regardless of flag — they're always authorised.
+  const me = window.DATA.member || {};
+  const pi = window.DATA.pi || {};
+  const piHandle = pi.handle || "";
+  const [busy, setBusy] = useState(null);
+  const grantees = (peers || []).filter(p => p.lab_sudo);
+  const candidates = (peers || []).filter(p => !p.lab_sudo && p.status === "active"
+                                              && p.handle !== piHandle);
+  const onToggle = async (peer, grant) => {
+    if (!grant && !window.confirm(
+      `Revoke lab_sudo for @${peer.handle}?\n\n` +
+      "They will lose access to /security dashboard. Granted again later restores access."
+    )) return;
+    setBusy(peer.handle);
+    try {
+      await postLabSudo(peer.handle, grant);
+      if (typeof window.__wigamigFetchData === "function") {
+        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      }
+    } catch (ex) { alert("lab_sudo update failed: " + (ex.message || ex)); }
+    finally { setBusy(null); }
+  };
+  return (
+    <div className={"panel " + span}>
+      <header>
+        <h2>Security dashboard access (lab_sudo)</h2>
+        <div className="row" style={{gap:8}}>
+          <a className="btn sm" href={`/security?user=${encodeURIComponent(me.handle || "")}`}
+             target="_blank" rel="noopener">open /security ↗</a>
+        </div>
+      </header>
+      <div className="body" style={{padding:"10px 14px", fontSize:12, lineHeight:1.55}}>
+        <p className="muted" style={{margin:"0 0 10px 0"}}>
+          Lab members with <code>lab_sudo: true</code> can open the per-lab
+          security dashboard at <code>/security</code>. You (PI) always have
+          access. This is the wigamig-level flag — OS-level sudo on the lab
+          server is a separate sysadmin grant (see <code>docs/security-dashboard.md</code>).
+        </p>
+
+        <div style={{marginBottom:14}}>
+          <div className="mono" style={{fontSize:11, color:"var(--muted)",
+                                          letterSpacing:1, textTransform:"uppercase",
+                                          marginBottom:6}}>
+            currently granted ({grantees.length + 1 /* +PI */})
+          </div>
+          <div className="row" style={{gap:6, flexWrap:"wrap"}}>
+            <span className="mono" style={{
+              fontSize:11, padding:"2px 8px", border:"1px solid var(--purple)",
+              borderRadius:2, color:"var(--purple)",
+            }}>
+              @{piHandle} <span className="muted">(PI · implicit)</span>
+            </span>
+            {grantees.map(p => (
+              <span key={p.handle} className="mono" style={{
+                fontSize:11, padding:"2px 8px", border:"1px solid var(--rule-strong)",
+                borderRadius:2, display:"inline-flex", gap:6, alignItems:"center",
+              }}>
+                @{p.handle}
+                <button className="btn xs" disabled={busy === p.handle}
+                        onClick={() => onToggle(p, false)}
+                        style={{fontSize:10, padding:"0 6px"}}>
+                  {busy === p.handle ? "…" : "revoke"}
+                </button>
+              </span>
+            ))}
+            {grantees.length === 0 && (
+              <span className="muted" style={{fontSize:11}}>
+                no explicit grants — only you have access
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <div className="mono" style={{fontSize:11, color:"var(--muted)",
+                                          letterSpacing:1, textTransform:"uppercase",
+                                          marginBottom:6}}>
+            grant access to a lab member
+          </div>
+          {candidates.length === 0 ? (
+            <span className="muted" style={{fontSize:11}}>
+              all active lab members already have lab_sudo.
+            </span>
+          ) : (
+            <div className="row" style={{gap:6, flexWrap:"wrap"}}>
+              {candidates.map(p => (
+                <button key={p.handle} className="btn sm"
+                        disabled={busy === p.handle}
+                        onClick={() => onToggle(p, true)}>
+                  {busy === p.handle ? "…" : "+ @" + p.handle}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -6298,6 +6506,16 @@ function App() {
         <div className="grid" style={{marginBottom:14}}>
           <SeaCatalogPanel entries={D.sea_catalog} span="c-12" />
         </div>
+
+        {/* Lab security access — PI grants/revokes the wigamig-level
+            ``lab_sudo`` flag that controls /security dashboard visibility.
+            Independent of OS-level sudo on the lab server (which is a
+            separate sysadmin grant; see docs/security-dashboard.md). */}
+        {persona === "pi" && (
+          <div className="grid" style={{marginBottom:14}}>
+            <SecurityAccessPanel peers={D.peers} span="c-12" />
+          </div>
+        )}
 
         {/* Decommissions — history of soft-deletes on this machine (PI only). */}
         {persona === "pi" && (
