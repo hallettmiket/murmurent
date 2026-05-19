@@ -272,8 +272,8 @@ sudo visudo -c -f /etc/sudoers.d/wigamig_sec_dump
 
 # 6. Smoke test — no password should be prompted.
 sudo -n /opt/wigamig/lab_sec_dump.sh
-# Expected: "lab_sec_dump: snapshot written to /data/lab_vm/wigamig/.snapshot/<UTC-date>"
-ls -la /data/lab_vm/wigamig/.snapshot/latest/
+# Expected: "lab_sec_dump: snapshot written to /var/lib/wigamig/.snapshot/<UTC-date>"
+ls -la /var/lib/wigamig/.snapshot/latest/
 # Expected files: manifest.json, acls_raw.txt, acls_refined.txt,
 #                  sshd_runtime.txt, ssh_keys.jsonl, auth_summary.json
 
@@ -294,9 +294,11 @@ back, parsed locally) and merges Tier 2 findings into the table.
 
 ### What the script writes
 
-Per-run directory at `/data/lab_vm/wigamig/.snapshot/<UTC-date>/`,
-owned by `root:labgroup`, mode 0750 (lab group can read; no one
-else). Files:
+Per-run directory at `/var/lib/wigamig/.snapshot/<UTC-date>/` on the
+**local disk** of the host (NOT on the the NAS share — the NAS's NFSv4 ACLs
+deny `root@<host>` write access since root isn't an AD principal there).
+Owned by `root:labgroup`, mode 0750 (lab group reads; no one else).
+Files:
 
 | File | Contents |
 |---|---|
