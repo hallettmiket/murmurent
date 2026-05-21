@@ -72,6 +72,40 @@ def test_load_lab_config_falls_back_when_file_missing(lab_world):
     assert cfg.lab == "hallett"
 
 
+# ---- Phase 0b (cores rollout) ---------------------------------------------
+
+def test_lab_settings_defaults_kind_to_lab(lab_world):
+    """A lab.md without an explicit ``kind:`` field is treated as a
+    research lab (back-compat with every existing wigamig install)."""
+    _write_lab(lab_world, lab="hallett", pi="the_pi")
+    settings = snapshot._lab_settings("hallett")
+    assert settings.kind == "lab"
+
+
+def test_lab_settings_reads_kind_core(lab_world):
+    """An entry with ``kind: core`` in frontmatter surfaces as kind=core,
+    so the dashboard can render 'Leader' instead of 'PI'."""
+    (lab_world / "lab-mgmt" / "lab.md").write_text(
+        "---\nlab: biocore\nname: 'BioCORE'\npi: '@biocore_leader'\n"
+        "kind: core\n---\n",
+        encoding="utf-8",
+    )
+    settings = snapshot._lab_settings("biocore")
+    assert settings.kind == "core"
+    assert settings.pi_handle.lstrip("@") == "biocore_leader"
+
+
+def test_lab_settings_rejects_unknown_kind_value(lab_world):
+    """Defensive: only 'lab' and 'core' are valid; anything else falls
+    back to 'lab' so a typo doesn't render a broken dashboard."""
+    (lab_world / "lab-mgmt" / "lab.md").write_text(
+        "---\nlab: oops\npi: '@x'\nkind: department\n---\n",
+        encoding="utf-8",
+    )
+    settings = snapshot._lab_settings("oops")
+    assert settings.kind == "lab"
+
+
 def test_alternate_pi_flips_can_pi_on_dashboard(lab_world):
     """Different lab.md PI → different person sees the persona toggle."""
     _write_lab(lab_world, lab="example", pi="alice")

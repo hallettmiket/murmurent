@@ -371,6 +371,13 @@ class LabSettings(BaseModel):
     name: str = "hallett"                      # short identifier, used in paths
     display_name: str = "Hallett Lab"          # human label shown in the UI
     pi_handle: str = ""
+    # Phase 0 of the cores rollout (docs/cores_plan.md §3): distinguishes
+    # a research lab from a service core. The Pydantic field stays
+    # ``pi_handle`` but the dashboard renders the label as "Leader" when
+    # ``kind=core``. Cores live at lab_mgmt/cores/<core>/core.md with the
+    # same schema; for backwards-compat ``kind`` defaults to "lab" so any
+    # lab.md without the field is treated as a research lab.
+    kind: str = "lab"                          # "lab" | "core"
     website: str | None = None                 # e.g. https://mikehallett.science
     admins: list[str] = []                     # handles with PI-level settings edit rights
     # Canonical server-side wigamig umbrella. Example:

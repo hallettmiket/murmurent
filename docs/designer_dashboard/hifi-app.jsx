@@ -20,12 +20,26 @@ function _displayMemberName(m) {
 }
 
 // Render role with canonical labels. "lead" is the lab-mgmt frontmatter value
-// for the principal investigator; surface it as "PI" in the UI.
+// for the principal investigator; surface it as "PI" in a research lab and
+// "Leader" in a core (per docs/cores_plan.md §3, the same role wears
+// different labels depending on the entity kind). Reads
+// ``window.DATA.lab_settings.kind`` (default "lab"); when called outside
+// the dashboard data context, falls back to "PI" for back-compat.
 function _displayRole(role) {
   if (!role) return "";
   const r = String(role).toLowerCase();
-  if (r === "lead" || r === "pi") return "PI";
+  if (r === "lead" || r === "pi") {
+    const kind = ((window.DATA && window.DATA.lab_settings && window.DATA.lab_settings.kind) || "lab").toLowerCase();
+    return kind === "core" ? "Leader" : "PI";
+  }
   return role;
+}
+
+// Short label for the persona-pill badge ("PI VIEW" vs "LEADER VIEW").
+function _personaLabel(persona) {
+  if (persona !== "pi") return "MEMBER VIEW";
+  const kind = ((window.DATA && window.DATA.lab_settings && window.DATA.lab_settings.kind) || "lab").toLowerCase();
+  return kind === "core" ? "LEADER VIEW" : "PI VIEW";
 }
 
 // Render the lab field. lab-mgmt stores a slug ("hallett"); the UI shows the
@@ -248,7 +262,7 @@ function CmdBar({ query, setQuery }) {
           : "You are a lab member per lab.md."
       }>
         <span className={"role-pill "+(persona==="pi"?"pi":"member")}>
-          {persona === "pi" ? "PI VIEW" : "MEMBER VIEW"}
+          {_personaLabel(persona)}
         </span>
       </div>
       {/* /security link — shown for the PI (implicit) and any lab member
