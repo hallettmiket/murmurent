@@ -469,10 +469,14 @@ def _lab_settings(lab_name: str) -> C.LabSettings:
                 C.GitProvider(**p.to_dict())
                 for p in _gp.resolve_providers(meta)
             ]
+            kind = str(meta.get("kind") or "lab").lower()
+            if kind not in ("lab", "core"):
+                kind = "lab"
             return C.LabSettings(
                 name=str(meta.get("name") or lab_name),
                 display_name=str(meta.get("display_name") or f"{lab_name.capitalize()} Lab"),
                 pi_handle=str(meta.get("pi") or _pi_handle()),
+                kind=kind,
                 website=meta.get("website") or None,
                 admins=list(meta.get("admins") or []),
                 lab_base=meta.get("lab_base") or None,
