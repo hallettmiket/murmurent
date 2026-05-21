@@ -62,6 +62,16 @@ Auto-loaded into every CC session via `~/.claude/rules/`:
 - [`rules/slack.md`](rules/slack.md) — Slack-posting protocol (after
   every `git push`, post to `#claude-test`).
 
+## User-invocable skills (the commons)
+
+Defined in [`skills/`](skills/), symlinked into `~/.claude/skills/` by
+[`scripts/setup.sh`](scripts/setup.sh). Each is a single-purpose slash
+command available in any wigamig-bootstrapped CC session.
+
+| Skill | Role |
+|---|---|
+| [`/wigamig-push`](skills/wigamig-push/SKILL.md) | Wigamig-aware stage/commit/push: skips per-machine + secret-shaped files, refuses large files that belong in `refined/`, never touches `/data/lab_vm/raw\|refined/`, posts a Slack release note. Use instead of generic `/commit-push` for any repo with a `CHARTER.md`. |
+
 ## Linked references (loaded on-demand)
 
 - [`docs/oracle-workflow.md`](docs/oracle-workflow.md) — personal vs lab Oracle, publish flow, MCP search.

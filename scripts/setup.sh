@@ -34,6 +34,7 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 CC_DIR="$HOME/.claude"
 AGENTS_SRC="$REPO_DIR/agents"
 RULES_SRC="$REPO_DIR/rules"
+SKILLS_SRC="$REPO_DIR/skills"
 CLAUDE_MD_SRC="$REPO_DIR/CLAUDE.md"
 
 # Traffic-light helpers — match the dashboard's probe pill semantics
@@ -50,7 +51,7 @@ fi
 
 mkdir -p "$CC_DIR/agents"
 
-echo "[1/4] Wiring ~/.claude/agents/ → $AGENTS_SRC/"
+echo "[1/5] Wiring ~/.claude/agents/ → $AGENTS_SRC/"
 swept_legacy=0
 created=0
 preserved=0
@@ -90,7 +91,7 @@ done
 echo "  -- migrated $swept_legacy generic_cc symlinks, created $created new, preserved $preserved user files."
 
 echo
-echo "[2/4] Wiring ~/.claude/rules/ → $RULES_SRC/"
+echo "[2/5] Wiring ~/.claude/rules/ → $RULES_SRC/"
 # Same idempotent pattern as agents: replace existing wigamig symlinks,
 # preserve user-authored .md files, create missing ones. Skips the step
 # entirely when wigamig has no rules/ dir yet (back-compat with older
@@ -121,7 +122,7 @@ else
 fi
 
 echo
-echo "[3/4] Wiring ~/.claude/CLAUDE.md → $CLAUDE_MD_SRC"
+echo "[3/5] Wiring ~/.claude/CLAUDE.md → $CLAUDE_MD_SRC"
 if [[ ! -e "$CLAUDE_MD_SRC" ]]; then
   warn "$CLAUDE_MD_SRC is missing — skipping global CLAUDE.md link"
 elif [[ -L "$CC_DIR/CLAUDE.md" ]]; then
@@ -135,7 +136,7 @@ else
 fi
 
 echo
-echo "[4/4] Installing wigamig hooks + MCP into ~/.claude/settings.json"
+echo "[4/5] Installing wigamig hooks + MCP into ~/.claude/settings.json"
 # Prefer the user's wigamig binary if on PATH; fall back to module
 # invocation through the repo's venv. The --hooks flag is the only
 # phase implemented so far.
@@ -152,6 +153,40 @@ else
 fi
 
 echo
+echo "[5/5] Wiring ~/.claude/skills/ → $SKILLS_SRC/"
+# Skills are directories (each contains SKILL.md), so we symlink the
+# DIRECTORY itself rather than per-file. Same idempotent pattern as
+# agents/rules: replace existing wigamig symlinks, preserve
+# user-authored skill directories (don't clobber a hand-written
+# skill that happens to share a name).
+if [[ -d "$SKILLS_SRC" ]]; then
+  mkdir -p "$CC_DIR/skills"
+  skills_created=0
+  skills_preserved=0
+  for src_dir in "$SKILLS_SRC"/*/; do
+    [[ -d "$src_dir" ]] || continue
+    src_dir="${src_dir%/}"
+    name="$(basename "$src_dir")"
+    dest="$CC_DIR/skills/$name"
+    if [[ -L "$dest" ]]; then
+      ln -sfn "$src_dir" "$dest"
+      ok "re-pointed skills/$name → wigamig"
+    elif [[ -e "$dest" ]]; then
+      warn "preserved user-authored skills/$name (not a symlink) — delete to use wigamig's version"
+      skills_preserved=$((skills_preserved + 1))
+    else
+      ln -sfn "$src_dir" "$dest"
+      ok "created skills/$name → wigamig"
+      skills_created=$((skills_created + 1))
+    fi
+  done
+  echo "  -- created $skills_created new skills, preserved $skills_preserved user dirs."
+else
+  warn "no skills/ dir in wigamig — skipping"
+fi
+
+echo
 echo "Done. Verify with:"
 echo "  ls -la ~/.claude/agents/   # should show symlinks into $AGENTS_SRC"
+echo "  ls -la ~/.claude/skills/   # should show symlinks into $SKILLS_SRC"
 echo "  grep -c wigamig.hooks ~/.claude/settings.json   # should be > 0"
