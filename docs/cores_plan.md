@@ -24,7 +24,7 @@ The genuinely new concepts are:
 | **Job → data deliverable** | Each booking produces files the requester needs to retrieve | Existing `raw/`/`refined/` model, scoped per-job |
 | **Invoicing** | Periodic per-lab statement of charges | (none — new) |
 
-We **recommend phasing** so we can land value quickly and learn before committing to the harder parts (scheduling UX, billing integration, cross-org identity). A 5-phase plan is in §10.
+We **recommend phasing** so we can land value quickly and learn before committing to the harder parts (scheduling UX, billing integration, cross-org identity). A 5-phase plan is in §11. Per-phase UI work for the Core Dashboard (added in §10) is folded into each phase rather than being separate.
 
 ---
 
@@ -230,7 +230,7 @@ The security dashboard's per-host view stays the same UX; the rule catalog grows
 
 ### Today's SEA model
 
-A SEA (Specific Experimental Action) is filed in a lab project, has a from/to handle, a state machine (`open → assigned → in_progress → concluded`), and lives in `<project>/SEAs/<id>.md`.
+A SEA (Service, Experiment, Assay) is filed in a lab project, has a from/to handle, a state machine (`open → assigned → in_progress → concluded`), and lives in `<project>/SEAs/<id>.md`.
 
 ### Adapted for cores
 
@@ -319,7 +319,7 @@ The state machine matches existing SEAs so the dashboard UX is reusable: a panel
 
 - **Member dashboard**: new **Service requests (mine)** panel showing requests the logged-in user has filed across all cores, with state + links.
 - **Lab PI dashboard**: new **Lab service spend** panel showing requests filed by anyone in the PI's lab + monthly $ total.
-- **Core leader dashboard** (new persona — see §8): inbox of incoming requests, calendar widget, fee schedule editor, member admin.
+- **Core leader dashboard** (new persona — see §10): inbox of incoming requests, calendar widget, fee schedule editor, member admin.
 
 ---
 
@@ -586,7 +586,67 @@ For non-Schulich industry users:
 
 ---
 
-## 10. Phasing
+## 10. The Core Dashboard (added 2026-05-21)
+
+Each core's leader needs a dashboard that mirrors the lab PI dashboard's shape, with core-specific extensions. Login: a new persona option `core_leader` (alongside `member`/`pi`/`registrar`), routed to a new top-level URL `/core?core=<id>&user=<handle>`.
+
+### Why a separate route
+
+Three reasons:
+
+1. **Cognitive scope**: the lab PI cares about projects, SEAs, experiments. The core leader cares about service catalog, incoming requests, equipment calendar, monthly invoice run. The data on screen at any given moment shouldn't mix.
+2. **Permission model**: the core leader has admin rights inside the core (add/remove core members, edit service catalog, set fees, approve/cancel requests) but is just an ordinary lab member elsewhere. A separate route lets us gate one without polluting the other.
+3. **Multi-affiliation**: a person can lead bioCore AND be a member of the Hallett lab. They'd switch between `/core?core=biocore` and `/dashboard` via the cmd-bar `↺ switch` link, the same way registrar already does.
+
+### Panel inventory
+
+The Core Dashboard reuses ~70% of the lab PI dashboard's panels. New panels for the core-specific concerns. Phasing notes which panels arrive in which phase.
+
+| Panel | Source | New / Reused | Phase |
+|---|---|---|---|
+| Topbar (lab logo → "BioCORE", member chip, ↺ switch, ⚿ security if granted) | hifi-app.jsx topbar | Reused + relabelled | 1 |
+| Cmd-bar (search) | hifi-app.jsx CmdBar | Reused; scope changes to search services + requests + member roster | 1 |
+| Identity block (leader + core contact info + capabilities list) | new | New (parallels lab identity block) | 1 |
+| **Core members panel** (analogue of LabMembersPanel — list staff, status, certifications, deactivate/reactivate) | LabMembersPanel | Reused as-is, scoped to core members | 1 |
+| **Service catalog panel** (list services, per-row status: active / maintenance / retired) | new | New (analogous to ProjectsPanel for labs) | 2 |
+| **Incoming requests inbox** (state machine: requested → scheduled → in_progress → completed) | new (analogous to SEAs) | New | 3 |
+| **Calendar widget** (next 30 days of bookings across all services) | new | New, embeds Google Calendar iframe per-service | 3 |
+| **Training catalogue + roster** (who has done which training, expiring soon) | extends TrainingCompliancePanel | Reused + extended | 2-3 |
+| **Fee schedule editor** (per-service rate tiers + modifiers) | new | New | 2 |
+| **Pending invoices** (current month's accumulated charges per requesting-lab) | new | New | 5 |
+| **Data deliverables overview** (recent jobs + their delivery status: pending / delivered / archived) | new | New (consumes wigamig-core-data MCP) | 4 |
+| **Repos panel** (this core's tooling repos, e.g. analysis scripts) | RepoInventoryPanel | Reused as-is | 1 |
+| **Security access (lab_sudo for core)** (which core staff can see /security) | SecurityAccessPanel | Reused, gates on core_leader instead of lab PI | 1 |
+| **Lab Oracle / personal Oracle** | OraclePanel | Reused | 1 |
+| **Audit log slice** (recent state-changing actions inside this core) | new (filtered audit) | New view of existing audit data | 1-3 |
+
+### What's NOT on the Core Dashboard
+
+To keep the leader's screen focused, deliberately excluded:
+- Lab research projects (those live on the PI dashboard).
+- Lab SEAs (research-side; the core's analogue is "incoming requests").
+- Cross-centre registrar view (that's the registrar route).
+- Per-project experiment notebooks (cores don't have lab-research experiments).
+
+### Persona + login routing
+
+`POST /api/login/select` body gains `role: "core_leader"` as a valid option. The resolve endpoint (`/api/login/resolve`) returns `is_core_leader: bool` after a frontmatter check: walks `lab_mgmt/cores/*/core.md`, sets True if any `leader: '@<handle>'` matches the requested handle. The login page surfaces "Core leader view" as an additional role-pill (greyed out unless `is_core_leader: true`); on submit the redirect is `/core?core=<found>&user=<handle>`.
+
+A leader of multiple cores (rare but possible) gets a core-picker on the login page; selecting one becomes the `?core=` query parameter.
+
+### Why we didn't reuse `/dashboard?persona=pi&kind=core`
+
+Considered. The risk is that "PI lens" baked the lab-research mental model into every panel (projects, SEAs, lab inventory). Trying to overlay `kind=core` onto that lens would require dozens of conditionals per panel ("if core, hide projects; if core, rename SEAs to requests; if core, show calendar instead of experiments"). A dedicated route makes the panel set explicit and keeps both dashboards readable.
+
+### Effort
+
+Phase 1 lands the Core Dashboard shell (topbar + identity + members panel + repos + security-access). Phase 2 adds the service catalog + fee editor. Phase 3 adds the inbox + calendar. Phase 4 adds the data deliverables overview. Phase 5 adds pending invoices. The dashboard grows feature-by-feature alongside the underlying functionality; nothing renders until its backing data is real.
+
+Estimate: roughly +1 week distributed across Phases 1-5 (each phase's UI is +1-2 days on top of its backend work). Already absorbed into the existing per-phase estimates rather than appearing as a separate phase.
+
+---
+
+## 11. Phasing
 
 **Hard rule: each phase ships independently and produces user value before the next starts.**
 
@@ -595,7 +655,7 @@ For non-Schulich industry users:
 - Rename "users" → "members" in user-facing copy (per §3).
 - Add `kind: lab | core` to `lab_mgmt/lab.md`; dashboard renders "Leader" vs "PI".
 - Add empty `lab_mgmt/cores/` directory + the `cores/biocore/core.md` example file (just the leader + members, no services yet).
-- Registrar dashboard shows a "Cores" panel that lists registered cores. Empty until §11.
+- Registrar dashboard shows a "Cores" panel that lists registered cores. Empty until later phases.
 
 **Deliverable:** Registrar can see "BioCORE" as a registered entity. No services yet.
 
@@ -655,7 +715,7 @@ For non-Schulich industry users:
 
 ---
 
-## 11. Risks and open questions
+## 12. Risks and open questions
 
 These need a decision from you before the plan goes further:
 
@@ -693,7 +753,7 @@ These need a decision from you before the plan goes further:
 
 ---
 
-## 12. What this plan does NOT cover
+## 13. What this plan does NOT cover
 
 To set expectations on what's out of scope and would be future work:
 
@@ -705,7 +765,7 @@ To set expectations on what's out of scope and would be future work:
 
 ---
 
-## 13. Why bioCore first
+## 14. Why bioCore first
 
 bioCore is the right pilot because:
 
@@ -719,7 +779,7 @@ Once Phase 0-4 are live for bioCore, **the second core** (genomics, proteomics, 
 
 ---
 
-## 14. Effort summary
+## 15. Effort summary
 
 | Phase | Effort | Cumulative |
 |---|---|---|
@@ -735,7 +795,7 @@ Total to a workable bioCore in wigamig: **~7 weeks** of focused work, with usabl
 
 ---
 
-## 15. Next decisions for you
+## 16. Next decisions for you
 
 Before this plan turns into code, I need answers to the **open questions in §11**, especially:
 
