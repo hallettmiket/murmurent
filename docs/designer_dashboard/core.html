@@ -209,6 +209,30 @@
         </div>
       </div>
 
+      <!-- Requests inbox (Phase 3f) -->
+      <div class="card" id="requests-card" style="display:none">
+        <header>
+          <h2>Requests inbox</h2>
+          <span class="meta">
+            <span id="requests-count">0</span> request<span id="requests-plural">s</span>
+            <label style="margin-left:14px; font-size:11px;">
+              <input type="checkbox" id="requests-show-terminal" checked>
+              show completed / cancelled
+            </label>
+            <button id="requests-refresh" class="btn-primary"
+                    style="margin-left:10px; font-family:var(--mono); font-size:11px;
+                           background:white; color:var(--text);
+                           border:1px solid var(--rule-strong); border-radius:2px;
+                           padding:4px 10px; cursor:pointer;">
+              ↻ refresh
+            </button>
+          </span>
+        </header>
+        <div class="body" id="requests-body">
+          <div class="placeholder">Loading requests…</div>
+        </div>
+      </div>
+
       <!-- Service editor modal (Phase 2c) -->
       <div id="modal-backdrop" style="display:none;
            position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100;
@@ -390,6 +414,7 @@
           renderMembers(data.members);
           renderRoleLabel(data.viewer);
           loadServices(data.viewer);
+          loadRequests(data.viewer);
         } catch (ex) {
           loading.style.display = "none";
           errBox.style.display = "block";
@@ -468,6 +493,125 @@
         }
         card.style.display = "block";
       }
+
+      async function loadRequests(viewer) {
+        // Leader/registrar only — show the requests-inbox card.
+        if (!(viewer && viewer.can_admin)) return;
+        const showTerm = document.getElementById("requests-show-terminal").checked;
+        try {
+          const url = `/api/core/${encodeURIComponent(CORE)}/requests`
+                    + `?user=${encodeURIComponent(ACTOR || "")}`
+                    + `&include_terminal=${showTerm ? "true" : "false"}`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          renderRequests(data.requests || []);
+        } catch (ex) {
+          const body = document.getElementById("requests-body");
+          body.innerHTML = `<div class="err">Failed to load requests: ${esc(ex.message || ex)}</div>`;
+          document.getElementById("requests-card").style.display = "block";
+        }
+      }
+
+      function renderRequests(requests) {
+        const card = document.getElementById("requests-card");
+        const body = document.getElementById("requests-body");
+        const countEl = document.getElementById("requests-count");
+        const pluralEl = document.getElementById("requests-plural");
+        countEl.textContent = requests.length;
+        pluralEl.textContent = requests.length === 1 ? "" : "s";
+        if (requests.length === 0) {
+          body.innerHTML = '<div class="placeholder">No requests yet.</div>';
+          card.style.display = "block";
+          return;
+        }
+        const rows = requests.map(r => {
+          const terminal = (r.state === "completed" || r.state === "cancelled");
+          const actions = terminal ? "" : `
+            <div style="display:flex; gap:4px; justify-content:flex-end;">
+              <button class="adv-req" data-rid="${esc(r.request_id)}"
+                      style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                             background:white; border:1px solid var(--green); color:var(--green);
+                             border-radius:2px; cursor:pointer;">advance</button>
+              <button class="cancel-req" data-rid="${esc(r.request_id)}"
+                      style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                             background:white; border:1px solid var(--red); color:var(--red);
+                             border-radius:2px; cursor:pointer;">cancel</button>
+            </div>`;
+          const fee = r.fee_at_booking.total
+            ? `$${Number(r.fee_at_booking.total).toFixed(2)}` : "—";
+          return `
+            <tr style="${terminal ? 'opacity:0.55;' : ''}">
+              <td><code>${esc(r.request_id)}</code></td>
+              <td><code>${esc(r.requester)}</code><br>
+                  <span class="muted" style="font-size:10px;">${esc(r.requester_lab)} lab</span></td>
+              <td><code>${esc(r.service)}</code></td>
+              <td><code style="font-size:11px;">${esc(r.slot.start || "—")}</code></td>
+              <td><span class="pill ${esc(r.state)}">${esc(r.state)}</span></td>
+              <td style="text-align:right;">${fee}</td>
+              <td>${actions}</td>
+            </tr>`;
+        }).join("");
+        body.innerHTML = `
+          <table class="members" style="font-size:12px;">
+            <thead><tr>
+              <th>request id</th><th>requester</th><th>service</th>
+              <th>start</th><th>state</th><th>fee</th><th></th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>`;
+        card.style.display = "block";
+
+        // Wire row actions.
+        body.querySelectorAll(".adv-req").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const rid = btn.dataset.rid;
+            btn.disabled = true;
+            try {
+              const url = `/api/core/${encodeURIComponent(CORE)}/requests/${encodeURIComponent(rid)}/advance`
+                        + `?user=${encodeURIComponent(ACTOR || "")}`;
+              const res = await fetch(url, { method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}) });
+              if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                throw new Error(d.detail || `HTTP ${res.status}`);
+              }
+              loadRequests(VIEWER);
+            } catch (ex) { alert("Advance failed: " + (ex.message || ex)); btn.disabled = false; }
+          });
+        });
+        body.querySelectorAll(".cancel-req").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const rid = btn.dataset.rid;
+            const reason = window.prompt("Cancellation note (optional):", "") || "";
+            btn.disabled = true;
+            try {
+              const url = `/api/core/${encodeURIComponent(CORE)}/requests/${encodeURIComponent(rid)}/cancel`
+                        + `?user=${encodeURIComponent(ACTOR || "")}`;
+              const res = await fetch(url, { method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ note: reason }) });
+              if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                throw new Error(d.detail || `HTTP ${res.status}`);
+              }
+              loadRequests(VIEWER);
+            } catch (ex) { alert("Cancel failed: " + (ex.message || ex)); btn.disabled = false; }
+          });
+        });
+      }
+
+      // Wire refresh button + toggle (deferred-bound once DOM is ready).
+      document.addEventListener("DOMContentLoaded", () => {
+        const refresh = document.getElementById("requests-refresh");
+        const toggle  = document.getElementById("requests-show-terminal");
+        if (refresh) refresh.addEventListener("click", () => loadRequests(VIEWER));
+        if (toggle)  toggle.addEventListener("change", () => loadRequests(VIEWER));
+      });
 
       async function loadServices(viewer) {
         try {

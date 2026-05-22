@@ -3943,6 +3943,69 @@ def create_app() -> FastAPI:
             "path": str(req.path),
         }
 
+    @app.get("/api/core/{core}/requests")
+    def core_list_requests(
+        core: str,
+        state: str = Query("", description="Filter by state (requested/scheduled/in_progress/...)."),
+        include_terminal: bool = Query(True, description="Include completed/cancelled in default view."),
+        user: str = Query("", description="Actor (must be leader or registrar)."),
+    ) -> dict:
+        """Inbox view of every request on a core. Gated to the core
+        leader OR a registrar so members can't peek at each other's
+        bookings via this surface.
+
+        Default sort: live first (scheduled, in_progress) by slot.start
+        asc, then terminal (completed, cancelled) by updated desc.
+        """
+        from ..core import registrar as _reg
+        from ..core import service_requests as _sr
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        reg = _reg.read_registry()
+        entry = next((c for c in reg.cores if c.name == core), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        is_leader = entry.pi.lstrip("@").lower() == actor.lower()
+        is_reg = _reg.is_registrar(actor)
+        if not (is_leader or is_reg):
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"@{actor} is not the leader of core {core!r} or a registrar."
+                ),
+            )
+        kwargs = {"include_terminal": include_terminal}
+        if state:
+            kwargs["state"] = state
+        rows = []
+        for req in _sr.iter_requests(core, **kwargs):
+            rows.append({
+                "request_id": req.request_id,
+                "service": req.service,
+                "requester": req.requester,
+                "requester_lab": req.requester_lab,
+                "state": req.state,
+                "slot": {
+                    "start": req.booked_slot.start,
+                    "end": req.booked_slot.end,
+                    "calendar_event_id": req.booked_slot.calendar_event_id,
+                },
+                "fee_at_booking": {
+                    "tier": req.fee_at_booking.tier,
+                    "total": req.fee_at_booking.total,
+                    "unit": req.fee_at_booking.unit,
+                },
+                "notes": req.notes,
+                "created": req.created,
+                "updated": req.updated,
+            })
+        live = [r for r in rows if r["state"] not in ("completed", "cancelled")]
+        term = [r for r in rows if r["state"] in ("completed", "cancelled")]
+        live.sort(key=lambda r: r["slot"]["start"] or "")
+        term.sort(key=lambda r: r["updated"] or "", reverse=True)
+        return {"core": core, "requests": live + term,
+                "counts": {"live": len(live), "terminal": len(term)}}
+
     def _require_request_actor(
         core: str, request_id: str, user: str, *, admin_only: bool = False,
     ) -> tuple[str, "Any"]:  # noqa: F821 - RequestSummary forward ref
