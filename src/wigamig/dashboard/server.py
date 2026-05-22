@@ -3820,6 +3820,240 @@ def create_app() -> FastAPI:
             "path": str(req.path),
         }
 
+    def _require_request_actor(
+        core: str, request_id: str, user: str, *, admin_only: bool = False,
+    ) -> tuple[str, "Any"]:  # noqa: F821 - RequestSummary forward ref
+        """Resolve actor + request, gate on the request's permission set.
+
+        When ``admin_only`` is True: only core leader OR registrar may
+        act (used for ``advance`` — the requester doesn't get to mark
+        their own job in_progress / completed).
+
+        When False: requester (self), core leader, and registrar all pass
+        (used for ``cancel`` and ``reschedule``).
+
+        Raises 404 / 403 with actionable messages.
+        """
+        from ..core import registrar as _reg
+        from ..core import service_requests as _sr
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        reg = _reg.read_registry()
+        entry = next((c for c in reg.cores if c.name == core), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        req = _sr.get_request(core, request_id)
+        if req is None:
+            raise HTTPException(
+                status_code=404, detail=f"request not found: {core}/{request_id}",
+            )
+        is_leader = entry.pi.lstrip("@").lower() == actor.lower()
+        is_reg = _reg.is_registrar(actor)
+        is_requester = req.requester.lstrip("@").lower() == actor.lower()
+        if admin_only:
+            if not (is_leader or is_reg):
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        f"@{actor} is not the leader of core {core!r} or a "
+                        "registrar; only they may advance a request."
+                    ),
+                )
+        else:
+            if not (is_leader or is_reg or is_requester):
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        f"@{actor} is neither the requester @{req.requester.lstrip('@')} "
+                        f"nor the leader of core {core!r} nor a registrar."
+                    ),
+                )
+        return actor, req
+
+    @app.post("/api/core/{core}/requests/{request_id}/advance")
+    def core_request_advance(
+        core: str, request_id: str,
+        body: dict | None = None,
+        user: str = Query("", description="Actor handle."),
+    ) -> dict:
+        """Move a request to the next state. Leader-only.
+
+        Default progression: scheduled -> in_progress -> completed.
+        ``body.to_state`` can override (must still be a legal transition).
+        ``body.note`` is appended to the request body as a timestamped
+        audit entry.
+        """
+        from ..core import service_requests as _sr
+        from . import slack_notify as _notify
+        body = body or {}
+        actor, req = _require_request_actor(core, request_id, user, admin_only=True)
+        # Default: pick the "forward" transition (the non-cancel one).
+        to_state = str(body.get("to_state") or "").strip().lower()
+        if not to_state:
+            allowed = _sr.ALLOWED_TRANSITIONS.get(req.state, set())
+            forward = allowed - {_sr.STATE_CANCELLED}
+            if not forward:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"request is in terminal state {req.state!r}",
+                )
+            to_state = sorted(forward)[0]
+        try:
+            updated = _sr.transition_request(
+                core=core, request_id=request_id,
+                to_state=to_state, note=str(body.get("note") or ""),
+            )
+        except _sr.RequestError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        try:
+            _notify.core_request_advanced(
+                core=core, request_id=request_id,
+                from_state=req.state, to_state=to_state,
+                requester=req.requester, actor=actor,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        return {
+            "ok": True, "core": core, "request_id": request_id,
+            "from_state": req.state, "state": updated.state,
+        }
+
+    @app.post("/api/core/{core}/requests/{request_id}/cancel")
+    def core_request_cancel(
+        core: str, request_id: str,
+        body: dict | None = None,
+        user: str = Query("", description="Actor handle."),
+    ) -> dict:
+        """Cancel a request. Requester / leader / registrar may all act.
+
+        Side effect: deletes the calendar event (best-effort — never
+        blocks the cancel). The request file flips to ``cancelled`` and
+        the body gets a timestamped audit note.
+        """
+        from ..core import calendar_google as _cal
+        from ..core import service_requests as _sr
+        from . import slack_notify as _notify
+        body = body or {}
+        actor, req = _require_request_actor(core, request_id, user)
+        calendar_warning = ""
+        evt_id = req.booked_slot.calendar_event_id
+        if evt_id and _cal.is_connected(core):
+            try:
+                _cal.delete_event(core, evt_id)
+            except _cal.CalendarError as exc:
+                calendar_warning = str(exc)
+        try:
+            _sr.transition_request(
+                core=core, request_id=request_id,
+                to_state=_sr.STATE_CANCELLED,
+                note=str(body.get("note") or f"cancelled by @{actor}"),
+            )
+        except _sr.RequestError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        try:
+            _notify.core_request_cancelled(
+                core=core, request_id=request_id,
+                requester=req.requester, actor=actor,
+                reason=str(body.get("note") or ""),
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        return {
+            "ok": True, "core": core, "request_id": request_id,
+            "state": _sr.STATE_CANCELLED,
+            "calendar": {"warning": calendar_warning,
+                         "deleted_event_id": evt_id if not calendar_warning else ""},
+        }
+
+    @app.post("/api/core/{core}/requests/{request_id}/reschedule")
+    def core_request_reschedule(
+        core: str, request_id: str,
+        body: dict,
+        user: str = Query("", description="Actor handle."),
+    ) -> dict:
+        """Replace a request's slot. Requester / leader / registrar.
+
+        Body: ``{slot: {start, end, calendar_event_id?}}``. If a calendar
+        event exists for the current slot, it's deleted; a new one is
+        created against the new slot (best-effort, fail-open). State is
+        unchanged (still ``scheduled`` / ``in_progress``).
+        """
+        from ..core import calendar_google as _cal
+        from ..core import service_requests as _sr
+        from ..core import services as _svc
+        from . import slack_notify as _notify
+        actor, req = _require_request_actor(core, request_id, user)
+        if req.state in _sr.TERMINAL_STATES:
+            raise HTTPException(
+                status_code=422,
+                detail=f"request is in terminal state {req.state!r}",
+            )
+        slot_in = (body or {}).get("slot") or {}
+        start = str(slot_in.get("start") or "").strip()
+        end = str(slot_in.get("end") or "").strip()
+        if not start or not end:
+            raise HTTPException(
+                status_code=422,
+                detail="slot.start and slot.end are required",
+            )
+        # Calendar rotation: delete old, create new (best-effort).
+        calendar_warning = ""
+        new_event_id = str(slot_in.get("calendar_event_id") or "")
+        new_html_link = ""
+        old_event_id = req.booked_slot.calendar_event_id
+        if _cal.is_connected(core):
+            if old_event_id:
+                try:
+                    _cal.delete_event(core, old_event_id)
+                except _cal.CalendarError as exc:
+                    calendar_warning = f"(old event delete) {exc}"
+            if not new_event_id:
+                svc = _svc.get_service(core, req.service)
+                summary = (
+                    f"{svc.name if svc else req.service} — {req.requester}"
+                )
+                try:
+                    evt = _cal.create_event(
+                        core=core, summary=summary,
+                        description=(
+                            f"Rescheduled via wigamig dashboard.\n"
+                            f"Request: {request_id}\n"
+                            f"Requester: {req.requester} ({req.requester_lab})"
+                        ),
+                        start_iso=start, end_iso=end,
+                    )
+                    new_event_id = evt.id
+                    new_html_link = evt.html_link
+                except _cal.CalendarError as exc:
+                    calendar_warning = (
+                        (calendar_warning + " ; " if calendar_warning else "")
+                        + f"(new event create) {exc}"
+                    )
+        new_slot = _sr.BookingSlot(
+            start=start, end=end, calendar_event_id=new_event_id,
+        )
+        try:
+            _sr.update_booking_slot(
+                core=core, request_id=request_id, booked_slot=new_slot,
+            )
+        except _sr.RequestError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        try:
+            _notify.core_request_rescheduled(
+                core=core, request_id=request_id,
+                requester=req.requester, actor=actor,
+                old_start=req.booked_slot.start, new_start=start,
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        return {
+            "ok": True, "core": core, "request_id": request_id,
+            "slot": {"start": start, "end": end,
+                     "calendar_event_id": new_event_id},
+            "calendar": {"warning": calendar_warning,
+                         "html_link": new_html_link},
+        }
+
     def _require_core_admin(core: str, user: str) -> str:
         """Return the actor handle if they're allowed to mutate ``core``'s
         catalog (the core's leader OR a centre registrar). 403 otherwise.
