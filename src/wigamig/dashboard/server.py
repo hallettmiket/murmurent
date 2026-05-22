@@ -3737,9 +3737,41 @@ def create_app() -> FastAPI:
         else:
             fee_snap = _sr.FeeSnapshot()
 
+        # Synchronous Google Calendar create (Phase 3c). Never blocks the
+        # booking: when the leader hasn't run `wigamig core-calendar-auth`
+        # yet, or the API call fails, we record the event_id as "" and
+        # surface a warning in the response. The leader can retry later
+        # from their inbox.
+        from ..core import calendar_google as _cal
+        calendar_event_id = str(slot_in.get("calendar_event_id") or "")
+        calendar_html_link = ""
+        calendar_warning = ""
+        if not calendar_event_id and _cal.is_connected(core):
+            try:
+                evt = _cal.create_event(
+                    core=core,
+                    summary=f"{svc.name} — @{requester}",
+                    description=(
+                        f"Booking via wigamig dashboard.\n"
+                        f"Core: {core}  Service: {slug}\n"
+                        f"Requester: @{requester} ({requester_lab} lab)\n"
+                        f"Notes: {str(body.get('notes') or '')}"
+                    ),
+                    start_iso=start, end_iso=end,
+                )
+                calendar_event_id = evt.id
+                calendar_html_link = evt.html_link
+            except _cal.CalendarError as exc:
+                calendar_warning = str(exc)
+        elif not calendar_event_id:
+            calendar_warning = (
+                f"calendar not connected for core {core!r}; "
+                f"ask the leader to run: wigamig core-calendar-auth --core {core}"
+            )
+
         slot = _sr.BookingSlot(
             start=start, end=end,
-            calendar_event_id=str(slot_in.get("calendar_event_id") or ""),
+            calendar_event_id=calendar_event_id,
         )
         try:
             req = _sr.create_request(
@@ -3779,6 +3811,11 @@ def create_app() -> FastAPI:
                 "base": fee_snap.base,
                 "modifiers_applied": fee_snap.modifiers_applied,
                 "total": fee_snap.total,
+            },
+            "calendar": {
+                "event_id": calendar_event_id,
+                "html_link": calendar_html_link,
+                "warning": calendar_warning,
             },
             "path": str(req.path),
         }

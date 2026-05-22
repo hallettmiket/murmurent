@@ -33,6 +33,11 @@ slack = [
     "slack-sdk>=3.30",
     "anthropic>=0.40",
 ]
+gcal = [
+    "google-api-python-client>=2.130",
+    "google-auth-oauthlib>=1.2",
+    "google-auth-httplib2>=0.2",
+]
 
 [project.scripts]
 wigamig = "wigamig.cli:cli"
