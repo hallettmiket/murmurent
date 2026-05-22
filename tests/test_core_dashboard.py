@@ -181,6 +181,53 @@ def test_resolver_grants_registrar_implicit_core_leader_access(world):
     assert "biocore" in d["core_leader_of"]
 
 
+def test_core_services_list_empty(world):
+    """A freshly-registered core with no services returns an empty list."""
+    _seed_core()
+    client = TestClient(create_app())
+    res = client.get("/api/core/biocore/services?user=the_pi")
+    assert res.status_code == 200, res.text
+    d = res.json()
+    assert d["ok"] is True
+    assert d["core"] == "biocore"
+    assert d["count"] == 0
+    assert d["services"] == []
+
+
+def test_core_services_list_returns_catalog(world):
+    """A core with services in lab-mgmt/services/ surfaces them in the
+    Phase 2b list endpoint. Schema mirrors the ServiceSummary dataclass."""
+    _seed_core()
+    from wigamig.core import services as _svc
+    sdir = _svc.services_dir("biocore")
+    sdir.mkdir(parents=True, exist_ok=True)
+    (sdir / "demo.md").write_text(
+        "---\n"
+        "service: demo\n"
+        "name: Demo Service\n"
+        "core: biocore\n"
+        "capability: structure_function_interaction\n"
+        "fee:\n  unit: per_run\n  tiers:\n    academic_internal: 80.0\n"
+        "status: active\n"
+        "---\n# Demo\n",
+        encoding="utf-8",
+    )
+    client = TestClient(create_app())
+    res = client.get("/api/core/biocore/services?user=the_pi")
+    d = res.json()
+    assert d["count"] == 1
+    s = d["services"][0]
+    assert s["slug"] == "demo"
+    assert s["name"] == "Demo Service"
+    assert s["fee"]["tiers"]["academic_internal"] == 80.0
+
+
+def test_core_services_list_unknown_core_404(world):
+    client = TestClient(create_app())
+    res = client.get("/api/core/ghost/services")
+    assert res.status_code == 404
+
+
 def test_registrar_can_select_core_leader_role_and_routes_to_first_core(world):
     _seed_core(name="biocore")
     # Second core, so we exercise the "first core" routing.
