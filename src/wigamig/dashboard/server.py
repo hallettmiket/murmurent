@@ -3558,6 +3558,110 @@ def create_app() -> FastAPI:
             ],
         }
 
+    def _require_core_admin(core: str, user: str) -> str:
+        """Return the actor handle if they're allowed to mutate ``core``'s
+        catalog (the core's leader OR a centre registrar). 403 otherwise.
+        """
+        from ..core import registrar as _reg
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        try:
+            reg = _reg.read_registry()
+            entry = next((c for c in reg.cores if c.name == core), None)
+        except Exception:
+            entry = None
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        is_leader = entry.pi.lstrip("@").lower() == actor.lower()
+        is_reg = _reg.is_registrar(actor)
+        if not (is_leader or is_reg):
+            raise HTTPException(
+                status_code=403,
+                detail=f"@{actor} is not the leader of core {core!r} or a registrar.",
+            )
+        return actor
+
+    @app.post("/api/core/{core}/services")
+    def core_service_create(
+        core: str,
+        body: dict,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Add a service to the core's catalog. Gated to core leader OR
+        registrar. Body matches the ServiceSummary fields (slug, name,
+        capability, mode, equipment, fee, prerequisites, …).
+        Phase 2c of the cores rollout (docs/cores_plan.md §11)."""
+        from ..core import services as _svc
+        from . import slack_notify as _notify
+        actor = _require_core_admin(core, user)
+        slug = str(body.get("slug") or "").strip()
+        name = str(body.get("name") or "").strip()
+        if not slug or not name:
+            raise HTTPException(status_code=422, detail="slug and name are required")
+        try:
+            path = _svc.create_service(
+                core=core, slug=slug, name=name,
+                capability=str(body.get("capability") or ""),
+                mode=str(body.get("mode") or "independent_data_collection"),
+                description=str(body.get("description") or ""),
+                body=str(body.get("body") or ""),
+                equipment=body.get("equipment") or {},
+                location=str(body.get("location") or ""),
+                duration_default_min=int(body.get("duration_default_min") or 60),
+                duration_max_min=int(body.get("duration_max_min") or 240),
+                training_required=body.get("training_required") or None,
+                prerequisites=list(body.get("prerequisites") or []),
+                fee=body.get("fee") or {},
+                data_deliverable=body.get("data_deliverable") or {},
+                contact=body.get("contact") or {},
+                status=str(body.get("status") or "active"),
+            )
+        except _svc.ServiceError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        _notify.core_service_added(
+            core=core, slug=slug, name=name, actor=actor,
+        )
+        return {"ok": True, "core": core, "slug": slug, "path": str(path)}
+
+    @app.patch("/api/core/{core}/services/{slug}")
+    def core_service_update(
+        core: str, slug: str,
+        body: dict,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Partial update of a service. Body is a {field: value} dict
+        merged into the frontmatter (top-level keys replaced wholesale —
+        send full sub-dicts for ``fee``, ``equipment``, etc.)."""
+        from ..core import services as _svc
+        from . import slack_notify as _notify
+        actor = _require_core_admin(core, user)
+        try:
+            _svc.update_service(core=core, slug=slug, patch=body or {})
+        except _svc.ServiceError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        _notify.core_service_updated(
+            core=core, slug=slug,
+            fields=list((body or {}).keys()), actor=actor,
+        )
+        return {"ok": True, "core": core, "slug": slug,
+                "fields_changed": list((body or {}).keys())}
+
+    @app.post("/api/core/{core}/services/{slug}/archive")
+    def core_service_archive(
+        core: str, slug: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Flip a service to status=retired. File preserved."""
+        from ..core import services as _svc
+        from . import slack_notify as _notify
+        actor = _require_core_admin(core, user)
+        try:
+            _svc.archive_service(core=core, slug=slug)
+        except _svc.ServiceError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        _notify.core_service_archived(core=core, slug=slug, actor=actor)
+        return {"ok": True, "core": core, "slug": slug, "status": "retired"}
+
     @app.get("/api/login/resolve")
     def get_login_resolve(
         user: str = Query("", description="Western netname to resolve roles for"),

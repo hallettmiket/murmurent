@@ -253,9 +253,186 @@ def quote_fee(
     }
 
 
+# ---------------------------------------------------------------------------
+# Writers (Phase 2c — service catalog editor)
+#
+# Each write helper persists to lab_info via the registrar's audit-trail
+# git commit. Callers (HTTP endpoints) layer Slack notifications +
+# permission gates on top — these helpers trust their inputs (they're
+# called only from server-side endpoints that have already authorised
+# the actor).
+# ---------------------------------------------------------------------------
+
+import datetime as _dt
+import re as _re
+
+from .registrar import (
+    LabNotFound as _LabNotFound,
+    _git_commit_all,
+    _git_init_if_needed,
+    read_registry as _read_registry,
+)
+
+
+class ServiceError(RuntimeError):
+    """Service-catalog edit failed (invalid slug, missing core, duplicate, …)."""
+
+
+_SLUG_RE = _re.compile(r"^[a-z0-9][a-z0-9_]{1,63}$")
+
+
+def _validate_slug(slug: str) -> str:
+    """Reject anything not safe-for-filename + safe-for-URL."""
+    slug = (slug or "").strip().lower()
+    if not _SLUG_RE.match(slug):
+        raise ServiceError(
+            f"slug must match {_SLUG_RE.pattern} (got {slug!r}); "
+            "use lowercase letters, digits, underscores."
+        )
+    return slug
+
+
+def _ensure_core_exists(core: str, env: dict[str, str] | None = None) -> None:
+    """Raise if ``core`` isn't a registered (non-archived) entry."""
+    reg = _read_registry(env)
+    if not any(c.name == core for c in reg.cores):
+        raise _LabNotFound(f"no core registered with short id: {core!r}")
+
+
+def _render_service_md(spec: dict, body: str = "") -> str:
+    """Serialise a service spec to a frontmatter Markdown file."""
+    import yaml as _y
+    # Filter out None / empty containers so the file is tidy.
+    cleaned = {k: v for k, v in spec.items()
+               if v is not None and (not isinstance(v, (list, dict)) or v)}
+    yaml_text = _y.safe_dump(cleaned, sort_keys=False, allow_unicode=True).rstrip()
+    body = body.strip() or f"# {cleaned.get('name') or cleaned.get('service')}"
+    return f"---\n{yaml_text}\n---\n\n{body}\n"
+
+
+def create_service(
+    *,
+    core: str,
+    slug: str,
+    name: str,
+    capability: str = "",
+    mode: str = "independent_data_collection",
+    description: str = "",
+    body: str = "",
+    equipment: dict | None = None,
+    location: str = "",
+    duration_default_min: int = 60,
+    duration_max_min: int = 240,
+    training_required: str | None = None,
+    prerequisites: list[str] | None = None,
+    fee: dict | None = None,
+    data_deliverable: dict | None = None,
+    contact: dict | None = None,
+    status: str = "active",
+    created: str | None = None,
+    env: dict[str, str] | None = None,
+) -> Path:
+    """Create a new service catalog entry. Refuses on duplicate slug.
+
+    Returns the path to the newly-written file. Commits via lab_info's
+    audit-trail git.
+    """
+    slug = _validate_slug(slug)
+    _ensure_core_exists(core, env)
+    if status not in VALID_STATUSES:
+        raise ServiceError(f"status must be one of {VALID_STATUSES}; got {status!r}")
+    sdir = services_dir(core, env)
+    sdir.mkdir(parents=True, exist_ok=True)
+    path = sdir / f"{slug}.md"
+    if path.is_file():
+        raise ServiceError(
+            f"service {slug!r} already exists in core {core!r}; "
+            "use update_service to edit it."
+        )
+    spec = {
+        "service": slug,
+        "name": name,
+        "core": core,
+        "capability": capability,
+        "mode": mode,
+        "description": description,
+        "equipment": equipment or {},
+        "location": location,
+        "duration_default_min": int(duration_default_min),
+        "duration_max_min": int(duration_max_min),
+        "training_required": training_required,
+        "prerequisites": list(prerequisites or []),
+        "fee": fee or {},
+        "data_deliverable": data_deliverable or {},
+        "contact": contact or {},
+        "status": status,
+        "created": created or _dt.date.today().isoformat(),
+    }
+    path.write_text(_render_service_md(spec, body=body), encoding="utf-8")
+    root = lab_info_root(env)
+    _git_init_if_needed(root)
+    _git_commit_all(root, f"registrar: add service {core}/{slug}")
+    return path
+
+
+def update_service(
+    *,
+    core: str,
+    slug: str,
+    patch: dict,
+    env: dict[str, str] | None = None,
+) -> Path:
+    """Apply a partial update to ``services/<slug>.md``.
+
+    ``patch`` is merged into the frontmatter (top-level keys replaced;
+    nested dicts like ``fee`` and ``equipment`` are replaced wholesale —
+    callers must send the full sub-dict if they want to add one field
+    without dropping others. This mirrors PATCH semantics in
+    /api/registrar/lab/<n>/edit).
+
+    Refuses if the slug doesn't exist. Returns the file path.
+    """
+    slug = _validate_slug(slug)
+    _ensure_core_exists(core, env)
+    path = service_path(core, slug, env)
+    if not path.is_file():
+        raise ServiceError(f"service {slug!r} not found in core {core!r}")
+    parsed = parse_file(path)
+    meta = dict(parsed.meta or {})
+    for k, v in (patch or {}).items():
+        if v is None:
+            meta.pop(k, None)
+        else:
+            meta[k] = v
+    # If status changed, validate it.
+    if "status" in meta and meta["status"] not in VALID_STATUSES:
+        raise ServiceError(f"status must be one of {VALID_STATUSES}; got {meta['status']!r}")
+    path.write_text(_render_service_md(meta, body=parsed.body or ""),
+                    encoding="utf-8")
+    root = lab_info_root(env)
+    _git_init_if_needed(root)
+    _git_commit_all(root,
+        f"registrar: update service {core}/{slug} "
+        f"(fields: {', '.join(sorted(patch or {}))})")
+    return path
+
+
+def archive_service(
+    *,
+    core: str,
+    slug: str,
+    env: dict[str, str] | None = None,
+) -> Path:
+    """Flip a service to ``status: retired``. File preserved so historic
+    references (booking records, invoices) keep resolving."""
+    return update_service(core=core, slug=slug, patch={"status": "retired"},
+                          env=env)
+
+
 __all__ = [
     "SERVICES_SUBDIR",
     "VALID_STATUSES",
+    "ServiceError",
     "ServiceFee",
     "ServiceSummary",
     "core_lab_mgmt_path",
@@ -264,4 +441,7 @@ __all__ = [
     "iter_services",
     "get_service",
     "quote_fee",
+    "create_service",
+    "update_service",
+    "archive_service",
 ]
