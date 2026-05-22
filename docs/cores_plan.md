@@ -107,24 +107,30 @@ Half a day of focused rename + grep verification + one back-compat shim per quer
 
 ---
 
-## 4. Items 1–4: Cores as first-class entities in lab_mgmt
+## 4. Items 1–4: Cores as first-class entities in the centre registrar
 
-### 4a. Where the core registry lives
+### 4a. Where the core registry lives — **STATUS UPDATE 2026-05-21**
 
-Two options:
+**Correction from the original v1 of this plan.** I initially proposed extending `~/repos/lab_mgmt/` (the Hallett lab's per-lab repo) with a `cores/` subdir. **That was wrong**: `lab_mgmt` is one *lab's* repo. Cores aren't part of any lab — they're centre-wide. Putting them under `lab_mgmt/cores/` is a category error (a core isn't a member of the Hallett lab).
 
-| Option | Schema | Pros | Cons |
-|---|---|---|---|
-| **A. Extend `lab_mgmt`** with a `cores/` subdir alongside `projects/` and `members/` | `lab_mgmt/cores/<core>/{core.md, members/, services/}` | Single registry to back up, audit, push. Reuses every existing tool (frontmatter parser, git workflow, agents). | Conflates labs and cores in one repo; one corrupt commit could break both. |
-| **B. New `core_mgmt` sibling repo** at `~/repos/core_mgmt/` | Independent repo with the same shape as lab_mgmt | Strict isolation; cores can evolve their schema independently | Doubles git operations, duplicates membership data (member of lab + core), two registrar dashboards |
+The right place was already wired up in wigamig:
 
-**Recommendation: A (extend `lab_mgmt`)**, because:
+- The **centre registrar** ([src/wigamig/core/registrar.py](../src/wigamig/core/registrar.py)) maintains `~/.wigamig/lab_info/` as the centre-wide registry. Index file `_registry.yaml` + per-entity directories under `labs/`, `cores/`, `collaborations/`.
+- Each core gets a **self-contained per-core mini-repo** at `~/.wigamig/lab_info/cores/<name>/lab-mgmt/` — a directory tree that mirrors the per-lab `lab_mgmt/` layout (members/, projects/, requests/, audit/) but owned by the centre's registrar, not by any one lab's PI.
+- Full CRUD already exists: `create_core`, `archive_core`, `unarchive_core`, edit endpoints, and a Cores panel on `/registrar` that calls into them.
 
-- Cross-membership is common (a core staff member is also in a lab; a lab PI may chair the core's advisory committee). Single source of truth for member identities avoids two-place updates.
-- The registrar already governs centre-wide. Cores are part of the centre. They belong in the centre registry.
-- All wigamig tooling that reads `lab_mgmt` (security guard, reconcile, training-compliance, slack-notify) Just Works on cores at the cost of small filters.
+**Why this is the right architecture (now, with hindsight):**
 
-### 4b. Schema for `lab_mgmt/cores/<core>/`
+- Cores are governance-level entities (the registrar adds/removes them, not any single PI). Their natural home is the centre registry, not any one lab's repo.
+- "A core is a self-contained mini-lab-mgmt" — beautifully captures the shape: a core has the same internal structure as a lab (members, projects, audit, requests) but its lifecycle is centre-managed. The existing `~/.wigamig/lab_info/cores/<name>/lab-mgmt/` directly expresses this.
+- Cross-membership (a core staff member also in a lab) works via shared handles: both registries reference the same member handle string; the member's identity record lives in whichever lab they primarily belong to.
+- All Phase 1+ work — registrar CRUD, security audit, slack-notify, training-compliance — already runs over `~/.wigamig/lab_info/` because the registrar dashboard's snapshot pulls from there. Zero migration needed.
+
+**Practical consequence**: Phase 0c (originally "extend lab_mgmt") was reverted (wigamig `3da0aa8`, lab_mgmt `b0b3a5e`) and redone by calling the existing `core.registrar.create_core("biocore", ...)` API, which scaffolds at `~/.wigamig/lab_info/cores/biocore/`. The existing registrar dashboard renders bioCORE without code changes — Phase 0d collapses from "build a Cores panel" to "verify the existing Cores panel + add coverage tests."
+
+The §4b schema below describes the **per-core lab-mgmt** that the registrar scaffolds; the storage path is `~/.wigamig/lab_info/cores/<core>/lab-mgmt/` not `~/repos/lab_mgmt/cores/<core>/`. The rest of the plan stands.
+
+### 4b. Schema for `~/.wigamig/lab_info/cores/<core>/lab-mgmt/`
 
 ```
 lab_mgmt/
