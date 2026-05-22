@@ -1378,6 +1378,9 @@ security_impl.add_to_cli(cli)
 from .commands.calendar_cmd import core_calendar_auth as _core_calendar_auth
 cli.add_command(_core_calendar_auth)
 
+from .commands.reminders_cmd import core_remind as _core_remind
+cli.add_command(_core_remind)
+
 
 if __name__ == "__main__":  # pragma: no cover
     cli()
