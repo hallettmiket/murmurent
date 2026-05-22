@@ -35,7 +35,7 @@ from typing import Iterable
 DEFAULT_LOG_PATH = Path.home() / ".wigamig" / "role_audit.log"
 ENV_VAR = "WIGAMIG_ROLE_AUDIT_LOG"
 
-VALID_ROLES = frozenset({"member", "pi", "registrar"})
+VALID_ROLES = frozenset({"member", "pi", "registrar", "core_leader"})
 
 
 def log_path(env: dict[str, str] | None = None) -> Path:

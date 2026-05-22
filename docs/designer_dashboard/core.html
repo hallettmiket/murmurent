@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>wigamig · Core dashboard</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700&family=Courier+Prime:ital,wght@0,400;0,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --purple:        #4F2683;
+        --purple-deep:   #201436;
+        --purple-soft:   #6F4DA8;
+        --tiger:         #F0A757;
+        --paper:         #FAF8F5;
+        --paper-2:       #F1ECE3;
+        --card:          #FFFFFF;
+        --rule:          #E0DAD0;
+        --rule-strong:   #C7BFB1;
+        --ink:           #1A1A1A;
+        --ink-2:         #3A3A3A;
+        --muted:         #5B5B5B;
+        --green:         #4F6B3A;
+        --red:           #B23A2B;
+        --serif: "EB Garamond", Georgia, serif;
+        --mono:  "Courier Prime", "IBM Plex Mono", Menlo, monospace;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--paper); color: var(--ink);
+                   font-family: var(--serif); }
+      .banner {
+        background: var(--purple); color: white;
+        padding: 12px 28px; display: flex; align-items: baseline;
+        justify-content: space-between; gap: 24px;
+        border-bottom: 4px solid var(--tiger);
+      }
+      .banner h1 { margin: 0; font-size: 22px; font-weight: 600; }
+      .banner h1 small {
+        font-family: var(--mono); font-size: 11px; font-weight: 400;
+        letter-spacing: 1px; opacity: 0.75; margin-left: 6px;
+      }
+      .banner .meta {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+        text-transform: uppercase; opacity: 0.9;
+      }
+      .banner a { color: var(--tiger); text-decoration: none; }
+      .banner a:hover { text-decoration: underline; }
+      .container { max-width: 1240px; margin: 24px auto; padding: 0 28px; }
+      .card {
+        background: var(--card); border: 1px solid var(--rule-strong);
+        border-radius: 2px; margin-bottom: 18px;
+      }
+      .card > header {
+        padding: 12px 16px; border-bottom: 1px solid var(--rule);
+        background: var(--paper-2); display: flex; align-items: center;
+        justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      }
+      .card > header h2 {
+        margin: 0; font-size: 16px; color: var(--purple-deep);
+      }
+      .card > header .meta {
+        font-family: var(--mono); font-size: 11px; color: var(--muted);
+      }
+      .card .body { padding: 14px 18px; }
+      .identity-grid {
+        display: grid; grid-template-columns: 180px 1fr; gap: 8px 18px;
+        font-size: 13px;
+      }
+      .identity-grid dt {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 1.2px;
+        text-transform: uppercase; color: var(--muted); padding-top: 3px;
+      }
+      .identity-grid dd { margin: 0; font-size: 14px; }
+      .identity-grid dd a { color: var(--purple); text-decoration: none; }
+      .identity-grid dd a:hover { text-decoration: underline; }
+      .pill {
+        display: inline-block; padding: 1px 9px; border-radius: 2px;
+        font-family: var(--mono); font-size: 10.5px;
+        letter-spacing: 1px; text-transform: uppercase;
+        background: var(--paper-2); color: var(--purple-deep);
+        border: 1px solid var(--rule);
+        margin-right: 4px; margin-bottom: 2px;
+      }
+      .pill.active { background: var(--green); color: white; border-color: var(--green); }
+      .pill.archived, .pill.inactive { background: var(--red); color: white; border-color: var(--red); }
+      table.members {
+        width: 100%; border-collapse: collapse; font-size: 13px;
+      }
+      table.members th, table.members td {
+        text-align: left; padding: 8px 10px;
+        border-bottom: 1px solid var(--rule);
+      }
+      table.members th {
+        font-family: var(--mono); font-size: 10.5px; letter-spacing: 1px;
+        text-transform: uppercase; color: var(--muted);
+        background: var(--paper-2);
+      }
+      .placeholder {
+        background: var(--paper-2); border: 1px dashed var(--rule-strong);
+        padding: 14px 16px; font-family: var(--mono); font-size: 12px;
+        color: var(--muted); border-radius: 2px;
+      }
+      .placeholder code { color: var(--purple-deep); }
+      .err {
+        background: #FFF1F0; border: 1px solid var(--red);
+        color: var(--red); padding: 12px 16px; font-family: var(--mono);
+        font-size: 12px; border-radius: 2px;
+      }
+      .footer { margin: 30px 0 20px; padding: 0 28px;
+                font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <div class="banner">
+      <h1>wigamig <small>CORE DASHBOARD</small></h1>
+      <div class="meta">
+        <span id="leader-handle">@—</span> ·
+        <span id="role-label">view</span> ·
+        <a href="/">↺ switch</a>
+      </div>
+    </div>
+
+    <div class="container">
+      <div id="loading" class="placeholder">Loading core data…</div>
+      <div id="error-box" class="err" style="display:none"></div>
+
+      <!-- Identity card -->
+      <div class="card" id="identity-card" style="display:none">
+        <header>
+          <h2 id="core-display-name">—</h2>
+          <span class="meta">
+            <span id="core-status-pill" class="pill">—</span>
+            <span id="core-kind-pill" class="pill">core</span>
+          </span>
+        </header>
+        <div class="body">
+          <dl class="identity-grid" id="identity-grid"></dl>
+        </div>
+      </div>
+
+      <!-- Members card -->
+      <div class="card" id="members-card" style="display:none">
+        <header>
+          <h2>Core members</h2>
+          <span class="meta"><span id="members-count">0</span> total</span>
+        </header>
+        <div class="body" id="members-body">
+          <div class="placeholder">No members yet.</div>
+        </div>
+      </div>
+
+      <!-- Phase placeholders (Phase 2 lands services, etc.) -->
+      <div class="card">
+        <header>
+          <h2>Service catalog</h2>
+          <span class="meta">phase 2</span>
+        </header>
+        <div class="body">
+          <div class="placeholder">
+            Phase 2 of the cores rollout lands the per-service editor:
+            <code>cores/&lt;core&gt;/services/&lt;service&gt;.md</code>,
+            fee tiers, training prerequisites, and Google Calendar wiring.
+            See <a href="https://github.com/hallettmiket/wigamig/blob/main/docs/cores_plan.md">docs/cores_plan.md</a>.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h2>Incoming service requests</h2>
+          <span class="meta">phase 3</span>
+        </header>
+        <div class="body">
+          <div class="placeholder">
+            Phase 3 wires the booking inbox + calendar widget. State machine
+            mirrors the existing SEA flow:
+            <code>requested → scheduled → in_progress → completed</code>.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h2>Data deliverables</h2>
+          <span class="meta">phase 4</span>
+        </header>
+        <div class="body">
+          <div class="placeholder">
+            Phase 4 ships the <code>wigamig-core-data</code> MCP that
+            delivers each completed job's artifacts to the requesting
+            lab without leaking across labs. Mirrors the existing
+            <code>wigamig-oracle</code> pattern.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h2>Pending invoices</h2>
+          <span class="meta">phase 5</span>
+        </header>
+        <div class="body">
+          <div class="placeholder">
+            Phase 5 wires monthly invoice generation per requesting lab.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Plan reference:
+      <a href="https://github.com/hallettmiket/wigamig/blob/main/docs/cores_plan.md" target="_blank">docs/cores_plan.md</a>
+      · §10 (Core Dashboard) for the panel inventory.
+    </div>
+
+    <script>
+      "use strict";
+      const params = new URLSearchParams(window.location.search);
+      const CORE  = params.get("core") || "";
+      const ACTOR = params.get("user") || "";
+      document.getElementById("leader-handle").textContent = ACTOR ? "@" + ACTOR : "@—";
+
+      const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+      }[c]));
+
+      async function loadCore() {
+        const loading = document.getElementById("loading");
+        const errBox = document.getElementById("error-box");
+        if (!CORE) {
+          loading.style.display = "none";
+          errBox.style.display = "block";
+          errBox.textContent = "Missing ?core=<id> in URL.";
+          return;
+        }
+        try {
+          const url = `/api/core/dashboard?core=${encodeURIComponent(CORE)}`
+                    + (ACTOR ? `&user=${encodeURIComponent(ACTOR)}` : "");
+          const res = await fetch(url);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          loading.style.display = "none";
+          renderIdentity(data.core, data.viewer);
+          renderMembers(data.members);
+          renderRoleLabel(data.viewer);
+        } catch (ex) {
+          loading.style.display = "none";
+          errBox.style.display = "block";
+          errBox.textContent = "Error: " + (ex.message || ex);
+        }
+      }
+
+      function renderRoleLabel(viewer) {
+        const el = document.getElementById("role-label");
+        if (!viewer) { el.textContent = "view"; return; }
+        if (viewer.is_leader)        el.textContent = "core leader view";
+        else if (viewer.is_registrar) el.textContent = "registrar view";
+        else                          el.textContent = "view";
+      }
+
+      function renderIdentity(core, viewer) {
+        const card = document.getElementById("identity-card");
+        const grid = document.getElementById("identity-grid");
+        document.getElementById("core-display-name").textContent = core.display_name || core.name;
+        const statusPill = document.getElementById("core-status-pill");
+        statusPill.textContent = core.status;
+        statusPill.className = "pill " + (core.status === "active" ? "active" : "archived");
+
+        const c = core.contact || {};
+        const caps = (core.capabilities || []).map(s =>
+          `<span class="pill">${esc(s)}</span>`).join("");
+        const modes = (core.service_modes || []).map(s =>
+          `<span class="pill">${esc(s)}</span>`).join("");
+
+        const rows = [
+          ["Leader",      esc(core.leader)],
+          ["Institution", esc(core.institution || "—")],
+          ["Department",  esc(core.department || "—")],
+          ["Website",     core.website
+              ? `<a href="${esc(core.website)}" target="_blank" rel="noopener">${esc(core.website)}</a>`
+              : "—"],
+          ["Email",       c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : "—"],
+          ["Phone",       esc(c.phone || "—")],
+          ["Location",    esc(c.location || "—")],
+          ["Capabilities", caps || "<span class='placeholder' style='padding:6px 10px;display:inline-block;'>none catalogued yet</span>"],
+          ["Service modes", modes || "—"],
+          ["Data root",   core.data_root
+              ? `<code>${esc(core.data_root)}</code>`
+              : "—"],
+          ["Created",     esc(core.created || "—")],
+        ];
+        grid.innerHTML = rows.map(([label, value]) =>
+          `<dt>${esc(label)}</dt><dd>${value}</dd>`
+        ).join("");
+        card.style.display = "block";
+      }
+
+      function renderMembers(members) {
+        const card = document.getElementById("members-card");
+        const body = document.getElementById("members-body");
+        const countEl = document.getElementById("members-count");
+        members = members || [];
+        countEl.textContent = members.length;
+        if (members.length === 0) {
+          body.innerHTML = '<div class="placeholder">No members yet. Use the registrar dashboard to add core staff.</div>';
+        } else {
+          const rows = members.map(m => `
+            <tr>
+              <td><strong>${esc(m.full_name || m.handle)}</strong></td>
+              <td><code>@${esc(m.handle)}</code></td>
+              <td>${esc(m.role || "member")}</td>
+              <td><span class="pill ${esc(m.status || "active")}">${esc(m.status || "active")}</span></td>
+            </tr>
+          `).join("");
+          body.innerHTML = `
+            <table class="members">
+              <thead><tr><th>name</th><th>handle</th><th>role</th><th>status</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `;
+        }
+        card.style.display = "block";
+      }
+
+      loadCore();
+    </script>
+  </body>
+</html>

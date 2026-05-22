@@ -3341,6 +3341,8 @@ def create_app() -> FastAPI:
                 "is_member": False,
                 "is_pi": False,
                 "is_registrar": False,
+                "is_core_leader": False,
+                "core_leader_of": [],
                 "pi_lab": None,
                 "registrar_centres": [],
                 "default_role": "member",
@@ -3369,11 +3371,29 @@ def create_app() -> FastAPI:
         is_pi_role = bool(pi_handle_now) and norm == pi_handle_now
         # registrar? (centre-level — independent of lab)
         is_reg = _reg.is_registrar(norm)
+        # core_leader? walk the centre registrar's cores and check if
+        # this handle is the leader of any registered (non-archived)
+        # core. Phase 1 of the cores rollout (docs/cores_plan.md §10).
+        # A handle can lead multiple cores; we surface the list so the
+        # login page can present a core-picker when there's more than one.
+        core_leader_of: list[str] = []
+        try:
+            reg = _reg.read_registry()
+            for c in reg.cores:
+                if c.status != "active":
+                    continue
+                if c.pi.lstrip("@").lower() == norm:
+                    core_leader_of.append(c.name)
+        except Exception:
+            pass
+        is_core_leader = bool(core_leader_of)
         # default lens: highest privilege the user holds
         if is_reg:
             default = "registrar"
         elif is_pi_role:
             default = "pi"
+        elif is_core_leader:
+            default = "core_leader"
         elif is_member:
             default = "member"
         else:
@@ -3383,11 +3403,103 @@ def create_app() -> FastAPI:
             "is_member": is_member,
             "is_pi": is_pi_role,
             "is_registrar": is_reg,
+            "is_core_leader": is_core_leader,
+            "core_leader_of": core_leader_of,
             "pi_lab": lab_name or pi_handle_now or None,
             "registrar_centres": _reg.registrars() or (
                 [_reg.registrar_handle()] if _reg.registrar_handle() else []
             ),
             "default_role": default,
+        }
+
+    @app.get("/api/core/dashboard")
+    def core_dashboard(
+        core: str = Query(..., description="Short core id (e.g. 'biocore')."),
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Minimal data payload for the Core Dashboard at /core.
+
+        Per docs/cores_plan.md §10 — Phase 1 ships the shell with
+        ``identity`` + ``members`` panels. Later phases (2-5) add
+        services, requests, calendar, deliverables, invoices.
+
+        Gating: any authenticated wigamig member can fetch a core's
+        public-shape data (name, leader, capabilities, contact, member
+        roster). Mutating endpoints (member add/remove, fee edits) are
+        gated separately to ``core_leader`` of THIS core or the
+        registrar.
+        """
+        from ..core import registrar as _reg
+        from ..core.frontmatter import parse_file as _pf
+
+        core = (core or "").strip()
+        if not core:
+            raise HTTPException(status_code=422, detail="core required")
+        actor = _resolve_actor(user)
+        # Look up the core in the registrar's registry.
+        reg = _reg.read_registry()
+        entry = next((c for c in reg.cores if c.name == core), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+
+        # Parse the core's own lab-mgmt/lab.md for the richer
+        # frontmatter (capabilities, contact, etc.) — the centre
+        # registry only carries the index summary.
+        lab_md = Path(entry.lab_mgmt_path) / "lab.md"
+        meta = {}
+        body = ""
+        if lab_md.is_file():
+            parsed = _pf(lab_md)
+            meta = parsed.meta or {}
+            body = parsed.body or ""
+
+        # Member roster — read the core's lab-mgmt/members/.
+        members_dir = Path(entry.lab_mgmt_path) / "members"
+        members: list[dict] = []
+        if members_dir.is_dir():
+            for mf in sorted(members_dir.glob("*.md")):
+                try:
+                    mmeta = (_pf(mf).meta or {})
+                except Exception:
+                    continue
+                members.append({
+                    "handle": str(mmeta.get("handle") or f"@{mf.stem}").lstrip("@"),
+                    "full_name": str(mmeta.get("full_name") or mf.stem),
+                    "role": str(mmeta.get("role") or "member"),
+                    "status": str(mmeta.get("status") or "active"),
+                })
+
+        leader_handle = entry.pi.lstrip("@")
+        is_leader = actor.lower() == leader_handle.lower()
+        # Centre-wide registrar always has implicit leader rights too.
+        is_registrar_role = _reg.is_registrar(actor) if actor else False
+        viewer_can_admin = bool(is_leader or is_registrar_role)
+
+        return {
+            "ok": True,
+            "core": {
+                "name": entry.name,
+                "display_name": str(meta.get("name") or entry.name),
+                "kind": "core",
+                "leader": entry.pi,
+                "status": entry.status,
+                "created": entry.created,
+                "institution": meta.get("institution") or None,
+                "department": meta.get("department") or None,
+                "website": meta.get("website") or None,
+                "contact": meta.get("contact") or {},
+                "capabilities": list(meta.get("capabilities") or []),
+                "service_modes": list(meta.get("service_modes") or []),
+                "data_root": meta.get("data_root") or None,
+                "description": (body or "").strip()[:500] or None,
+            },
+            "members": members,
+            "viewer": {
+                "handle": actor,
+                "is_leader": is_leader,
+                "is_registrar": is_registrar_role,
+                "can_admin": viewer_can_admin,
+            },
         }
 
     @app.get("/api/login/resolve")
@@ -3451,6 +3563,13 @@ def create_app() -> FastAPI:
             next_url = f"/registrar?user={handle}"
         elif role == "pi":
             next_url = f"/dashboard?user={handle}&persona=pi"
+        elif role == "core_leader":
+            # Pick the first (and usually only) core this handle leads.
+            # Multi-core leaders can switch via a future picker; for now
+            # the path goes to the first registered core they own.
+            cores = roles.get("core_leader_of") or []
+            target = cores[0] if cores else ""
+            next_url = f"/core?core={target}&user={handle}"
         else:
             next_url = f"/dashboard?user={handle}&persona=member"
         return {
@@ -4338,6 +4457,18 @@ def create_app() -> FastAPI:
             """Phase A registrar dashboard — separate route from the lab UI."""
             return HTMLResponse(
                 (STATIC_DIR / "registrar.html").read_text(encoding="utf-8"),
+                headers=_NO_CACHE,
+            )
+
+        @app.get("/core", response_class=HTMLResponse)
+        def core_index() -> HTMLResponse:
+            """Phase 1 core-leader dashboard — analogue of /dashboard
+            for a service core. Gated server-side by /api/core/dashboard
+            (the page calls it; non-core-leaders get a 403 + empty
+            render). Per docs/cores_plan.md §10.
+            """
+            return HTMLResponse(
+                (STATIC_DIR / "core.html").read_text(encoding="utf-8"),
                 headers=_NO_CACHE,
             )
 
