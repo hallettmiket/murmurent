@@ -525,6 +525,56 @@ def core_request_booked(
     _post(channel, text)
 
 
+def core_request_advanced(
+    *, core: str, request_id: str,
+    from_state: str, to_state: str,
+    requester: str, actor: str,
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Post a state-advancement event for a core service request."""
+    text = (
+        f":arrow_forward: Core *{core}*: request `{request_id}` "
+        f"({requester}) {from_state} → *{to_state}* by @{actor}."
+    )
+    _post(channel, text)
+
+
+def core_request_cancelled(
+    *, core: str, request_id: str,
+    requester: str, actor: str, reason: str = "",
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Post a cancellation event."""
+    by = (
+        "" if requester.lstrip("@").lower() == actor.lower()
+        else f" by @{actor}"
+    )
+    reason_str = f" — _{reason}_" if reason else ""
+    text = (
+        f":x: Core *{core}*: request `{request_id}` ({requester}) "
+        f"cancelled{by}{reason_str}."
+    )
+    _post(channel, text)
+
+
+def core_request_rescheduled(
+    *, core: str, request_id: str,
+    requester: str, actor: str,
+    old_start: str, new_start: str,
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Post a reschedule event."""
+    by = (
+        "" if requester.lstrip("@").lower() == actor.lower()
+        else f" by @{actor}"
+    )
+    text = (
+        f":calendar: Core *{core}*: request `{request_id}` ({requester}) "
+        f"rescheduled {old_start} → *{new_start}*{by}."
+    )
+    _post(channel, text)
+
+
 # ---------------------------------------------------------------------------
 # Channel-member sync (item #11)
 # ---------------------------------------------------------------------------
