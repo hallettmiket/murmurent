@@ -242,14 +242,16 @@
     "use strict";
 
     const ROLE_LABELS = {
-      member:    "Member view",
-      pi:        "PI view",
-      registrar: "Registrar view",
+      member:      "Member view",
+      pi:          "PI view",
+      core_leader: "Core leader view",
+      registrar:   "Registrar view",
     };
     const ROLE_DESCRIPTIONS = {
-      member:    "everyone in lab-mgmt/members",
-      pi:        "the lab's named PI",
-      registrar: "centre-level administrator",
+      member:      "everyone in lab-mgmt/members",
+      pi:          "the lab's named PI",
+      core_leader: "the leader of a service core (e.g. BioCORE)",
+      registrar:   "centre-level administrator",
     };
 
     const inferredEl = document.getElementById("inferred-handle");
@@ -278,21 +280,23 @@
       lastResolved = resolved;
       const handle = resolved && resolved.handle ? resolved.handle : "";
       const flags = {
-        member:    !!(resolved && resolved.is_member),
-        pi:        !!(resolved && resolved.is_pi),
-        registrar: !!(resolved && resolved.is_registrar),
+        member:      !!(resolved && resolved.is_member),
+        pi:          !!(resolved && resolved.is_pi),
+        core_leader: !!(resolved && resolved.is_core_leader),
+        registrar:   !!(resolved && resolved.is_registrar),
       };
       // Unknown handles can still pick "member" — they'll see an empty
       // dashboard, but we don't punish a typo with a 403.
       const allowed = {
-        member:    true,
-        pi:        flags.pi,
-        registrar: flags.registrar,
+        member:      true,
+        pi:          flags.pi,
+        core_leader: flags.core_leader,
+        registrar:   flags.registrar,
       };
       const defaultRole = (resolved && resolved.default_role) || "member";
       selectedRole = allowed[defaultRole] ? defaultRole : "member";
 
-      const rows = ["member", "pi", "registrar"].map(role => {
+      const rows = ["member", "pi", "core_leader", "registrar"].map(role => {
         const isAllowed = allowed[role];
         const why = role === "member"
           ? (handle ? "available" : "claim a netname first")
