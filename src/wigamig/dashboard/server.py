@@ -3376,13 +3376,20 @@ def create_app() -> FastAPI:
         # core. Phase 1 of the cores rollout (docs/cores_plan.md §10).
         # A handle can lead multiple cores; we surface the list so the
         # login page can present a core-picker when there's more than one.
+        #
+        # Special case: centre registrars get is_core_leader=true for
+        # ALL registered cores. Rationale: the registrar manages cores
+        # (add/remove, rotate leaders, archive) and routinely needs to
+        # open any core's dashboard to investigate — gating that behind
+        # "type the actual leader's handle" is friction for no security
+        # gain (they could rotate themselves to leader anyway).
         core_leader_of: list[str] = []
         try:
             reg = _reg.read_registry()
             for c in reg.cores:
                 if c.status != "active":
                     continue
-                if c.pi.lstrip("@").lower() == norm:
+                if c.pi.lstrip("@").lower() == norm or is_reg:
                     core_leader_of.append(c.name)
         except Exception:
             pass
