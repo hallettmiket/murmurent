@@ -188,18 +188,123 @@
         </div>
       </div>
 
-      <!-- Service catalog (Phase 2b) -->
+      <!-- Service catalog (Phase 2b read + 2c editor) -->
       <div class="card" id="services-card" style="display:none">
         <header>
           <h2>Service catalog</h2>
           <span class="meta">
             <span id="services-count">0</span> service<span id="services-plural">s</span>
-            <span id="services-edit-hint" class="muted"
-                  style="margin-left:8px; font-size:11px"></span>
+            <button id="add-service-btn" class="btn-primary"
+                    style="display:none; margin-left:10px;
+                           font-family:var(--mono); font-size:11px;
+                           background:var(--purple); color:white;
+                           border:1px solid var(--purple); border-radius:2px;
+                           padding:4px 10px; cursor:pointer;">
+              ＋ add service
+            </button>
           </span>
         </header>
         <div class="body" id="services-body">
           <div class="placeholder">Loading services…</div>
+        </div>
+      </div>
+
+      <!-- Service editor modal (Phase 2c) -->
+      <div id="modal-backdrop" style="display:none;
+           position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100;
+           align-items:center; justify-content:center; padding:20px;">
+        <div style="background:white; border-radius:4px; max-width:680px;
+             width:100%; max-height:90vh; overflow-y:auto;
+             padding:24px; font-family:var(--serif);">
+          <div style="display:flex; justify-content:space-between; align-items:center;
+                      margin-bottom:14px;">
+            <h2 id="modal-title" style="margin:0; color:var(--purple-deep)">Add service</h2>
+            <button id="modal-close" style="background:none; border:0; font-size:22px;
+                                             cursor:pointer; color:var(--muted)">×</button>
+          </div>
+          <form id="service-form">
+            <input type="hidden" id="f-slug-existing" />
+            <div style="display:grid; grid-template-columns:130px 1fr; gap:10px 14px; font-size:13px;">
+              <label>Slug *</label>
+              <input id="f-slug" required pattern="[a-z0-9][a-z0-9_]{1,63}"
+                     placeholder="e.g. itc_microcal_peaq"
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;" />
+              <label>Display name *</label>
+              <input id="f-name" required placeholder="e.g. MicroCal PEAQ-ITC"
+                     style="padding:4px 6px;" />
+              <label>Capability</label>
+              <select id="f-capability" style="padding:4px 6px;">
+                <option value="">(none)</option>
+                <option value="protein_production_synthetic_biology">protein_production_synthetic_biology</option>
+                <option value="structure_function_interaction">structure_function_interaction</option>
+                <option value="high_throughput_molecular_analysis">high_throughput_molecular_analysis</option>
+              </select>
+              <label>Mode</label>
+              <select id="f-mode" style="padding:4px 6px;">
+                <option value="independent_data_collection">independent_data_collection</option>
+                <option value="fee_for_service_data_collection">fee_for_service_data_collection</option>
+                <option value="consultation">consultation</option>
+              </select>
+              <label>Description</label>
+              <textarea id="f-description" rows="3" placeholder="One-paragraph summary"
+                        style="padding:4px 6px; font-family:var(--serif);"></textarea>
+              <label>Location</label>
+              <input id="f-location" placeholder="e.g. MSB 323, room A"
+                     style="padding:4px 6px;" />
+              <label>Equipment</label>
+              <div style="display:flex; gap:6px;">
+                <input id="f-equip-manuf" placeholder="manufacturer"
+                       style="flex:1; padding:4px 6px;" />
+                <input id="f-equip-model" placeholder="model"
+                       style="flex:1; padding:4px 6px;" />
+              </div>
+              <label>Duration (default)</label>
+              <div><input id="f-duration-default" type="number" value="60" min="5"
+                          style="width:80px; padding:4px 6px;" />
+                   <span class="muted" style="font-size:11px; margin-left:4px;">minutes</span></div>
+              <label>Duration (max)</label>
+              <div><input id="f-duration-max" type="number" value="240" min="5"
+                          style="width:80px; padding:4px 6px;" />
+                   <span class="muted" style="font-size:11px; margin-left:4px;">minutes</span></div>
+              <label>Training required</label>
+              <input id="f-training" placeholder="e.g. itc_basic_training (or blank)"
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;" />
+              <label>Prerequisites</label>
+              <textarea id="f-prereqs" rows="3"
+                        placeholder="One per line — e.g.&#10;Sample concentration ≥ 10 µM&#10;Buffer matched between cell and syringe"
+                        style="padding:4px 6px; font-family:var(--serif);"></textarea>
+              <label>Fee unit</label>
+              <select id="f-fee-unit" style="padding:4px 6px;">
+                <option value="per_run">per_run</option>
+                <option value="per_hour">per_hour</option>
+                <option value="per_sample">per_sample</option>
+              </select>
+              <label>Fee tiers (CAD)</label>
+              <div style="display:grid; grid-template-columns:1fr 90px; gap:4px 8px; font-family:var(--mono); font-size:11.5px;">
+                <span>academic_internal</span><input id="f-fee-ai" type="number" step="0.01" min="0" style="padding:3px 6px;" />
+                <span>academic_external</span><input id="f-fee-ae" type="number" step="0.01" min="0" style="padding:3px 6px;" />
+                <span>industry</span><input id="f-fee-ind" type="number" step="0.01" min="0" style="padding:3px 6px;" />
+              </div>
+              <label>Modifiers</label>
+              <div style="display:grid; grid-template-columns:1fr 90px; gap:4px 8px; font-family:var(--mono); font-size:11.5px;">
+                <span>weekend</span><input id="f-mod-weekend" type="number" step="0.01" min="0" placeholder="1.25" style="padding:3px 6px;" />
+                <span>after_hours</span><input id="f-mod-after" type="number" step="0.01" min="0" placeholder="1.5" style="padding:3px 6px;" />
+                <span>overtime</span><input id="f-mod-overtime" type="number" step="0.01" min="0" placeholder="1.5" style="padding:3px 6px;" />
+              </div>
+            </div>
+            <div id="form-error" class="err" style="display:none; margin-top:12px;"></div>
+            <div style="margin-top:18px; display:flex; gap:10px; justify-content:flex-end;">
+              <button type="button" id="modal-cancel"
+                      style="font-family:var(--mono); font-size:11px; padding:6px 14px;
+                             background:white; border:1px solid var(--rule-strong);
+                             border-radius:2px; cursor:pointer;">cancel</button>
+              <button type="submit" id="modal-submit"
+                      style="font-family:var(--mono); font-size:11px; padding:6px 14px;
+                             background:var(--purple); color:white;
+                             border:1px solid var(--purple); border-radius:2px;
+                             cursor:pointer;">save</button>
+            </div>
+          </form>
         </div>
       </div>
 
@@ -382,19 +487,24 @@
         }
       }
 
+      let VIEWER = null;   // captured for the modal's permission gating
+
       function renderServices(services, viewer) {
+        VIEWER = viewer;
         const card = document.getElementById("services-card");
         const body = document.getElementById("services-body");
         const countEl = document.getElementById("services-count");
         const pluralEl = document.getElementById("services-plural");
-        const hintEl = document.getElementById("services-edit-hint");
+        const addBtn = document.getElementById("add-service-btn");
         countEl.textContent = services.length;
         pluralEl.textContent = services.length === 1 ? "" : "s";
-        hintEl.textContent = viewer && viewer.can_admin
-          ? "(editor lands in Phase 2c)"
-          : "(read-only view)";
+        addBtn.style.display = (viewer && viewer.can_admin) ? "inline-block" : "none";
         if (services.length === 0) {
-          body.innerHTML = '<div class="placeholder">No services catalogued yet. The core leader will add them via the Phase 2c editor.</div>';
+          body.innerHTML = '<div class="placeholder">No services catalogued yet. '
+                         + (viewer && viewer.can_admin
+                              ? 'Click <strong>＋ add service</strong> to add the first one.'
+                              : 'The core leader will add them via the editor.')
+                         + '</div>';
           card.style.display = "block";
           return;
         }
@@ -413,11 +523,25 @@
               (s.prerequisites || []).map(p => `<li>${esc(p)}</li>`).join("") +
               "</ul>"
             : "<span class='muted'>none</span>";
+          const adminActions = (viewer && viewer.can_admin) ? `
+            <div style="display:flex; gap:6px; margin-left:10px;">
+              <button class="edit-svc" data-slug="${esc(s.slug)}"
+                      style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                             background:white; border:1px solid var(--rule-strong);
+                             border-radius:2px; cursor:pointer;">edit</button>
+              <button class="archive-svc" data-slug="${esc(s.slug)}"
+                      style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                             background:white; border:1px solid var(--red); color:var(--red);
+                             border-radius:2px; cursor:pointer;">archive</button>
+            </div>` : "";
           return `
             <div class="service-row">
               <div class="head">
                 <h3>${esc(s.name)}</h3>
-                <span class="slug">${esc(s.slug)} · <span class="pill ${esc(s.status)}">${esc(s.status)}</span></span>
+                <span class="slug" style="display:flex; align-items:center; gap:6px;">
+                  ${esc(s.slug)} · <span class="pill ${esc(s.status)}">${esc(s.status)}</span>
+                  ${adminActions}
+                </span>
               </div>
               ${s.description ? `<div class="body-text">${esc(s.description)}</div>` : ""}
               <dl class="meta-grid">
@@ -440,6 +564,157 @@
         body.innerHTML = rows;
         card.style.display = "block";
       }
+
+      // ---- Editor modal (Phase 2c) ----------------------------------------
+      const modal = document.getElementById("modal-backdrop");
+
+      function openModalForNew() {
+        document.getElementById("modal-title").textContent = "Add service";
+        document.getElementById("service-form").reset();
+        document.getElementById("f-slug-existing").value = "";
+        document.getElementById("f-slug").disabled = false;
+        document.getElementById("form-error").style.display = "none";
+        modal.style.display = "flex";
+      }
+      function openModalForEdit(svc) {
+        document.getElementById("modal-title").textContent = "Edit " + svc.slug;
+        document.getElementById("f-slug-existing").value = svc.slug;
+        document.getElementById("f-slug").value = svc.slug;
+        document.getElementById("f-slug").disabled = true;  // slug is the id; can't rename
+        document.getElementById("f-name").value = svc.name || "";
+        document.getElementById("f-capability").value = svc.capability || "";
+        document.getElementById("f-mode").value = svc.mode || "independent_data_collection";
+        document.getElementById("f-description").value = svc.description || "";
+        document.getElementById("f-location").value = svc.location || "";
+        document.getElementById("f-equip-manuf").value = (svc.equipment || {}).manufacturer || "";
+        document.getElementById("f-equip-model").value = (svc.equipment || {}).model || "";
+        document.getElementById("f-duration-default").value = svc.duration_default_min || 60;
+        document.getElementById("f-duration-max").value = svc.duration_max_min || 240;
+        document.getElementById("f-training").value = svc.training_required || "";
+        document.getElementById("f-prereqs").value = (svc.prerequisites || []).join("\n");
+        document.getElementById("f-fee-unit").value = (svc.fee || {}).unit || "per_run";
+        const t = (svc.fee || {}).tiers || {};
+        document.getElementById("f-fee-ai").value  = t.academic_internal ?? "";
+        document.getElementById("f-fee-ae").value  = t.academic_external ?? "";
+        document.getElementById("f-fee-ind").value = t.industry ?? "";
+        const m = (svc.fee || {}).modifiers || {};
+        document.getElementById("f-mod-weekend").value   = m.weekend   ?? "";
+        document.getElementById("f-mod-after").value     = m.after_hours ?? "";
+        document.getElementById("f-mod-overtime").value  = m.overtime  ?? "";
+        document.getElementById("form-error").style.display = "none";
+        modal.style.display = "flex";
+      }
+      function closeModal() { modal.style.display = "none"; }
+
+      function readModalForm() {
+        const slug = document.getElementById("f-slug").value.trim();
+        const name = document.getElementById("f-name").value.trim();
+        const tiers = {};
+        const ai  = parseFloat(document.getElementById("f-fee-ai").value);
+        const ae  = parseFloat(document.getElementById("f-fee-ae").value);
+        const ind = parseFloat(document.getElementById("f-fee-ind").value);
+        if (!isNaN(ai))  tiers.academic_internal = ai;
+        if (!isNaN(ae))  tiers.academic_external = ae;
+        if (!isNaN(ind)) tiers.industry = ind;
+        const mods = {};
+        const mw  = parseFloat(document.getElementById("f-mod-weekend").value);
+        const ma  = parseFloat(document.getElementById("f-mod-after").value);
+        const mo  = parseFloat(document.getElementById("f-mod-overtime").value);
+        if (!isNaN(mw)) mods.weekend     = mw;
+        if (!isNaN(ma)) mods.after_hours = ma;
+        if (!isNaN(mo)) mods.overtime    = mo;
+        const prereqs = document.getElementById("f-prereqs").value
+          .split("\n").map(s => s.trim()).filter(Boolean);
+        const equipment = {};
+        const em = document.getElementById("f-equip-manuf").value.trim();
+        const ee = document.getElementById("f-equip-model").value.trim();
+        if (em) equipment.manufacturer = em;
+        if (ee) equipment.model = ee;
+        return {
+          slug, name,
+          capability: document.getElementById("f-capability").value,
+          mode: document.getElementById("f-mode").value,
+          description: document.getElementById("f-description").value.trim(),
+          equipment,
+          location: document.getElementById("f-location").value.trim(),
+          duration_default_min: parseInt(document.getElementById("f-duration-default").value, 10),
+          duration_max_min: parseInt(document.getElementById("f-duration-max").value, 10),
+          training_required: document.getElementById("f-training").value.trim() || null,
+          prerequisites: prereqs,
+          fee: { unit: document.getElementById("f-fee-unit").value,
+                 tiers, modifiers: mods },
+        };
+      }
+
+      document.getElementById("add-service-btn").addEventListener("click", openModalForNew);
+      document.getElementById("modal-close").addEventListener("click", closeModal);
+      document.getElementById("modal-cancel").addEventListener("click", closeModal);
+      modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+
+      document.getElementById("service-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const errEl = document.getElementById("form-error");
+        errEl.style.display = "none";
+        const submitBtn = document.getElementById("modal-submit");
+        submitBtn.disabled = true;
+        try {
+          const data = readModalForm();
+          const existingSlug = document.getElementById("f-slug-existing").value;
+          let url, method;
+          if (existingSlug) {
+            url = `/api/core/${encodeURIComponent(CORE)}/services/${encodeURIComponent(existingSlug)}`
+                + (ACTOR ? `?user=${encodeURIComponent(ACTOR)}` : "");
+            method = "PATCH";
+            // PATCH body — drop slug (immutable on edit).
+            const patch = { ...data };
+            delete patch.slug;
+            var body = patch;
+          } else {
+            url = `/api/core/${encodeURIComponent(CORE)}/services`
+                + (ACTOR ? `?user=${encodeURIComponent(ACTOR)}` : "");
+            method = "POST";
+            var body = data;
+          }
+          const res = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          closeModal();
+          // Reload services list.
+          loadServices(VIEWER);
+        } catch (ex) {
+          errEl.textContent = "Error: " + (ex.message || ex);
+          errEl.style.display = "block";
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      // Click delegation for the per-row Edit / Archive buttons.
+      document.getElementById("services-body").addEventListener("click", async (ev) => {
+        const t = ev.target;
+        if (t.classList.contains("edit-svc")) {
+          const slug = t.dataset.slug;
+          const url = `/api/core/${encodeURIComponent(CORE)}/services?user=${encodeURIComponent(ACTOR || "")}`;
+          const res = await fetch(url);
+          const d = await res.json();
+          const svc = (d.services || []).find(s => s.slug === slug);
+          if (svc) openModalForEdit(svc);
+        } else if (t.classList.contains("archive-svc")) {
+          const slug = t.dataset.slug;
+          if (!confirm(`Archive service "${slug}"? The file is preserved; flag flips to status=retired.`)) return;
+          const url = `/api/core/${encodeURIComponent(CORE)}/services/${encodeURIComponent(slug)}/archive`
+                    + (ACTOR ? `?user=${encodeURIComponent(ACTOR)}` : "");
+          const res = await fetch(url, { method: "POST" });
+          if (res.ok) loadServices(VIEWER);
+          else alert("Archive failed: " + (await res.text()));
+        }
+      });
 
       loadCore();
     </script>

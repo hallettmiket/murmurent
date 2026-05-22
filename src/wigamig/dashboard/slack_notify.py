@@ -468,6 +468,48 @@ def core_leader_rotated(
 
 
 # ---------------------------------------------------------------------------
+# Core service catalog events (cores Phase 2c)
+# ---------------------------------------------------------------------------
+
+
+def core_service_added(
+    *, core: str, slug: str, name: str, actor: str,
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Post a new service catalog entry event."""
+    text = (
+        f":sparkles: Core *{core}*: service `{slug}` added "
+        f"(*{name}*) by @{actor}."
+    )
+    _post(channel, text)
+
+
+def core_service_updated(
+    *, core: str, slug: str, fields: list[str], actor: str,
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Post a service-edit event with the list of fields changed."""
+    field_str = ", ".join(sorted(fields)) or "(no-op)"
+    text = (
+        f":pencil2: Core *{core}*: service `{slug}` updated "
+        f"by @{actor} — fields: {field_str}."
+    )
+    _post(channel, text)
+
+
+def core_service_archived(
+    *, core: str, slug: str, actor: str,
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Post a service-archival event."""
+    text = (
+        f":package: Core *{core}*: service `{slug}` archived (retired) "
+        f"by @{actor}. File preserved."
+    )
+    _post(channel, text)
+
+
+# ---------------------------------------------------------------------------
 # Channel-member sync (item #11)
 # ---------------------------------------------------------------------------
 
