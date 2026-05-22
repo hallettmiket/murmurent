@@ -3626,6 +3626,163 @@ def create_app() -> FastAPI:
             "reason": check.reason,
         }
 
+    @app.post("/api/core/{core}/services/{slug}/book")
+    def core_service_book(
+        core: str, slug: str,
+        body: dict,
+        user: str = Query("", description="Booking actor; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Book a slot on ``core/<slug>`` for the calling member.
+
+        Body:
+          - ``slot``: ``{start, end, calendar_event_id?}`` (required —
+            this endpoint always lands the request in ``scheduled``;
+            the Calendar event ID is filled in by Phase 3c after the
+            MCP create succeeds, or supplied directly when the caller
+            already has one).
+          - ``requester``: handle to book for. Defaults to the actor;
+            non-self bookings are only allowed for core leaders /
+            registrars (e.g. leader fronts a slot for a member who
+            can't reach the dashboard).
+          - ``requester_lab``: lab slug for billing. Defaults to the
+            calling lab (``lab.load_lab_config().lab``).
+          - ``tier``: fee tier key. Defaults to the first tier on the
+            service. Must be present in ``service.fee.tiers`` when
+            the service prices anything.
+          - ``modifiers``: list of modifier keys to multiply through.
+          - ``notes``: free-text brief for the core staff.
+
+        Gates: actor must be active; training prereq must pass (the
+        same check the dashboard greys the Book button with); service
+        must exist and be ``active``. Fee is snapshotted at booking
+        time via :func:`services.quote_fee` so later catalog edits
+        don't retroactively repricing live bookings.
+        """
+        from ..core import lab as _lab
+        from ..core import registrar as _reg
+        from ..core import service_requests as _sr
+        from ..core import services as _svc
+        from ..core import training as _t
+        from . import slack_notify as _notify
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+
+        reg = _reg.read_registry()
+        if not any(c.name == core for c in reg.cores):
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        svc = _svc.get_service(core, slug)
+        if svc is None:
+            raise HTTPException(status_code=404, detail=f"service not found: {slug}")
+        if (svc.status or "active").lower() != "active":
+            raise HTTPException(
+                status_code=422,
+                detail=f"service {slug!r} is not active (status={svc.status!r}).",
+            )
+
+        slot_in = body.get("slot") or {}
+        start = str(slot_in.get("start") or "").strip()
+        end = str(slot_in.get("end") or "").strip()
+        if not start or not end:
+            raise HTTPException(
+                status_code=422,
+                detail="slot.start and slot.end are required (ISO8601 with tz).",
+            )
+
+        requester_raw = str(body.get("requester") or actor).strip()
+        requester = requester_raw.lstrip("@").lower()
+        if requester != actor.lower():
+            # Booking on behalf of someone else requires leader/registrar.
+            entry = next((c for c in reg.cores if c.name == core), None)
+            is_leader = bool(entry) and entry.pi.lstrip("@").lower() == actor.lower()
+            if not (is_leader or _reg.is_registrar(actor)):
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        f"@{actor} cannot book on behalf of @{requester}; "
+                        "only the core leader or a registrar can proxy-book."
+                    ),
+                )
+
+        requester_lab = str(
+            body.get("requester_lab") or _lab.load_lab_config().lab
+        ).strip().lower()
+        if not requester_lab:
+            raise HTTPException(status_code=422, detail="requester_lab is required")
+
+        check = _t.check_service_prereqs(
+            member_handle=f"@{requester}", service=svc,
+        )
+        if not check.ok:
+            raise HTTPException(status_code=422, detail=check.reason)
+
+        # Fee snapshot: default to the first tier when caller didn't pick.
+        tier = str(body.get("tier") or "").strip()
+        modifiers = list(body.get("modifiers") or [])
+        fee_snap: _sr.FeeSnapshot
+        if svc.fee.tiers:
+            if not tier:
+                tier = sorted(svc.fee.tiers.keys())[0]
+            try:
+                quote = _svc.quote_fee(svc, tier=tier, modifiers=modifiers)
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
+            fee_snap = _sr.FeeSnapshot(
+                tier=str(quote["tier"]),
+                unit=str(quote["unit"]),
+                base=float(quote["base"]),
+                modifiers_applied=list(quote["modifiers_applied"]),
+                total=float(quote["total"]),
+            )
+        else:
+            fee_snap = _sr.FeeSnapshot()
+
+        slot = _sr.BookingSlot(
+            start=start, end=end,
+            calendar_event_id=str(slot_in.get("calendar_event_id") or ""),
+        )
+        try:
+            req = _sr.create_request(
+                core=core, service=slug,
+                requester=f"@{requester}", requester_lab=requester_lab,
+                booked_slot=slot, fee_at_booking=fee_snap,
+                notes=str(body.get("notes") or ""),
+            )
+        except _sr.RequestError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+
+        try:
+            _notify.core_request_booked(
+                core=core, slug=slug, request_id=req.request_id,
+                requester=f"@{requester}", actor=actor,
+                start=start, end=end, total=fee_snap.total,
+            )
+        except Exception:  # noqa: BLE001 - Slack must never block a booking
+            pass
+
+        return {
+            "ok": True,
+            "core": core,
+            "service": slug,
+            "request_id": req.request_id,
+            "state": req.state,
+            "requester": req.requester,
+            "requester_lab": req.requester_lab,
+            "slot": {
+                "start": req.booked_slot.start,
+                "end": req.booked_slot.end,
+                "calendar_event_id": req.booked_slot.calendar_event_id,
+            },
+            "fee_at_booking": {
+                "tier": fee_snap.tier,
+                "unit": fee_snap.unit,
+                "base": fee_snap.base,
+                "modifiers_applied": fee_snap.modifiers_applied,
+                "total": fee_snap.total,
+            },
+            "path": str(req.path),
+        }
+
     def _require_core_admin(core: str, user: str) -> str:
         """Return the actor handle if they're allowed to mutate ``core``'s
         catalog (the core's leader OR a centre registrar). 403 otherwise.
