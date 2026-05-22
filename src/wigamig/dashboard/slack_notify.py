@@ -557,6 +557,22 @@ def core_request_cancelled(
     _post(channel, text)
 
 
+def core_request_reminder(
+    *, core: str, request_id: str, requester: str,
+    service: str, start: str, window: str,
+    minutes_until: int,
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Reminder ping for an upcoming booking. ``window`` is '24h' or '1h'."""
+    emoji = ":alarm_clock:" if window == "1h" else ":bell:"
+    when = f"in ~{minutes_until} min" if window == "1h" else f"tomorrow ({start})"
+    text = (
+        f"{emoji} Core *{core}* reminder ({window}): {requester} has "
+        f"`{service}` booked {when}. _id: {request_id}_"
+    )
+    _post(channel, text)
+
+
 def core_request_rescheduled(
     *, core: str, request_id: str,
     requester: str, actor: str,
