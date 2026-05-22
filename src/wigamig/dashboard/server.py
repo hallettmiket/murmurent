@@ -3509,6 +3509,55 @@ def create_app() -> FastAPI:
             },
         }
 
+    @app.get("/api/core/{core}/services")
+    def core_services_list(
+        core: str,
+        include_retired: bool = Query(False, description="Include retired services."),
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """List a core's service catalog. Phase 2b of the cores rollout
+        (docs/cores_plan.md §11). Readable by any authenticated wigamig
+        member — a service catalog is the core's outward face; gating
+        view is the wrong default. Mutation goes through the editor
+        endpoints in Phase 2c."""
+        from ..core import services as _svc
+        from ..core import registrar as _reg
+        reg = _reg.read_registry()
+        if not any(c.name == core for c in reg.cores):
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        catalog = _svc.iter_services(core, include_retired=include_retired)
+        return {
+            "ok": True,
+            "core": core,
+            "count": len(catalog),
+            "services": [
+                {
+                    "slug": s.slug,
+                    "name": s.name,
+                    "core": s.core,
+                    "capability": s.capability,
+                    "mode": s.mode,
+                    "description": s.description,
+                    "equipment": s.equipment,
+                    "location": s.location,
+                    "duration_default_min": s.duration_default_min,
+                    "duration_max_min": s.duration_max_min,
+                    "training_required": s.training_required,
+                    "prerequisites": s.prerequisites,
+                    "fee": {
+                        "unit": s.fee.unit,
+                        "tiers": s.fee.tiers,
+                        "modifiers": s.fee.modifiers,
+                    },
+                    "data_deliverable": s.data_deliverable,
+                    "contact": s.contact,
+                    "status": s.status,
+                    "created": s.created,
+                }
+                for s in catalog
+            ],
+        }
+
     @app.get("/api/login/resolve")
     def get_login_resolve(
         user: str = Query("", description="Western netname to resolve roles for"),
