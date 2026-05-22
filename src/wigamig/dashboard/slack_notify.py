@@ -509,6 +509,22 @@ def core_service_archived(
     _post(channel, text)
 
 
+def core_request_booked(
+    *, core: str, slug: str, request_id: str,
+    requester: str, actor: str,
+    start: str, end: str, total: float,
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Post a booking event for a core service."""
+    by = "" if requester.lstrip("@").lower() == actor.lower() else f" (booked by @{actor})"
+    fee_str = f" — ${total:.2f}" if total else ""
+    text = (
+        f":calendar: Core *{core}*: {requester} booked `{slug}` "
+        f"{start} → {end}{fee_str}. _id: {request_id}_{by}"
+    )
+    _post(channel, text)
+
+
 # ---------------------------------------------------------------------------
 # Channel-member sync (item #11)
 # ---------------------------------------------------------------------------
