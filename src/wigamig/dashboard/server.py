@@ -3626,6 +3626,129 @@ def create_app() -> FastAPI:
             "reason": check.reason,
         }
 
+    @app.get("/api/cores/services")
+    def list_cores_services(
+        member: str = Query("", description="Member handle to evaluate prereqs against."),
+    ) -> dict:
+        """Cross-core service catalog for the member-browse panel.
+
+        Returns one ``services`` array with all active services across
+        all cores. When ``member`` is provided, each row carries a
+        ``can_book`` block from training.check_service_prereqs so the
+        UI can grey out the Book button without a second round-trip.
+        """
+        from ..core import registrar as _reg
+        from ..core import services as _svc
+        from ..core import training as _t
+        from ..core.frontmatter import parse_file as _pf2
+        out: list[dict] = []
+        try:
+            reg = _reg.read_registry()
+            cores = list(reg.cores)
+        except Exception:
+            cores = []
+        # display_name lives in each core's lab-mgmt/lab.md frontmatter,
+        # not the registry index. Cache per-call.
+        _display_cache: dict[str, str] = {}
+        def _disp(core_entry) -> str:
+            if core_entry.name in _display_cache:
+                return _display_cache[core_entry.name]
+            d = core_entry.name
+            try:
+                lab_md = Path(core_entry.lab_mgmt_path) / "lab.md"
+                if lab_md.is_file():
+                    meta = (_pf2(lab_md).meta or {})
+                    d = str(meta.get("name") or core_entry.name)
+            except Exception:
+                pass
+            _display_cache[core_entry.name] = d
+            return d
+        for core in cores:
+            for svc in _svc.iter_services(core.name):
+                if (svc.status or "active").lower() != "active":
+                    continue
+                row = {
+                    "core": core.name,
+                    "core_display_name": _disp(core),
+                    "slug": svc.slug,
+                    "name": svc.name,
+                    "capability": svc.capability,
+                    "mode": svc.mode,
+                    "description": svc.description,
+                    "location": svc.location,
+                    "duration_default_min": svc.duration_default_min,
+                    "training_required": svc.training_required,
+                    "fee": {
+                        "unit": svc.fee.unit,
+                        "tiers": dict(svc.fee.tiers),
+                        "modifiers": dict(svc.fee.modifiers),
+                    },
+                    "leader": core.pi,
+                }
+                if member:
+                    check = _t.check_service_prereqs(
+                        member_handle=member, service=svc,
+                    )
+                    row["can_book"] = {
+                        "ok": check.ok,
+                        "reason": check.reason,
+                        "training_slug": check.training_slug,
+                    }
+                out.append(row)
+        return {"services": out}
+
+    @app.get("/api/member/{handle}/requests")
+    def list_member_requests(
+        handle: str,
+        include_terminal: bool = Query(False),
+    ) -> dict:
+        """A member's bookings across every core they've requested from.
+
+        Drives the 'My bookings' sub-section of the member dashboard.
+        ``include_terminal=true`` reveals cancelled + completed history
+        (default: only live requests).
+        """
+        from ..core import registrar as _reg
+        from ..core import service_requests as _sr
+        handle_lc = handle.lstrip("@").lower()
+        out: list[dict] = []
+        try:
+            reg = _reg.read_registry()
+            cores = [c.name for c in reg.cores]
+        except Exception:
+            cores = []
+        for core in cores:
+            for req in _sr.iter_requests(
+                core, requester=f"@{handle_lc}",
+                include_terminal=include_terminal,
+            ):
+                out.append({
+                    "core": core,
+                    "request_id": req.request_id,
+                    "service": req.service,
+                    "state": req.state,
+                    "slot": {
+                        "start": req.booked_slot.start,
+                        "end": req.booked_slot.end,
+                        "calendar_event_id": req.booked_slot.calendar_event_id,
+                    },
+                    "fee_at_booking": {
+                        "tier": req.fee_at_booking.tier,
+                        "total": req.fee_at_booking.total,
+                        "unit": req.fee_at_booking.unit,
+                    },
+                    "requester_lab": req.requester_lab,
+                    "created": req.created,
+                    "updated": req.updated,
+                })
+        # Sort: live requests first (by slot.start asc), then terminal
+        # (most-recently-updated first when included).
+        live = [r for r in out if r["state"] not in ("completed", "cancelled")]
+        term = [r for r in out if r["state"] in ("completed", "cancelled")]
+        live.sort(key=lambda r: r["slot"]["start"] or "")
+        term.sort(key=lambda r: r["updated"] or "", reverse=True)
+        return {"member": f"@{handle_lc}", "requests": live + term}
+
     @app.post("/api/core/{core}/services/{slug}/book")
     def core_service_book(
         core: str, slug: str,

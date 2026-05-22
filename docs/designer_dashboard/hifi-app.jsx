@@ -3683,6 +3683,344 @@ function SeaCatalogPanel({ entries, span="c-12" }) {
   );
 }
 
+/* ───────── Core services panel (Phase 3e of the cores rollout) ─────────
+   Lists every active service across every core (cross-core browse),
+   with a per-service Book button that opens a modal slot-picker. The
+   Book button is disabled (and shows the training-required reason)
+   when can_book.ok is false for the viewing member. Below the catalog,
+   "My bookings" shows the viewer's own live requests with cancel +
+   reschedule actions. Hidden when no cores are registered. */
+
+async function fetchCoresServices(member) {
+  const url = "/api/cores/services" + (member ? "?member=" + encodeURIComponent(member) : "");
+  const res = await fetch(url, { credentials: "same-origin" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+async function fetchMyRequests(member, includeTerminal=false) {
+  if (!member) return { requests: [] };
+  const url = "/api/member/" + encodeURIComponent(member) + "/requests"
+    + (includeTerminal ? "?include_terminal=true" : "");
+  const res = await fetch(url, { credentials: "same-origin" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+async function postBookSlot(core, slug, body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/core/" + encodeURIComponent(core)
+    + "/services/" + encodeURIComponent(slug) + "/book"
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+async function postRequestLifecycle(core, requestId, action, body={}) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/core/" + encodeURIComponent(core)
+    + "/requests/" + encodeURIComponent(requestId) + "/" + action
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function BookSlotModal({ service, member, onClose, onBooked }) {
+  const tiers = Object.keys((service.fee && service.fee.tiers) || {});
+  const [start, setStart] = useState("");
+  const [end, setEnd]     = useState("");
+  const [tier, setTier]   = useState(tiers[0] || "");
+  const [notes, setNotes] = useState("");
+  const [busy, setBusy]   = useState(false);
+  const [err, setErr]     = useState(null);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!start || !end) { setErr("Pick a start and end time."); return; }
+    setBusy(true); setErr(null);
+    try {
+      const body = {
+        slot: { start, end },
+        notes: notes.trim(),
+      };
+      if (tier) body.tier = tier;
+      const resp = await postBookSlot(service.core, service.slug, body);
+      onBooked && onBooked(resp);
+      onClose();
+    } catch (ex) {
+      setErr(String(ex.message || ex));
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:560}}>
+        <header><h3>Book {service.name} ({service.core})</h3></header>
+        <form onSubmit={submit} style={{padding:14}}>
+          <div className="muted" style={{fontSize:12, marginBottom:10}}>
+            Booking as <b>@{member || "?"}</b>. Times are ISO8601 with timezone, e.g.
+            <code> 2026-05-23T10:00-04:00</code>.
+          </div>
+          <label style={{display:"block", marginBottom:8}}>
+            <div style={{fontSize:11, color:"#666"}}>Start</div>
+            <input type="text" value={start} onChange={e=>setStart(e.target.value)}
+                   placeholder="2026-05-23T10:00-04:00"
+                   style={{width:"100%"}} required />
+          </label>
+          <label style={{display:"block", marginBottom:8}}>
+            <div style={{fontSize:11, color:"#666"}}>End</div>
+            <input type="text" value={end} onChange={e=>setEnd(e.target.value)}
+                   placeholder="2026-05-23T11:30-04:00"
+                   style={{width:"100%"}} required />
+          </label>
+          {tiers.length > 0 && (
+            <label style={{display:"block", marginBottom:8}}>
+              <div style={{fontSize:11, color:"#666"}}>Tier</div>
+              <select value={tier} onChange={e=>setTier(e.target.value)}>
+                {tiers.map(t => (
+                  <option key={t} value={t}>
+                    {t} — ${service.fee.tiers[t]} {service.fee.unit}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label style={{display:"block", marginBottom:8}}>
+            <div style={{fontSize:11, color:"#666"}}>Notes (for the core staff)</div>
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)}
+                      rows={3} style={{width:"100%"}} />
+          </label>
+          {err && <div className="error" style={{marginBottom:8}}>{err}</div>}
+          <div className="row" style={{justifyContent:"flex-end", gap:6}}>
+            <button type="button" className="btn sm" onClick={onClose}
+                    disabled={busy}>Cancel</button>
+            <button type="submit" className="btn sm primary" disabled={busy}>
+              {busy ? "Booking…" : "Book slot"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function CoreServicesPanel({ span="c-12" }) {
+  const params = new URLSearchParams(window.location.search);
+  const member = (params.get("user") || (window.DATA.identity && window.DATA.identity.handle) || "").replace(/^@/, "");
+  const [services, setServices] = useState(null);
+  const [myReqs, setMyReqs]     = useState([]);
+  const [showTerm, setShowTerm] = useState(false);
+  const [booking, setBooking]   = useState(null);
+  const [busyReq, setBusyReq]   = useState(null);
+  const [err, setErr]           = useState(null);
+
+  const reload = async () => {
+    setErr(null);
+    try {
+      const [a, b] = await Promise.all([
+        fetchCoresServices(member),
+        fetchMyRequests(member, showTerm),
+      ]);
+      setServices(a.services || []);
+      setMyReqs(b.requests || []);
+    } catch (ex) { setErr(String(ex.message || ex)); }
+  };
+  useEffect(() => { reload(); /* eslint-disable-line */ }, [showTerm]);
+
+  if (services === null) {
+    return (
+      <div className={"panel " + span}>
+        <header><h2>Core services</h2></header>
+        <div className="body muted" style={{padding:14}}>Loading…</div>
+      </div>
+    );
+  }
+  if (services.length === 0) return null;  // no cores → hide panel
+
+  const byCore = {};
+  for (const s of services) {
+    (byCore[s.core] = byCore[s.core] || []).push(s);
+  }
+
+  const onCancel = async (r) => {
+    if (!window.confirm(`Cancel request ${r.request_id}?`)) return;
+    setBusyReq(r.request_id);
+    try { await postRequestLifecycle(r.core, r.request_id, "cancel"); await reload(); }
+    catch (ex) { alert(ex.message || ex); }
+    finally { setBusyReq(null); }
+  };
+  const onReschedule = async (r) => {
+    const newStart = window.prompt("New start (ISO8601 + tz)", r.slot.start);
+    if (!newStart) return;
+    const newEnd = window.prompt("New end (ISO8601 + tz)", r.slot.end);
+    if (!newEnd) return;
+    setBusyReq(r.request_id);
+    try {
+      await postRequestLifecycle(r.core, r.request_id, "reschedule",
+        { slot: { start: newStart, end: newEnd } });
+      await reload();
+    } catch (ex) { alert(ex.message || ex); }
+    finally { setBusyReq(null); }
+  };
+
+  return (
+    <div className={"panel " + span}>
+      <header>
+        <h2>Core services</h2>
+        <span className="meta">
+          {services.length} active service{services.length === 1 ? "" : "s"} ·
+          {" "}{Object.keys(byCore).length} core{Object.keys(byCore).length === 1 ? "" : "s"}
+        </span>
+      </header>
+      <div className="body" style={{padding:0}}>
+        {Object.keys(byCore).sort().map(coreName => (
+          <div key={coreName} style={{padding:"8px 14px", borderTop:"1px solid #eee"}}>
+            <div style={{fontWeight:600, marginBottom:6}}>
+              {byCore[coreName][0].core_display_name || coreName}
+              <span className="mono muted" style={{marginLeft:8, fontSize:11}}>
+                ({coreName})
+              </span>
+            </div>
+            <table className="dt">
+              <thead><tr>
+                <th>service</th>
+                <th style={{width:130}}>capability</th>
+                <th style={{width:80}}>fee</th>
+                <th style={{width:140}}>training</th>
+                <th style={{width:110}}></th>
+              </tr></thead>
+              <tbody>
+                {byCore[coreName].map(s => {
+                  const tier0 = Object.keys((s.fee && s.fee.tiers) || {})[0];
+                  const price = tier0 ? `$${s.fee.tiers[tier0]} ${s.fee.unit}` : "—";
+                  const canBook = !s.can_book || s.can_book.ok;
+                  return (
+                    <tr key={s.core+"::"+s.slug}>
+                      <td>
+                        <div style={{fontWeight:500}}>{s.name}</div>
+                        {s.description && (
+                          <div className="muted" style={{fontSize:11}}>{s.description}</div>
+                        )}
+                      </td>
+                      <td className="mono muted" style={{fontSize:11}}>{s.capability || "—"}</td>
+                      <td className="mono" style={{fontSize:12}}>{price}</td>
+                      <td>
+                        {s.training_required
+                          ? <Pill tone={canBook ? "green" : "warn"}>
+                              {s.training_required}
+                            </Pill>
+                          : <span className="muted" style={{fontSize:11}}>none</span>}
+                      </td>
+                      <td>
+                        <button className="btn sm primary"
+                                disabled={!canBook}
+                                title={canBook ? "" : (s.can_book && s.can_book.reason) || ""}
+                                onClick={() => setBooking(s)}>
+                          Book
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ))}
+      </div>
+
+      {/* My bookings */}
+      <header style={{borderTop:"1px solid #eee"}}>
+        <h3 style={{margin:"4px 0"}}>My bookings</h3>
+        <label style={{fontSize:11}}>
+          <input type="checkbox" checked={showTerm}
+                 onChange={e=>setShowTerm(e.target.checked)} />
+          {" "}show cancelled / completed
+        </label>
+      </header>
+      <div className="body" style={{padding:0}}>
+        {myReqs.length === 0 && (
+          <div className="muted" style={{padding:14, fontSize:13}}>
+            No bookings yet.
+          </div>
+        )}
+        {myReqs.length > 0 && (
+          <table className="dt">
+            <thead><tr>
+              <th style={{width:90}}>core</th>
+              <th style={{width:100}}>service</th>
+              <th style={{width:170}}>start</th>
+              <th style={{width:90}}>state</th>
+              <th style={{width:80}}>fee</th>
+              <th></th>
+            </tr></thead>
+            <tbody>
+              {myReqs.map(r => {
+                const terminal = r.state === "completed" || r.state === "cancelled";
+                return (
+                  <tr key={r.core+"::"+r.request_id}
+                      style={{opacity: terminal ? 0.55 : 1}}>
+                    <td className="mono" style={{fontSize:11}}>{r.core}</td>
+                    <td className="mono" style={{fontSize:12}}>{r.service}</td>
+                    <td className="mono" style={{fontSize:11}}>{r.slot.start}</td>
+                    <td>
+                      <Pill tone={terminal ? "outline" :
+                                  r.state === "in_progress" ? "warn" : "green"}>
+                        {r.state}
+                      </Pill>
+                    </td>
+                    <td className="num">{r.fee_at_booking.total ? "$" + r.fee_at_booking.total : "—"}</td>
+                    <td>
+                      <div className="row" style={{justifyContent:"flex-end", gap:4}}>
+                        {!terminal && (
+                          <button className="btn sm"
+                                  disabled={busyReq === r.request_id}
+                                  onClick={() => onReschedule(r)}>
+                            reschedule
+                          </button>
+                        )}
+                        {!terminal && (
+                          <button className="btn sm danger"
+                                  disabled={busyReq === r.request_id}
+                                  onClick={() => onCancel(r)}>
+                            cancel
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
+      </div>
+      {err && <div className="error" style={{padding:10}}>{err}</div>}
+      {booking && (
+        <BookSlotModal service={booking} member={member}
+                       onClose={() => setBooking(null)}
+                       onBooked={() => reload()} />
+      )}
+    </div>
+  );
+}
+
 /* ───────── Collaborations (item #9: PI proposes; registrar approves) ─────────
    PIs use this panel to request a new cross-lab collaboration; the
    registrar's dashboard has the matching approve/decline UI. Members
@@ -6519,6 +6857,14 @@ function App() {
         {/* SEAs we offer (catalog) - every member sees; PI edits. */}
         <div className="grid" style={{marginBottom:14}}>
           <SeaCatalogPanel entries={D.sea_catalog} span="c-12" />
+        </div>
+
+        {/* Core services browse + my bookings (Phase 3e of cores rollout).
+            Hidden when no cores are registered. Every member sees both
+            the cross-core catalog and their own live + (toggleable)
+            terminal request history. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <CoreServicesPanel span="c-12" />
         </div>
 
         {/* Lab security access — PI grants/revokes the wigamig-level
