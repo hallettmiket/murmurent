@@ -3558,6 +3558,74 @@ def create_app() -> FastAPI:
             ],
         }
 
+    @app.get("/api/core/{core}/training")
+    def core_training_list(
+        core: str,
+        include_retired: bool = Query(False, description="Include retired trainings."),
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """List a core's training catalog. Phase 2d. Readable by any
+        authenticated wigamig member — training requirements gate
+        bookings, so members need to see what's required + how to
+        complete it."""
+        from ..core import training as _t
+        from ..core import registrar as _reg
+        reg = _reg.read_registry()
+        if not any(c.name == core for c in reg.cores):
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        catalog = _t.iter_trainings(core, include_retired=include_retired)
+        return {
+            "ok": True,
+            "core": core,
+            "count": len(catalog),
+            "trainings": [
+                {
+                    "slug": t.slug,
+                    "name": t.name,
+                    "core": t.core,
+                    "description": t.description,
+                    "duration_min": t.duration_min,
+                    "refresher_years": t.refresher_years,
+                    "trainers": t.trainers,
+                    "location": t.location,
+                    "status": t.status,
+                    "created": t.created,
+                }
+                for t in catalog
+            ],
+        }
+
+    @app.get("/api/core/{core}/services/{slug}/can_book")
+    def core_service_can_book(
+        core: str, slug: str,
+        member: str = Query(..., description="Member handle to check."),
+    ) -> dict:
+        """Phase 2d helper: does ``member`` satisfy the training
+        prerequisites for ``core/<slug>``? Used by Phase 3's booking
+        UI to greying-out the Book button when prereqs are missing.
+
+        Returns ``{ok, reason, training_slug}``. ``ok=true`` means
+        the member is cleared to book; ``ok=false`` means they need
+        to complete the named training first (the reason is
+        UI-presentable text)."""
+        from ..core import services as _svc
+        from ..core import training as _t
+        from ..core import registrar as _reg
+        reg = _reg.read_registry()
+        if not any(c.name == core for c in reg.cores):
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        svc = _svc.get_service(core, slug)
+        if svc is None:
+            raise HTTPException(status_code=404, detail=f"service not found: {slug}")
+        check = _t.check_service_prereqs(
+            member_handle=member, service=svc,
+        )
+        return {
+            "ok": check.ok,
+            "training_slug": check.training_slug,
+            "reason": check.reason,
+        }
+
     def _require_core_admin(core: str, user: str) -> str:
         """Return the actor handle if they're allowed to mutate ``core``'s
         catalog (the core's leader OR a centre registrar). 403 otherwise.
