@@ -4128,6 +4128,107 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc))
         return {"ok": True, "core": _core_entry_to_dict(entry)}
 
+    # ---- Per-core member CRUD (cores Phase 1d) -----------------------
+    @app.post("/api/registrar/core/{name}/members")
+    def registrar_add_core_member(
+        name: str,
+        body: dict,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Add a staff member to a core. Body: {handle, full_name, role}.
+        ``role`` defaults to 'staff'. Registrar-only."""
+        from ..core import registrar as _reg
+        from ..core.membership import MembershipError
+        from . import slack_notify as _notify
+        _require_registrar(user)
+        handle = str(body.get("handle") or "").strip()
+        if not handle:
+            raise HTTPException(status_code=422, detail="handle required")
+        full_name = body.get("full_name") or None
+        role = str(body.get("role") or "staff").strip() or "staff"
+        try:
+            path = _reg.add_core_member(
+                core_name=name, handle=handle,
+                full_name=full_name, role=role,
+            )
+        except _reg.LabNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except MembershipError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        _notify.core_member_added(
+            core=name, handle=handle.lstrip("@"),
+            full_name=full_name or handle.lstrip("@"),
+            role=role,
+        )
+        return {"ok": True, "core": name, "handle": handle.lstrip("@"),
+                "path": str(path)}
+
+    @app.post("/api/registrar/core/{name}/members/{handle}/remove")
+    def registrar_remove_core_member(
+        name: str, handle: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Soft-remove (status=inactive) a core member. Refuses to remove
+        the current leader. Registrar-only."""
+        from ..core import registrar as _reg
+        from . import slack_notify as _notify
+        _require_registrar(user)
+        try:
+            changed = _reg.remove_core_member(core_name=name, handle=handle)
+        except _reg.LabNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _reg.PIAlreadyLeadsAnother as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        if changed:
+            _notify.core_member_removed(core=name, handle=handle.lstrip("@"))
+        return {"ok": True, "core": name, "handle": handle.lstrip("@"),
+                "changed": changed}
+
+    @app.post("/api/registrar/core/{name}/leader")
+    def registrar_rotate_core_leader(
+        name: str,
+        body: dict,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Rotate a core's leader. Body: {handle, full_name (optional)}.
+        Old leader demoted to ``staff`` and kept on the roster.
+        Refuses if the new handle already leads another active group.
+        Registrar-only."""
+        from ..core import registrar as _reg
+        from . import slack_notify as _notify
+        _require_registrar(user)
+        new_handle = str(body.get("handle") or "").strip()
+        if not new_handle:
+            raise HTTPException(status_code=422, detail="handle required")
+        new_full_name = body.get("full_name") or None
+        # Snapshot the old leader before rotation so we can include it
+        # in the Slack ping.
+        try:
+            existing_reg = _reg.read_registry()
+        except Exception:
+            existing_reg = None
+        old_handle = ""
+        if existing_reg:
+            for c in existing_reg.cores:
+                if c.name == name:
+                    old_handle = c.pi.lstrip("@")
+                    break
+        try:
+            entry = _reg.rotate_core_leader(
+                core_name=name, new_handle=new_handle,
+                new_full_name=new_full_name,
+            )
+        except _reg.LabNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _reg.PIAlreadyLeadsAnother as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        new_h = new_handle.lstrip("@")
+        if old_handle and old_handle != new_h:
+            _notify.core_leader_rotated(
+                core=name, old_handle=old_handle, new_handle=new_h,
+            )
+        return {"ok": True, "core": name, "leader": entry.pi}
+
     def _collab_entry_to_dict(entry) -> dict:
         return {
             "name": entry.name,
