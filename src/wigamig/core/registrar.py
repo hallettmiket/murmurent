@@ -1801,3 +1801,220 @@ def update_collaboration(
     summary = ", ".join(changed) or "no-op"
     _git_commit_all(root, f"registrar: update collaboration {name} ({summary})")
     return updated
+
+
+# ---------------------------------------------------------------------------
+# Per-core member management (cores Phase 1d)
+#
+# Add/remove members + rotate the leader of an existing core. The
+# centre registrar drives these via /api/registrar/core/<name>/...
+# endpoints; the storage layer is the per-core lab-mgmt dir at
+# <lab_info_root>/cores/<name>/lab-mgmt/members/. See
+# docs/cores_plan.md §11 (Phase 1) for the rollout context.
+# ---------------------------------------------------------------------------
+
+
+def _render_core_member_md(
+    *,
+    handle_at: str,
+    full_name: str | None,
+    role: str,
+    core_name: str,
+    status: str = "active",
+) -> str:
+    """Render members/<handle>.md for a (non-leader) core staff member."""
+    meta: dict[str, Any] = {
+        "handle": handle_at,
+        "full_name": full_name or handle_at.lstrip("@").title(),
+        "role": role,
+        "status": status,
+        "lab": core_name,
+    }
+    yaml_text = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip() + "\n"
+    return f"---\n{yaml_text}---\n\n# {handle_at}\n"
+
+
+def add_core_member(
+    *,
+    core_name: str,
+    handle: str,
+    full_name: str | None = None,
+    role: str = "staff",
+    env: dict[str, str] | None = None,
+) -> Path:
+    """Add a member to ``core_name``. Writes the member's .md file in
+    the core's lab-mgmt/members/ dir + commits via the registrar's
+    audit-trail git. Idempotent: re-adding an existing handle is a
+    no-op (returns the existing path) rather than an error.
+
+    Raises:
+      LabNotFound — no such core.
+      MembershipError — handle is empty or invalid shape.
+    """
+    handle_at = _normalize_pi(handle)
+    plain = handle_at.lstrip("@")
+    if not plain:
+        from .membership import MembershipError
+        raise MembershipError("handle is required")
+    reg, idx = _find_core(core_name, env)
+    core = reg.cores[idx]
+    members_dir = Path(core.lab_mgmt_path) / "members"
+    members_dir.mkdir(parents=True, exist_ok=True)
+    member_path = members_dir / f"{plain}.md"
+    if member_path.is_file():
+        return member_path
+    member_path.write_text(
+        _render_core_member_md(
+            handle_at=handle_at, full_name=full_name,
+            role=role, core_name=core_name,
+        ),
+        encoding="utf-8",
+    )
+    root = lab_info_root(env)
+    _git_init_if_needed(root)
+    _git_commit_all(root,
+        f"registrar: add member {handle_at} ({role}) to core {core_name}")
+    return member_path
+
+
+def remove_core_member(
+    *,
+    core_name: str,
+    handle: str,
+    env: dict[str, str] | None = None,
+) -> bool:
+    """Soft-remove a member from ``core_name`` by flipping their
+    frontmatter ``status:`` to ``inactive``. The file is preserved so
+    historical references (audit log, past job manifests) keep
+    resolving.
+
+    Refuses to remove the current leader: rotate first via
+    :func:`rotate_core_leader`, then remove the displaced handle.
+
+    Returns True if a change occurred, False if the member wasn't found
+    or was already inactive.
+    """
+    from .frontmatter import dump_document, parse_file
+    handle_at = _normalize_pi(handle)
+    plain = handle_at.lstrip("@")
+    reg, idx = _find_core(core_name, env)
+    core = reg.cores[idx]
+    if _normalize_pi(core.pi) == handle_at:
+        raise PIAlreadyLeadsAnother(
+            f"cannot remove {handle_at}: they are the leader of core {core_name!r}. "
+            "Rotate the leader first via rotate_core_leader()."
+        )
+    member_path = Path(core.lab_mgmt_path) / "members" / f"{plain}.md"
+    if not member_path.is_file():
+        return False
+    parsed = parse_file(member_path)
+    meta = dict(parsed.meta or {})
+    if str(meta.get("status") or "active") == "inactive":
+        return False
+    meta["status"] = "inactive"
+    member_path.write_text(
+        dump_document(meta, parsed.body or ""), encoding="utf-8",
+    )
+    root = lab_info_root(env)
+    _git_init_if_needed(root)
+    _git_commit_all(root,
+        f"registrar: deactivate member {handle_at} in core {core_name}")
+    return True
+
+
+def rotate_core_leader(
+    *,
+    core_name: str,
+    new_handle: str,
+    new_full_name: str | None = None,
+    env: dict[str, str] | None = None,
+) -> CoreEntry:
+    """Replace the leader of ``core_name`` with ``new_handle``.
+
+    Effects:
+      1. ``_registry.yaml``: ``cores.<name>.pi`` becomes the new handle.
+      2. ``cores/<name>/lab-mgmt/lab.md`` frontmatter ``pi:`` updated.
+      3. The new leader's member file (members/<new>.md) is created
+         with role ``core_leader`` if absent; if present, their role
+         is upgraded to ``core_leader``.
+      4. The old leader's member file (members/<old>.md) is kept; their
+         role is demoted to ``staff`` so they remain a regular core
+         member. Caller can subsequently :func:`remove_core_member`
+         them if they're leaving the core entirely.
+
+    Refuses if ``new_handle`` already leads another active group (lab
+    or core) — single-lead-per-group rule per ``_enforce_core_create_invariants``.
+
+    Returns the updated CoreEntry.
+    """
+    from .frontmatter import dump_document, parse_file
+    new_at = _normalize_pi(new_handle)
+    reg, idx = _find_core(core_name, env)
+    core = reg.cores[idx]
+    old_at = _normalize_pi(core.pi)
+    if new_at == old_at:
+        return core   # no-op
+    # Single-lead-per-group rule (matches create_core).
+    for l in reg.labs:
+        if l.status == "active" and _normalize_pi(l.pi) == new_at:
+            raise PIAlreadyLeadsAnother(
+                f"cannot rotate {core_name} to {new_at}: they lead active lab {l.name!r}."
+            )
+    for j, c in enumerate(reg.cores):
+        if j == idx:
+            continue
+        if c.status == "active" and _normalize_pi(c.pi) == new_at:
+            raise PIAlreadyLeadsAnother(
+                f"cannot rotate {core_name} to {new_at}: they lead active core {c.name!r}."
+            )
+    # Update the in-memory registry + persist.
+    updated = CoreEntry(
+        name=core.name, pi=new_at,
+        lab_mgmt_path=core.lab_mgmt_path,
+        status=core.status, created=core.created,
+        slack_workspace=core.slack_workspace,
+        github_org=core.github_org,
+        oracle_vault=core.oracle_vault,
+    )
+    new_reg = _replace_core(reg, idx, updated)
+    write_registry(new_reg, env)
+    # Update lab.md frontmatter.
+    lab_md = Path(core.lab_mgmt_path) / "lab.md"
+    if lab_md.is_file():
+        parsed = parse_file(lab_md)
+        meta = dict(parsed.meta or {})
+        meta["pi"] = new_at
+        lab_md.write_text(dump_document(meta, parsed.body or ""), encoding="utf-8")
+    members_dir = Path(core.lab_mgmt_path) / "members"
+    members_dir.mkdir(parents=True, exist_ok=True)
+    # New leader's member file.
+    new_plain = new_at.lstrip("@")
+    new_path = members_dir / f"{new_plain}.md"
+    if new_path.is_file():
+        parsed = parse_file(new_path)
+        meta = dict(parsed.meta or {})
+        meta["role"] = "core_leader"
+        meta["status"] = "active"
+        new_path.write_text(dump_document(meta, parsed.body or ""), encoding="utf-8")
+    else:
+        new_path.write_text(
+            _render_core_leader_member_md(
+                leader_at=new_at, leader_full_name=new_full_name,
+                core_name=core.name,
+            ),
+            encoding="utf-8",
+        )
+    # Old leader demoted to staff (kept on the roster; not deleted).
+    old_plain = old_at.lstrip("@")
+    old_path = members_dir / f"{old_plain}.md"
+    if old_path.is_file():
+        parsed = parse_file(old_path)
+        meta = dict(parsed.meta or {})
+        if meta.get("role") == "core_leader":
+            meta["role"] = "staff"
+            old_path.write_text(dump_document(meta, parsed.body or ""), encoding="utf-8")
+    root = lab_info_root(env)
+    _git_init_if_needed(root)
+    _git_commit_all(root,
+        f"registrar: rotate core {core_name} leader: {old_at} -> {new_at}")
+    return updated

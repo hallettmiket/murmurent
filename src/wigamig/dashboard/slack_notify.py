@@ -421,6 +421,53 @@ def member_added(
 
 
 # ---------------------------------------------------------------------------
+# Core member events (cores Phase 1e)
+#
+# Mirror the lab-side member_added function so the centre's Slack
+# channel sees core staff churn the same way it sees lab staff churn.
+# Posts to #claude-test (the lab's infrastructure channel) since cores
+# don't yet have their own Slack channels per the cores rollout plan;
+# Phase 6 may add per-core channels.
+# ---------------------------------------------------------------------------
+
+
+def core_member_added(
+    *, core: str, handle: str, full_name: str, role: str,
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Post a core-member-added event to Slack."""
+    text = (
+        f":busts_in_silhouette: *{full_name}* (@{handle}) "
+        f"added to core *{core}* as *{role}*."
+    )
+    _post(channel, text)
+
+
+def core_member_removed(
+    *, core: str, handle: str,
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Post a core-member-deactivated event to Slack. (Soft-remove —
+    the file is preserved; the frontmatter status flips to inactive.)"""
+    text = f":wave: @{handle} deactivated from core *{core}* (file preserved)."
+    _post(channel, text)
+
+
+def core_leader_rotated(
+    *, core: str, old_handle: str, new_handle: str,
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Post a core-leader-rotation event to Slack. Old leader becomes
+    a staff member; new leader's role becomes core_leader."""
+    text = (
+        f":crown: Core *{core}*: leader rotated "
+        f"@{old_handle} → @{new_handle}. The displaced handle is now "
+        "a staff member of the core."
+    )
+    _post(channel, text)
+
+
+# ---------------------------------------------------------------------------
 # Channel-member sync (item #11)
 # ---------------------------------------------------------------------------
 
