@@ -126,10 +126,14 @@ def test_login_resolve_flags_core_leader(world):
     assert d["core_leader_of"] == ["biocore"]
 
 
-def test_login_resolve_non_leader_has_core_leader_false(world):
+def test_login_resolve_non_leader_non_registrar_has_core_leader_false(world):
+    """A handle that is NEITHER a core leader NOR a centre registrar
+    gets is_core_leader=false. the_pi is the registrar in this fixture
+    so they get the implicit-leader shortcut (covered in a separate test);
+    a fresh handle should not."""
     _seed_core()
     client = TestClient(create_app())
-    res = client.get("/api/login/resolve?user=the_pi")
+    res = client.get("/api/login/resolve?user=random_outsider")
     d = res.json()
     assert d["is_core_leader"] is False
     assert d["core_leader_of"] == []
@@ -153,9 +157,44 @@ def test_login_select_core_leader_routes_to_core_dashboard(world):
 def test_login_select_rejects_core_leader_for_non_leader(world):
     _seed_core()
     client = TestClient(create_app())
+    # Use a totally unrelated handle (not the registered registrar,
+    # not the seeded core leader). The registrar shortcut tested
+    # below means @the_pi (the registrar here) IS a valid core_leader.
     res = client.post("/api/login/select", json={
-        "handle": "the_pi",   # not a core leader
+        "handle": "random_outsider",
         "role": "core_leader",
         "remember_user": False,
     })
     assert res.status_code == 403
+
+
+def test_resolver_grants_registrar_implicit_core_leader_access(world):
+    """Centre registrars manage cores (add/remove/rotate), so they get
+    is_core_leader=true for all registered cores. Avoids forcing them
+    to type the actual leader's handle to open a core dashboard."""
+    _seed_core()
+    client = TestClient(create_app())
+    res = client.get("/api/login/resolve?user=the_pi")  # the_pi is the registrar
+    d = res.json()
+    assert d["is_registrar"] is True
+    assert d["is_core_leader"] is True
+    assert "biocore" in d["core_leader_of"]
+
+
+def test_registrar_can_select_core_leader_role_and_routes_to_first_core(world):
+    _seed_core(name="biocore")
+    # Second core, so we exercise the "first core" routing.
+    R.create_core(
+        name="genomics", display_name="Genomics Core",
+        leader_handle="@genomics_leader",
+    )
+    client = TestClient(create_app())
+    res = client.post("/api/login/select", json={
+        "handle": "the_pi", "role": "core_leader", "remember_user": False,
+    })
+    assert res.status_code == 200, res.text
+    d = res.json()
+    # core_leader_of is alphabetised by registry insertion order; bioCORE
+    # was registered first so it's at index 0.
+    assert d["next"].startswith("/core?core=")
+    assert "user=the_pi" in d["next"]
