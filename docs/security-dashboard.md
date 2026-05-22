@@ -230,6 +230,23 @@ templates above. Rules:
 | <a id="AUTH-PWD-ATTEMPTS-01"></a>`AUTH-PWD-ATTEMPTS-01` | warn | Any successful password-auth login in last 30 days (`auth.log` summary). |
 | <a id="AUTH-WEAK-KEYS-LAB-01"></a>`AUTH-WEAK-KEYS-LAB-01` | warn | Any lab member's `authorized_keys` contains `ssh-rsa` or `ssh-dss` (lab-wide view, requires root walk). |
 
+### Tier 2 — per-core ACL diff (cores Phase 1c, script v7+)
+
+The snapshot script's `acls_core_<core>_<kind>.txt` files are diffed
+against the same templates as the lab tree, but with `CORE-`-prefixed
+rule IDs so the dashboard can group findings per core. Each finding
+carries the core's short id in its `project` field. Categories:
+`core_raw` and `core_refined`.
+
+| Rule | Severity | Description |
+|---|---|---|
+| <a id="CORE-RAW-DENY-DELETE-MISSING-01"></a>`CORE-RAW-DENY-DELETE-MISSING-01` | block | A directory under a core's `raw/` is missing the inherited Deny-delete ACE. Files there could be deleted. |
+| <a id="CORE-RAW-FILE-WRITABLE-01"></a>`CORE-RAW-FILE-WRITABLE-01` | block | A file under a core's `raw/` has OWNER@/GROUP@ allow ACE granting `w`/`a`/`D`/`C`. |
+| <a id="CORE-RAW-UNEXPECTED-PRINCIPAL-01"></a>`CORE-RAW-UNEXPECTED-PRINCIPAL-01` | info | A directory under a core's `raw/` has a named-principal ACE outside the standard allowlist. For the registrar to vet. |
+| <a id="CORE-REFINED-PATTERN-DRIFT-01"></a>`CORE-REFINED-PATTERN-DRIFT-01` | warn | A core's `refined/` root drifts from the canonical template (missing OWNER+GROUP full, missing Users@example.edu read, etc.). |
+| <a id="CORE-REFINED-EXCEPTION-DETECTED-01"></a>`CORE-REFINED-EXCEPTION-DETECTED-01` | info | A subdir of a core's `refined/` has the bc_dcis-style locked-down pattern (GROUP@ stripped). Surfaced for the core leader to vet. |
+| <a id="CORE-ACL-UNEXPECTED-PRINCIPAL-01"></a>`CORE-ACL-UNEXPECTED-PRINCIPAL-01` | info | A directory anywhere under a core's tree has a named-principal ACE outside the standard allowlist. |
+
 ---
 
 ## Tier 2 setup

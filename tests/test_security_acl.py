@@ -374,3 +374,75 @@ def test_consume_snapshot_emits_stale_warning_after_30_days(tmp_path):
     )
     assert any(f.rule == "TIER2-SNAPSHOT-STALE-01" for f in res.findings)
     assert res.snapshot_age_hours > 24 * 30
+
+
+# ---- Phase 1c: per-core ACL diff routing -----------------------------------
+
+def test_consume_snapshot_routes_per_core_acl_files(tmp_path):
+    """A v7 snapshot may contain acls_core_<core>_<kind>.txt per core.
+    The consumer should diff each, retag rule ids with the CORE- prefix,
+    and set the project field to the core's name so the dashboard
+    groups findings by core.
+    """
+    snap = _build_fixture_snapshot(tmp_path)
+    # Add a per-core raw dump that's missing the inherited Deny ACEs
+    # (same shape as RAW_ROOT_MISSING_DENY but for biocore).
+    (snap / "acls_core_biocore_raw.txt").write_text(
+        "# file: /srv/acl-view/lab_vm/wigamig/core/biocore/raw\n"
+        "A::OWNER@:rwaDdxtTnNcCoy\n"
+        "A::GROUP@:rwaxtTnNcy\n"
+        "A:di:OWNER@:rwaDdxtTnNcCoy\n",
+        encoding="utf-8",
+    )
+    res = T2.consume_snapshot(snap, host="lab-server",
+                              now=_dt.datetime(2026, 5, 19, 12, 0, 0))
+    core_findings = [f for f in res.findings if f.category == "core_raw"]
+    assert len(core_findings) >= 1
+    # Rule was retagged.
+    rules = {f.rule for f in core_findings}
+    assert "CORE-RAW-DENY-DELETE-MISSING-01" in rules
+    # project field carries the core's short id.
+    assert all(f.project == "biocore" for f in core_findings)
+    # rule_doc_anchor points at the new rule id, not the lab one.
+    assert all("CORE-RAW-" in f.rule_doc_anchor for f in core_findings)
+
+
+def test_consume_snapshot_handles_no_core_files_gracefully(tmp_path):
+    """A v6 snapshot (no per-core files) shouldn't break the consumer.
+    Just no core findings, and the legacy lab findings still flow."""
+    snap = _build_fixture_snapshot(tmp_path)
+    res = T2.consume_snapshot(snap, host="lab-server",
+                              now=_dt.datetime(2026, 5, 19, 12, 0, 0))
+    core_findings = [f for f in res.findings
+                     if f.category in ("core_raw", "core_refined")]
+    assert core_findings == []
+    # Lab-level findings still present.
+    assert any(f.rule == "RAW-DENY-DELETE-MISSING-01" for f in res.findings)
+
+
+def test_consume_snapshot_per_core_refined_exception(tmp_path):
+    """A core's refined/<project>/ with the locked-down GROUP@ pattern
+    (bc_dcis-style) gets CORE-REFINED-EXCEPTION-DETECTED-01."""
+    snap = _build_fixture_snapshot(tmp_path)
+    (snap / "acls_core_biocore_refined.txt").write_text(
+        REFINED_ROOT_OK.replace(
+            "/srv/acl-view/lab_vm/refined",
+            "/srv/acl-view/lab_vm/wigamig/core/biocore/refined",
+        )
+        + REFINED_BC_DCIS_EXCEPTION.replace(
+            "/srv/acl-view/lab_vm/refined/bc_dcis",
+            "/srv/acl-view/lab_vm/wigamig/core/biocore/refined/locked_project",
+        ),
+        encoding="utf-8",
+    )
+    res = T2.consume_snapshot(snap, host="lab-server",
+                              now=_dt.datetime(2026, 5, 19, 12, 0, 0))
+    core_refined = [f for f in res.findings if f.category == "core_refined"]
+    rules = {f.rule for f in core_refined}
+    assert "CORE-REFINED-EXCEPTION-DETECTED-01" in rules
+    # Per-core findings tagged with core name as the project.
+    assert all(f.project == "biocore" for f in core_refined)
+
+
+def test_supported_versions_includes_v7():
+    assert "7" in T2.SUPPORTED_SCRIPT_VERSIONS

@@ -29,9 +29,10 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="6"   # v6: refined walked per-project so one big subdir
-                     # only times itself out. raw still walked globally
-                     # (typically fast enough).
+SCRIPT_VERSION="7"   # v7: cores Phase 1c — also walks $V4_ROOT/core/<core>/
+                     # {raw,refined}/ for each core present on the lab
+                     # server. Emits acls_core_<core>_{raw,refined}.txt
+                     # so the consumer can route per-core findings.
 LAB_GROUP="labgroup"     # owner group on snapshot dir; readers
 # Snapshot output is on LOCAL DISK (ext4) rather than the NAS:
 #  - Root on lab-server isn't a principal in the the NAS ACLs, so even on
@@ -193,6 +194,87 @@ if [[ -d "$V4_ROOT/refined" ]]; then
         "$refined_ok ok, $refined_timeout timeout, $refined_fail fail (total $((SECONDS-refined_total_start))s)"
 else
     record_attempt "acls_refined" "skip" "$V4_ROOT/refined not present"
+fi
+
+# -- 1c. Per-core ACL walks (cores Phase 1c) -------------------------------
+# Each registered core's data tree lives at $V4_ROOT/core/<core>/{raw,refined}/.
+# We walk every core present on the filesystem (no centre-registry
+# lookup required — the directory is authoritative for what's actually
+# on disk on the server). Each core gets its own pair of dump files
+# named acls_core_<core>_raw.txt + acls_core_<core>_refined.txt so the
+# Python consumer can route per-core findings without splitting one
+# giant blob. Same per-project budget applies to refined/ subdirs.
+CORE_ROOT="$V4_ROOT/core"
+if [[ -d "$CORE_ROOT" ]]; then
+    log "scanning per-core trees under $CORE_ROOT"
+    core_count=0
+    for core_dir in "$CORE_ROOT"/*/; do
+        [[ -d "$core_dir" ]] || continue
+        core=$(basename "$core_dir")
+        core_count=$((core_count + 1))
+        log "  core: $core"
+        # core/<core>/raw — same shape as lab raw: walk recursively
+        cr_file="$OUT_DIR/acls_core_${core}_raw.txt"
+        if [[ -d "$core_dir/raw" ]]; then
+            start=$SECONDS
+            if bounded "$TIMEOUT_ACL" nfs4_getfacl -R "$core_dir/raw" \
+               > "$cr_file" 2>"$OUT_DIR/acls_core_${core}_raw.stderr"; then
+                chmod 0640 "$cr_file"
+                chgrp "$LAB_GROUP" "$cr_file" 2>/dev/null || true
+                record_attempt "acls_core_${core}_raw" "ok" \
+                    "$(wc -l < "$cr_file") lines in $((SECONDS-start))s"
+            else
+                rc=$?
+                if [[ $rc -eq 124 || $rc -eq 137 ]]; then
+                    record_attempt "acls_core_${core}_raw" "timeout" "exceeded ${TIMEOUT_ACL}s"
+                else
+                    record_attempt "acls_core_${core}_raw" "fail" "rc=$rc"
+                fi
+            fi
+        else
+            record_attempt "acls_core_${core}_raw" "skip" "$core_dir/raw not present"
+        fi
+        # core/<core>/refined — same per-project per-project walk.
+        cf_file="$OUT_DIR/acls_core_${core}_refined.txt"
+        : > "$cf_file"
+        if [[ -d "$core_dir/refined" ]]; then
+            cf_ok=0; cf_timeout=0; cf_fail=0
+            cf_start=$SECONDS
+            nfs4_getfacl "$core_dir/refined" >> "$cf_file" \
+                2>"$OUT_DIR/acls_core_${core}_refined.stderr" || true
+            for proj_dir in "$core_dir/refined"/*/; do
+                [[ -d "$proj_dir" ]] || continue
+                proj=$(basename "$proj_dir")
+                if bounded "$TIMEOUT_ACL_PER_PROJECT" nfs4_getfacl -R "$proj_dir" \
+                   >> "$cf_file" 2>>"$OUT_DIR/acls_core_${core}_refined.stderr"; then
+                    cf_ok=$((cf_ok + 1))
+                else
+                    rc=$?
+                    if [[ $rc -eq 124 || $rc -eq 137 ]]; then
+                        cf_timeout=$((cf_timeout + 1))
+                    else
+                        cf_fail=$((cf_fail + 1))
+                    fi
+                fi
+            done
+            chmod 0640 "$cf_file"
+            chgrp "$LAB_GROUP" "$cf_file" 2>/dev/null || true
+            if [[ $cf_timeout -eq 0 && $cf_fail -eq 0 ]]; then
+                cf_status="ok"
+            elif [[ $cf_ok -gt 0 ]]; then
+                cf_status="partial"
+            else
+                cf_status="fail"
+            fi
+            record_attempt "acls_core_${core}_refined" "$cf_status" \
+                "$cf_ok ok, $cf_timeout timeout, $cf_fail fail (total $((SECONDS-cf_start))s)"
+        else
+            record_attempt "acls_core_${core}_refined" "skip" "$core_dir/refined not present"
+        fi
+    done
+    log "  walked $core_count cores"
+else
+    record_attempt "cores" "skip" "$CORE_ROOT not present (no cores deployed)"
 fi
 
 # -- 2. sshd policy (authoritative via `sshd -T`) ---------------------------

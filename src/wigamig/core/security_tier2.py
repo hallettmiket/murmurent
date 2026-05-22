@@ -43,7 +43,7 @@ from .security_findings import (
 )
 
 
-SUPPORTED_SCRIPT_VERSIONS = ("1", "2", "3", "4", "5", "6")
+SUPPORTED_SCRIPT_VERSIONS = ("1", "2", "3", "4", "5", "6", "7")
 
 
 @dataclass
@@ -112,7 +112,7 @@ def consume_snapshot(snapshot_dir: Path, *, host: str,
             now_iso=now_iso,
         ))
 
-    # ----- ACL diffs (raw + refined) ---------------------------------------
+    # ----- ACL diffs (lab raw + refined) -----------------------------------
     for kind, parser_fn in (
         ("raw", diff_raw),
         ("refined", diff_refined),
@@ -130,6 +130,64 @@ def consume_snapshot(snapshot_dir: Path, *, host: str,
         result.findings.extend(parser_fn(
             acls, host=host, lab_vm_root=lab_vm_root, now_iso=now_iso,
         ))
+
+    # ----- ACL diffs (per-core raw + refined) ------------------------------
+    # Phase 1c of the cores rollout (docs/cores_plan.md §11). The Phase
+    # 1c snapshot script (v7+) emits acls_core_<core>_<kind>.txt per
+    # core present on the lab server. Reuse the existing diff_raw /
+    # diff_refined functions, but emit findings with CORE- rule
+    # prefixes so the dashboard can group them separately and so the
+    # core's leader can see only their core's findings later (Phase 3
+    # of the security dashboard work).
+    for acl_path in sorted(snapshot_dir.glob("acls_core_*_*.txt")):
+        # Filename format: acls_core_<core>_<kind>.txt  (kind = raw|refined)
+        stem = acl_path.stem  # e.g. "acls_core_biocore_raw"
+        parts = stem.split("_", 3)
+        if len(parts) < 4 or parts[0] != "acls" or parts[1] != "core":
+            continue
+        core_name = parts[2]
+        kind = parts[3]
+        if kind not in ("raw", "refined"):
+            continue
+        try:
+            text = acl_path.read_text(encoding="utf-8", errors="replace")
+        except OSError as exc:
+            result.warnings.append(f"{acl_path.name}: read failed ({exc})")
+            continue
+        acls = parse_nfs4_getfacl(text)
+        # Re-use the same diff functions; relabel rule IDs + category
+        # post-hoc so dashboard filtering by category="core_raw" /
+        # "core_refined" works without duplicating ~300 lines of ACL
+        # template logic. The lab_vm_root mapping for paths needs
+        # adjusting because core trees live one level deeper.
+        parser_fn = diff_raw if kind == "raw" else diff_refined
+        core_findings = parser_fn(
+            acls, host=host, lab_vm_root=lab_vm_root, now_iso=now_iso,
+        )
+        for f in core_findings:
+            # Rule re-tag: RAW-IMMUTABLE-01 -> CORE-RAW-IMMUTABLE-01,
+            # REFINED-PATTERN-DRIFT-01 -> CORE-REFINED-PATTERN-DRIFT-01,
+            # etc. Preserves the diff logic but the dashboard can tell
+            # core findings apart from lab findings at a glance.
+            new_rule = f.rule
+            if not new_rule.startswith("CORE-"):
+                if new_rule.startswith("RAW-"):
+                    new_rule = "CORE-" + new_rule
+                elif new_rule.startswith("REFINED-"):
+                    new_rule = "CORE-" + new_rule
+                elif new_rule == "ACL-UNEXPECTED-PRINCIPAL-01":
+                    new_rule = "CORE-ACL-UNEXPECTED-PRINCIPAL-01"
+            new_category = f"core_{kind}"
+            # Pydantic dataclass — copy with overrides via _replace-like
+            # pattern (Finding is a regular dataclass).
+            from dataclasses import replace as _replace
+            result.findings.append(_replace(
+                f,
+                rule=new_rule,
+                category=new_category,
+                project=core_name,   # surface the core name in the project field
+                rule_doc_anchor=f"docs/security-dashboard.md#{new_rule}",
+            ))
 
     # ----- sshd policy -----------------------------------------------------
     sshd_path = snapshot_dir / "sshd_runtime.txt"
