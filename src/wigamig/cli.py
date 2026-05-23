@@ -1381,6 +1381,9 @@ cli.add_command(_core_calendar_auth)
 from .commands.reminders_cmd import core_remind as _core_remind
 cli.add_command(_core_remind)
 
+from .commands.invoice_cmd import core_invoice as _core_invoice
+cli.add_command(_core_invoice)
+
 
 if __name__ == "__main__":  # pragma: no cover
     cli()

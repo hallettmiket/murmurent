@@ -3943,6 +3943,151 @@ def create_app() -> FastAPI:
             "path": str(req.path),
         }
 
+    @app.get("/api/lab/{lab}/core_charges")
+    def lab_core_charges(
+        lab: str,
+        month: str = Query("", description="YYYY-MM; defaults to current month."),
+    ) -> dict:
+        """Phase 4d: aggregate a requesting lab's charges across every
+        core for one month. Drives the PI 'Core charges this month'
+        panel. No write side; safe for any viewer (the data only shows
+        their lab's spend).
+        """
+        import datetime as _dt2
+        from ..core import invoices as _inv
+        from ..core import registrar as _reg
+        lab_lc = lab.lstrip("@").lower()
+        if not month:
+            now = _dt2.datetime.now(_dt2.timezone.utc)
+            month = f"{now.year:04d}-{now.month:02d}"
+        try:
+            reg = _reg.read_registry()
+            cores = list(reg.cores)
+        except Exception:
+            cores = []
+        per_core: list[dict] = []
+        grand_total = 0.0
+        grand_unconfirmed = 0
+        for core in cores:
+            try:
+                invs = _inv.gather_invoices(core=core.name, month=month)
+            except _inv.InvoiceError as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
+            mine = next((i for i in invs if i.lab == lab_lc), None)
+            if mine is None or not mine.lines:
+                continue
+            per_core.append({
+                "core": core.name,
+                "lines": len(mine.lines),
+                "unconfirmed": mine.unconfirmed_count,
+                "subtotal": mine.subtotal,
+            })
+            grand_total += mine.subtotal
+            grand_unconfirmed += mine.unconfirmed_count
+        return {
+            "lab": lab_lc, "month": month,
+            "cores": per_core,
+            "total": round(grand_total, 2),
+            "unconfirmed": grand_unconfirmed,
+        }
+
+    @app.get("/api/core/{core}/invoices/{month}/preview")
+    def core_invoice_preview(
+        core: str, month: str,
+        finalised: bool = Query(False),
+        user: str = Query(""),
+    ) -> dict:
+        """Dry-run invoice aggregation for a core/month (Phase 4c).
+
+        Leader/registrar gated. Returns one entry per requesting lab
+        with subtotal + unconfirmed count so the dashboard can render
+        a summary before the user commits to writing files.
+        """
+        from ..core import invoices as _inv
+        from ..core import registrar as _reg
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        reg = _reg.read_registry()
+        entry = next((c for c in reg.cores if c.name == core), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        if not (entry.pi.lstrip("@").lower() == actor.lower()
+                or _reg.is_registrar(actor)):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not the leader of {core!r} or a registrar.")
+        try:
+            invs = _inv.gather_invoices(
+                core=core, month=month,
+                include_unconfirmed=not finalised,
+            )
+        except _inv.InvoiceError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {
+            "core": core, "month": month,
+            "labs": [
+                {"lab": i.lab, "lines": len(i.lines),
+                 "unconfirmed": i.unconfirmed_count,
+                 "subtotal": i.subtotal}
+                for i in invs
+            ],
+            "total": round(sum(i.subtotal for i in invs), 2),
+            "unconfirmed": sum(i.unconfirmed_count for i in invs),
+        }
+
+    @app.post("/api/core/{core}/invoices/{month}/generate")
+    def core_invoice_generate(
+        core: str, month: str,
+        body: dict | None = None,
+        user: str = Query(""),
+    ) -> dict:
+        """Write per-lab CSV + MD + summary under
+        <lab_info>/cores/<core>/lab-mgmt/invoices/<month>/.
+
+        body.finalised=true excludes rows whose actual_charge is
+        unconfirmed (used for end-of-month sign-off). Leader / registrar.
+        """
+        from ..core import invoices as _inv
+        from ..core import registrar as _reg
+        from ..core.frontmatter import parse_file as _pf
+        body = body or {}
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        reg = _reg.read_registry()
+        entry = next((c for c in reg.cores if c.name == core), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        if not (entry.pi.lstrip("@").lower() == actor.lower()
+                or _reg.is_registrar(actor)):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not the leader of {core!r} or a registrar.")
+        try:
+            invs = _inv.gather_invoices(
+                core=core, month=month,
+                include_unconfirmed=not bool(body.get("finalised")),
+            )
+        except _inv.InvoiceError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        if not invs:
+            return {"ok": True, "core": core, "month": month,
+                    "labs": [], "total": 0.0, "written": []}
+        core_display = core
+        try:
+            lab_md = Path(entry.lab_mgmt_path) / "lab.md"
+            if lab_md.is_file():
+                core_display = str((_pf(lab_md).meta or {}).get("name") or core)
+        except Exception:
+            pass
+        paths = _inv.write_invoices(
+            core=core, month=month, invoices=invs,
+            core_display=core_display,
+        )
+        return {
+            "ok": True, "core": core, "month": month,
+            "labs": [i.lab for i in invs],
+            "total": round(sum(i.subtotal for i in invs), 2),
+            "written": [str(p) for p in paths],
+        }
+
     @app.get("/api/core/{core}/requests")
     def core_list_requests(
         core: str,
@@ -4149,6 +4294,85 @@ def create_app() -> FastAPI:
             "state": _sr.STATE_CANCELLED,
             "calendar": {"warning": calendar_warning,
                          "deleted_event_id": evt_id if not calendar_warning else ""},
+        }
+
+    @app.patch("/api/core/{core}/requests/{request_id}/actual_charge")
+    def core_request_actual_charge(
+        core: str, request_id: str,
+        body: dict,
+        user: str = Query("", description="Actor handle (leader or registrar)."),
+    ) -> dict:
+        """Phase 4a: leader confirms the final billable charge for a
+        request (typically called after `advance` to ``in_progress`` or
+        ``completed`` but allowed in any state).
+
+        Body:
+          - ``total``: required float — the dollar amount the lab will
+            be invoiced.
+          - ``tier``, ``unit``, ``base``, ``modifiers_applied``:
+            optional; default to the booking-time snapshot when omitted.
+          - ``note``: free-text justification (overtime, sample rerun,
+            …) appended to the audit trail.
+        """
+        from ..core import service_requests as _sr
+        from . import slack_notify as _notify
+        actor, req = _require_request_actor(
+            core, request_id, user, admin_only=True,
+        )
+        if "total" not in (body or {}):
+            raise HTTPException(
+                status_code=422, detail="body.total is required",
+            )
+        try:
+            total = float(body["total"])
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=422, detail="body.total must be a number",
+            )
+        if total < 0:
+            raise HTTPException(
+                status_code=422, detail="body.total must be >= 0",
+            )
+        booking_fee = req.fee_at_booking
+        charge = _sr.FeeSnapshot(
+            tier=str(body.get("tier") or booking_fee.tier),
+            unit=str(body.get("unit") or booking_fee.unit),
+            base=float(body.get("base") if body.get("base") is not None
+                       else booking_fee.base),
+            modifiers_applied=list(
+                body.get("modifiers_applied")
+                if body.get("modifiers_applied") is not None
+                else booking_fee.modifiers_applied
+            ),
+            total=total,
+        )
+        try:
+            updated = _sr.set_actual_charge(
+                core=core, request_id=request_id,
+                charge=charge, confirmed_by=actor,
+                note=str(body.get("note") or ""),
+            )
+        except _sr.RequestError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        try:
+            _notify.core_request_charge_confirmed(
+                core=core, request_id=request_id,
+                requester=req.requester, actor=actor,
+                booked_total=booking_fee.total, actual_total=total,
+                note=str(body.get("note") or ""),
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        return {
+            "ok": True, "core": core, "request_id": request_id,
+            "fee_at_booking_total": booking_fee.total,
+            "actual_charge": {
+                "tier": charge.tier, "unit": charge.unit,
+                "base": charge.base, "total": charge.total,
+                "modifiers_applied": charge.modifiers_applied,
+            },
+            "actual_charge_confirmed_by": updated.actual_charge_confirmed_by,
+            "actual_charge_confirmed_at": updated.actual_charge_confirmed_at,
         }
 
     @app.post("/api/core/{core}/requests/{request_id}/reschedule")

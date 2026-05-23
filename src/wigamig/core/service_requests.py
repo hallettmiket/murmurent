@@ -110,6 +110,14 @@ class RequestSummary:
     training_verified: dict[str, str] = field(default_factory=dict)
     prerequisites_attested: list[dict[str, bool]] = field(default_factory=list)
     fee_at_booking: FeeSnapshot = field(default_factory=FeeSnapshot)
+    # Phase 4a: leader confirms the final charge post-run; may differ
+    # from fee_at_booking (overtime, sample re-runs, …). None ≡ not yet
+    # confirmed; the invoice generator falls back to fee_at_booking in
+    # that case but flags the row.
+    actual_charge: FeeSnapshot | None = None
+    actual_charge_note: str = ""
+    actual_charge_confirmed_by: str = ""
+    actual_charge_confirmed_at: str = ""
     notes: str = ""
     job_id: str = ""                      # data-delivery dir name
     created: str = ""
@@ -171,8 +179,18 @@ def new_request_id(
 # Render / parse
 # ---------------------------------------------------------------------------
 
-def _to_dict(req: RequestSummary) -> dict:
+def _fee_dict(f: FeeSnapshot) -> dict:
     return {
+        "tier": f.tier,
+        "unit": f.unit,
+        "base": f.base,
+        "modifiers_applied": list(f.modifiers_applied or []),
+        "total": f.total,
+    }
+
+
+def _to_dict(req: RequestSummary) -> dict:
+    out = {
         "request_id": req.request_id,
         "service": req.service,
         "core": req.core,
@@ -186,17 +204,17 @@ def _to_dict(req: RequestSummary) -> dict:
         },
         "training_verified": dict(req.training_verified or {}),
         "prerequisites_attested": list(req.prerequisites_attested or []),
-        "fee_at_booking": {
-            "tier": req.fee_at_booking.tier,
-            "unit": req.fee_at_booking.unit,
-            "base": req.fee_at_booking.base,
-            "modifiers_applied": list(req.fee_at_booking.modifiers_applied or []),
-            "total": req.fee_at_booking.total,
-        },
+        "fee_at_booking": _fee_dict(req.fee_at_booking),
         "job_id": req.job_id,
         "created": req.created,
         "updated": req.updated,
     }
+    if req.actual_charge is not None:
+        out["actual_charge"] = _fee_dict(req.actual_charge)
+        out["actual_charge_note"] = req.actual_charge_note
+        out["actual_charge_confirmed_by"] = req.actual_charge_confirmed_by
+        out["actual_charge_confirmed_at"] = req.actual_charge_confirmed_at
+    return out
 
 
 def _render_request_md(req: RequestSummary, body: str = "") -> str:
@@ -205,6 +223,18 @@ def _render_request_md(req: RequestSummary, body: str = "") -> str:
     yaml_text = _y.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip()
     body = body.strip() or f"# Request {req.request_id}"
     return f"---\n{yaml_text}\n---\n\n{body}\n"
+
+
+def _parse_fee_or_none(raw) -> FeeSnapshot | None:
+    if not raw or not isinstance(raw, dict):
+        return None
+    return FeeSnapshot(
+        tier=str(raw.get("tier") or ""),
+        unit=str(raw.get("unit") or "per_run"),
+        base=float(raw.get("base") or 0.0),
+        modifiers_applied=list(raw.get("modifiers_applied") or []),
+        total=float(raw.get("total") or 0.0),
+    )
 
 
 def _parse_request(path: Path) -> RequestSummary | None:
@@ -238,6 +268,10 @@ def _parse_request(path: Path) -> RequestSummary | None:
             modifiers_applied=list(fee_raw.get("modifiers_applied") or []),
             total=float(fee_raw.get("total") or 0.0),
         ),
+        actual_charge=_parse_fee_or_none(meta.get("actual_charge")),
+        actual_charge_note=str(meta.get("actual_charge_note") or ""),
+        actual_charge_confirmed_by=str(meta.get("actual_charge_confirmed_by") or ""),
+        actual_charge_confirmed_at=str(meta.get("actual_charge_confirmed_at") or ""),
         notes=(parsed.body or "").strip(),
         job_id=str(meta.get("job_id") or ""),
         created=str(meta.get("created") or ""),
@@ -426,6 +460,51 @@ def update_booking_slot(
     return updated
 
 
+def set_actual_charge(
+    *,
+    core: str,
+    request_id: str,
+    charge: FeeSnapshot,
+    confirmed_by: str,
+    note: str = "",
+    env: dict[str, str] | None = None,
+) -> RequestSummary:
+    """Phase 4a: leader records the final billable amount post-run.
+
+    Allowed in any state — bookings can pre-confirm overtime even
+    before transitioning to completed. Replaces any previous
+    actual_charge entirely (no partial-merge).
+    """
+    req = get_request(core, request_id, env=env)
+    if req is None:
+        raise RequestError(f"request not found: {core}/{request_id}")
+    now_iso = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    updated = replace(
+        req,
+        actual_charge=charge,
+        actual_charge_note=note,
+        actual_charge_confirmed_by=confirmed_by.lstrip("@"),
+        actual_charge_confirmed_at=now_iso,
+        updated=now_iso,
+    )
+    body = req.notes or ""
+    body = body.rstrip() + (
+        f"\n\n## {now_iso}: actual_charge confirmed by @{updated.actual_charge_confirmed_by}\n"
+        f"tier={charge.tier} total=${charge.total:.2f}"
+        + (f" — {note.strip()}" if note.strip() else "")
+        + "\n"
+    )
+    target = request_path(core, request_id, env)
+    target.write_text(_render_request_md(updated, body=body), encoding="utf-8")
+    updated.path = target
+    root = lab_info_root(env)
+    _git_init_if_needed(root)
+    _git_commit_all(root,
+        f"core {core}: request {request_id} actual_charge ${charge.total:.2f} "
+        f"confirmed by @{updated.actual_charge_confirmed_by}")
+    return updated
+
+
 __all__ = [
     "REQUESTS_SUBDIR",
     "STATE_REQUESTED", "STATE_SCHEDULED", "STATE_IN_PROGRESS",
@@ -436,4 +515,5 @@ __all__ = [
     "requests_dir", "request_path", "new_request_id",
     "iter_requests", "get_request",
     "create_request", "transition_request", "update_booking_slot",
+    "set_actual_charge",
 ]
