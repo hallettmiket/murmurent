@@ -50,13 +50,13 @@ def world(monkeypatch, tmp_path):
 
 @patch("wigamig.dashboard.slack_notify._post")
 def _seed_bookings(mock_post, client):
-    """Three bookings: alice@10, bob@11 (cancelled), alice@12 (completed)."""
-    for user, start, terminal in [
-        ("alice", "2026-05-23T10:00-04:00", None),
-        ("bob",   "2026-05-23T11:00-04:00", "cancel"),
-        ("alice", "2026-05-23T12:00-04:00", "complete"),
+    """Three back-to-back hour slots: alice@10-11 (live), bob@11-12
+    (cancelled), alice@12-13 (completed)."""
+    for user, start, end, terminal in [
+        ("alice", "2026-05-23T10:00-04:00", "2026-05-23T11:00-04:00", None),
+        ("bob",   "2026-05-23T11:00-04:00", "2026-05-23T12:00-04:00", "cancel"),
+        ("alice", "2026-05-23T12:00-04:00", "2026-05-23T13:00-04:00", "complete"),
     ]:
-        end = start.replace("10:", "11:").replace("11:", "12:").replace("12:", "13:")
         res = client.post(
             f"/api/core/biocore/services/itc/book?user={user}",
             json={"slot": {"start": start, "end": end}},

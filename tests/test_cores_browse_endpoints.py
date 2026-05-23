@@ -118,11 +118,16 @@ def test_list_cores_services_member_with_training(world):
 def test_member_requests_only_for_that_member(mock_post, world):
     client = TestClient(create_app())
     # alice books cd; bob books cd; alice books seq.
-    for user in ("alice", "bob", "alice"):
+    # Staggered slots so the conflict-check doesn't refuse later
+    # bookings on the same service.
+    for user, start, end in [
+        ("alice", "2026-05-23T10:00-04:00", "2026-05-23T11:00-04:00"),
+        ("bob",   "2026-05-23T11:00-04:00", "2026-05-23T12:00-04:00"),
+        ("alice", "2026-05-23T12:00-04:00", "2026-05-23T13:00-04:00"),
+    ]:
         client.post(
             f"/api/core/biocore/services/cd/book?user={user}",
-            json={"slot": {"start": "2026-05-23T10:00-04:00",
-                           "end":   "2026-05-23T11:00-04:00"}},
+            json={"slot": {"start": start, "end": end}},
         )
     client.post(
         "/api/core/genomics/services/seq/book?user=alice",
