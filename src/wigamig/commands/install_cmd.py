@@ -206,13 +206,47 @@ def _ensure_hook(settings: dict[str, Any], reg: dict[str, Any]) -> bool:
 
 
 def _ensure_mcp(settings: dict[str, Any]) -> bool:
-    """Ensure each entry in ``MCP_REGISTRATIONS`` is in ``settings.mcpServers``."""
+    """Ensure each entry in ``MCP_REGISTRATIONS`` is in ``settings.mcpServers``.
+
+    Kept for back-compat: prior wigamig releases wrote MCPs to
+    ``~/.claude/settings.json``. Claude Code actually reads them from
+    ``~/.claude.json`` (see :func:`_ensure_mcp_claude_json`), so this
+    function's writes are effectively no-ops for runtime — but other
+    tooling may still inspect ~/.claude/settings.json, so we keep
+    populating it.
+    """
     changed = False
     servers = settings.setdefault("mcpServers", {})
     for name, spec in MCP_REGISTRATIONS.items():
         if servers.get(name) != spec:
             servers[name] = spec
             changed = True
+    return changed
+
+
+def _ensure_mcp_claude_json() -> bool:
+    """Write MCP entries to ``~/.claude.json`` so Claude Code actually
+    picks them up. Without this, ``claude mcp list`` doesn't see our
+    servers and members can't reach the wigamig MCPs.
+
+    Idempotent. Preserves any entries the user added by hand (e.g.
+    slack). Writes at user scope (top-level ``mcpServers`` key).
+    """
+    target = Path.home() / ".claude.json"
+    data: dict[str, Any] = {}
+    if target.is_file():
+        try:
+            data = json.loads(target.read_text(encoding="utf-8") or "{}")
+        except json.JSONDecodeError:
+            data = {}
+    servers = data.setdefault("mcpServers", {})
+    changed = False
+    for name, spec in MCP_REGISTRATIONS.items():
+        if servers.get(name) != spec:
+            servers[name] = spec
+            changed = True
+    if changed:
+        target.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     return changed
 
 
@@ -244,6 +278,11 @@ def cmd_install(
         if _ensure_hook(settings, reg):
             changed = True
     if _ensure_mcp(settings):
+        changed = True
+    # ALSO write MCP entries to ~/.claude.json — that's where Claude Code
+    # actually reads from. (~/.claude/settings.json's mcpServers block
+    # is a legacy wigamig convention that CC ignores at runtime.)
+    if _ensure_mcp_claude_json():
         changed = True
 
     target.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
