@@ -34,19 +34,28 @@ def project_with_seas(monkeypatch, tmp_path):
     return repo
 
 
+def _context(stdout: io.StringIO) -> str:
+    """Pull additionalContext from the CC-modern hook output. Returns
+    empty string when the hook chose to inject nothing (= allow)."""
+    raw = stdout.getvalue().strip()
+    if not raw:
+        return ""
+    data = json.loads(raw)
+    return (data.get("hookSpecificOutput") or {}).get("additionalContext", "")
+
+
 def test_injects_when_inside_project(project_with_seas):
     payload = {"user_prompt": "what's next?"}
     stdin = io.StringIO(json.dumps(payload))
     stdout = io.StringIO()
     code = context_inject.main(stdin=stdin, stdout=stdout)
     assert code == 0
-    out = json.loads(stdout.getvalue())
-    assert out["decision"] == "modify"
-    assert "<system-reminder>" in out["user_prompt"]
-    assert "project: p" in out["user_prompt"]
-    assert "@allie" in out["user_prompt"]
-    assert "what's next?" in out["user_prompt"]
-    assert "SEAs you filed" in out["user_prompt"]
+    ctx = _context(stdout)
+    # CC keeps the user_prompt verbatim; we only contribute extra context.
+    assert "<system-reminder>" in ctx
+    assert "project: p" in ctx
+    assert "@allie" in ctx
+    assert "SEAs you filed" in ctx
 
 
 def test_no_injection_outside_project(monkeypatch, tmp_path):
@@ -56,8 +65,8 @@ def test_no_injection_outside_project(monkeypatch, tmp_path):
     stdout = io.StringIO()
     code = context_inject.main(stdin=stdin, stdout=stdout)
     assert code == 0
-    out = json.loads(stdout.getvalue())
-    assert out["decision"] == "allow"
+    # Empty stdout == allow (no injection).
+    assert stdout.getvalue() == ""
 
 
 def test_role_lead_for_charter_lead(project_with_seas):
@@ -65,5 +74,4 @@ def test_role_lead_for_charter_lead(project_with_seas):
     stdin = io.StringIO(json.dumps(payload))
     stdout = io.StringIO()
     context_inject.main(stdin=stdin, stdout=stdout)
-    text = json.loads(stdout.getvalue())["user_prompt"]
-    assert "(lead)" in text
+    assert "(lead)" in _context(stdout)

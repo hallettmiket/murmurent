@@ -269,23 +269,29 @@ def evaluate(call: dict[str, Any]) -> dict[str, Any]:
 
 
 def main(stdin: IO[str] | None = None, stdout: IO[str] | None = None) -> int:
-    """Read tool-call JSON from stdin, write decision JSON to stdout."""
+    """Read tool-call JSON from stdin, write decision JSON to stdout.
+
+    CC modern protocol: empty stdout = allow; deny uses
+    hookSpecificOutput. See raw_guard.main for the rationale.
+    """
     src = stdin or sys.stdin
     dst = stdout or sys.stdout
     raw_text = src.read()
     if not raw_text.strip():
-        dst.write(json.dumps({"decision": "allow"}))
         return 0
     try:
         call = json.loads(raw_text)
-    except json.JSONDecodeError as exc:
-        dst.write(json.dumps({
-            "decision": "allow",
-            "warning": f"protected_paths parse error: {exc}",
-        }))
+    except json.JSONDecodeError:
         return 0
     decision = evaluate(call if isinstance(call, dict) else {})
-    dst.write(json.dumps(decision))
+    if decision.get("decision") == "deny":
+        dst.write(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": decision.get("reason", ""),
+            },
+        }))
     return 0
 
 

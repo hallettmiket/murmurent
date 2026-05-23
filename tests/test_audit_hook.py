@@ -24,7 +24,8 @@ def test_writes_jsonl(tmp_path, monkeypatch):
     stdout = io.StringIO()
     code = audit.main(stdin=stdin, stdout=stdout)
     assert code == 0
-    assert json.loads(stdout.getvalue())["decision"] == "allow"
+    # CC modern protocol: empty stdout == "allow, no opinion".
+    assert stdout.getvalue() == ""
 
     today = _dt.date.today().isoformat()
     log_path = tmp_path / f"{today}.log"
