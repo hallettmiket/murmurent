@@ -69,8 +69,14 @@ def _write_member(root, handle, *, role="postdoc", trainings=None):
     )
 
 
-def _seed_itc(world, *, training_required="itc_basic", status="active"):
-    """Create a paid ITC service with one tier + one modifier."""
+def _seed_itc(world, *, training_required="itc_basic", status="active",
+               trained=("alice", "gary")):
+    """Create a paid ITC service with one tier + one modifier.
+
+    Phase 6++: training is recorded on the CORE's training_roster, not
+    on the member file. ``trained`` lists handles to grant the
+    ``training_required`` prereq to via T.record_training.
+    """
     # Catalog entry for the training the service requires.
     if training_required:
         T.training_dir("biocore").mkdir(parents=True, exist_ok=True)
@@ -90,6 +96,16 @@ def _seed_itc(world, *, training_required="itc_basic", status="active"):
              "tiers": {"academic_internal": 80.0, "industry": 260.0},
              "modifiers": {"weekend": 1.25}},
     )
+    # Record training on the core's roster for the trained handles
+    # (Phase 6+ — bioCore is the authority on bioCore prereqs).
+    if training_required:
+        for h in trained:
+            T.record_training(
+                core="biocore", handle=h,
+                training_slug=training_required,
+                completed="2025-11-15", by="@gary",
+                valid_until="2030-11-15",
+            )
 
 
 # ---- happy path --------------------------------------------------------
@@ -139,9 +155,7 @@ def test_book_modifiers_multiply_through(mock_post, world):
 # ---- prereq + status gates ---------------------------------------------
 
 def test_book_blocked_when_training_missing(world):
-    _seed_itc(world)
-    # alice has the training; strip it.
-    _write_member(world, "alice", trainings=[])
+    _seed_itc(world, trained=())   # nobody trained → alice has no roster record
     client = TestClient(create_app())
     res = client.post(
         "/api/core/biocore/services/itc/book?user=alice",

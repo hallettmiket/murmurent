@@ -175,9 +175,150 @@ class TrainingRecord:
 
 
 def _member_path(handle: str, env: dict[str, str] | None = None) -> Path:
-    """Resolve ``<lab_mgmt>/members/<handle>.md``."""
+    """Resolve ``<lab_mgmt>/members/<handle>.md``.
+
+    Lab-side training records here are advisory only — service prereqs
+    check the core's own training_roster instead (the core is the
+    authority on who's trained on the core's instruments)."""
     from .repo import lab_mgmt_repo_root
     return lab_mgmt_repo_root(env) / "members" / f"{handle.lstrip('@')}.md"
+
+
+# ---------------------------------------------------------------------------
+# Per-core training roster (the core is the authority — Gary writes here)
+# ---------------------------------------------------------------------------
+
+TRAINING_ROSTER_SUBDIR = "lab-mgmt/training_roster"
+
+
+def training_roster_dir(
+    core: str, env: dict[str, str] | None = None,
+) -> Path:
+    """``<lab_info>/cores/<core>/lab-mgmt/training_roster/``."""
+    return lab_info_root(env) / "cores" / core / "lab-mgmt" / "training_roster"
+
+
+def _roster_path(
+    core: str, handle: str, env: dict[str, str] | None = None,
+) -> Path:
+    return training_roster_dir(core, env) / f"{handle.lstrip('@')}.md"
+
+
+def list_core_member_trainings(
+    core: str,
+    handle: str,
+    env: dict[str, str] | None = None,
+) -> list[TrainingRecord]:
+    """Read ``training:`` from the *core's* per-member roster file.
+
+    This is the canonical source for booking-prereq checks. Returns
+    [] when the core has no record for the member (the common case
+    on a fresh install)."""
+    path = _roster_path(core, handle, env)
+    if not path.is_file():
+        return []
+    try:
+        meta = parse_file(path).meta or {}
+    except Exception:
+        return []
+    rows = meta.get("training") or []
+    if not isinstance(rows, list):
+        return []
+    out: list[TrainingRecord] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        out.append(TrainingRecord(
+            name=str(row.get("name") or "").strip(),
+            completed=str(row.get("completed") or ""),
+            by=str(row.get("by") or ""),
+            valid_until=str(row.get("valid_until") or ""),
+            notes=str(row.get("notes") or ""),
+        ))
+    return [r for r in out if r.name]
+
+
+def has_completed_on_core(
+    core: str,
+    handle: str,
+    training_slug: str,
+    *,
+    today: _dt.date | None = None,
+    env: dict[str, str] | None = None,
+) -> bool:
+    """True iff ``handle`` has a current record on ``core``'s roster
+    for ``training_slug``."""
+    for r in list_core_member_trainings(core, handle, env=env):
+        if r.name == training_slug and r.is_current(today=today):
+            return True
+    return False
+
+
+def record_training(
+    *,
+    core: str,
+    handle: str,
+    training_slug: str,
+    completed: str,
+    by: str,
+    valid_until: str = "",
+    notes: str = "",
+    env: dict[str, str] | None = None,
+) -> Path:
+    """Gary's "sign-off" action: add (or update) a training record for
+    ``handle`` on ``core``'s roster.
+
+    Idempotent: if a record for the same ``training_slug`` already
+    exists, it's replaced with the new fields. Commits via lab_info
+    git ledger so the audit log captures the sign-off.
+    """
+    import yaml as _y
+    from .registrar import (
+        _git_commit_all, _git_init_if_needed, lab_info_root as _root,
+    )
+    handle_clean = handle.lstrip("@").lower()
+    slug_clean = training_slug.strip()
+    if not slug_clean:
+        raise ValueError("training_slug is required")
+    path = _roster_path(core, handle_clean, env)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Merge: read existing rows (if any), replace matching, append new.
+    existing = list_core_member_trainings(core, handle_clean, env=env)
+    by_name = {r.name: r for r in existing}
+    by_name[slug_clean] = TrainingRecord(
+        name=slug_clean,
+        completed=completed,
+        by=by.lstrip("@") and f"@{by.lstrip('@')}" or "",
+        valid_until=valid_until,
+        notes=notes,
+    )
+    rows = sorted(by_name.values(), key=lambda r: r.name)
+    meta = {
+        "member": f"@{handle_clean}",
+        "core": core,
+        "training": [
+            {"name": r.name, "completed": r.completed,
+             "by": r.by, "valid_until": r.valid_until,
+             **({"notes": r.notes} if r.notes else {})}
+            for r in rows
+        ],
+    }
+    yaml_text = _y.safe_dump(meta, sort_keys=False).rstrip()
+    body = (
+        f"# Training roster — @{handle_clean} (core {core})\n\n"
+        f"This file is maintained by the *core* (e.g. {core}'s leader). "
+        f"It is the canonical record of which trainings @{handle_clean} "
+        f"has completed under {core}'s purview. Booking prereqs are "
+        f"checked against this file, not against the member's lab record.\n"
+    )
+    path.write_text(f"---\n{yaml_text}\n---\n\n{body}", encoding="utf-8")
+    root = _root(env)
+    _git_init_if_needed(root)
+    _git_commit_all(root,
+        f"core {core}: training_roster +@{handle_clean} "
+        f"{slug_clean} (by @{by.lstrip('@')})")
+    return path
 
 
 def list_member_trainings(
@@ -249,16 +390,21 @@ def check_service_prereqs(
     """Decide whether ``member_handle`` is cleared to book ``service``.
 
     Pass-through when the service declares no training requirement.
-    Otherwise verifies the member has a current TrainingRecord whose
-    ``name`` matches ``service.training_required``.
+    Otherwise verifies the *core's* training_roster has a current
+    TrainingRecord whose ``name`` matches ``service.training_required``.
+    The member's lab-side file is NOT consulted — the core is the
+    authority on its own service prereqs.
     """
     slug = getattr(service, "training_required", None)
+    core = getattr(service, "core", "") or ""
     if not slug:
         return TrainingCheck(
             member=member_handle, training_slug=None, ok=True,
             reason="service has no training requirement",
         )
-    if has_completed(member_handle, slug, today=today, env=env):
+    if core and has_completed_on_core(
+        core, member_handle, slug, today=today, env=env,
+    ):
         return TrainingCheck(
             member=member_handle, training_slug=slug, ok=True,
         )
@@ -273,7 +419,7 @@ def check_service_prereqs(
 
 
 __all__ = [
-    "TRAINING_SUBDIR",
+    "TRAINING_SUBDIR", "TRAINING_ROSTER_SUBDIR",
     "TrainingSummary",
     "TrainingRecord",
     "TrainingCheck",
@@ -281,7 +427,11 @@ __all__ = [
     "training_path",
     "iter_trainings",
     "get_training",
-    "list_member_trainings",
-    "has_completed",
+    "list_member_trainings",          # lab-side (advisory)
+    "list_core_member_trainings",     # core-side (authoritative)
+    "training_roster_dir",
+    "has_completed",                  # lab-side helper (legacy)
+    "has_completed_on_core",          # core-side helper (canonical)
+    "record_training",                # leader's sign-off action
     "check_service_prereqs",
 ]

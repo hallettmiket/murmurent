@@ -99,10 +99,13 @@ def test_list_cores_services_per_member_can_book(world):
 
 
 def test_list_cores_services_member_with_training(world):
-    _write_member(world, "carol", trainings=[
-        {"name": "itc_basic", "completed": "2025-11-15",
-         "valid_until": "2030-11-15"},
-    ])
+    _write_member(world, "carol")
+    # bioCore signs carol off on its own roster (the lab-side
+    # member file's training: field is no longer consulted).
+    T.record_training(
+        core="biocore", handle="@carol", training_slug="itc_basic",
+        completed="2025-11-15", by="@gary", valid_until="2030-11-15",
+    )
     client = TestClient(create_app())
     res = client.get("/api/cores/services?member=carol")
     rows = {(r["core"], r["slug"]): r for r in res.json()["services"]}

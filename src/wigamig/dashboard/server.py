@@ -3595,6 +3595,152 @@ def create_app() -> FastAPI:
             ],
         }
 
+    @app.get("/api/core/{core}/training_roster")
+    def core_training_roster(
+        core: str,
+        user: str = Query(""),
+    ) -> dict:
+        """List every member the core has trained, with their records.
+        Leader/registrar gated."""
+        from ..core import registrar as _reg
+        from ..core import training as _t
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        reg = _reg.read_registry()
+        entry = next((c for c in reg.cores if c.name == core), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        if not (entry.pi.lstrip("@").lower() == actor.lower()
+                or _reg.is_registrar(actor)):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not the leader of {core!r} or a registrar.")
+        roster_dir = _t.training_roster_dir(core)
+        rows: list[dict] = []
+        if roster_dir.is_dir():
+            for path in sorted(roster_dir.glob("*.md")):
+                handle = path.stem
+                trainings = _t.list_core_member_trainings(core, handle)
+                rows.append({
+                    "handle": f"@{handle}",
+                    "trainings": [
+                        {"name": r.name, "completed": r.completed,
+                         "by": r.by, "valid_until": r.valid_until,
+                         "is_current": r.is_current(),
+                         "notes": r.notes}
+                        for r in trainings
+                    ],
+                })
+        return {"core": core, "members": rows}
+
+    @app.post("/api/core/{core}/training/{slug}/record")
+    def core_training_record(
+        core: str, slug: str,
+        body: dict,
+        user: str = Query("", description="Trainer (must be leader or registrar)."),
+    ) -> dict:
+        """Leader signs a member off as trained.
+
+        Body:
+          - ``member`` (required): @handle of the trainee.
+          - ``completed`` (required): ISO date the session happened.
+          - ``valid_until`` (optional): ISO date the cert expires;
+            defaults to ``completed`` + refresher_years (from the
+            training catalog entry).
+          - ``notes`` (optional): free text appended to the record.
+        """
+        import datetime as _dt2
+        from ..core import registrar as _reg
+        from ..core import training as _t
+        from . import slack_notify as _notify
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        reg = _reg.read_registry()
+        entry = next((c for c in reg.cores if c.name == core), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        if not (entry.pi.lstrip("@").lower() == actor.lower()
+                or _reg.is_registrar(actor)):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not the leader of {core!r} or a registrar.")
+        t = _t.get_training(core, slug)
+        if t is None:
+            raise HTTPException(status_code=404,
+                detail=f"training not found: {core}/{slug}")
+        member = str((body or {}).get("member") or "").strip()
+        completed = str((body or {}).get("completed") or "").strip()
+        if not member or not completed:
+            raise HTTPException(status_code=422,
+                detail="body.member and body.completed are required")
+        valid_until = str((body or {}).get("valid_until") or "").strip()
+        if not valid_until and t.refresher_years:
+            try:
+                d = _dt2.date.fromisoformat(completed)
+                valid_until = (
+                    d.replace(year=d.year + int(t.refresher_years))
+                ).isoformat()
+            except ValueError:
+                pass
+        path = _t.record_training(
+            core=core, handle=member, training_slug=slug,
+            completed=completed, by=actor,
+            valid_until=valid_until,
+            notes=str((body or {}).get("notes") or ""),
+        )
+        return {
+            "ok": True, "core": core, "training_slug": slug,
+            "member": member.lstrip("@").lower(),
+            "completed": completed, "valid_until": valid_until,
+            "path": str(path),
+        }
+
+    @app.post("/api/core/{core}/training/{slug}/request")
+    def core_training_request(
+        core: str, slug: str,
+        body: dict | None = None,
+        user: str = Query("", description="Member asking for training."),
+    ) -> dict:
+        """Member asks a trainer to schedule a session for ``slug``.
+
+        No persistence — Slack message to #claude-test is the artifact;
+        the trainer replies inline, runs the session, then adds the
+        ``training:`` entry to the member's frontmatter to clear the
+        prereq for future bookings.
+
+        Body (optional):
+          - ``note``: free-text "when works for you?" type message.
+        """
+        from ..core import registrar as _reg
+        from ..core import training as _t
+        from . import slack_notify as _notify
+        body = body or {}
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        reg = _reg.read_registry()
+        if not any(c.name == core for c in reg.cores):
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        t = _t.get_training(core, slug)
+        if t is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"training not found: {core}/{slug}",
+            )
+        try:
+            _notify.core_training_requested(
+                core=core, training_slug=t.slug, training_name=t.name,
+                requester=f"@{actor}",
+                trainers=list(t.trainers or []),
+                location=t.location or "",
+                duration_min=int(t.duration_min or 0),
+                note=str(body.get("note") or ""),
+            )
+        except Exception:  # noqa: BLE001
+            pass
+        return {
+            "ok": True, "core": core, "training_slug": t.slug,
+            "trainers": t.trainers, "location": t.location,
+            "duration_min": t.duration_min,
+        }
+
     @app.get("/api/core/{core}/services/{slug}/can_book")
     def core_service_can_book(
         core: str, slug: str,
