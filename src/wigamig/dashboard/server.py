@@ -3833,6 +3833,31 @@ def create_app() -> FastAPI:
         if not requester_lab:
             raise HTTPException(status_code=422, detail="requester_lab is required")
 
+        # Phase 6c: validate requester_lab against the centre roster +
+        # external customers. Unknown labs are allowed by default
+        # (warning surfaced in response) so brand-new collaborators can
+        # book before paperwork lands; the registrar can promote them
+        # afterwards. Pass body.strict_lab=true to refuse unknowns.
+        from ..core import lab_roster as _roster
+        lab_resolution = _roster.resolve(requester_lab)
+        lab_warning = ""
+        if lab_resolution.kind == _roster.KIND_UNKNOWN:
+            if bool(body.get("strict_lab")):
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"requester_lab {requester_lab!r} is not in the "
+                        "centre lab roster or external_customers/. "
+                        "Register it via /api/registrar/external_customers "
+                        "before booking, or omit strict_lab to proceed "
+                        "with a warning."
+                    ),
+                )
+            lab_warning = (
+                f"requester_lab {requester_lab!r} is not registered; "
+                "billing + data delivery may need manual routing."
+            )
+
         check = _t.check_service_prereqs(
             member_handle=f"@{requester}", service=svc,
         )
@@ -3939,6 +3964,11 @@ def create_app() -> FastAPI:
                 "event_id": calendar_event_id,
                 "html_link": calendar_html_link,
                 "warning": calendar_warning,
+            },
+            "lab_resolution": {
+                "kind": lab_resolution.kind,
+                "display_name": lab_resolution.display_name,
+                "warning": lab_warning,
             },
             "path": str(req.path),
         }
@@ -5679,6 +5709,101 @@ def create_app() -> FastAPI:
         except _reg.RegistrarError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         return {"ok": True, "lab": _lab_entry_to_dict(entry)}
+
+    # ------------------------------------------------------------------
+    # Phase 6e: external customers CRUD (registrar-only)
+    # ------------------------------------------------------------------
+
+    def _cust_to_dict(c) -> dict:
+        return {
+            "id": c.id, "name": c.name, "kind": c.kind,
+            "billing_contact": c.billing_contact,
+            "billing_address": c.billing_address,
+            "po_number": c.po_number, "tax_id": c.tax_id,
+            "contact_name": c.contact_name, "status": c.status,
+            "created": c.created,
+            "path": str(c.path) if c.path else "",
+        }
+
+    @app.get("/api/registrar/external_customers")
+    def list_external_customers(
+        include_archived: bool = Query(False),
+        user: str = Query(""),
+    ) -> dict:
+        from ..core import external_customers as _ec
+        _require_registrar(user)
+        return {
+            "customers": [
+                _cust_to_dict(c)
+                for c in _ec.iter_customers(include_archived=include_archived)
+            ],
+        }
+
+    @app.post("/api/registrar/external_customers")
+    def create_external_customer(
+        body: dict,
+        user: str = Query(""),
+    ) -> dict:
+        from ..core import external_customers as _ec
+        _require_registrar(user)
+        try:
+            p = _ec.create_customer(
+                id=str((body or {}).get("id") or ""),
+                name=str((body or {}).get("name") or ""),
+                kind=str((body or {}).get("kind") or "industry"),
+                billing_contact=str((body or {}).get("billing_contact") or ""),
+                billing_address=str((body or {}).get("billing_address") or ""),
+                po_number=str((body or {}).get("po_number") or ""),
+                tax_id=str((body or {}).get("tax_id") or ""),
+                contact_name=str((body or {}).get("contact_name") or ""),
+                notes=str((body or {}).get("notes") or ""),
+            )
+        except _ec.ExternalCustomerError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"ok": True, "id": str((body or {}).get("id") or "").lower(),
+                "path": str(p)}
+
+    @app.patch("/api/registrar/external_customers/{cust_id}")
+    def update_external_customer(
+        cust_id: str, body: dict,
+        user: str = Query(""),
+    ) -> dict:
+        from ..core import external_customers as _ec
+        _require_registrar(user)
+        try:
+            _ec.update_customer(id=cust_id, patch=body or {})
+        except _ec.ExternalCustomerError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True, "id": cust_id}
+
+    @app.post("/api/registrar/external_customers/{cust_id}/archive")
+    def archive_external_customer(
+        cust_id: str,
+        user: str = Query(""),
+    ) -> dict:
+        from ..core import external_customers as _ec
+        _require_registrar(user)
+        try:
+            _ec.archive_customer(id=cust_id)
+        except _ec.ExternalCustomerError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True, "id": cust_id, "status": "archived"}
+
+    @app.get("/api/lab_roster/resolve")
+    def lab_roster_resolve(
+        lab: str = Query(..., description="Lab id to resolve."),
+    ) -> dict:
+        """Public read: tells the dashboard whether a lab id is known.
+        Used by the booking-modal client-side validator + the registrar
+        UI's external-customer overlap check."""
+        from ..core import lab_roster as _roster
+        res = _roster.resolve(lab)
+        return {
+            "lab": res.name, "kind": res.kind,
+            "display_name": res.display_name,
+            "pi_or_contact": res.pi_or_contact,
+            "billing_meta": res.billing_meta,
+        }
 
     @app.get("/healthz")
     def healthz() -> dict[str, str]:

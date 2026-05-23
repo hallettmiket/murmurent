@@ -205,10 +205,37 @@ def render_lab_csv(inv: LabInvoice) -> str:
 
 
 def render_lab_md(inv: LabInvoice, core_display: str = "") -> str:
-    """Human-readable per-lab invoice."""
+    """Human-readable per-lab invoice.
+
+    Phase 6d: if the recipient is an external customer (resolved via
+    lab_roster), prepend their billing header (display name + PO +
+    billing contact + address) so the PDF/print step has everything
+    in one document. Falls back to the bare lab header otherwise.
+    """
+    from . import lab_roster as _roster
+    res = _roster.resolve(inv.lab)
+    bill_kind = "external customer" if res.kind == _roster.KIND_EXTERNAL else "lab"
+    header_label = res.display_name or inv.lab
     lines = [
-        f"# Invoice — {core_display or inv.core} — {inv.lab} lab — {inv.month}",
+        f"# Invoice — {core_display or inv.core} — {header_label} ({bill_kind}) — {inv.month}",
         "",
+    ]
+    if res.kind == _roster.KIND_EXTERNAL and res.billing_meta:
+        bm = res.billing_meta
+        lines += [
+            "## Bill to",
+            "",
+            f"- **Contact:** {bm.get('contact_name') or '—'} <{res.pi_or_contact or '—'}>",
+        ]
+        if bm.get("po_number"):
+            lines.append(f"- **PO:** {bm['po_number']}")
+        if bm.get("tax_id"):
+            lines.append(f"- **Tax ID:** {bm['tax_id']}")
+        if bm.get("billing_address"):
+            addr = str(bm["billing_address"]).replace("\n", "  \n  ")
+            lines.append(f"- **Address:**  \n  {addr}")
+        lines.append("")
+    lines += [
         f"Lines: {len(inv.lines)} · "
         f"Confirmed: {len(inv.lines) - inv.unconfirmed_count} / {len(inv.lines)} · "
         f"Subtotal: **${inv.subtotal:.2f}**",
@@ -238,22 +265,37 @@ def render_summary_md(
     invoices: list[LabInvoice], *,
     core: str, month: str, core_display: str = "",
 ) -> str:
+    from . import lab_roster as _roster
     total = round(sum(i.subtotal for i in invoices), 2)
     unconfirmed = sum(i.unconfirmed_count for i in invoices)
+    # Per-bill-kind split (Phase 6d).
+    by_kind: dict[str, list[LabInvoice]] = {}
+    for i in invoices:
+        res = _roster.resolve(i.lab)
+        by_kind.setdefault(res.kind, []).append(i)
     lines = [
         f"# Invoice summary — {core_display or core} — {month}",
         "",
-        f"Labs billed: {len(invoices)} · "
+        f"Recipients: {len(invoices)} · "
         f"Lines: {sum(len(i.lines) for i in invoices)} · "
         f"Unconfirmed: {unconfirmed} · "
         f"Total: **${total:.2f}**",
+    ]
+    if len(by_kind) > 1:
+        breakdown = ", ".join(
+            f"{k}: ${sum(i.subtotal for i in v):.2f} ({len(v)})"
+            for k, v in sorted(by_kind.items())
+        )
+        lines += ["", f"Breakdown by recipient kind: {breakdown}"]
+    lines += [
         "",
-        "| lab | lines | unconfirmed | subtotal |",
-        "|---|---:|---:|---:|",
+        "| recipient | kind | lines | unconfirmed | subtotal |",
+        "|---|---|---:|---:|---:|",
     ]
     for i in invoices:
+        kind = _roster.resolve(i.lab).kind
         lines.append(
-            f"| {i.lab} | {len(i.lines)} | {i.unconfirmed_count} | "
+            f"| {i.lab} | {kind} | {len(i.lines)} | {i.unconfirmed_count} | "
             f"${i.subtotal:.2f} |"
         )
     return "\n".join(lines) + "\n"
