@@ -101,6 +101,14 @@ MCP_REGISTRATIONS: dict[str, dict[str, Any]] = {
         "args": ["-m", "wigamig.mcp.oracle_server"],
         "env": {},
     },
+    # Per-job deliverable reader for core services. Members of a
+    # requesting lab pull their job files through this MCP from any
+    # CC session connected to the lab server (Phases 5d + 7).
+    "wigamig-core-data": {
+        "command": sys.executable,
+        "args": ["-m", "wigamig.mcp.core_data_server"],
+        "env": {},
+    },
 }
 
 

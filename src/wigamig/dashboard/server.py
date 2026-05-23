@@ -4088,6 +4088,38 @@ def create_app() -> FastAPI:
             "path": str(p),
         }
 
+    @app.get("/api/core/{core}/jobs/{job_id}/bundle")
+    def core_job_bundle(
+        core: str, job_id: str,
+        user: str = Query(""),
+        max_bytes: int = Query(100 * 1024 * 1024),
+        exclude_manifest: bool = Query(False),
+    ):
+        """Phase 7b: download the whole job dir as tar.gz. Leader,
+        registrar, and requester-lab may all pull. Refuses bundles
+        larger than ``max_bytes`` (default 100MB)."""
+        from fastapi.responses import Response
+        from ..core import jobs as _jobs
+        actor, _ = _require_job_actor(core, job_id, user)
+        try:
+            blob = _jobs.bundle_job_tarball(
+                core, job_id, exclude_manifest=exclude_manifest,
+            )
+        except _jobs.JobError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        if len(blob) > max_bytes:
+            raise HTTPException(
+                status_code=413,
+                detail=(f"bundle is {len(blob)} bytes (> max {max_bytes}); "
+                         "increase ?max_bytes= or use per-file downloads."),
+            )
+        return Response(
+            content=blob,
+            media_type="application/gzip",
+            headers={"Content-Disposition":
+                     f"attachment; filename=\"{job_id}.tar.gz\""},
+        )
+
     @app.get("/api/core/{core}/jobs/{job_id}/files/{relpath:path}")
     def core_job_download(
         core: str, job_id: str, relpath: str,
