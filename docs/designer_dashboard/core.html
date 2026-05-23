@@ -233,6 +233,38 @@
         </div>
       </div>
 
+      <!-- Deliverables overview (Phase 8b) -->
+      <div class="card" id="deliverables-card" style="display:none">
+        <header>
+          <h2>Deliverables overview</h2>
+          <span class="meta">
+            <span id="deliverables-count">…</span>
+            <button id="deliverables-refresh" class="btn-primary"
+                    style="margin-left:10px; font-family:var(--mono); font-size:11px;
+                           background:white; border:1px solid var(--rule-strong);
+                           border-radius:2px; padding:4px 10px; cursor:pointer;">
+              ↻ refresh
+            </button>
+          </span>
+        </header>
+        <div class="body" id="deliverables-body">
+          <div class="placeholder">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Audit log slice (Phase 8a) -->
+      <div class="card" id="audit-card" style="display:none">
+        <header>
+          <h2>Recent activity</h2>
+          <span class="meta">
+            <span id="audit-count">…</span> entries
+          </span>
+        </header>
+        <div class="body" id="audit-body">
+          <div class="placeholder">Loading…</div>
+        </div>
+      </div>
+
       <!-- Billing card (Phase 4c): per-month invoice preview + generate -->
       <div class="card" id="billing-card" style="display:none">
         <header>
@@ -451,6 +483,8 @@
           renderRoleLabel(data.viewer);
           loadServices(data.viewer);
           loadRequests(data.viewer);
+          loadDeliverables(data.viewer);
+          loadAudit(data.viewer);
           // Reveal the billing card (admin-only); user explicitly
           // clicks preview to populate.
           if (data.viewer && data.viewer.can_admin) {
@@ -533,6 +567,99 @@
           `;
         }
         card.style.display = "block";
+      }
+
+      async function loadDeliverables(viewer) {
+        if (!(viewer && viewer.can_admin)) return;
+        const card = document.getElementById("deliverables-card");
+        const body = document.getElementById("deliverables-body");
+        const count = document.getElementById("deliverables-count");
+        card.style.display = "block";
+        try {
+          const url = `/api/core/${encodeURIComponent(CORE)}/deliverables`
+                    + `?user=${encodeURIComponent(ACTOR || "")}`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          const rows = data.rows || [];
+          count.textContent = `${rows.length} job${rows.length === 1 ? "" : "s"}`;
+          if (rows.length === 0) {
+            body.innerHTML = '<div class="placeholder">No jobs yet.</div>';
+            return;
+          }
+          const fmtBytes = b => b < 1024 ? `${b} B`
+            : b < 1048576 ? `${(b/1024).toFixed(1)} KB`
+            : `${(b/1048576).toFixed(1)} MB`;
+          const html = rows.map(r => `
+            <tr>
+              <td class="mono" style="font-size:11px;">${esc(r.job_id)}</td>
+              <td class="mono" style="font-size:11px;">${esc(r.service)}</td>
+              <td><code>${esc(r.requester)}</code></td>
+              <td>${esc(r.state)}</td>
+              <td class="num">${r.file_count}</td>
+              <td class="num">${fmtBytes(r.bytes_total)}</td>
+              <td class="mono" style="font-size:11px;">${esc(r.last_upload_at || "—")}</td>
+              <td class="mono" style="font-size:11px;">${esc(r.last_access_at || "—")}</td>
+              <td>${r.accessed_by && r.accessed_by.length ? r.accessed_by.map(a => `<code>${esc(a)}</code>`).join(" ") : '<span class="muted">—</span>'}</td>
+            </tr>`).join("");
+          body.innerHTML = `
+            <table class="members" style="font-size:12px;">
+              <thead><tr>
+                <th>job</th><th>service</th><th>requester</th>
+                <th>state</th>
+                <th style="text-align:right;">files</th>
+                <th style="text-align:right;">size</th>
+                <th>last upload</th>
+                <th>last access</th>
+                <th>accessed by</th>
+              </tr></thead>
+              <tbody>${html}</tbody>
+            </table>`;
+        } catch (ex) {
+          body.innerHTML = `<div class="err">Failed: ${esc(ex.message || ex)}</div>`;
+        }
+      }
+
+      async function loadAudit(viewer) {
+        if (!(viewer && viewer.can_admin)) return;
+        const card = document.getElementById("audit-card");
+        const body = document.getElementById("audit-body");
+        const count = document.getElementById("audit-count");
+        card.style.display = "block";
+        try {
+          const url = `/api/core/${encodeURIComponent(CORE)}/audit`
+                    + `?user=${encodeURIComponent(ACTOR || "")}&limit=50`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          const entries = data.entries || [];
+          count.textContent = entries.length;
+          if (entries.length === 0) {
+            body.innerHTML = '<div class="placeholder">No audit entries yet.</div>';
+            return;
+          }
+          body.innerHTML = `
+            <table class="members" style="font-size:12px;">
+              <thead><tr>
+                <th>when</th><th>who</th><th>action</th><th>sha</th>
+              </tr></thead>
+              <tbody>${entries.map(e => `
+                <tr>
+                  <td class="mono" style="font-size:11px;">${esc(e.iso_ts)}</td>
+                  <td>${esc(e.author)}</td>
+                  <td>${esc(e.subject)}</td>
+                  <td class="mono" style="font-size:11px;">${esc(e.sha)}</td>
+                </tr>`).join("")}</tbody>
+            </table>`;
+        } catch (ex) {
+          body.innerHTML = `<div class="err">Failed: ${esc(ex.message || ex)}</div>`;
+        }
       }
 
       async function loadBilling(viewer, action) {
@@ -797,6 +924,8 @@
         if (refresh) refresh.addEventListener("click", () => loadRequests(VIEWER));
         if (toggle)  toggle.addEventListener("change", () => loadRequests(VIEWER));
         // Billing card (Phase 4c).
+        const dlvRefresh = document.getElementById("deliverables-refresh");
+        if (dlvRefresh) dlvRefresh.addEventListener("click", () => loadDeliverables(VIEWER));
         const prev = document.getElementById("billing-preview");
         const gen  = document.getElementById("billing-generate");
         const mInp = document.getElementById("billing-month");

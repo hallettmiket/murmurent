@@ -4200,6 +4200,73 @@ def create_app() -> FastAPI:
             "unconfirmed": grand_unconfirmed,
         }
 
+    @app.get("/api/core/{core}/audit")
+    def core_audit_slice(
+        core: str,
+        limit: int = Query(50),
+        user: str = Query(""),
+    ) -> dict:
+        """Phase 8a: recent state-changing actions on this core, read
+        from the lab_info git log. Leader/registrar gated."""
+        from ..core import audit_slice as _audit
+        from ..core import registrar as _reg
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        reg = _reg.read_registry()
+        entry = next((c for c in reg.cores if c.name == core), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        if not (entry.pi.lstrip("@").lower() == actor.lower()
+                or _reg.is_registrar(actor)):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not the leader of {core!r} or a registrar.")
+        rows = _audit.slice_for_core(core, limit=limit)
+        return {
+            "core": core,
+            "entries": [
+                {"sha": r.sha, "iso_ts": r.iso_ts,
+                 "author": r.author, "subject": r.subject}
+                for r in rows
+            ],
+        }
+
+    @app.get("/api/core/{core}/deliverables")
+    def core_deliverables(
+        core: str,
+        limit: int = Query(50),
+        include_terminal: bool = Query(True),
+        user: str = Query(""),
+    ) -> dict:
+        """Phase 8b: cross-job deliverable status. Leader/registrar."""
+        from ..core import deliverables as _dlv
+        from ..core import registrar as _reg
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        reg = _reg.read_registry()
+        entry = next((c for c in reg.cores if c.name == core), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        if not (entry.pi.lstrip("@").lower() == actor.lower()
+                or _reg.is_registrar(actor)):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not the leader of {core!r} or a registrar.")
+        rows = _dlv.overview(core=core, limit=limit,
+                              include_terminal=include_terminal)
+        return {
+            "core": core,
+            "rows": [
+                {"job_id": r.job_id, "service": r.service,
+                 "requester": r.requester, "requester_lab": r.requester_lab,
+                 "state": r.state, "slot_start": r.slot_start,
+                 "file_count": r.file_count,
+                 "bytes_total": r.bytes_total,
+                 "last_upload_at": r.last_upload_at,
+                 "last_access_at": r.last_access_at,
+                 "accessed_by": r.accessed_by}
+                for r in rows
+            ],
+        }
+
     @app.get("/api/core/{core}/invoices/{month}/preview")
     def core_invoice_preview(
         core: str, month: str,
