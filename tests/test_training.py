@@ -227,6 +227,22 @@ def test_check_prereqs_passes_when_service_has_no_requirement(world):
 
 
 def test_check_prereqs_passes_with_current_record(world):
+    """Prereq passes when the CORE's roster has a current record —
+    the member's lab-side file is no longer consulted."""
+    T.record_training(
+        core="biocore", handle="@alice", training_slug="itc_basic",
+        completed="2025-11-15", by="@gary", valid_until="2030-11-15",
+    )
+    out = T.check_service_prereqs(
+        member_handle="@alice",
+        service=_service(training_required="itc_basic"),
+    )
+    assert out.ok is True
+
+
+def test_check_prereqs_fails_when_lab_only_record(world):
+    """A record on the member's lab file does NOT satisfy the prereq —
+    only the core's roster does."""
     _write_member(world, "alice", trainings=[
         {"name": "itc_basic", "completed": "2025-11-15",
          "valid_until": "2030-11-15"},
@@ -235,7 +251,7 @@ def test_check_prereqs_passes_with_current_record(world):
         member_handle="@alice",
         service=_service(training_required="itc_basic"),
     )
-    assert out.ok is True
+    assert out.ok is False
 
 
 def test_check_prereqs_fails_when_record_missing(world):
@@ -250,10 +266,10 @@ def test_check_prereqs_fails_when_record_missing(world):
 
 
 def test_check_prereqs_fails_when_record_expired(world):
-    _write_member(world, "alice", trainings=[
-        {"name": "itc_basic", "completed": "2020-01-01",
-         "valid_until": "2022-01-01"},
-    ])
+    T.record_training(
+        core="biocore", handle="@alice", training_slug="itc_basic",
+        completed="2020-01-01", by="@gary", valid_until="2022-01-01",
+    )
     out = T.check_service_prereqs(
         member_handle="@alice",
         service=_service(training_required="itc_basic"),

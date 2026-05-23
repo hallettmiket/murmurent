@@ -578,6 +578,31 @@ def core_request_charge_confirmed(
     _post(channel, text)
 
 
+def core_training_requested(
+    *, core: str, training_slug: str, training_name: str,
+    requester: str, trainers: list[str],
+    location: str = "", duration_min: int = 0,
+    note: str = "",
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Member is asking a trainer to schedule a training session."""
+    trainer_str = " ".join(trainers) if trainers else "(no trainer listed)"
+    bits = [f":mortar_board: *{core}* training request — {requester} "
+            f"wants {trainer_str} to train them on `{training_slug}` "
+            f"(*{training_name}*)"]
+    meta = []
+    if duration_min:
+        meta.append(f"{duration_min} min")
+    if location:
+        meta.append(location)
+    if meta:
+        bits.append(f" ({', '.join(meta)})")
+    bits.append(".")
+    if note:
+        bits.append(f"\n> {note}")
+    _post(channel, "".join(bits))
+
+
 def core_request_reminder(
     *, core: str, request_id: str, requester: str,
     service: str, start: str, window: str,

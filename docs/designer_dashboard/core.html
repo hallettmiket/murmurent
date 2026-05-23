@@ -233,6 +233,26 @@
         </div>
       </div>
 
+      <!-- Training roster (Phase 6++: bioCore tracks who it has trained) -->
+      <div class="card" id="roster-card" style="display:none">
+        <header>
+          <h2>Training roster</h2>
+          <span class="meta">
+            <span id="roster-count">…</span>
+            <button id="roster-add" class="btn-primary"
+                    style="margin-left:10px; font-family:var(--mono); font-size:11px;
+                           background:var(--purple); color:white;
+                           border:1px solid var(--purple); border-radius:2px;
+                           padding:4px 10px; cursor:pointer;">
+              ＋ sign off
+            </button>
+          </span>
+        </header>
+        <div class="body" id="roster-body">
+          <div class="placeholder">Loading…</div>
+        </div>
+      </div>
+
       <!-- Deliverables overview (Phase 8b) -->
       <div class="card" id="deliverables-card" style="display:none">
         <header>
@@ -483,6 +503,7 @@
           renderRoleLabel(data.viewer);
           loadServices(data.viewer);
           loadRequests(data.viewer);
+          loadRoster(data.viewer);
           loadDeliverables(data.viewer);
           loadAudit(data.viewer);
           // Reveal the billing card (admin-only); user explicitly
@@ -567,6 +588,95 @@
           `;
         }
         card.style.display = "block";
+      }
+
+      async function loadRoster(viewer) {
+        if (!(viewer && viewer.can_admin)) return;
+        const card = document.getElementById("roster-card");
+        const body = document.getElementById("roster-body");
+        const count = document.getElementById("roster-count");
+        card.style.display = "block";
+        try {
+          const url = `/api/core/${encodeURIComponent(CORE)}/training_roster`
+                    + `?user=${encodeURIComponent(ACTOR || "")}`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          const rows = data.members || [];
+          count.textContent = `${rows.length} member${rows.length === 1 ? "" : "s"} on roster`;
+          if (rows.length === 0) {
+            body.innerHTML = '<div class="placeholder">No members signed off yet. Click <strong>＋ sign off</strong> to record the first training.</div>';
+            return;
+          }
+          const html = rows.map(m => {
+            const items = m.trainings.map(t => {
+              const tag = t.is_current
+                ? '<span class="pill active">current</span>'
+                : '<span class="pill retired">expired</span>';
+              return `<li><code>${esc(t.name)}</code> ${tag}`
+                   + ` <span class="muted">${esc(t.completed)}`
+                   + (t.valid_until ? ` → ${esc(t.valid_until)}` : "")
+                   + ` (by ${esc(t.by)})</span></li>`;
+            }).join("");
+            return `
+              <tr>
+                <td><code>${esc(m.handle)}</code></td>
+                <td><ul style="margin:0; padding-left:18px;">${items}</ul></td>
+              </tr>`;
+          }).join("");
+          body.innerHTML = `
+            <table class="members" style="font-size:12px;">
+              <thead><tr><th>member</th><th>trainings</th></tr></thead>
+              <tbody>${html}</tbody>
+            </table>`;
+        } catch (ex) {
+          body.innerHTML = `<div class="err">Failed: ${esc(ex.message || ex)}</div>`;
+        }
+      }
+
+      async function recordTrainingSignoff() {
+        const member = window.prompt("Member handle to sign off (@netname):");
+        if (!member) return;
+        // Pull the training catalog so we can offer a sensible default.
+        let trainings = [];
+        try {
+          const res = await fetch(
+            `/api/core/${encodeURIComponent(CORE)}/training?user=${encodeURIComponent(ACTOR || "")}`,
+          );
+          if (res.ok) trainings = (await res.json()).trainings || [];
+        } catch (_) { /* best-effort */ }
+        const slugs = trainings.map(t => t.slug).join(", ");
+        const slug = window.prompt(
+          `Training slug (one of: ${slugs || "[catalog empty]"}):`);
+        if (!slug) return;
+        const today = new Date().toISOString().slice(0, 10);
+        const completed = window.prompt("Completion date (YYYY-MM-DD):", today);
+        if (!completed) return;
+        const validUntil = window.prompt(
+          "Valid until (YYYY-MM-DD, leave blank to auto-compute from refresher_years):",
+          "");
+        const notes = window.prompt("Notes (optional):", "") || "";
+        const payload = { member, completed, notes };
+        if (validUntil) payload.valid_until = validUntil;
+        try {
+          const url = `/api/core/${encodeURIComponent(CORE)}/training/${encodeURIComponent(slug)}/record`
+                    + `?user=${encodeURIComponent(ACTOR || "")}`;
+          const res = await fetch(url, { method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload) });
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const j = await res.json();
+          alert(`Signed off: ${j.member} on ${j.training_slug}\nvalid until ${j.valid_until || "(no expiry)"}.`);
+          loadRoster(VIEWER);
+        } catch (ex) {
+          alert("Sign-off failed: " + (ex.message || ex));
+        }
       }
 
       async function loadDeliverables(viewer) {
@@ -926,6 +1036,8 @@
         // Billing card (Phase 4c).
         const dlvRefresh = document.getElementById("deliverables-refresh");
         if (dlvRefresh) dlvRefresh.addEventListener("click", () => loadDeliverables(VIEWER));
+        const rosterAdd = document.getElementById("roster-add");
+        if (rosterAdd) rosterAdd.addEventListener("click", recordTrainingSignoff);
         const prev = document.getElementById("billing-preview");
         const gen  = document.getElementById("billing-generate");
         const mInp = document.getElementById("billing-month");

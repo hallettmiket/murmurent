@@ -3691,6 +3691,21 @@ function SeaCatalogPanel({ entries, span="c-12" }) {
    "My bookings" shows the viewer's own live requests with cancel +
    reschedule actions. Hidden when no cores are registered. */
 
+// Inline modal styles — the hifi HTML doesn't define .modal-backdrop /
+// .modal classes (only the registrar.html does), so we hand-roll them
+// to guarantee the overlay is visible.
+const MODAL_BACKDROP_STYLE = {
+  position: "fixed", inset: 0,
+  background: "rgba(0,0,0,0.45)",
+  display: "flex", alignItems: "center", justifyContent: "center",
+  zIndex: 100, padding: 20,
+};
+const MODAL_PANEL_STYLE = {
+  background: "white", borderRadius: 4,
+  width: "100%", maxHeight: "90vh", overflowY: "auto",
+  boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+};
+
 async function fetchCoresServices(member) {
   const url = "/api/cores/services" + (member ? "?member=" + encodeURIComponent(member) : "");
   const res = await fetch(url, { credentials: "same-origin" });
@@ -3705,6 +3720,25 @@ async function fetchMyRequests(member, includeTerminal=false) {
   if (!res.ok) throw new Error("HTTP " + res.status);
   return res.json();
 }
+async function requestTraining(core, trainingSlug, note) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/core/" + encodeURIComponent(core)
+    + "/training/" + encodeURIComponent(trainingSlug) + "/request"
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note: note || "" }),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 async function postBookSlot(core, slug, body) {
   const params = new URLSearchParams(window.location.search);
   const userParam = params.get("user");
@@ -3765,9 +3799,13 @@ function JobFilesModal({ core, jobId, onClose }) {
   }, [core, jobId]);
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:640}}>
-        <header><h3>Files for {jobId}</h3></header>
+    <div onClick={onClose} style={MODAL_BACKDROP_STYLE}>
+      <div onClick={(e) => e.stopPropagation()}
+           style={{...MODAL_PANEL_STYLE, maxWidth:640}}>
+        <header style={{padding:"11px 14px 9px",
+                         borderBottom:"1px solid var(--rule)"}}>
+          <h3 style={{margin:0, fontSize:16}}>Files for {jobId}</h3>
+        </header>
         <div style={{padding:14}}>
           {err && <div className="error">{err}</div>}
           {!err && data === null && <div className="muted">Loading…</div>}
@@ -3827,22 +3865,70 @@ async function postRequestLifecycle(core, requestId, action, body={}) {
   return res.json();
 }
 
+// Pads minutes to two digits for the local-timezone offset format
+// (e.g. -240 → "-04:00").
+function _tzOffsetIso() {
+  const m = -new Date().getTimezoneOffset();
+  const sign = m >= 0 ? "+" : "-";
+  const abs = Math.abs(m);
+  return sign + String(Math.floor(abs/60)).padStart(2,"0")
+              + ":" + String(abs%60).padStart(2,"0");
+}
+// `<input type="datetime-local">` gives "YYYY-MM-DDTHH:mm" with no
+// timezone; the backend needs ISO8601 with offset. Append local offset.
+function _toIsoWithLocalTz(localDt) {
+  if (!localDt) return "";
+  return localDt + ":00" + _tzOffsetIso();
+}
+
 function BookSlotModal({ service, member, onClose, onBooked }) {
   const tiers = Object.keys((service.fee && service.fee.tiers) || {});
-  const [start, setStart] = useState("");
-  const [end, setEnd]     = useState("");
+  // Default start = next round hour from now, end = start + service.duration.
+  const _defaultStart = () => {
+    const d = new Date();
+    d.setMinutes(0, 0, 0);
+    d.setHours(d.getHours() + 1);
+    // datetime-local wants "YYYY-MM-DDTHH:mm" in *local* time.
+    const pad = n => String(n).padStart(2,"0");
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+         + `T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  const _addMin = (localDt, mins) => {
+    const [date, time] = localDt.split("T");
+    const [y, mo, d] = date.split("-").map(Number);
+    const [hh, mm] = time.split(":").map(Number);
+    const dt = new Date(y, mo-1, d, hh, mm);
+    dt.setMinutes(dt.getMinutes() + mins);
+    const pad = n => String(n).padStart(2,"0");
+    return `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}`
+         + `T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  };
+  const initialStart = _defaultStart();
+  const initialEnd = _addMin(initialStart, service.duration_default_min || 60);
+
+  const [start, setStart] = useState(initialStart);
+  const [end, setEnd]     = useState(initialEnd);
   const [tier, setTier]   = useState(tiers[0] || "");
   const [notes, setNotes] = useState("");
   const [busy, setBusy]   = useState(false);
   const [err, setErr]     = useState(null);
 
+  // When the user changes start, snap end to start + default duration
+  // (only if they haven't manually edited end since the last start change).
+  const handleStartChange = (v) => {
+    const newEnd = _addMin(v, service.duration_default_min || 60);
+    setStart(v);
+    setEnd(newEnd);
+  };
+
   const submit = async (e) => {
     e.preventDefault();
     if (!start || !end) { setErr("Pick a start and end time."); return; }
+    if (end <= start) { setErr("End must be after start."); return; }
     setBusy(true); setErr(null);
     try {
       const body = {
-        slot: { start, end },
+        slot: { start: _toIsoWithLocalTz(start), end: _toIsoWithLocalTz(end) },
         notes: notes.trim(),
       };
       if (tier) body.tier = tier;
@@ -3855,24 +3941,30 @@ function BookSlotModal({ service, member, onClose, onBooked }) {
   };
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:560}}>
-        <header><h3>Book {service.name} ({service.core})</h3></header>
+    <div onClick={onClose} style={MODAL_BACKDROP_STYLE}>
+      <div onClick={(e) => e.stopPropagation()}
+           style={{...MODAL_PANEL_STYLE, maxWidth:560}}>
+        <header style={{padding:"11px 14px 9px",
+                         borderBottom:"1px solid var(--rule)"}}>
+          <h3 style={{margin:0, fontSize:16}}>Book {service.name} ({service.core})</h3>
+        </header>
         <form onSubmit={submit} style={{padding:14}}>
           <div className="muted" style={{fontSize:12, marginBottom:10}}>
-            Booking as <b>@{member || "?"}</b>. Times are ISO8601 with timezone, e.g.
-            <code> 2026-05-23T10:00-04:00</code>.
+            Booking as <b>@{member || "?"}</b>. Times are in your local
+            timezone ({_tzOffsetIso()}).
           </div>
           <label style={{display:"block", marginBottom:8}}>
             <div style={{fontSize:11, color:"#666"}}>Start</div>
-            <input type="text" value={start} onChange={e=>setStart(e.target.value)}
-                   placeholder="2026-05-23T10:00-04:00"
+            <input type="datetime-local" value={start}
+                   onChange={e=>handleStartChange(e.target.value)}
+                   step="900"
                    style={{width:"100%"}} required />
           </label>
           <label style={{display:"block", marginBottom:8}}>
             <div style={{fontSize:11, color:"#666"}}>End</div>
-            <input type="text" value={end} onChange={e=>setEnd(e.target.value)}
-                   placeholder="2026-05-23T11:30-04:00"
+            <input type="datetime-local" value={end}
+                   onChange={e=>setEnd(e.target.value)}
+                   step="900"
                    style={{width:"100%"}} required />
           </label>
           {tiers.length > 0 && (
@@ -4015,12 +4107,32 @@ function CoreServicesPanel({ span="c-12" }) {
                           : <span className="muted" style={{fontSize:11}}>none</span>}
                       </td>
                       <td>
-                        <button className="btn sm primary"
-                                disabled={!canBook}
-                                title={canBook ? "" : (s.can_book && s.can_book.reason) || ""}
-                                onClick={() => setBooking(s)}>
-                          Book
-                        </button>
+                        {canBook ? (
+                          <button className="btn sm primary"
+                                  onClick={() => setBooking(s)}>
+                            Book
+                          </button>
+                        ) : (
+                          <button className="btn sm"
+                                  title={(s.can_book && s.can_book.reason) || ""}
+                                  onClick={async () => {
+                                    const note = window.prompt(
+                                      `Request training on ${s.training_required} from the trainer(s) for ${s.core}.\n\nOptional note (e.g. "afternoons work best"):`,
+                                      "",
+                                    );
+                                    if (note === null) return;
+                                    try {
+                                      await requestTraining(s.core, s.training_required, note);
+                                      alert(`Request posted to Slack for ${s.training_required}.\nThe trainer will reach out to schedule a session.`);
+                                    } catch (ex) {
+                                      alert("Request failed: " + (ex.message || ex));
+                                    }
+                                  }}
+                                  style={{background:"#fff5d6", borderColor:"#d4a017",
+                                          color:"#6b4d00"}}>
+                            Request training
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
@@ -4031,16 +4143,20 @@ function CoreServicesPanel({ span="c-12" }) {
         ))}
       </div>
 
-      {/* My bookings */}
-      <header style={{borderTop:"1px solid #eee"}}>
-        <h3 style={{margin:"4px 0"}}>My bookings</h3>
+      {/* My bookings — plain div instead of <header> so the panel
+          CSS doesn't reposition it on top of the catalog above. */}
+      <div style={{borderTop:"1px solid #eee",
+                    padding:"10px 14px 4px",
+                    display:"flex", justifyContent:"space-between",
+                    alignItems:"baseline"}}>
+        <h3 style={{margin:0, fontSize:14}}>My bookings</h3>
         <label style={{fontSize:11}}>
           <input type="checkbox" checked={showTerm}
                  onChange={e=>setShowTerm(e.target.checked)} />
           {" "}show cancelled / completed
         </label>
-      </header>
-      <div className="body" style={{padding:0}}>
+      </div>
+      <div style={{padding:0}}>
         {myReqs.length === 0 && (
           <div className="muted" style={{padding:14, fontSize:13}}>
             No bookings yet.
