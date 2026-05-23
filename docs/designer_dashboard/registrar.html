@@ -519,6 +519,19 @@
       }
       html += '</div>';
 
+      // -- External customers panel (Phase 6e) --
+      // Industry / non-Schulich clients that the registrar tracks so
+      // booking + invoicing know how to bill them. Hidden until the
+      // registrar adds the first one.
+      html += '<div class="panel" id="ext-cust-card"><header>'
+        + '<h2>External customers</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + '<span id="ext-cust-count">…</span>'
+        + '<button class="btn" id="btn-new-ext-cust">＋ new external customer</button>'
+        + '</span></header>'
+        + '<div id="ext-cust-body"><div class="empty">Loading…</div></div>'
+        + '</div>';
+
       // -- Certifications panel (centre-wide compliance view) --
       const certs = data.certs || { aggregate: {}, rows: [], cert_specs: [] };
       const a = certs.aggregate || {};
@@ -663,7 +676,98 @@
         });
       });
 
+      // Phase 6e: external customers panel.
+      loadExternalCustomers();
+      const newCustBtn = document.getElementById("btn-new-ext-cust");
+      if (newCustBtn) newCustBtn.addEventListener("click", openNewExternalCustomerModal);
+
       renderFooter(data);
+    }
+
+    // -----------------------------------------------------------
+    // Phase 6e: external customers helpers
+    // -----------------------------------------------------------
+
+    async function loadExternalCustomers() {
+      const body = document.getElementById("ext-cust-body");
+      const count = document.getElementById("ext-cust-count");
+      if (!body) return;
+      try {
+        const url = "/api/registrar/external_customers"
+                  + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const r = await fetch(url, { credentials: "same-origin" });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || ("HTTP " + r.status));
+        }
+        const data = await r.json();
+        const rows = data.customers || [];
+        count.textContent = rows.length + (rows.length === 1 ? " customer" : " customers");
+        if (rows.length === 0) {
+          body.innerHTML = '<div class="empty">No external customers yet. Click <strong>＋ new external customer</strong> to add an industry / non-Schulich client.</div>';
+          return;
+        }
+        let html = '<table><thead><tr>'
+          + '<th>id</th><th>name</th><th>kind</th>'
+          + '<th>billing contact</th><th>PO</th><th>status</th>'
+          + '<th style="text-align:right;">actions</th>'
+          + '</tr></thead><tbody>';
+        for (const c of rows) {
+          html += '<tr>'
+            + '<td class="mono">' + escapeHTML(c.id) + '</td>'
+            + '<td>' + escapeHTML(c.name) + '</td>'
+            + '<td class="mono">' + escapeHTML(c.kind) + '</td>'
+            + '<td>' + escapeHTML(c.billing_contact || '—') + '</td>'
+            + '<td class="mono">' + escapeHTML(c.po_number || '—') + '</td>'
+            + '<td><span class="pill ' + escapeHTML(c.status) + '">' + escapeHTML(c.status) + '</span></td>'
+            + '<td style="text-align:right;">'
+            +   '<button class="btn ext-cust-action" data-action="archive" data-id="' + escapeHTML(c.id) + '">archive</button>'
+            + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        body.innerHTML = html;
+        body.querySelectorAll(".ext-cust-action").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-id");
+            if (!confirm("Archive external customer " + id + "?")) return;
+            const url = "/api/registrar/external_customers/" + encodeURIComponent(id)
+                      + "/archive"
+                      + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+            const r = await fetch(url, { method: "POST" });
+            if (!r.ok) { alert("Archive failed"); return; }
+            loadExternalCustomers();
+          });
+        });
+      } catch (ex) {
+        body.innerHTML = '<div class="empty">Failed to load: ' + escapeHTML(String(ex.message || ex)) + '</div>';
+      }
+    }
+
+    function openNewExternalCustomerModal() {
+      const id   = prompt("ID (kebab-case, e.g. 'acme-bio'):");
+      if (!id) return;
+      const name = prompt("Display name (e.g. 'ACME Biosciences'):");
+      if (!name) return;
+      const kind = prompt("Kind (industry | academic_external | hospital):", "industry") || "industry";
+      const contact_name = prompt("Contact name:", "") || "";
+      const billing_contact = prompt("Billing email:", "") || "";
+      const po_number = prompt("PO number (optional):", "") || "";
+      (async () => {
+        const url = "/api/registrar/external_customers"
+                  + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, name, kind, contact_name,
+                                  billing_contact, po_number }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          alert("Create failed: " + (d.detail || ("HTTP " + r.status)));
+          return;
+        }
+        loadExternalCustomers();
+      })();
     }
 
     // -----------------------------------------------------------
