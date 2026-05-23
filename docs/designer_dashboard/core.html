@@ -661,6 +661,10 @@
                       style="font-family:var(--mono); font-size:10px; padding:2px 8px;
                              background:white; border:1px solid var(--purple); color:var(--purple);
                              border-radius:2px; cursor:pointer;">$ charge</button>
+              <button class="upload-req" data-rid="${esc(r.request_id)}"
+                      style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                             background:white; border:1px solid var(--rule-strong);
+                             border-radius:2px; cursor:pointer;">upload</button>
             </div>`;
           const fee = r.fee_at_booking.total
             ? `$${Number(r.fee_at_booking.total).toFixed(2)}` : "—";
@@ -703,6 +707,41 @@
               }
               loadRequests(VIEWER);
             } catch (ex) { alert("Advance failed: " + (ex.message || ex)); btn.disabled = false; }
+          });
+        });
+        body.querySelectorAll(".upload-req").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const rid = btn.dataset.rid;
+            const input = document.createElement("input");
+            input.type = "file";
+            input.onchange = async (e) => {
+              const f = e.target.files && e.target.files[0];
+              if (!f) return;
+              const subdir = window.prompt(
+                `Subdir under job ${rid} (e.g. raw, refined):`, "refined");
+              if (!subdir) return;
+              const relpath = subdir.replace(/\/$/, "") + "/" + f.name;
+              btn.disabled = true;
+              try {
+                const buf = await f.arrayBuffer();
+                let bin = "";
+                const arr = new Uint8Array(buf);
+                for (let i = 0; i < arr.byteLength; i++) bin += String.fromCharCode(arr[i]);
+                const b64 = btoa(bin);
+                const url = `/api/core/${encodeURIComponent(CORE)}/jobs/${encodeURIComponent(rid)}/files`
+                          + `?user=${encodeURIComponent(ACTOR || "")}`;
+                const res = await fetch(url, { method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ relpath, content_base64: b64 }) });
+                if (!res.ok) {
+                  const d = await res.json().catch(() => ({}));
+                  throw new Error(d.detail || `HTTP ${res.status}`);
+                }
+                alert(`Uploaded ${relpath} (${f.size.toLocaleString()} B).`);
+              } catch (ex) { alert("Upload failed: " + (ex.message || ex)); }
+              finally { btn.disabled = false; }
+            };
+            input.click();
           });
         });
         body.querySelectorAll(".charge-req").forEach(btn => {

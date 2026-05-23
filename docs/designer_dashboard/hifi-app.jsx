@@ -3723,6 +3723,79 @@ async function postBookSlot(core, slug, body) {
   }
   return res.json();
 }
+async function fetchJobFiles(core, jobId) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/core/" + encodeURIComponent(core)
+    + "/jobs/" + encodeURIComponent(jobId) + "/files"
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, { credentials: "same-origin" });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+function jobFileUrl(core, jobId, relpath) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  return "/api/core/" + encodeURIComponent(core)
+    + "/jobs/" + encodeURIComponent(jobId)
+    + "/files/" + relpath.split("/").map(encodeURIComponent).join("/")
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+}
+
+function JobFilesModal({ core, jobId, onClose }) {
+  const [data, setData] = useState(null);
+  const [err, setErr]   = useState(null);
+
+  useEffect(() => {
+    (async () => {
+      try { setData(await fetchJobFiles(core, jobId)); }
+      catch (ex) { setErr(String(ex.message || ex)); }
+    })();
+  }, [core, jobId]);
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} style={{maxWidth:640}}>
+        <header><h3>Files for {jobId}</h3></header>
+        <div style={{padding:14}}>
+          {err && <div className="error">{err}</div>}
+          {!err && data === null && <div className="muted">Loading…</div>}
+          {data && data.files && data.files.length === 0 && (
+            <div className="muted">
+              No files yet. The core staff hasn't uploaded any deliverables.
+            </div>
+          )}
+          {data && data.files && data.files.length > 0 && (
+            <table className="dt">
+              <thead><tr><th>relpath</th><th>size</th><th></th></tr></thead>
+              <tbody>
+                {data.files.map(f => (
+                  <tr key={f.relpath}>
+                    <td className="mono" style={{fontSize:12}}>{f.relpath}</td>
+                    <td className="num">{f.size_bytes.toLocaleString()} B</td>
+                    <td>
+                      <a className="btn sm"
+                         href={jobFileUrl(core, jobId, f.relpath)}
+                         download>download</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <div className="row" style={{justifyContent:"flex-end", marginTop:10}}>
+            <button className="btn sm" onClick={onClose}>Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function postRequestLifecycle(core, requestId, action, body={}) {
   const params = new URLSearchParams(window.location.search);
   const userParam = params.get("user");
@@ -3829,6 +3902,7 @@ function CoreServicesPanel({ span="c-12" }) {
   const [showTerm, setShowTerm] = useState(false);
   const [booking, setBooking]   = useState(null);
   const [busyReq, setBusyReq]   = useState(null);
+  const [filesFor, setFilesFor] = useState(null);  // { core, jobId } or null
   const [err, setErr]           = useState(null);
 
   const reload = async () => {
@@ -3988,6 +4062,10 @@ function CoreServicesPanel({ span="c-12" }) {
                     <td className="num">{r.fee_at_booking.total ? "$" + r.fee_at_booking.total : "—"}</td>
                     <td>
                       <div className="row" style={{justifyContent:"flex-end", gap:4}}>
+                        <button className="btn sm"
+                                onClick={() => setFilesFor({ core: r.core, jobId: r.request_id })}>
+                          files
+                        </button>
                         {!terminal && (
                           <button className="btn sm"
                                   disabled={busyReq === r.request_id}
@@ -4016,6 +4094,10 @@ function CoreServicesPanel({ span="c-12" }) {
         <BookSlotModal service={booking} member={member}
                        onClose={() => setBooking(null)}
                        onBooked={() => reload()} />
+      )}
+      {filesFor && (
+        <JobFilesModal core={filesFor.core} jobId={filesFor.jobId}
+                       onClose={() => setFilesFor(null)} />
       )}
     </div>
   );

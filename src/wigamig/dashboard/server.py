@@ -3943,6 +3943,153 @@ def create_app() -> FastAPI:
             "path": str(req.path),
         }
 
+    # ------------------------------------------------------------------
+    # Phase 5b: per-job file delivery endpoints
+    # ------------------------------------------------------------------
+
+    def _require_job_actor(
+        core: str, job_id: str, user: str, *, write: bool = False,
+    ):
+        """Resolve actor + job, gate per direction.
+
+        - write=True  → only leader or registrar may write
+        - write=False → requester (job's requester_lab), leader, registrar
+
+        Returns (actor, manifest_dict). 404 on unknown core/job, 403 on
+        permission failure.
+        """
+        from ..core import jobs as _jobs
+        from ..core import lab as _lab
+        from ..core import registrar as _reg
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        reg = _reg.read_registry()
+        entry = next((c for c in reg.cores if c.name == core), None)
+        if entry is None:
+            raise HTTPException(status_code=404, detail=f"core not found: {core}")
+        manifest = _jobs.read_manifest(core, job_id)
+        if manifest is None:
+            raise HTTPException(status_code=404,
+                detail=f"job not found: {core}/{job_id}")
+        is_leader = entry.pi.lstrip("@").lower() == actor.lower()
+        is_reg = _reg.is_registrar(actor)
+        if write:
+            if not (is_leader or is_reg):
+                raise HTTPException(status_code=403,
+                    detail=(f"@{actor} is not the leader of {core!r} "
+                            "or a registrar."))
+            return actor, manifest
+        # Read path: also let the requester's lab read.
+        actor_lab = _lab.load_lab_config().lab.lower()
+        job_lab = str(manifest.get("requester_lab") or "").lower()
+        is_requester_lab = bool(actor_lab) and actor_lab == job_lab
+        if not (is_leader or is_reg or is_requester_lab):
+            raise HTTPException(status_code=403,
+                detail=(f"@{actor} ({actor_lab}) is not in the requesting "
+                        f"lab ({job_lab}), the leader, nor a registrar."))
+        return actor, manifest
+
+    @app.get("/api/core/{core}/jobs/{job_id}/manifest")
+    def core_job_manifest(
+        core: str, job_id: str,
+        user: str = Query(""),
+    ) -> dict:
+        actor, manifest = _require_job_actor(core, job_id, user)
+        return {"ok": True, "manifest": manifest}
+
+    @app.get("/api/core/{core}/jobs/{job_id}/files")
+    def core_job_files(
+        core: str, job_id: str,
+        user: str = Query(""),
+    ) -> dict:
+        from ..core import jobs as _jobs
+        actor, _ = _require_job_actor(core, job_id, user)
+        rows = _jobs.list_files(core, job_id)
+        return {
+            "ok": True, "core": core, "job_id": job_id,
+            "files": [
+                {"relpath": r.relpath, "size_bytes": r.size_bytes}
+                for r in rows
+            ],
+        }
+
+    @app.post("/api/core/{core}/jobs/{job_id}/files")
+    def core_job_upload(
+        core: str, job_id: str,
+        body: dict,
+        user: str = Query(""),
+    ) -> dict:
+        """Upload one file into a job dir. Leader/registrar only.
+
+        Body:
+          - ``relpath``: required, must resolve inside the job dir
+            (no '..', no absolute). Convention: ``raw/...`` for
+            instrument outputs, ``refined/...`` for deliverables.
+          - ``content_base64``: required; the bytes to write.
+
+        Multipart upload deferred to a later phase — JSON+base64 keeps
+        the dashboard implementation trivial and works fine for the
+        typical ITC/CD/microscope output sizes (~10MB).
+        """
+        import base64
+        from ..core import jobs as _jobs
+        actor, _ = _require_job_actor(core, job_id, user, write=True)
+        relpath = str((body or {}).get("relpath") or "").strip()
+        b64 = (body or {}).get("content_base64")
+        if not relpath:
+            raise HTTPException(status_code=422,
+                detail="body.relpath is required")
+        if not b64:
+            raise HTTPException(status_code=422,
+                detail="body.content_base64 is required")
+        try:
+            data = base64.b64decode(b64, validate=True)
+        except Exception:
+            raise HTTPException(status_code=422,
+                detail="body.content_base64 is not valid base64")
+        try:
+            p = _jobs.write_file(core, job_id, relpath, data)
+        except _jobs.JobError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {
+            "ok": True, "core": core, "job_id": job_id,
+            "relpath": relpath,
+            "size_bytes": len(data),
+            "path": str(p),
+        }
+
+    @app.get("/api/core/{core}/jobs/{job_id}/files/{relpath:path}")
+    def core_job_download(
+        core: str, job_id: str, relpath: str,
+        user: str = Query(""),
+        max_bytes: int = Query(50 * 1024 * 1024,
+            description="Refuse downloads larger than this (default 50MB)."),
+    ):
+        from fastapi.responses import Response
+        from ..core import jobs as _jobs
+        actor, _ = _require_job_actor(core, job_id, user)
+        try:
+            p = _jobs.safe_resolve(core, job_id, relpath)
+        except _jobs.JobError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        if not p.is_file():
+            raise HTTPException(status_code=404, detail="file not found")
+        try:
+            size = p.stat().st_size
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+        if size > max_bytes:
+            raise HTTPException(status_code=413,
+                detail=f"file too large ({size} > {max_bytes} bytes); "
+                        "pass a larger ?max_bytes= or use the MCP bundle tool.")
+        data = p.read_bytes()
+        return Response(
+            content=data,
+            media_type="application/octet-stream",
+            headers={"Content-Disposition":
+                     f"attachment; filename=\"{p.name}\""},
+        )
+
     @app.get("/api/lab/{lab}/core_charges")
     def lab_core_charges(
         lab: str,
