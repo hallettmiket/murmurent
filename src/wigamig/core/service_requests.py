@@ -394,6 +394,15 @@ def create_request(
     root = lab_info_root(env)
     _git_init_if_needed(root)
     _git_commit_all(root, f"core {core}: request {rid} created ({state})")
+    # Phase 5a: auto-create the job dir + manifest so the leader can
+    # upload deliverables as soon as the booking exists. Best-effort
+    # — failure to create the job dir (e.g. lab_vm_root unwritable on
+    # a member's laptop) does NOT block booking.
+    try:
+        from . import jobs as _jobs
+        _jobs.init_job(core, req, env=env)
+    except Exception:
+        pass
     return req
 
 
@@ -431,6 +440,11 @@ def transition_request(
     _git_init_if_needed(root)
     _git_commit_all(root,
         f"core {core}: request {request_id} -> {to_state}")
+    try:
+        from . import jobs as _jobs
+        _jobs.refresh_manifest(core, updated, env=env)
+    except Exception:
+        pass
     return updated
 
 
@@ -502,6 +516,11 @@ def set_actual_charge(
     _git_commit_all(root,
         f"core {core}: request {request_id} actual_charge ${charge.total:.2f} "
         f"confirmed by @{updated.actual_charge_confirmed_by}")
+    try:
+        from . import jobs as _jobs
+        _jobs.refresh_manifest(core, updated, env=env)
+    except Exception:
+        pass
     return updated
 
 
