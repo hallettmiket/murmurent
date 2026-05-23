@@ -4021,6 +4021,78 @@ function CoreServicesPanel({ span="c-12" }) {
   );
 }
 
+/* ───────── PI-only lab core-charges summary (Phase 4d of cores rollout) ─────────
+   Shows how much THIS lab owes each core this month. Hidden on the
+   member dashboard and when no cores have billed the lab yet. Read-only;
+   the actual invoices are written by the core leader via core.html. */
+
+function LabCoreChargesPanel({ span="c-6" }) {
+  const lab = (window.DATA.lab_settings && window.DATA.lab_settings.short_name)
+            || (window.DATA.lab_settings && window.DATA.lab_settings.lab)
+            || "";
+  const [data, setData] = useState(null);
+  const [err, setErr]   = useState(null);
+
+  useEffect(() => {
+    if (!lab) { setData({ cores: [], total: 0 }); return; }
+    (async () => {
+      try {
+        const res = await fetch(`/api/lab/${encodeURIComponent(lab)}/core_charges`,
+                                 { credentials: "same-origin" });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        setData(await res.json());
+      } catch (ex) { setErr(String(ex.message || ex)); }
+    })();
+  }, [lab]);
+
+  if (err) return (
+    <div className={"panel " + span}>
+      <header><h2>Core charges this month</h2></header>
+      <div className="body error" style={{padding:14}}>{err}</div>
+    </div>
+  );
+  if (data === null) return null;
+  if (!data.cores || data.cores.length === 0) return null;   // hide cleanly
+
+  return (
+    <div className={"panel " + span}>
+      <header>
+        <h2>Core charges this month</h2>
+        <span className="meta">
+          {data.month} · {data.cores.length} core{data.cores.length === 1 ? "" : "s"}
+          {data.unconfirmed > 0 && (
+            <span style={{marginLeft:6}}>· {data.unconfirmed} unconfirmed</span>
+          )}
+        </span>
+      </header>
+      <div className="body" style={{padding:0}}>
+        <table className="dt">
+          <thead><tr>
+            <th>core</th>
+            <th style={{textAlign:"right"}}>lines</th>
+            <th style={{textAlign:"right"}}>unconfirmed</th>
+            <th style={{textAlign:"right"}}>subtotal</th>
+          </tr></thead>
+          <tbody>
+            {data.cores.map(c => (
+              <tr key={c.core}>
+                <td className="mono">{c.core}</td>
+                <td className="num">{c.lines}</td>
+                <td className="num">{c.unconfirmed > 0 ? c.unconfirmed : "—"}</td>
+                <td className="num">${c.subtotal.toFixed(2)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <tfoot><tr style={{fontWeight:600}}>
+            <td>TOTAL</td><td></td><td></td>
+            <td className="num">${data.total.toFixed(2)}</td>
+          </tr></tfoot>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 /* ───────── Collaborations (item #9: PI proposes; registrar approves) ─────────
    PIs use this panel to request a new cross-lab collaboration; the
    registrar's dashboard has the matching approve/decline UI. Members
@@ -6866,6 +6938,14 @@ function App() {
         <div className="grid" style={{marginBottom:14}}>
           <CoreServicesPanel span="c-12" />
         </div>
+
+        {/* Lab's core charges this month (Phase 4d). PI-only;
+            self-hides when the lab has no billed lines this month. */}
+        {persona === "pi" && (
+          <div className="grid" style={{marginBottom:14}}>
+            <LabCoreChargesPanel span="c-6" />
+          </div>
+        )}
 
         {/* Lab security access — PI grants/revokes the wigamig-level
             ``lab_sudo`` flag that controls /security dashboard visibility.

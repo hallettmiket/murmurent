@@ -557,6 +557,27 @@ def core_request_cancelled(
     _post(channel, text)
 
 
+def core_request_charge_confirmed(
+    *, core: str, request_id: str, requester: str, actor: str,
+    booked_total: float, actual_total: float, note: str = "",
+    channel: str = _CHAN_CLAUDE_CODE,
+) -> None:
+    """Phase 4a: leader confirmed the final billable charge."""
+    delta = actual_total - booked_total
+    if abs(delta) < 0.005:
+        delta_str = "= booked"
+    elif delta > 0:
+        delta_str = f"+${delta:.2f} vs booked"
+    else:
+        delta_str = f"-${abs(delta):.2f} vs booked"
+    note_str = f" — _{note}_" if note else ""
+    text = (
+        f":moneybag: Core *{core}*: request `{request_id}` ({requester}) "
+        f"charge confirmed by @{actor}: *${actual_total:.2f}* ({delta_str}){note_str}."
+    )
+    _post(channel, text)
+
+
 def core_request_reminder(
     *, core: str, request_id: str, requester: str,
     service: str, start: str, window: str,

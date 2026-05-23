@@ -233,6 +233,42 @@
         </div>
       </div>
 
+      <!-- Billing card (Phase 4c): per-month invoice preview + generate -->
+      <div class="card" id="billing-card" style="display:none">
+        <header>
+          <h2>Billing</h2>
+          <span class="meta">
+            <label style="font-size:11px;">
+              month
+              <input type="text" id="billing-month" placeholder="YYYY-MM"
+                     style="font-family:var(--mono); font-size:11px; padding:2px 6px;
+                            border:1px solid var(--rule-strong); border-radius:2px;
+                            margin-left:4px; width:80px;">
+            </label>
+            <label style="font-size:11px; margin-left:10px;">
+              <input type="checkbox" id="billing-finalised">
+              finalised (skip unconfirmed)
+            </label>
+            <button id="billing-preview" class="btn-primary"
+                    style="margin-left:10px; font-family:var(--mono); font-size:11px;
+                           background:white; border:1px solid var(--rule-strong);
+                           border-radius:2px; padding:4px 10px; cursor:pointer;">
+              preview
+            </button>
+            <button id="billing-generate" class="btn-primary"
+                    style="margin-left:6px; font-family:var(--mono); font-size:11px;
+                           background:var(--purple); color:white;
+                           border:1px solid var(--purple); border-radius:2px;
+                           padding:4px 10px; cursor:pointer;">
+              generate
+            </button>
+          </span>
+        </header>
+        <div class="body" id="billing-body">
+          <div class="placeholder">Pick a month and click <strong>preview</strong>.</div>
+        </div>
+      </div>
+
       <!-- Service editor modal (Phase 2c) -->
       <div id="modal-backdrop" style="display:none;
            position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100;
@@ -415,6 +451,11 @@
           renderRoleLabel(data.viewer);
           loadServices(data.viewer);
           loadRequests(data.viewer);
+          // Reveal the billing card (admin-only); user explicitly
+          // clicks preview to populate.
+          if (data.viewer && data.viewer.can_admin) {
+            document.getElementById("billing-card").style.display = "block";
+          }
         } catch (ex) {
           loading.style.display = "none";
           errBox.style.display = "block";
@@ -494,6 +535,80 @@
         card.style.display = "block";
       }
 
+      async function loadBilling(viewer, action) {
+        // Leader/registrar only — show the billing card.
+        if (!(viewer && viewer.can_admin)) return;
+        const card = document.getElementById("billing-card");
+        card.style.display = "block";
+        const month = document.getElementById("billing-month").value.trim();
+        if (!month) {
+          document.getElementById("billing-body").innerHTML =
+            '<div class="placeholder">Pick a month (YYYY-MM) and click <strong>preview</strong>.</div>';
+          return;
+        }
+        const finalised = document.getElementById("billing-finalised").checked;
+        const body = document.getElementById("billing-body");
+        body.innerHTML = `<div class="placeholder">${action === "generate" ? "Writing files…" : "Loading…"}</div>`;
+        try {
+          let url, method = "GET", payload = null;
+          if (action === "generate") {
+            url = `/api/core/${encodeURIComponent(CORE)}/invoices/${encodeURIComponent(month)}/generate`
+                + `?user=${encodeURIComponent(ACTOR || "")}`;
+            method = "POST";
+            payload = JSON.stringify({ finalised });
+          } else {
+            url = `/api/core/${encodeURIComponent(CORE)}/invoices/${encodeURIComponent(month)}/preview`
+                + `?user=${encodeURIComponent(ACTOR || "")}`
+                + `&finalised=${finalised ? "true" : "false"}`;
+          }
+          const opts = { method, headers: { "Content-Type": "application/json" } };
+          if (payload) opts.body = payload;
+          const res = await fetch(url, opts);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          if (action === "generate") {
+            const list = (data.written || []).map(p => `<li><code>${esc(p)}</code></li>`).join("");
+            body.innerHTML = `
+              <div style="padding:10px 14px;">
+                <strong>Wrote ${(data.written || []).length} file(s)</strong>
+                · labs: ${(data.labs || []).join(", ") || "—"}
+                · total: $${Number(data.total || 0).toFixed(2)}
+                <ul style="font-family:var(--mono); font-size:11px; margin-top:8px;">${list}</ul>
+              </div>`;
+          } else {
+            const rows = (data.labs || []).map(L => `
+              <tr>
+                <td>${esc(L.lab)}</td>
+                <td style="text-align:right;">${L.lines}</td>
+                <td style="text-align:right;">${L.unconfirmed}</td>
+                <td style="text-align:right;">$${Number(L.subtotal).toFixed(2)}</td>
+              </tr>`).join("");
+            body.innerHTML = (data.labs || []).length === 0
+              ? '<div class="placeholder">No billable requests for this month.</div>'
+              : `
+                <table class="members" style="font-size:12px;">
+                  <thead><tr>
+                    <th>lab</th><th style="text-align:right;">lines</th>
+                    <th style="text-align:right;">unconfirmed</th>
+                    <th style="text-align:right;">subtotal</th>
+                  </tr></thead>
+                  <tbody>${rows}</tbody>
+                  <tfoot><tr style="font-weight:600;">
+                    <td>TOTAL</td>
+                    <td style="text-align:right;">${(data.labs || []).reduce((a,b) => a + b.lines, 0)}</td>
+                    <td style="text-align:right;">${data.unconfirmed}</td>
+                    <td style="text-align:right;">$${Number(data.total).toFixed(2)}</td>
+                  </tr></tfoot>
+                </table>`;
+          }
+        } catch (ex) {
+          body.innerHTML = `<div class="err">Failed: ${esc(ex.message || ex)}</div>`;
+        }
+      }
+
       async function loadRequests(viewer) {
         // Leader/registrar only — show the requests-inbox card.
         if (!(viewer && viewer.can_admin)) return;
@@ -530,16 +645,22 @@
         }
         const rows = requests.map(r => {
           const terminal = (r.state === "completed" || r.state === "cancelled");
-          const actions = terminal ? "" : `
+          const actions = `
             <div style="display:flex; gap:4px; justify-content:flex-end;">
-              <button class="adv-req" data-rid="${esc(r.request_id)}"
+              ${terminal ? "" : `
+                <button class="adv-req" data-rid="${esc(r.request_id)}"
+                        style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                               background:white; border:1px solid var(--green); color:var(--green);
+                               border-radius:2px; cursor:pointer;">advance</button>
+                <button class="cancel-req" data-rid="${esc(r.request_id)}"
+                        style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                               background:white; border:1px solid var(--red); color:var(--red);
+                               border-radius:2px; cursor:pointer;">cancel</button>`}
+              <button class="charge-req" data-rid="${esc(r.request_id)}"
+                      data-booked="${Number(r.fee_at_booking.total || 0).toFixed(2)}"
                       style="font-family:var(--mono); font-size:10px; padding:2px 8px;
-                             background:white; border:1px solid var(--green); color:var(--green);
-                             border-radius:2px; cursor:pointer;">advance</button>
-              <button class="cancel-req" data-rid="${esc(r.request_id)}"
-                      style="font-family:var(--mono); font-size:10px; padding:2px 8px;
-                             background:white; border:1px solid var(--red); color:var(--red);
-                             border-radius:2px; cursor:pointer;">cancel</button>
+                             background:white; border:1px solid var(--purple); color:var(--purple);
+                             border-radius:2px; cursor:pointer;">$ charge</button>
             </div>`;
           const fee = r.fee_at_booking.total
             ? `$${Number(r.fee_at_booking.total).toFixed(2)}` : "—";
@@ -584,6 +705,31 @@
             } catch (ex) { alert("Advance failed: " + (ex.message || ex)); btn.disabled = false; }
           });
         });
+        body.querySelectorAll(".charge-req").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const rid = btn.dataset.rid;
+            const booked = btn.dataset.booked;
+            const totalStr = window.prompt(
+              `Actual charge for ${rid} (booked: $${booked}):`, booked);
+            if (totalStr === null) return;
+            const total = parseFloat(totalStr);
+            if (!isFinite(total) || total < 0) { alert("Bad amount."); return; }
+            const note = window.prompt("Optional note (overtime, etc.):", "") || "";
+            btn.disabled = true;
+            try {
+              const url = `/api/core/${encodeURIComponent(CORE)}/requests/${encodeURIComponent(rid)}/actual_charge`
+                        + `?user=${encodeURIComponent(ACTOR || "")}`;
+              const res = await fetch(url, { method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ total, note }) });
+              if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                throw new Error(d.detail || `HTTP ${res.status}`);
+              }
+              loadRequests(VIEWER);
+            } catch (ex) { alert("Charge failed: " + (ex.message || ex)); btn.disabled = false; }
+          });
+        });
         body.querySelectorAll(".cancel-req").forEach(btn => {
           btn.addEventListener("click", async () => {
             const rid = btn.dataset.rid;
@@ -611,6 +757,20 @@
         const toggle  = document.getElementById("requests-show-terminal");
         if (refresh) refresh.addEventListener("click", () => loadRequests(VIEWER));
         if (toggle)  toggle.addEventListener("change", () => loadRequests(VIEWER));
+        // Billing card (Phase 4c).
+        const prev = document.getElementById("billing-preview");
+        const gen  = document.getElementById("billing-generate");
+        const mInp = document.getElementById("billing-month");
+        if (prev) prev.addEventListener("click", () => loadBilling(VIEWER, "preview"));
+        if (gen)  gen.addEventListener("click",  () => {
+          if (!window.confirm("Write CSV + MD invoices to lab_info?")) return;
+          loadBilling(VIEWER, "generate");
+        });
+        // Default the month input to current YYYY-MM.
+        if (mInp && !mInp.value) {
+          const d = new Date();
+          mInp.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        }
       });
 
       async function loadServices(viewer) {
