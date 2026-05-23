@@ -216,6 +216,48 @@ def tool_list_job_files(core: str, job_id: str) -> dict[str, Any]:
     }
 
 
+def tool_bundle_job(
+    core: str, job_id: str,
+    *, exclude_manifest: bool = False,
+    max_bytes: int = 100 * 1024 * 1024,
+) -> dict[str, Any]:
+    """Return the entire job dir as a single base64-encoded tar.gz.
+
+    Caps the bundle at ``max_bytes`` (default 100MB) since MCP
+    responses live in agent context. For larger jobs, fall back to
+    per-file ``read_job_file`` calls.
+    """
+    m = _jobs.read_manifest(core, job_id)
+    if m is None:
+        return {"ok": False, "error": f"job not found: {core}/{job_id}"}
+    ok, reason = _can_read_job(core, m)
+    if not ok:
+        _audit_log(core, "bundle_job_denied", job_id=job_id, reason=reason)
+        return {"ok": False, "error": reason}
+    try:
+        blob = _jobs.bundle_job_tarball(
+            core, job_id, exclude_manifest=exclude_manifest,
+        )
+    except _jobs.JobError as exc:
+        return {"ok": False, "error": str(exc)}
+    if len(blob) > max_bytes:
+        _audit_log(core, "bundle_job_too_large",
+                    job_id=job_id, size=len(blob))
+        return {
+            "ok": False,
+            "error": (f"bundle is {len(blob)} bytes (> max {max_bytes}); "
+                       "list_job_files + read_job_file each file individually."),
+            "size_bytes": len(blob),
+        }
+    _audit_log(core, "bundle_job", job_id=job_id, size=len(blob))
+    return {
+        "ok": True, "core": core, "job_id": job_id,
+        "size_bytes": len(blob),
+        "format": "tar.gz",
+        "content_base64": base64.b64encode(blob).decode("ascii"),
+    }
+
+
 def tool_read_job_file(
     core: str, job_id: str, relpath: str,
     max_bytes: int = 10 * 1024 * 1024,
@@ -295,6 +337,15 @@ def _build_server():  # pragma: no cover - only when SDK installed
         return json.dumps(tool_read_job_file(core, job_id, relpath,
                                               max_bytes=max_bytes))
 
+    @server.tool(name="bundle_job",
+                  description="Entire job dir as a single base64 tar.gz. Size-capped.")
+    def _bundle(core: str, job_id: str,
+                 exclude_manifest: bool = False,
+                 max_bytes: int = 100 * 1024 * 1024) -> str:
+        return json.dumps(tool_bundle_job(core, job_id,
+                                            exclude_manifest=exclude_manifest,
+                                            max_bytes=max_bytes))
+
     return server
 
 
@@ -312,4 +363,5 @@ __all__ = [
     "AccessDenied",
     "tool_list_my_jobs", "tool_get_job_manifest",
     "tool_list_job_files", "tool_read_job_file",
+    "tool_bundle_job",
 ]

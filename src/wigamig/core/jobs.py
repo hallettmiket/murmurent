@@ -217,6 +217,37 @@ def safe_resolve(
     return candidate
 
 
+def bundle_job_tarball(
+    core: str, job_id: str,
+    *, exclude_manifest: bool = False,
+    env: dict[str, str] | None = None,
+) -> bytes:
+    """Return the entire job dir as an in-memory ``.tar.gz`` blob.
+
+    Phase 7b: small jobs only — caps are enforced by the HTTP / MCP
+    layer (this helper itself doesn't size-check so tests can exercise
+    arbitrary fixture sizes). For multi-GB jobs we'd want a streaming
+    response instead; not in scope today.
+    """
+    import io, tarfile
+    jdir = job_dir(core, job_id, env)
+    if not jdir.is_dir():
+        raise JobError(f"job dir not found: {core}/{job_id}")
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tar:
+        for p in sorted(jdir.rglob("*")):
+            if not p.is_file():
+                continue
+            try:
+                rel = p.relative_to(jdir)
+            except ValueError:
+                continue
+            if exclude_manifest and str(rel) == MANIFEST_NAME:
+                continue
+            tar.add(str(p), arcname=f"{job_id}/{rel}")
+    return buf.getvalue()
+
+
 def write_file(
     core: str, job_id: str, relpath: str, data: bytes,
     env: dict[str, str] | None = None,
@@ -258,4 +289,5 @@ __all__ = [
     "cores_root", "core_jobs_dir", "job_dir", "manifest_path",
     "init_job", "refresh_manifest", "read_manifest",
     "list_files", "safe_resolve", "write_file",
+    "bundle_job_tarball",
 ]

@@ -3745,6 +3745,13 @@ function jobFileUrl(core, jobId, relpath) {
     + "/files/" + relpath.split("/").map(encodeURIComponent).join("/")
     + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
 }
+function jobBundleUrl(core, jobId) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  return "/api/core/" + encodeURIComponent(core)
+    + "/jobs/" + encodeURIComponent(jobId) + "/bundle"
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+}
 
 function JobFilesModal({ core, jobId, onClose }) {
   const [data, setData] = useState(null);
@@ -3787,7 +3794,12 @@ function JobFilesModal({ core, jobId, onClose }) {
               </tbody>
             </table>
           )}
-          <div className="row" style={{justifyContent:"flex-end", marginTop:10}}>
+          <div className="row" style={{justifyContent:"space-between", marginTop:10}}>
+            {data && data.files && data.files.length > 0 ? (
+              <a className="btn sm" href={jobBundleUrl(core, jobId)} download>
+                download all (tar.gz)
+              </a>
+            ) : <span />}
             <button className="btn sm" onClick={onClose}>Close</button>
           </div>
         </div>
