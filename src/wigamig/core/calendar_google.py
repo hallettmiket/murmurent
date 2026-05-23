@@ -169,6 +169,24 @@ def _build_service(core: str):
 # Public API used by the booking endpoint
 # ---------------------------------------------------------------------------
 
+def _normalize_iso_for_google(iso: str) -> str:
+    """Google Calendar's events.insert rejects ISO8601 strings without
+    a seconds component (``2026-05-28T14:00-04:00`` → HTTP 400). Parse
+    + reformat so the API always sees ``YYYY-MM-DDTHH:MM:SS±HH:MM``.
+
+    Falls through unchanged if parsing fails (let Google return its
+    own error rather than masking it).
+    """
+    import datetime as _dt
+    if not iso:
+        return iso
+    try:
+        dt = _dt.datetime.fromisoformat(iso)
+    except ValueError:
+        return iso
+    return dt.isoformat(timespec="seconds")
+
+
 def create_event(
     core: str,
     *,
@@ -181,11 +199,14 @@ def create_event(
 ) -> CalendarEvent:
     """Create a calendar event on the core leader's calendar.
 
-    Times must be ISO8601 with timezone offset (matches what the booking
-    endpoint receives from the dashboard). ``attendees`` is a list of
+    Times must be ISO8601 with timezone offset. We normalise both
+    endpoints to include a seconds component (Google's API rejects
+    minute-only forms with HTTP 400). ``attendees`` is a list of
     email addresses; non-email handles are silently skipped (Google
     requires real RFC822 emails — our @netname handles aren't valid).
     """
+    start_iso = _normalize_iso_for_google(start_iso)
+    end_iso = _normalize_iso_for_google(end_iso)
     try:
         from googleapiclient.errors import HttpError  # type: ignore
     except ImportError as exc:
