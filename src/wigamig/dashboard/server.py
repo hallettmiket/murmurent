@@ -4010,6 +4010,55 @@ def create_app() -> FastAPI:
         if not check.ok:
             raise HTTPException(status_code=422, detail=check.reason)
 
+        # Overlap check: refuse if another scheduled/in_progress request
+        # on the same service's [start, end) intersects ours. Two ranges
+        # overlap iff (start < other.end) AND (other.start < end).
+        import datetime as _dt2
+        try:
+            new_start = _dt2.datetime.fromisoformat(start)
+            new_end   = _dt2.datetime.fromisoformat(end)
+        except ValueError:
+            raise HTTPException(
+                status_code=422,
+                detail="slot.start / slot.end must be ISO8601 with timezone offset",
+            )
+        if new_end <= new_start:
+            raise HTTPException(
+                status_code=422, detail="slot.end must be after slot.start",
+            )
+        # override_conflict=true lets the leader/registrar force-book
+        # when the override is intentional (e.g. proxy-booking on behalf
+        # of a member who already cleared it with the other party).
+        # Silently ignored for regular members.
+        entry_for_perm = next((c for c in reg.cores if c.name == core), None)
+        is_leader_or_reg = (
+            entry_for_perm is not None
+            and (entry_for_perm.pi.lstrip("@").lower() == actor.lower()
+                 or _reg.is_registrar(actor))
+        )
+        if not (bool(body.get("override_conflict")) and is_leader_or_reg):
+            for other in _sr.iter_requests(core, include_terminal=False):
+                if other.service != slug:
+                    continue
+                if not (other.booked_slot.start and other.booked_slot.end):
+                    continue
+                try:
+                    o_start = _dt2.datetime.fromisoformat(other.booked_slot.start)
+                    o_end   = _dt2.datetime.fromisoformat(other.booked_slot.end)
+                except ValueError:
+                    continue
+                if new_start < o_end and o_start < new_end:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            f"slot conflicts with {other.requester}'s "
+                            f"{other.state} booking on {slug!r} "
+                            f"{other.booked_slot.start} → {other.booked_slot.end}. "
+                            "Pick a different time or pass "
+                            "override_conflict=true (leader/registrar only)."
+                        ),
+                    )
+
         # Fee snapshot: default to the first tier when caller didn't pick.
         tier = str(body.get("tier") or "").strip()
         modifiers = list(body.get("modifiers") or [])
