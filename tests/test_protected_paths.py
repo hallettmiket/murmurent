@@ -26,12 +26,22 @@ from wigamig.hooks import protected_paths as pp
 
 
 def _run(payload: dict) -> dict:
-    """Pipe ``payload`` through the hook and return the parsed decision."""
+    """Pipe ``payload`` through the hook and return a normalised
+    decision dict in the legacy ``{"decision": ..., "reason": ...}``
+    shape (see test_raw_guard._run for the rationale)."""
     stdin = io.StringIO(json.dumps(payload))
     stdout = io.StringIO()
     code = pp.main(stdin=stdin, stdout=stdout)
     assert code == 0
-    return json.loads(stdout.getvalue())
+    raw = stdout.getvalue().strip()
+    if not raw:
+        return {"decision": "allow"}
+    data = json.loads(raw)
+    hso = data.get("hookSpecificOutput") or {}
+    if hso.get("permissionDecision") == "deny":
+        return {"decision": "deny",
+                "reason": hso.get("permissionDecisionReason", "")}
+    return data
 
 
 @pytest.fixture
@@ -361,17 +371,17 @@ def test_production_refined_blocked_even_with_env(monkeypatch, tmp_path):
 
 
 def test_empty_stdin_allows():
+    """CC modern protocol: empty stdout == allow."""
     stdout = io.StringIO()
     pp.main(stdin=io.StringIO(""), stdout=stdout)
-    assert json.loads(stdout.getvalue())["decision"] == "allow"
+    assert stdout.getvalue() == ""
 
 
-def test_malformed_json_allows_with_warning():
+def test_malformed_json_allows_silently():
+    """Defensive: bad input still means 'no opinion, proceed'."""
     stdout = io.StringIO()
     pp.main(stdin=io.StringIO("not json"), stdout=stdout)
-    body = json.loads(stdout.getvalue())
-    assert body["decision"] == "allow"
-    assert "parse error" in body["warning"].lower()
+    assert stdout.getvalue() == ""
 
 
 # ---------------------------------------------------------------------------

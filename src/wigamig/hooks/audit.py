@@ -71,16 +71,18 @@ def write_entry(payload: dict[str, Any], *, log_dir: Path | None = None) -> Path
 
 
 def main(stdin: IO[str] | None = None, stdout: IO[str] | None = None) -> int:
+    """Audit is read-only — never blocks. CC's modern hook protocol
+    treats empty stdout + exit 0 as 'no opinion, proceed normally',
+    so we emit nothing and avoid the legacy ``{"decision": "allow"}``
+    shape that CC's schema validator rejects.
+    """
     src = stdin or sys.stdin
-    dst = stdout or sys.stdout
     raw = src.read()
     if not raw.strip():
-        dst.write(json.dumps({"decision": "allow"}))
         return 0
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError:
-        dst.write(json.dumps({"decision": "allow"}))
         return 0
     if isinstance(payload, dict):
         try:
@@ -88,7 +90,6 @@ def main(stdin: IO[str] | None = None, stdout: IO[str] | None = None) -> int:
         except Exception:
             # Audit must never block the call; log silently and continue.
             pass
-    dst.write(json.dumps({"decision": "allow"}))
     return 0
 
 

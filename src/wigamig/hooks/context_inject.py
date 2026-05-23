@@ -80,29 +80,34 @@ def _resolve_role(at_handle: str, meta: dict[str, Any], members: list[str]) -> s
 
 
 def main(stdin: IO[str] | None = None, stdout: IO[str] | None = None) -> int:
+    """UserPromptSubmit hook. CC's modern protocol: emit
+    ``hookSpecificOutput.additionalContext`` to prepend system context
+    to what the model sees; emit nothing to pass the prompt through
+    unchanged. The legacy ``{"decision": "modify", "user_prompt": …}``
+    form is no longer accepted.
+    """
     src = stdin or sys.stdin
     dst = stdout or sys.stdout
     raw = src.read()
     if not raw.strip():
-        dst.write(json.dumps({"decision": "allow"}))
         return 0
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError:
-        dst.write(json.dumps({"decision": "allow"}))
         return 0
     if not isinstance(payload, dict):
-        dst.write(json.dumps({"decision": "allow"}))
         return 0
 
     summary = _project_summary()
     if summary is None:
-        dst.write(json.dumps({"decision": "allow"}))
         return 0
 
-    original = payload.get("user_prompt") or payload.get("prompt") or ""
-    new_prompt = summary + "\n\n" + str(original)
-    dst.write(json.dumps({"decision": "modify", "user_prompt": new_prompt}))
+    dst.write(json.dumps({
+        "hookSpecificOutput": {
+            "hookEventName": "UserPromptSubmit",
+            "additionalContext": summary,
+        },
+    }))
     return 0
 
 

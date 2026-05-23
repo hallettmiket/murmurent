@@ -144,22 +144,30 @@ def evaluate(call: dict[str, Any]) -> dict[str, Any]:
 def main(stdin: IO[str] | None = None, stdout: IO[str] | None = None) -> int:
     """Read tool-call JSON from stdin, write the decision to stdout.
 
-    Returns the suggested process exit code (always 0; the decision is
-    transported in stdout JSON, per the CC hook contract).
+    CC's modern hook protocol: empty stdout = "no opinion, proceed".
+    Block decisions use the hookSpecificOutput shape. (The legacy
+    ``{"decision": "allow"}`` form is no longer accepted and trips
+    CC's schema validator; that was the source of every "Hook JSON
+    output validation failed" line in fresh CC sessions.)
     """
     src = stdin or sys.stdin
     dst = stdout or sys.stdout
     raw_text = src.read()
     if not raw_text.strip():
-        dst.write(json.dumps({"decision": "allow"}))
         return 0
     try:
         call = json.loads(raw_text)
-    except json.JSONDecodeError as exc:
-        dst.write(json.dumps({"decision": "allow", "warning": f"raw_guard parse error: {exc}"}))
+    except json.JSONDecodeError:
         return 0
     decision = evaluate(call if isinstance(call, dict) else {})
-    dst.write(json.dumps(decision))
+    if decision.get("decision") == "deny":
+        dst.write(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": decision.get("reason", ""),
+            },
+        }))
     return 0
 
 

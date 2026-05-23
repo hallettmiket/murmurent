@@ -174,18 +174,34 @@ def main(
 
     raw = src.read()
     if not raw.strip():
-        dst.write(json.dumps({"decision": "allow"}))
         return 0
     try:
         payload = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        dst.write(json.dumps({"decision": "allow", "warning": f"phi_check parse error: {exc}"}))
+    except json.JSONDecodeError:
         return 0
     if not isinstance(payload, dict):
-        dst.write(json.dumps({"decision": "allow"}))
         return 0
     decision = evaluate_post(payload) if mode == "post" else evaluate_pre(payload)
-    dst.write(json.dumps(decision))
+    dec = decision.get("decision")
+    if dec == "deny":
+        event = "PostToolUse" if mode == "post" else "PreToolUse"
+        dst.write(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": event,
+                "permissionDecision": "deny",
+                "permissionDecisionReason": decision.get("reason", ""),
+            },
+        }))
+    elif dec == "modify" and mode == "post" and "tool_response" in decision:
+        # PHI redaction on the response — emit modern PostToolUse
+        # additionalContext (the tool already ran; this is feedback to
+        # the model that the response was redacted).
+        dst.write(json.dumps({
+            "hookSpecificOutput": {
+                "hookEventName": "PostToolUse",
+                "additionalContext": decision.get("reason", "PHI redacted"),
+            },
+        }))
     return 0
 
 

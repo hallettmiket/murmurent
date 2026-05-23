@@ -14,14 +14,29 @@ from wigamig.hooks import raw_guard
 
 
 def _run(payload: dict, env: dict[str, str] | None = None) -> dict:
-    """Pipe ``payload`` through the hook and return the parsed decision."""
+    """Pipe ``payload`` through the hook and return a normalised
+    decision dict in the legacy ``{"decision": "allow"|"deny", "reason": ...}``
+    shape so older test assertions keep working.
+
+    CC's modern wire format is ``hookSpecificOutput.permissionDecision``
+    for denies and empty stdout for allows; this helper translates back
+    so we don't have to rewrite every test."""
     if env is not None:
         os.environ.update(env)
     stdin = io.StringIO(json.dumps(payload))
     stdout = io.StringIO()
     code = raw_guard.main(stdin=stdin, stdout=stdout)
     assert code == 0
-    return json.loads(stdout.getvalue())
+    raw = stdout.getvalue().strip()
+    if not raw:
+        return {"decision": "allow"}
+    data = json.loads(raw)
+    hso = data.get("hookSpecificOutput") or {}
+    pd = hso.get("permissionDecision")
+    if pd == "deny":
+        return {"decision": "deny",
+                "reason": hso.get("permissionDecisionReason", "")}
+    return data   # unchanged for unfamiliar shapes
 
 
 def test_write_into_raw_denied(monkeypatch, tmp_path):
@@ -105,7 +120,8 @@ def test_production_path_blocked_even_with_env(monkeypatch, tmp_path):
 
 
 def test_empty_stdin_allows():
+    """CC modern protocol: empty stdout == allow."""
     stdout = io.StringIO()
     code = raw_guard.main(stdin=io.StringIO(""), stdout=stdout)
     assert code == 0
-    assert json.loads(stdout.getvalue())["decision"] == "allow"
+    assert stdout.getvalue() == ""

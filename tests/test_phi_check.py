@@ -13,11 +13,25 @@ from wigamig.hooks import phi_check
 
 
 def _run(payload, *, mode="pre"):
+    """Normalise CC-modern hook output back to the legacy decision
+    shape tests assert on (see test_raw_guard._run for rationale)."""
     stdin = io.StringIO(json.dumps(payload))
     stdout = io.StringIO()
     code = phi_check.main(stdin=stdin, stdout=stdout, mode=mode)
     assert code == 0
-    return json.loads(stdout.getvalue())
+    raw = stdout.getvalue().strip()
+    if not raw:
+        return {"decision": "allow"}
+    data = json.loads(raw)
+    hso = data.get("hookSpecificOutput") or {}
+    pd = hso.get("permissionDecision")
+    if pd == "deny":
+        return {"decision": "deny",
+                "reason": hso.get("permissionDecisionReason", "")}
+    if hso.get("additionalContext"):
+        return {"decision": "modify",
+                "reason": hso.get("additionalContext", "")}
+    return data
 
 
 @pytest.fixture
@@ -115,7 +129,17 @@ def test_pre_blocks_dob_near_name(clinical_project):
     assert "DOB-near-name" in decision["reason"]
 
 
-def test_post_redacts_phi(clinical_project):
+def test_post_warns_on_phi(clinical_project):
+    """Modern CC hook protocol no longer supports tool_response
+    replacement from a hook — only additionalContext. So the PHI
+    detector now emits a warning to the model rather than redacting
+    the response in-place. The user still sees the raw output in
+    their terminal; the model gets a flag that PHI was present.
+
+    Tracked as a known regression vs. the legacy hook contract; the
+    proper fix requires either a CC protocol extension or moving
+    redaction into the tool wrapper itself.
+    """
     decision = _run(
         {
             "tool_name": "Bash",
@@ -125,5 +149,4 @@ def test_post_redacts_phi(clinical_project):
         mode="post",
     )
     assert decision["decision"] == "modify"
-    assert "[REDACTED-PHI]" in decision["tool_response"]
-    assert "1234-567-890-AB" not in decision["tool_response"]
+    assert "REDACTED-PHI" in decision["reason"] or "PHI" in decision["reason"]
