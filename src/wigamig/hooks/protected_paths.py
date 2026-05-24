@@ -78,14 +78,21 @@ def _refined_prefixes() -> list[str]:
 
 
 def _notebook_prefixes() -> list[str]:
-    """Return Obsidian-vault prefixes covered by this hook.
+    """Return notebook prefixes covered by this hook.
+
+    The write-once scope is the **daily lab-notebook subfolder**
+    (``<vault>/<notebook_subfolder>``), NOT the whole Obsidian vault.
+    The rest of the vault (recipes, to-dos, project notes, …) is
+    freely editable — only the lab-notebook entries are append-only,
+    matching the oracle MCP server's notebook tier
+    (``oracle_server._safe_notebook_dir``).
 
     Resolution order:
       1. ``$WIGAMIG_NOTEBOOK_ROOT`` — explicit override (one path)
-      2. The wigamig-preferred vault (``preferred_vault()``)
+      2. ``<vault>/<notebook_subfolder>`` from per-machine settings
     Both, if both are set. Returns an empty list when neither resolves
     — the hook silently skips notebook protection in that case rather
-    than guessing.
+    than guessing (and never falls back to protecting the vault root).
     """
     out: list[str] = []
     explicit = os.environ.get("WIGAMIG_NOTEBOOK_ROOT")
@@ -96,12 +103,17 @@ def _notebook_prefixes() -> list[str]:
         # source tree isn't on the importer's path (it always is when
         # invoked via ``python -m wigamig.hooks.protected_paths``, but
         # the test harness may import this module standalone).
-        from ..core.obsidian import preferred_vault
-        vault = preferred_vault()
-        if vault is not None:
-            out.append(str(vault.path))
+        from ..dashboard import machine_settings as _ms
+        s = _ms.load()
+        vault = (s.obsidian_vault_path or "").strip()
+        sub = (s.notebook_subfolder or "").strip()
+        # Only protect the notebook *subfolder*. If the subfolder is
+        # unset we deliberately protect nothing rather than freezing
+        # the entire vault.
+        if vault and sub:
+            out.append(str(Path(vault).expanduser() / sub))
     except Exception:
-        pass  # vault discovery is best-effort — never block on it
+        pass  # settings discovery is best-effort — never block on it
     return _dedup_prefixes(out)
 
 
