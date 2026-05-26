@@ -1387,6 +1387,9 @@ cli.add_command(_core_invoice)
 from .commands.common_seas_cmd import common_sea as _common_sea
 cli.add_command(_common_sea)
 
+from .commands.broadcast_cmd import broadcast as _broadcast
+cli.add_command(_broadcast)
+
 
 if __name__ == "__main__":  # pragma: no cover
     cli()
