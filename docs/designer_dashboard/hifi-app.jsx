@@ -4616,6 +4616,214 @@ function BroadcastsPanel({ span="c-12" }) {
   );
 }
 
+/* ───────── Centre projects (centre_cable_guy front door, item 0e) ─────────
+   PI of primary_lab can declare and reconcile their projects from
+   here. Members see read-only listing of every centre project they
+   belong to (visibility, not editing). */
+
+async function postCentreProject(body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/centre/projects"
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+async function postCentreProjectReconcile(name, body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/centre/projects/" + encodeURIComponent(name) + "/reconcile"
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function CentreProjectsPanel({ span="c-12" }) {
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi" || persona === "registrar";
+  const labSettings = window.DATA.lab_settings || {};
+  const myLab = (labSettings.short_name || labSettings.lab || "").toLowerCase();
+  const myHandle = ((window.DATA.identity && window.DATA.identity.handle) || "")
+    .replace(/^@/, "").toLowerCase();
+  const [rows, setRows] = useState(null);
+  const [deltas, setDeltas] = useState({});       // name → Delta[]
+  const [err, setErr] = useState(null);
+
+  const reload = async () => {
+    try {
+      const r = await fetch("/api/centre/projects", { credentials: "same-origin" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      setRows((await r.json()).projects || []);
+    } catch (ex) { setErr(String(ex.message || ex)); }
+  };
+  useEffect(() => { reload(); }, []);
+
+  const onDeclare = async () => {
+    const name = window.prompt("Project name (slug):");
+    if (!name) return;
+    const primary_lab = window.prompt("Primary lab id:", myLab) || myLab;
+    if (!primary_lab) return;
+    const membersRaw = window.prompt("Members (comma-separated @handles):", "@" + myHandle);
+    if (membersRaw === null) return;
+    const members = membersRaw.split(",").map(s => s.trim()).filter(Boolean);
+    const machinesRaw = window.prompt("Machines hosting the data (comma-separated):", "biodatsci");
+    if (machinesRaw === null) return;
+    const machines = machinesRaw.split(",").map(s => s.trim()).filter(Boolean);
+    const description = window.prompt("Description (optional):", "") || "";
+    try {
+      await postCentreProject({ name, primary_lab, members, machines, description });
+      reload();
+    } catch (ex) { alert("Declare failed: " + (ex.message || ex)); }
+  };
+
+  const onReconcile = async (proj) => {
+    // v1: pure-diff with empty actuals — surfaces "this lab member
+    // hasn't been wired to Slack/GitHub/FS yet" deltas for every
+    // declared member. A future commit will fetch actual state.
+    try {
+      const r = await postCentreProjectReconcile(proj.name, {});
+      setDeltas({ ...deltas, [proj.name]: r.deltas });
+    } catch (ex) { alert("Reconcile failed: " + (ex.message || ex)); }
+  };
+
+  if (err) return (
+    <div className={"panel " + span}>
+      <header><h2>Centre projects</h2></header>
+      <div className="body error" style={{padding:14}}>{err}</div>
+    </div>
+  );
+  if (rows === null) return null;
+
+  // Hide for non-PI members when they belong to no declared project.
+  const visible = isPI
+    ? rows
+    : rows.filter(r => (r.members || []).includes(myHandle));
+  if (visible.length === 0 && !isPI) return null;
+
+  return (
+    <div className={"panel " + span}>
+      <header>
+        <h2>Centre projects</h2>
+        <div className="row" style={{gap:8}}>
+          <span className="meta">
+            {visible.length} project{visible.length === 1 ? "" : "s"}
+          </span>
+          {isPI && (
+            <button className="btn sm primary" onClick={onDeclare}>
+              ＋ declare
+            </button>
+          )}
+        </div>
+      </header>
+      <div className="body" style={{padding:0}}>
+        {visible.length === 0 ? (
+          <div className="muted" style={{padding:14, fontSize:13}}>
+            No centre projects declared yet.{" "}
+            {isPI && <span>Click <code>＋ declare</code> to register one.</span>}
+          </div>
+        ) : (
+        <table className="dt">
+          <thead><tr>
+            <th>name</th>
+            <th style={{width:110}}>primary lab</th>
+            <th>members</th>
+            <th style={{width:120}}>machines</th>
+            <th style={{width:130}}>github</th>
+            {isPI && <th style={{width:130}}></th>}
+          </tr></thead>
+          <tbody>
+            {visible.map(r => (
+              <React.Fragment key={r.name}>
+                <tr>
+                  <td>
+                    <div style={{fontWeight:500}}>{r.name}</div>
+                    {r.description && (
+                      <div className="muted" style={{fontSize:11}}>{r.description}</div>
+                    )}
+                  </td>
+                  <td className="mono" style={{fontSize:11}}>{r.primary_lab}</td>
+                  <td>
+                    {(r.members || []).map(h => (
+                      <code key={h} style={{fontSize:11, marginRight:4}}>
+                        @{h}
+                      </code>
+                    ))}
+                  </td>
+                  <td className="mono" style={{fontSize:11}}>
+                    {(r.machines || []).join(", ") || "—"}
+                  </td>
+                  <td className="mono" style={{fontSize:11}}>
+                    {r.github_org ? `${r.github_org}/${r.github_repo}` : "—"}
+                  </td>
+                  {isPI && (
+                    <td>
+                      <div className="row" style={{justifyContent:"flex-end", gap:4}}>
+                        <button className="btn sm" onClick={() => onReconcile(r)}>
+                          reconcile
+                        </button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+                {(deltas[r.name] || []).length > 0 && (
+                  <tr><td colSpan={isPI ? 6 : 5}
+                          style={{padding:"6px 14px", background:"#fffbe6"}}>
+                    <strong style={{fontSize:11}}>Reconcile drift:</strong>
+                    <ul style={{margin:"4px 0 0", paddingLeft:18, fontSize:11}}>
+                      {deltas[r.name].map((d, i) => (
+                        <li key={i}>
+                          <Pill tone={d.severity === "block" ? "red"
+                                    : d.severity === "warn" ? "warn" : "outline"}>
+                            {d.kind}
+                          </Pill>{" "}
+                          {d.summary}
+                          {d.apply_hint && (
+                            <div className="muted" style={{fontFamily:"monospace",
+                                                            fontSize:10, marginTop:2}}>
+                              {d.apply_hint}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </td></tr>
+                )}
+                {deltas[r.name] && deltas[r.name].length === 0 && (
+                  <tr><td colSpan={isPI ? 6 : 5}
+                          style={{padding:"6px 14px", background:"#f0fff4",
+                                   fontSize:11, color:"#2d7a2d"}}>
+                    ✓ Reconcile clean — no drift.
+                  </td></tr>
+                )}
+              </React.Fragment>
+            ))}
+          </tbody>
+        </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ───────── Collaborations (item #9: PI proposes; registrar approves) ─────────
    PIs use this panel to request a new cross-lab collaboration; the
    registrar's dashboard has the matching approve/decline UI. Members
@@ -7468,6 +7676,13 @@ function App() {
         {/* Centre broadcasts — PI sends; everyone reads. */}
         <div className="grid" style={{marginBottom:14}}>
           <BroadcastsPanel span="c-12" />
+        </div>
+
+        {/* Centre projects (centre_cable_guy front door). PI of
+            primary_lab can declare + reconcile their projects; members
+            see a read-only listing of every centre project they belong to. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <CentreProjectsPanel span="c-12" />
         </div>
 
         {/* Lab's core charges this month (Phase 4d). PI-only;
