@@ -22,6 +22,7 @@ EXPECTED_AGENTS = {
     "blacksmith",
     "bookworm",
     "cable_guy",
+    "centre_cable_guy",
     "conscience",
     "lab_oracle",
     "oracle",
