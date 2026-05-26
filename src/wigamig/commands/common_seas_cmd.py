@@ -1,17 +1,17 @@
 """
-Purpose: ``wigamig common-tool`` — terminal-first CRUD for the centre's
-         common-tools catalog.
+Purpose: ``wigamig common-sea`` — terminal-first CRUD for the centre's
+         common-SEAs catalog.
 Author: Mike Hallett (with Claude Code)
-Date: 2026-05-23
+Date: 2026-05-26
 
 Examples:
 
-    wigamig common-tool list
-    wigamig common-tool list --kind skill --tag qc
-    wigamig common-tool show qc_drift_routine
+    wigamig common-sea list
+    wigamig common-sea list --kind skill --tag qc
+    wigamig common-sea show qc_drift_routine
 
     # Submit (defaults owner_lab to your local lab).
-    wigamig common-tool submit \\
+    wigamig common-sea submit \\
       --slug qc_drift_routine --name 'QC drift watcher' \\
       --kind routine \\
       --description 'Posts Slack on MoM QC drift >2σ' \\
@@ -19,10 +19,10 @@ Examples:
       --url https://github.com/hallettmiket/qc_drift_routine \\
       --tag qc --tag monitoring
 
-    wigamig common-tool archive qc_drift_routine
+    wigamig common-sea archive qc_drift_routine
 
 The CLI does not call the HTTP dashboard; it edits ``<lab_info>``
-directly via the same ``core.common_tools`` helpers the endpoints
+directly via the same ``core.common_seas`` helpers the endpoints
 use, so it works offline / before the dashboard is running.
 """
 
@@ -30,71 +30,71 @@ from __future__ import annotations
 
 import click
 
-from ..core import common_tools as _ct
+from ..core import common_seas as _cs
 from ..core import lab as _lab
 
 
-@click.group(name="common-tool",
-              help="Centre-wide common-tools catalog (SEAs / skills / routines).")
-def common_tool() -> None:
+@click.group(name="common-sea",
+              help="Centre-wide common-SEAs catalog.")
+def common_sea() -> None:
     pass
 
 
-@common_tool.command("list")
+@common_sea.command("list")
 @click.option("--kind", default="",
-              help="Filter to one kind: sea|skill|routine|mcp|dataset.")
+              help="Filter to one kind: service|skill|routine|mcp|dataset.")
 @click.option("--owner-lab", default="",
               help="Filter to one lab id.")
 @click.option("--tag", default="",
               help="Filter to one tag.")
 @click.option("--include-deprecated", is_flag=True, default=False,
-              help="Include archived/deprecated tools.")
+              help="Include archived/deprecated SEAs.")
 def cmd_list(kind: str, owner_lab: str, tag: str,
               include_deprecated: bool) -> None:
-    tools = _ct.iter_tools(
+    seas = _cs.iter_seas(
         kind=kind or None, owner_lab=owner_lab or None,
         tag=tag or None, include_deprecated=include_deprecated,
     )
-    if not tools:
-        click.echo("(no common tools registered)")
+    if not seas:
+        click.echo("(no common SEAs registered)")
         return
     click.echo(f"{'slug':30s} {'kind':9s} {'owner':12s} {'status':10s} name")
     click.echo("-" * 80)
-    for t in tools:
+    for s in seas:
         click.echo(
-            f"{t.slug:30s} {t.kind:9s} {t.owner_lab:12s} "
-            f"{t.status:10s} {t.name}"
+            f"{s.slug:30s} {s.kind:9s} {s.owner_lab:12s} "
+            f"{s.status:10s} {s.name}"
         )
 
 
-@common_tool.command("show")
+@common_sea.command("show")
 @click.argument("slug")
 def cmd_show(slug: str) -> None:
-    t = _ct.get_tool(slug)
-    if t is None:
+    s = _cs.get_sea(slug)
+    if s is None:
         raise click.ClickException(f"not found: {slug}")
-    click.echo(f"slug:        {t.slug}")
-    click.echo(f"name:        {t.name}")
-    click.echo(f"kind:        {t.kind}")
-    click.echo(f"owner_lab:   {t.owner_lab}")
-    click.echo(f"status:      {t.status}")
-    click.echo(f"tags:        {', '.join(t.tags) or '—'}")
-    click.echo(f"description: {t.description}")
-    if t.install:
-        click.echo(f"install:     {t.install}")
-    if t.url:
-        click.echo(f"url:         {t.url}")
-    click.echo(f"created:     {t.created}")
-    click.echo(f"path:        {t.path}")
-    if t.notes:
-        click.echo("\n" + t.notes)
+    click.echo(f"slug:        {s.slug}")
+    click.echo(f"name:        {s.name}")
+    click.echo(f"kind:        {s.kind}")
+    click.echo(f"owner_lab:   {s.owner_lab}")
+    click.echo(f"status:      {s.status}")
+    click.echo(f"tags:        {', '.join(s.tags) or '—'}")
+    click.echo(f"description: {s.description}")
+    if s.install:
+        click.echo(f"install:     {s.install}")
+    if s.url:
+        click.echo(f"url:         {s.url}")
+    click.echo(f"created:     {s.created}")
+    click.echo(f"path:        {s.path}")
+    if s.notes:
+        click.echo("\n" + s.notes)
 
 
-@common_tool.command("submit")
+@common_sea.command("submit")
 @click.option("--slug", required=True)
 @click.option("--name", required=True)
 @click.option("--kind", required=True,
-              type=click.Choice(list(_ct.VALID_KINDS)))
+              type=click.Choice(list(_cs.VALID_KINDS)))
 @click.option("--owner-lab", default="",
               help="Defaults to local lab.md's lab id.")
 @click.option("--description", default="")
@@ -116,21 +116,21 @@ def cmd_submit(slug: str, name: str, kind: str, owner_lab: str,
                 f"--owner-lab not provided and lab.md couldn't be read: {exc}"
             ) from exc
     try:
-        p = _ct.create_tool(
+        p = _cs.create_sea(
             slug=slug, name=name, kind=kind, owner_lab=owner_lab,
             description=description, install=install, url=url,
             tags=list(tags), notes=notes,
         )
-    except _ct.CommonToolError as exc:
+    except _cs.CommonSeaError as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(f"Submitted {slug} ({kind}, lab {owner_lab}): {p}")
 
 
-@common_tool.command("archive")
+@common_sea.command("archive")
 @click.argument("slug")
 def cmd_archive(slug: str) -> None:
     try:
-        _ct.archive_tool(slug=slug)
-    except _ct.CommonToolError as exc:
+        _cs.archive_sea(slug=slug)
+    except _cs.CommonSeaError as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(f"Archived {slug} → status=deprecated.")

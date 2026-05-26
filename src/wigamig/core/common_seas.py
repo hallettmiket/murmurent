@@ -1,29 +1,33 @@
 """
-Purpose: Centre-wide registry of "common tools" — SEAs, skills, routines,
-         MCP servers, datasets that one lab built and is offering for any
-         other lab to clone / use.
+Purpose: Centre-wide registry of "common SEAs" — services / experiments /
+         assays / skills / routines / MCPs / datasets that one lab built
+         and is offering to every other lab in the centre to clone or use.
 Author: Mike Hallett (with Claude Code)
-Date: 2026-05-23
+Date: 2026-05-26
+
+A "Common SEA" is the centre-wide-scope counterpart to a per-lab SEA
+(``D.sea_catalog`` — the existing lab-local SEA catalog). Per-lab SEAs
+are offered to specific labs; common SEAs are advertised to everyone.
 
 The registrar advertises these on a public list; the member dashboard
-renders them with a copy-paste install command per row. Submission is
-explicit (each lab declares what it's sharing — no auto-discovery), so
-the catalog stays curated.
+shows them inside the "SEAs we offer" panel alongside the lab's own
+SEA catalog. Submission is explicit (each lab declares what it's
+sharing — no auto-discovery), so the catalog stays curated.
 
 Storage:
 
-  <lab_info>/common_tools/<slug>.md
+  <lab_info>/common_seas/<slug>.md
     ---
     slug: qc_drift_routine
     name: 'QC drift watcher'
-    kind: routine                     # sea | skill | routine | mcp | dataset
+    kind: routine               # service | skill | routine | mcp | dataset
     owner_lab: hallett
-    description: 'Posts to slack when MoM QC metric drifts > 2σ.'
+    description: 'Posts Slack on MoM QC drift > 2σ.'
     install: 'wigamig routine install qc_drift_routine'
     url: 'https://github.com/hallettmiket/qc_drift_routine'
     tags: [qc, monitoring]
-    status: active                    # active | deprecated
-    created: '2026-05-23'
+    status: active              # active | deprecated
+    created: '2026-05-26'
     ---
 
     # QC drift watcher
@@ -51,22 +55,22 @@ from .registrar import (
 )
 
 
-COMMON_TOOLS_SUBDIR = "common_tools"
-VALID_KINDS = ("sea", "skill", "routine", "mcp", "dataset")
+COMMON_SEAS_SUBDIR = "common_seas"
+VALID_KINDS = ("service", "skill", "routine", "mcp", "dataset")
 _SLUG_RE = _re.compile(r"^[a-z0-9][a-z0-9_]{1,63}$")
 
 
-class CommonToolError(ValueError):
-    """Common-tool mutation failed (bad slug, missing fields, …)."""
+class CommonSeaError(ValueError):
+    """Common-SEA mutation failed (bad slug, missing fields, …)."""
 
 
 @dataclass
-class CommonTool:
-    """One advertised common tool."""
+class CommonSea:
+    """One advertised common SEA."""
 
     slug: str                              # filename stem
     name: str                              # display
-    kind: str                              # sea | skill | routine | mcp | dataset
+    kind: str                              # service | skill | routine | mcp | dataset
     owner_lab: str                         # short id of the lab that submitted it
     description: str = ""
     install: str = ""                      # copy-paste install command
@@ -82,20 +86,20 @@ class CommonTool:
 # Paths
 # ---------------------------------------------------------------------------
 
-def common_tools_dir(env: dict[str, str] | None = None) -> Path:
-    """``<lab_info>/common_tools/``."""
-    return lab_info_root(env) / COMMON_TOOLS_SUBDIR
+def common_seas_dir(env: dict[str, str] | None = None) -> Path:
+    """``<lab_info>/common_seas/``."""
+    return lab_info_root(env) / COMMON_SEAS_SUBDIR
 
 
-def tool_path(slug: str, env: dict[str, str] | None = None) -> Path:
-    return common_tools_dir(env) / f"{slug}.md"
+def sea_path(slug: str, env: dict[str, str] | None = None) -> Path:
+    return common_seas_dir(env) / f"{slug}.md"
 
 
 # ---------------------------------------------------------------------------
 # Readers
 # ---------------------------------------------------------------------------
 
-def _parse_tool(path: Path) -> CommonTool | None:
+def _parse_sea(path: Path) -> CommonSea | None:
     try:
         parsed = parse_file(path)
     except Exception:
@@ -103,7 +107,7 @@ def _parse_tool(path: Path) -> CommonTool | None:
     meta = parsed.meta or {}
     slug = str(meta.get("slug") or path.stem)
     name = str(meta.get("name") or slug)
-    return CommonTool(
+    return CommonSea(
         slug=slug, name=name,
         kind=str(meta.get("kind") or "skill").lower(),
         owner_lab=str(meta.get("owner_lab") or "").lower(),
@@ -118,44 +122,44 @@ def _parse_tool(path: Path) -> CommonTool | None:
     )
 
 
-def iter_tools(
+def iter_seas(
     *,
     include_deprecated: bool = False,
     kind: str | None = None,
     owner_lab: str | None = None,
     tag: str | None = None,
     env: dict[str, str] | None = None,
-) -> list[CommonTool]:
+) -> list[CommonSea]:
     """Browse the catalog with optional filters. Filters compose."""
-    cdir = common_tools_dir(env)
+    cdir = common_seas_dir(env)
     if not cdir.is_dir():
         return []
-    out: list[CommonTool] = []
+    out: list[CommonSea] = []
     for entry in sorted(cdir.iterdir()):
         if not entry.is_file() or entry.suffix != ".md":
             continue
-        t = _parse_tool(entry)
-        if t is None:
+        s = _parse_sea(entry)
+        if s is None:
             continue
-        if t.status == "deprecated" and not include_deprecated:
+        if s.status == "deprecated" and not include_deprecated:
             continue
-        if kind and t.kind != kind.lower():
+        if kind and s.kind != kind.lower():
             continue
-        if owner_lab and t.owner_lab != owner_lab.lower():
+        if owner_lab and s.owner_lab != owner_lab.lower():
             continue
-        if tag and tag.lower() not in [x.lower() for x in t.tags]:
+        if tag and tag.lower() not in [x.lower() for x in s.tags]:
             continue
-        out.append(t)
+        out.append(s)
     return out
 
 
-def get_tool(
+def get_sea(
     slug: str, env: dict[str, str] | None = None,
-) -> CommonTool | None:
-    p = tool_path(slug, env)
+) -> CommonSea | None:
+    p = sea_path(slug, env)
     if not p.is_file():
         return None
-    return _parse_tool(p)
+    return _parse_sea(p)
 
 
 # ---------------------------------------------------------------------------
@@ -165,32 +169,32 @@ def get_tool(
 def _validate_slug(slug: str) -> str:
     s = (slug or "").strip().lower()
     if not _SLUG_RE.match(s):
-        raise CommonToolError(
+        raise CommonSeaError(
             f"slug must match {_SLUG_RE.pattern} (got {slug!r}); "
             "use lowercase letters / digits / underscore; 2-64 chars."
         )
     return s
 
 
-def _render(t: CommonTool) -> str:
+def _render(s: CommonSea) -> str:
     meta = {
-        "slug": t.slug,
-        "name": t.name,
-        "kind": t.kind,
-        "owner_lab": t.owner_lab,
-        "description": t.description,
-        "install": t.install,
-        "url": t.url,
-        "tags": list(t.tags),
-        "status": t.status,
-        "created": t.created,
+        "slug": s.slug,
+        "name": s.name,
+        "kind": s.kind,
+        "owner_lab": s.owner_lab,
+        "description": s.description,
+        "install": s.install,
+        "url": s.url,
+        "tags": list(s.tags),
+        "status": s.status,
+        "created": s.created,
     }
     yaml_text = yaml.safe_dump(meta, sort_keys=False).rstrip()
-    body = (t.notes or "").strip() or f"# {t.name}"
+    body = (s.notes or "").strip() or f"# {s.name}"
     return f"---\n{yaml_text}\n---\n\n{body}\n"
 
 
-def create_tool(
+def create_sea(
     *,
     slug: str,
     name: str,
@@ -205,19 +209,19 @@ def create_tool(
 ) -> Path:
     s = _validate_slug(slug)
     if not name.strip():
-        raise CommonToolError("name is required")
+        raise CommonSeaError("name is required")
     k = (kind or "").strip().lower()
     if k not in VALID_KINDS:
-        raise CommonToolError(
+        raise CommonSeaError(
             f"kind must be one of {VALID_KINDS} (got {kind!r})"
         )
     if not owner_lab.strip():
-        raise CommonToolError("owner_lab is required")
-    p = tool_path(s, env)
+        raise CommonSeaError("owner_lab is required")
+    p = sea_path(s, env)
     if p.is_file():
-        raise CommonToolError(f"common tool already exists: {s}")
+        raise CommonSeaError(f"common SEA already exists: {s}")
     now = _dt.datetime.now(_dt.timezone.utc).date().isoformat()
-    t = CommonTool(
+    sea = CommonSea(
         slug=s, name=name.strip(), kind=k,
         owner_lab=owner_lab.strip().lower(),
         description=description.strip(),
@@ -228,57 +232,57 @@ def create_tool(
         created=now,
     )
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(_render(t), encoding="utf-8")
+    p.write_text(_render(sea), encoding="utf-8")
     root = lab_info_root(env)
     _git_init_if_needed(root)
     _git_commit_all(root,
-        f"common_tools: +{s} ({k}, by lab {owner_lab.lower()})")
+        f"common_seas: +{s} ({k}, by lab {owner_lab.lower()})")
     return p
 
 
-def update_tool(
+def update_sea(
     *,
     slug: str,
     patch: dict[str, Any],
     env: dict[str, str] | None = None,
 ) -> Path:
-    t = get_tool(slug, env)
-    if t is None:
-        raise CommonToolError(f"common tool not found: {slug}")
+    s = get_sea(slug, env)
+    if s is None:
+        raise CommonSeaError(f"common SEA not found: {slug}")
     allowed = {"name", "kind", "description", "install", "url",
                "tags", "status", "notes"}
     for k, v in (patch or {}).items():
         if k not in allowed:
             continue
         if k == "tags":
-            setattr(t, k, list(v or []))
+            setattr(s, k, list(v or []))
         elif k == "kind":
             kv = str(v or "").strip().lower()
             if kv not in VALID_KINDS:
-                raise CommonToolError(
+                raise CommonSeaError(
                     f"kind must be one of {VALID_KINDS} (got {v!r})"
                 )
-            t.kind = kv
+            s.kind = kv
         else:
-            setattr(t, k, v if isinstance(v, str) else str(v or ""))
-    p = tool_path(slug, env)
-    p.write_text(_render(t), encoding="utf-8")
+            setattr(s, k, v if isinstance(v, str) else str(v or ""))
+    p = sea_path(slug, env)
+    p.write_text(_render(s), encoding="utf-8")
     root = lab_info_root(env)
     _git_init_if_needed(root)
-    _git_commit_all(root, f"common_tools: {slug} updated")
+    _git_commit_all(root, f"common_seas: {slug} updated")
     return p
 
 
-def archive_tool(
+def archive_sea(
     *, slug: str, env: dict[str, str] | None = None,
 ) -> Path:
-    return update_tool(slug=slug, patch={"status": "deprecated"}, env=env)
+    return update_sea(slug=slug, patch={"status": "deprecated"}, env=env)
 
 
 __all__ = [
-    "COMMON_TOOLS_SUBDIR", "VALID_KINDS",
-    "CommonToolError", "CommonTool",
-    "common_tools_dir", "tool_path",
-    "iter_tools", "get_tool",
-    "create_tool", "update_tool", "archive_tool",
+    "COMMON_SEAS_SUBDIR", "VALID_KINDS",
+    "CommonSeaError", "CommonSea",
+    "common_seas_dir", "sea_path",
+    "iter_seas", "get_sea",
+    "create_sea", "update_sea", "archive_sea",
 ]
