@@ -346,6 +346,49 @@ def _post(channel: str, text: str) -> bool:
         return False
 
 
+def post_and_link(channel: str, text: str) -> str:
+    """Post + return the Slack permalink (best-effort).
+
+    Used by broadcasts so we can store the link in the audit ledger.
+    Returns "" on failure (caller may still proceed; missing link is
+    a degraded but non-fatal state).
+    """
+    tok = _token()
+    if not tok:
+        return ""
+    try:
+        import httpx
+        r = httpx.post(
+            _SLACK_API_URL,
+            headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"},
+            json={"channel": channel, "text": text},
+            timeout=5,
+        )
+        data = r.json()
+        if not data.get("ok"):
+            log.warning("Slack post to %s failed: %s", channel, data.get("error"))
+            return ""
+        ts = data.get("ts")
+        if not ts:
+            return ""
+        # Look up the permalink (cheap extra call; keeps ledger useful).
+        try:
+            pl = httpx.get(
+                "https://slack.com/api/chat.getPermalink",
+                headers={"Authorization": f"Bearer {tok}"},
+                params={"channel": channel, "message_ts": ts},
+                timeout=5,
+            ).json()
+            if pl.get("ok") and pl.get("permalink"):
+                return pl["permalink"]
+        except Exception:  # noqa: BLE001
+            pass
+        return ""
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Slack notification error: %s", exc)
+        return ""
+
+
 # ── Public notification functions ──────────────────────────────────────────
 
 def sea_state_change(

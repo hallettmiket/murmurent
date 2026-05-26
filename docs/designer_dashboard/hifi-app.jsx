@@ -4473,6 +4473,149 @@ function LabCoreChargesPanel({ span="c-6" }) {
   );
 }
 
+/* ───────── Centre broadcasts (item 3 of post-smoke design) ─────────
+   Tier-tailored Slack messages across the centre. PI/registrar
+   composes; every member sees the audit log. Channel IDs live in
+   the registrar profile so different institutions name them
+   differently. */
+
+async function postBroadcast(body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/broadcast"
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+function BroadcastsPanel({ span="c-12" }) {
+  const persona = window.DATA.persona || "member";
+  const canSend = persona === "pi" || persona === "registrar";
+  const [recent, setRecent] = useState(null);
+  const [audience, setAudience] = useState("everyone");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [showCompose, setShowCompose] = useState(false);
+
+  const reload = async () => {
+    try {
+      const r = await fetch("/api/broadcast/recent?limit=10",
+                             { credentials: "same-origin" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      setRecent((await r.json()).broadcasts || []);
+    } catch (ex) { setErr(String(ex.message || ex)); }
+  };
+  useEffect(() => { reload(); }, []);
+
+  const onSend = async () => {
+    if (!message.trim()) { setErr("Message is empty."); return; }
+    setBusy(true); setErr(null);
+    try {
+      await postBroadcast({ audience, message });
+      setMessage("");
+      setShowCompose(false);
+      reload();
+    } catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(false); }
+  };
+
+  if (recent === null) return null;
+
+  // Format ISO ts compactly: "2026-05-26 14:23 UTC" (drop microseconds).
+  const fmtTs = (iso) => {
+    if (!iso) return "";
+    const m = iso.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+    return m ? `${m[1]} ${m[2]}:${m[3]} UTC` : iso;
+  };
+
+  return (
+    <div className={"panel "+span}>
+      <header>
+        <h2>Centre broadcasts</h2>
+        <div className="row" style={{gap:8}}>
+          <span className="meta">{recent.length} recent</span>
+          {canSend && (
+            <button className="btn sm primary"
+                    onClick={() => setShowCompose(!showCompose)}>
+              {showCompose ? "cancel" : "＋ compose"}
+            </button>
+          )}
+        </div>
+      </header>
+      {showCompose && canSend && (
+        <div style={{padding:"10px 14px", borderBottom:"1px solid #eee",
+                      background:"#fafafa"}}>
+          <div className="row" style={{gap:8, marginBottom:6, alignItems:"baseline"}}>
+            <label style={{fontSize:11}}>to</label>
+            <select value={audience} onChange={e=>setAudience(e.target.value)}>
+              <option value="everyone">everyone</option>
+              <option value="pis">pis</option>
+              <option value="leaders">leaders</option>
+              <option value="admin">admin</option>
+            </select>
+          </div>
+          <textarea value={message} onChange={e=>setMessage(e.target.value)}
+                    placeholder="Your message …"
+                    rows={3}
+                    style={{width:"100%", fontSize:13, fontFamily:"inherit",
+                             padding:6, border:"1px solid var(--rule)",
+                             borderRadius:2}} />
+          {err && <div className="error" style={{fontSize:11, marginTop:4}}>{err}</div>}
+          <div className="row" style={{justifyContent:"flex-end", marginTop:6}}>
+            <button className="btn sm primary" disabled={busy}
+                    onClick={onSend}>
+              {busy ? "Sending…" : `Send to #${audience}`}
+            </button>
+          </div>
+        </div>
+      )}
+      <div className="body" style={{padding:0}}>
+        {recent.length === 0 ? (
+          <div className="muted" style={{padding:14, fontSize:13}}>
+            No broadcasts yet.{" "}
+            {canSend && <span>Click <code>＋ compose</code> to send the first one.</span>}
+          </div>
+        ) : (
+        <table className="dt">
+          <thead><tr>
+            <th style={{width:140}}>when</th>
+            <th style={{width:90}}>to</th>
+            <th style={{width:110}}>from</th>
+            <th>message</th>
+          </tr></thead>
+          <tbody>
+            {recent.map(b => (
+              <tr key={b.iso_ts + "::" + b.sender}>
+                <td className="mono" style={{fontSize:11}}>{fmtTs(b.iso_ts)}</td>
+                <td><Pill tone="outline">{b.audience}</Pill></td>
+                <td className="mono" style={{fontSize:11}}>@{b.sender}</td>
+                <td>
+                  <div style={{whiteSpace:"pre-wrap", fontSize:13}}>{b.message}</div>
+                  {b.message_link && (
+                    <a href={b.message_link} target="_blank" rel="noopener"
+                       style={{fontSize:11}}>open in Slack ↗</a>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ───────── Collaborations (item #9: PI proposes; registrar approves) ─────────
    PIs use this panel to request a new cross-lab collaboration; the
    registrar's dashboard has the matching approve/decline UI. Members
@@ -7320,6 +7463,11 @@ function App() {
             terminal request history. */}
         <div className="grid" style={{marginBottom:14}}>
           <CoreServicesPanel span="c-12" />
+        </div>
+
+        {/* Centre broadcasts — PI sends; everyone reads. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <BroadcastsPanel span="c-12" />
         </div>
 
         {/* Lab's core charges this month (Phase 4d). PI-only;

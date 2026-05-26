@@ -6251,6 +6251,76 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422, detail=str(exc))
         return {"ok": True, "slug": slug, "status": "deprecated"}
 
+    # ------------------------------------------------------------------
+    # Broadcasts (item 3 of post-smoke design)
+    # ------------------------------------------------------------------
+
+    def _can_broadcast(actor: str) -> bool:
+        """PIs / registrars may broadcast. Members may not. v1 flattens
+        admin → registrar (no separate admin concept in the registry today)."""
+        from ..core import lab as _lab
+        from ..core import registrar as _reg
+        try:
+            if _reg.is_registrar(actor):
+                return True
+        except Exception:
+            pass
+        try:
+            return _lab.pi_handle().lower() == actor.lower()
+        except Exception:
+            return False
+
+    @app.post("/api/broadcast")
+    def post_broadcast(
+        body: dict,
+        user: str = Query(""),
+    ) -> dict:
+        """Send a centre-wide broadcast. PI / registrar only."""
+        from ..core import broadcasts as _bc
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        if not _can_broadcast(actor):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not a PI or registrar; "
+                       "broadcasts are gated to centre-level roles.")
+        audience = str((body or {}).get("audience") or "").strip().lower()
+        message = str((body or {}).get("message") or "").strip()
+        if not message:
+            raise HTTPException(status_code=422, detail="message is required")
+        try:
+            b = _bc.send_broadcast(
+                audience=audience, message=message, sender=actor,
+                tags=list((body or {}).get("tags") or []),
+            )
+        except _bc.BroadcastError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {
+            "ok": True,
+            "iso_ts": b.iso_ts,
+            "audience": b.audience,
+            "channel_id": b.channel_id,
+            "sender": b.sender,
+            "message_link": b.message_link,
+        }
+
+    @app.get("/api/broadcast/recent")
+    def recent_broadcasts(
+        limit: int = Query(20),
+    ) -> dict:
+        """Public read of recent broadcasts (anyone in the centre can
+        audit who broadcast what to whom)."""
+        from ..core import broadcasts as _bc
+        rows = _bc.iter_recent(limit=limit)
+        return {
+            "broadcasts": [
+                {"iso_ts": b.iso_ts, "audience": b.audience,
+                 "channel_id": b.channel_id, "sender": b.sender,
+                 "message": b.message, "message_link": b.message_link,
+                 "tags": list(b.tags)}
+                for b in rows
+            ],
+        }
+
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
