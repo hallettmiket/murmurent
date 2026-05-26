@@ -532,6 +532,35 @@
         + '<div id="ext-cust-body"><div class="empty">Loading…</div></div>'
         + '</div>';
 
+      // -- Centre broadcasts (compose + audit view) --
+      // Registrar can send to any audience and audits the full log
+      // here. The same panel lives on every member's /dashboard
+      // (read-only for non-PIs).
+      html += '<div class="panel" id="broadcasts-card"><header>'
+        + '<h2>Centre broadcasts</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + '<span id="broadcasts-count">…</span>'
+        + '<button class="btn" id="btn-broadcast-compose">＋ compose</button>'
+        + '</span></header>'
+        + '<div id="broadcasts-compose" style="display:none; padding:10px 14px; background:var(--paper); border-bottom:1px solid var(--rule);">'
+        +   '<div style="display:flex; gap:8px; align-items:baseline; margin-bottom:6px;">'
+        +     '<label style="font-size:11px;">to</label>'
+        +     '<select id="broadcasts-audience">'
+        +       '<option value="everyone">everyone</option>'
+        +       '<option value="pis">pis</option>'
+        +       '<option value="leaders">leaders</option>'
+        +       '<option value="admin">admin</option>'
+        +     '</select>'
+        +   '</div>'
+        +   '<textarea id="broadcasts-message" rows="3" placeholder="Your message …" style="width:100%; font-family:inherit; font-size:13px; padding:6px; border:1px solid var(--rule); border-radius:2px;"></textarea>'
+        +   '<div id="broadcasts-err" class="err" style="display:none; font-size:11px; margin-top:4px;"></div>'
+        +   '<div style="display:flex; justify-content:flex-end; margin-top:6px;">'
+        +     '<button id="btn-broadcast-send" class="btn">Send</button>'
+        +   '</div>'
+        + '</div>'
+        + '<div id="broadcasts-body"><div class="empty">Loading…</div></div>'
+        + '</div>';
+
       // -- Common SEAs (centre-wide catalog, read-only here) --
       // Each PI submits from their own /dashboard "SEAs we offer"
       // panel. The registrar sees the full picture here with an
@@ -699,7 +728,100 @@
       const depToggle = document.getElementById("common-seas-show-deprecated");
       if (depToggle) depToggle.addEventListener("change", loadCommonSeas);
 
+      // Centre broadcasts (compose + recent log).
+      loadBroadcasts();
+      const composeBtn = document.getElementById("btn-broadcast-compose");
+      const composeBox = document.getElementById("broadcasts-compose");
+      if (composeBtn) composeBtn.addEventListener("click", () => {
+        composeBox.style.display = composeBox.style.display === "none" ? "block" : "none";
+      });
+      const sendBtn = document.getElementById("btn-broadcast-send");
+      if (sendBtn) sendBtn.addEventListener("click", sendBroadcast);
+
       renderFooter(data);
+    }
+
+    // -----------------------------------------------------------
+    // Centre broadcasts
+    // -----------------------------------------------------------
+
+    async function loadBroadcasts() {
+      const body = document.getElementById("broadcasts-body");
+      const count = document.getElementById("broadcasts-count");
+      try {
+        const r = await fetch("/api/broadcast/recent?limit=20",
+                                { credentials: "same-origin" });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || ("HTTP " + r.status));
+        }
+        const data = await r.json();
+        const rows = data.broadcasts || [];
+        count.textContent = rows.length + " recent";
+        if (rows.length === 0) {
+          body.innerHTML = '<div class="empty">No broadcasts yet. Click <strong>＋ compose</strong> to send the first one.</div>';
+          return;
+        }
+        const fmtTs = (iso) => {
+          if (!iso) return "";
+          const m = iso.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+          return m ? `${m[1]} ${m[2]}:${m[3]} UTC` : iso;
+        };
+        let html = '<table><thead><tr>'
+          + '<th style="width:150px;">when</th>'
+          + '<th style="width:90px;">to</th>'
+          + '<th style="width:110px;">from</th>'
+          + '<th>message</th>'
+          + '</tr></thead><tbody>';
+        for (const b of rows) {
+          html += '<tr>'
+            + '<td class="mono" style="font-size:11px;">' + escapeHTML(fmtTs(b.iso_ts)) + '</td>'
+            + '<td><span class="pill">' + escapeHTML(b.audience) + '</span></td>'
+            + '<td class="mono" style="font-size:11px;">@' + escapeHTML(b.sender) + '</td>'
+            + '<td><div style="white-space:pre-wrap; font-size:13px;">' + escapeHTML(b.message) + '</div>'
+            + (b.message_link
+              ? '<a href="' + escapeHTML(b.message_link) + '" target="_blank" rel="noopener" style="font-size:11px;">open in Slack ↗</a>'
+              : '')
+            + '</td>'
+            + '</tr>';
+        }
+        html += '</tbody></table>';
+        body.innerHTML = html;
+      } catch (ex) {
+        body.innerHTML = '<div class="empty">Failed to load: ' + escapeHTML(String(ex.message || ex)) + '</div>';
+      }
+    }
+
+    async function sendBroadcast() {
+      const audience = document.getElementById("broadcasts-audience").value;
+      const message = document.getElementById("broadcasts-message").value;
+      const errBox = document.getElementById("broadcasts-err");
+      errBox.style.display = "none";
+      if (!message.trim()) {
+        errBox.textContent = "Message is empty.";
+        errBox.style.display = "block";
+        return;
+      }
+      try {
+        const url = "/api/broadcast"
+                  + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audience, message }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || ("HTTP " + r.status));
+        }
+        // Clear + close + reload.
+        document.getElementById("broadcasts-message").value = "";
+        document.getElementById("broadcasts-compose").style.display = "none";
+        loadBroadcasts();
+      } catch (ex) {
+        errBox.textContent = "Send failed: " + (ex.message || ex);
+        errBox.style.display = "block";
+      }
     }
 
     // -----------------------------------------------------------
