@@ -1390,6 +1390,9 @@ cli.add_command(_common_sea)
 from .commands.broadcast_cmd import broadcast as _broadcast
 cli.add_command(_broadcast)
 
+from .commands.project_centre_cmd import centre_project as _centre_project
+cli.add_command(_centre_project)
+
 
 if __name__ == "__main__":  # pragma: no cover
     cli()

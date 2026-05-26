@@ -6321,6 +6321,129 @@ def create_app() -> FastAPI:
             ],
         }
 
+    # ------------------------------------------------------------------
+    # Centre projects (centre_cable_guy front door, item 0)
+    # ------------------------------------------------------------------
+
+    def _project_to_dict(r) -> dict:
+        return {
+            "name": r.name,
+            "primary_lab": r.primary_lab,
+            "members": list(r.members),
+            "machines": list(r.machines),
+            "github_org": r.github_org,
+            "github_repo": r.github_repo,
+            "slack_channel_id": r.slack_channel_id,
+            "description": r.description,
+            "created": r.created,
+            "path": str(r.path) if r.path else "",
+        }
+
+    @app.get("/api/centre/projects")
+    def centre_projects_list(user: str = Query("")) -> dict:
+        from ..core import centre_provision as _cp
+        return {"projects": [_project_to_dict(r) for r in _cp.iter_projects()]}
+
+    @app.get("/api/centre/projects/{name}")
+    def centre_projects_get(name: str) -> dict:
+        from ..core import centre_provision as _cp
+        r = _cp.get_project(name)
+        if r is None:
+            raise HTTPException(status_code=404, detail=f"project not found: {name}")
+        return _project_to_dict(r)
+
+    @app.post("/api/centre/projects")
+    def centre_projects_upsert(
+        body: dict,
+        user: str = Query(""),
+    ) -> dict:
+        """Declare or update a project's centre-side record. PI of the
+        primary_lab or registrar may write."""
+        from ..core import centre_provision as _cp
+        from ..core import lab as _lab
+        from ..core import registrar as _reg
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        primary_lab = str((body or {}).get("primary_lab") or "").strip().lower()
+        if not primary_lab:
+            raise HTTPException(status_code=422, detail="primary_lab is required")
+        try:
+            local_lab = _lab.load_lab_config().lab.lower()
+        except Exception:
+            local_lab = ""
+        is_pi_of_primary = (
+            local_lab == primary_lab
+            and _lab.pi_handle().lower() == actor.lower()
+        )
+        if not (is_pi_of_primary or _reg.is_registrar(actor)):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not PI of {primary_lab!r} nor a registrar.")
+        try:
+            p = _cp.upsert_project(
+                name=str((body or {}).get("name") or ""),
+                primary_lab=primary_lab,
+                members=list((body or {}).get("members") or []),
+                machines=list((body or {}).get("machines") or []),
+                github_org=str((body or {}).get("github_org") or ""),
+                github_repo=str((body or {}).get("github_repo") or ""),
+                description=str((body or {}).get("description") or ""),
+            )
+        except _cp.CentreProvisionError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        _cp.append_log(project=str((body or {}).get("name")),
+                        actor=actor, action="upsert",
+                        detail=f"members={len(list((body or {}).get('members') or []))}")
+        return {"ok": True, "path": str(p)}
+
+    @app.post("/api/centre/projects/{name}/reconcile")
+    def centre_projects_reconcile(
+        name: str, body: dict | None = None,
+        user: str = Query(""),
+    ) -> dict:
+        """Pure-diff reconcile. Caller passes the actual state (Slack
+        members / GitHub collaborators / FS ACL per machine); the
+        endpoint returns the deltas. Wiring the actual-fetch (slack
+        API, gh api, ssh+sudo) lives in the dashboard/centre_cable_guy
+        — keeping the diff pure here makes the surface trivially
+        testable + offline-runnable."""
+        from ..core import centre_provision as _cp
+        from ..core import registrar as _reg
+        from ..core import lab as _lab
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        try:
+            local_lab = _lab.load_lab_config().lab.lower()
+        except Exception:
+            local_lab = ""
+        r = _cp.get_project(name)
+        if r is None:
+            raise HTTPException(status_code=404, detail=f"project not found: {name}")
+        is_pi_of_primary = (
+            local_lab == r.primary_lab
+            and _lab.pi_handle().lower() == actor.lower()
+        )
+        if not (is_pi_of_primary or _reg.is_registrar(actor)):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not PI of {r.primary_lab!r} nor a registrar.")
+        body = body or {}
+        try:
+            deltas = _cp.reconcile_project(
+                project=name,
+                slack_actual_members=body.get("slack_actual_members"),
+                github_actual_collaborators=body.get("github_actual_collaborators"),
+                fs_actual_acl=body.get("fs_actual_acl"),
+            )
+        except _cp.CentreProvisionError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {
+            "project": name,
+            "deltas": [
+                {"kind": d.kind, "severity": d.severity,
+                 "summary": d.summary, "apply_hint": d.apply_hint}
+                for d in deltas
+            ],
+        }
+
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
