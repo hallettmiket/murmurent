@@ -532,9 +532,18 @@
         + '<div id="ext-cust-body"><div class="empty">Loading…</div></div>'
         + '</div>';
 
-      // Common SEAs catalog: edited from each PI's own /dashboard
-      // "SEAs we offer" panel; the registrar doesn't need a duplicate
-      // surface here.
+      // -- Common SEAs (centre-wide catalog, read-only here) --
+      // Each PI submits from their own /dashboard "SEAs we offer"
+      // panel. The registrar sees the full picture here with an
+      // archive button (registrars + owner_lab PIs may archive).
+      html += '<div class="panel" id="common-seas-card"><header>'
+        + '<h2>Common SEAs (centre-wide catalog)</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + '<span id="common-seas-count">…</span>'
+        + '<label style="font-size:11px;"><input type="checkbox" id="common-seas-show-deprecated"> include deprecated</label>'
+        + '</span></header>'
+        + '<div id="common-seas-body"><div class="empty">Loading…</div></div>'
+        + '</div>';
 
       // -- Certifications panel (centre-wide compliance view) --
       const certs = data.certs || { aggregate: {}, rows: [], cert_specs: [] };
@@ -685,7 +694,81 @@
       const newCustBtn = document.getElementById("btn-new-ext-cust");
       if (newCustBtn) newCustBtn.addEventListener("click", openNewExternalCustomerModal);
 
+      // Common SEAs catalog (read-only here; PIs submit from their dashboard).
+      loadCommonSeas();
+      const depToggle = document.getElementById("common-seas-show-deprecated");
+      if (depToggle) depToggle.addEventListener("change", loadCommonSeas);
+
       renderFooter(data);
+    }
+
+    // -----------------------------------------------------------
+    // Common SEAs catalog (read-only view + archive action)
+    // -----------------------------------------------------------
+
+    async function loadCommonSeas() {
+      const body = document.getElementById("common-seas-body");
+      const count = document.getElementById("common-seas-count");
+      const dep = document.getElementById("common-seas-show-deprecated").checked;
+      try {
+        const url = "/api/common_seas?include_deprecated=" + (dep ? "true" : "false");
+        const r = await fetch(url, { credentials: "same-origin" });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || ("HTTP " + r.status));
+        }
+        const data = await r.json();
+        const rows = data.seas || [];
+        count.textContent = rows.length + (rows.length === 1 ? " SEA" : " SEAs");
+        if (rows.length === 0) {
+          body.innerHTML = '<div class="empty">No common SEAs published yet. PIs publish from their own dashboard\'s "SEAs we offer" panel (or via <code>wigamig common-sea submit</code>).</div>';
+          return;
+        }
+        let html = '<table><thead><tr>'
+          + '<th>slug</th><th>name</th><th>kind</th><th>owner</th>'
+          + '<th>status</th><th>install</th>'
+          + '<th style="text-align:right;">actions</th>'
+          + '</tr></thead><tbody>';
+        for (const s of rows) {
+          const tags = (s.tags || []).map(x => '<span class="pill" style="font-size:10px;">' + escapeHTML(x) + '</span>').join(" ");
+          html += '<tr style="' + (s.status === "deprecated" ? "opacity:0.55;" : "") + '">'
+            + '<td class="mono" style="font-size:11px;">' + escapeHTML(s.slug) + '</td>'
+            + '<td>' + escapeHTML(s.name)
+              + (s.url ? ' <a href="' + escapeHTML(s.url) + '" target="_blank" rel="noopener" style="font-size:11px;">↗</a>' : "")
+              + (s.description ? '<br><span class="muted" style="font-size:11px;">' + escapeHTML(s.description) + '</span>' : "")
+              + (tags ? '<br>' + tags : "")
+              + '</td>'
+            + '<td class="mono" style="font-size:11px;">' + escapeHTML(s.kind) + '</td>'
+            + '<td class="mono" style="font-size:11px;">' + escapeHTML(s.owner_lab) + '</td>'
+            + '<td><span class="pill ' + escapeHTML(s.status) + '">' + escapeHTML(s.status) + '</span></td>'
+            + '<td><code style="font-size:11px;">' + escapeHTML(s.install || "—") + '</code></td>'
+            + '<td style="text-align:right;">'
+            +   (s.status === "active"
+                ? '<button class="btn common-sea-action" data-action="archive" data-slug="' + escapeHTML(s.slug) + '">archive</button>'
+                : '<span class="muted" style="font-size:11px;">—</span>')
+            + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        body.innerHTML = html;
+        body.querySelectorAll(".common-sea-action").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const slug = btn.getAttribute("data-slug");
+            if (!confirm("Archive common SEA " + slug + "?")) return;
+            const url = "/api/registrar/common_seas/" + encodeURIComponent(slug)
+                      + "/archive"
+                      + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+            const r = await fetch(url, { method: "POST" });
+            if (!r.ok) {
+              const d = await r.json().catch(() => ({}));
+              alert("Archive failed: " + (d.detail || ("HTTP " + r.status)));
+              return;
+            }
+            loadCommonSeas();
+          });
+        });
+      } catch (ex) {
+        body.innerHTML = '<div class="empty">Failed to load: ' + escapeHTML(String(ex.message || ex)) + '</div>';
+      }
     }
 
     // -----------------------------------------------------------
