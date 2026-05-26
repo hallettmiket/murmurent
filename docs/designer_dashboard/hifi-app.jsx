@@ -4309,7 +4309,27 @@ function LabCoreChargesPanel({ span="c-6" }) {
    server-side — safer for v1 since tool submitters are trusted but
    not vetted). Self-hides when the catalog is empty. */
 
+async function postCommonToolSubmit(body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/registrar/common_tools"
+    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST", credentials: "same-origin",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 function CommonToolsPanel({ span="c-12" }) {
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
   const [tools, setTools] = useState(null);
   const [kind, setKind] = useState("");
   const [tag, setTag] = useState("");
@@ -4329,14 +4349,36 @@ function CommonToolsPanel({ span="c-12" }) {
   };
   useEffect(() => { reload(); /* eslint-disable-line */ }, [kind, tag]);
 
+  const onSubmit = async () => {
+    const slug = window.prompt("Slug (lowercase, underscores, e.g. 'qc_drift_routine'):");
+    if (!slug) return;
+    const name = window.prompt("Display name:");
+    if (!name) return;
+    const k = window.prompt("Kind (sea | skill | routine | mcp | dataset):", "skill");
+    if (!k) return;
+    const description = window.prompt("One-line description:", "") || "";
+    const install = window.prompt("Copy-paste install command:", "") || "";
+    const url = window.prompt("Canonical URL (git repo or docs):", "") || "";
+    const tagsRaw = window.prompt("Tags (comma-separated, optional):", "") || "";
+    const tags = tagsRaw.split(",").map(s => s.trim()).filter(Boolean);
+    try {
+      await postCommonToolSubmit({
+        slug, name, kind: k, description, install, url, tags,
+      });
+      reload();
+    } catch (ex) { alert("Submit failed: " + (ex.message || ex)); }
+  };
+
   if (err) return (
     <div className={"panel " + span}>
-      <header><h2>Common tools</h2></header>
+      <header><h2>Common tools we share (centre-wide)</h2></header>
       <div className="body error" style={{padding:14}}>{err}</div>
     </div>
   );
   if (tools === null) return null;       // initial load
-  if (tools.length === 0) return null;   // empty → hide cleanly
+  // Don't auto-hide when empty if the PI is here — they need somewhere
+  // to click "+ submit" to seed the first one.
+  if (tools.length === 0 && !isPI) return null;
 
   const allTags = Array.from(new Set(tools.flatMap(t => t.tags || []))).sort();
   const allKinds = Array.from(new Set(tools.map(t => t.kind))).sort();
@@ -4352,7 +4394,7 @@ function CommonToolsPanel({ span="c-12" }) {
   return (
     <div className={"panel " + span}>
       <header>
-        <h2>Common tools</h2>
+        <h2>Common tools we share (centre-wide)</h2>
         <span className="meta" style={{display:"flex", gap:8, alignItems:"baseline"}}>
           <span>{tools.length} active</span>
           <select value={kind} onChange={e=>setKind(e.target.value)}
@@ -4365,8 +4407,21 @@ function CommonToolsPanel({ span="c-12" }) {
             <option value="">any tag</option>
             {allTags.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
+          {isPI && (
+            <button className="btn sm primary" onClick={onSubmit}>
+              ＋ submit
+            </button>
+          )}
         </span>
       </header>
+      {tools.length === 0 && (
+        <div className="body muted" style={{padding:14, fontSize:13}}>
+          Nothing shared yet. Click <strong>＋ submit</strong> to publish
+          a skill / routine / SEA / MCP / dataset that any other lab in
+          the centre can clone or install.
+        </div>
+      )}
+      {tools.length > 0 && (
       <div className="body" style={{padding:0}}>
         <table className="dt">
           <thead><tr>
@@ -4433,6 +4488,7 @@ function CommonToolsPanel({ span="c-12" }) {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
@@ -7270,9 +7326,15 @@ function App() {
           <RepoInventoryPanel span="c-12" />
         </div>
 
-        {/* SEAs we offer (catalog) - every member sees; PI edits. */}
+        {/* SEAs we offer (catalog) - every member sees; PI edits.
+            Common tools we share (centre-wide catalog) sits right next
+            to it — same "outbound" concept, different audience scope
+            (SEAs = specific labs; common tools = whole centre). */}
         <div className="grid" style={{marginBottom:14}}>
           <SeaCatalogPanel entries={D.sea_catalog} span="c-12" />
+        </div>
+        <div className="grid" style={{marginBottom:14}}>
+          <CommonToolsPanel span="c-12" />
         </div>
 
         {/* Core services browse + my bookings (Phase 3e of cores rollout).
@@ -7281,12 +7343,6 @@ function App() {
             terminal request history. */}
         <div className="grid" style={{marginBottom:14}}>
           <CoreServicesPanel span="c-12" />
-        </div>
-
-        {/* Centre-wide common tools catalog. Every persona sees;
-            read-only with copy-paste install commands per row. */}
-        <div className="grid" style={{marginBottom:14}}>
-          <CommonToolsPanel span="c-12" />
         </div>
 
         {/* Lab's core charges this month (Phase 4d). PI-only;
