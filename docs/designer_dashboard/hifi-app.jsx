@@ -4303,6 +4303,140 @@ function LabCoreChargesPanel({ span="c-6" }) {
   );
 }
 
+/* ───────── Common tools catalog (centre-wide; read-only on /dashboard) ─────
+   Lists every active common tool any lab has submitted. Each row carries
+   a copy-paste install command (we deliberately don't run anything
+   server-side — safer for v1 since tool submitters are trusted but
+   not vetted). Self-hides when the catalog is empty. */
+
+function CommonToolsPanel({ span="c-12" }) {
+  const [tools, setTools] = useState(null);
+  const [kind, setKind] = useState("");
+  const [tag, setTag] = useState("");
+  const [err, setErr] = useState(null);
+  const [copied, setCopied] = useState(null);
+
+  const reload = async () => {
+    try {
+      const qs = new URLSearchParams();
+      if (kind) qs.set("kind", kind);
+      if (tag) qs.set("tag", tag);
+      const url = "/api/common_tools" + (qs.toString() ? "?" + qs : "");
+      const res = await fetch(url, { credentials: "same-origin" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      setTools((await res.json()).tools || []);
+    } catch (ex) { setErr(String(ex.message || ex)); }
+  };
+  useEffect(() => { reload(); /* eslint-disable-line */ }, [kind, tag]);
+
+  if (err) return (
+    <div className={"panel " + span}>
+      <header><h2>Common tools</h2></header>
+      <div className="body error" style={{padding:14}}>{err}</div>
+    </div>
+  );
+  if (tools === null) return null;       // initial load
+  if (tools.length === 0) return null;   // empty → hide cleanly
+
+  const allTags = Array.from(new Set(tools.flatMap(t => t.tags || []))).sort();
+  const allKinds = Array.from(new Set(tools.map(t => t.kind))).sort();
+
+  const onCopy = async (text, key) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1500);
+    } catch (_) { /* clipboard denied; user can still ctrl-c the text */ }
+  };
+
+  return (
+    <div className={"panel " + span}>
+      <header>
+        <h2>Common tools</h2>
+        <span className="meta" style={{display:"flex", gap:8, alignItems:"baseline"}}>
+          <span>{tools.length} active</span>
+          <select value={kind} onChange={e=>setKind(e.target.value)}
+                  style={{fontSize:11}}>
+            <option value="">any kind</option>
+            {allKinds.map(k => <option key={k} value={k}>{k}</option>)}
+          </select>
+          <select value={tag} onChange={e=>setTag(e.target.value)}
+                  style={{fontSize:11}}>
+            <option value="">any tag</option>
+            {allTags.map(t => <option key={t} value={t}>{t}</option>)}
+          </select>
+        </span>
+      </header>
+      <div className="body" style={{padding:0}}>
+        <table className="dt">
+          <thead><tr>
+            <th>name</th>
+            <th style={{width:90}}>kind</th>
+            <th style={{width:100}}>owner</th>
+            <th>install</th>
+          </tr></thead>
+          <tbody>
+            {tools.map(t => (
+              <tr key={t.slug}>
+                <td>
+                  <div style={{fontWeight:500}}>
+                    {t.name}
+                    {t.url && (
+                      <a href={t.url} target="_blank" rel="noopener"
+                         style={{marginLeft:6, fontSize:11}}>
+                        ↗
+                      </a>
+                    )}
+                  </div>
+                  {t.description && (
+                    <div className="muted" style={{fontSize:11}}>
+                      {t.description}
+                    </div>
+                  )}
+                  {(t.tags || []).length > 0 && (
+                    <div style={{marginTop:3}}>
+                      {t.tags.map(x => (
+                        <span key={x} className="pill" style={{fontSize:10, marginRight:3}}>
+                          {x}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </td>
+                <td className="mono muted" style={{fontSize:11}}>{t.kind}</td>
+                <td className="mono" style={{fontSize:11}}>{t.owner_lab}</td>
+                <td>
+                  {t.install ? (
+                    <div style={{display:"flex", gap:4, alignItems:"center"}}>
+                      <code style={{flex:1, fontSize:11,
+                                     padding:"2px 4px",
+                                     background:"#f5f5f5",
+                                     borderRadius:2,
+                                     overflow:"hidden",
+                                     textOverflow:"ellipsis",
+                                     whiteSpace:"nowrap"}}>
+                        {t.install}
+                      </code>
+                      <button className="btn sm"
+                              onClick={() => onCopy(t.install, t.slug)}>
+                        {copied === t.slug ? "copied!" : "copy"}
+                      </button>
+                    </div>
+                  ) : (
+                    <span className="muted" style={{fontSize:11}}>
+                      see source ↗
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 /* ───────── Collaborations (item #9: PI proposes; registrar approves) ─────────
    PIs use this panel to request a new cross-lab collaboration; the
    registrar's dashboard has the matching approve/decline UI. Members
@@ -7147,6 +7281,12 @@ function App() {
             terminal request history. */}
         <div className="grid" style={{marginBottom:14}}>
           <CoreServicesPanel span="c-12" />
+        </div>
+
+        {/* Centre-wide common tools catalog. Every persona sees;
+            read-only with copy-paste install commands per row. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <CommonToolsPanel span="c-12" />
         </div>
 
         {/* Lab's core charges this month (Phase 4d). PI-only;

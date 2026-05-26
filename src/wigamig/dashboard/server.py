@@ -6099,6 +6099,158 @@ def create_app() -> FastAPI:
             "billing_meta": res.billing_meta,
         }
 
+    # ------------------------------------------------------------------
+    # Common tools registry (centre-wide catalog of SEAs/skills/routines)
+    # Any lab submits; owner_lab or registrar edits + archives.
+    # ------------------------------------------------------------------
+
+    def _tool_to_dict(t) -> dict:
+        return {
+            "slug": t.slug, "name": t.name, "kind": t.kind,
+            "owner_lab": t.owner_lab,
+            "description": t.description,
+            "install": t.install, "url": t.url,
+            "tags": list(t.tags), "status": t.status,
+            "created": t.created,
+            "notes": t.notes,
+            "path": str(t.path) if t.path else "",
+        }
+
+    def _is_owner_or_registrar(actor: str, owner_lab: str) -> bool:
+        """True iff actor is the PI of ``owner_lab`` or a registrar."""
+        from ..core import registrar as _reg
+        if _reg.is_registrar(actor):
+            return True
+        try:
+            entries = _reg.read_registry().labs
+        except Exception:
+            return False
+        entry = next((e for e in entries if e.name == owner_lab.lower()), None)
+        return bool(entry and entry.pi.lstrip("@").lower() == actor.lower())
+
+    @app.get("/api/common_tools")
+    def public_list_common_tools(
+        kind: str = Query("", description="Filter: sea|skill|routine|mcp|dataset"),
+        owner_lab: str = Query("", description="Filter: lab id"),
+        tag: str = Query("", description="Filter: single tag"),
+        include_deprecated: bool = Query(False),
+    ) -> dict:
+        """Public catalog — every member's dashboard reads this."""
+        from ..core import common_tools as _ct
+        rows = _ct.iter_tools(
+            include_deprecated=include_deprecated,
+            kind=kind or None,
+            owner_lab=owner_lab or None,
+            tag=tag or None,
+        )
+        return {"tools": [_tool_to_dict(t) for t in rows]}
+
+    @app.get("/api/common_tools/{slug}")
+    def public_get_common_tool(slug: str) -> dict:
+        from ..core import common_tools as _ct
+        t = _ct.get_tool(slug)
+        if t is None:
+            raise HTTPException(status_code=404,
+                                detail=f"common tool not found: {slug}")
+        return _tool_to_dict(t)
+
+    @app.post("/api/registrar/common_tools")
+    def create_common_tool(
+        body: dict,
+        user: str = Query(""),
+    ) -> dict:
+        """Submit a tool. Any active member of any lab may submit on
+        behalf of their own lab; only registrars may submit on behalf
+        of another lab (e.g. for migration / cleanup)."""
+        from ..core import common_tools as _ct
+        from ..core import lab as _lab
+        from ..core import registrar as _reg
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        owner_lab = str((body or {}).get("owner_lab") or "").strip().lower()
+        if not owner_lab:
+            # Default to the calling member's lab.
+            try:
+                owner_lab = _lab.load_lab_config().lab.lower()
+            except Exception:
+                owner_lab = ""
+        if not owner_lab:
+            raise HTTPException(status_code=422,
+                detail="owner_lab is required (and can't be inferred)")
+        # Submitting on behalf of someone else's lab requires registrar.
+        try:
+            local_lab = _lab.load_lab_config().lab.lower()
+        except Exception:
+            local_lab = ""
+        if owner_lab != local_lab and not _reg.is_registrar(actor):
+            raise HTTPException(status_code=403,
+                detail=(f"@{actor} can submit only on behalf of "
+                        f"their own lab ({local_lab!r}); registrar "
+                        "required to submit for {owner_lab!r}."))
+        try:
+            p = _ct.create_tool(
+                slug=str((body or {}).get("slug") or ""),
+                name=str((body or {}).get("name") or ""),
+                kind=str((body or {}).get("kind") or ""),
+                owner_lab=owner_lab,
+                description=str((body or {}).get("description") or ""),
+                install=str((body or {}).get("install") or ""),
+                url=str((body or {}).get("url") or ""),
+                tags=list((body or {}).get("tags") or []),
+                notes=str((body or {}).get("notes") or ""),
+            )
+        except _ct.CommonToolError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"ok": True,
+                "slug": str((body or {}).get("slug") or "").lower(),
+                "owner_lab": owner_lab, "path": str(p)}
+
+    @app.patch("/api/registrar/common_tools/{slug}")
+    def patch_common_tool(
+        slug: str, body: dict,
+        user: str = Query(""),
+    ) -> dict:
+        """Edit a tool. Owner_lab's PI or registrar only."""
+        from ..core import common_tools as _ct
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        existing = _ct.get_tool(slug)
+        if existing is None:
+            raise HTTPException(status_code=404,
+                detail=f"common tool not found: {slug}")
+        if not _is_owner_or_registrar(actor, existing.owner_lab):
+            raise HTTPException(status_code=403,
+                detail=(f"@{actor} is neither the PI of {existing.owner_lab!r} "
+                        "nor a registrar."))
+        try:
+            _ct.update_tool(slug=slug, patch=body or {})
+        except _ct.CommonToolError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"ok": True, "slug": slug}
+
+    @app.post("/api/registrar/common_tools/{slug}/archive")
+    def archive_common_tool_endpoint(
+        slug: str,
+        user: str = Query(""),
+    ) -> dict:
+        """Mark a tool deprecated. Owner_lab's PI or registrar only."""
+        from ..core import common_tools as _ct
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        existing = _ct.get_tool(slug)
+        if existing is None:
+            raise HTTPException(status_code=404,
+                detail=f"common tool not found: {slug}")
+        if not _is_owner_or_registrar(actor, existing.owner_lab):
+            raise HTTPException(status_code=403,
+                detail=(f"@{actor} is neither the PI of {existing.owner_lab!r} "
+                        "nor a registrar."))
+        try:
+            _ct.archive_tool(slug=slug)
+        except _ct.CommonToolError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"ok": True, "slug": slug, "status": "deprecated"}
+
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}

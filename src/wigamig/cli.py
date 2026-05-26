@@ -1384,6 +1384,9 @@ cli.add_command(_core_remind)
 from .commands.invoice_cmd import core_invoice as _core_invoice
 cli.add_command(_core_invoice)
 
+from .commands.common_tools_cmd import common_tool as _common_tool
+cli.add_command(_common_tool)
+
 
 if __name__ == "__main__":  # pragma: no cover
     cli()
