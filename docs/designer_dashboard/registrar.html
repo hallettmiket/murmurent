@@ -532,20 +532,9 @@
         + '<div id="ext-cust-body"><div class="empty">Loading…</div></div>'
         + '</div>';
 
-      // -- Common tools catalog panel --
-      // Centre-wide catalog of SEAs / skills / routines / MCPs /
-      // datasets any lab has submitted. Registrar sees the full table
-      // with edit + archive controls; members see read-only on
-      // /dashboard's CommonToolsPanel.
-      html += '<div class="panel" id="common-tools-card"><header>'
-        + '<h2>Common tools (centre-wide catalog)</h2>'
-        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
-        + '<span id="common-tools-count">…</span>'
-        + '<label style="font-size:11px;"><input type="checkbox" id="common-tools-show-deprecated"> include deprecated</label>'
-        + '<button class="btn" id="btn-new-common-tool">＋ submit tool</button>'
-        + '</span></header>'
-        + '<div id="common-tools-body"><div class="empty">Loading…</div></div>'
-        + '</div>';
+      // Common SEAs catalog: edited from each PI's own /dashboard
+      // "SEAs we offer" panel; the registrar doesn't need a duplicate
+      // surface here.
 
       // -- Certifications panel (centre-wide compliance view) --
       const certs = data.certs || { aggregate: {}, rows: [], cert_specs: [] };
@@ -696,115 +685,7 @@
       const newCustBtn = document.getElementById("btn-new-ext-cust");
       if (newCustBtn) newCustBtn.addEventListener("click", openNewExternalCustomerModal);
 
-      // Common tools catalog (post-smoke item 1).
-      loadCommonTools();
-      const newToolBtn = document.getElementById("btn-new-common-tool");
-      if (newToolBtn) newToolBtn.addEventListener("click", openNewCommonToolModal);
-      const depToggle = document.getElementById("common-tools-show-deprecated");
-      if (depToggle) depToggle.addEventListener("change", loadCommonTools);
-
       renderFooter(data);
-    }
-
-    // -----------------------------------------------------------
-    // Common tools catalog (item 1 of post-smoke design)
-    // -----------------------------------------------------------
-
-    async function loadCommonTools() {
-      const body = document.getElementById("common-tools-body");
-      const count = document.getElementById("common-tools-count");
-      const dep = document.getElementById("common-tools-show-deprecated").checked;
-      try {
-        const url = "/api/common_tools?include_deprecated=" + (dep ? "true" : "false");
-        const r = await fetch(url, { credentials: "same-origin" });
-        if (!r.ok) {
-          const d = await r.json().catch(() => ({}));
-          throw new Error(d.detail || ("HTTP " + r.status));
-        }
-        const data = await r.json();
-        const rows = data.tools || [];
-        count.textContent = rows.length + (rows.length === 1 ? " tool" : " tools");
-        if (rows.length === 0) {
-          body.innerHTML = '<div class="empty">No common tools registered yet. Click <strong>＋ submit tool</strong> to add one (any lab\'s PI can submit on their lab\'s behalf via this page or <code>wigamig common-tool submit</code>).</div>';
-          return;
-        }
-        let html = '<table><thead><tr>'
-          + '<th>slug</th><th>name</th><th>kind</th>'
-          + '<th>owner</th><th>status</th><th>install</th>'
-          + '<th style="text-align:right;">actions</th>'
-          + '</tr></thead><tbody>';
-        for (const t of rows) {
-          const tags = (t.tags || []).map(x => '<span class="pill" style="font-size:10px;">' + escapeHTML(x) + '</span>').join(" ");
-          html += '<tr style="' + (t.status === "deprecated" ? "opacity:0.55;" : "") + '">'
-            + '<td class="mono" style="font-size:11px;">' + escapeHTML(t.slug) + '</td>'
-            + '<td>' + escapeHTML(t.name)
-              + (t.url ? ' <a href="' + escapeHTML(t.url) + '" target="_blank" rel="noopener" style="font-size:11px;">↗</a>' : "")
-              + (t.description ? '<br><span class="muted" style="font-size:11px;">' + escapeHTML(t.description) + '</span>' : "")
-              + (tags ? '<br>' + tags : "")
-              + '</td>'
-            + '<td class="mono" style="font-size:11px;">' + escapeHTML(t.kind) + '</td>'
-            + '<td class="mono" style="font-size:11px;">' + escapeHTML(t.owner_lab) + '</td>'
-            + '<td><span class="pill ' + escapeHTML(t.status) + '">' + escapeHTML(t.status) + '</span></td>'
-            + '<td><code style="font-size:11px;">' + escapeHTML(t.install || "—") + '</code></td>'
-            + '<td style="text-align:right;">'
-            +   (t.status === "active"
-                ? '<button class="btn common-tool-action" data-action="archive" data-slug="' + escapeHTML(t.slug) + '">archive</button>'
-                : '<span class="muted" style="font-size:11px;">—</span>')
-            + '</td></tr>';
-        }
-        html += '</tbody></table>';
-        body.innerHTML = html;
-        body.querySelectorAll(".common-tool-action").forEach(btn => {
-          btn.addEventListener("click", async () => {
-            const slug = btn.getAttribute("data-slug");
-            if (!confirm("Archive common tool " + slug + "?")) return;
-            const url = "/api/registrar/common_tools/" + encodeURIComponent(slug)
-                      + "/archive"
-                      + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
-            const r = await fetch(url, { method: "POST" });
-            if (!r.ok) {
-              const d = await r.json().catch(() => ({}));
-              alert("Archive failed: " + (d.detail || ("HTTP " + r.status)));
-              return;
-            }
-            loadCommonTools();
-          });
-        });
-      } catch (ex) {
-        body.innerHTML = '<div class="empty">Failed to load: ' + escapeHTML(String(ex.message || ex)) + '</div>';
-      }
-    }
-
-    function openNewCommonToolModal() {
-      const slug = prompt("Slug (lowercase, underscores, e.g. 'qc_drift_routine'):");
-      if (!slug) return;
-      const name = prompt("Display name:");
-      if (!name) return;
-      const kind = prompt("Kind (sea | skill | routine | mcp | dataset):", "skill");
-      if (!kind) return;
-      const description = prompt("One-line description:", "") || "";
-      const install = prompt("Copy-paste install command (e.g. 'wigamig routine install qc_drift_routine'):", "") || "";
-      const url = prompt("Canonical URL (git repo or docs):", "") || "";
-      const tagsRaw = prompt("Tags (comma-separated, optional):", "") || "";
-      const tags = tagsRaw.split(",").map(s => s.trim()).filter(Boolean);
-      const ownerLab = prompt("Owner lab (leave blank to default to your local lab):", "") || "";
-      (async () => {
-        const payload = { slug, name, kind, description, install, url, tags };
-        if (ownerLab) payload.owner_lab = ownerLab;
-        const u = "/api/registrar/common_tools"
-                + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
-        const r = await fetch(u, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!r.ok) {
-          const d = await r.json().catch(() => ({}));
-          alert("Submit failed: " + (d.detail || ("HTTP " + r.status)));
-          return;
-        }
-        loadCommonTools();
-      })();
     }
 
     // -----------------------------------------------------------

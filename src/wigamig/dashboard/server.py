@@ -6104,7 +6104,7 @@ def create_app() -> FastAPI:
     # Any lab submits; owner_lab or registrar edits + archives.
     # ------------------------------------------------------------------
 
-    def _tool_to_dict(t) -> dict:
+    def _sea_to_dict(t) -> dict:
         return {
             "slug": t.slug, "name": t.name, "kind": t.kind,
             "owner_lab": t.owner_lab,
@@ -6128,41 +6128,41 @@ def create_app() -> FastAPI:
         entry = next((e for e in entries if e.name == owner_lab.lower()), None)
         return bool(entry and entry.pi.lstrip("@").lower() == actor.lower())
 
-    @app.get("/api/common_tools")
-    def public_list_common_tools(
+    @app.get("/api/common_seas")
+    def public_list_common_seas(
         kind: str = Query("", description="Filter: sea|skill|routine|mcp|dataset"),
         owner_lab: str = Query("", description="Filter: lab id"),
         tag: str = Query("", description="Filter: single tag"),
         include_deprecated: bool = Query(False),
     ) -> dict:
         """Public catalog — every member's dashboard reads this."""
-        from ..core import common_tools as _ct
-        rows = _ct.iter_tools(
+        from ..core import common_seas as _cs
+        rows = _cs.iter_seas(
             include_deprecated=include_deprecated,
             kind=kind or None,
             owner_lab=owner_lab or None,
             tag=tag or None,
         )
-        return {"tools": [_tool_to_dict(t) for t in rows]}
+        return {"seas": [_sea_to_dict(t) for t in rows]}
 
-    @app.get("/api/common_tools/{slug}")
-    def public_get_common_tool(slug: str) -> dict:
-        from ..core import common_tools as _ct
-        t = _ct.get_tool(slug)
+    @app.get("/api/common_seas/{slug}")
+    def public_get_common_sea(slug: str) -> dict:
+        from ..core import common_seas as _cs
+        t = _cs.get_sea(slug)
         if t is None:
             raise HTTPException(status_code=404,
                                 detail=f"common tool not found: {slug}")
-        return _tool_to_dict(t)
+        return _sea_to_dict(t)
 
-    @app.post("/api/registrar/common_tools")
-    def create_common_tool(
+    @app.post("/api/registrar/common_seas")
+    def create_common_sea(
         body: dict,
         user: str = Query(""),
     ) -> dict:
         """Submit a tool. Any active member of any lab may submit on
         behalf of their own lab; only registrars may submit on behalf
         of another lab (e.g. for migration / cleanup)."""
-        from ..core import common_tools as _ct
+        from ..core import common_seas as _cs
         from ..core import lab as _lab
         from ..core import registrar as _reg
         actor = _resolve_actor(user)
@@ -6188,7 +6188,7 @@ def create_app() -> FastAPI:
                         f"their own lab ({local_lab!r}); registrar "
                         "required to submit for {owner_lab!r}."))
         try:
-            p = _ct.create_tool(
+            p = _cs.create_sea(
                 slug=str((body or {}).get("slug") or ""),
                 name=str((body or {}).get("name") or ""),
                 kind=str((body or {}).get("kind") or ""),
@@ -6199,22 +6199,22 @@ def create_app() -> FastAPI:
                 tags=list((body or {}).get("tags") or []),
                 notes=str((body or {}).get("notes") or ""),
             )
-        except _ct.CommonToolError as exc:
+        except _cs.CommonSeaError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         return {"ok": True,
                 "slug": str((body or {}).get("slug") or "").lower(),
                 "owner_lab": owner_lab, "path": str(p)}
 
-    @app.patch("/api/registrar/common_tools/{slug}")
-    def patch_common_tool(
+    @app.patch("/api/registrar/common_seas/{slug}")
+    def patch_common_sea(
         slug: str, body: dict,
         user: str = Query(""),
     ) -> dict:
         """Edit a tool. Owner_lab's PI or registrar only."""
-        from ..core import common_tools as _ct
+        from ..core import common_seas as _cs
         actor = _resolve_actor(user)
         _require_active(actor)
-        existing = _ct.get_tool(slug)
+        existing = _cs.get_sea(slug)
         if existing is None:
             raise HTTPException(status_code=404,
                 detail=f"common tool not found: {slug}")
@@ -6223,21 +6223,21 @@ def create_app() -> FastAPI:
                 detail=(f"@{actor} is neither the PI of {existing.owner_lab!r} "
                         "nor a registrar."))
         try:
-            _ct.update_tool(slug=slug, patch=body or {})
-        except _ct.CommonToolError as exc:
+            _cs.update_sea(slug=slug, patch=body or {})
+        except _cs.CommonSeaError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         return {"ok": True, "slug": slug}
 
-    @app.post("/api/registrar/common_tools/{slug}/archive")
-    def archive_common_tool_endpoint(
+    @app.post("/api/registrar/common_seas/{slug}/archive")
+    def archive_common_sea_endpoint(
         slug: str,
         user: str = Query(""),
     ) -> dict:
         """Mark a tool deprecated. Owner_lab's PI or registrar only."""
-        from ..core import common_tools as _ct
+        from ..core import common_seas as _cs
         actor = _resolve_actor(user)
         _require_active(actor)
-        existing = _ct.get_tool(slug)
+        existing = _cs.get_sea(slug)
         if existing is None:
             raise HTTPException(status_code=404,
                 detail=f"common tool not found: {slug}")
@@ -6246,8 +6246,8 @@ def create_app() -> FastAPI:
                 detail=(f"@{actor} is neither the PI of {existing.owner_lab!r} "
                         "nor a registrar."))
         try:
-            _ct.archive_tool(slug=slug)
-        except _ct.CommonToolError as exc:
+            _cs.archive_sea(slug=slug)
+        except _cs.CommonSeaError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         return {"ok": True, "slug": slug, "status": "deprecated"}
 
