@@ -26,6 +26,7 @@ PI's admin token wigamig should use, then add the helper.
 ---
 
 ## 2. Slack `conversations.create` smoke against a live workspace
+✅ **Code shipped 2026-06-16; live smoke still needed.**
 
 **Problem.** The mayor-approval auto-provisioning flow (item 2) calls
 `centre_provision._live_slack_create_channel` which posts to
@@ -35,12 +36,21 @@ registrar approves a lab join in production, we'll discover whatever's
 wrong with the live call (scopes, channel name validation, dup
 detection, …).
 
-**Scope.** ~1 hour, mostly Slack admin config + one smoke run.
+**Shipped 2026-06-16:**
+- `core.centre_provision.slack_create_channel()` returns a
+  structured `SlackChannelResult` with actionable hints for every
+  Slack error code (`missing_scope`, `name_taken`, `ratelimited`, …).
+- `_live_slack_create_channel` is now a thin compat shim around
+  it so the join-approve probe signature stays unchanged.
+- New CLI: `wigamig centre-slack-smoke` creates a probe channel,
+  reports the result, archives the probe on success. Exit 0 = bot
+  healthy; exit 1 = registrar needs to fix the token.
+- Documented in `docs/setup.md` §4.
 
-**First step.** Create a throwaway test workspace, mint a bot token
-with `channels:manage` + `groups:write`, file a real `kind=lab` join
-request, approve it, watch the Slack workspace. File any bugs that
-fall out.
+**Still needed.** Actually run `wigamig centre-slack-smoke` against
+the centre's real Slack workspace once it exists, file any bugs
+that fall out. Then approve a real `kind=lab` join request end-to-end
+and watch the workspace for the channel.
 
 ---
 

@@ -39,6 +39,8 @@ hood, which writes:
 
 1. `CHARTER.md` at the clone root (if missing).
 2. `lab_mgmt/projects/<name>.md` (the lab registry entry, if missing).
+   See [`lab_mgmt.md`](lab_mgmt.md) for what this repo is, who needs
+   it, and how it differs from `~/.wigamig/lab_info/`.
 3. `~/.wigamig/installations/<name>.yaml` (this-machine manifest).
 4. `.claude/agents/` symlinks for the agents you picked.
 5. `.vscode/settings.json` (wigamig chrome — title, activity bar
@@ -149,7 +151,41 @@ For larger centres a webhook → systemd-path-triggered pull avoids
 the manual step. For our small-scale deployment, a daily pull via
 cron is sufficient.
 
-### 4. Member onboarding
+### 4. Smoke-test the Slack token BEFORE accepting real join requests
+
+The auto-provisioning path calls `conversations.create` against the
+centre's Slack workspace. If the bot token is misconfigured, the
+first real lab approval will fail mid-flight — the lab record is
+written, but the Slack channel + GitHub repo + FS ACLs all warn,
+and the registrar has to remediate by hand.
+
+Run this once before the first real approval:
+
+```bash
+export SLACK_BOT_TOKEN=xoxb-...           # the centre workspace bot
+wigamig centre-slack-smoke
+```
+
+Expected output:
+
+```
+channel name:  wigamig-smoke-20260616-093014
+private:       True
+keep:          False
+
+✓ created channel C09ABC123 (wigamig-smoke-20260616-093014)
+  detail: created (HTTP 200)
+✓ probe channel archived
+
+Bot token is healthy. Real join-approve provisioning will work.
+```
+
+If the smoke fails it prints an actionable hint for the specific
+Slack error code (most commonly `missing_scope` — add
+`groups:write` to the bot's OAuth scopes and reinstall the app to
+the workspace). Re-run until it passes.
+
+### 5. Member onboarding
 
 Once the centre is live, anyone at the institution visits
 `https://wigamig.<your-domain>.edu/join` and submits a request. The
