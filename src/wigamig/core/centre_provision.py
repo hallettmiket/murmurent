@@ -291,6 +291,167 @@ def _default_runner(argv: list[str]) -> subprocess.CompletedProcess:
 
 
 # ---------------------------------------------------------------------------
+# Lab onboarding (item 2g — fires when a lab/core join request is approved)
+# ---------------------------------------------------------------------------
+
+def provision_lab_onboarding(
+    lab_name: str,
+    *,
+    env: dict[str, str] | None = None,
+    slack_creator=None,             # injectable: (channel_name, ws_id) -> str | None
+    github_creator=None,            # injectable: (org, repo, members) -> bool
+    acl_runner=None,                # injectable: same shape as apply_fs_acl runner
+) -> list[Probe]:
+    """Provision Slack channel + GitHub repo + filesystem ACLs for a
+    newly-approved lab.
+
+    The three injectable hooks let tests run end-to-end without
+    touching real Slack / GitHub / sudo. Production calls leave them
+    None and the helpers fall back to the live integrations:
+
+      - Slack: ``slack_notify._post`` + a thin create-channel wrapper
+      - GitHub: ``project_provision._gh`` (the existing gh wrapper)
+      - ACL:   ``apply_fs_acl`` defined above
+
+    Reads the centre profile (``centre_init.read_centre``) to pull
+    workspace id / github org / data server. If the centre isn't
+    initialised yet, returns a single block-severity Probe so the
+    UI surfaces the missing precondition cleanly.
+
+    Returns a Probe per step (4 probes max).
+    """
+    from . import centre_init as _ci
+    centre = _ci.read_centre(env=env)
+    if centre is None:
+        return [Probe(
+            name="centre-profile", status="block",
+            detail="centre is not initialised; run wigamig centre-init first.",
+        )]
+
+    probes: list[Probe] = []
+
+    # 1. Slack channel.
+    if slack_creator is None:
+        slack_creator = _live_slack_create_channel
+    if centre.slack_workspace:
+        try:
+            channel_id = slack_creator(
+                f"lab-{lab_name}", centre.slack_workspace,
+            )
+            if channel_id:
+                probes.append(Probe(
+                    name="slack-channel", status="ok",
+                    detail=f"#lab-{lab_name} in {centre.slack_workspace} → {channel_id}",
+                ))
+            else:
+                probes.append(Probe(
+                    name="slack-channel", status="warn",
+                    detail=f"#lab-{lab_name} could not be created (workspace {centre.slack_workspace})",
+                ))
+        except Exception as exc:  # noqa: BLE001
+            probes.append(Probe(
+                name="slack-channel", status="warn",
+                detail=f"slack error: {exc}",
+            ))
+    else:
+        probes.append(Probe(
+            name="slack-channel", status="warn",
+            detail="centre.slack_workspace not configured; skipping",
+        ))
+
+    # 2. GitHub repo.
+    if github_creator is None:
+        github_creator = _live_github_create_repo
+    if centre.github_org:
+        try:
+            ok = github_creator(centre.github_org, lab_name, [])
+            probes.append(Probe(
+                name="github-repo",
+                status="ok" if ok else "warn",
+                detail=(
+                    f"{centre.github_org}/{lab_name}"
+                    if ok else
+                    f"gh create failed for {centre.github_org}/{lab_name}"
+                ),
+            ))
+        except Exception as exc:  # noqa: BLE001
+            probes.append(Probe(
+                name="github-repo", status="warn",
+                detail=f"gh error: {exc}",
+            ))
+    else:
+        probes.append(Probe(
+            name="github-repo", status="warn",
+            detail="centre.github_org not configured; skipping",
+        ))
+
+    # 3. Filesystem ACL (one probe per machine; here just centre.data_server).
+    if centre.data_server:
+        probes.append(apply_fs_acl(
+            project=lab_name,
+            members=[],          # PI joins as roster grows; v1 grants empty.
+            machine=centre.data_server,
+            sudo=True,
+            env=env,
+            runner=acl_runner,
+        ))
+    else:
+        probes.append(Probe(
+            name="fs-acl[unspecified]", status="warn",
+            detail="centre.data_server not configured; skipping",
+        ))
+
+    return probes
+
+
+def _live_slack_create_channel(
+    channel_name: str, workspace_id: str,
+) -> str | None:
+    """Live Slack channel creation. Returns channel_id or None on failure.
+
+    Stub today: calls Slack's conversations.create. The wigamig Slack
+    helper (slack_notify._post) only posts messages; channel creation
+    needs a separate API call. We attempt it but treat any failure as
+    a non-fatal warn so the approve flow continues.
+    """
+    try:
+        import os
+        import httpx
+        tok = os.environ.get("SLACK_BOT_TOKEN")
+        if not tok:
+            return None
+        r = httpx.post(
+            "https://slack.com/api/conversations.create",
+            headers={"Authorization": f"Bearer {tok}"},
+            json={"name": channel_name, "is_private": True},
+            timeout=5,
+        )
+        data = r.json()
+        if data.get("ok"):
+            return str(data.get("channel", {}).get("id") or "")
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def _live_github_create_repo(
+    org: str, repo: str, collaborators: list[str],
+) -> bool:
+    """Live GitHub repo creation via gh CLI. Returns True on success.
+
+    Reuses the existing _gh helper from project_provision for
+    consistency with the per-lab provisioning path.
+    """
+    try:
+        from . import project_provision as _pp
+        r = _pp._gh(["repo", "create", f"{org}/{repo}", "--private",
+                      "--confirm"])
+        return r.returncode == 0
+    except Exception:  # noqa: BLE001
+        return False
+
+
+# ---------------------------------------------------------------------------
 # Reconcile loop (diff desired vs actual)
 # ---------------------------------------------------------------------------
 
@@ -419,4 +580,5 @@ __all__ = [
     "apply_fs_acl",
     "reconcile_project",
     "append_log",
+    "provision_lab_onboarding",
 ]

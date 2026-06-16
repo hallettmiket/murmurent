@@ -1393,6 +1393,13 @@ cli.add_command(_broadcast)
 from .commands.project_centre_cmd import centre_project as _centre_project
 cli.add_command(_centre_project)
 
+from .commands.centre_cmd import centre_init as _centre_init_cmd
+from .commands.centre_cmd import centre_status as _centre_status_cmd
+from .commands.centre_cmd import join_request_group as _join_request_group
+cli.add_command(_centre_init_cmd)
+cli.add_command(_centre_status_cmd)
+cli.add_command(_join_request_group)
+
 
 if __name__ == "__main__":  # pragma: no cover
     cli()

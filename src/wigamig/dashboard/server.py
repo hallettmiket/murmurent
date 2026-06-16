@@ -6444,6 +6444,250 @@ def create_app() -> FastAPI:
             ],
         }
 
+    # ------------------------------------------------------------------
+    # Centre bootstrap (mayor flow, item 2 of post-smoke design)
+    # ------------------------------------------------------------------
+
+    def _centre_profile_to_dict(p) -> dict:
+        return {
+            "name": p.name,
+            "institution": p.institution,
+            "founding_mayor": f"@{p.founding_mayor}",
+            "slack_workspace": p.slack_workspace,
+            "github_org": p.github_org,
+            "data_server": p.data_server,
+            "raw_root": p.raw_root,
+            "refined_root": p.refined_root,
+            "created": p.created,
+            "path": str(p.path) if p.path else "",
+        }
+
+    @app.get("/api/centre/profile")
+    def get_centre_profile() -> dict:
+        """Public read. 404 when no centre exists → triggers mayor wizard."""
+        from ..core import centre_init as _ci
+        profile = _ci.read_centre()
+        if profile is None:
+            raise HTTPException(status_code=404, detail="centre not initialised")
+        return _centre_profile_to_dict(profile)
+
+    @app.post("/api/centre/init")
+    def post_centre_init(
+        body: dict,
+        user: str = Query(""),
+    ) -> dict:
+        """Bootstrap the centre. Only callable when no centre exists.
+
+        The user running the server becomes the founding mayor → first
+        registrar (unless ``body.mayor`` overrides). Once the centre
+        exists, this endpoint returns 409 forever.
+        """
+        from ..core import centre_init as _ci
+        if _ci.is_initialised():
+            raise HTTPException(
+                status_code=409,
+                detail="centre already initialised; use /api/centre/profile PATCH to edit.",
+            )
+        # Mayor resolution: explicit body > query user > $WIGAMIG_USER.
+        mayor = str((body or {}).get("mayor") or "").strip()
+        if not mayor:
+            try:
+                mayor = _resolve_actor(user)
+            except HTTPException:
+                mayor = ""
+        if not mayor:
+            raise HTTPException(status_code=422,
+                detail="mayor handle required (body.mayor or ?user=)")
+        try:
+            profile = _ci.init_centre(
+                name=str((body or {}).get("name") or ""),
+                institution=str((body or {}).get("institution") or ""),
+                founding_mayor=mayor,
+                slack_workspace=str((body or {}).get("slack_workspace") or ""),
+                github_org=str((body or {}).get("github_org") or ""),
+                data_server=str((body or {}).get("data_server") or ""),
+                raw_root=str((body or {}).get("raw_root") or ""),
+                refined_root=str((body or {}).get("refined_root") or ""),
+                # Server-mode default: skip the per-machine sentinel
+                # write (Tyler's laptop did it; the server doesn't need
+                # the OS-user-as-registrar identity since auth comes
+                # via _registry.yaml).
+                write_sentinel=bool((body or {}).get("write_sentinel", False)),
+            )
+        except _ci.CentreAlreadyInitialised as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except _ci.CentreInitError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"ok": True, "profile": _centre_profile_to_dict(profile)}
+
+    # ------------------------------------------------------------------
+    # Join requests (item 2f) — public submit + registrar approve/decline
+    # ------------------------------------------------------------------
+
+    def _join_request_to_dict(r) -> dict:
+        return {
+            "id": r.id,
+            "id_str": f"{r.id:04d}",
+            "kind": r.kind,
+            "state": r.state,
+            "requester_email": r.requester_email,
+            "proposed_name": r.proposed_name,
+            "proposed_pi": r.proposed_pi,
+            "institution_affiliation": r.institution_affiliation,
+            "justification": r.justification,
+            "proposed_members": list(r.proposed_members),
+            "created_at": r.created_at,
+            "resolved_at": r.resolved_at,
+            "resolved_by": r.resolved_by,
+            "decline_reason": r.decline_reason,
+            "probes": list(r.probes),
+        }
+
+    @app.get("/api/centre/join_requests")
+    def list_join_requests(
+        state: str = Query(""),
+        user: str = Query(""),
+    ) -> dict:
+        """Registrar lists all; anyone else sees their own only (matched
+        by requester_email)."""
+        from ..core import join_requests as _jr
+        from ..core import registrar as _R
+        actor = ""
+        try:
+            actor = _resolve_actor(user)
+        except HTTPException:
+            actor = ""
+        is_reg = actor and _R.is_registrar(actor)
+        rows = _jr.iter_requests(state=state or None)
+        if not is_reg:
+            # Filter to the actor's email if we can resolve it from
+            # membership; otherwise return [] (the form posts back the
+            # confirmation in the response, no need to expose all
+            # requests anonymously).
+            return {"join_requests": []}
+        return {"join_requests": [_join_request_to_dict(r) for r in rows]}
+
+    @app.post("/api/centre/join_requests")
+    def post_join_request(body: dict) -> dict:
+        """Public submission endpoint. No auth. Rate-limit on the
+        reverse proxy in production (caddy/nginx).
+        """
+        from ..core import join_requests as _jr
+        body = body or {}
+        try:
+            req = _jr.file_request(
+                kind=str(body.get("kind") or ""),
+                requester_email=str(body.get("requester_email") or ""),
+                proposed_name=str(body.get("proposed_name") or ""),
+                proposed_pi=str(body.get("proposed_pi") or ""),
+                institution_affiliation=str(body.get("institution_affiliation") or ""),
+                justification=str(body.get("justification") or ""),
+                proposed_members=list(body.get("proposed_members") or []),
+            )
+        except _jr.JoinRequestError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"ok": True, "id": req.id,
+                "id_str": f"{req.id:04d}",
+                "state": req.state,
+                "message": "Your request is queued; the registrar will "
+                            "reach out at "
+                            f"{req.requester_email} once decided."}
+
+    @app.post("/api/registrar/join_request/{req_id}/approve")
+    def approve_join_request(
+        req_id: int,
+        body: dict | None = None,
+        user: str = Query(""),
+    ) -> dict:
+        from ..core import join_requests as _jr
+        from ..core import registrar as _R
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        if not _R.is_registrar(actor):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not a registrar.")
+        body = body or {}
+        try:
+            r = _jr.approve(
+                req_id=req_id, actor=actor,
+                provision=bool(body.get("provision", True)),
+            )
+        except _jr.JoinRequestNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _jr.JoinRequestStateError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        except _jr.JoinRequestError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"ok": True, "request": _join_request_to_dict(r)}
+
+    @app.post("/api/registrar/join_request/{req_id}/decline")
+    def decline_join_request(
+        req_id: int,
+        body: dict,
+        user: str = Query(""),
+    ) -> dict:
+        from ..core import join_requests as _jr
+        from ..core import registrar as _R
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        if not _R.is_registrar(actor):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not a registrar.")
+        reason = str((body or {}).get("reason") or "").strip()
+        if not reason:
+            raise HTTPException(status_code=422, detail="reason is required")
+        try:
+            r = _jr.decline(req_id=req_id, actor=actor, reason=reason)
+        except _jr.JoinRequestNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _jr.JoinRequestStateError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        except _jr.JoinRequestError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"ok": True, "request": _join_request_to_dict(r)}
+
+    @app.get("/api/registrar/join_request/{req_id}/probes")
+    def get_join_request_probes(
+        req_id: int,
+        user: str = Query(""),
+    ) -> dict:
+        """Long-poll endpoint for the registrar UI to watch provisioning
+        progress on an approved request."""
+        from ..core import join_requests as _jr
+        from ..core import registrar as _R
+        actor = _resolve_actor(user)
+        if not _R.is_registrar(actor):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not a registrar.")
+        try:
+            r = _jr.get_request(req_id)
+        except _jr.JoinRequestNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"state": r.state, "probes": list(r.probes)}
+
+    @app.patch("/api/centre/profile")
+    def patch_centre_profile(
+        body: dict,
+        user: str = Query(""),
+    ) -> dict:
+        """Edit centre metadata after bootstrap. Registrar only.
+
+        ``founding_mayor`` is immutable — silently dropped if present
+        in the patch.
+        """
+        from ..core import centre_init as _ci
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        from ..core import registrar as _R
+        if not _R.is_registrar(actor):
+            raise HTTPException(status_code=403,
+                detail=f"@{actor} is not a registrar.")
+        try:
+            profile = _ci.update_centre(body or {})
+        except _ci.CentreInitError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True, "profile": _centre_profile_to_dict(profile)}
+
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
@@ -6535,6 +6779,15 @@ def create_app() -> FastAPI:
             """Phase A registrar dashboard — separate route from the lab UI."""
             return HTMLResponse(
                 (STATIC_DIR / "registrar.html").read_text(encoding="utf-8"),
+                headers=_NO_CACHE,
+            )
+
+        @app.get("/join", response_class=HTMLResponse)
+        def join_index() -> HTMLResponse:
+            """Public join form — no auth. Anyone at the institution can
+            submit a lab/core/admin/pi join request from here. Item 2h."""
+            return HTMLResponse(
+                (STATIC_DIR / "join.html").read_text(encoding="utf-8"),
                 headers=_NO_CACHE,
             )
 

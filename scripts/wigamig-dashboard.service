@@ -1,0 +1,46 @@
+# /etc/systemd/system/wigamig-dashboard.service
+#
+# Run the wigamig hi-fi dashboard headless on a dedicated Ubuntu server.
+# After landing the centre on the server (see docs/setup.md), edit the
+# placeholders below for your install, then:
+#
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now wigamig-dashboard
+#
+# Front the listening port with caddy / nginx for TLS. Do NOT expose
+# port 8771 directly to the internet.
+
+[Unit]
+Description=wigamig hi-fi dashboard (centre)
+Documentation=https://github.com/hallettmiket/wigamig/blob/main/docs/setup.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=wigamig
+Group=wigamig
+
+# Centre data lives under /var/lib/wigamig/lab_info on the server.
+Environment=WIGAMIG_LAB_INFO_ROOT=/var/lib/wigamig/lab_info
+Environment=WIGAMIG_USER=tbrowne
+# Optional — set if your install uses a non-default location.
+# Environment=WIGAMIG_LAB_VM_ROOT=/data/lab_vm
+
+# Adjust the wigamig binary path if you installed via pip / uv tool.
+ExecStart=/usr/local/bin/wigamig dashboard --hifi --host 0.0.0.0 --port 8771
+
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+# Hardening — relax only if a feature breaks.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/wigamig
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

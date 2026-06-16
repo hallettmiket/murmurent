@@ -475,7 +475,9 @@ def bootstrap_from_existing_lab_mgmt(
             oracle_vault=_opt_str(meta.get("lab_oracle_vault")),
         )
     )
-    reg = Registry(labs=other_labs, cores=existing.cores, collaborations=existing.collaborations)
+    reg = Registry(labs=other_labs, cores=existing.cores,
+                    collaborations=existing.collaborations,
+                    registrars=existing.registrars)
     write_registry(reg, env)
     return reg
 
@@ -829,6 +831,7 @@ def create_lab(
         labs=[*existing.labs, entry],
         cores=existing.cores,
         collaborations=existing.collaborations,
+        registrars=existing.registrars,
     )
     write_registry(updated_registry, env)
 
@@ -860,7 +863,7 @@ def _replace_lab(reg: Registry, idx: int, new_entry: LabEntry) -> Registry:
     """Return a copy of ``reg`` with ``new_entry`` at ``labs[idx]``."""
     new_labs = list(reg.labs)
     new_labs[idx] = new_entry
-    return Registry(labs=new_labs, cores=reg.cores, collaborations=reg.collaborations)
+    return Registry(labs=new_labs, cores=reg.cores, collaborations=reg.collaborations, registrars=reg.registrars)
 
 
 def _set_status(name: str, status: str, env: dict[str, str] | None = None) -> LabEntry:
@@ -1144,7 +1147,7 @@ def _find_core(name: str, env: dict[str, str] | None = None) -> tuple[Registry, 
 def _replace_core(reg: Registry, idx: int, new_entry: CoreEntry) -> Registry:
     new_cores = list(reg.cores)
     new_cores[idx] = new_entry
-    return Registry(labs=reg.labs, cores=new_cores, collaborations=reg.collaborations)
+    return Registry(labs=reg.labs, cores=new_cores, collaborations=reg.collaborations, registrars=reg.registrars)
 
 
 def _enforce_core_create_invariants(
@@ -1449,7 +1452,7 @@ def _replace_collaboration(
 ) -> Registry:
     new_collabs = list(reg.collaborations)
     new_collabs[idx] = new_entry
-    return Registry(labs=reg.labs, cores=reg.cores, collaborations=new_collabs)
+    return Registry(labs=reg.labs, cores=reg.cores, collaborations=new_collabs, registrars=reg.registrars)
 
 
 def _normalize_handles(handles: list[str]) -> list[str]:
