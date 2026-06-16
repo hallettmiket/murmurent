@@ -243,6 +243,85 @@
         .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     }
 
+    // 2i: Mayor wizard — shown when no centre is initialised yet.
+    function renderMayorWizard() {
+      banner.textContent = "wigamig — first-time setup";
+      const osUser = (userOverride || "").trim();
+      root.innerHTML =
+        '<div class="panel"><header><h2>Welcome — let\'s set up your centre.</h2></header>'
+        + '<div style="padding:18px 20px;">'
+        + '<p>Nothing is configured yet. As the <strong>mayor</strong>, '
+        + 'fill in these centre-level details and you\'ll become the first '
+        + 'registrar. You can edit any of this later from the profile panel.</p>'
+        + '<form id="mayor-form" autocomplete="off" '
+        +     'style="display:grid; grid-template-columns: 220px 1fr; gap:8px 14px; align-items:baseline; max-width:760px;">'
+        + '<label>Centre name <span style="color:#b23a2b">*</span></label>'
+        + '<input name="name" required placeholder="Western Bioconvergence Centre">'
+        + '<label>Institution <span style="color:#b23a2b">*</span></label>'
+        + '<input name="institution" required placeholder="Western University">'
+        + '<label>Founding mayor (@handle)</label>'
+        + '<input name="mayor" value="' + escapeHTML(osUser) + '" '
+        +   'placeholder="@tbrowne — defaults to ?user= or $WIGAMIG_USER">'
+        + '<label>Slack workspace id</label>'
+        + '<input name="slack_workspace" placeholder="T0WESTERN">'
+        + '<label>GitHub org</label>'
+        + '<input name="github_org" placeholder="centre-westernu">'
+        + '<label>Data server hostname</label>'
+        + '<input name="data_server" placeholder="lab-server.example.edu">'
+        + '<label>Raw root path</label>'
+        + '<input name="raw_root" value="/data/lab_vm/raw">'
+        + '<label>Refined root path</label>'
+        + '<input name="refined_root" value="/data/lab_vm/refined">'
+        + '</form>'
+        + '<div id="mayor-err" class="error" style="display:none; margin-top:12px;"></div>'
+        + '<div style="margin-top:18px;">'
+        + '<button class="btn" id="btn-mayor-submit" '
+        +   'style="background:var(--purple); color:white; border-color:var(--purple);">'
+        +   'Bootstrap centre →</button>'
+        + '</div>'
+        + '</div></div>';
+      document.getElementById("btn-mayor-submit")
+        .addEventListener("click", submitMayorWizard);
+    }
+
+    async function submitMayorWizard() {
+      const errEl = document.getElementById("mayor-err");
+      errEl.style.display = "none";
+      const btn = document.getElementById("btn-mayor-submit");
+      btn.disabled = true;
+      btn.textContent = "Bootstrapping…";
+      const form = document.getElementById("mayor-form");
+      const data = Object.fromEntries(new FormData(form).entries());
+      const userParam = data.mayor
+        ? "?user=" + encodeURIComponent(data.mayor.replace(/^@/, ""))
+        : "";
+      try {
+        const r = await fetch("/api/centre/init" + userParam, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+        if (!r.ok) {
+          const detail = (await r.json().catch(() => ({}))).detail
+            || ("HTTP " + r.status);
+          throw new Error(detail);
+        }
+        // Reload — the page will now render the normal dashboard.
+        const out = await r.json();
+        const mayor = (out.profile && out.profile.founding_mayor)
+          ? out.profile.founding_mayor.replace(/^@/, "")
+          : (data.mayor || "").replace(/^@/, "");
+        const target = "/registrar"
+          + (mayor ? "?user=" + encodeURIComponent(mayor) : "");
+        window.location.href = target;
+      } catch (ex) {
+        errEl.textContent = String(ex.message || ex);
+        errEl.style.display = "block";
+        btn.disabled = false;
+        btn.textContent = "Bootstrap centre →";
+      }
+    }
+
     function renderError(detail) {
       banner.textContent = "registrar dashboard";
       root.innerHTML =
@@ -427,6 +506,17 @@
     }
 
     async function load() {
+      // 2i: Mayor wizard. If no centre is initialised, show the
+      // bootstrap form INSTEAD of the normal dashboard.
+      try {
+        const cp = await fetch("/api/centre/profile",
+                                { credentials: "same-origin" });
+        if (cp.status === 404) {
+          renderMayorWizard();
+          return;
+        }
+      } catch (_) { /* fall through to normal load */ }
+
       const url = "/api/registrar/dashboard" + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
       let res;
       try {
@@ -518,6 +608,19 @@
         html += '</tbody></table>';
       }
       html += '</div>';
+
+      // -- Pending join requests panel (item 2j) --
+      // Public /join form posts here; registrar approves/declines.
+      html += '<div class="panel" id="join-card"><header>'
+        + '<h2>Pending join requests</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + '<span id="join-count">…</span>'
+        + '<a class="btn" href="/join" target="_blank" rel="noopener" '
+        +     'style="text-decoration:none;">'
+        +   'open /join form ↗</a>'
+        + '</span></header>'
+        + '<div id="join-body"><div class="empty">Loading…</div></div>'
+        + '</div>';
 
       // -- External customers panel (Phase 6e) --
       // Industry / non-Schulich clients that the registrar tracks so
@@ -718,6 +821,9 @@
         });
       });
 
+      // 2j: pending join requests panel.
+      loadJoinRequests();
+
       // Phase 6e: external customers panel.
       loadExternalCustomers();
       const newCustBtn = document.getElementById("btn-new-ext-cust");
@@ -896,6 +1002,122 @@
     // -----------------------------------------------------------
     // Phase 6e: external customers helpers
     // -----------------------------------------------------------
+
+    // 2j: pending join requests
+    async function loadJoinRequests() {
+      const body = document.getElementById("join-body");
+      const count = document.getElementById("join-count");
+      try {
+        const url = "/api/centre/join_requests"
+                  + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const r = await fetch(url, { credentials: "same-origin" });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || ("HTTP " + r.status));
+        }
+        const data = await r.json();
+        const rows = data.join_requests || [];
+        const pending = rows.filter(x => x.state === "pending");
+        const failed = rows.filter(x => x.state === "failed");
+        const resolved = rows.filter(x =>
+          x.state !== "pending" && x.state !== "failed");
+        count.textContent = pending.length + " pending"
+          + (failed.length > 0 ? " · " + failed.length + " failed" : "")
+          + (resolved.length > 0 ? " · " + resolved.length + " resolved" : "");
+        if (rows.length === 0) {
+          body.innerHTML = '<div class="empty">No join requests yet. '
+            + 'Share the link <a href="/join" target="_blank">'
+            + '<code>/join</code></a> for anyone at the institution to apply.</div>';
+          return;
+        }
+        const showRows = pending.concat(failed).concat(resolved);
+        let html = '<table><thead><tr>'
+          + '<th>id</th><th>kind</th><th>name</th><th>PI</th>'
+          + '<th>email</th><th>state</th>'
+          + '<th style="text-align:right;">actions</th>'
+          + '</tr></thead><tbody>';
+        for (const r of showRows) {
+          const probes = (r.probes || []).map(p =>
+            '<div style="font-size:11px; color:'
+            + (p.severity === "block" ? "#b23a2b"
+              : p.severity === "warn" ? "#8a560f" : "#2d7a2d")
+            + ';">[' + escapeHTML(p.severity) + '] '
+            + escapeHTML(p.kind) + ': ' + escapeHTML(p.summary || '')
+            + '</div>'
+          ).join("");
+          const isPending = r.state === "pending" || r.state === "failed";
+          html += '<tr style="' + (r.state === "declined" ? "opacity:0.55;" : "") + '">'
+            + '<td class="mono">#' + escapeHTML(r.id_str) + '</td>'
+            + '<td class="mono">' + escapeHTML(r.kind) + '</td>'
+            + '<td>' + escapeHTML(r.proposed_name)
+              + (r.institution_affiliation
+                ? '<br><span class="muted" style="font-size:11px;">'
+                  + escapeHTML(r.institution_affiliation) + '</span>'
+                : '')
+              + (r.justification
+                ? '<br><span class="muted" style="font-size:11px;">'
+                  + escapeHTML(r.justification.slice(0, 80))
+                  + (r.justification.length > 80 ? '…' : '')
+                  + '</span>'
+                : '')
+              + '</td>'
+            + '<td class="mono">' + escapeHTML(r.proposed_pi || "—") + '</td>'
+            + '<td>' + escapeHTML(r.requester_email) + '</td>'
+            + '<td><span class="pill ' + escapeHTML(r.state) + '">'
+              + escapeHTML(r.state) + '</span>'
+              + probes
+              + '</td>'
+            + '<td style="text-align:right;">'
+            +   (isPending
+                ? '<button class="btn join-action" data-action="approve" data-id="' + r.id + '">approve</button> '
+                  + '<button class="btn join-action" data-action="decline" data-id="' + r.id + '">decline</button>'
+                : (r.state === "failed"
+                  ? '<button class="btn join-action" data-action="approve" data-id="' + r.id + '">retry</button>'
+                  : '<span class="muted" style="font-size:11px;">—</span>'))
+            + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        body.innerHTML = html;
+        body.querySelectorAll(".join-action").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-id");
+            const action = btn.getAttribute("data-action");
+            if (action === "decline") {
+              const reason = window.prompt(
+                "Decline reason (will be in the audit log + email reply):");
+              if (!reason || !reason.trim()) return;
+              const url = "/api/registrar/join_request/" + id + "/decline"
+                + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+              const r = await fetch(url, { method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason }) });
+              if (!r.ok) {
+                alert("Decline failed: " + (await r.json().catch(() => ({}))).detail);
+                return;
+              }
+            } else {
+              if (!confirm("Approve request #" + id
+                + "?\nThis will auto-provision Slack channel + GitHub repo + filesystem ACLs.")) return;
+              btn.disabled = true; btn.textContent = "approving…";
+              const url = "/api/registrar/join_request/" + id + "/approve"
+                + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+              const r = await fetch(url, { method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ provision: true }) });
+              if (!r.ok) {
+                alert("Approve failed: " + (await r.json().catch(() => ({}))).detail);
+                btn.disabled = false; btn.textContent = action;
+                return;
+              }
+            }
+            loadJoinRequests();
+          });
+        });
+      } catch (ex) {
+        body.innerHTML = '<div class="empty">Failed to load: '
+          + escapeHTML(String(ex.message || ex)) + '</div>';
+      }
+    }
 
     async function loadExternalCustomers() {
       const body = document.getElementById("ext-cust-body");

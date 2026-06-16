@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Join Wigamig</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #fafafa;
+      --paper: #ffffff;
+      --rule: #e0e0e0;
+      --rule-strong: #b8b8b8;
+      --text: #1a1a1a;
+      --muted: #707070;
+      --purple: #6b46c1;
+      --purple-deep: #4c2a85;
+      --serif: 'Georgia', serif;
+      --mono: 'SF Mono', Menlo, monospace;
+    }
+    body {
+      margin: 0; padding: 0;
+      font-family: var(--serif);
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+    }
+    .container {
+      max-width: 640px;
+      margin: 40px auto;
+      padding: 0 24px;
+    }
+    .card {
+      background: var(--paper);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      padding: 32px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 28px;
+      color: var(--purple-deep);
+    }
+    .lead {
+      color: var(--muted);
+      margin: 0 0 24px;
+    }
+    label {
+      display: block;
+      margin-top: 16px;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    .hint {
+      display: block;
+      font-weight: 400;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 8px 10px;
+      margin-top: 4px;
+      border: 1px solid var(--rule-strong);
+      border-radius: 2px;
+      font-family: var(--serif);
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    .row {
+      display: flex; gap: 12px;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+    button {
+      padding: 10px 18px;
+      font-size: 14px;
+      font-family: var(--serif);
+      background: var(--purple);
+      color: white;
+      border: 1px solid var(--purple);
+      border-radius: 2px;
+      cursor: pointer;
+    }
+    button:hover { background: var(--purple-deep); }
+    button:disabled { background: var(--muted); cursor: not-allowed; }
+    .err {
+      color: #b23a2b;
+      font-size: 13px;
+      margin-top: 8px;
+    }
+    .ok {
+      background: #f0fff4;
+      border: 1px solid #2d7a2d;
+      border-radius: 4px;
+      padding: 16px;
+      margin-top: 16px;
+      color: #2d7a2d;
+    }
+    code { font-family: var(--mono); font-size: 13px;
+      background: #f3f3f3; padding: 1px 4px; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card" id="form-card">
+      <h1>Join Wigamig</h1>
+      <p class="lead" id="centre-lead">Loading centre…</p>
+
+      <form id="join-form" autocomplete="off">
+        <label>
+          Kind
+          <span class="hint">Choose what you're applying to register.</span>
+          <select name="kind" required>
+            <option value="lab">Lab — a research group with a PI + members</option>
+            <option value="core">Core — a service-providing centre facility</option>
+            <option value="admin">Admin — a centre administrator</option>
+            <option value="pi">PI — a principal investigator without a registered lab yet</option>
+          </select>
+        </label>
+
+        <label>
+          Proposed name <span class="hint">Lowercase short slug (e.g. <code>hallett</code>, <code>biocore</code>). Will become the registry id.</span>
+          <input name="proposed_name" type="text" required
+                 pattern="[a-z][a-z0-9_-]*"
+                 placeholder="my_lab_slug">
+        </label>
+
+        <label>
+          PI handle <span class="hint">@handle of the proposed PI / leader. Required for <code>lab</code> and <code>core</code>.</span>
+          <input name="proposed_pi" type="text"
+                 placeholder="@netname">
+        </label>
+
+        <label>
+          Your email <span class="hint">Where the registrar replies. Stays in the audit log.</span>
+          <input name="requester_email" type="email" required
+                 placeholder="you@example.edu">
+        </label>
+
+        <label>
+          Institution affiliation <span class="hint">School / department / Western affiliation.</span>
+          <input name="institution_affiliation" type="text">
+        </label>
+
+        <label>
+          Justification <span class="hint">A sentence or two — what work this lab/core will do, who it serves, why now.</span>
+          <textarea name="justification"></textarea>
+        </label>
+
+        <div class="err" id="err" style="display:none"></div>
+        <div class="row">
+          <button type="submit" id="submit-btn">Submit request</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card" id="ok-card" style="display:none">
+      <h1>Submitted ✓</h1>
+      <div class="ok" id="ok-message"></div>
+      <p style="margin-top:16px;">You'll hear from the registrar at the
+        email you provided.</p>
+    </div>
+  </div>
+
+  <script>
+    async function loadCentre() {
+      const lead = document.getElementById("centre-lead");
+      try {
+        const r = await fetch("/api/centre/profile");
+        if (r.status === 404) {
+          lead.textContent = "The centre hasn't been initialised yet. Ask the mayor to run wigamig centre-init.";
+          document.querySelectorAll("button, input, select, textarea")
+            .forEach(el => el.disabled = true);
+          return;
+        }
+        const data = await r.json();
+        lead.textContent = "Submit a request to join the "
+          + (data.name || "centre")
+          + (data.institution ? " at " + data.institution : "")
+          + ". The registrar will review.";
+      } catch (e) {
+        lead.textContent = "Couldn't reach the centre. Try again later.";
+      }
+    }
+
+    document.getElementById("join-form").addEventListener("submit", async (ev) => {
+      ev.preventDefault();
+      const errEl = document.getElementById("err");
+      errEl.style.display = "none";
+      const btn = document.getElementById("submit-btn");
+      btn.disabled = true;
+      btn.textContent = "Submitting…";
+      const data = Object.fromEntries(new FormData(ev.target).entries());
+      try {
+        const r = await fetch("/api/centre/join_requests", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+        if (!r.ok) {
+          const detail = (await r.json().catch(() => ({}))).detail
+            || ("HTTP " + r.status);
+          throw new Error(detail);
+        }
+        const out = await r.json();
+        document.getElementById("form-card").style.display = "none";
+        const card = document.getElementById("ok-card");
+        card.style.display = "block";
+        document.getElementById("ok-message").innerHTML =
+          out.message
+          + '<br><br>Reference: <code>#' + out.id_str + '</code>';
+      } catch (ex) {
+        errEl.textContent = String(ex.message || ex);
+        errEl.style.display = "block";
+        btn.disabled = false;
+        btn.textContent = "Submit request";
+      }
+    });
+
+    loadCentre();
+  </script>
+</body>
+</html>
