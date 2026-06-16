@@ -404,34 +404,116 @@ def provision_lab_onboarding(
     return probes
 
 
-def _live_slack_create_channel(
-    channel_name: str, workspace_id: str,
-) -> str | None:
-    """Live Slack channel creation. Returns channel_id or None on failure.
+@dataclass
+class SlackChannelResult:
+    """Outcome of a live Slack channel-create attempt. Used both by
+    the join-approve flow (which only cares about channel_id) AND by
+    the ``wigamig centre-slack-smoke`` CLI (which surfaces the full
+    detail so the registrar can debug a misconfigured token)."""
+    ok: bool
+    channel_id: str = ""                    # populated when ok=True
+    channel_name: str = ""
+    error: str = ""                         # Slack API error code
+    detail: str = ""                        # human-readable explanation
 
-    Stub today: calls Slack's conversations.create. The wigamig Slack
-    helper (slack_notify._post) only posts messages; channel creation
-    needs a separate API call. We attempt it but treat any failure as
-    a non-fatal warn so the approve flow continues.
+
+def slack_create_channel(
+    channel_name: str,
+    *,
+    workspace_id: str = "",
+    private: bool = True,
+    token: str | None = None,
+) -> SlackChannelResult:
+    """Live Slack ``conversations.create``. Returns a structured
+    result that the smoke CLI can render in full and the join-approve
+    flow can collapse to "ok / not ok".
+
+    ``token`` defaults to ``$SLACK_BOT_TOKEN``. The token's bot needs:
+
+      - ``channels:manage`` for public channels
+      - ``groups:write``    for private channels (the join-approve
+                              path uses ``private=True``)
+
+    The Slack ``conversations.create`` payload doesn't take a
+    workspace id — the token is scoped to one workspace. We accept
+    ``workspace_id`` only for caller-side documentation / parity with
+    the centre profile field.
     """
+    import os
+    import httpx
+    tok = token if token is not None else os.environ.get("SLACK_BOT_TOKEN", "")
+    if not tok:
+        return SlackChannelResult(
+            ok=False, channel_name=channel_name,
+            error="missing_token",
+            detail="$SLACK_BOT_TOKEN is not set; pass token= or "
+                    "export it before running.",
+        )
+    payload: dict = {"name": channel_name, "is_private": bool(private)}
     try:
-        import os
-        import httpx
-        tok = os.environ.get("SLACK_BOT_TOKEN")
-        if not tok:
-            return None
         r = httpx.post(
             "https://slack.com/api/conversations.create",
             headers={"Authorization": f"Bearer {tok}"},
-            json={"name": channel_name, "is_private": True},
-            timeout=5,
+            json=payload,
+            timeout=10,
         )
+    except Exception as exc:  # noqa: BLE001
+        return SlackChannelResult(
+            ok=False, channel_name=channel_name,
+            error="transport",
+            detail=f"network error: {exc}",
+        )
+    try:
         data = r.json()
-        if data.get("ok"):
-            return str(data.get("channel", {}).get("id") or "")
-    except Exception:  # noqa: BLE001
-        pass
-    return None
+    except Exception as exc:  # noqa: BLE001
+        return SlackChannelResult(
+            ok=False, channel_name=channel_name,
+            error="bad_response",
+            detail=f"non-JSON response from Slack (HTTP {r.status_code}): {exc}",
+        )
+    if data.get("ok"):
+        return SlackChannelResult(
+            ok=True, channel_name=channel_name,
+            channel_id=str(data.get("channel", {}).get("id") or ""),
+            detail=f"created (HTTP {r.status_code})",
+        )
+    # Slack's documented error codes — make them actionable.
+    err = str(data.get("error") or "unknown")
+    hints = {
+        "missing_scope": "your bot token lacks the required OAuth scope; "
+                         "add 'groups:write' (private) or 'channels:manage' "
+                         "(public) in the app's OAuth settings and reinstall.",
+        "not_authed": "no token or expired token.",
+        "invalid_auth": "the token is wrong or has been revoked.",
+        "name_taken": "a channel with that name already exists. Slack "
+                       "doesn't allow re-creating it; rename or reuse.",
+        "invalid_name_specials": "channel name has special chars; only "
+                                  "lowercase letters / digits / hyphens / "
+                                  "underscores allowed.",
+        "invalid_name_maxlength": "channel name longer than 80 chars.",
+        "ratelimited": "Slack rate-limited the call; retry after a minute.",
+        "restricted_action": "your workspace plan / admin policy forbids "
+                              "bot-created channels.",
+    }
+    return SlackChannelResult(
+        ok=False, channel_name=channel_name,
+        error=err,
+        detail=hints.get(err, f"Slack returned error={err!r} (raw: {data})"),
+    )
+
+
+def _live_slack_create_channel(
+    channel_name: str, workspace_id: str,
+) -> str | None:
+    """Compat shim used by provision_lab_onboarding's default hook.
+
+    Returns the channel_id on success, None on failure (so the
+    join-approve probe collapses to ok/warn). For a structured
+    result use :func:`slack_create_channel` directly.
+    """
+    res = slack_create_channel(channel_name, workspace_id=workspace_id,
+                                 private=True)
+    return res.channel_id if res.ok else None
 
 
 def _live_github_create_repo(
@@ -581,4 +663,5 @@ __all__ = [
     "reconcile_project",
     "append_log",
     "provision_lab_onboarding",
+    "SlackChannelResult", "slack_create_channel",
 ]

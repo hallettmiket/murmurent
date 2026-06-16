@@ -279,6 +279,97 @@ def cmd_decline(req_id: int, actor: str, reason: str) -> None:
     click.echo(f"Request #{r.id:04d} → declined (by @{actor}). Reason: {r.decline_reason}")
 
 
+@click.command(
+    "centre-slack-smoke",
+    help="Verify the Slack bot token can create a private channel. "
+          "Run this BEFORE approving real lab/core join requests so the "
+          "auto-provisioning path doesn't fail mid-flight.",
+)
+@click.option("--channel", default="",
+              help="Channel name to attempt to create. "
+                   "Defaults to a timestamped probe name so the smoke "
+                   "doesn't collide with real channels.")
+@click.option("--public", is_flag=True, default=False,
+              help="Create a public channel. Default is private (matches "
+                   "the join-approve flow).")
+@click.option("--keep", is_flag=True, default=False,
+              help="Leave the probe channel behind. Default: archive it "
+                   "via conversations.archive after a successful create.")
+def centre_slack_smoke(channel: str, public: bool, keep: bool) -> None:
+    """End-to-end smoke for the Slack channel-create path.
+
+    Prints (a) the resolved channel name, (b) the result of the
+    conversations.create call, (c) the actionable hint when Slack
+    returns an error code. Cleans up the probe channel unless --keep.
+    """
+    import datetime as _dt
+    import os
+    from ..core import centre_provision as _cp
+
+    if not os.environ.get("SLACK_BOT_TOKEN"):
+        raise click.ClickException(
+            "$SLACK_BOT_TOKEN is not set. Get a bot token with "
+            "'groups:write' (private) or 'channels:manage' (public) "
+            "scope from your Slack app's OAuth settings and export it."
+        )
+
+    if not channel:
+        # Use UTC + seconds so re-runs don't collide.
+        stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
+        channel = f"wigamig-smoke-{stamp}"
+
+    click.echo(f"channel name:  {channel}")
+    click.echo(f"private:       {not public}")
+    click.echo(f"keep:          {keep}")
+    click.echo()
+
+    res = _cp.slack_create_channel(channel, private=not public)
+    if res.ok:
+        click.echo(f"✓ created channel {res.channel_id} ({res.channel_name})")
+        click.echo(f"  detail: {res.detail}")
+        if not keep:
+            archived = _archive_probe_channel(res.channel_id)
+            if archived:
+                click.echo("✓ probe channel archived")
+            else:
+                click.echo(
+                    "⚠ created but could not archive — go clean up "
+                    f"{res.channel_id} by hand."
+                )
+        click.echo()
+        click.echo("Bot token is healthy. Real join-approve "
+                    "provisioning will work.")
+        return
+
+    click.echo(f"✗ failed: error={res.error}")
+    click.echo(f"  detail: {res.detail}")
+    click.echo()
+    click.echo("Fix the issue above and re-run before approving "
+                "real lab/core join requests.")
+    raise click.exceptions.Exit(1)
+
+
+def _archive_probe_channel(channel_id: str) -> bool:
+    """Archive a channel via Slack's conversations.archive. Returns
+    True on success; best-effort (no exceptions). Used by the smoke
+    CLI to clean up after itself."""
+    import os
+    try:
+        import httpx
+        tok = os.environ.get("SLACK_BOT_TOKEN", "")
+        if not tok:
+            return False
+        r = httpx.post(
+            "https://slack.com/api/conversations.archive",
+            headers={"Authorization": f"Bearer {tok}"},
+            json={"channel": channel_id},
+            timeout=10,
+        )
+        return bool(r.json().get("ok"))
+    except Exception:  # noqa: BLE001
+        return False
+
+
 @click.command("centre-status",
                 help="Print the centre profile + counts of labs/cores/joins.")
 def centre_status() -> None:
