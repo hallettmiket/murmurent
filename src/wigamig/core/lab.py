@@ -42,6 +42,10 @@ class LabConfig:
     institution: str
     department: str
     slack_workspace: str | None = None
+    # GitHub org for this lab's repos. Empty = unconfigured: CLI commands
+    # that create/push a GitHub remote must fail safe (refuse) rather than
+    # substitute another lab's org.
+    github_org: str = ""
     path: Path | None = None
 
 
@@ -91,6 +95,7 @@ def load_lab_config() -> LabConfig:
         slack_workspace=(
             str(meta["slack_workspace"]) if meta.get("slack_workspace") else None
         ),
+        github_org=str(meta.get("github_org") or ""),
         path=path,
     )
 

@@ -23,8 +23,6 @@ from ..core.notebook import ChecksumEntry, sha256_file
 from ..core.projects import find_project
 from ..core.repo import ProjectRepo
 
-GITHUB_ORG = "hallettmiket"
-
 
 def _resolve_repo(project_name: str) -> ProjectRepo:
     repo = find_project(project_name)

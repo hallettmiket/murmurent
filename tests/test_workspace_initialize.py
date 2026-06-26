@@ -38,7 +38,10 @@ def isolated(monkeypatch, tmp_path):
     # Seed a minimal lab-mgmt so _require_active doesn't blow up.
     (lab_mgmt / "members").mkdir(parents=True)
     (lab_mgmt / "lab.md").write_text(
-        "---\nlab: hallett\nname: 'Hallett Lab'\npi: '@the_pi'\n---\n",
+        # github_org is set explicitly so github-kind installs derive a
+        # real org (the fallback is now empty = unconfigured).
+        "---\nlab: hallett\nname: 'Hallett Lab'\npi: '@the_pi'\n"
+        "github_org: hallettmiket\n---\n",
         encoding="utf-8",
     )
     (lab_mgmt / "members" / "the_pi.md").write_text(

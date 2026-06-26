@@ -182,13 +182,37 @@ def test_lab_settings_reads_github_org_from_labmd(world):
 
 
 def test_lab_settings_github_org_falls_back(world):
-    """Missing ``github_org`` falls back to the historic literal; missing
-    ``git_repos_subpath`` falls back to the 2026-05-14 default ``repos``
-    (was ``git_repos`` before the lab_base umbrella refactor)."""
+    """Missing ``github_org`` resolves to empty string — the fail-safe:
+    never substitute another lab's org. Missing ``git_repos_subpath``
+    falls back to the 2026-05-14 default ``repos`` (was ``git_repos``
+    before the lab_base umbrella refactor)."""
     from wigamig.dashboard import snapshot
     s = snapshot._lab_settings("hallett")
-    assert s.github_org == "hallettmiket"
+    assert s.github_org == ""
     assert s.git_repos_subpath == "repos"
+
+
+def test_no_github_org_fails_safe_not_hallettmiket(world, monkeypatch):
+    """With no ``github_org`` configured, the inventory path surfaces a
+    clear error and never queries a stranger's org (the reported bug:
+    a fresh lab must not run ``gh repo list hallettmiket``)."""
+    from wigamig.core import repo_inventory as inv
+
+    # Empty org short-circuits before any gh/subprocess call.
+    repos, err = inv.list_github_repos("")
+    assert repos == []
+    assert "no GitHub org configured" in err
+
+    # Guard: if anything tried to shell out with an empty org, fail loudly.
+    def _no_subprocess(*a, **k):  # pragma: no cover - only runs on regression
+        raise AssertionError("subprocess must not run when github_org is empty")
+
+    monkeypatch.setattr(inv.subprocess, "run", _no_subprocess)
+
+    report = inv.build_inventory(github_org="", host_names=[])
+    assert any("no GitHub org configured" in e for e in report.errors)
+    # No row references the historic hardcoded org.
+    assert all("hallettmiket" not in r.key for r in report.rows)
 
 
 # ---------------------------------------------------------------------------

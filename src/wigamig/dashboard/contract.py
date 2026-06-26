@@ -390,8 +390,10 @@ class LabSettings(BaseModel):
     git_providers: list[GitProvider] = []
     # Legacy: single flat GitHub org. Kept for backwards-compat with
     # lab.md files that pre-date ``git_providers``. New code should
-    # iterate ``git_providers`` instead.
-    github_org: str = "hallettmiket"
+    # iterate ``git_providers`` instead. Default is empty = unconfigured:
+    # callers must fail safe (do NOT substitute another lab's org) and
+    # prompt the PI to set ``github_org`` in lab.md.
+    github_org: str = ""
     # Subpath under lab_base where bare git repos live (used by the
     # ``local-bare`` provider kind, if the lab declares one).
     git_repos_subpath: str = "repos"

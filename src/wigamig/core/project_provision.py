@@ -51,7 +51,7 @@ class ProvisionContext:
     project: str
     local_repo: Path
     kind: str = "github"
-    org: str = "hallettmiket"
+    org: str = ""  # empty = unconfigured; provisioning fails safe (see line ~441)
     bare_repo_path: Path | None = None
     members: list[str] | None = None
     lab_mgmt_root: Path | None = None  # for resolving member git logins
@@ -438,7 +438,19 @@ def provision_project_remote(ctx: ProvisionContext) -> list[Probe]:
         return probes
 
     # provider.kind == "github"
-    org = provider.target or "hallettmiket"
+    org = provider.target or ""
+    if not org:
+        # Fail safe: never substitute another lab's org. Without a
+        # configured org we cannot create the repo or add collaborators
+        # — refuse with a clear, actionable probe instead of querying or
+        # writing to a stranger's org.
+        probes.append(Probe(
+            name="github org",
+            status="fail",
+            detail="no GitHub org configured — set github_org in lab.md",
+            required=True,
+        ))
+        return probes
     exists = _probe_repo_exists(org, ctx.project)
     probes.append(exists)
     if exists.status == "fail":
