@@ -481,7 +481,7 @@ def _lab_settings(lab_name: str) -> C.LabSettings:
                 admins=list(meta.get("admins") or []),
                 lab_base=meta.get("lab_base") or None,
                 git_providers=providers,
-                github_org=str(meta.get("github_org") or "hallettmiket"),
+                github_org=str(meta.get("github_org") or ""),
                 git_repos_subpath=str(meta.get("git_repos_subpath") or "repos"),
                 notebook_large_files_path=meta.get("notebook_large_files_path") or None,
                 lab_oracle_vault=meta.get("lab_oracle_vault") or _lab_oracle_folder(lab_name),
@@ -493,6 +493,17 @@ def _lab_settings(lab_name: str) -> C.LabSettings:
         pi_handle=_pi_handle(),
         lab_oracle_vault=_lab_oracle_folder(lab_name),
     )
+
+
+def _current_lab_settings() -> C.LabSettings:
+    """Resolve :func:`_lab_settings` for the *current* lab.
+
+    Reads the lab slug from ``lab.md`` via ``load_lab_config().lab``
+    instead of hardcoding a lab name. Use this at call sites that
+    previously passed the literal ``"hallett"``.
+    """
+    from ..core.lab import load_lab_config
+    return _lab_settings(load_lab_config().lab)
 
 
 # ---------------------------------------------------------------------------
@@ -950,7 +961,8 @@ def _projects(
         import re as _re
         import subprocess as _sp
         slack_channel = f"proj_{p.name}"
-        ws = _load_lab().slack_workspace
+        _lab_cfg = _load_lab()
+        ws = _lab_cfg.slack_workspace
         slack_url = (
             f"https://{ws}/channels/{slack_channel}"
             if ws and ws != "<set-on-first-publish>"
@@ -1021,7 +1033,9 @@ def _projects(
                 members=len(p.members),
                 open_seas=open_seas,
                 last_activity=_humanize(last_activity, today_d),
-                github_repo=f"hallettmiket/{p.name}",
+                github_repo=(
+                    f"{_lab_cfg.github_org}/{p.name}" if _lab_cfg.github_org else None
+                ),
                 github_pushed=github_pushed,
                 slack_channel=slack_channel,
                 slack_channel_id=slack_channel_id,

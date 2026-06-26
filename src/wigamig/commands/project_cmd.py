@@ -136,7 +136,7 @@ def cmd_new(
     skip_github: bool = False,
     repo_kind: str = "github",
     local_repo_root: str | None = None,
-    github_org: str = "hallettmiket",
+    github_org: str = "",
 ) -> ProjectSummary:
     """``wigamig project new`` — scaffold the local project repo + GitHub repo.
 
@@ -261,7 +261,11 @@ def cmd_new(
             bare_path = Path(local_repo_root).expanduser() / f"{name}.git"
             ensure_remote(repo_dir, name, kind="local", bare_repo_path=bare_path)
         elif _gh_available():
-            ensure_remote(repo_dir, name, kind="github", org=github_org)
+            # Resolve the org from lab.md when not passed explicitly.
+            # ``ensure_remote`` fails safe (raises) if it's still empty.
+            from ..core.lab import load_lab_config
+            org = github_org or load_lab_config().github_org
+            ensure_remote(repo_dir, name, kind="github", org=org)
 
     return summary
 
@@ -290,7 +294,7 @@ def cmd_new_remote(
     data_residency: str | None = None,
     lead: str | None = None,
     skip_github: bool = False,
-    github_org: str = "hallettmiket",
+    github_org: str = "",
 ) -> str:
     """Create a project on a remote SSH host and leave a local pointer.
 
@@ -575,7 +579,7 @@ def _git_has_changes(repo_dir: Path) -> bool:
     return bool(result.stdout.strip())
 
 
-def _ensure_github_repo(name: str, *, org: str = "hallettmiket") -> None:
+def _ensure_github_repo(name: str, *, org: str = "") -> None:
     """Idempotent ``gh repo create --private`` wrapper."""
     if not _gh_available():
         return
@@ -627,7 +631,7 @@ def _set_origin_and_push(repo_dir: Path, remote_url: str) -> None:
     subprocess.run(["git", "push", "-u", "origin", "main"], cwd=str(repo_dir), check=False)
 
 
-def _ensure_origin_and_push(repo_dir: Path, name: str, *, org: str = "hallettmiket") -> None:
+def _ensure_origin_and_push(repo_dir: Path, name: str, *, org: str = "") -> None:
     """Legacy GitHub-specific entry point. Kept for callers that haven't
     migrated to :func:`ensure_remote` yet."""
     _set_origin_and_push(repo_dir, f"git@github.com:{org}/{name}.git")
@@ -638,7 +642,7 @@ def ensure_remote(
     name: str,
     *,
     kind: str = "github",
-    org: str = "hallettmiket",
+    org: str = "",
     bare_repo_path: Path | str | None = None,
 ) -> str | None:
     """Provision the project's git origin and push, kind-aware.
@@ -655,6 +659,13 @@ def ensure_remote(
     if kind == "github":
         if not _gh_available():
             return None
+        if not org:
+            # Fail safe: never create/push to a stranger's org. Without a
+            # configured org we refuse rather than substitute a default.
+            raise click.ClickException(
+                "no GitHub org configured — set github_org in lab.md "
+                "(or pass --github-org) before provisioning a GitHub remote."
+            )
         _ensure_github_repo(name, org=org)
         url = f"git@github.com:{org}/{name}.git"
         _set_origin_and_push(repo_dir, url)

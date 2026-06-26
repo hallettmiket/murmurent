@@ -487,10 +487,10 @@ def create_app() -> FastAPI:
                 return
             def _run() -> None:
                 try:
-                    lab = snap_mod._lab_settings("hallett")
+                    lab = snap_mod._current_lab_settings()
                     host_names = [h.name for h in _hosts.read().values()]
                     _inv.scan_and_cache(
-                        github_org=lab.github_org or "hallettmiket",
+                        github_org=lab.github_org,
                         host_names=host_names,
                     )
                     _log.info("repo inventory: weekly refresh complete")
@@ -924,7 +924,7 @@ def create_app() -> FastAPI:
             from ..core import git_providers as _gpr2
             local_repo = Path(f"~/repos/{req.project}").expanduser()
             kind_or_id = req.repo_kind or "github"
-            lab_settings = snap_mod._lab_settings("hallett")
+            lab_settings = snap_mod._current_lab_settings()
             provider = _gpr2.find_provider(
                 [_pp._GP.GitProvider(**p.model_dump()) for p in lab_settings.git_providers],
                 kind_or_id,
@@ -933,7 +933,7 @@ def create_app() -> FastAPI:
                 project=req.project,
                 local_repo=local_repo,
                 kind=kind_or_id,
-                org=lab_settings.github_org or "hallettmiket",
+                org=lab_settings.github_org,
                 bare_repo_path=(
                     Path(req.local_repo_root).expanduser() / f"{req.project}.git"
                     if kind_or_id == "local" and req.local_repo_root else None
@@ -1306,23 +1306,37 @@ def create_app() -> FastAPI:
             # remote-clone path lands.
             from ..core.frontmatter import parse_file as _parse_charter
             repo_url: str | None = None
+            kind = "github"
             try:
                 charter = Path(f"~/repos/{body.project}/CHARTER.md").expanduser()
-                kind = "github"
                 if charter.is_file():
                     meta = _parse_charter(charter).meta or {}
                     kind = str(meta.get("repo_kind") or "github")
-                if kind == "github":
-                    org = snap_mod._lab_settings("hallett").github_org or "hallettmiket"
-                    repo_url = f"git@github.com:{org}/{body.project}.git"
             except Exception:
-                repo_url = None
-            # Explicit override from the request body. Used by the Repos
-            # panel's clone-and-adopt path where the CHARTER doesn't
+                kind = "github"
+            # Explicit override from the request body wins. Used by the
+            # Repos panel's clone-and-adopt path where the CHARTER doesn't
             # exist yet on the remote — we know the URL from the GitHub
             # row, no need to derive it.
             if body.repo_url:
                 repo_url = body.repo_url
+            elif kind == "github":
+                # Derive the canonical GitHub URL from the lab's settings.
+                # Fail safe: with no configured org we must NOT build a
+                # URL against a stranger's org — refuse with a clear error.
+                # (Raised outside the charter-parse try above so it isn't
+                # masked to repo_url=None.)
+                org = snap_mod._current_lab_settings().github_org or ""
+                if not org:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=(
+                            "no GitHub org configured — set github_org in lab.md "
+                            "before installing a GitHub-backed project, or pass "
+                            "repo_url explicitly."
+                        ),
+                    )
+                repo_url = f"git@github.com:{org}/{body.project}.git"
 
             targets = _ri.InstallTargets(
                 project=body.project,
@@ -1798,8 +1812,11 @@ def create_app() -> FastAPI:
         cheap.
         """
         from ..core import repo_inventory as _inv
-        lab_settings = snap_mod._lab_settings("hallett")
-        org = lab_settings.github_org or "hallettmiket"
+        lab_settings = snap_mod._current_lab_settings()
+        # Empty org is intentional: scan_and_cache -> list_github_repos("")
+        # returns a "no GitHub org configured" error into report.errors
+        # rather than querying a stranger's org.
+        org = lab_settings.github_org
 
         cached_path = _inv.latest_report_path()
         if refresh or cached_path is None:
@@ -1825,8 +1842,9 @@ def create_app() -> FastAPI:
         runs without worrying about caching.
         """
         from ..core import repo_inventory as _inv
-        lab_settings = snap_mod._lab_settings("hallett")
-        org = lab_settings.github_org or "hallettmiket"
+        lab_settings = snap_mod._current_lab_settings()
+        # Empty org is intentional — see the GET handler above.
+        org = lab_settings.github_org
         report = _inv.scan_and_cache(
             github_org=org,
             host_names=_inventory_host_names(),
@@ -2798,7 +2816,16 @@ def create_app() -> FastAPI:
                 )
                 return {"ok": True, "kind": "local", "remote": url}
             # kind="github"
-            org = snap_mod._lab_settings("hallett").github_org or "hallettmiket"
+            org = snap_mod._current_lab_settings().github_org or ""
+            if not org:
+                # Fail safe: never provision into a stranger's org.
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "no GitHub org configured — set github_org in lab.md "
+                        "before provisioning a GitHub remote."
+                    ),
+                )
             url = _project_cmd.ensure_remote(
                 local_repo, project, kind="github", org=org,
             )
@@ -2853,7 +2880,7 @@ def create_app() -> FastAPI:
             members = [str(m) for m in (meta.get("members") or [])]
 
         from ..core import git_providers as _gpr3
-        lab_settings = snap_mod._lab_settings("hallett")
+        lab_settings = snap_mod._current_lab_settings()
         provider = _gpr3.find_provider(
             [_pp._GP.GitProvider(**p.model_dump()) for p in lab_settings.git_providers],
             kind,
@@ -2862,7 +2889,10 @@ def create_app() -> FastAPI:
             project=project,
             local_repo=local_repo,
             kind=kind,
-            org=lab_settings.github_org or "hallettmiket",
+            # Empty org fails safe in provision_project_remote (emits a
+            # "no GitHub org configured" probe instead of using a
+            # stranger's org).
+            org=lab_settings.github_org,
             bare_repo_path=(
                 Path(local_repo_root).expanduser() / f"{project}.git"
                 if kind == "local" and local_repo_root else None
