@@ -244,30 +244,56 @@
     }
 
     // 2i: Mayor wizard — shown when no centre is initialised yet.
+    function secHdr(text) {
+      return '<div style="grid-column:1 / -1; margin-top:10px; font-weight:600; '
+        + 'color:var(--purple); border-bottom:1px solid #e2ddef; padding-bottom:4px;">'
+        + text + '</div>';
+    }
+
     function renderMayorWizard() {
       banner.textContent = "wigamig — first-time setup";
       const osUser = (userOverride || "").trim();
       root.innerHTML =
-        '<div class="panel"><header><h2>Welcome — let\'s set up your centre.</h2></header>'
+        '<div class="panel"><header><h2>Welcome — let\'s set up your wigamig server.</h2></header>'
         + '<div style="padding:18px 20px;">'
         + '<p>Nothing is configured yet. As the <strong>mayor</strong>, '
         + 'fill in these centre-level details and you\'ll become the first '
-        + 'registrar. You can edit any of this later from the profile panel.</p>'
+        + 'registrar. Provisioning steps (Slack, GitHub, filesystem ACLs) '
+        + 'are wired up by the <strong>cable&nbsp;guy</strong> once this is saved. '
+        + 'You can edit any of this later from the profile panel.</p>'
         + '<form id="mayor-form" autocomplete="off" '
         +     'style="display:grid; grid-template-columns: 220px 1fr; gap:8px 14px; align-items:baseline; max-width:760px;">'
+        + secHdr('Identity')
         + '<label>Centre name <span style="color:#b23a2b">*</span></label>'
         + '<input name="name" required placeholder="Western Bioconvergence Centre">'
         + '<label>Institution <span style="color:#b23a2b">*</span></label>'
         + '<input name="institution" required placeholder="Western University">'
+        + '<label>Unique install name</label>'
+        + '<input name="unique_name" placeholder="western — drives repo/Slack/group names; not institution-specific">'
         + '<label>Founding mayor (@handle)</label>'
         + '<input name="mayor" value="' + escapeHTML(osUser) + '" '
         +   'placeholder="@tbrowne — defaults to ?user= or $WIGAMIG_USER">'
+        + secHdr('Communication &amp; code')
         + '<label>Slack workspace id</label>'
         + '<input name="slack_workspace" placeholder="T0WESTERN">'
-        + '<label>GitHub org</label>'
-        + '<input name="github_org" placeholder="centre-westernu">'
+        + '<label>GitHub org / account</label>'
+        + '<input name="github_org" placeholder="centre-westernu (dedicated-purpose account)">'
+        + '<label>Public onboarding hub</label>'
+        + '<input name="public_hub" placeholder="github.com/hallettmiket/wigamig_public#western">'
+        + secHdr('Wigamig server (always-online, ssh-key gated)')
+        + '<label>Server host / IP</label>'
+        + '<input name="server_host" placeholder="biodatsci.schulich.uwo.ca">'
+        + '<label>SSH access account</label>'
+        + '<input name="server_account" placeholder="wigamig">'
+        + '<label>Claude Code install path</label>'
+        + '<input name="cc_install_path" placeholder="/opt/claude">'
+        + secHdr('Storage &amp; vault')
+        + '<label>Mayor root dir</label>'
+        + '<input name="mayor_root" placeholder="/mayor/wigamig — mirrorable to GitHub">'
+        + '<label>Obsidian vault (centre pool)</label>'
+        + '<input name="obsidian_vault" placeholder="/mayor/obsidian">'
         + '<label>Data server hostname</label>'
-        + '<input name="data_server" placeholder="biodatsci.uwo.ca">'
+        + '<input name="data_server" placeholder="biodatsci.uwo.ca (legacy alias of server host)">'
         + '<label>Raw root path</label>'
         + '<input name="raw_root" value="/data/lab_vm/raw">'
         + '<label>Refined root path</label>'

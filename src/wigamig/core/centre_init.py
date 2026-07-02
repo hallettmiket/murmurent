@@ -16,14 +16,28 @@ Storage (single source of truth = ``<lab_info>/centre.md`` frontmatter):
     ---
     name: 'Western Bioconvergence Centre'
     institution: 'Western University'
+    unique_name: 'western'            # non-institution-specific install id
     slack_workspace: 'T0XXXXX'        # Slack team/workspace id
     github_org: 'centre-westernu'     # canonical centre github org
-    data_server: 'biodatsci.uwo.ca'   # primary lab server hostname
+    data_server: 'biodatsci.uwo.ca'   # legacy alias of server_host
+    server_host: 'biodatsci.uwo.ca'   # the "wigamig server" hostname/IP
+    server_account: 'wigamig'         # ssh login account on the server
+    cc_install_path: '/opt/claude'    # where Claude Code lives on the server
+    obsidian_vault: '/mayor/obsidian' # centre-level markdown pool
+    mayor_root: '/mayor/wigamig'      # high-level centre dir (mirrorable)
+    public_hub: 'github.com/hallettmiket/wigamig_public#western'
     raw_root: '/data/lab_vm/raw'
     refined_root: '/data/lab_vm/refined'
     created: '2026-05-26'
     founding_mayor: '@tbrowne'
     ---
+
+  ``unique_name`` is the institution's install identifier used to name the
+  ``wigamig_<name>`` repo, Slack channels, and ``wgm_<project>`` groups. It is
+  deliberately distinct from ``name`` (display) and ``institution`` so a
+  deployment is never hardcoded to one university. ``server_host`` (with
+  ``data_server`` kept as a back-compat alias) names the always-online
+  "wigamig server"; the remaining fields drive the mayor's server-setup form.
 
 We deliberately do NOT bloat ``_registry.yaml`` with a centre block —
 ``write_registry()`` doesn't preserve unknown keys and the analogue
@@ -63,8 +77,10 @@ REQUIRED_KEYS = ("name", "institution", "founding_mayor")
 
 # All recognised keys (anything else is preserved but ignored by readers).
 KNOWN_KEYS = (
-    "name", "institution", "slack_workspace", "github_org",
-    "data_server", "raw_root", "refined_root",
+    "name", "institution", "unique_name", "slack_workspace", "github_org",
+    "data_server", "server_host", "server_account", "cc_install_path",
+    "obsidian_vault", "mayor_root", "public_hub",
+    "raw_root", "refined_root",
     "created", "founding_mayor",
 )
 
@@ -84,13 +100,33 @@ class CentreProfile:
     name: str
     institution: str
     founding_mayor: str                    # @handle (no leading @)
+    unique_name: str = ""                  # non-institution-specific install id
     slack_workspace: str = ""
     github_org: str = ""
-    data_server: str = ""
+    data_server: str = ""                  # legacy alias of server_host
+    server_host: str = ""                  # the "wigamig server" hostname/IP
+    server_account: str = ""               # ssh login account on the server
+    cc_install_path: str = ""              # where Claude Code lives on the server
+    obsidian_vault: str = ""               # centre-level markdown pool
+    mayor_root: str = ""                   # high-level centre dir (mirrorable)
+    public_hub: str = ""                   # global wigamig_public + this centre's label
     raw_root: str = ""
     refined_root: str = ""
     created: str = ""
     path: Path | None = None
+
+    @property
+    def server(self) -> str:
+        """The wigamig server hostname, preferring ``server_host`` and
+        falling back to the legacy ``data_server`` alias."""
+        return self.server_host or self.data_server
+
+    @property
+    def install_id(self) -> str:
+        """The install identifier used to name repos/channels/groups.
+        Falls back to a slug-ish ``institution`` when ``unique_name`` is
+        unset so older centres still resolve to *something* deterministic."""
+        return self.unique_name or self.institution
 
 
 # ---------------------------------------------------------------------------
@@ -125,9 +161,16 @@ def read_centre(env: dict[str, str] | None = None) -> CentreProfile | None:
         name=name,
         institution=institution,
         founding_mayor=mayor,
+        unique_name=str(meta.get("unique_name") or "").strip(),
         slack_workspace=str(meta.get("slack_workspace") or "").strip(),
         github_org=str(meta.get("github_org") or "").strip(),
         data_server=str(meta.get("data_server") or "").strip(),
+        server_host=str(meta.get("server_host") or "").strip(),
+        server_account=str(meta.get("server_account") or "").strip(),
+        cc_install_path=str(meta.get("cc_install_path") or "").strip(),
+        obsidian_vault=str(meta.get("obsidian_vault") or "").strip(),
+        mayor_root=str(meta.get("mayor_root") or "").strip(),
+        public_hub=str(meta.get("public_hub") or "").strip(),
         raw_root=str(meta.get("raw_root") or "").strip(),
         refined_root=str(meta.get("refined_root") or "").strip(),
         created=str(meta.get("created") or "").strip(),
@@ -148,9 +191,16 @@ def _render_centre(profile: CentreProfile) -> str:
     meta: dict[str, Any] = {
         "name": profile.name,
         "institution": profile.institution,
+        "unique_name": profile.unique_name,
         "slack_workspace": profile.slack_workspace,
         "github_org": profile.github_org,
         "data_server": profile.data_server,
+        "server_host": profile.server_host,
+        "server_account": profile.server_account,
+        "cc_install_path": profile.cc_install_path,
+        "obsidian_vault": profile.obsidian_vault,
+        "mayor_root": profile.mayor_root,
+        "public_hub": profile.public_hub,
         "raw_root": profile.raw_root,
         "refined_root": profile.refined_root,
         "created": profile.created,
@@ -175,9 +225,16 @@ def init_centre(
     name: str,
     institution: str,
     founding_mayor: str,
+    unique_name: str = "",
     slack_workspace: str = "",
     github_org: str = "",
     data_server: str = "",
+    server_host: str = "",
+    server_account: str = "",
+    cc_install_path: str = "",
+    obsidian_vault: str = "",
+    mayor_root: str = "",
+    public_hub: str = "",
     raw_root: str = "",
     refined_root: str = "",
     env: dict[str, str] | None = None,
@@ -218,9 +275,16 @@ def init_centre(
         name=name.strip(),
         institution=institution.strip(),
         founding_mayor=mayor_clean,
+        unique_name=unique_name.strip(),
         slack_workspace=slack_workspace.strip(),
         github_org=github_org.strip(),
         data_server=data_server.strip(),
+        server_host=server_host.strip(),
+        server_account=server_account.strip(),
+        cc_install_path=cc_install_path.strip(),
+        obsidian_vault=obsidian_vault.strip(),
+        mayor_root=mayor_root.strip(),
+        public_hub=public_hub.strip(),
         raw_root=raw_root.strip(),
         refined_root=refined_root.strip(),
         created=today,

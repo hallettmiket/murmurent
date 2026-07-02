@@ -61,6 +61,9 @@ Auto-loaded into every CC session via `~/.claude/rules/`:
   final reply leads with a ≤200-char verdict.
 - [`rules/slack.md`](rules/slack.md) — Slack-posting protocol (after
   every `git push`, post to `#claude-test`).
+- [`rules/manuscript.md`](rules/manuscript.md) — the manuscript is
+  Overleaf-synced; **`git pull` `~/repos/wigamig_manuscript` before
+  editing it**, no feature branches, don't compile locally.
 
 ## User-invocable skills (the commons)
 
@@ -71,6 +74,7 @@ command available in any wigamig-bootstrapped CC session.
 | Skill | Role |
 |---|---|
 | [`/wigamig-push`](skills/wigamig-push/SKILL.md) | Wigamig-aware stage/commit/push: skips per-machine + secret-shaped files, refuses large files that belong in `refined/`, never touches `/data/lab_vm/raw\|refined/`, posts a Slack release note. Use instead of generic `/commit-push` for any repo with a `CHARTER.md`. |
+| [`/wigamig-admin`](skills/wigamig-admin/SKILL.md) | Prime context before admin-level (centre / mayor / registrar / join / provisioning) work: reloads wigamig's purpose from the manuscript + code, pins Obsidian maps-legends and CC guidance to the top, enforces the manuscript pull-first rule. |
 
 ## Linked references (loaded on-demand)
 
@@ -86,10 +90,23 @@ command available in any wigamig-bootstrapped CC session.
 - [`docs/group_level.md`](docs/group_level.md) — group-level architecture notes.
 - [`docs/cli_manual.md`](docs/cli_manual.md) — CLI command reference.
 
+## Related repos + the public hub
+
+Wigamig spans three repos plus a global onboarding hub. Name them
+precisely; keep every deployment institution-agnostic (drive names off a
+centre's `unique_name`, never a hardcoded university).
+
+| Repo | Purpose |
+|---|---|
+| [`hallettmiket/wigamig`](https://github.com/hallettmiket/wigamig) | this repo — agents, rules, hooks, MCP servers, CLI, dashboard |
+| [`hallettmiket/wigamig_manuscript`](https://github.com/hallettmiket/wigamig_manuscript) | the paper (Overleaf-synced; see [`rules/manuscript.md`](rules/manuscript.md)) |
+| [`hallettmiket/lab_mgmt`](https://github.com/hallettmiket/lab_mgmt) | per-group governance repo — see [`docs/lab_mgmt.md`](docs/lab_mgmt.md) |
+| [`hallettmiket/wigamig_public`](https://github.com/hallettmiket/wigamig_public) | **global onboarding hub**: institution directory + GitHub-issue join intake (no netnames / server paths) |
+
 ## Quick setup
 
 ```bash
-bash scripts/setup.sh              # symlinks agents/ + rules/ into ~/.claude/
+bash scripts/setup.sh              # symlinks agents/ + rules/ + skills/ into ~/.claude/
 wigamig install --hooks            # registers hooks + MCP servers
 ```
 

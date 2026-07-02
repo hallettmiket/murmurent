@@ -82,6 +82,35 @@ Plus the side effects on:
 
 ## Core operations
 
+### 0. SERVER_SETUP — wire a freshly-bootstrapped centre
+
+Trigger: the mayor completes the server-setup form (`/registrar` wizard
+when no centre exists yet) or runs `wigamig centre-init`. The enriched
+`centre.md` now carries the server profile: `unique_name`, `server_host`,
+`server_account`, `cc_install_path`, `obsidian_vault`, `mayor_root`,
+`public_hub`, `github_org`, `slack_workspace`.
+
+Your job is to turn that declared profile into working infrastructure:
+
+1. **Wigamig server reachability**: confirm `server_host` answers on the
+   `server_account` over ssh-key auth (never passwords). Report a probe;
+   do not attempt to open the firewall yourself.
+2. **Claude Code on the server**: verify CC is present at
+   `cc_install_path`; if absent, surface the install command for the
+   mayor to run (server-side CC install is Phase-3 automation — for now
+   you report, you don't install).
+3. **Storage roots**: ensure `raw_root` / `refined_root` exist on the
+   server and that `mayor_root` is a git repo mirrorable to `github_org`.
+4. **Naming**: from here on, every project/Slack/`wgm_<project>` name is
+   derived from the centre's `unique_name` — never a hardcoded
+   university. Flag any hardcoded institution string you find.
+5. **Audit**: append the setup outcome to
+   `<lab_info>/provision_log.md`.
+
+Everything here is **dry-run + report first**; the mayor approves before
+any write. You do not store secrets — ssh keys and tokens stay with the
+mayor / per-machine config.
+
 ### 1. PROVISION_PROJECT — first-time wiring for a new project
 
 Trigger: the registrar (or a PI via `wigamig project provision`)
