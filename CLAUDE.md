@@ -98,10 +98,10 @@ centre's `unique_name`, never a hardcoded university).
 
 | Repo | Purpose |
 |---|---|
-| [`hallettmiket/wigamig`](https://github.com/hallettmiket/wigamig) | this repo — agents, rules, hooks, MCP servers, CLI, dashboard |
-| [`hallettmiket/wigamig_manuscript`](https://github.com/hallettmiket/wigamig_manuscript) | the paper (Overleaf-synced; see [`rules/manuscript.md`](rules/manuscript.md)) |
-| [`hallettmiket/lab_mgmt`](https://github.com/hallettmiket/lab_mgmt) | per-group governance repo — see [`docs/lab_mgmt.md`](docs/lab_mgmt.md) |
-| [`hallettmiket/wigamig_public`](https://github.com/hallettmiket/wigamig_public) | **global onboarding hub**: institution directory + GitHub-issue join intake (no netnames / server paths) |
+| [`hallettmiket/wigamig`](https://github.com/hallettmiket/wigamig) | this repo (**public**) — agents, rules, hooks, MCP servers, CLI, dashboard. Clone this to install wigamig / bootstrap a centre. |
+| `hallettmiket/wigamig_manuscript` | the paper (private; Overleaf-synced — see [`rules/manuscript.md`](rules/manuscript.md)) |
+| `hallettmiket/lab_mgmt` | per-group governance repo (private) — see [`docs/lab_mgmt.md`](docs/lab_mgmt.md) |
+| `hallettmiket/wigamig_public` *(planned — Phase 2)* | global onboarding hub: institution directory + GitHub-issue join intake (no netnames / server paths). **Not yet created**; onboarding is the phase after the admin level. |
 
 ## Quick setup
 
