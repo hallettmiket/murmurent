@@ -6483,9 +6483,16 @@ def create_app() -> FastAPI:
             "name": p.name,
             "institution": p.institution,
             "founding_mayor": f"@{p.founding_mayor}",
+            "unique_name": p.unique_name,
             "slack_workspace": p.slack_workspace,
             "github_org": p.github_org,
             "data_server": p.data_server,
+            "server_host": p.server_host,
+            "server_account": p.server_account,
+            "cc_install_path": p.cc_install_path,
+            "obsidian_vault": p.obsidian_vault,
+            "mayor_root": p.mayor_root,
+            "public_hub": p.public_hub,
             "raw_root": p.raw_root,
             "refined_root": p.refined_root,
             "created": p.created,
@@ -6529,20 +6536,28 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422,
                 detail="mayor handle required (body.mayor or ?user=)")
         try:
+            b = body or {}
             profile = _ci.init_centre(
-                name=str((body or {}).get("name") or ""),
-                institution=str((body or {}).get("institution") or ""),
+                name=str(b.get("name") or ""),
+                institution=str(b.get("institution") or ""),
                 founding_mayor=mayor,
-                slack_workspace=str((body or {}).get("slack_workspace") or ""),
-                github_org=str((body or {}).get("github_org") or ""),
-                data_server=str((body or {}).get("data_server") or ""),
-                raw_root=str((body or {}).get("raw_root") or ""),
-                refined_root=str((body or {}).get("refined_root") or ""),
+                unique_name=str(b.get("unique_name") or ""),
+                slack_workspace=str(b.get("slack_workspace") or ""),
+                github_org=str(b.get("github_org") or ""),
+                data_server=str(b.get("data_server") or ""),
+                server_host=str(b.get("server_host") or ""),
+                server_account=str(b.get("server_account") or ""),
+                cc_install_path=str(b.get("cc_install_path") or ""),
+                obsidian_vault=str(b.get("obsidian_vault") or ""),
+                mayor_root=str(b.get("mayor_root") or ""),
+                public_hub=str(b.get("public_hub") or ""),
+                raw_root=str(b.get("raw_root") or ""),
+                refined_root=str(b.get("refined_root") or ""),
                 # Server-mode default: skip the per-machine sentinel
                 # write (Tyler's laptop did it; the server doesn't need
                 # the OS-user-as-registrar identity since auth comes
                 # via _registry.yaml).
-                write_sentinel=bool((body or {}).get("write_sentinel", False)),
+                write_sentinel=bool(b.get("write_sentinel", False)),
             )
         except _ci.CentreAlreadyInitialised as exc:
             raise HTTPException(status_code=409, detail=str(exc))

@@ -97,8 +97,15 @@ def test_interactive_uses_prompts(world):
                               input="\n".join([
                                   "Test Centre",        # name
                                   "Test University",    # institution
+                                  "",                    # unique_name
                                   "",                    # slack ws
                                   "",                    # github org
+                                  "",                    # public_hub
+                                  "",                    # server_host
+                                  "",                    # server_account
+                                  "",                    # cc_install_path
+                                  "",                    # obsidian_vault
+                                  "",                    # mayor_root
                                   "",                    # data server
                                   "/data/lab_vm/raw",   # raw_root default accepted
                                   "/data/lab_vm/refined",

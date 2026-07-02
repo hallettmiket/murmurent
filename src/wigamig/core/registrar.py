@@ -1254,6 +1254,7 @@ def create_core(
         labs=existing.labs,
         cores=[*existing.cores, entry],
         collaborations=existing.collaborations,
+        registrars=existing.registrars,
     )
     write_registry(new_reg, env)
 
@@ -1678,6 +1679,7 @@ def create_collaboration(
     new_reg = Registry(
         labs=existing.labs, cores=existing.cores,
         collaborations=[*existing.collaborations, entry],
+        registrars=existing.registrars,
     )
     write_registry(new_reg, env)
 

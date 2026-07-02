@@ -60,12 +60,30 @@ def _default_mayor() -> str:
 @click.option("--mayor", default="",
               help="@handle of the bootstrapping user. "
                    "Defaults to $WIGAMIG_USER then the OS user.")
+@click.option("--unique-name", default="",
+              help="Non-institution-specific install id (drives repo/Slack/"
+                   "group names, e.g. 'western'). Optional.")
 @click.option("--slack-workspace", default="",
               help="Slack team/workspace id (e.g. T0WESTERN). Optional.")
 @click.option("--github-org", default="",
-              help="Canonical centre github org. Optional.")
+              help="Canonical centre github org / dedicated account. Optional.")
+@click.option("--public-hub", default="",
+              help="Global wigamig_public onboarding hub + this centre's label. "
+                   "Optional.")
+@click.option("--server-host", default="",
+              help="The 'wigamig server' hostname/IP (always-online, ssh-gated). "
+                   "Optional.")
+@click.option("--server-account", default="",
+              help="SSH login account on the wigamig server. Optional.")
+@click.option("--cc-install-path", default="",
+              help="Where Claude Code is installed on the server. Optional.")
+@click.option("--obsidian-vault", default="",
+              help="Centre-level Obsidian/markdown pool path. Optional.")
+@click.option("--mayor-root", default="",
+              help="High-level mayor dir (e.g. /mayor/wigamig; mirrorable). "
+                   "Optional.")
 @click.option("--data-server", default="",
-              help="Primary lab server hostname. Optional.")
+              help="Legacy alias of --server-host. Optional.")
 @click.option("--raw-root", default="",
               help="Path to centre raw/ root on the data server. Optional.")
 @click.option("--refined-root", default="",
@@ -77,7 +95,9 @@ def _default_mayor() -> str:
                    "(useful when running under sudo or in CI).")
 def centre_init(
     name: str, institution: str, mayor: str,
-    slack_workspace: str, github_org: str,
+    unique_name: str, slack_workspace: str, github_org: str, public_hub: str,
+    server_host: str, server_account: str, cc_install_path: str,
+    obsidian_vault: str, mayor_root: str,
     data_server: str, raw_root: str, refined_root: str,
     no_prompt: bool, no_sentinel: bool,
 ) -> None:
@@ -107,9 +127,17 @@ def centre_init(
 
     name = _prompt("Centre name", name, required=True)
     institution = _prompt("Institution", institution, required=True)
+    unique_name = _prompt("Unique install name (repo/Slack id)", unique_name)
     slack_workspace = _prompt("Slack workspace id", slack_workspace)
-    github_org = _prompt("Centre GitHub org", github_org)
-    data_server = _prompt("Primary lab server hostname", data_server)
+    github_org = _prompt("Centre GitHub org / account", github_org)
+    public_hub = _prompt("Public onboarding hub", public_hub)
+    server_host = _prompt("Wigamig server host/IP", server_host)
+    server_account = _prompt("Server SSH account", server_account)
+    cc_install_path = _prompt("Claude Code install path on server",
+                              cc_install_path)
+    obsidian_vault = _prompt("Centre Obsidian vault path", obsidian_vault)
+    mayor_root = _prompt("Mayor root dir", mayor_root)
+    data_server = _prompt("Data server hostname (legacy alias)", data_server)
     raw_root = _prompt("Centre raw/ root path", raw_root,
                         default="/data/lab_vm/raw")
     refined_root = _prompt("Centre refined/ root path", refined_root,
@@ -124,8 +152,15 @@ def centre_init(
         profile = _ci.init_centre(
             name=name, institution=institution,
             founding_mayor=mayor,
+            unique_name=unique_name,
             slack_workspace=slack_workspace,
             github_org=github_org,
+            public_hub=public_hub,
+            server_host=server_host,
+            server_account=server_account,
+            cc_install_path=cc_install_path,
+            obsidian_vault=obsidian_vault,
+            mayor_root=mayor_root,
             data_server=data_server,
             raw_root=raw_root, refined_root=refined_root,
             write_sentinel=write_sent,
@@ -140,13 +175,18 @@ def centre_init(
     click.echo("Centre initialised ✓")
     click.echo(f"  name:         {profile.name}")
     click.echo(f"  institution:  {profile.institution}")
+    if profile.unique_name:
+        click.echo(f"  install id:   {profile.unique_name}")
     click.echo(f"  mayor:        @{profile.founding_mayor}")
     if profile.slack_workspace:
         click.echo(f"  slack:        {profile.slack_workspace}")
     if profile.github_org:
         click.echo(f"  github:       {profile.github_org}")
-    if profile.data_server:
-        click.echo(f"  data_server:  {profile.data_server}")
+    if profile.server:
+        click.echo(f"  server:       {profile.server}"
+                   + (f" ({profile.server_account})" if profile.server_account else ""))
+    if profile.mayor_root:
+        click.echo(f"  mayor_root:   {profile.mayor_root}")
     click.echo(f"  centre.md:    {profile.path}")
     click.echo()
     click.echo("Next: open the registrar dashboard at "
