@@ -56,10 +56,10 @@ precisely when you reference them:
 
 | Repo | Purpose |
 |---|---|
-| `github.com/hallettmiket/wigamig` | reference implementation: agents, rules, hooks, MCP servers, CLI, dashboard |
-| `github.com/hallettmiket/wigamig_manuscript` | the paper (Overleaf-synced) |
-| `github.com/hallettmiket/lab_mgmt` | per-group governance repo (registry + lab Oracle publish gateway) |
-| `github.com/hallettmiket/wigamig_public` | **global onboarding hub**: institution directory + GitHub-issue join intake (no netnames / server paths) |
+| `github.com/hallettmiket/wigamig` | reference implementation (**public**): agents, rules, hooks, MCP servers, CLI, dashboard. This is what a new mayor clones to bootstrap a centre. |
+| `github.com/hallettmiket/wigamig_manuscript` | the paper (private; Overleaf-synced) |
+| `github.com/hallettmiket/lab_mgmt` | per-group governance repo (private; registry + lab Oracle publish gateway) |
+| `github.com/hallettmiket/wigamig_public` *(planned — Phase 2)* | global onboarding hub for self-service join. **Not yet created**; onboarding is the phase after the admin level. |
 
 ## 4. Then act
 
