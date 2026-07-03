@@ -1,0 +1,7 @@
+# wigamig institution directory — machine-readable form, read by wigamig-join.sh.
+# One row per installation: institution <TAB> email <TAB> age_recipient
+# Registrars: add your row when you go live (email + your age1... public key).
+# Rows with an empty email or key are treated as "not live yet" and skipped.
+#
+# institution	email	age_recipient
+Western University (Bioconvergence Centre)
