@@ -75,6 +75,11 @@ lab manager. (Registrars add their row here when they go live.)
 
 The wigamig **code** lives in a different repo:
 [github.com/hallettmiket/wigamig](https://github.com/hallettmiket/wigamig).
-You only need that if you're *setting up* wigamig at an institution (as a
-mayor) or *building* wigamig — not to join one. To join, just email your
-registrar above.
+You'll install it on your own computer to run wigamig — the easiest way is the
+one-command installer above (it clones that repo for you), so you don't need to
+touch GitHub directly. Setting up wigamig for a whole institution (as a
+**mayor**) or building wigamig itself uses the same repo, just further in.
+
+The **two steps are separate**: *joining* a lab/core is the encrypted email to
+your registrar; *installing the software* is the command above. You can do the
+install anytime — it's public and needs no approval.
