@@ -74,8 +74,10 @@ def _launch_hifi(*, host: str, port: int) -> int:
         from ..dashboard import server as hifi_server  # noqa: F401
     except ModuleNotFoundError as exc:  # pragma: no cover
         raise click.ClickException(
-            "hi-fi dashboard deps missing. Install with "
-            "`uv sync --extra dashboard`."
+            "hi-fi dashboard deps missing (fastapi/uvicorn). Reinstall wigamig "
+            "with the dashboard extra:\n"
+            "    cd ~/repos/wigamig && uv tool install -e '.[dashboard]'\n"
+            "(In a dev checkout you can instead run `uv sync --extra dashboard`.)"
         ) from exc
 
     click.echo(f"Hi-fi dashboard: http://{host}:{port}/")

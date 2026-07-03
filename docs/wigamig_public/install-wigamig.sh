@@ -82,8 +82,12 @@ main() {
   need_uv
   get_code
 
-  say ""; say "Installing the 'wigamig' command ..."
-  ( cd "$DEST" && uv tool install -e . )
+  say ""; say "Installing the 'wigamig' command (with dashboard + Slack + tools) ..."
+  # Include the extras a full wigamig needs: the dashboard (fastapi/uvicorn),
+  # Slack comms, and the MCP tools. Without these, `wigamig dashboard` fails.
+  # Pin Python 3.12 (wigamig needs >=3.12) so we don't inherit a system/conda
+  # default that's too old — uv fetches a managed 3.12 if there isn't one.
+  ( cd "$DEST" && uv tool install --python 3.12 -e '.[dashboard,slack,mcp]' )
 
   say ""; say "Wiring shared agents + rules into ~/.claude/ ..."
   ( cd "$DEST" && bash scripts/setup.sh )

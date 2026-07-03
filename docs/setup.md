@@ -9,8 +9,11 @@ First-time wigamig installation on a new machine.
 git clone git@github.com:hallettmiket/wigamig.git ~/repos/wigamig
 cd ~/repos/wigamig
 
-# 2. Install the CLI + venv.
-uv tool install -e .
+# 2. Install the CLI + venv (with the dashboard, Slack, and MCP extras).
+#    Without these extras `wigamig dashboard` can't start (no fastapi/uvicorn).
+#    --python 3.12: wigamig needs >=3.12; this avoids inheriting an older
+#    system/conda default (uv fetches a managed 3.12 if needed).
+uv tool install --python 3.12 -e '.[dashboard,slack,mcp]'
 
 # 3. Symlink agents + rules into ~/.claude/.
 bash scripts/setup.sh
