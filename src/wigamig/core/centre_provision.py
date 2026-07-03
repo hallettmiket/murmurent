@@ -294,11 +294,21 @@ def _default_runner(argv: list[str]) -> subprocess.CompletedProcess:
 # Lab onboarding (item 2g — fires when a lab/core join request is approved)
 # ---------------------------------------------------------------------------
 
+def _has_env_slack_token() -> bool:
+    """True iff a Slack bot token is set via env (WIGAMIG_SLACK_TOKEN or the
+    legacy SLACK_BOT_TOKEN). Deliberately env-only — the ~/.config token file
+    is NOT consulted here so the token-less test suite never triggers live
+    Slack member invites even on a dev machine that has the file."""
+    return bool(os.environ.get("WIGAMIG_SLACK_TOKEN", "").strip()
+                or os.environ.get("SLACK_BOT_TOKEN", "").strip())
+
+
 def provision_lab_onboarding(
     lab_name: str,
     *,
     env: dict[str, str] | None = None,
     slack_creator=None,             # injectable: (channel_name, ws_id) -> str | None
+    member_inviter=None,            # injectable: (channel_id, handles, member_email_map) -> dict
     github_creator=None,            # injectable: (org, repo, members) -> bool
     acl_runner=None,                # injectable: same shape as apply_fs_acl runner
 ) -> list[Probe]:
@@ -330,23 +340,38 @@ def provision_lab_onboarding(
 
     probes: list[Probe] = []
 
-    # 1. Slack channel.
+    # 1. Slack channel — a private channel named after the group, with the
+    #    group's members invited. The channel name is the group's own name
+    #    (normalized to Slack rules), e.g. lab_mh -> #lab_mh.
     if slack_creator is None:
         slack_creator = _live_slack_create_channel
     if centre.slack_workspace:
         try:
-            channel_id = slack_creator(
-                f"lab-{lab_name}", centre.slack_workspace,
-            )
+            from . import registrar as _reg
+            from ..dashboard import slack_notify as _sn
+            channel_name = _sn.normalize_channel_name(lab_name) or lab_name
+            channel_id = slack_creator(channel_name, centre.slack_workspace)
             if channel_id:
+                _reg.set_group_slack_channel(lab_name, channel_id, env=env)
+                # Invite members. Gated so the token-less test suite never
+                # hits the wire: only when an inviter is injected OR an env
+                # Slack token is present (mirrors the creator's env gating).
+                invited_n = 0
+                if member_inviter is not None or _has_env_slack_token():
+                    inviter = member_inviter or _sn.invite_members_to_channel
+                    email_map = _reg.group_email_map(lab_name, env=env)
+                    inv = inviter(channel_id, list(email_map.keys()),
+                                  member_email_map=email_map) or {}
+                    invited_n = len(inv.get("invited", [])) + len(inv.get("already_in", []))
                 probes.append(Probe(
                     name="slack-channel", status="ok",
-                    detail=f"#lab-{lab_name} in {centre.slack_workspace} → {channel_id}",
+                    detail=f"#{channel_name} in {centre.slack_workspace} → "
+                           f"{channel_id} (members: {invited_n})",
                 ))
             else:
                 probes.append(Probe(
                     name="slack-channel", status="warn",
-                    detail=f"#lab-{lab_name} could not be created (workspace {centre.slack_workspace})",
+                    detail=f"#{channel_name} could not be created (workspace {centre.slack_workspace})",
                 ))
         except Exception as exc:  # noqa: BLE001
             probes.append(Probe(
@@ -401,6 +426,75 @@ def provision_lab_onboarding(
             detail="centre.data_server not configured; skipping",
         ))
 
+    return probes
+
+
+def provision_centre_slack(
+    *,
+    env: dict[str, str] | None = None,
+    channel_creator=None,     # injectable: (channel_name, ws_id) -> str | None
+    channel_resolver=None,    # injectable: (channel_name) -> str | None
+) -> list[Probe]:
+    """Provision the centre's Slack fabric: the private mayor↔CC channel
+    (``#wigamig-ops``, stored as ``mayor_channel_id``) and the broadcast
+    audience map (``admin`` → mayor channel, ``everyone`` → ``#general``).
+
+    Explicit entry point — run by ``wigamig centre-slack-setup``, never
+    auto-fired from ``init_centre``. Best-effort + injectable; the live
+    creator is env-token-gated so the token-less suite makes no live calls.
+    """
+    from . import centre_init as _ci
+    from . import registrar as _reg
+    centre = _ci.read_centre(env=env)
+    if centre is None:
+        return [Probe(name="centre-profile", status="block",
+                      detail="centre is not initialised; run wigamig centre-init first.")]
+    if not centre.slack_workspace:
+        return [Probe(name="slack", status="warn",
+                      detail="centre.slack_workspace not configured; skipping.")]
+
+    probes: list[Probe] = []
+    if channel_creator is None:
+        channel_creator = _live_slack_create_channel
+
+    # 1. Mayor↔CC channel.
+    mayor_id = ""
+    try:
+        mayor_id = channel_creator("wigamig-ops", centre.slack_workspace) or ""
+        if mayor_id:
+            _ci.update_centre({"mayor_channel_id": mayor_id}, env=env)
+            probes.append(Probe(name="mayor-channel", status="ok",
+                                detail=f"#wigamig-ops → {mayor_id}"))
+        else:
+            probes.append(Probe(name="mayor-channel", status="warn",
+                                detail="#wigamig-ops could not be created"))
+    except Exception as exc:  # noqa: BLE001
+        probes.append(Probe(name="mayor-channel", status="warn",
+                            detail=f"slack error: {exc}"))
+
+    # 2. Broadcast audiences: admin → mayor channel, everyone → #general.
+    profile = _reg.read_profile(env)
+    bc = dict(profile.get("broadcast_channels") or {})
+    if mayor_id:
+        bc["admin"] = mayor_id
+    if channel_resolver is not None or _has_env_slack_token():
+        if channel_resolver is None:
+            from ..dashboard import slack_notify as _sn
+            channel_resolver = _sn._lookup_channel_id_by_name
+        try:
+            gen = channel_resolver("general")
+            if gen:
+                bc["everyone"] = gen
+                probes.append(Probe(name="general-channel", status="ok",
+                                    detail=f"#general → {gen}"))
+            else:
+                probes.append(Probe(name="general-channel", status="warn",
+                                    detail="#general not found; create it in Slack"))
+        except Exception as exc:  # noqa: BLE001
+            probes.append(Probe(name="general-channel", status="warn",
+                                detail=f"slack error: {exc}"))
+    if bc:
+        _reg.write_profile({"broadcast_channels": bc}, env=env)
     return probes
 
 

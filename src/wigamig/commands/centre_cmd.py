@@ -457,3 +457,24 @@ def centre_status() -> None:
     click.echo(f"Labs:             {len(reg.labs)}")
     click.echo(f"Cores:            {len(reg.cores)}")
     click.echo(f"Collaborations:   {len(reg.collaborations)}")
+
+
+@click.command("centre-slack-setup",
+                help="Provision the centre's Slack fabric: the private mayor↔CC "
+                     "channel (#wigamig-ops) + the #general broadcast wiring. "
+                     "Needs a bot token ($WIGAMIG_SLACK_TOKEN) + slack_workspace "
+                     "set on the centre.")
+def centre_slack_setup() -> None:
+    from ..core import centre_provision as _cp
+    probes = _cp.provision_centre_slack()
+    any_block = False
+    for p in probes:
+        mark = {"ok": "✓", "warn": "!", "block": "✗"}.get(p.status, "-")
+        click.echo(f"  {mark} {p.name}: {p.detail}")
+        any_block = any_block or p.status == "block"
+    if any_block:
+        raise click.exceptions.Exit(1)
+    prof = _ci.read_centre()
+    if prof and prof.mayor_channel_id:
+        click.echo(f"\nmayor↔CC channel: {prof.mayor_channel_id}  "
+                   f"(events + `admin` broadcasts route here)")

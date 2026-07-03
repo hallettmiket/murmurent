@@ -26,7 +26,7 @@ import datetime as _dt
 import os
 import re
 import subprocess
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -948,6 +948,57 @@ _EDITABLE_FIELDS = frozenset({
     "institution",
     "department",
 })
+
+
+def set_group_slack_channel(
+    name: str, channel_id: str, *, env: dict[str, str] | None = None,
+) -> bool:
+    """Stamp a lab or core's ``slack_channel_id`` in ``_registry.yaml``.
+
+    Returns True if a group named ``name`` was found and updated. Best-effort
+    for the provisioning path (a missing group is a no-op returning False)."""
+    reg = read_registry(env)
+    for i, lab in enumerate(reg.labs):
+        if lab.name == name:
+            labs = list(reg.labs)
+            labs[i] = replace(lab, slack_channel_id=channel_id or None)
+            write_registry(replace(reg, labs=labs), env)
+            return True
+    for i, core in enumerate(reg.cores):
+        if core.name == name:
+            cores = list(reg.cores)
+            cores[i] = replace(core, slack_channel_id=channel_id or None)
+            write_registry(replace(reg, cores=cores), env)
+            return True
+    return False
+
+
+def group_email_map(
+    name: str, *, env: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Return ``{handle: email}`` for a lab/core's members that have an email
+    on file (reads ``<group>/lab-mgmt/members/*.md``). Feeds the Slack invite
+    engine. Members without an email are omitted."""
+    from .frontmatter import parse_file as _pf
+    reg = read_registry(env)
+    entry = next((g for g in [*reg.labs, *reg.cores] if g.name == name), None)
+    if entry is None or not entry.lab_mgmt_path:
+        return {}
+    members_dir = Path(entry.lab_mgmt_path) / "members"
+    if not members_dir.is_dir():
+        return {}
+    out: dict[str, str] = {}
+    for mf in sorted(members_dir.glob("*.md")):
+        try:
+            meta = _pf(mf).meta or {}
+        except Exception:  # noqa: BLE001
+            continue
+        if str(meta.get("status") or "active") != "active":
+            continue
+        email = str(meta.get("email") or "").strip()
+        if email:
+            out[_normalize(str(meta.get("handle") or mf.stem))] = email
+    return out
 
 
 def update_lab_metadata(
