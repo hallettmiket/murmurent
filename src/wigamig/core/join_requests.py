@@ -217,6 +217,20 @@ def write_request(
 # Lifecycle
 # ---------------------------------------------------------------------------
 
+def _notify_safe(event: str, req: "JoinRequest", env) -> None:
+    """Fire a Slack notification for a join event. Best-effort: any failure
+    (import error, Slack down, no token) is swallowed so the request
+    lifecycle is never affected. See core/join_notify.py."""
+    try:
+        from . import join_notify
+        if event == "new":
+            join_notify.notify_new_request(req, env=env)
+        elif event == "decision":
+            join_notify.notify_decision(req, env=env)
+    except Exception:  # noqa: BLE001 — notification must never break the flow
+        pass
+
+
 def file_request(
     *,
     kind: str,
@@ -255,6 +269,7 @@ def file_request(
         created_at=_dt.datetime.now(_dt.timezone.utc).isoformat(),
     )
     write_request(req, env, audit_action=f"filed by {requester_email}")
+    _notify_safe("new", req, env)
     return req
 
 
@@ -363,6 +378,7 @@ def approve(
         _set_resolved(req, actor, "approved")
 
     write_request(req, env, audit_action=f"approved by @{actor.lstrip('@')}")
+    _notify_safe("decision", req, env)
     return req
 
 
@@ -383,6 +399,7 @@ def decline(
     req.decline_reason = reason.strip()
     _set_resolved(req, actor, "declined")
     write_request(req, env, audit_action=f"declined by @{actor.lstrip('@')}")
+    _notify_safe("decision", req, env)
     return req
 
 
