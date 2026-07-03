@@ -84,6 +84,7 @@ class MemberRecord:
     full_name: str
     role: str
     status: str
+    email: str = ""  # used to resolve the member's Slack account (users.lookupByEmail)
     certifications: list[str] = field(default_factory=list)
     created: str | None = None
     deactivated_at: str | None = None
@@ -113,6 +114,7 @@ def parse_member(path: Path) -> MemberRecord:
         full_name=str(meta.get("full_name") or _strip_at(handle_raw)),
         role=str(meta.get("role") or "staff"),
         status=str(meta.get("status") or ACTIVE),
+        email=str(meta.get("email") or "").strip(),
         certifications=[str(c) for c in (meta.get("certifications") or [])],
         created=str(meta.get("created")) if meta.get("created") else None,
         deactivated_at=str(meta.get("deactivated_at")) if meta.get("deactivated_at") else None,
@@ -167,6 +169,7 @@ def add(
     handle: str,
     full_name: str,
     role: str = "staff",
+    email: str = "",
     certifications: list[str] | None = None,
     today: _dt.date | None = None,
 ) -> MemberRecord:
@@ -188,11 +191,25 @@ def add(
         full_name=full_name.strip() or norm,
         role=role,
         status=ACTIVE,
+        email=(email or "").strip(),
         certifications=list(certifications or []),
         created=today.isoformat(),
     )
     _write(rec)
     return rec
+
+
+def member_email_map(*, active_only: bool = True) -> dict[str, str]:
+    """Return ``{handle: email}`` for members that have an email on file.
+
+    Feeds ``slack_notify.sync_project_channel_members`` (handle→email→Slack
+    uid). Members without an email are omitted (they can't be resolved to a
+    Slack account until one is recorded)."""
+    out: dict[str, str] = {}
+    for rec in iter_members(include_inactive=not active_only):
+        if rec.email:
+            out[rec.handle] = rec.email
+    return out
 
 
 def set_status(
@@ -339,6 +356,8 @@ def _write(rec: MemberRecord) -> Path:
         "role": rec.role,
         "status": rec.status,
     }
+    if rec.email:
+        meta["email"] = rec.email
     if rec.certifications:
         meta["certifications"] = list(rec.certifications)
     if rec.created:
