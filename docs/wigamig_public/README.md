@@ -27,7 +27,7 @@ Pick your institution's name in the join form's **Institution** field.
 
 | Institution | Institution field |
 |---|---|
-| _Your institution here_ | _its short name_ |
+| Western University | `western` |
 
 **Don't see your institution?** It may not run wigamig yet — ask your PI
 or lab manager. (Institutions are added here by their registrar when they
