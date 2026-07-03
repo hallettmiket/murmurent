@@ -63,6 +63,9 @@ def _default_mayor() -> str:
 @click.option("--unique-name", default="",
               help="Non-institution-specific install id (drives repo/Slack/"
                    "group names, e.g. 'western'). Optional.")
+@click.option("--join-email", default="",
+              help="Public contact address for join requests (listed in the "
+                   "wigamig_public directory). Optional.")
 @click.option("--slack-workspace", default="",
               help="Slack team/workspace id (e.g. T0WESTERN). Optional.")
 @click.option("--github-org", default="",
@@ -95,7 +98,8 @@ def _default_mayor() -> str:
                    "(useful when running under sudo or in CI).")
 def centre_init(
     name: str, institution: str, mayor: str,
-    unique_name: str, slack_workspace: str, github_org: str, public_hub: str,
+    unique_name: str, join_email: str, slack_workspace: str, github_org: str,
+    public_hub: str,
     server_host: str, server_account: str, cc_install_path: str,
     obsidian_vault: str, mayor_root: str,
     data_server: str, raw_root: str, refined_root: str,
@@ -128,6 +132,7 @@ def centre_init(
     name = _prompt("Centre name", name, required=True)
     institution = _prompt("Institution", institution, required=True)
     unique_name = _prompt("Unique install name (repo/Slack id)", unique_name)
+    join_email = _prompt("Public join-request email", join_email)
     slack_workspace = _prompt("Slack workspace id", slack_workspace)
     github_org = _prompt("Centre GitHub org / account", github_org)
     public_hub = _prompt("Public onboarding hub", public_hub)
@@ -153,6 +158,7 @@ def centre_init(
             name=name, institution=institution,
             founding_mayor=mayor,
             unique_name=unique_name,
+            join_email=join_email,
             slack_workspace=slack_workspace,
             github_org=github_org,
             public_hub=public_hub,

@@ -37,6 +37,7 @@ EXTENDED = dict(
     institution="Demo University",
     founding_mayor="@tbrowne",
     unique_name="demo",
+    join_email="wigamig-demo@demo.edu",
     slack_workspace="T0DEMO",
     github_org="wigamig-demo",
     server_host="lab-server.demo.edu",
@@ -56,7 +57,7 @@ def test_extended_fields_round_trip(world):
     CI.init_centre(write_sentinel=False, **EXTENDED)
     got = CI.read_centre()
     assert got is not None
-    for field in ("unique_name", "server_host", "server_account",
+    for field in ("unique_name", "join_email", "server_host", "server_account",
                   "cc_install_path", "obsidian_vault", "mayor_root",
                   "public_hub"):
         assert getattr(got, field) == EXTENDED[field], field

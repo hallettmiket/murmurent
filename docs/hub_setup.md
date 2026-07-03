@@ -1,62 +1,65 @@
-# The global onboarding hub — maintainer / mayor notes
+# The public directory hub — maintainer / mayor notes
 
-This is **maintainer-facing** documentation for the global `wigamig_public`
-hub. It does **not** live on the public hub itself — the hub's own README
-([`docs/wigamig_public/README.md`](wigamig_public/README.md)) is kept
-trivially simple for prospective members. Keep the two separate: novice
-users should never see setup mechanics.
+Maintainer-facing notes for the global `wigamig_public` repo. It does **not**
+live on the hub itself — the hub's own README
+([`docs/wigamig_public/README.md`](wigamig_public/README.md)) is kept trivially
+simple for prospective members.
 
-## What the hub is
+## What the hub is (and is NOT)
 
-A **single global repository** — `github.com/hallettmiket/wigamig_public` —
-that is the public front door for *every* wigamig deployment. It holds:
+A **single global repository** — `github.com/hallettmiket/wigamig_public` — that
+is a **public directory only**: a list of participating institutions and, for
+each, the **registrar's contact email**. That's the entire function.
 
-- a **directory** of participating institutions (public names only — **no
-  netnames, server hostnames, data paths, or tokens**), and
-- a **GitHub-issue intake** form
-  ([`.github/ISSUE_TEMPLATE/join.yml`](wigamig_public/.github/ISSUE_TEMPLATE/join.yml)).
+**It collects nothing.** GitHub Issues are **disabled** on the repo, and there is
+no form. Joining is by **email to the registrar** — a prospective member's
+netname, institution, role, PI, justification, etc. never touch GitHub. This is
+deliberate: we don't want a permanent, publicly-archived pile of "who wants to
+join what, where" across institutions.
 
-Each centre's registrar polls the hub for issues addressed to their
-institution and ingests them into their private `join_requests/` queue.
-Private details are exchanged over Slack/email *after* the registrar
-engages — never on the public issue.
+> The hub is **not** where the wigamig code lives — that's
+> [`github.com/hallettmiket/wigamig`](https://github.com/hallettmiket/wigamig)
+> (public, cloned via `bootstrap.sh`). You don't need the hub to get the code;
+> you need it only to look up who to email.
 
 ## Creating the hub (one time, by the ecosystem maintainer)
 
-The hub already exists. It only needs to be created once for the whole
-ecosystem — an individual institution's mayor does **not** create a hub.
+Already done. It's created once for the whole ecosystem; an individual mayor does
+**not** create a hub.
 
 ```bash
 gh repo create hallettmiket/wigamig_public --public
 git clone https://github.com/hallettmiket/wigamig_public /tmp/wigamig_public
 cp -R docs/wigamig_public/. /tmp/wigamig_public/
 cd /tmp/wigamig_public && git add -A \
-  && git commit -m "seed wigamig_public hub" && git push
-# labels the ingest flow uses:
-gh label create join-request --repo hallettmiket/wigamig_public --color 0e8a16
-gh label create ingested     --repo hallettmiket/wigamig_public --color ededed
+  && git commit -m "seed wigamig_public directory" && git push
+gh repo edit hallettmiket/wigamig_public --enable-issues=false   # no data collection
 ```
 
-## Connecting a centre to the hub (each mayor, once)
+## Listing a centre in the directory (each mayor, once)
 
-When an institution goes live, its mayor:
+When an institution goes live, its mayor adds **one row** to the hub's
+[`README.md`](wigamig_public/README.md) table — institution, a short description
+(centre / department / group name), and the **join email** (`join_email` on the
+centre, set via `wigamig centre-init --join-email …` or the `/registrar` profile
+editor). Nothing else is published.
 
-1. **Points the centre at the hub** — set `public_hub` in `centre.md` to
-   `github.com/hallettmiket/wigamig_public#<unique_name>` (the mayor
-   server-setup form / `wigamig centre-init --public-hub` does this).
-2. **Adds their installation to the directory** — a one-line row in the
-   hub's [`README.md`](wigamig_public/README.md) table: institution, a short
-   description (a centre / department / group name — one institution can run
-   several installations), and the `unique_name` members enter on the form.
-3. **Polls the hub** — run `wigamig join-request ingest` on the centre
-   (schedule it from a routine/cron). It ingests only issues whose
-   `Institution` field matches the centre's `unique_name`, files a local
-   join request, comments on the issue, and later posts the registrar's
-   decision back on that issue.
+## Receiving + filing a join request (each mayor, ongoing)
 
-A paste-able step-by-step for these three is in
-[`docs/connect_to_hub.md`](connect_to_hub.md).
+1. A prospective member emails the registrar (the address in the directory).
+2. The registrar reads the email and files the request **locally**:
 
-See [`join_ingest`](../src/wigamig/core/join_ingest.py) for the ingest
-implementation and [`docs/setup.md`](setup.md) for the full centre
-deployment runbook.
+   ```bash
+   wigamig join-request submit --kind lab \
+     --name <proposed_name> --pi @<netname> \
+     --email <requester_email> --institution <institution> \
+     --justification "…"
+   ```
+3. Then approves/declines as usual (`wigamig join-request approve|decline`, or
+   the `/registrar` dashboard). Provisioning (Slack/GitHub/FS) fires on approval.
+
+Everything about the requester stays on the registrar's own machine + the
+centre's private `lab_info` — never on GitHub.
+
+See [`docs/setup.md`](setup.md) for the full centre deployment runbook and
+[`docs/slack_setup.md`](slack_setup.md) for the Slack fabric.

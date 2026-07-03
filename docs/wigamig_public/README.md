@@ -1,42 +1,40 @@
 # Join a wigamig institution
 
 **wigamig** is shared AI research infrastructure used by universities and
-research centres. If your institution already runs wigamig and you'd like
-to join a lab or core, this page is where you ask — it takes about two
-minutes, and you don't need to know where anything is hosted.
+research centres. This page is a **directory**: if your institution runs
+wigamig and you'd like to join a lab or core, find it below and **email its
+registrar**.
+
+> This repository collects **nothing**. There is no form and no issue to
+> file — your request goes straight to your institution's registrar by
+> email, privately. (Issues are disabled here on purpose.)
 
 ## How to join
 
-1. **Find your installation** in the list below (match on your institution
-   *and* the description — one institution can run more than one).
-2. Open a request: **[New issue → "Request to join a wigamig centre"](../../issues/new/choose)**.
-3. Fill in the short form — enter the installation **ID** from the list, say
-   what you'd like to join, and add a sentence about who you are.
-4. Submit. The installation's registrar is notified automatically and will
-   reply **in the issue** with next steps.
+1. **Find your institution** in the directory below and note its registrar
+   email.
+2. **Email the registrar.** Say who you are (your netname is fine), your
+   institution, and which lab or core you'd like to join.
+3. The registrar replies and takes it from there. Everything else is handled
+   privately — nothing about you is posted publicly.
 
-That's it. The registrar reaches out to you — you never need a server
-address or any private details.
+## Institutions using wigamig
 
-> **Please don't put anything private in the issue** — no passwords, no
-> server names, no account IDs. Anything sensitive is handled privately
-> after the registrar contacts you.
+One institution may run more than one wigamig installation (a centre, a
+department, a named group), so match on the institution *and* the
+description, then email the address listed.
 
-## Installations using wigamig
-
-One institution may run **more than one** wigamig installation — a centre, a
-department, or a named group — so find yours by matching the institution
-*and* the description, then enter its **ID** on the join form.
-
-| Institution | Installation | ID (enter this on the form) |
+| Institution | Installation | Email to join |
 |---|---|---|
-| Western University | Bioconvergence Centre | `western` |
+| Western University | Bioconvergence Centre | _(registrar's address — added when the centre goes live)_ |
 
-**Don't see your installation?** It may not run wigamig yet — ask your PI
-or lab manager. (Installations are added here by their registrar when they
-go live.)
+**Don't see your institution?** It may not run wigamig yet — ask your PI or
+lab manager. (Registrars add their row here when they go live.)
 
-## What is wigamig?
+## Where's the software?
 
-Shared, open-source agentic-AI infrastructure for research groups —
+The wigamig **code** lives in a different repo:
 [github.com/hallettmiket/wigamig](https://github.com/hallettmiket/wigamig).
+You only need that if you're *setting up* wigamig at an institution (as a
+mayor) or *building* wigamig — not to join one. To join, just email your
+registrar above.

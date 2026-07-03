@@ -1,0 +1,8 @@
+# wigamig_public collects nothing. Issues are disabled so no member
+# information is ever posted publicly — joining is by email to the
+# institution's registrar (see the directory in README.md).
+blank_issues_enabled: false
+contact_links:
+  - name: Join a wigamig institution (by email)
+    url: https://github.com/hallettmiket/wigamig_public#how-to-join
+    about: To join, find your institution in the README directory and email its registrar. This repo does not accept issues.
