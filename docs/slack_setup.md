@@ -1,0 +1,92 @@
+# Slack setup for a wigamig centre (mayor guide)
+
+Wigamig uses Slack as its primary communication fabric: a private **mayor↔CC
+channel** (`#wigamig-ops`) where the code posts events, a private **channel per
+lab/core** (named after the group, members-only), and **`#general`** for
+broadcasts. This guide is the one-time setup a **mayor** does so those channels
+get created and populated automatically.
+
+Slack workspaces can't be created by API, so a few steps are manual — they're
+marked **[manual]**.
+
+## 1. Create the workspace  [manual]
+
+In Slack, create a workspace named **`wigamig-<unique_name>`** (e.g.
+`wigamig-bioconvergence`). Then:
+
+- Create a **`#general`** channel if one doesn't already exist (it's the
+  broadcast channel for everyone).
+- Grab the **workspace invite link**: *Invite people → Copy invite link*. You'll
+  give this to new members during onboarding.
+
+## 2. Create a bot token  [manual]
+
+At <https://api.slack.com/apps> → *Create New App → From scratch*, install it to
+your `wigamig-<name>` workspace, and give the bot these **OAuth scopes**:
+
+| Scope | Why |
+|---|---|
+| `groups:write` | create private channels (lab/core + `#wigamig-ops`) |
+| `channels:manage` | create public channels (if you use any) |
+| `chat:write` | post events + broadcasts |
+| `users:read.email` | resolve a member's email → their Slack account |
+| `groups:read`, `channels:read` | look up channel ids by name (e.g. `#general`) |
+
+Copy the **Bot User OAuth Token** (`xoxb-…`).
+
+## 3. Give wigamig the token
+
+Either export it, or store it in the token file (mode 0600):
+
+```bash
+export WIGAMIG_SLACK_TOKEN=xoxb-...
+#   ...or, to persist it for the dashboard/server:
+umask 077; printf '%s\n' 'xoxb-...' > ~/.config/wigamig/slack-token
+```
+
+`WIGAMIG_SLACK_TOKEN` and the legacy `SLACK_BOT_TOKEN` both work.
+
+## 4. Point the centre at the workspace
+
+Set the workspace id + invite link on the centre (via `wigamig centre-init
+--slack-workspace T… --slack-invite-url https://join…`, or the `/registrar`
+profile editor for an existing centre — `slack_workspace` and `slack_invite_url`
+in `centre.md`).
+
+## 5. Verify + provision the centre channels
+
+```bash
+wigamig centre-slack-smoke     # confirms the bot token can create a channel
+wigamig centre-slack-setup     # creates #wigamig-ops, wires #general + admin broadcasts
+```
+
+`centre-slack-setup` creates the private **mayor↔CC channel** (`#wigamig-ops`,
+stored as `mayor_channel_id`) and seeds the broadcast map (`admin` → the mayor
+channel, `everyone` → `#general`). Re-running is safe (idempotent).
+
+## What happens automatically after this
+
+- **New lab/core** (created via a join approval or the registrar): a private
+  channel **named after the group** is created, the PI/leader is invited, and the
+  channel id is stored on the group — as long as the token + `slack_workspace`
+  are set.
+- **Broadcasts**: `wigamig broadcast --audience everyone …` lands in `#general`;
+  `--audience admin` reaches the mayor channel.
+- **Join requests**: the mayor is notified in the `admin` (mayor) channel; the
+  requester is DM'd (or the source GitHub issue is commented) on a decision.
+
+## New members
+
+Give a new member the **workspace invite link** (step 1). Once they've joined the
+workspace and their **email is on their member file** (`email:` frontmatter), the
+next provision/reconcile of their lab adds them to that lab's channel — and only
+that lab's channel. Members without an email on file can't be resolved to a Slack
+account and are reported as `unresolved` until one is recorded.
+
+## Notes
+
+- **Free/Pro Slack has no user-invite API**, so joining the workspace is the
+  invite-link step above; wigamig auto-adds people to *channels* once they're in
+  the workspace. Full workspace-invite automation needs a paid admin token.
+- Channel names follow the group's own name normalized to Slack rules
+  (lowercase, `[a-z0-9_-]`, ≤80): `lab_mh` → `#lab_mh`.
