@@ -225,6 +225,42 @@ def write_request(
 # Lifecycle
 # ---------------------------------------------------------------------------
 
+def parse_join_form(text: str) -> dict[str, str]:
+    """Parse the encrypted-email join form (``key: value`` lines, ``#``
+    comments ignored) into a field dict. Recognised keys: kind, institution,
+    name, pi, email, justification. Leading ``@`` on ``pi`` is preserved."""
+    fields: dict[str, str] = {}
+    known = {"kind", "institution", "name", "pi", "email", "justification"}
+    for raw in (text or "").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or ":" not in line:
+            continue
+        key, _, val = line.partition(":")
+        key = key.strip().lower()
+        # strip trailing inline "# comment"
+        val = _re.split(r"\s+#", val.strip(), maxsplit=1)[0].strip()
+        if key in known and val:
+            fields[key] = val
+    return fields
+
+
+def file_request_from_form(
+    text: str, *, source: str = "encrypted-email", env: dict[str, str] | None = None,
+) -> JoinRequest:
+    """Parse a decrypted join form and file the request. ``source`` is a short
+    provenance note (e.g. the sender email) recorded in the audit action."""
+    f = parse_join_form(text)
+    return file_request(
+        kind=f.get("kind", "pi"),
+        requester_email=f.get("email", ""),
+        proposed_name=f.get("name", ""),
+        proposed_pi=f.get("pi", ""),
+        institution_affiliation=f.get("institution", ""),
+        justification=f.get("justification", ""),
+        env=env,
+    )
+
+
 def _notify_safe(event: str, req: "JoinRequest", env) -> None:
     """Fire a Slack notification for a join event. Best-effort: any failure
     (import error, Slack down, no token) is swallowed so the request

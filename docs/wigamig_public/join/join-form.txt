@@ -1,0 +1,13 @@
+# wigamig join request — fill in the value after each colon, then encrypt this
+# file with wigamig-join.sh and email the result to your institution's
+# registrar (address + key are in the directory at the repo root).
+#
+# Lines starting with # are ignored. Nothing here is sent anywhere until you
+# encrypt it and choose to email it.
+
+kind:            # one of: lab | core | pi | member
+institution:     # the institution you're joining (from the directory)
+name:            # proposed lab/core name — or the existing lab you want to join
+pi:              # PI / lead handle = your netname, e.g. @jsmith
+email:           # how the registrar reaches you
+justification:   # a sentence: who you are and why you're joining
