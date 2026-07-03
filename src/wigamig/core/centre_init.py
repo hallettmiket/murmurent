@@ -77,7 +77,7 @@ REQUIRED_KEYS = ("name", "institution", "founding_mayor")
 
 # All recognised keys (anything else is preserved but ignored by readers).
 KNOWN_KEYS = (
-    "name", "institution", "unique_name", "slack_workspace",
+    "name", "institution", "unique_name", "join_email", "slack_workspace",
     "slack_invite_url", "mayor_channel_id", "github_org",
     "data_server", "server_host", "server_account", "cc_install_path",
     "obsidian_vault", "mayor_root", "public_hub",
@@ -102,6 +102,7 @@ class CentreProfile:
     institution: str
     founding_mayor: str                    # @handle (no leading @)
     unique_name: str = ""                  # non-institution-specific install id
+    join_email: str = ""                   # public contact address for join requests
     slack_workspace: str = ""
     slack_invite_url: str = ""             # workspace join link (mayor pastes it)
     mayor_channel_id: str = ""             # private mayor↔CC events channel
@@ -165,6 +166,7 @@ def read_centre(env: dict[str, str] | None = None) -> CentreProfile | None:
         institution=institution,
         founding_mayor=mayor,
         unique_name=str(meta.get("unique_name") or "").strip(),
+        join_email=str(meta.get("join_email") or "").strip(),
         slack_workspace=str(meta.get("slack_workspace") or "").strip(),
         slack_invite_url=str(meta.get("slack_invite_url") or "").strip(),
         mayor_channel_id=str(meta.get("mayor_channel_id") or "").strip(),
@@ -197,6 +199,7 @@ def _render_centre(profile: CentreProfile) -> str:
         "name": profile.name,
         "institution": profile.institution,
         "unique_name": profile.unique_name,
+        "join_email": profile.join_email,
         "slack_workspace": profile.slack_workspace,
         "slack_invite_url": profile.slack_invite_url,
         "mayor_channel_id": profile.mayor_channel_id,
@@ -233,6 +236,7 @@ def init_centre(
     institution: str,
     founding_mayor: str,
     unique_name: str = "",
+    join_email: str = "",
     slack_workspace: str = "",
     slack_invite_url: str = "",
     github_org: str = "",
@@ -284,6 +288,7 @@ def init_centre(
         institution=institution.strip(),
         founding_mayor=mayor_clean,
         unique_name=unique_name.strip(),
+        join_email=join_email.strip(),
         slack_workspace=slack_workspace.strip(),
         slack_invite_url=slack_invite_url.strip(),
         github_org=github_org.strip(),

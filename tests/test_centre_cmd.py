@@ -98,6 +98,7 @@ def test_interactive_uses_prompts(world):
                                   "Test Centre",        # name
                                   "Test University",    # institution
                                   "",                    # unique_name
+                                  "",                    # join_email
                                   "",                    # slack ws
                                   "",                    # github org
                                   "",                    # public_hub

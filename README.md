@@ -21,16 +21,15 @@ new institution stands it up by having one person (the **mayor**) bootstrap a
 wigamig and you simply want to join, you do **not** install any software, and
 you do **not** need to know where anything is hosted.
 
-1. Go to the public onboarding hub:
+1. Open the public directory:
    **[github.com/hallettmiket/wigamig_public](https://github.com/hallettmiket/wigamig_public)**
-2. Find your institution in the list there, then open a **"Request to join a
-   wigamig centre"** issue.
-3. Fill in the short form — pick your institution, say what you'd like to join,
-   and add a sentence about who you are. **Don't include anything private**
-   (no passwords, server names, or account IDs).
+2. Find your institution and note its **registrar email**.
+3. **Email the registrar** — say who you are (your netname is fine), your
+   institution, and which lab or core you'd like to join.
 
-That's the whole thing. Your institution's registrar is notified automatically
-and replies **right in the issue** with your next steps.
+Your request goes **straight to the registrar, privately** — nothing about you
+is posted publicly (the directory collects nothing; that's why it has no form).
+The registrar replies and takes it from there.
 
 Everything below is only for people **setting up** wigamig at a new institution
 (administrators) or **building** wigamig itself (developers).
