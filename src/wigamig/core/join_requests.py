@@ -75,6 +75,11 @@ class JoinRequest:
     decline_reason: str = ""
     # probes is a list of {kind, severity, summary, apply_hint?}
     probes: list[dict[str, str]] = field(default_factory=list)
+    # Provenance for requests ingested from the wigamig_public hub:
+    # the source GitHub issue as "owner/repo#N" (empty for dashboard/CLI
+    # submissions). When set, the decision is reported back as an issue
+    # comment instead of an email DM (the public form collects no email).
+    source_issue: str = ""
     body: str = ""
     path: Path | None = None
 
@@ -95,6 +100,8 @@ class JoinRequest:
             "decline_reason": self.decline_reason,
             "probes": list(self.probes),
         }
+        if self.source_issue:
+            meta["source_issue"] = self.source_issue
         return meta
 
 
@@ -132,6 +139,7 @@ def parse_request(path: Path) -> JoinRequest:
         resolved_by=str(meta.get("resolved_by") or ""),
         decline_reason=str(meta.get("decline_reason") or ""),
         probes=list(meta.get("probes") or []),
+        source_issue=str(meta.get("source_issue") or "").strip(),
         body=(parsed.body or "").strip(),
         path=path,
     )
@@ -226,7 +234,13 @@ def _notify_safe(event: str, req: "JoinRequest", env) -> None:
         if event == "new":
             join_notify.notify_new_request(req, env=env)
         elif event == "decision":
+            # Dashboard/CLI requests → DM the requester by email (no-op if
+            # they gave none). Hub-ingested requests → comment on the
+            # source GitHub issue (the public form collects no email).
             join_notify.notify_decision(req, env=env)
+            if req.source_issue:
+                from . import join_ingest
+                join_ingest.comment_decision_on_issue(req, env=env)
     except Exception:  # noqa: BLE001 — notification must never break the flow
         pass
 
@@ -240,16 +254,24 @@ def file_request(
     institution_affiliation: str = "",
     justification: str = "",
     proposed_members: list[str] | None = None,
+    source_issue: str = "",
     env: dict[str, str] | None = None,
 ) -> JoinRequest:
-    """Persist a new join request. Returns the saved request."""
+    """Persist a new join request. Returns the saved request.
+
+    ``requester_email`` is required for dashboard/CLI submissions. It may
+    be empty **only** when ``source_issue`` is set (a request ingested
+    from the wigamig_public hub, whose public form collects no email — the
+    decision is reported back as a comment on that issue instead)."""
     kind_clean = (kind or "").strip().lower()
     if kind_clean not in VALID_KINDS:
         raise JoinRequestError(
             f"kind must be one of {VALID_KINDS} (got {kind!r})"
         )
-    if not (requester_email or "").strip():
-        raise JoinRequestError("requester_email is required")
+    if not (requester_email or "").strip() and not (source_issue or "").strip():
+        raise JoinRequestError(
+            "requester_email is required (or source_issue for hub-ingested requests)"
+        )
     if not (proposed_name or "").strip():
         raise JoinRequestError("proposed_name is required")
     if kind_clean in ("lab", "core") and not (proposed_pi or "").strip():
@@ -259,16 +281,18 @@ def file_request(
     req = JoinRequest(
         id=next_request_id(env),
         kind=kind_clean,
-        requester_email=requester_email.strip(),
+        requester_email=(requester_email or "").strip(),
         proposed_name=proposed_name.strip().lower(),
         proposed_pi=(proposed_pi.strip() if proposed_pi else ""),
         institution_affiliation=institution_affiliation.strip(),
         justification=justification.strip(),
         proposed_members=list(proposed_members or []),
+        source_issue=(source_issue or "").strip(),
         state="pending",
         created_at=_dt.datetime.now(_dt.timezone.utc).isoformat(),
     )
-    write_request(req, env, audit_action=f"filed by {requester_email}")
+    filed_by = requester_email or source_issue or "unknown"
+    write_request(req, env, audit_action=f"filed by {filed_by}")
     _notify_safe("new", req, env)
     return req
 

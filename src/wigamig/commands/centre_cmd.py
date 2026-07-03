@@ -319,6 +319,28 @@ def cmd_decline(req_id: int, actor: str, reason: str) -> None:
     click.echo(f"Request #{r.id:04d} → declined (by @{actor}). Reason: {r.decline_reason}")
 
 
+@join_request_group.command("ingest")
+def cmd_ingest() -> None:
+    """Poll the wigamig_public hub once and file new join requests.
+
+    Reads the hub repo from `public_hub` in centre.md, ingests open
+    `join-request` issues addressed to this centre, comments on each with
+    the routed request id, and skips anything already ingested. Safe to
+    run repeatedly (schedule it from a routine/cron)."""
+    from ..core import join_ingest as _ji
+    try:
+        created = _ji.ingest()
+    except _ji.JoinIngestError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not created:
+        click.echo("No new hub requests to ingest.")
+        return
+    click.echo(f"Ingested {len(created)} request(s) from the hub:")
+    for r in created:
+        click.echo(f"  #{r.id:04d}  {r.kind:5s} {r.proposed_name:20s} "
+                   f"← {r.source_issue}")
+
+
 @click.command(
     "centre-slack-smoke",
     help="Verify the Slack bot token can create a private channel. "
