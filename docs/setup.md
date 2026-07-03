@@ -133,6 +133,27 @@ wigamig.<your-domain>.edu {
 }
 ```
 
+**Require a dashboard login (do this before exposing it).** By default the
+dashboard trusts `?user=<handle>` — fine on a localhost laptop, but a hole
+once it's reachable off-machine. Set a **dashboard secret** and every
+mutating action (approve/decline, profile edits, provisioning, …) then
+requires a signed session cookie; the public join form and first-run
+bootstrap stay open. It's opt-in — with no secret set, behaviour is
+unchanged.
+
+```bash
+# one secret, known to the registrar(s):
+sudo -u wigamig sh -c 'umask 077; openssl rand -hex 32 > ~wigamig/.wigamig/dashboard_secret'
+#   ...or set WIGAMIG_DASHBOARD_SECRET in the systemd unit's Environment=.
+```
+
+Operators then log in once per session: `POST /api/login/authenticate`
+with `{handle, secret}` sets the cookie (the dashboard shows a prompt).
+`wigamig dashboard` warns loudly if it's bound to a non-loopback address
+with no secret configured. Shared-secret model: the secret proves you're a
+trusted operator; per-user accountability is via the audit log. (Per-user
+credentials / GitHub OAuth are future upgrades.)
+
 ### 3. Pulling lab_info updates
 
 The centre data is a normal git repo. To sync edits made on the

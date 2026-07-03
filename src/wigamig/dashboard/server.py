@@ -357,6 +357,13 @@ class LoginSelectBody(BaseModel):
     remember_user: bool = False
 
 
+class AuthenticateBody(BaseModel):
+    """JSON body for ``POST /api/login/authenticate`` (session auth)."""
+
+    handle: str = ""
+    secret: str = ""
+
+
 class RegistrarProfileBody(BaseModel):
     """JSON body for ``POST /api/registrar/profile``.
 
@@ -469,6 +476,25 @@ def create_app() -> FastAPI:
         description="Hi-fi Hallett Lab dashboard — Western University.",
         version="0.1.0",
     )
+
+    # Opt-in session auth (see dashboard/auth.py). When a dashboard secret
+    # is configured, every mutating request must carry a valid signed
+    # session cookie — except the public allowlist (login, first-run
+    # bootstrap, the public join form). With no secret configured this is a
+    # no-op, so the laptop/dev flow and the test suite are unchanged.
+    @app.middleware("http")
+    async def _auth_gate(request: Request, call_next):
+        from . import auth as _auth
+        secret = _auth.configured_secret()
+        if secret and _auth.request_needs_session(request.method, request.url.path):
+            token = request.cookies.get(_auth.COOKIE_NAME, "")
+            if _auth.verify_token(token, secret) is None:
+                return JSONResponse(
+                    {"detail": "authentication required — POST /api/login/authenticate "
+                               "with the dashboard secret to obtain a session."},
+                    status_code=401,
+                )
+        return await call_next(request)
 
     # Weekly repo-inventory refresh. Wigamig-internal cron: at startup
     # we check the cached report's mtime; if it's stale, fire a fresh
@@ -5145,6 +5171,54 @@ def create_app() -> FastAPI:
             "role": role,
             "next": next_url,
         }
+
+    @app.get("/api/login/auth-status")
+    def get_auth_status() -> dict:
+        """Whether the dashboard requires a session (secret configured)."""
+        from . import auth as _auth
+        return {"auth_enabled": _auth.auth_enabled(),
+                "cookie": _auth.COOKIE_NAME}
+
+    @app.post("/api/login/authenticate")
+    def post_login_authenticate(body: AuthenticateBody) -> JSONResponse:
+        """Exchange the dashboard secret for a signed session cookie.
+
+        Only meaningful when a secret is configured. The handle is recorded
+        (and role-resolved from the registry) but, under the shared-secret
+        model, is self-asserted — accountability comes from the audit log.
+        Returns 401 on a bad/absent secret; 400 if auth isn't enabled.
+        """
+        from . import auth as _auth
+        secret = _auth.configured_secret()
+        if not secret:
+            raise HTTPException(
+                status_code=400,
+                detail="dashboard auth is not enabled (no secret configured).",
+            )
+        if not _auth.check_secret(body.secret):
+            raise HTTPException(status_code=401, detail="invalid dashboard secret")
+        handle = (body.handle or "").strip().lstrip("@").lower()
+        if not handle:
+            raise HTTPException(status_code=400, detail="handle is required")
+        roles = _resolve_roles(handle)
+        role = ("registrar" if roles.get("is_registrar")
+                else "pi" if roles.get("is_pi")
+                else "member")
+        token = _auth.mint_token(handle, role, secret)
+        resp = JSONResponse({"ok": True, "handle": handle, "role": role})
+        resp.set_cookie(
+            _auth.COOKIE_NAME, token, max_age=_auth.DEFAULT_TTL,
+            httponly=True, samesite="lax", path="/",
+        )
+        return resp
+
+    @app.post("/api/login/logout")
+    def post_login_logout() -> JSONResponse:
+        """Clear the session cookie."""
+        from . import auth as _auth
+        resp = JSONResponse({"ok": True})
+        resp.delete_cookie(_auth.COOKIE_NAME, path="/")
+        return resp
 
     # -----------------------------------------------------------------
     # SEA catalog (Phase 10)
