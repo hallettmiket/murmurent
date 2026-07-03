@@ -134,7 +134,50 @@ EOF
   else
     say "Attach the file $OUT to the email (or paste its contents), then Send."
   fi
-  say ""; say "That's it — the registrar will reply."
+
+  # --- 6. what happens next --------------------------------------------------
+  say ""
+  say "──────────────────────────────────────────────────────────────────────"
+  say "WHAT HAPPENS NEXT — please read:"
+  say ""
+  say "  1. The Mayor (the person who runs wigamig at ${INSTITUTION})"
+  say "     will REPLY TO YOU BY EMAIL. Watch your inbox (and spam folder)."
+  say "  2. That reply will include a SLACK INVITE to the '${INSTITUTION}'"
+  say "     wigamig workspace. Accept it — Slack is where everything happens"
+  say "     from then on (you'll land in a channel for your lab/core)."
+  say ""
+  say "  So: expect (a) an EMAIL from the Mayor, and (b) a SLACK INVITE."
+  say "  If you don't hear back in a few days, reply to your own email to nudge."
+  say "──────────────────────────────────────────────────────────────────────"
+
+  # --- 7. offer to install the software now (optional, while you wait) ------
+  offer_install
+}
+
+# --- optional: download + install the wigamig software ---------------------
+offer_install() {
+  say ""
+  say "You can INSTALL the wigamig software now, while you wait for the reply —"
+  say "the code is public, so this doesn't need anyone's approval. It just gets"
+  say "your computer ready so you're set the moment you're added."
+  case "$(ask 'Download + install wigamig now? [Y/n] ')" in
+    n*|N*) say ""; say "No problem. When you're ready, run:";
+           say "  curl -fsSL -O $HUB_RAW/install-wigamig.sh && sh install-wigamig.sh";
+           return 0 ;;
+  esac
+  if ! command -v curl >/dev/null 2>&1; then
+    say "Need 'curl' to fetch the installer. Install curl, then run:"
+    say "  curl -fsSL -O $HUB_RAW/install-wigamig.sh && sh install-wigamig.sh"
+    return 0
+  fi
+  INST="$(mktemp)"
+  if curl -fsSL "$HUB_RAW/install-wigamig.sh" -o "$INST" 2>/dev/null; then
+    sh "$INST"; rm -f "$INST"
+  else
+    rm -f "$INST"
+    say "Couldn't fetch the installer just now. Try again later with:"
+    say "  curl -fsSL -O $HUB_RAW/install-wigamig.sh && sh install-wigamig.sh"
+  fi
 }
 
 main "$@"

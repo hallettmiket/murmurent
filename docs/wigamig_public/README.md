@@ -23,11 +23,41 @@ sh wigamig-join.sh
 
 Then just press **Send** in the email that pops up. That's it — you don't edit
 any files, and **nothing about you is posted here**. Your request is encrypted
-so only your institution's registrar can read it; they reply and take it from
-there.
+so only your institution's registrar can read it.
 
 (Prefer to do it by hand? [`join/join-form.txt`](join/join-form.txt) is the
 plain form, and the directory below has each registrar's email + encryption key.)
+
+## After you send it
+
+You're now waiting on the **Mayor** — the person who runs wigamig at your
+institution. Expect **two things back**:
+
+1. **An email reply from the Mayor.** Watch your inbox (and your spam folder).
+2. **A Slack invite** to your institution's `wigamig-<centre>` workspace,
+   included in that reply. **Accept it** — from then on, everything happens in
+   Slack, and you'll land in a private channel for your lab or core.
+
+If a few days pass with no reply, reply to your own sent email to nudge them.
+
+## Install the software (you can do this now, while you wait)
+
+You don't have to wait to be approved to install wigamig — **the code is
+public**, and installing it just gets your computer ready. Approval only
+decides which lab/core you join, not whether you can have the software. The
+one-script joiner above offers to do this for you at the end; or run it
+yourself, anytime:
+
+```sh
+curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/wigamig_public/main/install-wigamig.sh
+sh install-wigamig.sh
+```
+
+It downloads wigamig to `~/repos/wigamig`, installs the `wigamig` command, and
+wires up the shared agents, rules, and tools — installing the `uv` helper for
+you if you don't already have it (you just need `git`). When the Mayor's reply
+and Slack invite arrive, you'll already be set, and the rest of onboarding is
+walked through for you in Slack.
 
 ## Institutions using wigamig
 
