@@ -54,6 +54,9 @@ When an institution goes live, its mayor:
    join request, comments on the issue, and later posts the registrar's
    decision back on that issue.
 
+A paste-able step-by-step for these three is in
+[`docs/connect_to_hub.md`](connect_to_hub.md).
+
 See [`join_ingest`](../src/wigamig/core/join_ingest.py) for the ingest
 implementation and [`docs/setup.md`](setup.md) for the full centre
 deployment runbook.
