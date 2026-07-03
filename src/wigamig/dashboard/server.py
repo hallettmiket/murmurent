@@ -6875,40 +6875,42 @@ def create_app() -> FastAPI:
         # stale script references.
         _NO_CACHE = {"Cache-Control": "no-cache, must-revalidate"}
 
+        _AUTH_MODAL_TAG = '<script src="/static/auth-modal.js"></script>'
+
+        def _html_page(filename: str) -> HTMLResponse:
+            """Serve a dashboard HTML file with the session-login modal
+            injected before </body>. The modal is inert unless the server
+            challenges a mutating request with 401 (auth enabled)."""
+            html = (STATIC_DIR / filename).read_text(encoding="utf-8")
+            if _AUTH_MODAL_TAG not in html:
+                if "</body>" in html:
+                    html = html.replace("</body>", _AUTH_MODAL_TAG + "\n</body>", 1)
+                else:
+                    html = html + "\n" + _AUTH_MODAL_TAG
+            return HTMLResponse(html, headers=_NO_CACHE)
+
         @app.get("/", response_class=HTMLResponse)
         def index() -> HTMLResponse:
             """Login landing page — always shown at app launch so the
             user explicitly picks their role for this session."""
-            return HTMLResponse(
-                (STATIC_DIR / "login.html").read_text(encoding="utf-8"),
-                headers=_NO_CACHE,
-            )
+            return _html_page("login.html")
 
         @app.get("/dashboard", response_class=HTMLResponse)
         def dashboard_index() -> HTMLResponse:
             """Member / PI lab dashboard. Reached from the login page
             with ``?user=<handle>&persona=member|pi``."""
-            return HTMLResponse(
-                (STATIC_DIR / "Wigamig Dashboard Hi-Fi.html").read_text(encoding="utf-8"),
-                headers=_NO_CACHE,
-            )
+            return _html_page("Wigamig Dashboard Hi-Fi.html")
 
         @app.get("/registrar", response_class=HTMLResponse)
         def registrar_index() -> HTMLResponse:
             """Phase A registrar dashboard — separate route from the lab UI."""
-            return HTMLResponse(
-                (STATIC_DIR / "registrar.html").read_text(encoding="utf-8"),
-                headers=_NO_CACHE,
-            )
+            return _html_page("registrar.html")
 
         @app.get("/join", response_class=HTMLResponse)
         def join_index() -> HTMLResponse:
             """Public join form — no auth. Anyone at the institution can
             submit a lab/core/admin/pi join request from here. Item 2h."""
-            return HTMLResponse(
-                (STATIC_DIR / "join.html").read_text(encoding="utf-8"),
-                headers=_NO_CACHE,
-            )
+            return _html_page("join.html")
 
         @app.get("/core", response_class=HTMLResponse)
         def core_index() -> HTMLResponse:
@@ -6917,10 +6919,7 @@ def create_app() -> FastAPI:
             (the page calls it; non-core-leaders get a 403 + empty
             render). Per docs/cores_plan.md §10.
             """
-            return HTMLResponse(
-                (STATIC_DIR / "core.html").read_text(encoding="utf-8"),
-                headers=_NO_CACHE,
-            )
+            return _html_page("core.html")
 
         @app.get("/security", response_class=HTMLResponse)
         def security_index() -> HTMLResponse:
