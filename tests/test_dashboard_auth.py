@@ -128,3 +128,18 @@ def test_auth_status_endpoint(client, monkeypatch):
     assert client.get("/api/login/auth-status").json()["auth_enabled"] is False
     monkeypatch.setenv(A.ENV_VAR, "topsecret")
     assert client.get("/api/login/auth-status").json()["auth_enabled"] is True
+
+
+# ---- login modal injection --------------------------------------------
+
+def test_login_modal_injected_into_dashboard_pages(client):
+    for path in ("/registrar", "/dashboard", "/core"):
+        html = client.get(path).text
+        assert '<script src="/static/auth-modal.js"></script>' in html, path
+
+
+def test_auth_modal_js_is_served(client):
+    r = client.get("/static/auth-modal.js")
+    assert r.status_code == 200
+    assert "/api/login/authenticate" in r.text     # the modal logs in via this
+    assert "window.fetch" in r.text                # it wraps fetch to catch 401s
