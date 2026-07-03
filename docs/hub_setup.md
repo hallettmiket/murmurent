@@ -44,9 +44,10 @@ When an institution goes live, its mayor:
 1. **Points the centre at the hub** — set `public_hub` in `centre.md` to
    `github.com/hallettmiket/wigamig_public#<unique_name>` (the mayor
    server-setup form / `wigamig centre-init --public-hub` does this).
-2. **Adds their institution to the directory** — a one-line row in the
-   hub's [`README.md`](wigamig_public/README.md) table so members can find
-   it (public name + the `unique_name` they'll pick on the form).
+2. **Adds their installation to the directory** — a one-line row in the
+   hub's [`README.md`](wigamig_public/README.md) table: institution, a short
+   description (a centre / department / group name — one institution can run
+   several installations), and the `unique_name` members enter on the form.
 3. **Polls the hub** — run `wigamig join-request ingest` on the centre
    (schedule it from a routine/cron). It ingests only issues whose
    `Institution` field matches the centre's `unique_name`, files a local
