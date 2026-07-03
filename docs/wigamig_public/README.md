@@ -7,11 +7,12 @@ minutes, and you don't need to know where anything is hosted.
 
 ## How to join
 
-1. **Find your institution** in the list below.
+1. **Find your installation** in the list below (match on your institution
+   *and* the description — one institution can run more than one).
 2. Open a request: **[New issue → "Request to join a wigamig centre"](../../issues/new/choose)**.
-3. Fill in the short form — pick your institution, say what you'd like to
-   join, and add a sentence about who you are.
-4. Submit. Your institution's registrar is notified automatically and will
+3. Fill in the short form — enter the installation **ID** from the list, say
+   what you'd like to join, and add a sentence about who you are.
+4. Submit. The installation's registrar is notified automatically and will
    reply **in the issue** with next steps.
 
 That's it. The registrar reaches out to you — you never need a server
@@ -21,16 +22,18 @@ address or any private details.
 > server names, no account IDs. Anything sensitive is handled privately
 > after the registrar contacts you.
 
-## Institutions using wigamig
+## Installations using wigamig
 
-Pick your institution's name in the join form's **Institution** field.
+One institution may run **more than one** wigamig installation — a centre, a
+department, or a named group — so find yours by matching the institution
+*and* the description, then enter its **ID** on the join form.
 
-| Institution | Institution field |
-|---|---|
-| Western University | `western` |
+| Institution | Installation | ID (enter this on the form) |
+|---|---|---|
+| Western University | Bioconvergence Centre | `western` |
 
-**Don't see your institution?** It may not run wigamig yet — ask your PI
-or lab manager. (Institutions are added here by their registrar when they
+**Don't see your installation?** It may not run wigamig yet — ask your PI
+or lab manager. (Installations are added here by their registrar when they
 go live.)
 
 ## What is wigamig?
