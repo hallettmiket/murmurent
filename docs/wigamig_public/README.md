@@ -12,24 +12,22 @@ registrar**.
 
 ## How to join
 
-You'll send the registrar a short, **encrypted** join form. Only they can
-decrypt it. You need [`age`](https://age-encryption.org) (a tiny encryption
-tool — `brew install age`, or see their site).
+**Run one script.** It installs the encryption tool if you don't have it, asks
+you a few questions, encrypts your answers to your registrar's key, and opens
+your email app with the request ready to send.
 
-1. **Find your institution** in the directory below; note its **email** and
-   **age key**.
-2. **Download** [`join/join-form.txt`](join/join-form.txt) and
-   [`join/wigamig-join.sh`](join/wigamig-join.sh), and fill in the form.
-3. **Encrypt it:**
-   ```sh
-   sh wigamig-join.sh join-form.txt <the age1... key from the directory>
-   ```
-   This writes `join-request.age`.
-4. **Email `join-request.age`** to the registrar's address. Done — the
-   registrar decrypts it on their machine and follows up.
+```sh
+curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/wigamig_public/main/join/wigamig-join.sh
+sh wigamig-join.sh
+```
 
-Your netname isn't secret, but this keeps every detail off GitHub and readable
-only by your registrar.
+Then just press **Send** in the email that pops up. That's it — you don't edit
+any files, and **nothing about you is posted here**. Your request is encrypted
+so only your institution's registrar can read it; they reply and take it from
+there.
+
+(Prefer to do it by hand? [`join/join-form.txt`](join/join-form.txt) is the
+plain form, and the directory below has each registrar's email + encryption key.)
 
 ## Institutions using wigamig
 
