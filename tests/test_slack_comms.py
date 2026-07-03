@@ -1,0 +1,147 @@
+"""
+Tests for the Slack comms-fabric wiring (Phase B): lab/core channels named
+after the group, members-only, with the channel id persisted. All Slack I/O
+is injected — no test hits the wire.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from wigamig.core import centre_init as CI
+from wigamig.core import centre_provision as CP
+from wigamig.core import registrar as R
+from wigamig.core import slack_comms as SC
+
+
+@pytest.fixture
+def world(monkeypatch, tmp_path):
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("WIGAMIG_SLACK_TOKEN", raising=False)
+    fake_home = tmp_path / "home"
+    fake_home.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(R, "REGISTRAR_SENTINEL",
+                        fake_home / ".wigamig" / "registrar")
+    CI.init_centre(name="Demo", institution="Demo U", founding_mayor="@tbrowne",
+                   unique_name="demo", slack_workspace="T0DEMO",
+                   write_sentinel=False)
+    return tmp_path
+
+
+# ---- registrar helpers -------------------------------------------------
+
+def test_set_and_read_group_channel_and_email_map(world):
+    R.create_lab(name="lab_mh", display_name="MH Lab", pi_handle="@harry",
+                 pi_email="harry@demo.edu")
+    assert R.set_group_slack_channel("lab_mh", "C0LABMH") is True
+    reg = R.read_registry()
+    lab = next(l for l in reg.labs if l.name == "lab_mh")
+    assert lab.slack_channel_id == "C0LABMH"
+    # email map picks up the PI's email
+    assert R.group_email_map("lab_mh") == {"harry": "harry@demo.edu"}
+    # unknown group → no-op
+    assert R.set_group_slack_channel("nope", "C0X") is False
+
+
+# ---- slack_comms.ensure_group_channel ---------------------------------
+
+def test_ensure_group_channel_noop_without_token(world, monkeypatch):
+    monkeypatch.setattr(SC, "token_present", lambda: False)
+    assert SC.ensure_group_channel("lab_mh", {"harry": "h@d.edu"}) is None
+
+
+def test_ensure_group_channel_creates_and_invites(world, monkeypatch):
+    monkeypatch.setattr(SC, "token_present", lambda: True)
+    from wigamig.core.centre_provision import SlackChannelResult
+    seen = {}
+    def creator(name, *, private=True):
+        seen["name"] = name
+        seen["private"] = private
+        return SlackChannelResult(ok=True, channel_id="C0NEW",
+                                  channel_name=name, detail="created (HTTP 200)")
+    def inviter(cid, handles, *, member_email_map=None):
+        seen["invite"] = (cid, list(handles), member_email_map)
+        return {"channel_id": cid, "invited": handles, "already_in": [],
+                "unresolved": [], "error": None}
+    out = SC.ensure_group_channel("lab_mh", {"harry": "harry@demo.edu"},
+                                  creator=creator, inviter=inviter)
+    assert seen["name"] == "lab_mh"          # channel named after the group
+    assert seen["private"] is True           # private
+    assert out["channel_id"] == "C0NEW" and out["created"] is True
+    assert out["invited"] == ["harry"]
+    assert seen["invite"][0] == "C0NEW"
+
+
+# ---- provision_lab_onboarding integration -----------------------------
+
+def test_provision_creates_group_channel_and_persists_id(world, monkeypatch):
+    R.create_lab(name="lab_mh", display_name="MH Lab", pi_handle="@harry",
+                 pi_email="harry@demo.edu")
+    created_with = {}
+    def fake_slack(name, ws):
+        created_with["name"] = name
+        created_with["ws"] = ws
+        return "C0LABMH"
+    invited_with = {}
+    def fake_inviter(cid, handles, *, member_email_map=None):
+        invited_with["args"] = (cid, list(handles), member_email_map)
+        return {"invited": list(handles), "already_in": [], "unresolved": [],
+                "error": None}
+    probes = CP.provision_lab_onboarding(
+        "lab_mh", slack_creator=fake_slack, member_inviter=fake_inviter,
+        github_creator=lambda *a, **k: True,
+        acl_runner=lambda *a, **k: (0, "", ""),
+    )
+    # channel named after the group (not lab-<name>)
+    assert created_with["name"] == "lab_mh"
+    # channel id persisted on the lab entry
+    lab = next(l for l in R.read_registry().labs if l.name == "lab_mh")
+    assert lab.slack_channel_id == "C0LABMH"
+    # the PI (with email) was passed to the inviter
+    assert invited_with["args"][0] == "C0LABMH"
+    assert invited_with["args"][2] == {"harry": "harry@demo.edu"}
+    # a slack probe is present + ok
+    slack_probe = next(p for p in probes if p.name == "slack-channel")
+    assert slack_probe.status == "ok"
+
+
+def test_provision_skips_invite_without_token_or_inviter(world, monkeypatch):
+    """No injected inviter + no env token → channel made + id stored, but the
+    member invite is not attempted (the token-less-suite guarantee)."""
+    R.create_lab(name="lab_mh", display_name="MH", pi_handle="@harry",
+                 pi_email="harry@demo.edu")
+    probes = CP.provision_lab_onboarding(
+        "lab_mh", slack_creator=lambda n, w: "C0LABMH",
+        github_creator=lambda *a, **k: True,
+        acl_runner=lambda *a, **k: (0, "", ""),
+    )
+    lab = next(l for l in R.read_registry().labs if l.name == "lab_mh")
+    assert lab.slack_channel_id == "C0LABMH"           # created + stored
+    slack_probe = next(p for p in probes if p.name == "slack-channel")
+    assert "members: 0" in slack_probe.detail          # invite not attempted
+
+
+# ---- provision_centre_slack (mayor channel + broadcast seeding) -------
+
+def test_provision_centre_slack_creates_mayor_channel_and_seeds_broadcasts(world):
+    probes = CP.provision_centre_slack(
+        channel_creator=lambda name, ws: "C0OPS" if name == "wigamig-ops" else None,
+        channel_resolver=lambda name: "C0GEN" if name == "general" else None,
+    )
+    # mayor channel id persisted on the centre
+    assert CI.read_centre().mayor_channel_id == "C0OPS"
+    # broadcast_channels seeded: admin -> mayor channel, everyone -> #general
+    prof = R.read_profile()
+    assert prof["broadcast_channels"]["admin"] == "C0OPS"
+    assert prof["broadcast_channels"]["everyone"] == "C0GEN"
+    names = {p.name for p in probes}
+    assert {"mayor-channel", "general-channel"} <= names
+
+
+def test_provision_centre_slack_needs_workspace(world):
+    CI.update_centre({"slack_workspace": ""})
+    probes = CP.provision_centre_slack()
+    assert len(probes) == 1 and probes[0].status == "warn"
+    assert "slack_workspace" in probes[0].detail
