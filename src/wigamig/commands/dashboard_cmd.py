@@ -80,6 +80,23 @@ def _launch_hifi(*, host: str, port: int) -> int:
 
     click.echo(f"Hi-fi dashboard: http://{host}:{port}/")
     click.echo(f"  Data contract:   http://{host}:{port}/api/dashboard")
+
+    # Guardrail: if the dashboard is bound to a non-loopback address it is
+    # reachable off-machine — refuse to run wide-open unless a dashboard
+    # secret is configured (or the operator explicitly accepts the risk).
+    from ..dashboard import auth as _auth
+    loopback = host in ("127.0.0.1", "localhost", "::1", "")
+    if not loopback and not _auth.auth_enabled():
+        click.secho(
+            f"  ⚠ Exposed on {host}:{port} with NO dashboard auth — anyone who "
+            f"can reach it can act as registrar.",
+            fg="red", err=True,
+        )
+        click.secho(
+            f"    Set ${_auth.ENV_VAR} (or write {_auth.SECRET_FILE}) to require a "
+            f"login, then front it with TLS. See docs/setup.md.",
+            fg="yellow", err=True,
+        )
     click.echo("  Ctrl+C to stop.")
     import uvicorn
 
