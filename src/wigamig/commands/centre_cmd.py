@@ -484,3 +484,49 @@ def centre_slack_setup() -> None:
     if prof and prof.mayor_channel_id:
         click.echo(f"\nmayor↔CC channel: {prof.mayor_channel_id}  "
                    f"(events + `admin` broadcasts route here)")
+
+
+@click.command("centre-age-keygen",
+                help="Generate the centre's age key pair for the encrypted-email "
+                     "join flow. Writes the private key to ~/.wigamig/age/mayor.key "
+                     "and stores the public recipient on the centre (publish it in "
+                     "the wigamig_public directory).")
+def centre_age_keygen() -> None:
+    from ..core import age_crypto as _age
+    if not _age.age_available():
+        raise click.ClickException(
+            "age is not installed. Install it from https://age-encryption.org "
+            "(e.g. `brew install age`), then re-run.")
+    if _ci.read_centre() is None:
+        raise click.ClickException("no centre initialised; run `wigamig centre-init` first.")
+    try:
+        recipient = _age.keygen()
+    except _age.AgeError as exc:
+        raise click.ClickException(str(exc)) from exc
+    _ci.update_centre({"age_recipient": recipient})
+    click.echo(f"✓ private key: {_age.default_key_path()}  (mode 0600, keep it secret)")
+    click.echo(f"✓ public recipient (publish this in the directory):\n    {recipient}")
+
+
+@join_request_group.command("decrypt")
+@click.argument("path", type=click.Path(exists=True, dir_okay=False))
+def cmd_decrypt(path: str) -> None:
+    """Decrypt an emailed .age join form and file it as a join request.
+
+    The prospective member encrypted their form to the centre's public key
+    (see the wigamig_public directory) and emailed you the ciphertext. This
+    decrypts it with the centre's private key and files a pending request."""
+    from ..core import age_crypto as _age
+    from ..core import join_requests as _jr
+    from pathlib import Path as _P
+    try:
+        plaintext = _age.decrypt(_P(path).read_text(encoding="utf-8"))
+    except _age.AgeError as exc:
+        raise click.ClickException(str(exc)) from exc
+    try:
+        req = _jr.file_request_from_form(plaintext, source=path)
+    except _jr.JoinRequestError as exc:
+        raise click.ClickException(f"form invalid: {exc}") from exc
+    click.echo(f"Filed join request #{req.id:04d} ({req.kind} {req.proposed_name}, "
+               f"from {req.requester_email or 'unknown'}).")
+    click.echo(f"Approve with:  wigamig join-request approve {req.id}")
