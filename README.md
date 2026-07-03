@@ -10,6 +10,31 @@ Wigamig is **institution-agnostic** — it is not tied to any one university. A
 new institution stands it up by having one person (the **mayor**) bootstrap a
 *centre*; everyone else joins afterward.
 
+> **Just want to join a wigamig that already runs at your institution?**
+> You don't install anything — jump to [Join an existing wigamig](#join-an-existing-wigamig).
+
+---
+
+## Join an existing wigamig
+
+**Most people start here.** If your lab, centre, or institution already uses
+wigamig and you simply want to join, you do **not** install any software, and
+you do **not** need to know where anything is hosted.
+
+1. Go to the public onboarding hub:
+   **[github.com/hallettmiket/wigamig_public](https://github.com/hallettmiket/wigamig_public)**
+2. Find your institution in the list there, then open a **"Request to join a
+   wigamig centre"** issue.
+3. Fill in the short form — pick your institution, say what you'd like to join,
+   and add a sentence about who you are. **Don't include anything private**
+   (no passwords, server names, or account IDs).
+
+That's the whole thing. Your institution's registrar is notified automatically
+and replies **right in the issue** with your next steps.
+
+Everything below is only for people **setting up** wigamig at a new institution
+(administrators) or **building** wigamig itself (developers).
+
 ---
 
 ## Install wigamig at your institution (administrator / mayor)
