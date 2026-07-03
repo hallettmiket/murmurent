@@ -441,13 +441,20 @@ def slack_create_channel(
     """
     import os
     import httpx
-    tok = token if token is not None else os.environ.get("SLACK_BOT_TOKEN", "")
+    # Unified token: prefer WIGAMIG_SLACK_TOKEN, fall back to the legacy
+    # SLACK_BOT_TOKEN (both are workspace-scoped bot tokens). The posting /
+    # invite path (dashboard/slack_notify) additionally honours the
+    # ~/.config/wigamig/slack-token file.
+    tok = token if token is not None else (
+        os.environ.get("WIGAMIG_SLACK_TOKEN", "").strip()
+        or os.environ.get("SLACK_BOT_TOKEN", "").strip()
+    )
     if not tok:
         return SlackChannelResult(
             ok=False, channel_name=channel_name,
             error="missing_token",
-            detail="$SLACK_BOT_TOKEN is not set; pass token= or "
-                    "export it before running.",
+            detail="no Slack token: set $WIGAMIG_SLACK_TOKEN (or the legacy "
+                    "$SLACK_BOT_TOKEN), or pass token=.",
         )
     payload: dict = {"name": channel_name, "is_private": bool(private)}
     try:

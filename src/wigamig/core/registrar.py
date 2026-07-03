@@ -183,6 +183,7 @@ class LabEntry:
     status: str = "active"                 # "active" | "archived"
     created: str | None = None
     slack_workspace: str | None = None
+    slack_channel_id: str | None = None    # the lab's private Slack channel
     github_org: str | None = None
     oracle_vault: str | None = None
 
@@ -206,6 +207,7 @@ class CoreEntry:
     status: str = "active"
     created: str | None = None
     slack_workspace: str | None = None
+    slack_channel_id: str | None = None    # the core's private Slack channel
     github_org: str | None = None
     oracle_vault: str | None = None
 
@@ -241,6 +243,7 @@ def _coerce_lab(name: str, data: dict[str, Any]) -> LabEntry:
         status=str(data.get("status") or "active"),
         created=_opt_str(data.get("created")),
         slack_workspace=_opt_str(data.get("slack_workspace")),
+        slack_channel_id=_opt_str(data.get("slack_channel_id")),
         github_org=_opt_str(data.get("github_org")),
         oracle_vault=_opt_str(data.get("oracle_vault")),
     )
@@ -254,6 +257,7 @@ def _coerce_core(name: str, data: dict[str, Any]) -> CoreEntry:
         status=str(data.get("status") or "active"),
         created=_opt_str(data.get("created")),
         slack_workspace=_opt_str(data.get("slack_workspace")),
+        slack_channel_id=_opt_str(data.get("slack_channel_id")),
         github_org=_opt_str(data.get("github_org")),
         oracle_vault=_opt_str(data.get("oracle_vault")),
     )
@@ -395,6 +399,7 @@ def write_registry(reg: Registry, env: dict[str, str] | None = None) -> Path:
                 "status": lab.status,
                 "created": lab.created,
                 "slack_workspace": lab.slack_workspace,
+                "slack_channel_id": lab.slack_channel_id,
                 "github_org": lab.github_org,
                 "oracle_vault": lab.oracle_vault,
             }.items() if v is not None
@@ -407,6 +412,7 @@ def write_registry(reg: Registry, env: dict[str, str] | None = None) -> Path:
                 "status": core.status,
                 "created": core.created,
                 "slack_workspace": core.slack_workspace,
+                "slack_channel_id": core.slack_channel_id,
                 "github_org": core.github_org,
                 "oracle_vault": core.oracle_vault,
             }.items() if v is not None
@@ -736,6 +742,7 @@ def _render_pi_member_md(
     pi_at: str,
     pi_full_name: str | None,
     lab_name: str,
+    pi_email: str = "",
 ) -> str:
     """Render ``members/<pi>.md`` for the initial PI."""
     meta: dict[str, Any] = {
@@ -745,6 +752,8 @@ def _render_pi_member_md(
         "status": "active",
         "lab": lab_name,
     }
+    if pi_email:
+        meta["email"] = pi_email
     yaml_text = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip() + "\n"
     return f"---\n{yaml_text}---\n\n# {pi_at}\n"
 
@@ -755,6 +764,7 @@ def create_lab(
     display_name: str,
     pi_handle: str,
     pi_full_name: str | None = None,
+    pi_email: str = "",
     slack_workspace: str | None = None,
     github_org: str | None = None,
     oracle_vault: str | None = None,
@@ -813,6 +823,7 @@ def create_lab(
     pi_member_md.write_text(
         _render_pi_member_md(
             pi_at=pi_at, pi_full_name=pi_full_name, lab_name=name,
+            pi_email=pi_email,
         ),
         encoding="utf-8",
     )
@@ -1123,6 +1134,7 @@ def _render_core_leader_member_md(
     leader_at: str,
     leader_full_name: str | None,
     core_name: str,
+    leader_email: str = "",
 ) -> str:
     """Render members/<leader>.md with role 'core_leader' for the initial lead."""
     meta: dict[str, Any] = {
@@ -1132,6 +1144,8 @@ def _render_core_leader_member_md(
         "status": "active",
         "lab": core_name,  # the group field; "lab" key kept for shared plumbing
     }
+    if leader_email:
+        meta["email"] = leader_email
     yaml_text = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip() + "\n"
     return f"---\n{yaml_text}---\n\n# {leader_at}\n"
 
@@ -1188,6 +1202,7 @@ def create_core(
     display_name: str,
     leader_handle: str,
     leader_full_name: str | None = None,
+    leader_email: str = "",
     slack_workspace: str | None = None,
     github_org: str | None = None,
     oracle_vault: str | None = None,
@@ -1239,7 +1254,7 @@ def create_core(
     leader_md.write_text(
         _render_core_leader_member_md(
             leader_at=leader_at, leader_full_name=leader_full_name,
-            core_name=name,
+            core_name=name, leader_email=leader_email,
         ),
         encoding="utf-8",
     )

@@ -40,7 +40,11 @@ _CHAN_LAB_INFRA = "CDWPTRQ86"
 
 @lru_cache(maxsize=1)
 def _token() -> str | None:
-    """Return the bot token, or None if not configured."""
+    """Return the bot token, or None if not configured.
+
+    Resolution: ``$WIGAMIG_SLACK_TOKEN`` → ``~/.config/wigamig/slack-token``
+    → the legacy ``$SLACK_BOT_TOKEN`` (unified with centre_provision so a
+    single token drives both channel creation and posting/invites)."""
     env = os.environ.get("WIGAMIG_SLACK_TOKEN", "").strip()
     if env:
         return env
@@ -51,7 +55,7 @@ def _token() -> str | None:
                 return tok
         except OSError:
             pass
-    return None
+    return os.environ.get("SLACK_BOT_TOKEN", "").strip() or None
 
 
 def _project_channel_id(project_slug: str) -> str:
@@ -789,6 +793,29 @@ def sync_project_channel_members(
                     "unresolved": [{"handle": h, "reason": "project has no slack channel yet"}
                                    for h in member_handles],
                     "error": f"no slack channel for project {project_slug!r}"}
+
+    return invite_members_to_channel(
+        channel_id, member_handles, member_email_map=member_email_map)
+
+
+def invite_members_to_channel(
+    channel_id: str,
+    member_handles: list[str],
+    *,
+    member_email_map: dict[str, str] | None = None,
+) -> dict:
+    """Invite ``member_handles`` to an existing channel by id.
+
+    Resolves each handle→email→Slack user_id and batch-invites those not
+    already present. Same structured result + idempotency as
+    ``sync_project_channel_members`` (which now delegates here); reusable for
+    lab/core channels which have no CHARTER-derived slug. Best-effort."""
+    tok = _token()
+    if not tok:
+        return {"channel_id": channel_id, "invited": [], "already_in": [],
+                "unresolved": [{"handle": h, "reason": "no slack token configured"}
+                               for h in member_handles],
+                "error": "no slack token configured"}
 
     existing = _channel_member_ids(channel_id)
     email_map = member_email_map or {}

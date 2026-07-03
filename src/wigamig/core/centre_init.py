@@ -77,7 +77,8 @@ REQUIRED_KEYS = ("name", "institution", "founding_mayor")
 
 # All recognised keys (anything else is preserved but ignored by readers).
 KNOWN_KEYS = (
-    "name", "institution", "unique_name", "slack_workspace", "github_org",
+    "name", "institution", "unique_name", "slack_workspace",
+    "slack_invite_url", "mayor_channel_id", "github_org",
     "data_server", "server_host", "server_account", "cc_install_path",
     "obsidian_vault", "mayor_root", "public_hub",
     "raw_root", "refined_root",
@@ -102,6 +103,8 @@ class CentreProfile:
     founding_mayor: str                    # @handle (no leading @)
     unique_name: str = ""                  # non-institution-specific install id
     slack_workspace: str = ""
+    slack_invite_url: str = ""             # workspace join link (mayor pastes it)
+    mayor_channel_id: str = ""             # private mayor↔CC events channel
     github_org: str = ""
     data_server: str = ""                  # legacy alias of server_host
     server_host: str = ""                  # the "wigamig server" hostname/IP
@@ -163,6 +166,8 @@ def read_centre(env: dict[str, str] | None = None) -> CentreProfile | None:
         founding_mayor=mayor,
         unique_name=str(meta.get("unique_name") or "").strip(),
         slack_workspace=str(meta.get("slack_workspace") or "").strip(),
+        slack_invite_url=str(meta.get("slack_invite_url") or "").strip(),
+        mayor_channel_id=str(meta.get("mayor_channel_id") or "").strip(),
         github_org=str(meta.get("github_org") or "").strip(),
         data_server=str(meta.get("data_server") or "").strip(),
         server_host=str(meta.get("server_host") or "").strip(),
@@ -193,6 +198,8 @@ def _render_centre(profile: CentreProfile) -> str:
         "institution": profile.institution,
         "unique_name": profile.unique_name,
         "slack_workspace": profile.slack_workspace,
+        "slack_invite_url": profile.slack_invite_url,
+        "mayor_channel_id": profile.mayor_channel_id,
         "github_org": profile.github_org,
         "data_server": profile.data_server,
         "server_host": profile.server_host,
@@ -227,6 +234,7 @@ def init_centre(
     founding_mayor: str,
     unique_name: str = "",
     slack_workspace: str = "",
+    slack_invite_url: str = "",
     github_org: str = "",
     data_server: str = "",
     server_host: str = "",
@@ -277,6 +285,7 @@ def init_centre(
         founding_mayor=mayor_clean,
         unique_name=unique_name.strip(),
         slack_workspace=slack_workspace.strip(),
+        slack_invite_url=slack_invite_url.strip(),
         github_org=github_org.strip(),
         data_server=data_server.strip(),
         server_host=server_host.strip(),
