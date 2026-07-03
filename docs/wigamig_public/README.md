@@ -1,47 +1,39 @@
-# wigamig_public — seed contents for the global onboarding hub
+# Join a wigamig institution
 
-This directory holds the **seed files for the public `wigamig_public`
-repository** — the single global hub where anyone who wants to join a
-wigamig-enabled institution files a request. It is *not* wired into the
-wigamig package; it is content the mayor copies into a new public repo:
+**wigamig** is shared AI research infrastructure used by universities and
+research centres. If your institution already runs wigamig and you'd like
+to join a lab or core, this page is where you ask — it takes about two
+minutes, and you don't need to know where anything is hosted.
 
-```bash
-# create the public hub once (any neutral org; e.g. the wigamig project org)
-gh repo create hallettmiket/wigamig_public --public
-git clone https://github.com/hallettmiket/wigamig_public /tmp/wigamig_public
-cp -R docs/wigamig_public/. /tmp/wigamig_public/
-cd /tmp/wigamig_public && git add -A && git commit -m "seed wigamig_public hub" && git push
-```
+## How to join
 
-## What the hub is (and is not)
+1. **Find your institution** in the list below.
+2. Open a request: **[New issue → "Request to join a wigamig centre"](../../issues/new/choose)**.
+3. Fill in the short form — pick your institution, say what you'd like to
+   join, and add a sentence about who you are.
+4. Submit. Your institution's registrar is notified automatically and will
+   reply **in the issue** with next steps.
 
-**Is:** a public directory of participating institutions and a structured
-**GitHub-issue intake** for join requests. Each institution's wigamig
-watcher ingests the issues addressed to it (by `institution` label) into
-its private `join_requests/` queue, then routes them to the mayor + the
-relevant PI over Slack.
+That's it. The registrar reaches out to you — you never need a server
+address or any private details.
 
-**Is NOT:** a place for anything private. **No netnames, no server
-hostnames, no data paths, no tokens.** Those are exchanged over the
-private Slack channel *after* the registrar engages. The public issue
-carries only: which institution, what kind of unit, a proposed name, the
-requester's role, and a justification.
+> **Please don't put anything private in the issue** — no passwords, no
+> server names, no account IDs. Anything sensitive is handled privately
+> after the registrar contacts you.
 
-## How a prospective member uses it
+## Institutions using wigamig
 
-1. Open a **"Request to join a wigamig centre"** issue (the form in
-   [`.github/ISSUE_TEMPLATE/join.yml`](.github/ISSUE_TEMPLATE/join.yml)).
-2. Pick the target institution and fill in the (non-sensitive) fields.
-3. The institution's registrar is notified in Slack, reviews in the
-   `/registrar` dashboard, and follows up privately.
+Pick your institution's name in the join form's **Institution** field.
 
-## Institution directory
+| Institution | Institution field |
+|---|---|
+| _Your institution here_ | _its short name_ |
 
-Institutions add themselves here (public name + how to reach the
-registrar — again, **no private infra**). This table is illustrative:
+**Don't see your institution?** It may not run wigamig yet — ask your PI
+or lab manager. (Institutions are added here by their registrar when they
+go live.)
 
-| Institution | `unique_name` (issue label) | Registrar contact |
-|---|---|---|
-| _Example University_ | `exampleu` | via the join issue form |
+## What is wigamig?
 
-Each centre's mayor appends their row when they go live.
+Shared, open-source agentic-AI infrastructure for research groups —
+[github.com/hallettmiket/wigamig](https://github.com/hallettmiket/wigamig).
