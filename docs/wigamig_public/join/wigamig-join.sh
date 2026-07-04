@@ -21,6 +21,22 @@ say()  { printf '%s\n' "$*"; }
 ask()  { # ask "prompt" -> echoes the answer
   printf '%s' "$1" >&2; IFS= read -r _a || _a=""; printf '%s' "$_a"; }
 
+# URL-encode stdin (RFC-3986 unreserved kept, others %XX, newline %0A) so the
+# ciphertext can go straight into a mailto: body. age armor is ASCII.
+urlencode() {
+  while IFS= read -r _l || [ -n "$_l" ]; do
+    _r=$_l
+    while [ -n "$_r" ]; do
+      _c=${_r%"${_r#?}"}; _r=${_r#?}
+      case "$_c" in
+        [a-zA-Z0-9._~-]) printf '%s' "$_c" ;;
+        *) printf '%%%02X' "$(printf '%d' "'$_c")" ;;
+      esac
+    done
+    printf '%%0A'
+  done
+}
+
 # --- 1. ensure age ---------------------------------------------------------
 ensure_age() {
   command -v age >/dev/null 2>&1 && return 0
@@ -111,29 +127,34 @@ EOF
   say ""; say "✓ Encrypted your request to $OUT (only $EMAIL can read it)."
 
   # --- 5. hand off to email ---
+  # Pre-fill the encrypted request into the email BODY (mailto), so the message
+  # isn't empty. Also copy it to the clipboard + leave the file as fallbacks.
   BODY="$(cat "$OUT")"
   if command -v pbcopy >/dev/null 2>&1;   then printf '%s' "$BODY" | pbcopy;   COPIED=1
   elif command -v wl-copy >/dev/null 2>&1; then printf '%s' "$BODY" | wl-copy;  COPIED=1
   elif command -v xclip >/dev/null 2>&1;   then printf '%s' "$BODY" | xclip -selection clipboard; COPIED=1
   else COPIED=0; fi
 
-  SUBJECT="wigamig join request"
+  SUBJECT="wigamig%20join%20request"
+  BODY_ENC="$(printf '%s' "$BODY" | urlencode)"
   OPEN=""
   command -v open >/dev/null 2>&1 && OPEN="open"
   command -v xdg-open >/dev/null 2>&1 && OPEN="xdg-open"
   say ""
   if [ -n "$OPEN" ]; then
-    say "Opening your email app, addressed to ${EMAIL} ..."
-    $OPEN "mailto:${EMAIL}?subject=${SUBJECT}" >/dev/null 2>&1 || true
+    say "Opening your email app, addressed to ${EMAIL}, with the encrypted"
+    say "request already in the message body. Just press Send."
+    $OPEN "mailto:${EMAIL}?subject=${SUBJECT}&body=${BODY_ENC}" >/dev/null 2>&1 || true
+    say ""
+    say "If the message is empty (some email apps ignore a pre-filled body):"
   else
-    say "Email this to: ${EMAIL}   (subject: ${SUBJECT})"
+    say "Email this to: ${EMAIL}   (subject: wigamig join request)"
+    say "Put the encrypted request in the body:"
   fi
   if [ "$COPIED" = 1 ]; then
-    say "Your encrypted request is on the clipboard — paste it (Cmd/Ctrl-V) into"
-    say "the email body, OR attach the file $OUT. Then press Send."
-  else
-    say "Attach the file $OUT to the email (or paste its contents), then Send."
+    say "  • it's on your clipboard — paste with Cmd/Ctrl-V, OR"
   fi
+  say "  • attach the file $OUT  (in $(pwd))."
 
   # --- 6. what happens next --------------------------------------------------
   say ""
