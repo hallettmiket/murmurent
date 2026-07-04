@@ -294,13 +294,19 @@ def cmd_show(req_id: int) -> None:
               help="Approve the record only; skip the Slack/GitHub/FS provisioning step.")
 def cmd_approve(req_id: int, actor: str, no_provision: bool) -> None:
     from ..core import join_requests as _jr
+    from ..core import centre_provision as _cp
     if not actor:
         actor = os.environ.get("WIGAMIG_USER", "")
     if not actor:
         raise click.ClickException("--actor required (or set $WIGAMIG_USER)")
+    # Approving is a deliberate mayor action → resolve the Slack token from env
+    # OR the mode-0600 ~/.config/wigamig/slack-token file, so lab/core
+    # provisioning actually creates the channel + invites members without
+    # requiring the mayor to export a token first.
+    tok = _cp.resolve_slack_token(allow_file=True)
     try:
         r = _jr.approve(req_id=req_id, actor=actor,
-                          provision=not no_provision)
+                          provision=not no_provision, token=tok or None)
     except _jr.JoinRequestError as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(f"Request #{r.id:04d} → {r.state} (by @{actor})")

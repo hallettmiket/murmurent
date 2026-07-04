@@ -336,6 +336,7 @@ def provision_lab_onboarding(
     member_inviter=None,            # injectable: (channel_id, handles, member_email_map) -> dict
     github_creator=None,            # injectable: (org, repo, members) -> bool
     acl_runner=None,                # injectable: same shape as apply_fs_acl runner
+    token: str | None = None,       # explicit token (file-aware) for the live path
 ) -> list[Probe]:
     """Provision Slack channel + GitHub repo + filesystem ACLs for a
     newly-approved lab.
@@ -369,7 +370,16 @@ def provision_lab_onboarding(
     #    group's members invited. The channel name is the group's own name
     #    (normalized to Slack rules), e.g. lab_mh -> #lab_mh.
     if slack_creator is None:
-        slack_creator = _live_slack_create_channel
+        # When an explicit (file-aware) token is passed — e.g. from
+        # `join-request approve`, a deliberate mayor action — use it for the
+        # live create so the channel is made even if the token is only in the
+        # ~/.config token file. Unattended paths pass token=None → env-only.
+        if token:
+            def slack_creator(name, ws, _tok=token):
+                res = slack_create_channel(name, workspace_id=ws, private=True, token=_tok)
+                return res.channel_id if res.ok else None
+        else:
+            slack_creator = _live_slack_create_channel
     if centre.slack_workspace:
         try:
             from . import registrar as _reg
@@ -379,10 +389,11 @@ def provision_lab_onboarding(
             if channel_id:
                 _reg.set_group_slack_channel(lab_name, channel_id, env=env)
                 # Invite members. Gated so the token-less test suite never
-                # hits the wire: only when an inviter is injected OR an env
-                # Slack token is present (mirrors the creator's env gating).
+                # hits the wire: an injected inviter, an explicit token, or an
+                # env Slack token. (invite_members_to_channel itself reads the
+                # ~/.config token file, so an explicit token unblocks the gate.)
                 invited_n = 0
-                if member_inviter is not None or _has_env_slack_token():
+                if member_inviter is not None or token or _has_env_slack_token():
                     inviter = member_inviter or _sn.invite_members_to_channel
                     email_map = _reg.group_email_map(lab_name, env=env)
                     inv = inviter(channel_id, list(email_map.keys()),
