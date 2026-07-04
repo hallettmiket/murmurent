@@ -104,7 +104,11 @@ if [ "$LEVEL" = install ] || [ "$LEVEL" = full ]; then
   if [ ! -d "$REPO" ]; then
     say "  !! repo not found at $REPO — set WIGAMIG_REPO. Skipping reinstall."
   else
-    run "cd '$REPO' && uv tool install --force --python 3.12 -e '.[dashboard,slack,mcp]'"
+    # Record the dashboard/Slack/MCP deps as --with requirements, NOT as
+    # `-e '.[extras]'`. uv does not persist an editable install's extras in
+    # its receipt, so on the next re-sync it drops them (fastapi disappears);
+    # --with deps ARE persisted and survive re-syncs.
+    run "cd '$REPO' && uv tool install --force --python 3.12 -e . --with streamlit --with fastapi --with uvicorn --with httpx --with slack-sdk --with anthropic --with mcp"
     run "cd '$REPO' && bash scripts/setup.sh"
     run "wigamig install --hooks"
   fi
