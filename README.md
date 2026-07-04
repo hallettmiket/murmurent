@@ -99,6 +99,30 @@ wigamig centre-init --mayor @<your-handle> \
 wigamig centre-status      # confirms you are the founding registrar
 ```
 
+### After bootstrap: make your centre joinable
+
+`centre-init` creates the centre but does **not** publish anything or wire
+Slack — those stay deliberate, opt-in steps. The `/registrar` page shows a
+**Slack** card and a **Public hub listing** card walking you through them; in
+short:
+
+1. **Encryption key for join requests.** `centre-init` generates an `age`
+   keypair automatically (so members can send you encrypted join requests). If
+   you ever need to (re)create it: `wigamig centre-age-keygen`. The public key
+   is stamped on your centre profile.
+
+2. **Get listed on the public hub** so members can find you. Nothing is posted
+   to GitHub automatically. Add one row — `Institution (Centre) <TAB> join-email
+   <TAB> age-public-key` — to the hub's
+   [`join/directory.tsv`](https://github.com/hallettmiket/wigamig_public) and
+   README table, then push. The `/registrar` "Public hub listing" card prints
+   the exact row for you. Details: [`docs/connect_to_hub.md`](docs/connect_to_hub.md).
+
+3. **Set up Slack** (the centre's communication fabric). You create a Slack
+   workspace named `wigamig-<unique-name>`, add a bot token, and smoke-test it
+   with `wigamig centre-slack-smoke`. Full guide:
+   [`docs/slack_setup.md`](docs/slack_setup.md).
+
 Once the centre exists on your laptop, move it to the always-online **wigamig
 server** by following [`docs/setup.md`](docs/setup.md) → *"Deploying a centre on
 a dedicated Ubuntu server"*. Onboarding of other labs, cores, and members comes
