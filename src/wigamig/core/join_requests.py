@@ -369,6 +369,7 @@ def approve(
                 name=req.proposed_name,
                 display_name=req.proposed_name,
                 pi_handle=pi_handle,
+                pi_email=req.requester_email,   # so the PI can be invited to the channel
                 env=env,
             )
         except Exception as exc:
@@ -385,6 +386,7 @@ def approve(
                 name=req.proposed_name,
                 display_name=req.proposed_name,
                 leader_handle=pi_handle,
+                leader_email=req.requester_email,   # so the leader can be invited
                 env=env,
             )
         except Exception as exc:
