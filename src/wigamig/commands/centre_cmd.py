@@ -510,6 +510,53 @@ def centre_age_keygen() -> None:
     click.echo(f"✓ public recipient (publish this in the directory):\n    {recipient}")
 
 
+@click.command("centre-hub-publish",
+                help="Prepare this centre's listing in the public wigamig_public "
+                     "hub: clone it if needed, then add/update your row in "
+                     "join/directory.tsv and the README table. Stops BEFORE "
+                     "commit/push — publishing to the public repo stays your call.")
+@click.option("--hub-dir", type=click.Path(file_okay=False), default=None,
+              help="Where to clone/find your wigamig_public checkout "
+                   "(default: ~/repos/wigamig_public).")
+@click.option("--remote", default=None,
+              help="Hub git remote to clone from (default: the public hub).")
+def centre_hub_publish(hub_dir: str | None, remote: str | None) -> None:
+    from pathlib import Path as _P
+    from ..core import hub_publish as _hp
+
+    prof = _ci.read_centre()
+    if prof is None:
+        raise click.ClickException("no centre initialised; run `wigamig centre-init` first.")
+    if not (getattr(prof, "age_recipient", "") or "").strip():
+        raise click.ClickException(
+            "no age key on the centre yet — run `wigamig centre-age-keygen` first "
+            "so members can send you encrypted join requests.")
+    try:
+        res = _hp.prepare_listing(
+            institution=prof.institution, name=prof.name,
+            email=prof.join_email, recipient=prof.age_recipient,
+            hub_dir=_P(hub_dir) if hub_dir else None,
+            remote=remote or _hp.DEFAULT_HUB_REMOTE,
+        )
+    except _hp.HubPublishError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"hub clone:     {res.hub_dir}"
+               + ("  (freshly cloned)" if res.cloned else "  (reused existing)"))
+    click.echo(f"directory.tsv: {res.directory_action}")
+    click.echo(f"README table:  {res.readme_action}")
+    click.echo(f"\nYour directory row:\n    {res.row}")
+    if res.directory_action == "unchanged" and res.readme_action == "unchanged":
+        click.echo("\nAlready listed — nothing to publish.")
+        return
+    click.echo("\nReview the change, then publish (the one deliberate, public step):")
+    click.echo(f"    cd {res.hub_dir}")
+    click.echo("    git diff                       # eyeball it")
+    click.echo("    git add join/directory.tsv README.md")
+    click.echo(f'    git commit -m "directory: list {prof.name}"')
+    click.echo("    git push")
+
+
 @join_request_group.command("decrypt")
 @click.argument("path", type=click.Path(exists=True, dir_okay=False))
 def cmd_decrypt(path: str) -> None:
