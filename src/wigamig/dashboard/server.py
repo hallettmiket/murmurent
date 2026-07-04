@@ -6559,6 +6559,7 @@ def create_app() -> FastAPI:
             "founding_mayor": f"@{p.founding_mayor}",
             "unique_name": p.unique_name,
             "join_email": p.join_email,
+            "age_recipient": getattr(p, "age_recipient", "") or "",
             "slack_workspace": p.slack_workspace,
             "github_org": p.github_org,
             "data_server": p.data_server,
@@ -6639,6 +6640,20 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc))
         except _ci.CentreInitError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
+
+        # Best-effort: generate the age keypair now so the centre is
+        # immediately join-ready (members can send encrypted join requests).
+        # Non-fatal — if age isn't installed or a key already exists, skip it;
+        # the mayor can run `wigamig centre-age-keygen` later. The public key
+        # is stamped on the profile; the private key stays local.
+        try:
+            from ..core import age_crypto as _age
+            if _age.age_available() and not _age.default_key_path().exists():
+                recipient = _age.keygen()
+                _ci.update_centre({"age_recipient": recipient})
+                profile = _ci.read_centre() or profile
+        except Exception:
+            pass
         return {"ok": True, "profile": _centre_profile_to_dict(profile)}
 
     # ------------------------------------------------------------------
@@ -6882,8 +6897,41 @@ def create_app() -> FastAPI:
         def _html_page(filename: str) -> HTMLResponse:
             """Serve a dashboard HTML file with the session-login modal
             injected before </body>. The modal is inert unless the server
-            challenges a mutating request with 401 (auth enabled)."""
+            challenges a mutating request with 401 (auth enabled).
+
+            Also injects a subtle "which wigamig installation am I in" badge
+            (top-right) on every page once a centre exists, so no page leaves
+            the reader guessing which centre they're looking at."""
             html = (STATIC_DIR / filename).read_text(encoding="utf-8")
+
+            # Installation badge — best-effort; absent before a centre exists.
+            try:
+                from ..core import centre_init as _ci
+                _centre = _ci.read_centre()
+            except Exception:
+                _centre = None
+            if _centre is not None and getattr(_centre, "name", ""):
+                import html as _htmllib
+                import re as _re
+                _label = _htmllib.escape(_centre.name)
+                _inst = _htmllib.escape(_centre.institution or "")
+                _badge = (
+                    '<div id="wigamig-centre-badge" title="' + _label
+                    + (' &middot; ' + _inst if _inst else '') + '" '
+                    'style="position:fixed;top:6px;right:12px;z-index:9998;'
+                    'font:600 11px/1.5 system-ui,-apple-system,sans-serif;'
+                    'color:#4a5568;background:rgba(255,255,255,.9);'
+                    'border:1px solid #dfe3ea;border-radius:11px;padding:2px 9px;'
+                    'pointer-events:none;box-shadow:0 1px 2px rgba(0,0,0,.06);">'
+                    'wigamig &middot; ' + _label + '</div>'
+                )
+                if _re.search(r"<body[^>]*>", html):
+                    html = _re.sub(r"<body[^>]*>",
+                                   lambda m: m.group(0) + "\n" + _badge,
+                                   html, count=1)
+                else:
+                    html = _badge + html
+
             if _AUTH_MODAL_TAG not in html:
                 if "</body>" in html:
                     html = html.replace("</body>", _AUTH_MODAL_TAG + "\n</body>", 1)

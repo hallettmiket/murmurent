@@ -597,7 +597,42 @@
           + row('Join email (public contact)', centre.join_email)
           + row('Created', centre.created)
           + '</div></div>';
-        html = centreHtml + html;
+
+        // Centre setup checklist — the post-bootstrap steps a new mayor still
+        // has to do. Surfaced here because nothing previously told the mayor
+        // about Slack setup or how to get listed on the public hub.
+        const uniq = centre.unique_name || 'centre';
+        const wsName = 'wigamig-' + uniq;
+        const dirRow = (centre.institution || 'Institution')
+          + ' (' + (centre.name || 'centre') + ')\t'
+          + (centre.join_email || 'YOUR_EMAIL') + '\t'
+          + (centre.age_recipient || 'age1…  (run: wigamig centre-age-keygen)');
+        const slackHtml = '<div class="panel" id="slack-setup-card">'
+          + '<header><h2>Slack</h2><span class="meta">centre communication fabric</span></header>'
+          + '<div>'
+          + (centre.slack_workspace
+              ? '<p>Declared workspace id: <span class="mono">' + escapeHTML(centre.slack_workspace) + '</span></p>'
+              : '<p><strong>No Slack workspace declared yet.</strong></p>')
+          + '<p>As the mayor you create the Slack workspace yourself, then wire a bot token so wigamig can post events and manage channels:</p>'
+          + '<ol style="margin:4px 0 4px 18px; line-height:1.6;">'
+          + '<li>Create a Slack workspace named <span class="mono">' + escapeHTML(wsName) + '</span> (or reuse one) with a <span class="mono">#general</span> channel.</li>'
+          + '<li>Add a Slack app + bot token (scopes: <span class="mono">channels:manage, groups:write, chat:write, users:read.email</span>) and install it.</li>'
+          + '<li><span class="mono">export WIGAMIG_SLACK_TOKEN=xoxb-…</span></li>'
+          + '<li><span class="mono">wigamig centre-slack-smoke</span> — verify it works.</li>'
+          + '</ol>'
+          + '<p class="meta">Full guide: <span class="mono">docs/slack_setup.md</span>. Until a token is wired, channel + broadcast provisioning is skipped (no-op).</p>'
+          + '</div></div>';
+        const hubHtml = '<div class="panel" id="hub-publish-card">'
+          + '<header><h2>Public hub listing</h2><span class="meta">how members find &amp; join you</span></header>'
+          + '<div>'
+          + (centre.age_recipient
+              ? '<p>Encryption key ready ✓ — members can send you an encrypted join request.</p>'
+              : '<p><strong>No encryption key yet.</strong> Run <span class="mono">wigamig centre-age-keygen</span> so members can send encrypted join requests.</p>')
+          + '<p>Your centre is <strong>not auto-posted</strong> to GitHub — nothing about you is published without your say-so. To be listed so members can find you, add this one row to the hub directory:</p>'
+          + '<pre class="mono" style="white-space:pre-wrap; background:#f6f8fa; border:1px solid #e1e4e8; border-radius:6px; padding:8px; font-size:11px;">' + escapeHTML(dirRow) + '</pre>'
+          + '<p class="meta">Add it to <span class="mono">wigamig_public/join/directory.tsv</span> + the README table (see <span class="mono">docs/connect_to_hub.md</span>), then push the hub repo. This is the only step that publishes anything public, so it stays deliberate.</p>'
+          + '</div></div>';
+        html = centreHtml + slackHtml + hubHtml + html;
       }
 
       html += '<div class="panel"><header><h2>Labs</h2>'
