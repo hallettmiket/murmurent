@@ -12,6 +12,21 @@ dependencies = [
     "click>=8.1",
     "pyyaml>=6.0",
     "rich>=13.7",
+    # Runtime deps for the hi-fi dashboard (FastAPI server), Slack comms, and
+    # the MCP servers. Kept as HARD deps — NOT optional extras — on purpose:
+    # `uv` does not persist an editable tool's extras in its receipt, so any
+    # bare `uv tool install .` / `--reinstall .` / re-sync silently dropped them
+    # and repeatedly broke `wigamig dashboard`. As base deps they install no
+    # matter how wigamig is installed. Only heavy streamlit (low-fi dashboard)
+    # stays optional, under the `dashboard` extra below.
+    "httpx>=0.27",
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+    "python-multipart>=0.0.9",
+    "sse-starlette>=2.0",
+    "slack-sdk>=3.30",
+    "anthropic>=0.40",
+    "mcp>=1.0",
 ]
 
 [project.optional-dependencies]

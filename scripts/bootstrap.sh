@@ -117,7 +117,12 @@ fi
 
 # ── 3. CLI ───────────────────────────────────────────────────────────────────
 step "3/6 installing the wigamig CLI"
-( cd "$REPO_DIR" && uv tool install --reinstall . >/dev/null )
+# Install EDITABLE (-e) from the working clone: a non-editable `uv tool install .`
+# relocates the package into site-packages, where the dashboard's static assets
+# (docs/designer_dashboard/, not shipped in the wheel) can't be found -> the
+# hi-fi dashboard 500s. Pin 3.12 (wigamig needs >=3.12). Dashboard/Slack/MCP
+# deps are hard deps in pyproject, so they come along automatically.
+( cd "$REPO_DIR" && uv tool install --reinstall --python 3.12 -e . >/dev/null )
 export PATH="$HOME/.local/bin:$PATH"
 command -v wigamig >/dev/null 2>&1 || fail "wigamig not on PATH after install (check ~/.local/bin)"
 ok "wigamig: $(wigamig --version 2>/dev/null | head -1)"

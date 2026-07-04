@@ -82,16 +82,14 @@ main() {
   need_uv
   get_code
 
-  say ""; say "Installing the 'wigamig' command (with dashboard + Slack + tools) ..."
-  # Record the dashboard (fastapi/uvicorn), Slack, and MCP deps as --with
-  # requirements rather than `-e '.[extras]'`: uv does NOT persist an editable
-  # install's extras in its tool receipt, so it silently drops them on the next
-  # re-sync (and `wigamig dashboard` breaks again). --with deps ARE persisted.
-  # Pin Python 3.12 (wigamig needs >=3.12) so we don't inherit a system/conda
-  # default that's too old — uv fetches a managed 3.12 if there isn't one.
-  ( cd "$DEST" && uv tool install --python 3.12 -e . \
-      --with streamlit --with fastapi --with uvicorn --with httpx \
-      --with slack-sdk --with anthropic --with mcp )
+  say ""; say "Installing the 'wigamig' command ..."
+  # Editable (-e) install from the clone, pinned to Python 3.12 (wigamig needs
+  # >=3.12 — uv fetches a managed 3.12 if the system default is older). The
+  # dashboard (fastapi/uvicorn), Slack, and MCP deps are HARD deps in pyproject,
+  # so they install automatically. -e keeps the package in the clone so the
+  # dashboard's static assets resolve. (Low-fi streamlit dashboard is the one
+  # optional extra: add `'.[dashboard]'` if you want it.)
+  ( cd "$DEST" && uv tool install --python 3.12 -e . )
 
   say ""; say "Wiring shared agents + rules into ~/.claude/ ..."
   ( cd "$DEST" && bash scripts/setup.sh )
