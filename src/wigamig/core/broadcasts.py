@@ -233,11 +233,15 @@ def send_broadcast(
     text = f"📣 *{audience_clean}* broadcast from @{sender_clean}\n{message.strip()}"
     if poster is None:
         from ..dashboard import slack_notify as _slack
-        link = ""
         try:
-            link = _slack.post_and_link(cid, text) or ""
-        except Exception as exc:
-            raise BroadcastError(f"Slack post failed: {exc}") from exc
+            res = _slack.post_message_result(cid, text)
+        except Exception as exc:  # unexpected — surface it, don't log a phantom send
+            raise BroadcastError(f"Slack post to {cid} failed: {exc}") from exc
+        if not res.ok:
+            # A rejected post is NOT a broadcast — raise before the ledger write
+            # so the audit log never records a send that didn't happen.
+            raise BroadcastError(f"Slack post to {cid} failed ({res.error}): {res.detail}")
+        link = res.link
     else:
         link = poster(cid, text) or ""
     b = Broadcast(
