@@ -529,6 +529,41 @@ def provision_centre_slack(
     # 2. Broadcast audiences: admin → mayor channel, everyone → #general.
     profile = _reg.read_profile(env)
     bc = dict(profile.get("broadcast_channels") or {})
+
+    # 1b. Invite the mayor to their own private channel. The bot CREATED
+    # #wigamig-ops, so it's the only member — the human mayor can't even see it
+    # until they're added. Needs the mayor's email (registrar profile → centre
+    # join_email) and users:read.email + invite scopes.
+    if mayor_id and (channel_creator is None):
+        mayor_handle = (centre.founding_mayor or "").strip()
+        mayor_email = (str(profile.get("email") or "").strip()
+                       or (centre.join_email or "").strip())
+        if mayor_handle and mayor_email and (token or _has_env_slack_token()):
+            try:
+                from ..dashboard import slack_notify as _sn
+                inv = _sn.invite_members_to_channel(
+                    mayor_id, [mayor_handle],
+                    member_email_map={mayor_handle.lstrip("@").lower(): mayor_email})
+                if mayor_handle in inv.get("invited", []):
+                    probes.append(Probe(name="mayor-invite", status="ok",
+                                        detail=f"added {mayor_handle} to #wigamig-ops"))
+                elif mayor_handle in inv.get("already_in", []):
+                    probes.append(Probe(name="mayor-invite", status="ok",
+                                        detail=f"{mayor_handle} already in #wigamig-ops"))
+                else:
+                    why = (inv.get("unresolved") or [{}])[0].get("reason", "") \
+                        or inv.get("error", "")
+                    probes.append(Probe(name="mayor-invite", status="warn",
+                        detail=f"couldn't add {mayor_handle} to #wigamig-ops"
+                               + (f" ({why})" if why else "")
+                               + " — open the channel in Slack and add yourself."))
+            except Exception as exc:  # noqa: BLE001
+                probes.append(Probe(name="mayor-invite", status="warn",
+                                    detail=f"mayor invite error: {exc}"))
+        elif mayor_handle and not mayor_email:
+            probes.append(Probe(name="mayor-invite", status="warn",
+                detail="no mayor email on record — set the centre join_email (or your "
+                       "registrar profile email) so you can be added to #wigamig-ops."))
     if mayor_id:
         bc["admin"] = mayor_id
     if channel_resolver is not None or token or _has_env_slack_token():
