@@ -303,6 +303,31 @@ def _has_env_slack_token() -> bool:
                 or os.environ.get("SLACK_BOT_TOKEN", "").strip())
 
 
+def resolve_slack_token(*, allow_file: bool = False) -> str:
+    """Resolve a Slack bot token for EXPLICIT mayor commands.
+
+    Env first (``WIGAMIG_SLACK_TOKEN`` → ``SLACK_BOT_TOKEN``); when
+    ``allow_file`` is set, fall back to the mode-0600
+    ``~/.config/wigamig/slack-token`` file — the same source the long-running
+    dashboard uses — so a mayor doesn't have to re-export the token in every
+    terminal. **Automatic** provisioning must NOT pass ``allow_file=True``:
+    keeping that path env-only (see :func:`_has_env_slack_token`) is what stops
+    a stale token file from firing live Slack calls unattended.
+    """
+    tok = (os.environ.get("WIGAMIG_SLACK_TOKEN", "").strip()
+           or os.environ.get("SLACK_BOT_TOKEN", "").strip())
+    if tok or not allow_file:
+        return tok
+    try:
+        from pathlib import Path
+        f = Path.home() / ".config" / "wigamig" / "slack-token"
+        if f.is_file():
+            return f.read_text(encoding="utf-8").strip()
+    except Exception:  # noqa: BLE001
+        pass
+    return ""
+
+
 def provision_lab_onboarding(
     lab_name: str,
     *,
@@ -434,6 +459,7 @@ def provision_centre_slack(
     env: dict[str, str] | None = None,
     channel_creator=None,     # injectable: (channel_name, ws_id) -> str | None
     channel_resolver=None,    # injectable: (channel_name) -> str | None
+    token: str | None = None,  # explicit token for the live path (env-only if None)
 ) -> list[Probe]:
     """Provision the centre's Slack fabric: the private mayor↔CC channel
     (``#wigamig-ops``, stored as ``mayor_channel_id``) and the broadcast
@@ -474,7 +500,7 @@ def provision_centre_slack(
         # error (missing_scope / invalid_auth / channel_not_found / …) instead
         # of a bare "could not be created".
         res = slack_create_channel("wigamig-ops", workspace_id=centre.slack_workspace,
-                                   private=True)
+                                   private=True, token=token)
         if res.ok:
             mayor_id = res.channel_id or ""
             probes.append(Probe(name="mayor-channel", status="ok",
@@ -505,7 +531,7 @@ def provision_centre_slack(
     bc = dict(profile.get("broadcast_channels") or {})
     if mayor_id:
         bc["admin"] = mayor_id
-    if channel_resolver is not None or _has_env_slack_token():
+    if channel_resolver is not None or token or _has_env_slack_token():
         if channel_resolver is None:
             from ..dashboard import slack_notify as _sn
             channel_resolver = _sn._lookup_channel_id_by_name

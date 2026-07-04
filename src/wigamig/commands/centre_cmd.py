@@ -371,14 +371,14 @@ def centre_slack_smoke(channel: str, public: bool, keep: bool) -> None:
     returns an error code. Cleans up the probe channel unless --keep.
     """
     import datetime as _dt
-    import os
     from ..core import centre_provision as _cp
 
-    if not (os.environ.get("WIGAMIG_SLACK_TOKEN") or os.environ.get("SLACK_BOT_TOKEN")):
+    tok = _cp.resolve_slack_token(allow_file=True)
+    if not tok:
         raise click.ClickException(
-            "$WIGAMIG_SLACK_TOKEN is not set (legacy $SLACK_BOT_TOKEN also works). "
-            "Get a bot token with 'groups:write' (private) or 'channels:manage' "
-            "(public) scope from your Slack app's OAuth settings and export it:\n"
+            "no Slack token found. Set $WIGAMIG_SLACK_TOKEN (legacy $SLACK_BOT_TOKEN "
+            "also works) or put it in ~/.config/wigamig/slack-token (mode 0600). "
+            "The bot needs 'groups:write' (private) or 'channels:manage' (public):\n"
             "    export WIGAMIG_SLACK_TOKEN=xoxb-..."
         )
 
@@ -392,7 +392,7 @@ def centre_slack_smoke(channel: str, public: bool, keep: bool) -> None:
     click.echo(f"keep:          {keep}")
     click.echo()
 
-    res = _cp.slack_create_channel(channel, private=not public)
+    res = _cp.slack_create_channel(channel, private=not public, token=tok)
     if res.ok:
         click.echo(f"✓ created channel {res.channel_id} ({res.channel_name})")
         click.echo(f"  detail: {res.detail}")
@@ -422,11 +422,10 @@ def _archive_probe_channel(channel_id: str) -> bool:
     """Archive a channel via Slack's conversations.archive. Returns
     True on success; best-effort (no exceptions). Used by the smoke
     CLI to clean up after itself."""
-    import os
     try:
         import httpx
-        tok = (os.environ.get("WIGAMIG_SLACK_TOKEN", "").strip()
-               or os.environ.get("SLACK_BOT_TOKEN", "").strip())
+        from ..core import centre_provision as _cp
+        tok = _cp.resolve_slack_token(allow_file=True)
         if not tok:
             return False
         r = httpx.post(
@@ -474,7 +473,10 @@ def centre_status() -> None:
                      "set on the centre.")
 def centre_slack_setup() -> None:
     from ..core import centre_provision as _cp
-    probes = _cp.provision_centre_slack()
+    # Explicit mayor command → resolve the token from env OR the mode-0600
+    # ~/.config/wigamig/slack-token file, so it works in any terminal.
+    tok = _cp.resolve_slack_token(allow_file=True)
+    probes = _cp.provision_centre_slack(token=tok or None)
     any_block = False
     for p in probes:
         mark = {"ok": "✓", "warn": "!", "block": "✗"}.get(p.status, "-")
