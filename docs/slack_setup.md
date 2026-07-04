@@ -14,8 +14,13 @@ marked **[manual]**.
 In Slack, create a workspace named **`wigamig-<unique_name>`** (e.g.
 `wigamig-bioconvergence`). Then:
 
-- Create a **`#general`** channel if one doesn't already exist (it's the
-  broadcast channel for everyone).
+- **Create a channel named exactly `#general`.** Newer Slack workspaces **no
+  longer ship with a `#general`** (you may see `#social` or a welcome channel
+  instead) — so you almost certainly have to create it yourself: *+ → Create a
+  channel → name it `general` → Create*. wigamig broadcasts to *everyone* through
+  this channel, and `centre-slack-setup` looks it up by that exact name; if it's
+  missing you'll get a `#general not found; create it in Slack` warning and
+  broadcasts to `everyone` won't have a target.
 - Grab the **workspace invite link**: *Invite people → Copy invite link*. You'll
   give this to new members during onboarding.
 

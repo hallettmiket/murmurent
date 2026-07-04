@@ -615,8 +615,9 @@
               : '<p><strong>No Slack workspace declared yet.</strong></p>')
           + '<p>As the mayor you create the Slack workspace yourself, then wire a bot token so wigamig can post events and manage channels:</p>'
           + '<ol style="margin:4px 0 4px 18px; line-height:1.6;">'
-          + '<li>Create a Slack workspace named <span class="mono">' + escapeHTML(wsName) + '</span> (or reuse one) with a <span class="mono">#general</span> channel.</li>'
-          + '<li>Add a Slack app + bot token (scopes: <span class="mono">channels:manage, groups:write, chat:write, users:read.email</span>) and install it.</li>'
+          + '<li>Create a Slack workspace named <span class="mono">' + escapeHTML(wsName) + '</span> (or reuse one).</li>'
+          + '<li><strong>Create a channel named exactly <span class="mono">#general</span></strong> — new Slack workspaces don\'t include one (you may see <span class="mono">#social</span> instead). wigamig broadcasts to everyone through it.</li>'
+          + '<li>Add a Slack app + bot token (scopes: <span class="mono">channels:manage, groups:write, chat:write, users:read.email, channels:read, groups:read</span>), install it, then <span class="mono">/invite</span> the bot to <span class="mono">#general</span>. See <span class="mono">docs/slack_setup.md</span> for the click-by-click.</li>'
           + '<li><span class="mono">export WIGAMIG_SLACK_TOKEN=xoxb-…</span></li>'
           + '<li><span class="mono">wigamig centre-slack-smoke</span> — verify it works.</li>'
           + '</ol>'
