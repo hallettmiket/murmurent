@@ -629,9 +629,10 @@
           + (centre.age_recipient
               ? '<p>Encryption key ready ✓ — members can send you an encrypted join request.</p>'
               : '<p><strong>No encryption key yet.</strong> Run <span class="mono">wigamig centre-age-keygen</span> so members can send encrypted join requests.</p>')
-          + '<p>Your centre is <strong>not auto-posted</strong> to GitHub — nothing about you is published without your say-so. To be listed so members can find you, add this one row to the hub directory:</p>'
+          + '<p>Your centre is <strong>not auto-posted</strong> to GitHub — nothing about you is published without your say-so. To be listed so members can find you, this row goes in the hub directory:</p>'
           + '<pre class="mono" style="white-space:pre-wrap; background:#f6f8fa; border:1px solid #e1e4e8; border-radius:6px; padding:8px; font-size:11px;">' + escapeHTML(dirRow) + '</pre>'
-          + '<p class="meta">Add it to <span class="mono">wigamig_public/join/directory.tsv</span> + the README table (see <span class="mono">docs/connect_to_hub.md</span>), then push the hub repo. This is the only step that publishes anything public, so it stays deliberate.</p>'
+          + '<p><strong>Easiest:</strong> run <span class="mono">wigamig centre-hub-publish</span> — it clones the hub (if you don\'t have it) and writes this row into <span class="mono">directory.tsv</span> + the README for you. It then prints a <span class="mono">git push</span> to run from the printed folder.</p>'
+          + '<p class="meta">You still commit + push yourself — that push is the only step that publishes anything public, so it stays deliberate. (Manual alternative: edit both files by hand; see <span class="mono">docs/connect_to_hub.md</span>.)</p>'
           + '</div></div>';
         html = centreHtml + slackHtml + hubHtml + html;
       }

@@ -112,11 +112,13 @@ short:
    is stamped on your centre profile.
 
 2. **Get listed on the public hub** so members can find you. Nothing is posted
-   to GitHub automatically. Add one row — `Institution (Centre) <TAB> join-email
-   <TAB> age-public-key` — to the hub's
-   [`join/directory.tsv`](https://github.com/hallettmiket/wigamig_public) and
-   README table, then push. The `/registrar` "Public hub listing" card prints
-   the exact row for you. Details: [`docs/connect_to_hub.md`](docs/connect_to_hub.md).
+   to GitHub automatically. Run **`wigamig centre-hub-publish`** — it clones the
+   [`wigamig_public`](https://github.com/hallettmiket/wigamig_public) hub (if you
+   don't already have it) and writes your row (`Institution (Centre) <TAB>
+   join-email <TAB> age-public-key`) into `join/directory.tsv` and the README
+   table for you. It then prints a `git push` for you to run — you commit and
+   push yourself, so publishing stays a deliberate act. (Manual alternative +
+   details: [`docs/connect_to_hub.md`](docs/connect_to_hub.md).)
 
 3. **Set up Slack** (the centre's communication fabric). You create a Slack
    workspace named `wigamig-<unique-name>`, add a bot token, and smoke-test it
