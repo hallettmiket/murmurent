@@ -345,6 +345,7 @@ def approve(
     actor: str,
     provision: bool = True,
     env: dict[str, str] | None = None,
+    token: str | None = None,
 ) -> JoinRequest:
     """Move a pending request → approved + dispatch the create / provision.
 
@@ -411,7 +412,7 @@ def approve(
         try:
             from . import centre_provision as _cp
             probes = _cp.provision_lab_onboarding(
-                req.proposed_name, env=env,
+                req.proposed_name, env=env, token=token,
             )
             req.probes.extend([
                 {"kind": p.name, "severity": p.status,
