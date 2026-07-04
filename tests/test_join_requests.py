@@ -151,6 +151,9 @@ def test_approve_lab_dispatches_create_and_provision(world,
     # Lab record exists.
     reg = R.read_registry()
     assert any(l.name == "dcis" for l in reg.labs)
+    # PI email from the request propagated onto the PI's member record, so the
+    # lab's email map is non-empty and the PI can be invited to the channel.
+    assert R.group_email_map("dcis") == {"allie": "pi@uwo.ca"}
 
 
 def test_approve_failed_create_lab_marks_failed(world, monkeypatch):
