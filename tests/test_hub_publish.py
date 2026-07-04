@@ -121,3 +121,85 @@ def test_prepare_listing_full_flow(hub):
     assert res.cloned is False
     assert res.directory_action == "updated" and res.readme_action == "updated"
     assert res.row == "Western University (Nirvana)\tthe_pi@example.edu\tage1abc"
+
+
+# ---- submit: direct push vs fork + PR -------------------------------------
+
+class _Proc:
+    def __init__(self, rc=0, out="", err=""):
+        self.returncode, self.stdout, self.stderr = rc, out, err
+
+
+def _runner(responses=None, record=None):
+    responses = responses or {}
+    def run(cmd, capture_output=False, text=False):
+        if record is not None:
+            record.append(cmd)
+        key = " ".join(cmd)
+        for pat, proc in responses.items():
+            if pat in key:
+                return proc
+        return _Proc(0, "", "")
+    return run
+
+
+@pytest.mark.parametrize("url,slug", [
+    ("https://github.com/hallettmiket/wigamig_public.git", "hallettmiket/wigamig_public"),
+    ("git@github.com:hallettmiket/wigamig_public.git", "hallettmiket/wigamig_public"),
+    ("https://github.com/foo/bar", "foo/bar"),
+])
+def test_parse_upstream_slug(url, slug):
+    assert H.parse_upstream_slug(url) == slug
+
+
+def test_gh_available():
+    assert H.gh_available(runner=_runner({"auth status": _Proc(0)})) is True
+    assert H.gh_available(runner=_runner({"auth status": _Proc(1)})) is False
+    def boom(*a, **k):
+        raise FileNotFoundError
+    assert H.gh_available(runner=boom) is False
+
+
+def test_can_push_parses_gh():
+    assert H.can_push("o/r", runner=_runner({"api repos/o/r": _Proc(0, "true\n")})) is True
+    assert H.can_push("o/r", runner=_runner({"api repos/o/r": _Proc(0, "false\n")})) is False
+    assert H.can_push("o/r", runner=_runner({"api repos/o/r": _Proc(1)})) is None
+
+
+def test_submit_direct_sequence(tmp_path):
+    rec = []
+    res = H.submit_direct(tmp_path, "directory: list Nirvana", runner=_runner(record=rec))
+    assert res.mode == "pushed"
+    joined = [" ".join(c) for c in rec]
+    assert any("add join/directory.tsv README.md" in j for j in joined)
+    assert any('commit -m directory: list Nirvana' in j for j in joined)
+    assert joined[-1].endswith("push")
+
+
+def test_submit_pr_sequence(tmp_path):
+    rec = []
+    resp = {"api user": _Proc(0, "the_pi\n"),
+            "pr create": _Proc(0, "https://github.com/hallettmiket/wigamig_public/pull/7\n")}
+    res = H.submit_pr(tmp_path, "hallettmiket/wigamig_public", branch="list-nirvana",
+                      message="m", title="t", body="b", runner=_runner(resp, rec))
+    assert res.mode == "pr" and res.detail.endswith("/pull/7")
+    joined = [" ".join(c) for c in rec]
+    assert any("repo fork hallettmiket/wigamig_public --remote --remote-name fork" in j for j in joined)
+    assert any("checkout -B list-nirvana" in j for j in joined)
+    assert any("push -u fork list-nirvana --force" in j for j in joined)
+    assert any("pr create --repo hallettmiket/wigamig_public --head the_pi:list-nirvana" in j for j in joined)
+
+
+def test_submit_pr_reuses_existing_pr(tmp_path):
+    resp = {"api user": _Proc(0, "the_pi\n"),
+            "pr create": _Proc(1, "", "a pull request already exists for the_pi:list-x"),
+            "pr view": _Proc(0, "https://github.com/o/r/pull/3\n")}
+    res = H.submit_pr(tmp_path, "o/r", branch="list-x", message="m", title="t",
+                      body="b", runner=_runner(resp))
+    assert res.mode == "pr" and res.detail.endswith("/pull/3")
+
+
+def test_submit_pr_needs_gh_login(tmp_path):
+    with pytest.raises(H.HubPublishError):
+        H.submit_pr(tmp_path, "o/r", branch="b", message="m", title="t", body="b",
+                    runner=_runner({"api user": _Proc(1)}))
