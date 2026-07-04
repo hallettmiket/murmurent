@@ -552,8 +552,15 @@ def centre_hub_publish(hub_dir: str | None, remote: str | None, submit: bool) ->
     click.echo(f"directory.tsv: {res.directory_action}")
     click.echo(f"README table:  {res.readme_action}")
     click.echo(f"\nYour directory row:\n    {res.row}")
-    if res.directory_action == "unchanged" and res.readme_action == "unchanged":
-        click.echo("\nAlready listed — nothing to publish.")
+    both_unchanged = (res.directory_action == "unchanged"
+                      and res.readme_action == "unchanged")
+    # NOTE: "unchanged" means the FILES already carry your row locally — NOT
+    # that it's on the public hub. A prior run (or `--no-submit`) writes the
+    # files without pushing, so `--submit` must still go on to publish them.
+    if both_unchanged and not submit:
+        click.echo("\nYour row is already written in the local hub clone, but that "
+                   "doesn't mean it's on the public hub. Publish it with:\n"
+                   "    wigamig centre-hub-publish --submit")
         return
 
     message = f"directory: list {prof.name}"

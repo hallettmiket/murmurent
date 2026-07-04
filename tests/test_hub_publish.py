@@ -203,3 +203,49 @@ def test_submit_pr_needs_gh_login(tmp_path):
     with pytest.raises(H.HubPublishError):
         H.submit_pr(tmp_path, "o/r", branch="b", message="m", title="t", body="b",
                     runner=_runner({"api user": _Proc(1)}))
+
+
+def test_command_submit_publishes_even_when_files_unchanged(monkeypatch, tmp_path):
+    """--submit must still publish when the row is already written locally
+    ("unchanged") — a prior run writes the files without pushing, and the old
+    code wrongly bailed with "nothing to publish"."""
+    from click.testing import CliRunner
+    from wigamig.commands import centre_cmd as CC
+
+    class _Prof:
+        institution = "Western University"; name = "Western Samadhi"
+        join_email = "m@uwo.ca"; unique_name = "samadhi"; age_recipient = "age1abc"
+
+    monkeypatch.setattr(CC._ci, "read_centre", lambda *a, **k: _Prof())
+    monkeypatch.setattr(H, "prepare_listing", lambda **k: H.HubPublishResult(
+        hub_dir=tmp_path, cloned=False, directory_action="unchanged",
+        readme_action="unchanged", row="Western University (Western Samadhi)\tm@uwo.ca\tage1abc"))
+    monkeypatch.setattr(H, "gh_available", lambda *a, **k: True)
+    monkeypatch.setattr(H, "upstream_slug", lambda *a, **k: "hallettmiket/wigamig_public")
+    monkeypatch.setattr(H, "can_push", lambda *a, **k: True)
+    called = {}
+    def fake_direct(hub_dir, msg, **k):
+        called["direct"] = (hub_dir, msg)
+        return H.SubmitResult("pushed", "pushed to origin")
+    monkeypatch.setattr(H, "submit_direct", fake_direct)
+
+    res = CliRunner().invoke(CC.centre_hub_publish, ["--submit"])
+    assert res.exit_code == 0, res.output
+    assert "direct" in called                       # pushed despite "unchanged"
+    assert "listed on the public hub" in res.output
+
+
+def test_command_no_submit_when_unchanged_tells_you_to_submit(monkeypatch, tmp_path):
+    from click.testing import CliRunner
+    from wigamig.commands import centre_cmd as CC
+
+    class _Prof:
+        institution = "U"; name = "C"; join_email = "m@u"; unique_name = "c"
+        age_recipient = "age1abc"
+    monkeypatch.setattr(CC._ci, "read_centre", lambda *a, **k: _Prof())
+    monkeypatch.setattr(H, "prepare_listing", lambda **k: H.HubPublishResult(
+        hub_dir=tmp_path, cloned=False, directory_action="unchanged",
+        readme_action="unchanged", row="row"))
+    res = CliRunner().invoke(CC.centre_hub_publish, [])   # no --submit
+    assert res.exit_code == 0
+    assert "--submit" in res.output and "on the public hub" in res.output
