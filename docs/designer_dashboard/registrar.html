@@ -535,7 +535,9 @@
 
     async function load() {
       // 2i: Mayor wizard. If no centre is initialised, show the
-      // bootstrap form INSTEAD of the normal dashboard.
+      // bootstrap form INSTEAD of the normal dashboard. Otherwise keep the
+      // centre profile so we can render the installation's identity header.
+      let centre = null;
       try {
         const cp = await fetch("/api/centre/profile",
                                 { credentials: "same-origin" });
@@ -543,6 +545,7 @@
           renderMayorWizard();
           return;
         }
+        if (cp.ok) { centre = await cp.json(); }
       } catch (_) { /* fall through to normal load */ }
 
       const url = "/api/registrar/dashboard" + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
@@ -570,6 +573,32 @@
         + '<div class="stat"><div class="label">collaborations</div><div class="value">' + (s.total_collaborations || 0) + '</div></div>'
         + '<div class="stat"><div class="label">members</div><div class="value">' + (s.total_members || 0) + '</div></div>'
         + '</div>';
+
+      // Centre identity — show the wigamig installation's own details at the
+      // top. The data comes from /api/centre/profile (fetched above); without
+      // this the registrar page never displays what centre you're looking at.
+      if (centre) {
+        const row = (label, val) => val
+          ? '<div style="display:flex; gap:10px; padding:3px 0; border-top:1px solid var(--border,#eee);">'
+            + '<span class="meta" style="min-width:190px;">' + escapeHTML(label) + '</span>'
+            + '<span>' + escapeHTML(String(val)) + '</span></div>'
+          : '';
+        const centreHtml = '<div class="panel" id="centre-card">'
+          + '<header><h2>' + escapeHTML(centre.name || 'Centre') + '</h2>'
+          + '<span class="meta">wigamig installation'
+          + (centre.institution ? ' · ' + escapeHTML(centre.institution) : '')
+          + '</span></header>'
+          + '<div>'
+          + row('Institution', centre.institution)
+          + row('Install id (unique name)', centre.unique_name)
+          + row('Founding mayor', centre.founding_mayor)
+          + row('Slack workspace', centre.slack_workspace)
+          + row('GitHub org', centre.github_org)
+          + row('Join email (public contact)', centre.join_email)
+          + row('Created', centre.created)
+          + '</div></div>';
+        html = centreHtml + html;
+      }
 
       html += '<div class="panel"><header><h2>Labs</h2>'
         + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
