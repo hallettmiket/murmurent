@@ -38,16 +38,26 @@ wigamig centre-age-keygen
 
 ## 4. Add your row to the public directory
 
-Add one line to the [`wigamig_public`](https://github.com/hallettmiket/wigamig_public)
-README table — institution, a short description, the join email, and your
-**age recipient** (the `age1...` public key):
+Run:
 
-```
-| Western University | Bioconvergence Centre | wigamig-western@uwo.ca | age1... |
+```bash
+wigamig centre-hub-publish            # writes your row + prints next steps
+wigamig centre-hub-publish --submit   # …and publishes it for you
 ```
 
-Open a PR (or push if you have access). That's the **only** thing published —
-no member data, ever.
+It clones the [`wigamig_public`](https://github.com/hallettmiket/wigamig_public)
+hub if you don't have it, writes your row (institution, centre name, join email,
+and your `age1...` public key) into both `join/directory.tsv` and the README
+table, and — with `--submit` — publishes it the right way for **you specifically**:
+
+- **You maintain the hub** (own/have write access): it commits and **pushes**.
+- **You're at any other institution** (the normal case): it **forks** the hub,
+  pushes a branch to your fork, and **opens a pull request** against the hub. The
+  hub maintainer reviews and merges it — that merge is what lists you. (`--submit`
+  needs the GitHub CLI: `gh` + `gh auth login`.)
+
+Either way, the directory row is the **only** thing published — institution,
+registrar email, age public key. **No member data, ever.**
 
 ## 5. Handle requests as they arrive
 

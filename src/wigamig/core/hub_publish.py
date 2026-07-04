@@ -18,6 +18,7 @@ Design notes
 
 from __future__ import annotations
 
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -228,3 +229,110 @@ def prepare_listing(*, institution: str, name: str, email: str, recipient: str,
         directory_action=dir_action, readme_action=readme_action,
         row=f"{directory_label(institution, name)}\t{email}\t{recipient}",
     )
+
+
+# ---------------------------------------------------------------------------
+# submit — direct push (owner) or fork + PR (everyone else)
+# ---------------------------------------------------------------------------
+
+@dataclass
+class SubmitResult:
+    mode: str           # "pushed" | "pr" | "nothing"
+    detail: str         # push target or PR url / message
+
+
+def _run(cmd: list[str], runner) -> tuple[int, str, str]:
+    proc = runner(cmd, capture_output=True, text=True)
+    return proc.returncode, (proc.stdout or ""), (proc.stderr or "")
+
+
+def gh_available(runner=subprocess.run) -> bool:
+    """True iff the GitHub CLI is installed and authenticated."""
+    try:
+        rc, _, _ = _run(["gh", "auth", "status"], runner)
+    except (FileNotFoundError, OSError):
+        return False
+    return rc == 0
+
+
+def parse_upstream_slug(remote_url: str) -> str:
+    """`https://github.com/OWNER/REPO.git` / `git@github.com:OWNER/REPO` -> OWNER/REPO."""
+    m = re.search(r"github\.com[:/]+([^/]+)/(.+?)(?:\.git)?/?$", remote_url.strip())
+    if not m:
+        raise HubPublishError(f"cannot parse a GitHub OWNER/REPO from remote: {remote_url!r}")
+    return f"{m.group(1)}/{m.group(2)}"
+
+
+def upstream_slug(hub_dir: Path, runner=subprocess.run) -> str:
+    rc, out, err = _run(["git", "-C", str(hub_dir), "remote", "get-url", "origin"], runner)
+    if rc != 0:
+        raise HubPublishError(f"no origin remote in {hub_dir}: {err.strip()}")
+    return parse_upstream_slug(out)
+
+
+def can_push(slug: str, runner=subprocess.run) -> bool | None:
+    """Push permission on ``OWNER/REPO`` per gh. None if it can't be determined."""
+    rc, out, _ = _run(["gh", "api", f"repos/{slug}", "--jq", ".permissions.push"], runner)
+    if rc != 0:
+        return None
+    return out.strip() == "true"
+
+
+def gh_login(runner=subprocess.run) -> str | None:
+    rc, out, _ = _run(["gh", "api", "user", "--jq", ".login"], runner)
+    return out.strip() if rc == 0 and out.strip() else None
+
+
+_FILES = ["join/directory.tsv", "README.md"]
+
+
+def submit_direct(hub_dir: Path, message: str, runner=subprocess.run) -> SubmitResult:
+    """Commit the two files and push to origin. For a mayor WITH write access."""
+    h = str(hub_dir)
+    _run(["git", "-C", h, "add", *_FILES], runner)
+    rc, out, err = _run(["git", "-C", h, "commit", "-m", message], runner)
+    if rc != 0 and "nothing to commit" not in (out + err):
+        raise HubPublishError(f"git commit failed: {(err or out).strip()}")
+    rc, out, err = _run(["git", "-C", h, "push"], runner)
+    if rc != 0:
+        raise HubPublishError(f"git push failed: {(err or out).strip()}")
+    return SubmitResult("pushed", "pushed to origin")
+
+
+def submit_pr(hub_dir: Path, slug: str, *, branch: str, message: str,
+              title: str, body: str, runner=subprocess.run) -> SubmitResult:
+    """Fork the hub, push a branch to the fork, and open a PR against upstream.
+
+    For a mayor WITHOUT write access — the standard contribution path. Idempotent:
+    re-running force-updates the branch and reuses an existing fork/PR.
+    """
+    h = str(hub_dir)
+    login = gh_login(runner)
+    if not login:
+        raise HubPublishError("gh is not authenticated — run `gh auth login`, then retry.")
+
+    # Fork (idempotent) + add the fork as a remote named 'fork'. gh no-ops if the
+    # fork already exists; tolerate an already-present remote.
+    _run(["gh", "repo", "fork", slug, "--remote", "--remote-name", "fork"], runner)
+
+    rc, _, err = _run(["git", "-C", h, "checkout", "-B", branch], runner)
+    if rc != 0:
+        raise HubPublishError(f"could not create branch {branch}: {err.strip()}")
+    _run(["git", "-C", h, "add", *_FILES], runner)
+    rc, out, err = _run(["git", "-C", h, "commit", "-m", message], runner)
+    if rc != 0 and "nothing to commit" not in (out + err):
+        raise HubPublishError(f"git commit failed: {(err or out).strip()}")
+    rc, out, err = _run(["git", "-C", h, "push", "-u", "fork", branch, "--force"], runner)
+    if rc != 0:
+        raise HubPublishError(f"push to your fork failed: {(err or out).strip()}")
+
+    rc, out, err = _run(["gh", "pr", "create", "--repo", slug,
+                         "--head", f"{login}:{branch}", "--title", title,
+                         "--body", body], runner)
+    if rc == 0:
+        return SubmitResult("pr", out.strip() or "PR opened")
+    if "already exists" in (out + err).lower():
+        rc2, out2, _ = _run(["gh", "pr", "view", f"{login}:{branch}", "--repo", slug,
+                             "--json", "url", "--jq", ".url"], runner)
+        return SubmitResult("pr", (out2.strip() if rc2 == 0 else "PR already open"))
+    raise HubPublishError(f"gh pr create failed: {(err or out).strip()}")

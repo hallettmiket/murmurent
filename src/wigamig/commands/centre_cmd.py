@@ -511,16 +511,20 @@ def centre_age_keygen() -> None:
 
 
 @click.command("centre-hub-publish",
-                help="Prepare this centre's listing in the public wigamig_public "
-                     "hub: clone it if needed, then add/update your row in "
-                     "join/directory.tsv and the README table. Stops BEFORE "
-                     "commit/push — publishing to the public repo stays your call.")
+                help="List this centre in the public wigamig_public hub. Clones "
+                     "the hub if needed and writes your row into "
+                     "join/directory.tsv + the README table. With --submit it "
+                     "also publishes: a direct push if you have write access, "
+                     "otherwise it forks the hub and opens a pull request for you.")
 @click.option("--hub-dir", type=click.Path(file_okay=False), default=None,
               help="Where to clone/find your wigamig_public checkout "
                    "(default: ~/repos/wigamig_public).")
 @click.option("--remote", default=None,
               help="Hub git remote to clone from (default: the public hub).")
-def centre_hub_publish(hub_dir: str | None, remote: str | None) -> None:
+@click.option("--submit/--no-submit", default=False,
+              help="Actually publish: push (if you own the hub) or fork + open a "
+                   "PR (if you don't). Default: just write the files + print steps.")
+def centre_hub_publish(hub_dir: str | None, remote: str | None, submit: bool) -> None:
     from pathlib import Path as _P
     from ..core import hub_publish as _hp
 
@@ -549,12 +553,56 @@ def centre_hub_publish(hub_dir: str | None, remote: str | None) -> None:
     if res.directory_action == "unchanged" and res.readme_action == "unchanged":
         click.echo("\nAlready listed — nothing to publish.")
         return
-    click.echo("\nReview the change, then publish (the one deliberate, public step):")
-    click.echo(f"    cd {res.hub_dir}")
-    click.echo("    git diff                       # eyeball it")
-    click.echo("    git add join/directory.tsv README.md")
-    click.echo(f'    git commit -m "directory: list {prof.name}"')
-    click.echo("    git push")
+
+    message = f"directory: list {prof.name}"
+    gh_ok = _hp.gh_available()
+    slug = None
+    push_ok: bool | None = None
+    if gh_ok:
+        try:
+            slug = _hp.upstream_slug(res.hub_dir)
+            push_ok = _hp.can_push(slug)
+        except _hp.HubPublishError:
+            slug, push_ok = None, None
+
+    # ---- guidance-only (default): tell the mayor what --submit will do -------
+    if not submit:
+        if push_ok:
+            click.echo("\nYou have write access. Publish with:")
+            click.echo("    wigamig centre-hub-publish --submit      # commits + pushes for you")
+            click.echo("  …or by hand:")
+            click.echo(f"    cd {res.hub_dir} && git add join/directory.tsv README.md "
+                       f'&& git commit -m "{message}" && git push')
+        else:
+            click.echo("\nYou don't own the hub, so listing goes in as a pull request "
+                       "(the maintainer reviews + merges). Open it with:")
+            click.echo("    wigamig centre-hub-publish --submit      # forks + opens the PR for you")
+            if not gh_ok:
+                click.echo("  (needs the GitHub CLI: install `gh` + `gh auth login` first.)")
+        return
+
+    # ---- --submit: actually publish ----------------------------------------
+    if not gh_ok:
+        raise click.ClickException(
+            "--submit needs the GitHub CLI to detect access and open a PR. "
+            "Install `gh` and run `gh auth login`, then retry. (Or publish by "
+            f"hand from {res.hub_dir}.)")
+    try:
+        if push_ok:
+            out = _hp.submit_direct(res.hub_dir, message)
+            click.echo(f"\n✓ {out.detail} — you're listed on the public hub.")
+        else:
+            branch = f"list-{(prof.unique_name or 'centre')}"
+            title = f"directory: list {prof.name} ({prof.institution})"
+            body = ("Adds a wigamig_public directory row for this centre "
+                    "(registrar contact + age public key). Opened by "
+                    "`wigamig centre-hub-publish`. No member data is included.")
+            out = _hp.submit_pr(res.hub_dir, slug, branch=branch, message=message,
+                                title=title, body=body)
+            click.echo(f"\n✓ pull request opened: {out.detail}")
+            click.echo("  The hub maintainer reviews + merges it; then you're listed.")
+    except _hp.HubPublishError as exc:
+        raise click.ClickException(str(exc)) from exc
 
 
 @join_request_group.command("decrypt")
