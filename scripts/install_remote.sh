@@ -123,7 +123,9 @@ fi
 # ── Step 4: `uv tool install` the wigamig CLI ────────────────────────────────
 step "4/5 wigamig CLI installation on ${HOST}"
 # --reinstall is idempotent and makes upgrades behave the same as fresh installs.
-ssh_run 'export PATH=$HOME/.local/bin:$PATH; cd ~/repos/wigamig && uv tool install --reinstall .'
+# -e (editable) + --python 3.12: a non-editable install relocates the package
+# away from the clone, breaking the dashboard's static assets; py3.12 is required.
+ssh_run 'export PATH=$HOME/.local/bin:$PATH; cd ~/repos/wigamig && uv tool install --reinstall --python 3.12 -e .'
 WIGAMIG_VERSION="$(ssh_run 'export PATH=$HOME/.local/bin:$PATH; wigamig --version 2>/dev/null || true')"
 if [[ -z "$WIGAMIG_VERSION" ]]; then
   fail "wigamig --version returned no output on the remote host"

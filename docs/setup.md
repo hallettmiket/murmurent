@@ -9,15 +9,16 @@ First-time wigamig installation on a new machine.
 git clone git@github.com:hallettmiket/wigamig.git ~/repos/wigamig
 cd ~/repos/wigamig
 
-# 2. Install the CLI + venv (with the dashboard, Slack, and MCP deps).
-#    Use --with (not `-e '.[extras]'`): uv does NOT persist an editable
-#    install's extras in its receipt, so it drops them on the next re-sync and
-#    `wigamig dashboard` breaks (no fastapi/uvicorn). --with deps ARE persisted.
-#    --python 3.12: wigamig needs >=3.12; this avoids inheriting an older
+# 2. Install the CLI (editable, pinned to Python 3.12).
+#    -e (editable): keeps the package in this clone so the dashboard's static
+#    assets (docs/designer_dashboard/) resolve — a non-editable install
+#    relocates it into site-packages and the hi-fi dashboard 500s.
+#    --python 3.12: wigamig needs >=3.12; avoids inheriting an older
 #    system/conda default (uv fetches a managed 3.12 if needed).
-uv tool install --python 3.12 -e . \
-  --with streamlit --with fastapi --with uvicorn --with httpx \
-  --with slack-sdk --with anthropic --with mcp
+#    The dashboard (fastapi/uvicorn), Slack, and MCP deps are HARD deps in
+#    pyproject, so they come along automatically — no extras to drop. (Only the
+#    low-fi streamlit dashboard is optional: `uv tool install ... -e '.[dashboard]'`.)
+uv tool install --python 3.12 -e .
 
 # 3. Symlink agents + rules into ~/.claude/.
 bash scripts/setup.sh

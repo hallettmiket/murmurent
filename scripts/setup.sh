@@ -147,7 +147,7 @@ else
   if [[ -x "$REPO_DIR/.venv/bin/wigamig" ]]; then
     "$REPO_DIR/.venv/bin/wigamig" install --hooks && ok "hooks installed (via .venv)"
   else
-    fail "wigamig binary not found — run `uv tool install --reinstall .` from $REPO_DIR first"
+    fail "wigamig binary not found — run \`uv tool install --python 3.12 -e .\` from $REPO_DIR first"
     exit 2
   fi
 fi

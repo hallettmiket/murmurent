@@ -24,7 +24,25 @@ then run for real**.
 Opt-in extras (only with the flag): `--nuke-installations` (also wipes
 `~/.wigamig/installations/` — **other projects' manifests**),
 `--nuke-credentials` (also wipes `~/.config/wigamig/` — the **slack-token +
-keys**).
+keys**), `--uninstall` (first **completely removes** the existing wigamig
+install — the uv-tool one *and* stray conda/pipx copies that shadow it — before
+any reinstall).
+
+### Completely removing the old install
+
+When the user asks to "completely remove" / "uninstall" wigamig:
+
+- **Remove it and leave nothing:** `--level centre --uninstall`. This
+  uninstalls every wigamig executable and does not reinstall — the machine ends
+  up with no `wigamig` on PATH.
+- **Remove the old one and put back a clean one** (the usual "fresh copy from
+  the repo" intent): `--level install --uninstall` — uninstalls first, then
+  reinstalls editable from `~/repos/wigamig`.
+
+`--uninstall` is what handles the stray-duplicate-install problem (e.g. an old
+`pip install -e` copy in a conda env shadowing the uv-tool one). It scans conda
+base/envs + pipx and removes any wigamig it finds. Working clones under
+`~/repos/*` are never touched — only installed executables.
 
 ## How to run it
 

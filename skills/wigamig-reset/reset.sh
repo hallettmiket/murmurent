@@ -13,6 +13,16 @@
 # Destructive extras (never happen without the explicit flag):
 #   --nuke-installations   also remove ~/.wigamig/installations (other projects)
 #   --nuke-credentials     also remove ~/.config/wigamig (slack-token + keys)
+#   --uninstall            first completely REMOVE the existing wigamig
+#                          install(s) — the uv-tool one AND stray conda/pipx
+#                          copies — before any reinstall. With --level centre
+#                          (default) this leaves NO wigamig on the machine; with
+#                          --level install/full it removes-then-reinstalls clean.
+#
+# Completely remove the old install (leave nothing):
+#   reset.sh --level centre --uninstall --yes
+# Remove the old install, then put back a clean one:
+#   reset.sh --level install --uninstall --yes
 #
 # Safety:
 #   * ALWAYS writes a timestamped backup tarball to ~/.wigamig_backups/ FIRST
@@ -29,6 +39,7 @@ DRY=0
 YES=0
 NUKE_INSTALL=0
 NUKE_CREDS=0
+UNINSTALL=0
 
 WIG="$HOME/.wigamig"
 CFG="$HOME/.config/wigamig"
@@ -46,6 +57,7 @@ while [ $# -gt 0 ]; do
     --yes|-y) YES=1; shift ;;
     --nuke-installations) NUKE_INSTALL=1; shift ;;
     --nuke-credentials) NUKE_CREDS=1; shift ;;
+    --uninstall) UNINSTALL=1; shift ;;
     -h|--help) usage 0 ;;
     *) echo "unknown arg: $1" >&2; usage 1 ;;
   esac
@@ -98,17 +110,39 @@ fi
 say "3. centre state"
 rmrf "$WIG/lab_info" "centre registry (lab_info/)"
 
+# 3b. uninstall the tool entirely (only with --uninstall) -------------------
+# Completely removes every wigamig executable: the uv-tool install AND any
+# stray copies pip-installed into conda envs / pipx that would shadow it.
+if [ "$UNINSTALL" = 1 ]; then
+  say "3b. removing existing wigamig install(s)"
+  if [ "$DRY" = 1 ]; then say "  DRY: would uv tool uninstall wigamig"; else
+    uv tool uninstall wigamig 2>/dev/null && say "  uv-tool wigamig removed" || say "  (no uv-tool wigamig)"
+  fi
+  # stray installs in conda base + envs and pipx
+  for py in "$HOME"/anaconda3/bin/python "$HOME"/anaconda3/envs/*/bin/python \
+            "$HOME"/miniconda3/bin/python "$HOME"/miniconda3/envs/*/bin/python; do
+    [ -x "$py" ] || continue
+    "$py" -c "import wigamig" >/dev/null 2>&1 || continue
+    if [ "$DRY" = 1 ]; then say "  DRY: would pip-uninstall wigamig from $py";
+    else "$py" -m pip uninstall -y wigamig >/dev/null 2>&1 && say "  removed stray install: $py"; fi
+  done
+  command -v pipx >/dev/null 2>&1 && { [ "$DRY" = 1 ] && say "  DRY: would pipx uninstall wigamig" || pipx uninstall wigamig >/dev/null 2>&1 || true; }
+  if [ "$DRY" != 1 ]; then
+    left="$(command -v wigamig 2>/dev/null || true)"
+    [ -z "$left" ] && say "  ✓ no wigamig left on PATH" || say "  ! still on PATH: $left (check it manually)"
+  fi
+fi
+
 # 4. install reset (install + full) -----------------------------------------
 if [ "$LEVEL" = install ] || [ "$LEVEL" = full ]; then
   say "4. reinstall from repo"
   if [ ! -d "$REPO" ]; then
     say "  !! repo not found at $REPO — set WIGAMIG_REPO. Skipping reinstall."
   else
-    # Record the dashboard/Slack/MCP deps as --with requirements, NOT as
-    # `-e '.[extras]'`. uv does not persist an editable install's extras in
-    # its receipt, so on the next re-sync it drops them (fastapi disappears);
-    # --with deps ARE persisted and survive re-syncs.
-    run "cd '$REPO' && uv tool install --force --python 3.12 -e . --with streamlit --with fastapi --with uvicorn --with httpx --with slack-sdk --with anthropic --with mcp"
+    # Editable (-e) + py3.12. The dashboard/Slack/MCP deps are HARD deps in
+    # pyproject, so a plain install carries them (no fragile extras/--with).
+    # -e keeps the package in the clone so the dashboard's static assets resolve.
+    run "cd '$REPO' && uv tool install --force --python 3.12 -e ."
     run "cd '$REPO' && bash scripts/setup.sh"
     run "wigamig install --hooks"
   fi
