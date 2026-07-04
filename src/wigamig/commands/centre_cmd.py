@@ -374,11 +374,12 @@ def centre_slack_smoke(channel: str, public: bool, keep: bool) -> None:
     import os
     from ..core import centre_provision as _cp
 
-    if not os.environ.get("SLACK_BOT_TOKEN"):
+    if not (os.environ.get("WIGAMIG_SLACK_TOKEN") or os.environ.get("SLACK_BOT_TOKEN")):
         raise click.ClickException(
-            "$SLACK_BOT_TOKEN is not set. Get a bot token with "
-            "'groups:write' (private) or 'channels:manage' (public) "
-            "scope from your Slack app's OAuth settings and export it."
+            "$WIGAMIG_SLACK_TOKEN is not set (legacy $SLACK_BOT_TOKEN also works). "
+            "Get a bot token with 'groups:write' (private) or 'channels:manage' "
+            "(public) scope from your Slack app's OAuth settings and export it:\n"
+            "    export WIGAMIG_SLACK_TOKEN=xoxb-..."
         )
 
     if not channel:
@@ -424,7 +425,8 @@ def _archive_probe_channel(channel_id: str) -> bool:
     import os
     try:
         import httpx
-        tok = os.environ.get("SLACK_BOT_TOKEN", "")
+        tok = (os.environ.get("WIGAMIG_SLACK_TOKEN", "").strip()
+               or os.environ.get("SLACK_BOT_TOKEN", "").strip())
         if not tok:
             return False
         r = httpx.post(
