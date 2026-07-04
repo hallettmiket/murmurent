@@ -171,11 +171,15 @@ def test_compat_shim_returns_none_on_failure(monkeypatch):
 
 # ---- centre-slack-smoke CLI -------------------------------------------
 
-def test_cli_missing_token_clean_error(monkeypatch):
+def test_cli_missing_token_clean_error(monkeypatch, tmp_path):
     monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
+    monkeypatch.delenv("WIGAMIG_SLACK_TOKEN", raising=False)
+    # Isolate the token-file lookup — a dev machine may have a real
+    # ~/.config/wigamig/slack-token that the command now (correctly) reads.
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     res = CliRunner().invoke(cli_smoke)
     assert res.exit_code != 0
-    assert "SLACK_BOT_TOKEN" in res.output
+    assert "WIGAMIG_SLACK_TOKEN" in res.output
 
 
 def test_cli_happy_path_exits_0(monkeypatch):

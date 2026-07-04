@@ -166,6 +166,23 @@ def test_provision_centre_slack_reuses_existing_mayor_channel(world, monkeypatch
     assert CI.read_centre().mayor_channel_id == "C0EXISTING"
 
 
+def test_resolve_slack_token_env_then_file(monkeypatch, tmp_path):
+    monkeypatch.delenv("WIGAMIG_SLACK_TOKEN", raising=False)
+    monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
+    cfg = tmp_path / ".config" / "wigamig"
+    cfg.mkdir(parents=True)
+    (cfg / "slack-token").write_text("xoxb-fromfile\n")
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+
+    # env-only (allow_file=False, the automatic-path default): file is ignored
+    assert CP.resolve_slack_token() == ""
+    # explicit command (allow_file=True): falls back to the file
+    assert CP.resolve_slack_token(allow_file=True) == "xoxb-fromfile"
+    # env always wins over the file
+    monkeypatch.setenv("WIGAMIG_SLACK_TOKEN", "xoxb-fromenv")
+    assert CP.resolve_slack_token(allow_file=True) == "xoxb-fromenv"
+
+
 def test_provision_centre_slack_needs_workspace(world):
     CI.update_centre({"slack_workspace": ""})
     probes = CP.provision_centre_slack()
