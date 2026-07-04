@@ -28,14 +28,45 @@ _SLACK_API_MEMBERS = "https://slack.com/api/conversations.members"
 _SLACK_API_LOOKUP_BY_EMAIL = "https://slack.com/api/users.lookupByEmail"
 _TOKEN_FILE = Path("~/.config/wigamig/slack-token").expanduser()
 
-# Fallback channel IDs. ``_CHAN_DEFAULT`` is where wigamig-generated
-# notifications land when a project has no slack_channel_id in its
-# CHARTER. Previously pointed at #claude-code (C0ANNQ1U5EZ); moved to
-# #claude-test (C0B3D9DS6SE) on 2026-05-12 because #claude-code became
-# too noisy for non-developer members of the lab.
+# Fallback channel IDs. ``_CHAN_DEFAULT`` is the LAST-RESORT channel for
+# wigamig-generated notifications when no specific project/group channel
+# applies. In a live centre it is superseded at send time by the private
+# mayor↔CC channel (see ``_default_channel`` / ``_route`` below): #claude-test
+# is only used during development or before ``centre-slack-setup`` has run.
+# History: #claude-code (C0ANNQ1U5EZ) → #claude-test (C0B3D9DS6SE) on 2026-05-12.
 _CHAN_DEFAULT = "C0B3D9DS6SE"
 _CHAN_CLAUDE_CODE = _CHAN_DEFAULT  # back-compat alias for older callers
 _CHAN_LAB_INFRA = "CDWPTRQ86"
+
+
+def _default_channel() -> str:
+    """Where wigamig system notifications land when no specific (project / lab /
+    group) channel applies.
+
+    Once a centre is initialised **and** has run ``centre-slack-setup`` — i.e.
+    it has a private mayor↔CC channel (``mayor_channel_id`` = ``#wigamig-ops``,
+    visible only to the mayor + the bot) — system messages default THERE instead
+    of the historical shared dev channel. The dev channel (``_CHAN_DEFAULT``) is
+    used only as a last resort: development, or a centre that hasn't wired its
+    mayor channel yet.
+    """
+    try:
+        from ..core import centre_init as _ci
+        prof = _ci.read_centre()
+        mayor_chan = (getattr(prof, "mayor_channel_id", "") or "").strip() if prof else ""
+        if mayor_chan:
+            return mayor_chan
+    except Exception:  # noqa: BLE001 — routing must never break a notification
+        pass
+    return _CHAN_DEFAULT
+
+
+def _route(channel: str) -> str:
+    """Redirect the dev fallback channel to the centre's private mayor channel
+    once one exists. Explicit per-group channel ids pass through unchanged."""
+    if not channel or channel == _CHAN_DEFAULT:
+        return _default_channel()
+    return channel
 
 
 @lru_cache(maxsize=1)
@@ -331,6 +362,7 @@ def _post(channel: str, text: str) -> bool:
     tok = _token()
     if not tok:
         return False
+    channel = _route(channel)
     try:
         import httpx  # already a project dependency
 
@@ -360,6 +392,7 @@ def post_and_link(channel: str, text: str) -> str:
     tok = _token()
     if not tok:
         return ""
+    channel = _route(channel)
     try:
         import httpx
         r = httpx.post(
