@@ -21,18 +21,32 @@ In Slack, create a workspace named **`wigamig-<unique_name>`** (e.g.
 
 ## 2. Create a bot token  [manual]
 
-At <https://api.slack.com/apps> → *Create New App → From scratch*, install it to
-your `wigamig-<name>` workspace, and give the bot these **OAuth scopes**:
+wigamig talks to Slack through a **bot user** on a Slack **app** you own. Create
+it once — click by click:
 
-| Scope | Why |
-|---|---|
-| `groups:write` | create private channels (lab/core + `#wigamig-ops`) |
-| `channels:manage` | create public channels (if you use any) |
-| `chat:write` | post events + broadcasts |
-| `users:read.email` | resolve a member's email → their Slack account |
-| `groups:read`, `channels:read` | look up channel ids by name (e.g. `#general`) |
+1. Go to <https://api.slack.com/apps> and sign in as the account that owns your
+   `wigamig-<name>` workspace.
+2. **Create New App → From scratch.** Name it `wigamig` (anything is fine), pick
+   your `wigamig-<name>` workspace, **Create App**.
+3. In the app's left sidebar, open **OAuth & Permissions**.
+4. Scroll to **Scopes → Bot Token Scopes** (the *Bot* section, **not** "User
+   Token Scopes"). Click **Add an OAuth Scope** and add each of these:
 
-Copy the **Bot User OAuth Token** (`xoxb-…`).
+   | Scope | Why |
+   |---|---|
+   | `groups:write` | create private channels (lab/core + `#wigamig-ops`) |
+   | `channels:manage` | create public channels (if you use any) |
+   | `chat:write` | post events + broadcasts |
+   | `users:read.email` | resolve a member's email → their Slack account |
+   | `groups:read`, `channels:read` | look up channel ids by name (e.g. `#general`) |
+
+5. Scroll back **up** to **OAuth Tokens for Your Workspace** → **Install to
+   Workspace** → **Allow**.
+6. Copy the **Bot User OAuth Token** — it starts with `xoxb-`.
+7. Back in Slack, invite the bot to `#general` so it can post there: in the
+   `#general` channel, type `/invite @wigamig` (the bot's name). The bot is
+   auto-added to any private channel it *creates*, but must be invited to
+   pre-existing channels like `#general`.
 
 ## 3. Give wigamig the token
 
