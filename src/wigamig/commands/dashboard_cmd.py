@@ -75,9 +75,12 @@ def _launch_hifi(*, host: str, port: int) -> int:
     except ModuleNotFoundError as exc:  # pragma: no cover
         raise click.ClickException(
             "hi-fi dashboard deps missing (fastapi/uvicorn). Reinstall wigamig "
-            "with the dashboard extra:\n"
-            "    cd ~/repos/wigamig && uv tool install -e '.[dashboard]'\n"
-            "(In a dev checkout you can instead run `uv sync --extra dashboard`.)"
+            "with the dashboard deps recorded (use --with, not '.[extra]' — uv "
+            "drops an editable install's extras on re-sync):\n"
+            "    cd ~/repos/wigamig && uv tool install --force --python 3.12 -e . \\\n"
+            "      --with streamlit --with fastapi --with uvicorn --with httpx \\\n"
+            "      --with slack-sdk --with anthropic --with mcp\n"
+            "Or just run the /wigamig-reset skill at --level install."
         ) from exc
 
     click.echo(f"Hi-fi dashboard: http://{host}:{port}/")

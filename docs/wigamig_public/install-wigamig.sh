@@ -83,11 +83,15 @@ main() {
   get_code
 
   say ""; say "Installing the 'wigamig' command (with dashboard + Slack + tools) ..."
-  # Include the extras a full wigamig needs: the dashboard (fastapi/uvicorn),
-  # Slack comms, and the MCP tools. Without these, `wigamig dashboard` fails.
+  # Record the dashboard (fastapi/uvicorn), Slack, and MCP deps as --with
+  # requirements rather than `-e '.[extras]'`: uv does NOT persist an editable
+  # install's extras in its tool receipt, so it silently drops them on the next
+  # re-sync (and `wigamig dashboard` breaks again). --with deps ARE persisted.
   # Pin Python 3.12 (wigamig needs >=3.12) so we don't inherit a system/conda
   # default that's too old — uv fetches a managed 3.12 if there isn't one.
-  ( cd "$DEST" && uv tool install --python 3.12 -e '.[dashboard,slack,mcp]' )
+  ( cd "$DEST" && uv tool install --python 3.12 -e . \
+      --with streamlit --with fastapi --with uvicorn --with httpx \
+      --with slack-sdk --with anthropic --with mcp )
 
   say ""; say "Wiring shared agents + rules into ~/.claude/ ..."
   ( cd "$DEST" && bash scripts/setup.sh )
