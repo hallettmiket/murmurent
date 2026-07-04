@@ -75,6 +75,7 @@ command available in any wigamig-bootstrapped CC session.
 |---|---|
 | [`/wigamig-push`](skills/wigamig-push/SKILL.md) | Wigamig-aware stage/commit/push: skips per-machine + secret-shaped files, refuses large files that belong in `refined/`, never touches `/data/lab_vm/raw\|refined/`, posts a Slack release note. Use instead of generic `/commit-push` for any repo with a `CHARTER.md`. |
 | [`/wigamig-admin`](skills/wigamig-admin/SKILL.md) | Prime context before admin-level (centre / mayor / registrar / join / provisioning) work: reloads wigamig's purpose from the manuscript + code, pins Obsidian maps-legends and CC guidance to the top, enforces the manuscript pull-first rule. |
+| [`/wigamig-reset`](skills/wigamig-reset/SKILL.md) | Back up, then reset this machine's wigamig state to a fresh start (so `centre-init` is first-run again). Tiered `centre`/`install`/`full`; always tarballs `~/.wigamig` first; credentials + other-project installs are protected behind explicit `--nuke` flags; `--dry-run` previews. Use for a clean slate / fresh copy from the repo. |
 
 ## Linked references (loaded on-demand)
 
