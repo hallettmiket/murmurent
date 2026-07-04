@@ -117,6 +117,18 @@ def test_send_broadcast_posts_and_logs(world):
     assert rows[0].message == "Friday 2pm cores review"
 
 
+def test_send_broadcast_surfaces_failed_post_and_skips_ledger(world, monkeypatch):
+    # Live path (no injected poster): a rejected Slack post must raise with the
+    # real error AND must not be recorded in the audit ledger.
+    from wigamig.dashboard import slack_notify as SN
+    monkeypatch.setattr(SN, "post_message_result",
+        lambda cid, text: SN.SlackPostResult(ok=False, error="not_in_channel",
+                                             detail="invite the bot into the channel"))
+    with pytest.raises(BC.BroadcastError, match="not_in_channel"):
+        BC.send_broadcast(audience="leaders", message="hi", sender="@mhallet")
+    assert BC.iter_recent() == []          # nothing logged for a failed send
+
+
 def test_send_broadcast_empty_message(world):
     with pytest.raises(BC.BroadcastError, match="message is required"):
         BC.send_broadcast(audience="pis", message="   ",

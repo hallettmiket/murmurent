@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import os
 import re
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
@@ -382,16 +383,50 @@ def _post(channel: str, text: str) -> bool:
         return False
 
 
-def post_and_link(channel: str, text: str) -> str:
-    """Post + return the Slack permalink (best-effort).
+@dataclass
+class SlackPostResult:
+    """Structured outcome of a Slack post. ``ok`` False carries the Slack
+    error code + a human hint so user-initiated actions can report it."""
+    ok: bool
+    link: str = ""
+    error: str = ""
+    detail: str = ""
 
-    Used by broadcasts so we can store the link in the audit ledger.
-    Returns "" on failure (caller may still proceed; missing link is
-    a degraded but non-fatal state).
+
+def _post_error_hint(error: str, channel: str) -> str:
+    """Map a Slack error code to an actionable, mayor-readable explanation."""
+    hints = {
+        "no_token": "no Slack token — set $WIGAMIG_SLACK_TOKEN or put it in "
+                    "~/.config/wigamig/slack-token.",
+        "channel_not_found": f"channel {channel} was not found. The bot token is "
+                    "almost certainly for a DIFFERENT Slack workspace than this "
+                    "channel — use the token for the channel's own workspace.",
+        "not_in_channel": f"the bot is not in {channel}. In Slack, `/invite` the "
+                    "bot into that channel, then retry.",
+        "is_archived": f"channel {channel} is archived — unarchive it in Slack.",
+        "invalid_auth": "the bot token is wrong or has been revoked.",
+        "token_revoked": "the bot token was revoked — reinstall the app and re-copy it.",
+        "account_inactive": "the bot / token is deactivated.",
+        "missing_scope": "the bot lacks the `chat:write` scope — add it and "
+                    "Reinstall the app to the workspace.",
+        "transport": "could not reach Slack (network error).",
+    }
+    return hints.get(error, f"Slack error: {error}")
+
+
+def post_message_result(channel: str, text: str) -> SlackPostResult:
+    """Post to Slack and return a STRUCTURED result (ok / error / hint / link).
+
+    Unlike the fire-and-forget ``_post`` / ``post_and_link`` (which swallow
+    failures so a flaky Slack never breaks a dashboard side-effect), this
+    surfaces the failure — so user-initiated actions like
+    ``wigamig broadcast send --apply`` can report exactly what went wrong and
+    exit non-zero instead of falsely claiming success.
     """
     tok = _token()
     if not tok:
-        return ""
+        return SlackPostResult(False, error="no_token",
+                               detail=_post_error_hint("no_token", channel))
     channel = _route(channel)
     try:
         import httpx
@@ -403,27 +438,35 @@ def post_and_link(channel: str, text: str) -> str:
         )
         data = r.json()
         if not data.get("ok"):
-            log.warning("Slack post to %s failed: %s", channel, data.get("error"))
-            return ""
+            err = data.get("error") or "unknown"
+            log.warning("Slack post to %s failed: %s", channel, err)
+            return SlackPostResult(False, error=err, detail=_post_error_hint(err, channel))
+        link = ""
         ts = data.get("ts")
-        if not ts:
-            return ""
-        # Look up the permalink (cheap extra call; keeps ledger useful).
-        try:
-            pl = httpx.get(
-                "https://slack.com/api/chat.getPermalink",
-                headers={"Authorization": f"Bearer {tok}"},
-                params={"channel": channel, "message_ts": ts},
-                timeout=5,
-            ).json()
-            if pl.get("ok") and pl.get("permalink"):
-                return pl["permalink"]
-        except Exception:  # noqa: BLE001
-            pass
-        return ""
+        if ts:
+            try:
+                pl = httpx.get(
+                    "https://slack.com/api/chat.getPermalink",
+                    headers={"Authorization": f"Bearer {tok}"},
+                    params={"channel": channel, "message_ts": ts},
+                    timeout=5,
+                ).json()
+                if pl.get("ok"):
+                    link = pl.get("permalink") or ""
+            except Exception:  # noqa: BLE001
+                pass
+        return SlackPostResult(True, link=link)
     except Exception as exc:  # noqa: BLE001
         log.warning("Slack notification error: %s", exc)
-        return ""
+        return SlackPostResult(False, error="transport",
+                               detail=_post_error_hint("transport", channel))
+
+
+def post_and_link(channel: str, text: str) -> str:
+    """Back-compat wrapper: post + return the permalink ("" on failure or when
+    Slack returns no permalink). Callers that must know *why* a post failed
+    should use :func:`post_message_result`."""
+    return post_message_result(channel, text).link
 
 
 # ── Public notification functions ──────────────────────────────────────────
