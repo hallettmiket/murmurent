@@ -471,12 +471,17 @@ def centre_status() -> None:
                      "channel (#wigamig-ops) + the #general broadcast wiring. "
                      "Needs a bot token ($WIGAMIG_SLACK_TOKEN) + slack_workspace "
                      "set on the centre.")
-def centre_slack_setup() -> None:
+@click.option("--mayor-email", default="",
+              help="The email on YOUR Slack account (used to add you to "
+                   "#wigamig-ops). Defaults to your registrar profile email, then "
+                   "the centre join_email — override here if those don't match "
+                   "your Slack login.")
+def centre_slack_setup(mayor_email: str) -> None:
     from ..core import centre_provision as _cp
     # Explicit mayor command → resolve the token from env OR the mode-0600
     # ~/.config/wigamig/slack-token file, so it works in any terminal.
     tok = _cp.resolve_slack_token(allow_file=True)
-    probes = _cp.provision_centre_slack(token=tok or None)
+    probes = _cp.provision_centre_slack(token=tok or None, mayor_email=mayor_email)
     any_block = False
     for p in probes:
         mark = {"ok": "✓", "warn": "!", "block": "✗"}.get(p.status, "-")
