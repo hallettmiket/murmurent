@@ -183,6 +183,35 @@ def test_resolve_slack_token_env_then_file(monkeypatch, tmp_path):
     assert CP.resolve_slack_token(allow_file=True) == "xoxb-fromenv"
 
 
+def test_provision_centre_slack_invites_the_mayor(world, monkeypatch):
+    # The bot creates the private #wigamig-ops → the human mayor must be invited
+    # or they can't see it.
+    CI.update_centre({"join_email": "tbrowne@demo.edu"})
+    monkeypatch.setenv("WIGAMIG_SLACK_TOKEN", "xoxb-x")
+    monkeypatch.setattr(CP, "slack_create_channel",
+        lambda name, **k: CP.SlackChannelResult(ok=True, channel_id="C0OPS", channel_name=name))
+    seen = {}
+    def fake_invite(cid, handles, *, member_email_map=None):
+        seen.update(cid=cid, handles=handles, map=member_email_map)
+        return {"invited": handles, "already_in": [], "unresolved": []}
+    monkeypatch.setattr("wigamig.dashboard.slack_notify.invite_members_to_channel", fake_invite)
+
+    probes = CP.provision_centre_slack(channel_resolver=lambda n: "C0GEN")
+    inv = next(p for p in probes if p.name == "mayor-invite")
+    assert inv.status == "ok" and "tbrowne" in inv.detail
+    assert seen["cid"] == "C0OPS"
+    assert seen["map"] == {"tbrowne": "tbrowne@demo.edu"}
+
+
+def test_provision_centre_slack_warns_when_no_mayor_email(world, monkeypatch):
+    monkeypatch.setenv("WIGAMIG_SLACK_TOKEN", "xoxb-x")
+    monkeypatch.setattr(CP, "slack_create_channel",
+        lambda name, **k: CP.SlackChannelResult(ok=True, channel_id="C0OPS", channel_name=name))
+    probes = CP.provision_centre_slack(channel_resolver=lambda n: "C0GEN")
+    inv = next(p for p in probes if p.name == "mayor-invite")
+    assert inv.status == "warn" and "email" in inv.detail.lower()
+
+
 def test_provision_centre_slack_needs_workspace(world):
     CI.update_centre({"slack_workspace": ""})
     probes = CP.provision_centre_slack()
