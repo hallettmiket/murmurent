@@ -454,23 +454,51 @@ def provision_centre_slack(
                       detail="centre.slack_workspace not configured; skipping.")]
 
     probes: list[Probe] = []
-    if channel_creator is None:
-        channel_creator = _live_slack_create_channel
 
     # 1. Mayor↔CC channel.
     mayor_id = ""
-    try:
-        mayor_id = channel_creator("wigamig-ops", centre.slack_workspace) or ""
-        if mayor_id:
-            _ci.update_centre({"mayor_channel_id": mayor_id}, env=env)
+    if channel_creator is not None:
+        # Injected seam (tests): returns a channel id or None.
+        try:
+            mayor_id = channel_creator("wigamig-ops", centre.slack_workspace) or ""
+            probes.append(Probe(
+                name="mayor-channel",
+                status="ok" if mayor_id else "warn",
+                detail=(f"#wigamig-ops → {mayor_id}" if mayor_id
+                        else "#wigamig-ops could not be created")))
+        except Exception as exc:  # noqa: BLE001
+            probes.append(Probe(name="mayor-channel", status="warn",
+                                detail=f"slack error: {exc}"))
+    else:
+        # Live path: use the structured API so we surface the actual Slack
+        # error (missing_scope / invalid_auth / channel_not_found / …) instead
+        # of a bare "could not be created".
+        res = slack_create_channel("wigamig-ops", workspace_id=centre.slack_workspace,
+                                   private=True)
+        if res.ok:
+            mayor_id = res.channel_id or ""
             probes.append(Probe(name="mayor-channel", status="ok",
                                 detail=f"#wigamig-ops → {mayor_id}"))
+        elif res.error == "name_taken":
+            # Already exists → reuse it, so re-running setup is idempotent.
+            try:
+                from ..dashboard import slack_notify as _sn
+                mayor_id = _sn._lookup_channel_id_by_name("wigamig-ops") or ""
+            except Exception:  # noqa: BLE001
+                mayor_id = ""
+            if mayor_id:
+                probes.append(Probe(name="mayor-channel", status="ok",
+                                    detail=f"#wigamig-ops → {mayor_id} (existing)"))
+            else:
+                probes.append(Probe(name="mayor-channel", status="warn",
+                                    detail="#wigamig-ops already exists but couldn't be "
+                                           "resolved — add the `groups:read` scope and reinstall."))
         else:
             probes.append(Probe(name="mayor-channel", status="warn",
-                                detail="#wigamig-ops could not be created"))
-    except Exception as exc:  # noqa: BLE001
-        probes.append(Probe(name="mayor-channel", status="warn",
-                            detail=f"slack error: {exc}"))
+                                detail=f"#wigamig-ops could not be created — "
+                                       f"{res.error}: {res.detail}"))
+    if mayor_id:
+        _ci.update_centre({"mayor_channel_id": mayor_id}, env=env)
 
     # 2. Broadcast audiences: admin → mayor channel, everyone → #general.
     profile = _reg.read_profile(env)
