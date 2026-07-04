@@ -203,6 +203,21 @@ def test_provision_centre_slack_invites_the_mayor(world, monkeypatch):
     assert seen["map"] == {"tbrowne": "tbrowne@demo.edu"}
 
 
+def test_provision_centre_slack_mayor_email_override(world, monkeypatch):
+    # --mayor-email must win over the centre join_email for the invite lookup.
+    CI.update_centre({"join_email": "public@demo.edu"})
+    monkeypatch.setenv("WIGAMIG_SLACK_TOKEN", "xoxb-x")
+    monkeypatch.setattr(CP, "slack_create_channel",
+        lambda name, **k: CP.SlackChannelResult(ok=True, channel_id="C0OPS", channel_name=name))
+    seen = {}
+    def fake_invite(cid, handles, *, member_email_map=None):
+        seen["map"] = member_email_map
+        return {"invited": handles, "already_in": [], "unresolved": []}
+    monkeypatch.setattr("wigamig.dashboard.slack_notify.invite_members_to_channel", fake_invite)
+    CP.provision_centre_slack(channel_resolver=lambda n: "C0GEN", mayor_email="real@slack.edu")
+    assert seen["map"] == {"tbrowne": "real@slack.edu"}     # override beats join_email
+
+
 def test_provision_centre_slack_warns_when_no_mayor_email(world, monkeypatch):
     monkeypatch.setenv("WIGAMIG_SLACK_TOKEN", "xoxb-x")
     monkeypatch.setattr(CP, "slack_create_channel",

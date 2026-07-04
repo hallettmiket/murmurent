@@ -460,6 +460,7 @@ def provision_centre_slack(
     channel_creator=None,     # injectable: (channel_name, ws_id) -> str | None
     channel_resolver=None,    # injectable: (channel_name) -> str | None
     token: str | None = None,  # explicit token for the live path (env-only if None)
+    mayor_email: str = "",     # override for the mayor's Slack-account email
 ) -> list[Probe]:
     """Provision the centre's Slack fabric: the private mayor↔CC channel
     (``#wigamig-ops``, stored as ``mayor_channel_id``) and the broadcast
@@ -536,7 +537,10 @@ def provision_centre_slack(
     # join_email) and users:read.email + invite scopes.
     if mayor_id and (channel_creator is None):
         mayor_handle = (centre.founding_mayor or "").strip()
-        mayor_email = (str(profile.get("email") or "").strip()
+        # Priority: explicit --mayor-email override → registrar profile email →
+        # centre join_email. Must match the email on the mayor's Slack account.
+        mayor_email = ((mayor_email or "").strip()
+                       or str(profile.get("email") or "").strip()
                        or (centre.join_email or "").strip())
         if mayor_handle and mayor_email and (token or _has_env_slack_token()):
             try:
