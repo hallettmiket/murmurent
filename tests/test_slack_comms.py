@@ -140,6 +140,32 @@ def test_provision_centre_slack_creates_mayor_channel_and_seeds_broadcasts(world
     assert {"mayor-channel", "general-channel"} <= names
 
 
+def test_provision_centre_slack_surfaces_create_error(world, monkeypatch):
+    # Live path (no channel_creator injected) must show the real Slack error,
+    # not a bare "could not be created".
+    monkeypatch.setattr(CP, "slack_create_channel",
+        lambda name, **k: CP.SlackChannelResult(
+            ok=False, channel_name=name, error="missing_scope",
+            detail="add groups:write and reinstall the app"))
+    probes = CP.provision_centre_slack(channel_resolver=lambda n: None)
+    mayor = next(p for p in probes if p.name == "mayor-channel")
+    assert mayor.status == "warn"
+    assert "missing_scope" in mayor.detail and "groups:write" in mayor.detail
+
+
+def test_provision_centre_slack_reuses_existing_mayor_channel(world, monkeypatch):
+    # name_taken → resolve + reuse the existing channel (idempotent re-run).
+    monkeypatch.setattr(CP, "slack_create_channel",
+        lambda name, **k: CP.SlackChannelResult(ok=False, channel_name=name,
+                                                error="name_taken", detail="exists"))
+    monkeypatch.setattr("wigamig.dashboard.slack_notify._lookup_channel_id_by_name",
+                        lambda n: "C0EXISTING")
+    probes = CP.provision_centre_slack(channel_resolver=lambda n: None)
+    mayor = next(p for p in probes if p.name == "mayor-channel")
+    assert mayor.status == "ok" and "C0EXISTING" in mayor.detail
+    assert CI.read_centre().mayor_channel_id == "C0EXISTING"
+
+
 def test_provision_centre_slack_needs_workspace(world):
     CI.update_centre({"slack_workspace": ""})
     probes = CP.provision_centre_slack()
