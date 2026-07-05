@@ -1846,9 +1846,17 @@ name = "wigamig"
 version = "1.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "anthropic" },
     { name = "click" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "mcp" },
+    { name = "python-multipart" },
     { name = "pyyaml" },
     { name = "rich" },
+    { name = "slack-sdk" },
+    { name = "sse-starlette" },
+    { name = "uvicorn" },
 ]
 
 [package.optional-dependencies]
@@ -1878,21 +1886,29 @@ slack = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anthropic", specifier = ">=0.40" },
     { name = "anthropic", marker = "extra == 'slack'", specifier = ">=0.40" },
     { name = "black", marker = "extra == 'dev'", specifier = ">=24.0" },
     { name = "click", specifier = ">=8.1" },
+    { name = "fastapi", specifier = ">=0.115" },
     { name = "fastapi", marker = "extra == 'dashboard'", specifier = ">=0.115" },
     { name = "google-api-python-client", marker = "extra == 'gcal'", specifier = ">=2.130" },
     { name = "google-auth-httplib2", marker = "extra == 'gcal'", specifier = ">=0.2" },
     { name = "google-auth-oauthlib", marker = "extra == 'gcal'", specifier = ">=1.2" },
+    { name = "httpx", specifier = ">=0.27" },
     { name = "httpx", marker = "extra == 'dashboard'", specifier = ">=0.27" },
     { name = "isort", marker = "extra == 'dev'", specifier = ">=5.13" },
+    { name = "mcp", specifier = ">=1.0" },
     { name = "mcp", marker = "extra == 'mcp'", specifier = ">=1.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "rich", specifier = ">=13.7" },
+    { name = "slack-sdk", specifier = ">=3.30" },
     { name = "slack-sdk", marker = "extra == 'slack'", specifier = ">=3.30" },
+    { name = "sse-starlette", specifier = ">=2.0" },
     { name = "streamlit", marker = "extra == 'dashboard'", specifier = ">=1.30" },
+    { name = "uvicorn", specifier = ">=0.30" },
     { name = "uvicorn", marker = "extra == 'dashboard'", specifier = ">=0.30" },
 ]
 provides-extras = ["dev", "mcp", "dashboard", "slack", "gcal"]
