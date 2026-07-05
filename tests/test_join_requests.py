@@ -180,11 +180,23 @@ def test_approve_admin_adds_registrar(world, monkeypatch):
     assert R.is_registrar("newadmin") is True
 
 
-def test_approve_pi_kind_is_noop_record(world):
-    req = JR.file_request(kind="pi",
-                           requester_email="newpi@x",
-                           proposed_name="newpi-role",
-                           proposed_pi="@newpi")
+def test_pi_kind_no_longer_fileable(world):
+    # A lab/core request creates the PI + group in one step, so `pi` was retired.
+    with pytest.raises(JR.JoinRequestError, match="kind must be one of"):
+        JR.file_request(kind="pi", requester_email="newpi@x",
+                        proposed_name="newpi-role", proposed_pi="@newpi")
+    assert "pi" not in JR.VALID_KINDS
+
+
+def test_legacy_pi_request_still_approves(world):
+    # A `pi` request already on disk (pre-retirement) must still read + approve
+    # (no infra) — approve() reads without re-validating the kind.
+    req = JR.file_request(kind="lab", requester_email="p@x",
+                          proposed_name="l1", proposed_pi="@p")
+    # hand-mutate the on-disk kind to the legacy value
+    import pathlib, re
+    f = next(pathlib.Path(JR.requests_dir()).glob("*.md"))
+    f.write_text(re.sub(r"^kind:.*$", "kind: pi", f.read_text(), count=1, flags=re.M))
     out = JR.approve(req_id=req.id, actor="@tbrowne", provision=False)
     assert out.state == "approved"
 

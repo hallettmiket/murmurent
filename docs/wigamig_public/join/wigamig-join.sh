@@ -101,12 +101,16 @@ choose_institution() {
 
 # --- 3. the form (interactive) ---------------------------------------------
 fill_form() {
+  say ""
+  say "You are setting up your own group and become its PI (leader)."
+  say "A lab is a research group; a core is a shared facility (e.g. proteomics)."
   say ""; say "A few questions — press Enter after each:"
-  KIND="$(ask '  What do you want? (lab / core / pi / member): ')"
-  NAME="$(ask '  Lab/core name (or the lab you want to join): ')"
-  PI="$(ask '  Your handle = your netname (e.g. @jsmith): ')"
+  KIND="$(ask '  Setting up a lab or a core? (lab / core): ')"
+  case "$KIND" in l*|L*) KIND=lab ;; c*|C*) KIND=core ;; esac
+  NAME="$(ask '  Name for your '"$KIND"' (short, e.g. hallett_lab): ')"
+  PI="$(ask '  Your handle = your netname (you are the PI, e.g. @jsmith): ')"
   RQEMAIL="$(ask '  Your email (how the registrar reaches you): ')"
-  JUST="$(ask '  One sentence: who are you / why join?: ')"
+  JUST="$(ask '  One sentence: who are you / what is this group?: ')"
 }
 
 # --- 4. encrypt ------------------------------------------------------------

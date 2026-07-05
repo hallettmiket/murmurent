@@ -5,9 +5,9 @@
 # Lines starting with # are ignored. Nothing here is sent anywhere until you
 # encrypt it and choose to email it.
 
-kind:            # one of: lab | core | pi | member
+kind:            # lab | core   (you become its PI / leader)
 institution:     # the institution you're joining (from the directory)
-name:            # proposed lab/core name — or the existing lab you want to join
-pi:              # PI / lead handle = your netname, e.g. @jsmith
+name:            # a name for your lab or core, e.g. hallett_lab
+pi:              # your handle = your netname (you are the PI), e.g. @jsmith
 email:           # how the registrar reaches you
-justification:   # a sentence: who you are and why you're joining
+justification:   # a sentence: who you are and what this group is
