@@ -136,10 +136,6 @@ def test_missing_required_field_not_created(centre):
     assert (12, JI.INGEST_LABEL) not in gh.labels
 
 
-def test_pi_kind_needs_no_pi_handle(centre):
-    gh = _GH([_issue(13, kind="pi — register as a PI", pi="")])
-    created = JI.ingest(fetcher=gh.fetch, commenter=gh.comment, labeler=gh.label)
-    assert len(created) == 1 and created[0].kind == "pi"
 
 
 # ---- decision → issue comment-back ------------------------------------
@@ -157,7 +153,7 @@ def test_comment_decision_declines_and_closes(centre):
 
 def test_comment_decision_approve_no_close(centre):
     gh = _GH([])
-    req = JR.file_request(kind="pi", requester_email="", proposed_name="x",
+    req = JR.file_request(kind="lab", requester_email="", proposed_name="x",
                           proposed_pi="@p", source_issue="acme/wigamig_public#6")
     req.state = "approved"
     JI.comment_decision_on_issue(req, commenter=gh.comment, closer=gh.close)
@@ -167,7 +163,7 @@ def test_comment_decision_approve_no_close(centre):
 
 def test_comment_decision_noop_without_source(centre):
     gh = _GH([])
-    req = JR.file_request(kind="pi", requester_email="a@b.edu",
+    req = JR.file_request(kind="lab", requester_email="a@b.edu",
                           proposed_name="x", proposed_pi="@p")
     assert JI.comment_decision_on_issue(req, commenter=gh.comment) is False
     assert gh.comments == []

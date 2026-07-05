@@ -40,7 +40,11 @@ from .registrar import (
 
 JOIN_REQUESTS_SUBDIR = "join_requests"
 REQUEST_ID_RE = _re.compile(r"^(\d{4})\.md$")
-VALID_KINDS = ("lab", "core", "admin", "pi")
+# A `lab`/`core` request creates the group AND its leader (the PI) in one step —
+# every PI has a group, so there's no separate `pi` kind. Legacy `pi` requests
+# already on disk still read + approve (the dispatch keeps a `pi` branch); they
+# just can't be filed anew.
+VALID_KINDS = ("lab", "core", "admin")
 VALID_STATES = ("pending", "approved", "declined", "provisioned", "failed")
 
 
@@ -251,7 +255,7 @@ def file_request_from_form(
     provenance note (e.g. the sender email) recorded in the audit action."""
     f = parse_join_form(text)
     return file_request(
-        kind=f.get("kind", "pi"),
+        kind=f.get("kind", "lab"),
         requester_email=f.get("email", ""),
         proposed_name=f.get("name", ""),
         proposed_pi=f.get("pi", ""),

@@ -72,11 +72,14 @@ Translate them:
 - **Blocks** mean the record was marked `failed` — surface the reason.
 
 ## What each kind does (so you set expectations)
-- **`lab` / `core`** → full provisioning: private group Slack channel (members
-  invited), GitHub repo, filesystem ACLs, registry entry.
-- **`pi`** → records the PI's intent only; **no infra** is created (the lab is a
-  separate `kind=lab` request later). Don't promise a channel for a `pi` approval.
+- **`lab` / `core`** → creates the group **and its leader (the PI) in one step**,
+  then full provisioning: the group's private Slack channel (PI + members
+  invited), GitHub repo, filesystem ACLs, registry entry. There is no separate
+  "register a PI" step — every PI has a group.
 - **`admin`** → adds the handle to the centre's registrars.
+- **`pi`** (legacy) → old requests may still show this kind; it records intent
+  only and creates no infra. New requests can't use it — steer the person to a
+  `lab`/`core` request instead.
 
 ## Guardrails
 - Never approve without the mayor's explicit yes (step 4).

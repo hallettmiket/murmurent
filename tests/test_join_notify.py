@@ -144,7 +144,7 @@ def test_file_request_survives_notifier_explosion(world, monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("slack exploded")
     monkeypatch.setattr(JN, "notify_new_request", boom)
-    req = JR.file_request(kind="pi", requester_email="x@y.edu",
-                          proposed_name="visitor", proposed_pi="@visitor")
+    req = JR.file_request(kind="lab", requester_email="x@y.edu",
+                          proposed_name="visitor_lab", proposed_pi="@visitor")
     assert req.state == "pending"          # filed despite the notifier blowing up
     assert JR.get_request(req.id) is not None
