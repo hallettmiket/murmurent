@@ -61,6 +61,47 @@ def _has_token() -> bool:
         return False
 
 
+def group_onboarding_steps(name: str, *, invite_url: str = "") -> list[str]:
+    """The ordered checklist a NEW PI runs to stand up their group's
+    environment. Shared by the invite email, the CLI next-steps block, and the
+    Slack reminder so the three never drift. ``invite_url`` is the centre's
+    Slack workspace join link (blank → the registrar hasn't set one yet)."""
+    first = (f"Join the centre Slack workspace: {invite_url}" if invite_url
+             else "Join the centre Slack workspace (the registrar will email you "
+                  "the invite link).")
+    return [
+        first,
+        f"Create your group's GitHub repo — you choose the org + visibility "
+        f"(the mayor does NOT create it):  wigamig group-init-toolkit {name} --create-repo",
+        f"Fill in your group's details — GitHub repo, lab-notebook host/path, "
+        f"your group's OWN Slack workspace + invite link, large-dataset location:  "
+        f"wigamig group-setup {name}",
+        f"Propagate members into your group's Slack workspace + GitHub repo:  "
+        f"wigamig group-reconcile {name} --apply",
+    ]
+
+
+def _fmt_provisioned(req, *, invite_url: str = "") -> str:
+    """Message to the mayor/registrar (admin channel) when a lab/core is
+    provisioned: confirms it + reminds them to email the new PI the invite."""
+    role = "PI" if req.kind == "lab" else "leader"
+    who = (req.requester_email or "").strip() or "the new " + role
+    pi = (req.proposed_pi or "").strip()
+    head = (f"✅ *{req.kind} `{req.proposed_name}` provisioned* — "
+            f"{role}: {pi + ' · ' if pi else ''}{who}")
+    if invite_url:
+        action = (f"➡️ *Action for the registrar:* email {who} the workspace "
+                  f"invite link so they can join and set up their group:\n{invite_url}")
+    else:
+        action = (f"➡️ *Action for the registrar:* set a workspace invite link "
+                  f"(`wigamig centre-set slack_invite_url=…`), then email it to "
+                  f"{who} so they can join.")
+    setup = (f"Their group setup: `wigamig group-init-toolkit {req.proposed_name} "
+             f"--create-repo` → `wigamig group-setup {req.proposed_name}` → "
+             f"`wigamig group-reconcile {req.proposed_name} --apply`.")
+    return f"{head}\n{action}\n{setup}"
+
+
 def _fmt_new(req, *, pi: str = "") -> str:
     if req.kind == "member":
         who = req.proposed_pi or req.requester_email or "someone"
@@ -96,7 +137,8 @@ def _fmt_decision(req) -> str:
     if req.state in ("approved", "provisioned"):
         return (
             f"✅ Your wigamig join request #{req.id:04d} ({label}) was "
-            f"*approved*. The registrar will follow up with next steps."
+            f"*approved*. Check your email for the workspace invite link + "
+            f"the steps to set up your group."
         )
     if req.state == "declined":
         reason = f" Reason: {req.decline_reason}" if req.decline_reason else ""
@@ -193,4 +235,48 @@ def notify_decision(
         return False
 
 
-__all__ = ["notify_new_request", "notify_decision"]
+def notify_group_provisioned(
+    req,
+    *,
+    env=None,
+    poster: PosterFn | None = None,
+    channel_resolver: ChannelResolverFn | None = None,
+) -> bool:
+    """Post to the admin/mayor channel that a lab/core was provisioned, and
+    remind the registrar to email the new PI the workspace invite link.
+
+    This is the mayor-facing counterpart to ``notify_decision`` (which DMs the
+    requester — and no-ops when the brand-new PI isn't in the workspace yet).
+    Best-effort + token-gated; never raises. Returns True iff a message posted.
+    """
+    if not _has_token():
+        return False
+    if getattr(req, "kind", "") not in ("lab", "core"):
+        return False
+    poster = poster or _default_poster
+    channel_resolver = channel_resolver or _default_channel_resolver
+    invite = ""
+    try:
+        from . import centre_init as _ci
+        prof = _ci.read_centre(env=env)
+        invite = (getattr(prof, "slack_invite_url", "") or "").strip() if prof else ""
+    except Exception as exc:  # noqa: BLE001
+        log.info("join_notify: centre read failed (%s); no invite link in reminder", exc)
+    try:
+        channel = channel_resolver("admin", env=env)
+    except Exception as exc:  # noqa: BLE001 — admin channel not configured
+        log.info("join_notify: admin channel not resolved (%s); skipping", exc)
+        return False
+    if not channel:
+        return False
+    try:
+        return bool(poster(channel, _fmt_provisioned(req, invite_url=invite)))
+    except Exception as exc:  # noqa: BLE001
+        log.warning("join_notify.notify_group_provisioned failed: %s", exc)
+        return False
+
+
+__all__ = [
+    "notify_new_request", "notify_decision", "notify_group_provisioned",
+    "group_onboarding_steps",
+]

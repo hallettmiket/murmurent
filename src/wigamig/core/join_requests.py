@@ -283,6 +283,12 @@ def _notify_safe(event: str, req: "JoinRequest", env) -> None:
             if req.source_issue:
                 from . import join_ingest
                 join_ingest.comment_decision_on_issue(req, env=env)
+        elif event == "provisioned":
+            # A lab/core was just stood up → tell the mayor/registrar (admin
+            # channel) to email the new PI the workspace invite link. Distinct
+            # from "decision", which DMs the requester (and no-ops when the
+            # brand-new PI isn't in the workspace yet).
+            join_notify.notify_group_provisioned(req, env=env)
     except Exception:  # noqa: BLE001 — notification must never break the flow
         pass
 
@@ -489,6 +495,10 @@ def approve(
 
     write_request(req, env, audit_action=f"approved by @{actor.lstrip('@')}")
     _notify_safe("decision", req, env)
+    if req.state == "provisioned" and req.kind in ("lab", "core"):
+        # Remind the mayor/registrar (admin channel) to email the new PI the
+        # workspace invite link so they can join + set up their group.
+        _notify_safe("provisioned", req, env)
     return req
 
 

@@ -313,33 +313,55 @@ def cmd_approve(req_id: int, actor: str, no_provision: bool) -> None:
     for p in r.probes:
         click.echo(f"  [{p.get('severity'):5s}] {p.get('kind')}: {p.get('summary')}")
 
-    # Workspace invite. On free/Pro Slack the bot can't add someone to the
-    # workspace by API — so the new PI (lab/core) or member gets the invite LINK
-    # by email, joins the workspace, and is then added to their channel on the
-    # next reconcile. Surface the link (and open a pre-filled email) so the
-    # approver can send it.
+    # Workspace invite + next steps. On free/Pro Slack the bot can't add someone
+    # to the workspace by API — so the new PI (lab/core) or member gets the
+    # invite LINK by email, joins the workspace, and is then added to their
+    # channel on the next reconcile. The mayor/registrar MUST send that email;
+    # for a lab/core the PI also needs the steps to set up their group. Surface
+    # both here (and open a pre-filled email so the approver just presses Send).
     if r.kind in ("lab", "core", "member") and r.state != "failed":
+        from ..core import join_notify as _jn
         prof = _ci.read_centre()
         link = (getattr(prof, "slack_invite_url", "") or "").strip() if prof else ""
         who = (r.requester_email or "").strip()
-        if link and who:
+        is_group = r.kind in ("lab", "core")
+        role = "PI" if is_group else "member"
+        steps = _jn.group_onboarding_steps(r.proposed_name, invite_url=link) if is_group else []
+
+        click.echo("\n─── NEXT STEPS ───")
+        # 1. The registrar's action: email the invite link.
+        if who and link:
+            click.echo(f"1. Send the workspace invite to the {role} ({who}):")
+            click.echo(f"     {link}")
+        elif who and not link:
+            click.echo(f"1. No workspace invite link is set yet — set one, then email it to {who}:")
+            click.echo("     wigamig centre-set slack_invite_url=<your western-serenity join link>")
+        # 2. What the new PI then does (lab/core only).
+        if is_group:
+            click.echo(f"\n2. Once joined, the {role} sets up their group (send them these):")
+            for i, s in enumerate(steps[1:], start=1):   # skip step 1 (join link, shown above)
+                click.echo(f"     {i}. {s}")
+
+        # Open a pre-filled email containing the link + the setup steps.
+        if who and link:
             import shutil as _sh, subprocess as _sp, urllib.parse as _url
-            role = "PI" if r.kind in ("lab", "core") else "member"
-            subject = _url.quote(f"You're in — join the {r.proposed_name} Slack workspace")
-            body = _url.quote(
-                f"Welcome! You've been added as a {role} of {r.proposed_name}.\n\n"
-                f"Join the Slack workspace here:\n{link}\n\n"
-                "Once you've joined, you'll be added to your group's channel automatically.")
+            body_lines = [
+                f"Welcome! You've been added as the {role} of {r.proposed_name}.",
+                "",
+                "To get set up, do these in order:",
+                "",
+            ]
+            body_lines += [f"{i}. {s}" for i, s in enumerate(steps, start=1)] if is_group \
+                else [f"Join the Slack workspace:\n{link}",
+                      "Once you've joined, you'll be added to your group's channel automatically."]
+            subject = _url.quote(f"You're in — setting up {r.proposed_name} on wigamig")
+            body = _url.quote("\n".join(body_lines))
             mailto = f"mailto:{who}?subject={subject}&body={body}"
             opener = _sh.which("open") or _sh.which("xdg-open")
-            click.echo(f"\nWorkspace invite for {who}:  {link}")
             if opener:
                 _sp.run([opener, mailto], check=False,
                         stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
-                click.echo("  Opened your email app to send them the invite — press Send.")
-        elif who and not link:
-            click.echo(f"\n(No workspace invite link set — add `slack_invite_url` to the "
-                       f"centre so approvals can email {who} a join link.)")
+                click.echo("\n  ✉️  Opened your email app pre-filled with the link + steps — press Send.")
 
 
 @join_request_group.command("decline")
