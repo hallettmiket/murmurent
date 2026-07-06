@@ -1025,6 +1025,65 @@ def add_group_member(
     return True
 
 
+# --- group profile (PI fills these in AFTER the group is created) ----------
+# Kept on the group's OWN lab.md (in its lab-mgmt repo), which the PI controls
+# and backs up — distinct from the centre registry the mayor holds.
+GROUP_PROFILE_FIELDS: tuple[str, ...] = (
+    "github",           # the group's GitHub repo, e.g. "org/mh_lab"
+    "notebook_host",    # a machine (in the host registry) where lab notebooks live
+    "notebook_path",    # path on that host
+    "slack_workspace",  # the group's OWN Slack workspace/team id (per-group workspace)
+    "slack_invite_url", # its join link (the PI manages this workspace)
+    "data_host",        # machine holding large datasets (e.g. biodatsci)
+    "data_raw",         # e.g. /data/lab_vm/raw/<group>
+    "data_refined",     # e.g. /data/lab_vm/refined/<group>
+)
+
+
+def _group_lab_md(name: str, *, env: dict[str, str] | None = None) -> Path | None:
+    reg = read_registry(env)
+    entry = next((g for g in [*reg.labs, *reg.cores] if g.name == name), None)
+    if entry is None or not entry.lab_mgmt_path:
+        return None
+    return Path(entry.lab_mgmt_path).expanduser() / "lab.md"
+
+
+def read_group_profile(name: str, *, env: dict[str, str] | None = None) -> dict[str, str]:
+    """Return the group's profile fields from its ``lab.md`` (empty if unset)."""
+    from .frontmatter import parse_file as _pf
+    p = _group_lab_md(name, env=env)
+    if p is None or not p.is_file():
+        return {}
+    meta = _pf(p).meta or {}
+    return {k: str(meta[k]) for k in GROUP_PROFILE_FIELDS if meta.get(k)}
+
+
+def update_group_profile(
+    name: str, fields: dict[str, str], *, env: dict[str, str] | None = None,
+) -> bool:
+    """Merge ``fields`` into the group's ``lab.md`` frontmatter.
+
+    Only known GROUP_PROFILE_FIELDS are written; an empty value clears a field.
+    Returns False if there is no such group (or it has no lab.md).
+    """
+    from .frontmatter import parse_file as _pf, dump_document as _dump
+    p = _group_lab_md(name, env=env)
+    if p is None or not p.is_file():
+        return False
+    doc = _pf(p)
+    meta = dict(doc.meta or {})
+    for k, v in fields.items():
+        if k not in GROUP_PROFILE_FIELDS:
+            continue
+        val = str(v).strip() if v is not None else ""
+        if val:
+            meta[k] = val
+        else:
+            meta.pop(k, None)
+    p.write_text(_dump(meta, doc.body), encoding="utf-8")
+    return True
+
+
 def group_email_map(
     name: str, *, env: dict[str, str] | None = None,
 ) -> dict[str, str]:

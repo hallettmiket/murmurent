@@ -218,6 +218,38 @@ def test_add_group_member_and_group_lookups(world):
     assert R.group_email_map("dcis").get("bob") == "bob@x.edu"
 
 
+def test_group_profile_roundtrip(world):
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+    assert R.read_group_profile("dcis") == {}
+    assert R.update_group_profile("dcis", {
+        "github": "hallettmiket/dcis", "notebook_host": "biodatsci",
+        "data_raw": "/data/lab_vm/raw/dcis", "bogus": "ignored"}) is True
+    prof = R.read_group_profile("dcis")
+    assert prof["github"] == "hallettmiket/dcis"
+    assert prof["notebook_host"] == "biodatsci"
+    assert prof["data_raw"] == "/data/lab_vm/raw/dcis"
+    assert "bogus" not in prof                       # only known fields written
+    # empty value clears a field
+    R.update_group_profile("dcis", {"github": ""})
+    assert "github" not in R.read_group_profile("dcis")
+
+
+def test_update_group_profile_no_such_group(world):
+    assert R.update_group_profile("ghost", {"github": "x/y"}) is False
+
+
+def test_group_setup_cli(world):
+    from click.testing import CliRunner
+    from wigamig.commands.centre_cmd import group_setup
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+    res = CliRunner().invoke(group_setup, [
+        "dcis", "--non-interactive",
+        "--set", "github=hallettmiket/dcis", "--set", "slack_workspace=T0DCIS"])
+    assert res.exit_code == 0, res.output
+    prof = R.read_group_profile("dcis")
+    assert prof["github"] == "hallettmiket/dcis" and prof["slack_workspace"] == "T0DCIS"
+
+
 def test_legacy_pi_request_still_approves(world):
     # A `pi` request already on disk (pre-retirement) must still read + approve
     # (no infra) — approve() reads without re-validating the kind.
