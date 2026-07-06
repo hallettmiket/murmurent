@@ -782,6 +782,104 @@ def group_reconcile_cmd(group: str, apply: bool) -> None:
         click.echo("\n  Re-run with --apply to add the GitHub collaborators.")
 
 
+_TOOLKIT_README = """# {group} toolkit — group agents + governance
+
+This is **{group}**'s private toolkit. It holds the group's own Claude Code
+agents that **override the general wigamig (commons) agents**, plus anything
+else the group wants to version privately.
+
+## How the override works
+
+Claude Code resolves agents **most-specific-wins**: an agent in a *project's*
+`.claude/agents/<name>.md` takes precedence over the same-named agent in the
+machine commons (`~/.claude/agents/<name>.md`). So a `blacksmith.md` placed in a
+project overrides the commons `blacksmith`; agents you don't override fall
+through to the commons unchanged.
+
+Put the group's custom/tuned agents in [`.claude/agents/`](.claude/agents/).
+To use them in one of the group's projects, wire them into that project's
+`.claude/agents/` (the wigamig install/adopt wizard does this when you pick
+them). New group members clone this repo to get the group's agents.
+
+**Keep this repo PRIVATE** — it may encode group-specific methods.
+"""
+
+_AGENTS_README = """# {group} agents (override the commons)
+
+Drop group-specific agents here as `<name>.md` with the standard agent
+frontmatter. Name a file after a commons agent (`blacksmith.md`, `bookworm.md`,
+…) to **override** it for the group's projects, or use a new name (e.g.
+`segmenter.md`) to add a discipline-specific agent on top of the commons.
+
+See `_TEMPLATE.md` for the shape. Every agent must open its final reply with a
+≤200-char verdict line (wigamig's headline-first rule).
+"""
+
+_AGENT_TEMPLATE = """---
+name: <agent-name>            # same name as a commons agent = override it
+description: 'MUST: first line of every final response is a <=200-char verdict.'
+model: sonnet
+required_tools: [Read, Write, Bash, Glob, Grep]
+---
+
+# <Agent name> ({group}-tuned)
+
+<Your group-specific instructions. Because this file name matches a commons
+agent, it overrides that agent in projects that wire it in.>
+"""
+
+
+@click.command("group-init-toolkit",
+                help="Scaffold the group's PRIVATE agent-toolkit repo — where the "
+                     "PI puts group agents that OVERRIDE the general wigamig "
+                     "agents. Creates ~/repos/<group>_toolkit with .claude/agents/ "
+                     "+ READMEs and git init; --create-repo also makes a private "
+                     "GitHub repo and records it on the group profile.")
+@click.argument("group")
+@click.option("--dir", "target_dir", default=None,
+              help="Where to scaffold (default: ~/repos/<group>_toolkit).")
+@click.option("--create-repo", default="", metavar="OWNER/REPO",
+              help="Also create a PRIVATE GitHub repo (gh) + push + record it.")
+def group_init_toolkit(group: str, target_dir: str | None, create_repo: str) -> None:
+    from pathlib import Path as _P
+    import subprocess as _sp
+    from ..core import registrar as _R
+
+    if not _R.group_exists(group):
+        raise click.ClickException(f"no lab or core named {group!r} — create it first.")
+    root = _P(target_dir).expanduser() if target_dir else _P.home() / "repos" / f"{group}_toolkit"
+    if root.exists() and any(root.iterdir()):
+        raise click.ClickException(f"{root} already exists and isn't empty — move it aside.")
+    (root / ".claude" / "agents").mkdir(parents=True, exist_ok=True)
+    (root / "README.md").write_text(_TOOLKIT_README.format(group=group), encoding="utf-8")
+    (root / ".claude" / "agents" / "README.md").write_text(
+        _AGENTS_README.format(group=group), encoding="utf-8")
+    (root / ".claude" / "agents" / "_TEMPLATE.md").write_text(
+        _AGENT_TEMPLATE.format(group=group), encoding="utf-8")
+    (root / ".gitignore").write_text(".claude/settings.json\n", encoding="utf-8")
+    _sp.run(["git", "init", "-q", str(root)], check=False,
+            stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+
+    click.echo(f"✓ Scaffolded {root}")
+    click.echo("    .claude/agents/  — put group agents here; they override the commons.")
+    if create_repo:
+        r = _sp.run(["gh", "repo", "create", create_repo, "--private",
+                     "--source", str(root), "--remote", "origin", "--push"],
+                    capture_output=True, text=True)
+        if r.returncode == 0:
+            click.echo(f"✓ Created private repo {create_repo} + pushed.")
+            _R.update_group_profile(group, {"github": create_repo})
+            click.echo(f"✓ Recorded github={create_repo} on the group profile.")
+        else:
+            click.echo(f"! gh repo create failed: "
+                       f"{((r.stderr or r.stdout) or '').strip()[:160]}")
+    else:
+        click.echo("\nNext — make it a private repo and record it:")
+        click.echo(f"    cd {root} && git add -A && git commit -m 'group toolkit'")
+        click.echo(f"    gh repo create <org>/{group}_toolkit --private --source . --push")
+        click.echo(f"    wigamig group-setup {group} --set github=<org>/{group}_toolkit")
+
+
 @join_request_group.command("decrypt")
 @click.argument("path", type=click.Path(exists=True, dir_okay=False))
 def cmd_decrypt(path: str) -> None:

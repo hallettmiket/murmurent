@@ -291,6 +291,28 @@ def test_resolve_group_slack_token_env_then_file(monkeypatch, tmp_path):
     assert GR.resolve_group_slack_token("dcis") == "xoxb-env"   # env wins
 
 
+def test_group_init_toolkit_scaffolds(world, tmp_path):
+    from click.testing import CliRunner
+    from wigamig.commands.centre_cmd import group_init_toolkit
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+    target = tmp_path / "dcis_toolkit"
+    res = CliRunner().invoke(group_init_toolkit, ["dcis", "--dir", str(target)])
+    assert res.exit_code == 0, res.output
+    assert (target / ".claude" / "agents" / "_TEMPLATE.md").is_file()
+    assert (target / ".claude" / "agents" / "README.md").is_file()
+    assert "override" in (target / "README.md").read_text().lower()
+
+
+def test_group_init_toolkit_refuses_nonempty(world, tmp_path):
+    from click.testing import CliRunner
+    from wigamig.commands.centre_cmd import group_init_toolkit
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+    target = tmp_path / "dcis_toolkit"; target.mkdir()
+    (target / "x").write_text("y")
+    res = CliRunner().invoke(group_init_toolkit, ["dcis", "--dir", str(target)])
+    assert res.exit_code != 0 and "already exists" in res.output
+
+
 def test_legacy_pi_request_still_approves(world):
     # A `pi` request already on disk (pre-retirement) must still read + approve
     # (no infra) — approve() reads without re-validating the kind.
