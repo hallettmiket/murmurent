@@ -354,6 +354,32 @@ def create_project_channel(
         return None
 
 
+def _open_dm(user_id: str, tok: str | None = None) -> str | None:
+    """Open (or reuse) the bot↔user DM and return its ``D…`` channel id.
+
+    Posting straight to a ``U…`` user id lands in the bot's *App messages*
+    tab, not the recipient's Direct Messages — so any DM path must resolve the
+    real IM channel first via ``conversations.open`` (needs the ``im:write``
+    scope). Returns None on failure so callers can fall back."""
+    tok = tok or _token()
+    if not (tok and user_id):
+        return None
+    try:
+        import httpx
+        r = httpx.post(
+            "https://slack.com/api/conversations.open",
+            headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"},
+            json={"users": user_id}, timeout=5,
+        ).json()
+        if r.get("ok"):
+            return (r.get("channel") or {}).get("id")
+        log.warning("conversations.open for %s failed: %s (add the im:write scope?)",
+                    user_id, r.get("error"))
+    except Exception as exc:  # noqa: BLE001
+        log.warning("conversations.open error: %s", exc)
+    return None
+
+
 def _post(channel: str, text: str) -> bool:
     """Low-level POST to Slack. Returns True on success, False otherwise.
 
@@ -364,6 +390,11 @@ def _post(channel: str, text: str) -> bool:
     if not tok:
         return False
     channel = _route(channel)
+    # A bare user id → open the real DM channel so the message lands in the
+    # recipient's Direct Messages, not the bot's App-messages tab. Fall back to
+    # the user id if the DM can't be opened (e.g. no im:write scope).
+    if channel and channel[:1] == "U":
+        channel = _open_dm(channel, tok) or channel
     try:
         import httpx  # already a project dependency
 
