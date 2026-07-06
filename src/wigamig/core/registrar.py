@@ -973,6 +973,58 @@ def set_group_slack_channel(
     return False
 
 
+def group_exists(name: str, *, env: dict[str, str] | None = None) -> bool:
+    """True iff a lab or core named ``name`` is registered at the centre."""
+    reg = read_registry(env)
+    return any(g.name == name for g in [*reg.labs, *reg.cores])
+
+
+def group_pi(name: str, *, env: dict[str, str] | None = None) -> str | None:
+    """The ``@handle`` of a lab/core's PI (leader), or None if no such group."""
+    reg = read_registry(env)
+    entry = next((g for g in [*reg.labs, *reg.cores] if g.name == name), None)
+    return entry.pi if entry else None
+
+
+def add_group_member(
+    name: str,
+    *,
+    handle: str,
+    email: str = "",
+    full_name: str = "",
+    role: str = "member",
+    env: dict[str, str] | None = None,
+) -> bool:
+    """Add (or update) a member of an existing lab/core, addressed by group name.
+
+    Writes ``<group>/lab-mgmt/members/<handle>.md`` with an ``email`` so the
+    member can be resolved for the group's Slack-channel invite. Idempotent.
+    Returns False if no group named ``name`` exists (or it has no lab_mgmt_path).
+    """
+    reg = read_registry(env)
+    entry = next((g for g in [*reg.labs, *reg.cores] if g.name == name), None)
+    if entry is None or not entry.lab_mgmt_path:
+        return False
+    norm = _normalize(handle)
+    if not norm:
+        return False
+    members_dir = Path(entry.lab_mgmt_path).expanduser() / "members"
+    members_dir.mkdir(parents=True, exist_ok=True)
+    meta: dict[str, Any] = {
+        "handle": f"@{norm}",
+        "full_name": full_name or norm.replace("_", " ").title(),
+        "role": role,
+        "status": "active",
+        "lab": name,
+    }
+    if (email or "").strip():
+        meta["email"] = email.strip()
+    yaml_text = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip() + "\n"
+    (members_dir / f"{norm}.md").write_text(
+        f"---\n{yaml_text}---\n\n# @{norm}\n", encoding="utf-8")
+    return True
+
+
 def group_email_map(
     name: str, *, env: dict[str, str] | None = None,
 ) -> dict[str, str]:

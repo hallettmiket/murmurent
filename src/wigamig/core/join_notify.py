@@ -62,6 +62,16 @@ def _has_token() -> bool:
 
 
 def _fmt_new(req) -> str:
+    if req.kind == "member":
+        who = req.proposed_pi or req.requester_email or "someone"
+        head = (f"🆕 *Join request* #{req.id:04d} — {who} wants to join "
+                f"*{req.proposed_name}*")
+        if req.requester_email:
+            head += f" · contact: {req.requester_email}"
+        tail = f"\n> {req.justification}" if req.justification else ""
+        return (f"{head}{tail}\nAs the PI, approve with "
+                f"`wigamig join-request approve {req.id} --actor @<you>` "
+                "or the /registrar Requests panel.")
     bits = [
         f"🆕 *New join request* #{req.id:04d}",
         f"kind: `{req.kind}`",
@@ -120,9 +130,20 @@ def notify_new_request(
     poster = poster or _default_poster
     channel_resolver = channel_resolver or _default_channel_resolver
     try:
-        channel = channel_resolver("admin", env=env)
+        if getattr(req, "kind", "") == "member":
+            # A member request is the group's PI's call, not the mayor's — post
+            # to the group's own channel (the PI is in it). Fall back to the
+            # admin channel if the group has no channel yet.
+            from . import registrar as _reg
+            reg = _reg.read_registry(env)
+            entry = next((g for g in [*reg.labs, *reg.cores]
+                          if g.name == req.proposed_name), None)
+            channel = (getattr(entry, "slack_channel_id", None) if entry else None) \
+                or channel_resolver("admin", env=env)
+        else:
+            channel = channel_resolver("admin", env=env)
     except Exception as exc:  # noqa: BLE001 — e.g. channel not configured
-        log.info("join_notify: admin channel not configured (%s); skipping", exc)
+        log.info("join_notify: target channel not resolved (%s); skipping", exc)
         return False
     if not channel:
         return False

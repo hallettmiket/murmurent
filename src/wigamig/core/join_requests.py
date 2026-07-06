@@ -40,11 +40,13 @@ from .registrar import (
 
 JOIN_REQUESTS_SUBDIR = "join_requests"
 REQUEST_ID_RE = _re.compile(r"^(\d{4})\.md$")
-# A `lab`/`core` request creates the group AND its leader (the PI) in one step —
-# every PI has a group, so there's no separate `pi` kind. Legacy `pi` requests
-# already on disk still read + approve (the dispatch keeps a `pi` branch); they
-# just can't be filed anew.
-VALID_KINDS = ("lab", "core", "admin")
+# `lab`/`core`  → create the group + its PI (decided by the mayor).
+# `member`      → join an EXISTING group (decided by that group's PI); the
+#                 mayor is only the intake (they hold the age key).
+# `admin`       → add a centre registrar.
+# Legacy `pi` requests already on disk still read + approve (the dispatch keeps
+# a `pi` branch); they just can't be filed anew.
+VALID_KINDS = ("lab", "core", "admin", "member")
 VALID_STATES = ("pending", "approved", "declined", "provisioned", "failed")
 
 
@@ -318,6 +320,18 @@ def file_request(
         raise JoinRequestError(
             f"proposed_pi is required for kind={kind_clean!r}"
         )
+    if kind_clean == "member":
+        # A member joins an EXISTING group. Require their handle, and verify the
+        # group is actually registered — so we never file a request against a
+        # group that doesn't exist (your "join a group that doesn't exist" case).
+        from . import registrar as _R
+        if not (proposed_pi or "").strip():
+            raise JoinRequestError("proposed_pi (your handle) is required for kind='member'")
+        _grp = proposed_name.strip().lower()
+        if not _R.group_exists(_grp, env=env):
+            raise JoinRequestError(
+                f"no lab or core named {_grp!r} at this centre — check the name, "
+                "or ask its PI to create the group first.")
     req = JoinRequest(
         id=next_request_id(env),
         kind=kind_clean,
@@ -408,6 +422,35 @@ def approve(
         if norm and norm not in reg.registrars:
             reg.registrars.append(norm)
             _R.write_registry(reg, env)
+    elif req.kind == "member":
+        # Join an existing group: add the requester to the group's membership,
+        # then add them to the group's Slack channel (or surface the workspace
+        # invite link if they're not in the workspace yet). Decided by the
+        # group's PI (they run approve with --actor @<pi>).
+        added = _R.add_group_member(
+            req.proposed_name, handle=req.proposed_pi,
+            email=req.requester_email, env=env)
+        if not added:
+            req.probes.append({"kind": "add-member", "severity": "block",
+                               "summary": f"no group named {req.proposed_name!r}"})
+            _set_resolved(req, actor, "failed")
+            write_request(req, env, audit_action="approve failed: no such group")
+            _notify_safe("decision", req, env)
+            return req
+        req.probes.append({
+            "kind": "add-member", "severity": "ok",
+            "summary": f"@{req.proposed_pi.lstrip('@')} added to {req.proposed_name}"})
+        if provision:
+            try:
+                from . import centre_provision as _cp
+                for p in _cp.provision_member_to_group(
+                        req.proposed_name, handle=req.proposed_pi,
+                        email=req.requester_email, env=env, token=token):
+                    req.probes.append({"kind": p.name, "severity": p.status,
+                                       "summary": p.detail or ""})
+            except Exception as exc:  # noqa: BLE001
+                req.probes.append({"kind": "member-channel", "severity": "warn",
+                                   "summary": f"slack step errored: {exc}"})
     elif req.kind == "pi":
         # No infra action: the PI's intent is recorded; the lab record
         # follows separately (via a kind=lab request).
