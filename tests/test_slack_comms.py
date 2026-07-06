@@ -91,7 +91,6 @@ def test_provision_creates_group_channel_and_persists_id(world, monkeypatch):
                 "error": None}
     probes = CP.provision_lab_onboarding(
         "lab_mh", slack_creator=fake_slack, member_inviter=fake_inviter,
-        github_creator=lambda *a, **k: True,
         acl_runner=lambda *a, **k: (0, "", ""),
     )
     # channel named after the group (not lab-<name>)
@@ -114,7 +113,6 @@ def test_provision_skips_invite_without_token_or_inviter(world, monkeypatch):
                  pi_email="harry@demo.edu")
     probes = CP.provision_lab_onboarding(
         "lab_mh", slack_creator=lambda n, w: "C0LABMH",
-        github_creator=lambda *a, **k: True,
         acl_runner=lambda *a, **k: (0, "", ""),
     )
     lab = next(l for l in R.read_registry().labs if l.name == "lab_mh")

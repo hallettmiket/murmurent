@@ -334,19 +334,20 @@ def provision_lab_onboarding(
     env: dict[str, str] | None = None,
     slack_creator=None,             # injectable: (channel_name, ws_id) -> str | None
     member_inviter=None,            # injectable: (channel_id, handles, member_email_map) -> dict
-    github_creator=None,            # injectable: (org, repo, members) -> bool
     acl_runner=None,                # injectable: same shape as apply_fs_acl runner
     token: str | None = None,       # explicit token (file-aware) for the live path
 ) -> list[Probe]:
-    """Provision Slack channel + GitHub repo + filesystem ACLs for a
-    newly-approved lab.
+    """Provision the centre-owned pieces for a newly-approved lab: the
+    Slack channel + filesystem ACLs.
 
-    The three injectable hooks let tests run end-to-end without
-    touching real Slack / GitHub / sudo. Production calls leave them
-    None and the helpers fall back to the live integrations:
+    The group's **GitHub repo is deliberately NOT created here** — that
+    belongs to the PI (group-side), not the mayor/registrar.
+
+    The injectable hooks let tests run end-to-end without touching real
+    Slack / sudo. Production calls leave them None and the helpers fall
+    back to the live integrations:
 
       - Slack: ``slack_notify._post`` + a thin create-channel wrapper
-      - GitHub: ``project_provision._gh`` (the existing gh wrapper)
       - ACL:   ``apply_fs_acl`` defined above
 
     Reads the centre profile (``centre_init.read_centre``) to pull
@@ -420,31 +421,17 @@ def provision_lab_onboarding(
             detail="centre.slack_workspace not configured; skipping",
         ))
 
-    # 2. GitHub repo.
-    if github_creator is None:
-        github_creator = _live_github_create_repo
-    if centre.github_org:
-        try:
-            ok = github_creator(centre.github_org, lab_name, [])
-            probes.append(Probe(
-                name="github-repo",
-                status="ok" if ok else "warn",
-                detail=(
-                    f"{centre.github_org}/{lab_name}"
-                    if ok else
-                    f"gh create failed for {centre.github_org}/{lab_name}"
-                ),
-            ))
-        except Exception as exc:  # noqa: BLE001
-            probes.append(Probe(
-                name="github-repo", status="warn",
-                detail=f"gh error: {exc}",
-            ))
-    else:
-        probes.append(Probe(
-            name="github-repo", status="warn",
-            detail="centre.github_org not configured; skipping",
-        ))
+    # 2. GitHub repo — deliberately NOT created here.
+    #    The group's repo belongs to the PI (the group-level cable_guy), who
+    #    decides its org, name, and visibility and owns it thereafter. The
+    #    centre/registrar never creates a repo on the PI's behalf. We only note
+    #    that the PI must, and point at the group-side command.
+    probes.append(Probe(
+        name="github-repo", status="ok",
+        detail=(f"deferred to the PI — the group's repo is created group-side "
+                f"(e.g. `wigamig group-init-toolkit {lab_name} --create-repo`); "
+                f"the mayor does not create it."),
+    ))
 
     # 3. Filesystem ACL (one probe per machine; here just centre.data_server).
     if centre.data_server:
@@ -770,23 +757,6 @@ def _live_slack_create_channel(
     res = slack_create_channel(channel_name, workspace_id=workspace_id,
                                  private=True)
     return res.channel_id if res.ok else None
-
-
-def _live_github_create_repo(
-    org: str, repo: str, collaborators: list[str],
-) -> bool:
-    """Live GitHub repo creation via gh CLI. Returns True on success.
-
-    Reuses the existing _gh helper from project_provision for
-    consistency with the per-lab provisioning path.
-    """
-    try:
-        from . import project_provision as _pp
-        r = _pp._gh(["repo", "create", f"{org}/{repo}", "--private",
-                      "--confirm"])
-        return r.returncode == 0
-    except Exception:  # noqa: BLE001
-        return False
 
 
 # ---------------------------------------------------------------------------

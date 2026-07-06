@@ -632,6 +632,11 @@
           + (centre.slack_workspace
               ? '<p>Declared workspace id: <span class="mono">' + escapeHTML(centre.slack_workspace) + '</span></p>'
               : '<p><strong>No Slack workspace declared yet.</strong></p>')
+          + (centre.slack_invite_url
+              ? '<p><strong>Workspace join link set ✓</strong> — new members are sent this to join the workspace:</p>'
+                + '<code class="cmd">' + escapeHTML(centre.slack_invite_url) + '</code>'
+              : '<p><strong>No workspace join link set.</strong> New members can\'t join the workspace (so they can\'t be added to any channel) until you add one. In Slack open <span class="mono">' + escapeHTML(wsName) + ' → Invite people → Copy invite link</span>, then paste it in place of the placeholder and run:</p>'
+                + '<code class="cmd">wigamig centre-set slack_invite_url=PASTE-YOUR-INVITE-LINK</code>')
           + '<p>As the mayor you set up Slack once. Follow these steps in order:</p>'
           + '<ol class="setup-steps">'
           + '<li>Create a Slack workspace named <span class="mono">' + escapeHTML(wsName) + '</span> (or reuse an existing one).</li>'
