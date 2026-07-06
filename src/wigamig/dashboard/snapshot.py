@@ -483,14 +483,24 @@ def _lab_settings(lab_name: str) -> C.LabSettings:
                 git_providers=providers,
                 github_org=str(meta.get("github_org") or ""),
                 git_repos_subpath=str(meta.get("git_repos_subpath") or "repos"),
+                notebook_host=str(meta.get("notebook_host") or ""),
+                notebook_path=str(meta.get("notebook_path") or ""),
+                obsidian_host=str(meta.get("obsidian_host") or ""),
+                obsidian_path=str(meta.get("obsidian_path") or ""),
+                lab_mgmt_path=str(root),
                 notebook_large_files_path=meta.get("notebook_large_files_path") or None,
                 lab_oracle_vault=meta.get("lab_oracle_vault") or _lab_oracle_folder(lab_name),
             )
     except Exception:
         pass
+    try:
+        _fallback_root = str(lab_mgmt_repo_root())
+    except Exception:
+        _fallback_root = ""
     return C.LabSettings(
         name=lab_name,
         pi_handle=_pi_handle(),
+        lab_mgmt_path=_fallback_root,
         lab_oracle_vault=_lab_oracle_folder(lab_name),
     )
 

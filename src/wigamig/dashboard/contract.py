@@ -397,6 +397,18 @@ class LabSettings(BaseModel):
     # Subpath under lab_base where bare git repos live (used by the
     # ``local-bare`` provider kind, if the lab declares one).
     git_repos_subpath: str = "repos"
+    # Storage locations (2026-07-06). ``lab_base`` above is the umbrella that
+    # holds the lab's FILES (raw/ + refined/ live under it). Lab notebooks and
+    # the Obsidian vault get their own machine + path so a lab can keep them on
+    # a different host if it wants. All optional; blank means "derive from
+    # lab_base" — the umbrella model is unchanged.
+    notebook_host: str = ""
+    notebook_path: str = ""
+    obsidian_host: str = ""
+    obsidian_path: str = ""
+    # Resolved on-disk lab-mgmt root (where lab.md actually lives). Display-only,
+    # so the settings popup shows the real path instead of a hardcoded guess.
+    lab_mgmt_path: str = ""
     # Deprecated fields kept on the model for backwards-compat with older
     # lab.md frontmatters. Not surfaced in the redesigned UI; will be
     # removed once the migration completes.

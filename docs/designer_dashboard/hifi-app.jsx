@@ -7160,19 +7160,42 @@ function GitProvidersEditor({ value, onChange }) {
   );
 }
 
+// Split/join a "host:/path" storage string into a machine + path pair.
+function _splitHostPath(s) {
+  const str = (s || "").trim();
+  const i = str.indexOf(":");
+  if (i < 0) return { host: str, path: "" };
+  return { host: str.slice(0, i), path: str.slice(i + 1) };
+}
+function _joinHostPath(host, path) {
+  const h = (host || "").trim();
+  const p = (path || "").trim();
+  if (!h && !p) return "";
+  return h + ":" + p;
+}
+
 function LabSettingsModal({ onClose }) {
   const ls = window.DATA.lab_settings || {};
+  const _fb = _splitHostPath(ls.lab_base);
   const [form, setForm] = useState({
+    // Identity
     display_name:      ls.display_name      || "",
     website:           ls.website           || "",
-    lab_base:          ls.lab_base          || "",
-    github_org:        ls.github_org        || "hallettmiket",
-    git_repos_subpath: ls.git_repos_subpath || "repos",
+    // Lab parameters
     admins:            (ls.admins || []).join(", "),
-    // Phase 2: editable list of git providers. Seed from server-side
-    // value; on save we send the full list back, so the user can
-    // add/edit/remove without coordinating with the rest of the form.
-    git_providers:     ls.git_providers || [],
+    // Git provider — no hardcoded org default; a fresh lab shows blank, not
+    // some other lab's org.
+    github_org:        ls.github_org        || "",
+    git_repos_subpath: ls.git_repos_subpath || "repos",
+    git_providers:     ls.git_providers     || [],
+    // Storage servers — three machine + path pairs. Files = the umbrella
+    // (lab_base); notebooks + Obsidian get their own if the lab wants.
+    files_host:        _fb.host,
+    files_path:        _fb.path,
+    notebook_host:     ls.notebook_host     || "",
+    notebook_path:     ls.notebook_path     || "",
+    obsidian_host:     ls.obsidian_host     || "",
+    obsidian_path:     ls.obsidian_path     || "",
   });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg]   = useState(null);
@@ -7186,11 +7209,16 @@ function LabSettingsModal({ onClose }) {
       const payload = {
         display_name:      form.display_name,
         website:           form.website,
-        lab_base:          form.lab_base,
+        admins:            form.admins.split(",").map(s => s.trim()).filter(Boolean),
         github_org:        form.github_org,
         git_repos_subpath: form.git_repos_subpath,
-        admins:            form.admins.split(",").map(s => s.trim()).filter(Boolean),
         git_providers:     form.git_providers,
+        // Files → the umbrella lab_base (host:/path).
+        lab_base:          _joinHostPath(form.files_host, form.files_path),
+        notebook_host:     form.notebook_host,
+        notebook_path:     form.notebook_path,
+        obsidian_host:     form.obsidian_host,
+        obsidian_path:     form.obsidian_path,
       };
       const res = await fetch("/api/lab/settings", {
         method: "POST",
@@ -7220,10 +7248,9 @@ function LabSettingsModal({ onClose }) {
     borderRadius:2, fontFamily:"var(--mono)", fontSize:12, width:"100%",
     boxSizing:"border-box", background:"var(--paper)",
   };
-  const derivedStyle = {
-    padding:"5px 8px", border:"1px dashed var(--rule)",
-    borderRadius:2, fontFamily:"var(--mono)", fontSize:12,
-    background:"var(--paper-2)", color:"var(--ink-2)",
+  const microHint = {
+    fontFamily:"var(--mono)", fontSize:9, letterSpacing:1,
+    textTransform:"uppercase", color:"var(--muted)", marginTop:2,
   };
   const sectionHeader = {
     margin:0, fontFamily:"var(--mono)", fontSize:10, letterSpacing:1.5,
@@ -7233,9 +7260,29 @@ function LabSettingsModal({ onClose }) {
     borderTop:"1px solid var(--rule)", paddingTop:10, marginTop:6,
   };
 
-  const subpath = (form.git_repos_subpath || "repos").replace(/^\/+|\/+$/g, "");
-  const githubOrg = (form.github_org || "hallettmiket").trim();
-  const labMgmtUrl = githubOrg ? `https://github.com/${githubOrg}/lab_mgmt` : "";
+  // One machine + path row for the Storage section. Rendered as a function
+  // (not a nested component) so typing never loses input focus.
+  const storageRow = ({ label, host, path, onHost, onPath, hostPh, pathPh, hint }) => (
+    <div style={{marginTop:8}}>
+      <div style={labelStyle}>{label}</div>
+      <div className="row" style={{gap:8, alignItems:"flex-start"}}>
+        <div style={{flex:"0 0 40%"}}>
+          <input style={inputStyle} value={host} onChange={onHost} placeholder={hostPh} />
+          <div style={microHint}>machine</div>
+        </div>
+        <div style={{flex:1}}>
+          <input style={inputStyle} value={path} onChange={onPath} placeholder={pathPh} />
+          <div style={microHint}>path</div>
+        </div>
+      </div>
+      {hint ? <div style={{fontSize:11, color:"var(--muted)", marginTop:3, lineHeight:1.5}}>{hint}</div> : null}
+    </div>
+  );
+
+  const subpath   = (form.git_repos_subpath || "repos").replace(/^\/+|\/+$/g, "");
+  const githubOrg = (form.github_org || "").trim();
+  const filesBase = _joinHostPath(form.files_host, form.files_path);
+  const labMgmtPath = ls.lab_mgmt_path || "lab_mgmt";
 
   return (
     <div onClick={onClose} style={{
@@ -7245,7 +7292,7 @@ function LabSettingsModal({ onClose }) {
     }}>
       <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
         background:"var(--card)", border:"1px solid var(--rule-strong)",
-        borderRadius:2, padding:18, width:"min(680px, 96vw)",
+        borderRadius:2, padding:18, width:"min(640px, 96vw)",
         display:"flex", flexDirection:"column", gap:4,
       }}>
         <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
@@ -7254,13 +7301,13 @@ function LabSettingsModal({ onClose }) {
           </h2>
           <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
         </div>
-        <p className="muted" style={{fontSize:12, margin:"4px 0 8px"}}>
-          Lab-wide parameters. Edits save to <code>lab_mgmt/lab.md</code> on
-          this machine; commit + push to GitHub afterwards. Only the PI and
-          designated admins can save changes.
+        <p className="muted" style={{fontSize:12, margin:"4px 0 8px", lineHeight:1.5}}>
+          Lab-wide parameters. Only the PI and designated admins can save. Edits
+          write to <code className="mono">{labMgmtPath}/lab.md</code> and are
+          committed + pushed for you.
         </p>
 
-        {/* Identity */}
+        {/* 1 · Identity */}
         <div style={sectionStyle}>
           <h4 style={sectionHeader}>Identity</h4>
           <div className="row" style={{flexWrap:"wrap", gap:14, marginTop:6, fontSize:13}}>
@@ -7275,102 +7322,74 @@ function LabSettingsModal({ onClose }) {
                  placeholder="https://mikehallett.science" />
         </div>
 
-        {/* Server storage */}
+        {/* 2 · Lab parameters */}
         <div style={sectionStyle}>
-          <h4 style={sectionHeader}>Server storage</h4>
-          <div style={labelStyle}>lab_base (host:/path to the wigamig umbrella)</div>
-          <input style={inputStyle} value={form.lab_base} onChange={update("lab_base")}
-                 placeholder="biodatsci.schulich.uwo.ca:/data/lab_vm/wigamig" />
+          <h4 style={sectionHeader}>Lab parameters</h4>
+          <div style={labelStyle}>settings admins — handles with edit rights (comma-separated)</div>
+          <input style={inputStyle} value={form.admins} onChange={update("admins")}
+                 placeholder="e.g. jsmith, admin_asst" />
           <div style={{fontSize:11, color:"var(--muted)", marginTop:4, lineHeight:1.5}}>
-            All lab data lives under <code>lab_base/</code>. Projects are
-            subfolders of <code>raw/</code> and <code>refined/</code>; users
-            are subfolders of <code>notebooks/</code> and <code>lab_oracle/</code>.
+            The PI always has edit rights; add handles here to let others change
+            these settings.
           </div>
-
-          <div style={labelStyle}>Server raw data</div>
-          <div style={derivedStyle}>{_underLabBase(form.lab_base, "raw")}</div>
-          <div style={labelStyle}>Server refined data</div>
-          <div style={derivedStyle}>{_underLabBase(form.lab_base, "refined")}</div>
-          <div style={labelStyle}>Server lab notebooks</div>
-          <div style={derivedStyle}>{_underLabBase(form.lab_base, "notebooks")}</div>
-          <div style={labelStyle}>Server lab oracle</div>
-          <div style={derivedStyle}>{_underLabBase(form.lab_base, "lab_oracle")}</div>
-
-          <MasterFoldersPanel labBase={form.lab_base} />
         </div>
 
-        {/* Git */}
+        {/* 3 · Git provider */}
         <div style={sectionStyle}>
-          <h4 style={sectionHeader}>Git providers</h4>
+          <h4 style={sectionHeader}>Git provider</h4>
           <div style={{fontSize:11, color:"var(--muted)", marginTop:3, marginBottom:6, lineHeight:1.5}}>
-            The menu of git origin servers this lab supports. Each project picks
-            one; each member registers a username per provider in Member Profile.
-            Empty list falls back to a single GitHub entry derived from the
-            legacy <code>github_org</code> field below.
+            The git origin servers this lab uses. Each project picks one; each
+            member registers a username per provider in Member Profile.
           </div>
           <GitProvidersEditor
             value={form.git_providers}
             onChange={(next) => setForm((p) => ({ ...p, git_providers: next }))}
           />
-
-          <div style={{...sectionStyle, paddingTop:8, marginTop:14}}>
-            <div style={labelStyle}>Lab GitHub org (legacy fallback)</div>
-            <input style={inputStyle} value={form.github_org} onChange={update("github_org")}
-                   placeholder="hallettmiket" />
-            <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
-              Used only when <code>git_providers</code> is empty. Keep set for
-              backwards-compat with lab.md files that pre-date the providers
-              refactor.
-              {githubOrg
-                ? <> Lab GitHub: <a href={`https://github.com/${githubOrg}`} target="_blank" rel="noopener">https://github.com/{githubOrg}</a></>
-                : null}
-            </div>
-
-            <div style={labelStyle}>Local bare-repo subpath under lab_base</div>
-            <input style={inputStyle} value={form.git_repos_subpath} onChange={update("git_repos_subpath")}
-                   placeholder="repos" />
-            <div style={{fontSize:11, color:"var(--muted)", marginTop:4, lineHeight:1.5}}>
-              Used by the <code>local-bare</code> provider kind (if declared
-              above). Default <code>repos</code> resolves to
-              <code>{" "}{_underLabBase(form.lab_base, subpath)}</code>.
-            </div>
-          </div>
+          <div style={labelStyle}>GitHub org (fallback when no provider above)</div>
+          <input style={inputStyle} value={form.github_org} onChange={update("github_org")}
+                 placeholder="your-github-org" />
+          {githubOrg
+            ? <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
+                Lab GitHub: <a href={`https://github.com/${githubOrg}`} target="_blank" rel="noopener">https://github.com/{githubOrg}</a>
+              </div>
+            : null}
+          <div style={labelStyle}>local bare-repo subpath (only for a local-bare provider)</div>
+          <input style={inputStyle} value={form.git_repos_subpath} onChange={update("git_repos_subpath")}
+                 placeholder="repos" />
+          {filesBase
+            ? <div style={{fontSize:11, color:"var(--muted)", marginTop:4}}>
+                Resolves to <code className="mono">{_underLabBase(filesBase, subpath)}</code>.
+              </div>
+            : null}
         </div>
 
-        {/* Lab parameters source */}
+        {/* 4 · Storage servers */}
         <div style={sectionStyle}>
-          <h4 style={sectionHeader}>Lab parameters source</h4>
-          <div style={{fontSize:12, marginTop:6, lineHeight:1.6}}>
-            <div>
-              <span className="muted" style={{display:"inline-block", width:160}}>GitHub (source of truth)</span>
-              {labMgmtUrl
-                ? <a href={labMgmtUrl} target="_blank" rel="noopener" className="mono">{labMgmtUrl}</a>
-                : <span className="muted">— (set GitHub org above)</span>}
-            </div>
-            <div>
-              <span className="muted" style={{display:"inline-block", width:160}}>Local clone</span>
-              <code className="mono">~/repos/lab_mgmt</code>
-            </div>
-            <div>
-              <span className="muted" style={{display:"inline-block", width:160}}>Local cache</span>
-              <code className="mono">~/.wigamig/</code>
-            </div>
-          </div>
-          <div style={{fontSize:11, color:"var(--muted)", marginTop:6, lineHeight:1.55}}>
-            <code>lab_mgmt</code> is the versioned source of truth (shared via
-            GitHub). <code>~/.wigamig/</code> is a per-machine materialised
-            view plus machine-local state (this machine's <code>machine.yaml</code>,
-            <code> installations/</code>, <code>workspaces/</code>) and is not
-            pushed back to GitHub.
-          </div>
-        </div>
-
-        {/* Admins */}
-        <div style={sectionStyle}>
-          <h4 style={sectionHeader}>Settings admins</h4>
-          <div style={labelStyle}>handles with PI-level settings edit rights (comma-separated)</div>
-          <input style={inputStyle} value={form.admins} onChange={update("admins")}
-                 placeholder="e.g. jsmith, admin_asst" />
+          <h4 style={sectionHeader}>Storage servers</h4>
+          {storageRow({
+            label: "files",
+            host: form.files_host, path: form.files_path,
+            onHost: update("files_host"), onPath: update("files_path"),
+            hostPh: "biodatsci.schulich.uwo.ca", pathPh: "/data/lab_vm/wigamig",
+            hint: filesBase
+              ? <>Projects live under <code className="mono">{_underLabBase(filesBase, "raw")}</code> and <code className="mono">{_underLabBase(filesBase, "refined")}</code>.</>
+              : "The lab's data root. raw/ and refined/ live under this path.",
+          })}
+          {storageRow({
+            label: "lab notebooks",
+            host: form.notebook_host, path: form.notebook_path,
+            onHost: update("notebook_host"), onPath: update("notebook_path"),
+            hostPh: form.files_host || "biodatsci.schulich.uwo.ca",
+            pathPh: filesBase ? _underLabBase(filesBase, "notebooks") : "/data/lab_vm/wigamig/notebooks",
+            hint: "Where per-member lab notebooks live. Leave blank to keep them under the files path.",
+          })}
+          {storageRow({
+            label: "Obsidian",
+            host: form.obsidian_host, path: form.obsidian_path,
+            onHost: update("obsidian_host"), onPath: update("obsidian_path"),
+            hostPh: "this-laptop", pathPh: "~/Obsidian/lab-vault",
+            hint: "The lab's Obsidian vault location (per-member vaults are set in Machine settings).",
+          })}
         </div>
 
         <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:14, alignItems:"center"}}>
