@@ -250,6 +250,47 @@ def test_group_setup_cli(world):
     assert prof["github"] == "hallettmiket/dcis" and prof["slack_workspace"] == "T0DCIS"
 
 
+def test_group_reconcile_reports_and_applies(world):
+    from wigamig.core import group_reconcile as GR
+    from wigamig.core.frontmatter import parse_file, dump_document
+    import pathlib
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+    R.update_group_profile("dcis", {"slack_workspace": "T0DCIS",
+                                    "slack_invite_url": "https://join/x", "github": "org/dcis"})
+    R.add_group_member("dcis", handle="@bob", email="bob@x.edu")
+    # give bob a GitHub login
+    lab = next(l for l in R.read_registry().labs if l.name == "dcis")
+    mf = pathlib.Path(lab.lab_mgmt_path) / "members" / "bob.md"
+    doc = parse_file(mf); meta = dict(doc.meta); meta["git_logins"] = {"github": "bob-gh"}
+    mf.write_text(dump_document(meta, doc.body))
+
+    calls = []
+    res = GR.group_reconcile("dcis", token="xoxb-x",
+        workspace_checker=lambda email: False,               # not in the workspace
+        collaborator_adder=lambda repo, login: (calls.append((repo, login)), (True, "ok"))[1])
+    assert any("NOT in the group workspace" in s for s in res.slack)
+    assert any("would add" in s for s in res.github)
+    assert calls == []                                       # report-only: no writes
+
+    res2 = GR.group_reconcile("dcis", token="xoxb-x", apply=True,
+        workspace_checker=lambda email: True,
+        collaborator_adder=lambda repo, login: (calls.append((repo, login)), (True, "ok"))[1])
+    assert ("org/dcis", "bob-gh") in calls                   # applied → collaborator added
+    assert any("added to org/dcis" in s for s in res2.github)
+    assert any("in the group workspace" in s for s in res2.slack)
+
+
+def test_resolve_group_slack_token_env_then_file(monkeypatch, tmp_path):
+    from wigamig.core import group_reconcile as GR
+    monkeypatch.delenv("WIGAMIG_GROUP_SLACK_TOKEN", raising=False)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    d = tmp_path / ".config" / "wigamig" / "groups" / "dcis"; d.mkdir(parents=True)
+    (d / "slack-token").write_text("xoxb-group\n")
+    assert GR.resolve_group_slack_token("dcis") == "xoxb-group"
+    monkeypatch.setenv("WIGAMIG_GROUP_SLACK_TOKEN", "xoxb-env")
+    assert GR.resolve_group_slack_token("dcis") == "xoxb-env"   # env wins
+
+
 def test_legacy_pi_request_still_approves(world):
     # A `pi` request already on disk (pre-retirement) must still read + approve
     # (no infra) — approve() reads without re-validating the kind.
