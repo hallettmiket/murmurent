@@ -86,6 +86,25 @@
       td { padding: 9px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
       tr:last-child td { border-bottom: 0; }
       .mono { font-family: var(--mono); font-size: 12px; }
+      /* Copyable command block: terminal-styled, its own line, click-selects all. */
+      .cmd {
+        display: block; font-family: var(--mono); font-size: 12.5px;
+        background: #0d1117; color: #e6edf3;
+        border-radius: 7px; padding: 10px 13px; margin: 7px 0 12px;
+        overflow-x: auto; white-space: pre; line-height: 1.5;
+        user-select: all; -webkit-user-select: all;
+      }
+      /* Prominent OAuth-scope chips so none get missed. */
+      .scopes { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+      .scope {
+        font-family: var(--mono); font-size: 12px;
+        background: #eef6ff; border: 1px solid #b6d4fe; color: #0b5cad;
+        border-radius: 5px; padding: 3px 9px;
+        user-select: all; -webkit-user-select: all;
+      }
+      .setup-steps { margin: 6px 0 4px 20px; line-height: 1.55; }
+      .setup-steps > li { margin-bottom: 9px; }
+      .setup-steps ol { margin: 5px 0 4px 14px; }
       .pill {
         display: inline-block; padding: 1px 8px; border-radius: 999px;
         font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
@@ -614,23 +633,36 @@
               ? '<p>Declared workspace id: <span class="mono">' + escapeHTML(centre.slack_workspace) + '</span></p>'
               : '<p><strong>No Slack workspace declared yet.</strong></p>')
           + '<p>As the mayor you set up Slack once. Follow these steps in order:</p>'
-          + '<ol style="margin:4px 0 4px 18px; line-height:1.6;">'
+          + '<ol class="setup-steps">'
           + '<li>Create a Slack workspace named <span class="mono">' + escapeHTML(wsName) + '</span> (or reuse an existing one).</li>'
           + '<li><strong>Create a channel named exactly <span class="mono">#general</span></strong> — new Slack workspaces don\'t include one (you may see <span class="mono">#social</span> instead). wigamig broadcasts to everyone through it.</li>'
           + '<li><strong>Create a Slack app + bot token</strong> — this is what lets wigamig post and manage channels. Click by click:'
-          +   '<ol style="margin:4px 0 6px 16px; line-height:1.6; list-style:lower-alpha;">'
+          +   '<ol style="list-style:lower-alpha;">'
           +     '<li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener"><span class="mono">api.slack.com/apps</span></a> and sign in as the account that owns your <span class="mono">' + escapeHTML(wsName) + '</span> workspace.</li>'
           +     '<li>Click <strong>Create New App → From scratch</strong>. Name it <span class="mono">wigamig</span>, pick your workspace, click <strong>Create App</strong>.</li>'
           +     '<li>In the app\'s left sidebar, open <strong>OAuth &amp; Permissions</strong>.</li>'
-          +     '<li>Scroll to <strong>Scopes → Bot Token Scopes</strong> (the <em>Bot</em> section, not "User Token Scopes"). Click <strong>Add an OAuth Scope</strong> and add each of: <span class="mono">channels:manage</span>, <span class="mono">groups:write</span>, <span class="mono">chat:write</span>, <span class="mono">users:read.email</span>, <span class="mono">channels:read</span>, <span class="mono">groups:read</span>.</li>'
+          +     '<li>Scroll to <strong>Scopes → Bot Token Scopes</strong> (the <em>Bot</em> section, <strong>not</strong> "User Token Scopes"). Click <strong>Add an OAuth Scope</strong> and add <strong>every one</strong> of these six:'
+          +       '<div class="scopes">'
+          +         '<span class="scope">channels:manage</span>'
+          +         '<span class="scope">groups:write</span>'
+          +         '<span class="scope">chat:write</span>'
+          +         '<span class="scope">users:read.email</span>'
+          +         '<span class="scope">channels:read</span>'
+          +         '<span class="scope">groups:read</span>'
+          +       '</div>'
+          +     '</li>'
           +     '<li>Scroll back <strong>up</strong> to <strong>OAuth Tokens for Your Workspace → Install to Workspace → Allow</strong>.</li>'
           +     '<li>Copy the <strong>Bot User OAuth Token</strong> — it starts with <span class="mono">xoxb-</span>.</li>'
           +   '</ol>'
           + '</li>'
-          + '<li><strong>Give wigamig the token</strong> (mode-0600 file, read from any terminal):<br>'
-          +   '<span class="mono" style="display:inline-block; background:#f6f8fa; border:1px solid #e1e4e8; border-radius:5px; padding:2px 6px; margin-top:3px; font-size:11px;">umask 077; printf \'%s\\n\' \'xoxb-…\' &gt; ~/.config/wigamig/slack-token</span></li>'
+          + '<li><strong>Give wigamig the token</strong> — paste your <span class="mono">xoxb-…</span> token in place of the placeholder, then run (writes a mode-0600 file any terminal can read):'
+          +   '<code class="cmd">umask 077; printf \'%s\\n\' \'xoxb-PASTE-YOUR-TOKEN\' &gt; ~/.config/wigamig/slack-token</code>'
+          + '</li>'
           + '<li>In Slack, <span class="mono">/invite</span> the bot into <span class="mono">#general</span> so it can post there. (It auto-joins private channels it creates, like <span class="mono">#wigamig-ops</span>.)</li>'
-          + '<li>Verify + provision: <span class="mono">wigamig centre-slack-smoke</span> then <span class="mono">wigamig centre-slack-setup</span>.</li>'
+          + '<li><strong>Verify, then provision</strong> — run these two, in order:'
+          +   '<code class="cmd">wigamig centre-slack-smoke</code>'
+          +   '<code class="cmd">wigamig centre-slack-setup</code>'
+          + '</li>'
           + '</ol>'
           + '<p class="meta">Same steps live in <span class="mono">docs/slack_setup.md</span>. If a scope is missing you\'ll get <span class="mono">missing_scope</span> — add it and <strong>Reinstall</strong> the app. Until a token is wired, channel + broadcast provisioning is skipped (no-op).</p>'
           + '</div></div>';
@@ -641,8 +673,9 @@
               ? '<p>Encryption key ready ✓ — members can send you an encrypted join request.</p>'
               : '<p><strong>No encryption key yet.</strong> Run <span class="mono">wigamig centre-age-keygen</span> so members can send encrypted join requests.</p>')
           + '<p>Your centre is <strong>not auto-posted</strong> to GitHub — nothing about you is published without your say-so. To be listed so members can find you, this row goes in the hub directory:</p>'
-          + '<pre class="mono" style="white-space:pre-wrap; background:#f6f8fa; border:1px solid #e1e4e8; border-radius:6px; padding:8px; font-size:11px;">' + escapeHTML(dirRow) + '</pre>'
-          + '<p><strong>Easiest:</strong> run <span class="mono">wigamig centre-hub-publish</span> — it clones the hub (if you don\'t have it) and writes this row into <span class="mono">directory.tsv</span> + the README for you. It then prints a <span class="mono">git push</span> to run from the printed folder.</p>'
+          + '<code class="cmd">' + escapeHTML(dirRow) + '</code>'
+          + '<p><strong>Easiest:</strong> run the command below — it clones the hub (if you don\'t have it) and writes this row into <span class="mono">directory.tsv</span> + the README for you, then prints the <span class="mono">git push</span> to run from the printed folder:</p>'
+          + '<code class="cmd">wigamig centre-hub-publish</code>'
           + '<p class="meta">You still commit + push yourself — that push is the only step that publishes anything public, so it stays deliberate. (Manual alternative: edit both files by hand; see <span class="mono">docs/connect_to_hub.md</span>.)</p>'
           + '</div></div>';
         html = centreHtml + slackHtml + hubHtml + html;
