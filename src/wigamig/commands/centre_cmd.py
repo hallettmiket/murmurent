@@ -593,6 +593,34 @@ def centre_age_keygen() -> None:
     click.echo(f"✓ public recipient (publish this in the directory):\n    {recipient}")
 
 
+@click.command("onboard-check",
+                help="Check whether newly-approved PIs have joined the Slack "
+                     "workspace yet; for any who have, add them to their group "
+                     "channel and DM them the step-by-step onboarding "
+                     "(registrar -> cable_guy -> security_guard -> dashboard). "
+                     "Run this after approving a lab/core (or on a schedule); "
+                     "it converges and never double-reports.")
+@click.argument("group", required=False, default="")
+def onboard_check(group: str) -> None:
+    from ..core import onboarding as _ob
+    from ..core import centre_provision as _cp
+    if _ci.read_centre() is None:
+        raise click.ClickException("no centre initialised; run `wigamig centre-init` first.")
+    tok = _cp.resolve_slack_token(allow_file=True)
+    results = _ob.run_onboard_check(group or None, token=tok or None)
+    if not results:
+        click.echo("No active labs/cores to check.")
+        return
+    for r in results:
+        icon = "✓" if r.joined and r.dmed else ("…" if not r.joined else "•")
+        who = f" ({r.email})" if r.email else ""
+        click.echo(f"  [{icon}] {r.group} · PI {r.pi}{who}: {r.note}")
+    waiting = [r for r in results if not r.joined and "waiting" in r.note]
+    if waiting:
+        click.echo(f"\n{len(waiting)} PI(s) haven't accepted the workspace invite yet — "
+                   "re-run onboard-check after they do (or leave it to the schedule).")
+
+
 # Centre profile fields a mayor may set/change after init. Excludes identity +
 # audit fields that must not drift once the centre exists (name, institution,
 # founding_mayor, created, unique_name).

@@ -235,6 +235,71 @@ def notify_decision(
         return False
 
 
+def pi_onboarding_messages(group: str, *, centre_name: str = "your centre",
+                           channel_name: str = "") -> list[str]:
+    """The step-by-step DMs a PI receives once they join the workspace — one per
+    line of the flow (registrar -> cable_guy -> security_guard -> dashboard).
+    Shared so the messages stay consistent wherever they're sent."""
+    ch = channel_name or group
+    return [
+        f"👋 Welcome to {centre_name}! You're now in the Slack workspace as PI of *{group}*.",
+        f"📋 *registrar*: you're recorded as the PI of *{group}* in the centre registry.",
+        f"🔌 *cable_guy*: your group's private channel *#{ch}* is ready and you've been added. "
+        f"Your members will be added here as they join.",
+        f"🛡️ *security_guard*: registered for *{group}* — it audits your group's shared "
+        f"files + secrets on every push, so nothing sensitive leaks.",
+        f"📝 *Next*: fill in your group's details in the lab dashboard — GitHub repo, "
+        f"lab-notebook + Obsidian locations, and storage servers. Open Lab settings there.",
+    ]
+
+
+def notify_pi_onboarded(
+    group: str,
+    *,
+    email: str,
+    env=None,
+    centre_name: str = "",
+    channel_name: str = "",
+    poster: PosterFn | None = None,
+    user_resolver: UserResolverFn | None = None,
+    messages: list[str] | None = None,
+) -> bool:
+    """DM the PI the step-by-step onboarding acknowledgement, once they've joined
+    the workspace. Resolves them by email; best-effort + token-gated; returns
+    True iff at least one DM was delivered."""
+    if not _has_token():
+        return False
+    if not (email or "").strip():
+        return False
+    poster = poster or _default_poster
+    user_resolver = user_resolver or _default_user_resolver
+    if centre_name == "":
+        try:
+            from . import centre_init as _ci
+            prof = _ci.read_centre(env=env)
+            centre_name = (getattr(prof, "name", "") or "your centre") if prof else "your centre"
+        except Exception:  # noqa: BLE001
+            centre_name = "your centre"
+    try:
+        uid = user_resolver(email.strip())
+    except Exception as exc:  # noqa: BLE001
+        log.warning("join_notify: PI lookup failed: %s", exc)
+        return False
+    if not uid:
+        log.info("join_notify: PI %s not in workspace yet; no onboarding DM", email)
+        return False
+    msgs = messages or pi_onboarding_messages(
+        group, centre_name=centre_name, channel_name=channel_name)
+    sent = False
+    for m in msgs:
+        try:
+            if poster(uid, m):
+                sent = True
+        except Exception as exc:  # noqa: BLE001
+            log.warning("join_notify.notify_pi_onboarded step failed: %s", exc)
+    return sent
+
+
 def notify_group_provisioned(
     req,
     *,
@@ -278,5 +343,5 @@ def notify_group_provisioned(
 
 __all__ = [
     "notify_new_request", "notify_decision", "notify_group_provisioned",
-    "group_onboarding_steps",
+    "notify_pi_onboarded", "pi_onboarding_messages", "group_onboarding_steps",
 ]

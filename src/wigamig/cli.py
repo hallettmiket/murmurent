@@ -1399,6 +1399,7 @@ from .commands.centre_cmd import centre_slack_smoke as _centre_slack_smoke
 from .commands.centre_cmd import centre_slack_setup as _centre_slack_setup
 from .commands.centre_cmd import centre_age_keygen as _centre_age_keygen
 from .commands.centre_cmd import centre_set as _centre_set
+from .commands.centre_cmd import onboard_check as _onboard_check
 from .commands.centre_cmd import centre_hub_publish as _centre_hub_publish
 from .commands.centre_cmd import group_setup as _group_setup
 from .commands.centre_cmd import group_reconcile_cmd as _group_reconcile_cmd
@@ -1410,6 +1411,7 @@ cli.add_command(_centre_slack_smoke)
 cli.add_command(_centre_slack_setup)
 cli.add_command(_centre_age_keygen)
 cli.add_command(_centre_set)
+cli.add_command(_onboard_check)
 cli.add_command(_centre_hub_publish)
 cli.add_command(_group_setup)
 cli.add_command(_group_reconcile_cmd)

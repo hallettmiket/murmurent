@@ -206,6 +206,50 @@ def test_group_onboarding_steps_shape():
     assert "registrar will email" in nolink[0]
 
 
+# ---- PI onboarding DMs -------------------------------------------------
+
+def test_pi_onboarded_noop_without_token(world, monkeypatch):
+    monkeypatch.setattr(JN, "_has_token", lambda: False)
+    posts = []
+    ok = JN.notify_pi_onboarded("mh", email="pi@x.edu",
+                                poster=lambda c, t: posts.append(1) or True,
+                                user_resolver=lambda e: "U0PI")
+    assert ok is False
+    assert posts == []
+
+
+def test_pi_onboarded_noop_when_not_in_workspace(world, monkeypatch):
+    monkeypatch.setattr(JN, "_has_token", lambda: True)
+    posts = []
+    ok = JN.notify_pi_onboarded("mh", email="pi@x.edu",
+                                poster=lambda c, t: posts.append(1) or True,
+                                user_resolver=lambda e: None)
+    assert ok is False
+    assert posts == []
+
+
+def test_pi_onboarded_dms_each_step(world, monkeypatch):
+    monkeypatch.setattr(JN, "_has_token", lambda: True)
+    seen = []
+    ok = JN.notify_pi_onboarded("mh", email="pi@x.edu", centre_name="Serenity",
+                                channel_name="mh",
+                                poster=lambda c, t: seen.append((c, t)) or True,
+                                user_resolver=lambda e: "U0PI")
+    assert ok is True
+    assert all(c == "U0PI" for c, _ in seen)          # all DMs to the PI
+    joined = " ".join(t for _, t in seen)
+    assert "registrar" in joined and "cable_guy" in joined
+    assert "security_guard" in joined and "dashboard" in joined
+    assert "#mh" in joined
+
+
+def test_pi_onboarding_messages_shape():
+    msgs = JN.pi_onboarding_messages("mh", centre_name="Serenity", channel_name="mh")
+    assert len(msgs) == 5
+    assert "Serenity" in msgs[0]
+    assert any("#mh" in m for m in msgs)
+
+
 # ---- lifecycle wiring is best-effort ----------------------------------
 
 def test_file_request_survives_notifier_explosion(world, monkeypatch):
