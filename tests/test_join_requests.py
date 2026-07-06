@@ -188,6 +188,36 @@ def test_pi_kind_no_longer_fileable(world):
     assert "pi" not in JR.VALID_KINDS
 
 
+def test_member_join_nonexistent_group_rejected(world):
+    # "Join a group that doesn't exist" → refused at filing time.
+    with pytest.raises(JR.JoinRequestError, match="no lab or core named"):
+        JR.file_request(kind="member", requester_email="s@x.edu",
+                        proposed_name="ghost_lab", proposed_pi="@student")
+
+
+def test_member_join_existing_group_adds_member(world):
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie",
+                 pi_email="allie@x.edu")
+    req = JR.file_request(kind="member", requester_email="student@x.edu",
+                          proposed_name="dcis", proposed_pi="@student")
+    assert req.kind == "member" and req.state == "pending"
+    out = JR.approve(req_id=req.id, actor="@allie", provision=False)
+    assert out.state == "approved"
+    # the member is now on the group's roster, with their email (for the invite)
+    assert R.group_email_map("dcis").get("student") == "student@x.edu"
+    assert any(p["kind"] == "add-member" and p["severity"] == "ok" for p in out.probes)
+
+
+def test_add_group_member_and_group_lookups(world):
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+    assert R.group_exists("dcis") is True
+    assert R.group_exists("nope") is False
+    assert R.group_pi("dcis") == "@allie"
+    assert R.add_group_member("dcis", handle="@bob", email="bob@x.edu") is True
+    assert R.add_group_member("nope", handle="@bob") is False    # no such group
+    assert R.group_email_map("dcis").get("bob") == "bob@x.edu"
+
+
 def test_legacy_pi_request_still_approves(world):
     # A `pi` request already on disk (pre-retirement) must still read + approve
     # (no infra) — approve() reads without re-validating the kind.

@@ -465,6 +465,57 @@ def provision_lab_onboarding(
     return probes
 
 
+def provision_member_to_group(
+    group_name: str,
+    *,
+    handle: str,
+    email: str,
+    env: dict[str, str] | None = None,
+    token: str | None = None,
+) -> list[Probe]:
+    """Add a newly-approved member to their group's existing Slack channel.
+
+    Slack can't add a non-member of the workspace to a channel, so this is
+    two-phase on free/Pro: if the person isn't in the workspace yet, we surface
+    the workspace invite link and they get added to the channel on the next
+    reconcile. Best-effort; returns a probe describing what happened.
+    """
+    from . import centre_init as _ci
+    from . import registrar as _reg
+    probes: list[Probe] = []
+    reg = _reg.read_registry(env)
+    entry = next((g for g in [*reg.labs, *reg.cores] if g.name == group_name), None)
+    channel_id = getattr(entry, "slack_channel_id", None) if entry else None
+    if not channel_id:
+        probes.append(Probe(name="member-channel", status="warn",
+            detail=f"group {group_name!r} has no Slack channel yet — provision the group first."))
+        return probes
+    if not (token or _has_env_slack_token()):
+        probes.append(Probe(name="member-channel", status="warn",
+            detail="no Slack token — member not added to the channel."))
+        return probes
+
+    from ..dashboard import slack_notify as _sn
+    norm = handle.lstrip("@").lower()
+    inv = _sn.invite_members_to_channel(
+        channel_id, [handle], member_email_map={norm: email}) or {}
+    if handle in inv.get("invited", []) or handle in inv.get("already_in", []):
+        probes.append(Probe(name="member-channel", status="ok",
+            detail=f"added @{norm} to the group's channel ({channel_id})"))
+    else:
+        # Almost always: they haven't joined the Slack workspace yet.
+        centre = _ci.read_centre(env=env)
+        link = (getattr(centre, "slack_invite_url", "") or "") if centre else ""
+        why = (inv.get("unresolved") or [{}])[0].get("reason", "") or inv.get("error", "")
+        probes.append(Probe(name="member-channel", status="warn",
+            detail=(f"@{norm} isn't in the Slack workspace yet"
+                    + (f" ({why})" if why else "")
+                    + " — send them the workspace invite"
+                    + (f" ({link})" if link else " link")
+                    + "; they're added to the channel on the next reconcile.")))
+    return probes
+
+
 def provision_centre_slack(
     *,
     env: dict[str, str] | None = None,
@@ -868,5 +919,6 @@ __all__ = [
     "reconcile_project",
     "append_log",
     "provision_lab_onboarding",
+    "provision_member_to_group",
     "SlackChannelResult", "slack_create_channel",
 ]

@@ -313,6 +313,34 @@ def cmd_approve(req_id: int, actor: str, no_provision: bool) -> None:
     for p in r.probes:
         click.echo(f"  [{p.get('severity'):5s}] {p.get('kind')}: {p.get('summary')}")
 
+    # Workspace invite. On free/Pro Slack the bot can't add someone to the
+    # workspace by API — so the new PI (lab/core) or member gets the invite LINK
+    # by email, joins the workspace, and is then added to their channel on the
+    # next reconcile. Surface the link (and open a pre-filled email) so the
+    # approver can send it.
+    if r.kind in ("lab", "core", "member") and r.state != "failed":
+        prof = _ci.read_centre()
+        link = (getattr(prof, "slack_invite_url", "") or "").strip() if prof else ""
+        who = (r.requester_email or "").strip()
+        if link and who:
+            import shutil as _sh, subprocess as _sp, urllib.parse as _url
+            role = "PI" if r.kind in ("lab", "core") else "member"
+            subject = _url.quote(f"You're in — join the {r.proposed_name} Slack workspace")
+            body = _url.quote(
+                f"Welcome! You've been added as a {role} of {r.proposed_name}.\n\n"
+                f"Join the Slack workspace here:\n{link}\n\n"
+                "Once you've joined, you'll be added to your group's channel automatically.")
+            mailto = f"mailto:{who}?subject={subject}&body={body}"
+            opener = _sh.which("open") or _sh.which("xdg-open")
+            click.echo(f"\nWorkspace invite for {who}:  {link}")
+            if opener:
+                _sp.run([opener, mailto], check=False,
+                        stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+                click.echo("  Opened your email app to send them the invite — press Send.")
+        elif who and not link:
+            click.echo(f"\n(No workspace invite link set — add `slack_invite_url` to the "
+                       f"centre so approvals can email {who} a join link.)")
+
 
 @join_request_group.command("decline")
 @click.argument("req_id", type=int)
@@ -329,6 +357,26 @@ def cmd_decline(req_id: int, actor: str, reason: str) -> None:
     except _jr.JoinRequestError as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(f"Request #{r.id:04d} → declined (by @{actor}). Reason: {r.decline_reason}")
+
+    # For a declined MEMBER request the applicant isn't in Slack, so notify them
+    # by plain email — open the mayor/PI's mail client pre-filled (no encryption
+    # needed for a decline). Best-effort.
+    if r.kind == "member" and (r.requester_email or "").strip():
+        import shutil as _sh, subprocess as _sp, urllib.parse as _url
+        subject = _url.quote(f"Your wigamig join request for {r.proposed_name}")
+        body = _url.quote(
+            f"Hello,\n\nYour request to join {r.proposed_name} was not approved."
+            f"{(' Reason: ' + r.decline_reason) if r.decline_reason else ''}\n\n"
+            f"Regards,\n@{actor.lstrip('@')}")
+        mailto = f"mailto:{r.requester_email}?subject={subject}&body={body}"
+        opener = _sh.which("open") or _sh.which("xdg-open")
+        if opener:
+            _sp.run([opener, mailto], check=False,
+                    stdout=_sp.DEVNULL, stderr=_sp.DEVNULL)
+            click.echo(f"\nOpened your email app to let {r.requester_email} know "
+                       "(plain email — just press Send).")
+        else:
+            click.echo(f"\nEmail {r.requester_email} to let them know:\n  {mailto}")
 
 
 @join_request_group.command("ingest")

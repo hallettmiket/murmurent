@@ -102,15 +102,30 @@ choose_institution() {
 # --- 3. the form (interactive) ---------------------------------------------
 fill_form() {
   say ""
-  say "You are setting up your own group and become its PI (leader)."
-  say "A lab is a research group; a core is a shared facility (e.g. proteomics)."
-  say ""; say "A few questions — press Enter after each:"
-  KIND="$(ask '  Setting up a lab or a core? (lab / core): ')"
-  case "$KIND" in l*|L*) KIND=lab ;; c*|C*) KIND=core ;; esac
-  NAME="$(ask '  Name for your '"$KIND"' (short, e.g. hallett_lab): ')"
-  PI="$(ask '  Your handle = your netname (you are the PI, e.g. @jsmith): ')"
-  RQEMAIL="$(ask '  Your email (how the registrar reaches you): ')"
-  JUST="$(ask '  One sentence: who are you / what is this group?: ')"
+  say "Two paths:"
+  say "  • start your OWN group — a lab or a core (you become its PI/leader)"
+  say "  • JOIN an existing group as a member (student, postdoc, staff)"
+  say ""
+  case "$(ask '  Start a new group, or join one? (new / join): ')" in
+    j*|J*)
+      KIND=member
+      say ""; say "Joining an existing group — a few questions:"
+      NAME="$(ask '  Which group do you want to join? (its exact name): ')"
+      PI="$(ask '  Your handle = your netname (e.g. @jsmith): ')"
+      RQEMAIL="$(ask '  Your email (how the PI reaches you): ')"
+      JUST="$(ask '  One sentence: who are you / why join?: ')"
+      ;;
+    *)
+      say ""; say "Starting a new group — you become its PI. A lab is a research"
+      say "group; a core is a shared facility (e.g. proteomics)."
+      KIND="$(ask '  A lab or a core? (lab / core): ')"
+      case "$KIND" in l*|L*) KIND=lab ;; c*|C*) KIND=core ;; esac
+      NAME="$(ask '  Name for your '"$KIND"' (short, e.g. hallett_lab): ')"
+      PI="$(ask '  Your handle = your netname (you are the PI, e.g. @jsmith): ')"
+      RQEMAIL="$(ask '  Your email (how the registrar reaches you): ')"
+      JUST="$(ask '  One sentence: who are you / what is this group?: ')"
+      ;;
+  esac
 }
 
 # --- 4. encrypt ------------------------------------------------------------

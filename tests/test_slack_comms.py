@@ -227,6 +227,28 @@ def test_provision_centre_slack_warns_when_no_mayor_email(world, monkeypatch):
     assert inv.status == "warn" and "email" in inv.detail.lower()
 
 
+def test_provision_member_to_group_invites(world, monkeypatch):
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+    R.set_group_slack_channel("dcis", "C0DCIS")
+    monkeypatch.setattr("wigamig.dashboard.slack_notify.invite_members_to_channel",
+        lambda cid, handles, *, member_email_map=None:
+            {"invited": handles, "already_in": [], "unresolved": []})
+    probes = CP.provision_member_to_group("dcis", handle="@bob", email="bob@x", token="xoxb-x")
+    assert probes[0].status == "ok" and "C0DCIS" in probes[0].detail
+
+
+def test_provision_member_defers_with_invite_link_when_not_in_workspace(world, monkeypatch):
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+    R.set_group_slack_channel("dcis", "C0DCIS")
+    CI.update_centre({"slack_invite_url": "https://join.slack/xyz"})
+    monkeypatch.setattr("wigamig.dashboard.slack_notify.invite_members_to_channel",
+        lambda cid, handles, *, member_email_map=None:
+            {"invited": [], "already_in": [],
+             "unresolved": [{"handle": handles[0], "reason": "no slack account"}]})
+    probes = CP.provision_member_to_group("dcis", handle="@bob", email="bob@x", token="xoxb-x")
+    assert probes[0].status == "warn" and "join.slack/xyz" in probes[0].detail
+
+
 def test_provision_centre_slack_needs_workspace(world):
     CI.update_centre({"slack_workspace": ""})
     probes = CP.provision_centre_slack()

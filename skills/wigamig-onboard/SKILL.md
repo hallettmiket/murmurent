@@ -73,13 +73,24 @@ Translate them:
 
 ## What each kind does (so you set expectations)
 - **`lab` / `core`** → creates the group **and its leader (the PI) in one step**,
-  then full provisioning: the group's private Slack channel (PI + members
-  invited), GitHub repo, filesystem ACLs, registry entry. There is no separate
-  "register a PI" step — every PI has a group.
+  then full provisioning: the group's private Slack channel, GitHub repo,
+  filesystem ACLs, registry entry. There is no separate "register a PI" step.
+- **`member`** → a person joining an **existing** group. **The group's PI
+  decides, not the mayor** — filing routes a notification to the group's Slack
+  channel, and the PI approves with `--actor @<pi>`. On approve the member is
+  added to the group's roster and to its channel (or, if they're not in the
+  Slack workspace yet, the approver is handed the workspace **invite link** to
+  email them — Slack can't add a non-member to a channel). If the named group
+  doesn't exist, filing is refused with a clear message. On **decline**, the CLI
+  opens a plain (unencrypted) email to the applicant.
 - **`admin`** → adds the handle to the centre's registrars.
-- **`pi`** (legacy) → old requests may still show this kind; it records intent
-  only and creates no infra. New requests can't use it — steer the person to a
-  `lab`/`core` request instead.
+- **`pi`** (legacy) → old requests may still show this kind; records intent
+  only. New requests can't use it — steer the person to `lab`/`core`.
+
+**So who approves what:** you (mayor) approve `lab`/`core`/`admin`; the **PI**
+approves `member` requests for their own group (they get the Slack ping). When
+you `/wigamig-onboard` a `member` request, confirm with — or hand it to — that
+group's PI rather than approving it yourself.
 
 ## Guardrails
 - Never approve without the mayor's explicit yes (step 4).
