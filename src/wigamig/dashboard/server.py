@@ -200,6 +200,13 @@ class LabSettingsBody(BaseModel):
     git_providers: list[GitProviderBody] | None = None
     github_org: str | None = None                    # legacy: single GitHub org
     git_repos_subpath: str | None = None             # default "repos"
+    # Storage locations (2026-07-06): notebooks + Obsidian each get a machine +
+    # path; ``lab_base`` remains the files umbrella. ``None`` = don't touch,
+    # empty string = clear.
+    notebook_host: str | None = None
+    notebook_path: str | None = None
+    obsidian_host: str | None = None
+    obsidian_path: str | None = None
     # Deprecated: still accepted for backwards-compat but ignored on output.
     notebook_large_files_path: str | None = None
     lab_oracle_vault: str | None = None
@@ -1678,6 +1685,14 @@ def create_app() -> FastAPI:
             updates["website"] = body.website or None
         if body.lab_base is not None:
             updates["lab_base"] = body.lab_base or None
+        if body.notebook_host is not None:
+            updates["notebook_host"] = body.notebook_host or None
+        if body.notebook_path is not None:
+            updates["notebook_path"] = body.notebook_path or None
+        if body.obsidian_host is not None:
+            updates["obsidian_host"] = body.obsidian_host or None
+        if body.obsidian_path is not None:
+            updates["obsidian_path"] = body.obsidian_path or None
         if body.notebook_large_files_path is not None:
             updates["notebook_large_files_path"] = body.notebook_large_files_path or None
         if body.lab_oracle_vault is not None:
