@@ -74,3 +74,51 @@ def test_post_message_result_ok(monkeypatch):
                         lambda *a, **k: _R({"ok": True, "permalink": "https://slack/x"}))
     res = SN.post_message_result("C0OK", "hi")
     assert res.ok is True and res.link == "https://slack/x"
+
+
+def test_post_opens_real_dm_for_user_id(monkeypatch):
+    """Posting to a bare U… id must open the real DM (conversations.open) and
+    post to the returned D… channel — not to the U id (App-messages tab)."""
+    monkeypatch.setattr(SN, "_token", lambda: "xoxb-x")
+    monkeypatch.setattr("wigamig.core.centre_init.read_centre", lambda *a, **k: None)
+
+    class _R:
+        def __init__(self, d): self._d = d
+        def json(self): return self._d
+
+    calls = []
+    def fake_post(url, *a, **k):
+        calls.append((url, (k.get("json") or {}).get("channel") or (k.get("json") or {}).get("users")))
+        if url.endswith("conversations.open"):
+            return _R({"ok": True, "channel": {"id": "D0DM"}})
+        return _R({"ok": True})
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    assert SN._post("U0PI", "hello") is True
+    # conversations.open was called with the user id, then chat.postMessage
+    # targeted the DM channel D0DM (never the U id).
+    assert any(u.endswith("conversations.open") and c == "U0PI" for u, c in calls)
+    assert any(u.endswith("chat.postMessage") and c == "D0DM" for u, c in calls)
+    assert not any(u.endswith("chat.postMessage") and c == "U0PI" for u, c in calls)
+
+
+def test_post_falls_back_to_user_id_when_dm_open_fails(monkeypatch):
+    """If conversations.open fails (e.g. no im:write), fall back to posting to
+    the U id so the message still gets through (best-effort)."""
+    monkeypatch.setattr(SN, "_token", lambda: "xoxb-x")
+    monkeypatch.setattr("wigamig.core.centre_init.read_centre", lambda *a, **k: None)
+
+    class _R:
+        def __init__(self, d): self._d = d
+        def json(self): return self._d
+
+    targets = []
+    def fake_post(url, *a, **k):
+        if url.endswith("conversations.open"):
+            return _R({"ok": False, "error": "missing_scope"})
+        targets.append((k.get("json") or {}).get("channel"))
+        return _R({"ok": True})
+    monkeypatch.setattr("httpx.post", fake_post)
+
+    assert SN._post("U0PI", "hello") is True
+    assert targets == ["U0PI"]                 # fell back to the user id

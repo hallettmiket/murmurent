@@ -42,6 +42,7 @@ it once — click by click:
    | `groups:write` | create private channels (lab/core + `#wigamig-ops`) |
    | `channels:manage` | create public channels (if you use any) |
    | `chat:write` | post events + broadcasts |
+   | `im:write` | open a real DM to a member (onboarding + decision DMs); without it, DMs land in the bot's *App messages* tab, not the member's Direct Messages |
    | `users:read.email` | resolve a member's email → their Slack account |
    | `groups:read`, `channels:read` | look up channel ids by name (e.g. `#general`) |
 
