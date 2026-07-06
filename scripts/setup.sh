@@ -185,6 +185,22 @@ else
   warn "no skills/ dir in wigamig — skipping"
 fi
 
+# ── macOS one-click dashboard launcher (every member: mayor, PI, member) ──────
+# Creates ~/Applications/Wigamig Dashboard.app so anyone gets a Dock/Launchpad
+# icon that starts the dashboard and opens it in their default browser.
+# Best-effort + macOS-only; non-Darwin platforms skip silently.
+echo
+echo "macOS dashboard launcher:"
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  if bash "$REPO_DIR/scripts/create_mac_app.sh" >/dev/null 2>&1; then
+    ok "created ~/Applications/Wigamig Dashboard.app — drag it to your Dock for one-click access"
+  else
+    warn "couldn't create the launcher app (run scripts/create_mac_app.sh manually)"
+  fi
+else
+  warn "not macOS — skipping the .app launcher (create one for your OS manually)"
+fi
+
 echo
 echo "Done. Verify with:"
 echo "  ls -la ~/.claude/agents/   # should show symlinks into $AGENTS_SRC"
