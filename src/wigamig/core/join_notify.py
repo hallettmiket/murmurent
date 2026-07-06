@@ -61,7 +61,7 @@ def _has_token() -> bool:
         return False
 
 
-def _fmt_new(req) -> str:
+def _fmt_new(req, *, pi: str = "") -> str:
     if req.kind == "member":
         who = req.proposed_pi or req.requester_email or "someone"
         head = (f"🆕 *Join request* #{req.id:04d} — {who} wants to join "
@@ -69,8 +69,9 @@ def _fmt_new(req) -> str:
         if req.requester_email:
             head += f" · contact: {req.requester_email}"
         tail = f"\n> {req.justification}" if req.justification else ""
-        return (f"{head}{tail}\nAs the PI, approve with "
-                f"`wigamig join-request approve {req.id} --actor @<you>` "
+        actor = ("@" + pi.lstrip("@")) if (pi or "").strip() else "@<pi>"
+        return (f"{head}{tail}\nApprove with "
+                f"`wigamig join-request approve {req.id} --actor {actor}` "
                 "or the /registrar Requests panel.")
     bits = [
         f"🆕 *New join request* #{req.id:04d}",
@@ -129,15 +130,18 @@ def notify_new_request(
         return False
     poster = poster or _default_poster
     channel_resolver = channel_resolver or _default_channel_resolver
+    member_pi = ""
     try:
         if getattr(req, "kind", "") == "member":
             # A member request is the group's PI's call, not the mayor's — post
             # to the group's own channel (the PI is in it). Fall back to the
-            # admin channel if the group has no channel yet.
+            # admin channel if the group has no channel yet. Capture the PI so
+            # the approve hint names them instead of a placeholder.
             from . import registrar as _reg
             reg = _reg.read_registry(env)
             entry = next((g for g in [*reg.labs, *reg.cores]
                           if g.name == req.proposed_name), None)
+            member_pi = getattr(entry, "pi", "") if entry else ""
             channel = (getattr(entry, "slack_channel_id", None) if entry else None) \
                 or channel_resolver("admin", env=env)
         else:
@@ -148,7 +152,7 @@ def notify_new_request(
     if not channel:
         return False
     try:
-        return bool(poster(channel, _fmt_new(req)))
+        return bool(poster(channel, _fmt_new(req, pi=member_pi)))
     except Exception as exc:  # noqa: BLE001
         log.warning("join_notify.notify_new_request failed: %s", exc)
         return False
