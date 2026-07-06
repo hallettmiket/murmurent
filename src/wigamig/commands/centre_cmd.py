@@ -748,6 +748,40 @@ def group_setup(group: str, sets: tuple[str, ...], non_interactive: bool) -> Non
                    f"then set it:  wigamig group-setup {group} --set github=<org>/<repo>")
 
 
+@click.command("group-reconcile",
+                help="Group-level cable_guy (the PI runs this): propagate the "
+                     "group's members into its OWN Slack workspace and GitHub "
+                     "repo. Reports Slack workspace membership (free/Pro can't "
+                     "API-invite — it surfaces the invite link) and, with "
+                     "--apply, adds members as GitHub collaborators. Uses the "
+                     "group's own token (~/.config/wigamig/groups/<group>/slack-token).")
+@click.argument("group")
+@click.option("--apply", is_flag=True,
+              help="Actually add GitHub collaborators (default: report only).")
+def group_reconcile_cmd(group: str, apply: bool) -> None:
+    from ..core import group_reconcile as _gr
+    from ..core import registrar as _R
+    if not _R.group_exists(group):
+        raise click.ClickException(f"no lab or core named {group!r}.")
+    res = _gr.group_reconcile(group, apply=apply)
+    click.echo(f"Group reconcile: {group}"
+               + ("  (--apply)" if apply else "  (report only — no writes)"))
+    click.echo("\nGroup Slack workspace:")
+    for line in (res.slack or ["  (nothing to check)"]):
+        click.echo(f"  {line}")
+    if res.invite_url:
+        click.echo(f"  invite link to send new members: {res.invite_url}")
+    elif any("NOT in the group workspace" in s for s in res.slack):
+        click.echo("  (set the group's slack_invite_url via `wigamig group-setup` "
+                   "so you have a link to send.)")
+    click.echo("\nGroup GitHub repo:")
+    for line in (res.github or ["  (no github repo set — `wigamig group-setup "
+                                f"{group} --set github=<org>/<repo>`)"]):
+        click.echo(f"  {line}")
+    if not apply and res.github:
+        click.echo("\n  Re-run with --apply to add the GitHub collaborators.")
+
+
 @join_request_group.command("decrypt")
 @click.argument("path", type=click.Path(exists=True, dir_okay=False))
 def cmd_decrypt(path: str) -> None:
