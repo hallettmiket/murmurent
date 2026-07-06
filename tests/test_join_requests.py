@@ -118,10 +118,6 @@ def _fake_slack(_name, _ws):
     return "C0FAKE"
 
 
-def _fake_github(_org, _repo, _members):
-    return True
-
-
 def _fake_acl_runner(_argv):
     import subprocess
     return subprocess.CompletedProcess(_argv, 0, "ok\n", "")
@@ -130,7 +126,8 @@ def _fake_acl_runner(_argv):
 def test_approve_lab_dispatches_create_and_provision(world,
                                                        monkeypatch):
     monkeypatch.setattr(CP, "_live_slack_create_channel", _fake_slack)
-    monkeypatch.setattr(CP, "_live_github_create_repo", _fake_github)
+    # No GitHub creator to patch — the mayor onboarding path never creates the
+    # group's repo (that's the PI's job); it only emits an informational probe.
     # Patch the apply_fs_acl runner via env.
     real_apply = CP.apply_fs_acl
     def patched_apply(**kw):
@@ -367,8 +364,13 @@ def test_provision_lab_onboarding_no_centre(monkeypatch, tmp_path):
 def test_provision_lab_onboarding_warns_on_missing_config(world,
                                                             monkeypatch):
     """If centre is initialised but optional fields are blank → warn
-    probes, not block."""
+    probes, not block. The github-repo step is exempt: it is deliberately
+    deferred to the PI (group-side), so it is always ``ok``, never a
+    config-driven warning — the mayor doesn't create the group's repo."""
     CI.update_centre({"slack_workspace": "", "github_org": "",
                         "data_server": ""})
     probes = CP.provision_lab_onboarding("any_lab")
-    assert all(p.status == "warn" for p in probes)
+    by = {p.name: p.status for p in probes}
+    assert by.get("github-repo") == "ok"        # deferred to the PI, not a warn
+    assert all(p.status == "warn" for p in probes if p.name != "github-repo")
+    assert not any(p.status == "fail" for p in probes)

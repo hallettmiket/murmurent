@@ -6561,6 +6561,7 @@ def create_app() -> FastAPI:
             "join_email": p.join_email,
             "age_recipient": getattr(p, "age_recipient", "") or "",
             "slack_workspace": p.slack_workspace,
+            "slack_invite_url": getattr(p, "slack_invite_url", "") or "",
             "github_org": p.github_org,
             "data_server": p.data_server,
             "server_host": p.server_host,

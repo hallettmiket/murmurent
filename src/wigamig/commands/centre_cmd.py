@@ -571,6 +571,46 @@ def centre_age_keygen() -> None:
     click.echo(f"✓ public recipient (publish this in the directory):\n    {recipient}")
 
 
+# Centre profile fields a mayor may set/change after init. Excludes identity +
+# audit fields that must not drift once the centre exists (name, institution,
+# founding_mayor, created, unique_name).
+_CENTRE_SETTABLE = (
+    "join_email", "slack_workspace", "slack_invite_url", "github_org",
+    "data_server", "server_host", "server_account", "cc_install_path",
+    "obsidian_vault", "mayor_root", "public_hub", "raw_root", "refined_root",
+)
+
+
+@click.command("centre-set",
+                help="Set one or more centre-profile fields after init "
+                     "(e.g. the Slack workspace join link). "
+                     "Usage: wigamig centre-set slack_invite_url=https://join.slack.com/…")
+@click.argument("pairs", nargs=-1, metavar="KEY=VALUE...")
+def centre_set(pairs: tuple[str, ...]) -> None:
+    if _ci.read_centre() is None:
+        raise click.ClickException("no centre initialised; run `wigamig centre-init` first.")
+    if not pairs:
+        click.echo("Settable fields:")
+        for k in _CENTRE_SETTABLE:
+            click.echo(f"  {k}")
+        click.echo("\nUsage: wigamig centre-set KEY=VALUE [KEY=VALUE ...]")
+        return
+    updates: dict[str, str] = {}
+    for p in pairs:
+        if "=" not in p:
+            raise click.ClickException(f"expected KEY=VALUE, got {p!r}")
+        key, _, val = p.partition("=")
+        key = key.strip()
+        if key not in _CENTRE_SETTABLE:
+            raise click.ClickException(
+                f"{key!r} is not a settable centre field. One of: "
+                + ", ".join(_CENTRE_SETTABLE))
+        updates[key] = val.strip()
+    _ci.update_centre(updates)
+    for k, v in updates.items():
+        click.echo(f"✓ {k} = {v or '(cleared)'}")
+
+
 @click.command("centre-hub-publish",
                 help="List this centre in the public wigamig_public hub. Clones "
                      "the hub if needed and writes your row into "

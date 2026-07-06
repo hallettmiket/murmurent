@@ -42,11 +42,10 @@ def world(monkeypatch, tmp_path):
         data_server="lab-server",
         write_sentinel=False,
     )
-    # Patch the live Slack/GitHub creators to deterministic fakes.
+    # Patch the live Slack creator to a deterministic fake. (No GitHub creator
+    # to patch — the mayor onboarding path never creates the group's repo.)
     monkeypatch.setattr(CP, "_live_slack_create_channel",
                          lambda n, w: "C0FAKE")
-    monkeypatch.setattr(CP, "_live_github_create_repo",
-                         lambda o, r, m: True)
     # Patch the acl runner via the public function — call apply_fs_acl
     # with our own runner.
     real_apply = CP.apply_fs_acl
