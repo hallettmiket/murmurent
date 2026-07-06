@@ -673,6 +673,81 @@ def centre_hub_publish(hub_dir: str | None, remote: str | None, submit: bool) ->
         raise click.ClickException(str(exc)) from exc
 
 
+_GROUP_SETUP_PROMPTS = [
+    ("github",           "GitHub repo for the group (org/repo)"),
+    ("notebook_host",    "Lab-notebook host (a machine name)"),
+    ("notebook_path",    "Lab-notebook path on that host"),
+    ("slack_workspace",  "The group's OWN Slack workspace (team id, e.g. T0…)"),
+    ("slack_invite_url", "That workspace's join link"),
+    ("data_host",        "Host for large datasets (e.g. lab-server)"),
+    ("data_raw",         "Raw data root"),
+    ("data_refined",     "Refined data root"),
+]
+
+
+@click.command("group-setup",
+                help="Fill in a group's post-creation details — GitHub repo, "
+                     "lab-notebook host/path, the group's OWN Slack workspace, and "
+                     "large-dataset location. Run by the PI after their lab/core "
+                     "exists; writes to the group's lab.md.")
+@click.argument("group")
+@click.option("--set", "sets", multiple=True, metavar="KEY=VALUE",
+              help="Set a field directly (repeatable): github, notebook_host, "
+                   "notebook_path, slack_workspace, slack_invite_url, data_host, "
+                   "data_raw, data_refined.")
+@click.option("--non-interactive", is_flag=True,
+              help="Don't prompt; apply only --set values.")
+def group_setup(group: str, sets: tuple[str, ...], non_interactive: bool) -> None:
+    from ..core import registrar as _R
+    from ..core import hosts as _hosts
+
+    if not _R.group_exists(group):
+        raise click.ClickException(
+            f"no lab or core named {group!r} — create it first (a lab/core join request).")
+    current = _R.read_group_profile(group)
+    try:
+        known_hosts = set(_hosts.read().keys())
+    except Exception:  # noqa: BLE001
+        known_hosts = set()
+
+    fields: dict[str, str] = {}
+    for kv in sets:
+        if "=" not in kv:
+            raise click.ClickException(f"--set expects KEY=VALUE, got {kv!r}")
+        k, v = kv.split("=", 1)
+        fields[k.strip()] = v.strip()
+
+    if not non_interactive:
+        click.echo(f"Group setup for '{group}'. Enter = keep the current value "
+                   "[in brackets]; leave blank to clear.\n")
+        for key, label in _GROUP_SETUP_PROMPTS:
+            if key in fields:
+                continue
+            cur = current.get(key, "")
+            fields[key] = click.prompt(f"  {label}", default=cur, show_default=bool(cur))
+
+    # Soft-validate notebook/data hosts against the machine registry.
+    for hk in ("notebook_host", "data_host"):
+        h = (fields.get(hk, current.get(hk, "")) or "").strip()
+        if h and known_hosts and h not in known_hosts:
+            click.secho(f"  ! host {h!r} isn't in your machine registry "
+                        f"(~/.wigamig/hosts.yaml) — add it with `wigamig host add {h} …` "
+                        "so notebooks/data can be reached.", fg="yellow", err=True)
+
+    if not _R.update_group_profile(group, fields):
+        raise click.ClickException(f"could not write the profile for {group!r}.")
+    click.echo("\n✓ Saved to the group's lab.md. Current profile:")
+    prof = _R.read_group_profile(group)
+    if prof:
+        for k, v in prof.items():
+            click.echo(f"    {k}: {v}")
+    else:
+        click.echo("    (empty)")
+    if not prof.get("github"):
+        click.echo("\nTip: create a PRIVATE group repo (your agent toolkit + lab-mgmt), "
+                   f"then set it:  wigamig group-setup {group} --set github=<org>/<repo>")
+
+
 @join_request_group.command("decrypt")
 @click.argument("path", type=click.Path(exists=True, dir_okay=False))
 def cmd_decrypt(path: str) -> None:

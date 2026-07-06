@@ -1399,6 +1399,7 @@ from .commands.centre_cmd import centre_slack_smoke as _centre_slack_smoke
 from .commands.centre_cmd import centre_slack_setup as _centre_slack_setup
 from .commands.centre_cmd import centre_age_keygen as _centre_age_keygen
 from .commands.centre_cmd import centre_hub_publish as _centre_hub_publish
+from .commands.centre_cmd import group_setup as _group_setup
 from .commands.centre_cmd import join_request_group as _join_request_group
 cli.add_command(_centre_init_cmd)
 cli.add_command(_centre_status_cmd)
@@ -1406,6 +1407,7 @@ cli.add_command(_centre_slack_smoke)
 cli.add_command(_centre_slack_setup)
 cli.add_command(_centre_age_keygen)
 cli.add_command(_centre_hub_publish)
+cli.add_command(_group_setup)
 cli.add_command(_join_request_group)
 
 
