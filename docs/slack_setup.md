@@ -31,8 +31,12 @@ it once — click by click:
 
 1. Go to <https://api.slack.com/apps> and sign in as the account that owns your
    `wigamig-<name>` workspace.
-2. **Create New App → From scratch.** Name it `wigamig` (anything is fine), pick
-   your `wigamig-<name>` workspace, **Create App**.
+2. **Create New App → From scratch.** Name it **`mayor`**, pick your
+   `wigamig-<name>` workspace, **Create App**. Then open **App Home** (left
+   sidebar) and set the bot's **Display Name** and **Default username** to
+   `mayor`. This name is what PIs + members see as the *sender* of every DM
+   wigamig sends (onboarding steps, approvals) — so messages read as coming
+   **from the mayor**, not a generic bot. (Already have an app? Rename it here.)
 3. In the app's left sidebar, open **OAuth & Permissions**.
 4. Scroll to **Scopes → Bot Token Scopes** (the *Bot* section, **not** "User
    Token Scopes"). Click **Add an OAuth Scope** and add each of these:
