@@ -137,6 +137,75 @@ def test_decision_noop_without_email(world, monkeypatch):
     assert posted == []
 
 
+# ---- provisioned → remind the mayor/registrar --------------------------
+
+def test_provisioned_noop_without_token(world, monkeypatch):
+    monkeypatch.setattr(JN, "_has_token", lambda: False)
+    posted = []
+    ok = JN.notify_group_provisioned(
+        _req(state="provisioned"),
+        poster=lambda c, t: posted.append(1) or True,
+        channel_resolver=lambda aud, env=None: "C0ADMIN")
+    assert ok is False
+    assert posted == []
+
+
+def test_provisioned_noop_for_non_group(world, monkeypatch):
+    monkeypatch.setattr(JN, "_has_token", lambda: True)
+    posted = []
+    ok = JN.notify_group_provisioned(
+        _req(kind="member", state="provisioned"),
+        poster=lambda c, t: posted.append(1) or True,
+        channel_resolver=lambda aud, env=None: "C0ADMIN")
+    assert ok is False
+    assert posted == []
+
+
+def test_provisioned_posts_to_admin_with_action_reminder(world, monkeypatch):
+    monkeypatch.setattr(JN, "_has_token", lambda: True)
+    seen = {}
+    def poster(channel, text):
+        seen["channel"] = channel
+        seen["text"] = text
+        return True
+    ok = JN.notify_group_provisioned(
+        _req(state="provisioned"), poster=poster,
+        channel_resolver=lambda aud, env=None: (seen.setdefault("aud", aud), "C0ADMIN")[1])
+    assert ok is True
+    assert seen["aud"] == "admin"          # the mayor/registrar channel
+    assert seen["channel"] == "C0ADMIN"
+    # It reminds the registrar to act, names the PI's email, and gives setup cmds.
+    assert "Action for the registrar" in seen["text"]
+    assert "pi@demo.edu" in seen["text"]
+    assert "group-init-toolkit newlab" in seen["text"]
+
+
+def test_provisioned_includes_invite_link_when_set(world, monkeypatch):
+    monkeypatch.setattr(JN, "_has_token", lambda: True)
+    from wigamig.core import centre_init as CI
+    monkeypatch.setattr(
+        CI, "read_centre",
+        lambda env=None: type("P", (), {"slack_invite_url": "https://join.example/xyz"})())
+    seen = {}
+    JN.notify_group_provisioned(
+        _req(state="provisioned"),
+        poster=lambda c, t: seen.setdefault("text", t) or True,
+        channel_resolver=lambda aud, env=None: "C0ADMIN")
+    assert "https://join.example/xyz" in seen["text"]
+
+
+def test_group_onboarding_steps_shape():
+    steps = JN.group_onboarding_steps("newlab", invite_url="https://join.example/xyz")
+    assert len(steps) == 4
+    assert "https://join.example/xyz" in steps[0]
+    assert "group-init-toolkit newlab --create-repo" in steps[1]
+    assert "group-setup newlab" in steps[2]
+    assert "group-reconcile newlab --apply" in steps[3]
+    # Without a link, step 1 tells the PI the registrar will email it.
+    nolink = JN.group_onboarding_steps("newlab")
+    assert "registrar will email" in nolink[0]
+
+
 # ---- lifecycle wiring is best-effort ----------------------------------
 
 def test_file_request_survives_notifier_explosion(world, monkeypatch):
