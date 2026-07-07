@@ -3604,6 +3604,9 @@ def create_app() -> FastAPI:
                 "created": entry.created,
                 "institution": meta.get("institution") or None,
                 "department": meta.get("department") or None,
+                "github_org": meta.get("github_org") or None,
+                "slack_workspace": meta.get("slack_workspace") or None,
+                "oracle_vault": meta.get("lab_oracle_vault") or None,
                 "website": meta.get("website") or None,
                 "contact": meta.get("contact") or {},
                 "capabilities": list(meta.get("capabilities") or []),
@@ -5809,6 +5812,33 @@ def create_app() -> FastAPI:
         kwargs = {k: getattr(body, k) for k in type(body).model_fields if k in sent}
         try:
             entry = _reg.update_core_metadata(name, **kwargs)
+        except _reg.LabNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        except _reg.PIAlreadyLeadsAnother as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except _reg.RegistrarError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"ok": True, "core": _core_entry_to_dict(entry)}
+
+    @app.post("/api/core/{core}/settings")
+    def core_settings_update(
+        core: str,
+        body: RegistrarCoreEditBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """Core-leader equivalent of ``POST /api/lab/settings``.
+
+        Lets the core's **leader** (not only the centre registrar) edit their
+        own core's metadata. Delegates to the same ``update_core_metadata`` as
+        the registrar edit route; only the authorisation differs
+        (``_require_core_admin`` = leader OR registrar).
+        """
+        from ..core import registrar as _reg
+        _require_core_admin(core, user)
+        sent = body.model_fields_set
+        kwargs = {k: getattr(body, k) for k in type(body).model_fields if k in sent}
+        try:
+            entry = _reg.update_core_metadata(core, **kwargs)
         except _reg.LabNotFound as exc:
             raise HTTPException(status_code=404, detail=str(exc))
         except _reg.PIAlreadyLeadsAnother as exc:
