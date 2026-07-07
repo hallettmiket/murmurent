@@ -593,6 +593,59 @@ def centre_age_keygen() -> None:
     click.echo(f"✓ public recipient (publish this in the directory):\n    {recipient}")
 
 
+@click.command("identity-card",
+                help="MAYOR: generate a scoped identity card for a member — their "
+                     "netname + only their own group's role — to hand them so their "
+                     "OWN machine knows their role. Decentralized: no shared server "
+                     "needed. Prints the card (YAML); --out writes it to a file.")
+@click.argument("handle")
+@click.option("--out", "out_file", type=click.Path(dir_okay=False), default=None,
+              help="Write the card to a file (default: print to stdout).")
+@click.option("--actor", default="", help="Issuing mayor handle (for the audit line).")
+def identity_card(handle: str, out_file: str | None, actor: str) -> None:
+    from ..core import identity_card as _ic
+    if _ci.read_centre() is None:
+        raise click.ClickException("no centre initialised; run `wigamig centre-init` first.")
+    if not actor:
+        actor = os.environ.get("WIGAMIG_USER", "")
+    try:
+        card = _ic.build_card(handle, issued_by=actor)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    text = _ic.card_yaml(card)
+    if out_file:
+        from pathlib import Path as _P
+        _P(out_file).write_text(text, encoding="utf-8")
+        click.echo(f"✓ wrote identity card for @{card['netname']} to {out_file}")
+        click.echo("  Send it to them; they run `wigamig identity-import <file>` on "
+                   "their machine.")
+    else:
+        click.echo(text.rstrip())
+
+
+@click.command("identity-import",
+                help="MEMBER: import an identity card the mayor gave you, so THIS "
+                     "machine knows your role (your dashboard login then resolves "
+                     "correctly). Reads a file, or stdin with '-'. Sets your netname "
+                     "and materializes a scoped local registry.")
+@click.argument("card_file")
+def identity_import(card_file: str) -> None:
+    from ..core import identity_card as _ic
+    import sys as _sys
+    text = _sys.stdin.read() if card_file == "-" else \
+        __import__("pathlib").Path(card_file).expanduser().read_text(encoding="utf-8")
+    try:
+        card = _ic.parse_card(text)
+        actions = _ic.import_card(card)
+    except (ValueError, OSError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"✓ imported identity card for @{card['netname']}"
+               + (f" — centre: {card.get('centre')}" if card.get("centre") else ""))
+    for a in actions:
+        click.echo(f"  • {a}")
+    click.echo("\nRestart your wigamig dashboard; the login will now show your role.")
+
+
 @click.command("onboard-check",
                 help="Check whether newly-approved PIs have joined the Slack "
                      "workspace yet; for any who have, add them to their group "
