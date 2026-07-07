@@ -66,10 +66,12 @@ def test_pi_handle_helper_strips_at_sign(lab_world):
 
 
 def test_load_lab_config_falls_back_when_file_missing(lab_world):
-    """No lab.md → default fallback so wigamig still boots fresh."""
+    """No lab.md → a NEUTRAL config so wigamig still boots, but it must NOT
+    fabricate a specific lab's identity (no hardcoded pi/lab/institution)."""
     cfg = load_lab_config()
-    assert cfg.pi == "mhallet"  # default fallback handle
-    assert cfg.lab == "hallett"
+    assert cfg.pi == ""     # institution-agnostic: never invent a PI
+    assert cfg.lab == ""    # never invent a lab name
+    assert cfg.institution == ""
 
 
 # ---- Phase 0b (cores rollout) ---------------------------------------------

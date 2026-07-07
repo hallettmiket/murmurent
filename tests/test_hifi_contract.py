@@ -27,6 +27,9 @@ def world(monkeypatch, tmp_path):
     monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
     monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
     monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    # Isolate the CENTRE registry too, so the scoping gate reads a hermetic
+    # (empty) registry instead of this machine's real ~/.wigamig/lab_info.
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
     monkeypatch.setenv("WIGAMIG_USER", "allie")
     monkeypatch.setenv("WIGAMIG_NOTEBOOK_DIR", str(tmp_path / "lab-notebook"))
     lab_mgmt = tmp_path / "lab-mgmt"
@@ -34,6 +37,13 @@ def world(monkeypatch, tmp_path):
     (lab_mgmt / "projects").mkdir(parents=True)
     (lab_mgmt / "dashboards").mkdir(parents=True)
     (lab_mgmt / "inventory").mkdir(parents=True)
+    # A real install always has a lab.md declaring the lab + its PI. Tests used
+    # to lean on the (now-removed) hardcoded "hallett"/"mhallet" defaults; make
+    # it explicit instead. ("hallett" here is test data, not a code default.)
+    (lab_mgmt / "lab.md").write_text(
+        "---\nlab: hallett\nname: Hallett Lab\npi: '@mhallet'\n"
+        "institution: Western University\n---\n\n# group config\n",
+        encoding="utf-8")
 
     members = {
         "mhallet": "TCPS_2:2030-12-31\n  - TOTP:enrolled\n  - signing_key:registered",

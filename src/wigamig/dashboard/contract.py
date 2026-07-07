@@ -60,7 +60,7 @@ class IdentityBlock(BaseModel):
     handle: str
     name: str
     role: str
-    lab: str = "hallett"
+    lab: str = ""
     contact: MemberContact = MemberContact()
     location: MemberLocation = MemberLocation()
     # Phase 3: only set on the ``member`` block (always False on ``pi``).
@@ -368,7 +368,7 @@ class LabSettings(BaseModel):
     are managed by the declared :class:`GitProvider` list).
     """
 
-    name: str = "hallett"                      # short identifier, used in paths
+    name: str = ""                             # short identifier, used in paths
     display_name: str = "Hallett Lab"          # human label shown in the UI
     pi_handle: str = ""
     # Phase 0 of the cores rollout (docs/cores_plan.md §3): distinguishes
