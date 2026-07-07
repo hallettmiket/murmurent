@@ -170,6 +170,13 @@
           <span class="meta">
             <span id="core-status-pill" class="pill">—</span>
             <span id="core-kind-pill" class="pill">core</span>
+            <button id="core-settings-btn" type="button"
+                    style="display:none; margin-left:10px;
+                           font-family:var(--mono); font-size:11px;
+                           letter-spacing:1px; text-transform:uppercase;
+                           background:var(--purple); color:white; border:0;
+                           border-radius:2px; padding:3px 10px; cursor:pointer;
+                           font-weight:600;">⚙ Core settings</button>
           </span>
         </header>
         <div class="body">
@@ -420,6 +427,64 @@
         </div>
       </div>
 
+      <!-- Core settings modal (leader-editable core metadata) -->
+      <div id="settings-backdrop" style="display:none;
+           position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100;
+           align-items:center; justify-content:center; padding:20px;">
+        <div style="background:white; border-radius:4px; max-width:620px;
+             width:100%; max-height:90vh; overflow-y:auto;
+             padding:24px; font-family:var(--serif);">
+          <div style="display:flex; justify-content:space-between; align-items:center;
+                      margin-bottom:6px;">
+            <h2 id="settings-title" style="margin:0; color:var(--purple-deep)">Core settings</h2>
+            <button id="settings-close" type="button" style="background:none; border:0;
+                    font-size:22px; cursor:pointer; color:var(--muted)">×</button>
+          </div>
+          <p class="muted" style="font-size:12px; margin:0 0 12px; line-height:1.5;">
+            Core-wide parameters. Only the core leader and centre registrars can save.
+            Edits write to the core's <code>lab.md</code> and are committed for you.
+          </p>
+          <form id="settings-form">
+            <div style="display:grid; grid-template-columns:150px 1fr; gap:10px 14px; font-size:13px;">
+              <label>Core id</label>
+              <input id="s-core-id" disabled
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;
+                            background:var(--paper-2);" />
+              <label>Display name</label>
+              <input id="s-display-name" placeholder="e.g. Western Bioconvergence Core"
+                     style="padding:4px 6px;" />
+              <label>Institution</label>
+              <input id="s-institution" placeholder="e.g. Western University"
+                     style="padding:4px 6px;" />
+              <label>Department</label>
+              <input id="s-department" placeholder="e.g. Schulich School of Medicine"
+                     style="padding:4px 6px;" />
+              <label>GitHub org</label>
+              <input id="s-github-org" placeholder="e.g. western-core"
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;" />
+              <label>Slack workspace</label>
+              <input id="s-slack-workspace" placeholder="e.g. westernqa"
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;" />
+              <label>Oracle vault</label>
+              <input id="s-oracle-vault" placeholder="path or vault id (optional)"
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;" />
+            </div>
+            <div id="settings-error" class="err" style="display:none; margin-top:12px;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+              <button type="button" id="settings-cancel"
+                      style="font-family:var(--mono); font-size:11px; padding:6px 14px;
+                             background:white; border:1px solid var(--rule-strong);
+                             border-radius:2px; cursor:pointer;">cancel</button>
+              <button type="submit" id="settings-submit"
+                      style="font-family:var(--mono); font-size:11px; padding:6px 14px;
+                             background:var(--purple); color:white;
+                             border:1px solid var(--purple); border-radius:2px;
+                             cursor:pointer;">save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
       <div class="card">
         <header>
           <h2>Incoming service requests</h2>
@@ -473,6 +538,7 @@
       const params = new URLSearchParams(window.location.search);
       const CORE  = params.get("core") || "";
       const ACTOR = params.get("user") || "";
+      let LOADED_CORE = null;   // last-fetched core metadata (for the settings modal)
       document.getElementById("leader-handle").textContent = ACTOR ? "@" + ACTOR : "@—";
 
       const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
@@ -498,6 +564,7 @@
           }
           const data = await res.json();
           loading.style.display = "none";
+          LOADED_CORE = data.core || null;
           renderIdentity(data.core, data.viewer);
           renderMembers(data.members);
           renderRoleLabel(data.viewer);
@@ -510,6 +577,7 @@
           // clicks preview to populate.
           if (data.viewer && data.viewer.can_admin) {
             document.getElementById("billing-card").style.display = "block";
+            document.getElementById("core-settings-btn").style.display = "inline-block";
           }
         } catch (ex) {
           loading.style.display = "none";
@@ -1297,6 +1365,67 @@
           const res = await fetch(url, { method: "POST" });
           if (res.ok) loadServices(VIEWER);
           else alert("Archive failed: " + (await res.text()));
+        }
+      });
+
+      // ---- Core settings modal (leader-editable metadata) -----------------
+      const settingsModal = document.getElementById("settings-backdrop");
+
+      function openSettingsModal() {
+        const c = LOADED_CORE || {};
+        document.getElementById("s-core-id").value          = c.name || CORE;
+        document.getElementById("s-display-name").value     = c.display_name || "";
+        document.getElementById("s-institution").value      = c.institution || "";
+        document.getElementById("s-department").value       = c.department || "";
+        document.getElementById("s-github-org").value       = c.github_org || "";
+        document.getElementById("s-slack-workspace").value  = c.slack_workspace || "";
+        document.getElementById("s-oracle-vault").value     = c.oracle_vault || "";
+        document.getElementById("settings-error").style.display = "none";
+        settingsModal.style.display = "flex";
+      }
+      function closeSettingsModal() { settingsModal.style.display = "none"; }
+
+      document.getElementById("core-settings-btn").addEventListener("click", openSettingsModal);
+      document.getElementById("settings-close").addEventListener("click", closeSettingsModal);
+      document.getElementById("settings-cancel").addEventListener("click", closeSettingsModal);
+      settingsModal.addEventListener("click", e => { if (e.target === settingsModal) closeSettingsModal(); });
+
+      document.getElementById("settings-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const errEl = document.getElementById("settings-error");
+        errEl.style.display = "none";
+        const submitBtn = document.getElementById("settings-submit");
+        submitBtn.disabled = true;
+        try {
+          // Send only fields the leader can set; empty strings are allowed
+          // (they clear a value), so we always send the full editable set.
+          const payload = {
+            display_name:     document.getElementById("s-display-name").value.trim(),
+            institution:      document.getElementById("s-institution").value.trim(),
+            department:       document.getElementById("s-department").value.trim(),
+            github_org:       document.getElementById("s-github-org").value.trim(),
+            slack_workspace:  document.getElementById("s-slack-workspace").value.trim(),
+            oracle_vault:     document.getElementById("s-oracle-vault").value.trim(),
+          };
+          const url = `/api/core/${encodeURIComponent(CORE)}/settings`
+                    + `?user=${encodeURIComponent(ACTOR || "")}`;
+          const res = await fetch(url, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || ("HTTP " + res.status));
+          }
+          closeSettingsModal();
+          loadCore();   // refresh the identity card with the saved values
+        } catch (ex) {
+          errEl.textContent = String(ex.message || ex);
+          errEl.style.display = "block";
+        } finally {
+          submitBtn.disabled = false;
         }
       });
 
