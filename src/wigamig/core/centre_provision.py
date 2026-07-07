@@ -503,6 +503,122 @@ def provision_member_to_group(
     return probes
 
 
+def _live_slack_kick(channel_id: str, email: str, token: str):
+    """Remove the Slack user with ``email`` from ``channel_id`` via
+    conversations.kick. Returns (ok, detail)."""
+    if not (channel_id and email and token):
+        return False, "missing channel, email, or token"
+    try:
+        import httpx
+        H = {"Authorization": f"Bearer {token}"}
+        u = httpx.get("https://slack.com/api/users.lookupByEmail",
+                      headers=H, params={"email": email}, timeout=8).json()
+        if not u.get("ok"):
+            return False, ("member not in the workspace"
+                           if u.get("error") == "users_not_found" else u.get("error", "lookup failed"))
+        uid = (u.get("user") or {}).get("id")
+        if not uid:
+            return False, "member not in the workspace"
+        r = httpx.post("https://slack.com/api/conversations.kick",
+                       headers={**H, "Content-Type": "application/json"},
+                       json={"channel": channel_id, "user": uid}, timeout=8).json()
+        if r.get("ok"):
+            return True, "kicked"
+        # not_in_channel means they're already out — treat as success.
+        if r.get("error") == "not_in_channel":
+            return True, "already out of the channel"
+        return False, r.get("error", "kick failed")
+    except Exception as exc:  # noqa: BLE001
+        return False, str(exc)
+
+
+def _gh_remove_collaborator(repo: str, login: str, *, runner=subprocess.run):
+    """DELETE repos/{repo}/collaborators/{login} via gh. Returns (ok, detail)."""
+    if not (repo and login):
+        return False, "missing repo or login"
+    proc = runner(["gh", "api", "-X", "DELETE", f"repos/{repo}/collaborators/{login}"],
+                  capture_output=True, text=True)
+    if proc.returncode == 0:
+        return True, "removed"
+    detail = (proc.stderr or proc.stdout or "gh error").strip().splitlines()
+    return False, (detail[0][:120] if detail else "gh error")
+
+
+def deprovision_member_from_group(
+    group_name: str,
+    *,
+    handle: str,
+    env: dict[str, str] | None = None,
+    token: str | None = None,
+    delete: bool = False,
+    kicker=None,                 # (channel_id, email) -> (bool, detail)
+    collaborator_remover=None,   # (repo, login) -> (bool, detail)
+) -> list[Probe]:
+    """Remove a member from a group: kick them from the group's Slack channel,
+    remove them as a collaborator on the group's GitHub repo, and mark them
+    removed in the roster. The inverse of onboarding a member.
+
+    PI-initiated. Slack + GitHub steps are best-effort and go through injectable
+    seams so the token-less test suite makes no live calls. ``delete=True``
+    unlinks the member file instead of marking ``status: removed``.
+    """
+    from . import registrar as _reg
+    probes: list[Probe] = []
+
+    info = _reg.read_group_member(group_name, handle, env=env)
+    if info is None:
+        probes.append(Probe(name="member", status="warn",
+            detail=f"@{handle.lstrip('@')} is not a member of {group_name} (nothing to remove)."))
+        return probes
+    norm, email, ghlogin = info["handle"], info["email"], info["github"]
+
+    # 1. Slack — kick from the group's channel (the centre-workspace channel the
+    #    member was invited to; uses the centre bot token, same as the invite).
+    reg = _reg.read_registry(env)
+    entry = next((g for g in [*reg.labs, *reg.cores] if g.name == group_name), None)
+    channel_id = getattr(entry, "slack_channel_id", None) if entry else None
+    tok = token if token is not None else resolve_slack_token(allow_file=True)
+    if not channel_id:
+        probes.append(Probe(name="slack-channel", status="warn",
+            detail=f"{group_name} has no Slack channel on record — nothing to remove them from."))
+    elif not (kicker or tok):
+        probes.append(Probe(name="slack-channel", status="warn",
+            detail="no Slack token — member not removed from the channel."))
+    elif not email:
+        probes.append(Probe(name="slack-channel", status="warn",
+            detail=f"@{norm} has no email on file — can't resolve their Slack account to remove."))
+    else:
+        kick = kicker or (lambda cid, em: _live_slack_kick(cid, em, tok))
+        ok, detail = kick(channel_id, email)
+        probes.append(Probe(name="slack-channel", status="ok" if ok else "warn",
+            detail=(f"removed @{norm} from #{group_name} ({detail})" if ok
+                    else f"couldn't remove @{norm} from the channel — {detail}")))
+
+    # 2. GitHub — remove as a collaborator on the group's repo (PI-owned).
+    prof = _reg.read_group_profile(group_name, env=env)
+    repo = prof.get("github", "")
+    if not repo:
+        probes.append(Probe(name="github-repo", status="warn",
+            detail="no group GitHub repo on file — skipping collaborator removal."))
+    elif not ghlogin:
+        probes.append(Probe(name="github-repo", status="warn",
+            detail=f"@{norm} has no GitHub login on file — nothing to remove."))
+    else:
+        rm = collaborator_remover or (lambda r, l: _gh_remove_collaborator(r, l))
+        ok, detail = rm(repo, ghlogin)
+        probes.append(Probe(name="github-repo", status="ok" if ok else "warn",
+            detail=(f"removed {ghlogin} from {repo}" if ok
+                    else f"couldn't remove {ghlogin} from {repo} — {detail}")))
+
+    # 3. Roster — mark removed (or delete the file).
+    removed = _reg.remove_group_member(group_name, norm, env=env, delete=delete)
+    probes.append(Probe(name="roster", status="ok" if removed else "warn",
+        detail=(f"@{norm} {'deleted from' if delete else 'marked removed in'} the "
+                f"{group_name} roster" if removed
+                else f"couldn't update the {group_name} roster for @{norm}")))
+    return probes
+
+
 def provision_centre_slack(
     *,
     env: dict[str, str] | None = None,

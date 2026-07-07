@@ -1025,6 +1025,73 @@ def add_group_member(
     return True
 
 
+def read_group_member(
+    name: str, handle: str, *, env: dict[str, str] | None = None,
+) -> dict | None:
+    """Return a group member's key details (``handle``, ``email``, ``github``
+    login, ``status``, ``role``) from ``<group>/lab-mgmt/members/<handle>.md``,
+    or None if the group or member file doesn't exist. Used before removing a
+    member so we know which Slack account + GitHub login to deprovision."""
+    reg = read_registry(env)
+    entry = next((g for g in [*reg.labs, *reg.cores] if g.name == name), None)
+    if entry is None or not entry.lab_mgmt_path:
+        return None
+    norm = _normalize(handle)
+    if not norm:
+        return None
+    mf = Path(entry.lab_mgmt_path).expanduser() / "members" / f"{norm}.md"
+    if not mf.is_file():
+        return None
+    from . import git_providers as _gp
+    from .frontmatter import parse_file as _pf
+    try:
+        meta = _pf(mf).meta or {}
+    except Exception:  # noqa: BLE001
+        meta = {}
+    return {
+        "handle": norm,
+        "email": str(meta.get("email") or "").strip(),
+        "github": _gp.parse_logins(meta).get("github", ""),
+        "status": str(meta.get("status") or "active"),
+        "role": str(meta.get("role") or "member"),
+    }
+
+
+def remove_group_member(
+    name: str, handle: str, *,
+    env: dict[str, str] | None = None, delete: bool = False,
+) -> bool:
+    """Remove a member from a group's roster. By default marks their file
+    ``status: removed`` (keeps it for the audit trail); ``delete=True`` unlinks
+    the file entirely. Returns False if the group or member file doesn't exist.
+
+    Roster-only — the caller handles Slack/GitHub deprovisioning."""
+    reg = read_registry(env)
+    entry = next((g for g in [*reg.labs, *reg.cores] if g.name == name), None)
+    if entry is None or not entry.lab_mgmt_path:
+        return False
+    norm = _normalize(handle)
+    if not norm:
+        return False
+    mf = Path(entry.lab_mgmt_path).expanduser() / "members" / f"{norm}.md"
+    if not mf.is_file():
+        return False
+    if delete:
+        mf.unlink()
+        return True
+    from .frontmatter import parse_file as _pf
+    try:
+        parsed = _pf(mf)
+        meta = dict(parsed.meta or {})
+        body = parsed.body or f"\n# @{norm}\n"
+    except Exception:  # noqa: BLE001
+        meta, body = {"handle": f"@{norm}", "lab": name}, f"\n# @{norm}\n"
+    meta["status"] = "removed"
+    yaml_text = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip() + "\n"
+    mf.write_text(f"---\n{yaml_text}---\n{body}", encoding="utf-8")
+    return True
+
+
 # --- group profile (PI fills these in AFTER the group is created) ----------
 # Kept on the group's OWN lab.md (in its lab-mgmt repo), which the PI controls
 # and backs up — distinct from the centre registry the mayor holds.
