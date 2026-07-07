@@ -126,7 +126,7 @@ def build_response(
     })
 
     member_profile = _load_member_profile(norm)
-    lab_name = str(member_profile.get("lab") or "hallett")
+    lab_name = str(member_profile.get("lab") or "")
 
     return C.DashboardResponse(
         today=_today_block(today_d),
@@ -228,7 +228,7 @@ def _identity(handle: str, full_name: str | None, role: str) -> C.IdentityBlock:
         handle=handle,
         name=full_name or profile.get("full_name") or handle,
         role=role,
-        lab=str(profile.get("lab") or "hallett"),
+        lab=str(profile.get("lab") or ""),
         contact=_merge_contact(profile.get("contact"),
                                fallback_email=str(profile.get("email") or "")),
         location=_merge_location(profile.get("location")),
@@ -243,7 +243,7 @@ def _pi_identity() -> C.IdentityBlock:
         handle=_pi_handle(),
         name=str(full_name) if full_name else _pi_handle(),
         role="Principal Investigator",
-        lab=str(profile.get("lab") or "hallett"),
+        lab=str(profile.get("lab") or ""),
         contact=_merge_contact(profile.get("contact"),
                                fallback_email=str(profile.get("email") or "")),
         location=_merge_location(profile.get("location")),
@@ -451,7 +451,7 @@ def _master_folders_summary() -> dict:
     """
     try:
         from ..core import master_folders as _mf
-        lab_name = "hallett"  # single-lab today; resolves via lab.md later
+        lab_name = ""  # resolved from the viewer's lab.md via the request override
         summary = _mf.cached_summary(lab_name)
         return summary or {}
     except Exception:

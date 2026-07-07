@@ -13,6 +13,13 @@ from wigamig.mcp import inventory_server
 @pytest.fixture
 def inv(monkeypatch, tmp_path):
     monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    # The lab_manager is the PI declared in lab.md. Declare it explicitly — the
+    # hardcoded "the_pi" default was removed, so a real lab.md is required.
+    lab_mgmt = tmp_path / "lab-mgmt"
+    lab_mgmt.mkdir(parents=True, exist_ok=True)
+    (lab_mgmt / "lab.md").write_text(
+        "---\nlab: hallett\nname: Hallett Lab\npi: '@the_pi'\n---\n\n# group\n",
+        encoding="utf-8")
     items = [
         inventory.InventoryItem(name="anti_cd31", status="in_stock", expiry="2027-03-01"),
         inventory.InventoryItem(name="4_oht", status="expired", expiry="2026-04-01"),

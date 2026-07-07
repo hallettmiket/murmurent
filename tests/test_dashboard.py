@@ -23,6 +23,12 @@ def world(monkeypatch, tmp_path):
     (lab_mgmt / "projects").mkdir(parents=True)
     (lab_mgmt / "dashboards").mkdir(parents=True)
     (lab_mgmt / "inventory").mkdir(parents=True)
+    # Declare the lab + PI explicitly (a real install always has lab.md; tests
+    # used to lean on the removed hardcoded "the_pi"/"hallett" defaults).
+    (lab_mgmt / "lab.md").write_text(
+        "---\nlab: hallett\nname: Hallett Lab\npi: '@the_pi'\n"
+        "institution: Western University\n---\n\n# group config\n",
+        encoding="utf-8")
 
     # Member files mirror the seed's umbrella state.
     members = {

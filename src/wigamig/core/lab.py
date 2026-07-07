@@ -28,8 +28,8 @@ LAB_FILE = "lab.md"
 # Hard-coded fallback used only when ``<lab-mgmt>/lab.md`` is missing
 # (e.g. a fresh clone, before ``wigamig install``). Tests reset this
 # via ``WIGAMIG_LAB_MGMT_REPO``.
-_DEFAULT_LAB = "hallett"
-_DEFAULT_PI = "the_pi"
+_DEFAULT_LAB = ""  # institution-agnostic: no fabricated fallback lab
+_DEFAULT_PI = ""   # institution-agnostic: never invent a PI handle
 
 
 @dataclass(frozen=True)
@@ -70,28 +70,25 @@ def load_lab_config() -> LabConfig:
     """
     path = lab_path()
     if not path.is_file():
+        # No lab.md yet (fresh checkout, before setup). Return a NEUTRAL config
+        # — never fabricate a specific lab's identity (that leaked one real
+        # lab's PI/name/institution onto every install).
         return LabConfig(
             lab=_DEFAULT_LAB,
-            name="Hallett Lab",
+            name="",
             pi=_DEFAULT_PI,
-            institution="Western University",
-            department=(
-                "Schulich School of Dentristy and Medicine · "
-                "Department of Biochemistry"
-            ),
+            institution="",
+            department="",
             slack_workspace=None,
             path=None,
         )
     meta = parse_file(path).meta or {}
     return LabConfig(
         lab=str(meta.get("lab") or _DEFAULT_LAB),
-        name=str(meta.get("name") or "Hallett Lab"),
+        name=str(meta.get("name") or ""),
         pi=_strip_at(meta.get("pi") or _DEFAULT_PI),
-        institution=str(meta.get("institution") or "Western University"),
-        department=str(
-            meta.get("department")
-            or "Schulich School of Dentristy and Medicine · Department of Biochemistry"
-        ),
+        institution=str(meta.get("institution") or ""),
+        department=str(meta.get("department") or ""),
         slack_workspace=(
             str(meta["slack_workspace"]) if meta.get("slack_workspace") else None
         ),

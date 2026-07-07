@@ -226,6 +226,37 @@ def test_login_resolve_registrar_from_registry(isolated, tmp_path, monkeypatch):
     assert "alice" in body["registrar_centres"]
 
 
+def test_login_resolve_core_leader_is_not_a_lab_pi(isolated, tmp_path, monkeypatch):
+    """A core LEADER must resolve as core_leader, NOT as a lab PI. Cores reuse
+    the ``pi:`` field internally for their leader, which used to make the
+    resolver read it as a lab PI (emucaki showing PI view but no core view)."""
+    from wigamig.core.registrar import CoreEntry
+    core_dir = _seed_lab_mgmt(tmp_path, lab_id="biocore", pi="emucaki",
+                              members=[("emucaki", "lead")])
+    registrar.write_registry(Registry(
+        cores=[CoreEntry(name="biocore", pi="@emucaki", lab_mgmt_path=str(core_dir))],
+    ))
+    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(core_dir))
+    body = TestClient(create_app()).get("/api/login/resolve?user=emucaki").json()
+    assert body["is_core_leader"] is True
+    assert "biocore" in body["core_leader_of"]
+    assert body["is_pi"] is False              # NOT misclassified as a lab PI
+    assert body["default_role"] == "core_leader"
+
+
+def test_dashboard_gate_rejects_unknown_on_multigroup_centre(isolated, tmp_path, monkeypatch):
+    """An unknown netname on a centre WITH groups gets 403 — NOT a fabricated
+    dashboard under some default ('hallett') lab. The core scoping-leak fix."""
+    lab_dir = _seed_lab_mgmt(tmp_path, lab_id="yxia_lab", pi="yxia266",
+                             members=[("yxia266", "pi")])
+    registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
+    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
+    client = TestClient(create_app())
+    res = client.get("/api/dashboard?user=totally_made_up_netname")
+    assert res.status_code == 403
+    assert "not registered" in res.json()["detail"].lower()
+
+
 # ---------------------------------------------------------------------------
 # /api/login/select
 # ---------------------------------------------------------------------------

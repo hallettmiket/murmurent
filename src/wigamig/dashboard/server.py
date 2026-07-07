@@ -564,6 +564,26 @@ def create_app() -> FastAPI:
         from ..core import registrar as _registrar
         from ..core.repo import use_lab_mgmt_root
         match = _registrar.lab_mgmt_path_for_handle(handle)
+        # SCOPING GATE: on a multi-group centre, a handle that belongs to NO
+        # registered group and is not a registrar has no dashboard here. Without
+        # this, an unknown netname fell through to the default lab-mgmt (and a
+        # hardcoded "hallett" lab name) and was shown a real lab's dashboard — a
+        # cross-centre data-leak. Only fires when a centre registry with groups
+        # exists; legacy single-lab installs (no registry) fall through as before.
+        if match is None and not _registrar.is_registrar(handle):
+            try:
+                _reg_now = _registrar.read_registry()
+                _has_groups = bool(_reg_now.labs or _reg_now.cores)
+            except Exception:
+                _has_groups = False
+            if _has_groups:
+                raise HTTPException(
+                    status_code=403,
+                    detail=(f"@{handle.lstrip('@')} is not registered in this centre. "
+                            "You must be a member, PI/leader, or registrar of a group "
+                            "here to open a dashboard. If this is wrong, ask your "
+                            "centre's mayor to add you."),
+                )
         with use_lab_mgmt_root(match[1] if match else None):
             return snap_mod.build_response(handle, persona=persona)
 
@@ -1768,7 +1788,7 @@ def create_app() -> FastAPI:
         on which lab we're talking about.
         """
         # Cheap lookup: read the current lab's name then its settings.
-        lab_name = "hallett"  # placeholder; today's dashboard is single-lab
+        lab_name = ""  # resolved from the viewer's lab.md via the request override
         try:
             ls = snap_mod._lab_settings(lab_name)
             return lab_name, ls.lab_base
@@ -3433,13 +3453,20 @@ def create_app() -> FastAPI:
                 is_member = rec.status == _mem.ACTIVE
             except _mem.MemberNotFound:
                 is_member = False
-            # pi? — read the matched lab's lab.md:pi field
-            try:
-                from ..core import dashboard as _dash
-                pi_handle_now = _dash._pi_handle().lstrip("@").lower()
-            except Exception:
-                pi_handle_now = ""
-        is_pi_role = bool(pi_handle_now) and norm == pi_handle_now
+        # pi? — ONLY if this handle is the PI of a registered LAB. Cores reuse
+        # the ``pi:`` field internally for their leader, so reading lab.md's pi
+        # (via _pi_handle) misclassified a *core leader* as a lab PI. Check the
+        # labs list directly and keep lab-PI and core-leader strictly separate.
+        pi_lab_name: str | None = None
+        try:
+            _reg_now = _reg.read_registry()
+            for _l in _reg_now.labs:
+                if _l.status == "active" and _l.pi.lstrip("@").lower() == norm:
+                    pi_lab_name = _l.name
+                    break
+        except Exception:
+            pass
+        is_pi_role = pi_lab_name is not None
         # registrar? (centre-level — independent of lab)
         is_reg = _reg.is_registrar(norm)
         # core_leader? walk the centre registrar's cores and check if
@@ -3483,7 +3510,7 @@ def create_app() -> FastAPI:
             "is_registrar": is_reg,
             "is_core_leader": is_core_leader,
             "core_leader_of": core_leader_of,
-            "pi_lab": lab_name or pi_handle_now or None,
+            "pi_lab": pi_lab_name or lab_name or None,
             "registrar_centres": _reg.registrars() or (
                 [_reg.registrar_handle()] if _reg.registrar_handle() else []
             ),
