@@ -41,8 +41,8 @@ def world(monkeypatch, tmp_path):
         "bob": "TCPS_2:2026-06-05\n  - TOTP:enrolled\n  - signing_key:registered",
         "cassie": "TOTP:pending\n  - signing_key:pending",
     }
-    # Per-member contact / location overrides (Phase 2). Bob and Cassie have
-    # nothing, so they should fall back to the lab default in the snapshot.
+    # Per-member contact / location (Phase 2). Bob and Cassie set nothing, so
+    # their contact/location stay blank (the lab default is empty).
     extras = {
         "the_pi": (
             "lab: hallett\n"
@@ -199,27 +199,28 @@ def test_member_and_pi_identities(world):
 
 
 def test_member_contact_and_location_override(world):
-    """Allie's profile overrides email + office; everything else falls back."""
+    """Allie's profile sets email + office; fields she didn't set stay EMPTY
+    (the lab default is blank — the footer never invents details)."""
     resp = snapshot.build_response("allie", today=_dt.date(2026, 5, 8))
     assert resp.member.contact.email == "allie@example.edu"
-    # Allie didn't override ORCID -> falls back to the lab default.
-    assert resp.member.contact.orcid == "0000-0001-6738-6786"
     assert resp.member.location.office == "SSC-2418"
-    # Allie inherits the lab address even though her office is in another building.
-    assert resp.member.location.address == "1 Example Ave"
+    # Fields Allie didn't set are blank, not a hardcoded fallback.
+    assert resp.member.contact.orcid is None
+    assert resp.member.location.address is None
 
 
-def test_member_without_overrides_uses_lab_defaults(world):
-    """Bob has no contact / location frontmatter, so everything is the lab default."""
+def test_member_without_overrides_is_empty(world):
+    """Bob has no contact / location frontmatter, so his footer is blank —
+    nothing is fabricated from a lab default."""
     resp = snapshot.build_response("bob", today=_dt.date(2026, 5, 8))
-    assert resp.member.contact.email == "michael.hallett@example.edu"
-    assert resp.member.location.office == "MSB-360"
-    assert "Schulich School of Dentristy and Medicine" in (
-        resp.member.location.department or ""
-    )
+    assert resp.member.contact.email is None
+    assert resp.member.location.office is None
+    assert resp.member.location.department is None
 
 
-def test_pi_identity_has_full_contact_block(world):
+def test_pi_identity_reads_only_the_pi_own_profile(world):
+    """The PI block shows the PI's *own* frontmatter (the_pi set email + orcid
+    + office in the fixture); nothing comes from a hardcoded default."""
     resp = snapshot.build_response("allie", today=_dt.date(2026, 5, 8))
     assert resp.pi.contact.email == "michael.hallett@example.edu"
     assert resp.pi.contact.orcid == "0000-0001-6738-6786"
