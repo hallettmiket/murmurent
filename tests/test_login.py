@@ -244,17 +244,25 @@ def test_login_resolve_core_leader_is_not_a_lab_pi(isolated, tmp_path, monkeypat
     assert body["default_role"] == "core_leader"
 
 
-def test_dashboard_gate_rejects_unknown_on_multigroup_centre(isolated, tmp_path, monkeypatch):
-    """An unknown netname on a centre WITH groups gets 403 — NOT a fabricated
-    dashboard under some default ('hallett') lab. The core scoping-leak fix."""
+def test_dashboard_gate_rejects_unknown_on_initialised_centre(isolated, tmp_path, monkeypatch):
+    """An unknown netname on ANY initialised centre gets 403 — NOT a fabricated
+    dashboard under a default/demo ('hallett'/'allie') lab. The scoping-leak fix
+    keys on the centre existing, so there is no default-lab-mgmt fallback."""
+    from wigamig.core import centre_init as CI
+    CI.init_centre(name="Western QA", institution="U", founding_mayor="@tbrowne5",
+                   write_sentinel=False)
     lab_dir = _seed_lab_mgmt(tmp_path, lab_id="yxia_lab", pi="yxia266",
                              members=[("yxia266", "pi")])
     registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
     monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
     client = TestClient(create_app())
+    # Arbitrary netname → refused, even though a demo lab-mgmt is the default.
     res = client.get("/api/dashboard?user=totally_made_up_netname")
     assert res.status_code == 403
     assert "not registered" in res.json()["detail"].lower()
+    # A demo-lab member who ISN'T in the centre registry is ALSO refused (no
+    # fallback to the default lab-mgmt).
+    assert client.get("/api/dashboard?user=allie").status_code == 403
 
 
 # ---------------------------------------------------------------------------

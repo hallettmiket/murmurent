@@ -575,21 +575,21 @@ def create_app() -> FastAPI:
         # the default (single-lab install) when the registry doesn't claim
         # this handle.
         from ..core import registrar as _registrar
+        from ..core import centre_init as _ci_gate
         from ..core.repo import use_lab_mgmt_root
         match = _registrar.lab_mgmt_path_for_handle(handle)
-        # SCOPING GATE: on a multi-group centre, a handle that belongs to NO
-        # registered group and is not a registrar has no dashboard here. Without
-        # this, an unknown netname fell through to the default lab-mgmt (and a
-        # hardcoded "hallett" lab name) and was shown a real lab's dashboard — a
-        # cross-centre data-leak. Only fires when a centre registry with groups
-        # exists; legacy single-lab installs (no registry) fall through as before.
+        # SCOPING GATE: in ANY initialised centre, the ONLY valid identities are
+        # those the centre registry claims (a member/PI/leader of a registered
+        # group) or a registrar. A netname that isn't claimed gets NO dashboard —
+        # there is no fallback to a default/demo lab-mgmt (which used to leak an
+        # unknown netname into a stale 'hallett'/'allie' lab). Legacy installs
+        # with NO centre at all (no centre.md) still fall through as before.
         if match is None and not _registrar.is_registrar(handle):
             try:
-                _reg_now = _registrar.read_registry()
-                _has_groups = bool(_reg_now.labs or _reg_now.cores)
+                _centre_live = _ci_gate.is_initialised()
             except Exception:
-                _has_groups = False
-            if _has_groups:
+                _centre_live = False
+            if _centre_live:
                 raise HTTPException(
                     status_code=403,
                     detail=(f"@{handle.lstrip('@')} is not registered in this centre. "
