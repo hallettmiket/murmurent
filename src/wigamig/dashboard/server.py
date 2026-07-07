@@ -556,6 +556,19 @@ def create_app() -> FastAPI:
                     "No user resolved. Set $WIGAMIG_USER or pass ?user=<handle>."
                 ),
             )
+        # NETNAME ENFORCEMENT: if THIS machine has an imported identity card, the
+        # signed-in netname must match its owner. Changing ~/.wigamig/user to an
+        # arbitrary netname must NOT grant access — wigamig refuses.
+        from ..core import identity_card as _idcard
+        _owner = _idcard.machine_netname()
+        if _owner and handle.lstrip("@").lower() != _owner:
+            raise HTTPException(
+                status_code=403,
+                detail=(f"This machine is registered to @{_owner}. You signed in as "
+                        f"@{handle.lstrip('@')} — access refused. Restore "
+                        "~/.wigamig/user, or import your own identity card "
+                        "(`wigamig identity-import`)."),
+            )
         # Cross-lab scoping: look up which lab this handle belongs to via the
         # registrar registry and point lab_mgmt_repo_root() at that lab's
         # lab-mgmt repo for the duration of the request. Falls through to
