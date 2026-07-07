@@ -7030,11 +7030,18 @@ def create_app() -> FastAPI:
 
 
 def _register_static_alias(app: FastAPI, url_name: str, file_path: Path) -> None:
-    """Register ``GET /<url_name>`` to serve ``file_path`` (closure-safe)."""
+    """Register ``GET /<url_name>`` to serve ``file_path`` (closure-safe).
+
+    Served ``no-cache, must-revalidate`` so the browser re-fetches the JSX on
+    every reload — edits to the dashboard show up on a normal refresh instead of
+    requiring a hard reload. FileResponse still sets Last-Modified/ETag, so an
+    unchanged file returns a cheap 304.
+    """
 
     @app.get(f"/{url_name}", include_in_schema=False)
     def _serve(_path: str = file_path.as_posix()) -> FileResponse:
-        return FileResponse(_path, media_type="text/babel")
+        return FileResponse(_path, media_type="text/babel",
+                            headers={"Cache-Control": "no-cache, must-revalidate"})
 
 
 # Module-level app for ``uvicorn wigamig.dashboard.server:app``.
