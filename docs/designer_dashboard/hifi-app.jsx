@@ -244,8 +244,18 @@ function CmdBar({ query, setQuery }) {
   // role badge below the search is informational (it reflects the lens
   // the user picked at sign-in).
   const persona = window.DATA.persona || "member";
+  // A PI (or a designated settings-admin) can edit the lab's parameters. This
+  // top-bar button is a copy of the footer "⚙ lab" control so the PI can reach
+  // Lab settings without scrolling — setting the lab parameters is a first job.
+  const _m = window.DATA.member || {};
+  const _ls = window.DATA.lab_settings || {};
+  const _myHandle = (_m.handle || "").toLowerCase();
+  const canEditLab = persona === "pi"
+    || (_ls.admins || []).map(h => h.toLowerCase()).includes(_myHandle);
+  const [showLabTop, setShowLabTop] = useState(false);
   return (
     <div className="cmdbar">
+      {showLabTop && <LabSettingsModal onClose={() => setShowLabTop(false)} />}
       <div className="home">wigamig <small>v1.0.0</small></div>
       <div className="search">
         <span className="mono muted" style={{fontSize:12}}>›</span>
@@ -256,6 +266,21 @@ function CmdBar({ query, setQuery }) {
         />
         <K>⌘K</K>
       </div>
+      {canEditLab && (
+        <button
+          type="button"
+          onClick={() => setShowLabTop(true)}
+          title="Lab settings — set your group's parameters (PI / admin)"
+          style={{
+            marginLeft: 10, fontFamily: "var(--mono)", fontSize: 11,
+            letterSpacing: 1, textTransform: "uppercase",
+            color: "var(--paper)", background: "var(--purple)",
+            border: "1px solid var(--purple)", borderRadius: 2,
+            padding: "3px 10px", cursor: "pointer", fontWeight: 600,
+          }}>
+          ⚙ Lab settings
+        </button>
+      )}
       <div className="persona-badge" title={
         persona === "pi"
           ? "You are the lab PI per lab.md (see <lab-mgmt>/lab.md)."
@@ -7137,9 +7162,9 @@ function GitProvidersEditor({ value, onChange }) {
                      onChange={(e) => update(i, "target", e.target.value)} />
             </div>
             <div style={{flex:"1 1 160px", minWidth:140}}>
-              <div style={labelStyle}>label (optional)</div>
+              <div style={labelStyle}>display name (optional)</div>
               <input style={inputStyle} value={p.label || ""}
-                     placeholder="GitHub (hallettmiket)"
+                     placeholder="e.g. Lab GitHub"
                      onChange={(e) => update(i, "label", e.target.value)} />
             </div>
             <div style={{display:"flex", alignItems:"flex-end"}}>
@@ -7322,15 +7347,15 @@ function LabSettingsModal({ onClose }) {
                  placeholder="https://mikehallett.science" />
         </div>
 
-        {/* 2 · Lab parameters */}
+        {/* 2 · Members with administrative privileges */}
         <div style={sectionStyle}>
-          <h4 style={sectionHeader}>Lab parameters</h4>
-          <div style={labelStyle}>settings admins — handles with edit rights (comma-separated)</div>
+          <h4 style={sectionHeader}>Members with administrative privileges</h4>
+          <div style={labelStyle}>handles (comma-separated)</div>
           <input style={inputStyle} value={form.admins} onChange={update("admins")}
                  placeholder="e.g. jsmith, admin_asst" />
           <div style={{fontSize:11, color:"var(--muted)", marginTop:4, lineHeight:1.5}}>
-            The PI always has edit rights; add handles here to let others change
-            these settings.
+            The PI always has edit rights; add handles here to let those members
+            change these lab settings too.
           </div>
         </div>
 
@@ -7339,7 +7364,9 @@ function LabSettingsModal({ onClose }) {
           <h4 style={sectionHeader}>Git provider</h4>
           <div style={{fontSize:11, color:"var(--muted)", marginTop:3, marginBottom:6, lineHeight:1.5}}>
             The git origin servers this lab uses. Each project picks one; each
-            member registers a username per provider in Member Profile.
+            member registers a username per provider in Member Profile. The
+            <em> display name</em> is just a friendly label shown in that
+            picker — leave it blank to fall back to the id.
           </div>
           <GitProvidersEditor
             value={form.git_providers}
@@ -7353,14 +7380,15 @@ function LabSettingsModal({ onClose }) {
                 Lab GitHub: <a href={`https://github.com/${githubOrg}`} target="_blank" rel="noopener">https://github.com/{githubOrg}</a>
               </div>
             : null}
-          <div style={labelStyle}>local bare-repo subpath (only for a local-bare provider)</div>
+          <div style={labelStyle}>location for the group's repos on the lab server</div>
           <input style={inputStyle} value={form.git_repos_subpath} onChange={update("git_repos_subpath")}
                  placeholder="repos" />
-          {filesBase
-            ? <div style={{fontSize:11, color:"var(--muted)", marginTop:4}}>
-                Resolves to <code className="mono">{_underLabBase(filesBase, subpath)}</code>.
-              </div>
-            : null}
+          <div style={{fontSize:11, color:"var(--muted)", marginTop:4, lineHeight:1.5}}>
+            Only used if you host git on your own lab server instead of GitHub.
+            {filesBase
+              ? <> Resolves to <code className="mono">{_underLabBase(filesBase, subpath)}</code>.</>
+              : null}
+          </div>
         </div>
 
         {/* 4 · Storage servers */}
