@@ -208,24 +208,16 @@ def _today_block(today_d: _dt.date) -> C.TodayBlock:
     )
 
 
-# Lab-default contact + location: applied to the PI and used as a fallback
-# for any member that hasn't overridden the field on their own profile.
-# These mirror the values that used to be hardcoded in ``FooterMeta``.
-_LAB_DEFAULT_CONTACT = C.MemberContact(
-    email="michael.hallett@uwo.ca",
-    orcid="0000-0001-6738-6786",
-    bluesky="@hallettmiket.bsky.social",
-    github="hallettmiket",
-    osf="osf.io/jz64u",
-)
-_LAB_DEFAULT_LOCATION = C.MemberLocation(
-    office="MSB-360",
-    dry_lab="MSB-309A",
-    wet_labs="M359A & M433",
-    address="1151 Richmond St",
-    city="London, ON N6A 3K7, Canada",
-    department="Schulich School of Dentristy and Medicine · Department of Biochemistry",
-)
+# Lab-default contact + location: a fallback for any field a member hasn't set
+# on their own profile. Deliberately EMPTY — the footer must not invent contact
+# details a member never entered (it used to hardcode one specific PI's real
+# ORCID / address / handles, which then leaked onto every install and every
+# member). Blank here means the footer shows only what the member fills in via
+# their Profile, so the footer and the Profile modal agree. A lab that wants
+# shared defaults (e.g. a common building address) should declare them on its
+# own record and have this read from there — not from source.
+_LAB_DEFAULT_CONTACT = C.MemberContact()
+_LAB_DEFAULT_LOCATION = C.MemberLocation()
 
 
 def _identity(handle: str, full_name: str | None, role: str) -> C.IdentityBlock:
