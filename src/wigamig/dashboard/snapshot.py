@@ -1940,8 +1940,13 @@ def _parse_markdown_blocks(body: str):
             i += 1  # skip closing ```
             blocks.append(C.NbCode(kind="code", text="\n".join(buf)))
             continue
-        if stripped.startswith("#### "):
-            blocks.append(C.NbHeading(kind="h4", text=stripped[5:]))
+        if stripped.startswith("#"):
+            # Any ATX heading (#, ##, ###, #### …). The block model only
+            # carries an h4 kind, so every level collapses to it — but we
+            # must still consume the line here. Routing non-h4 headings to
+            # the paragraph branch below would leave ``i`` unadvanced (that
+            # branch refuses to consume ``#``-led lines), spinning forever.
+            blocks.append(C.NbHeading(kind="h4", text=stripped.lstrip("#").strip()))
             i += 1
             continue
         if stripped.startswith(("- [ ]", "- [x]", "- [X]")):
