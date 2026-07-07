@@ -1403,6 +1403,7 @@ from .commands.centre_cmd import onboard_check as _onboard_check
 from .commands.centre_cmd import centre_hub_publish as _centre_hub_publish
 from .commands.centre_cmd import group_setup as _group_setup
 from .commands.centre_cmd import group_reconcile_cmd as _group_reconcile_cmd
+from .commands.centre_cmd import group_remove_member as _group_remove_member
 from .commands.centre_cmd import group_init_toolkit as _group_init_toolkit
 from .commands.centre_cmd import join_request_group as _join_request_group
 cli.add_command(_centre_init_cmd)
@@ -1415,6 +1416,7 @@ cli.add_command(_onboard_check)
 cli.add_command(_centre_hub_publish)
 cli.add_command(_group_setup)
 cli.add_command(_group_reconcile_cmd)
+cli.add_command(_group_remove_member)
 cli.add_command(_group_init_toolkit)
 cli.add_command(_join_request_group)
 

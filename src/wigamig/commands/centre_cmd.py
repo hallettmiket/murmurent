@@ -872,6 +872,39 @@ def group_reconcile_cmd(group: str, apply: bool) -> None:
         click.echo("\n  Re-run with --apply to add the GitHub collaborators.")
 
 
+@click.command("group-remove-member",
+                help="Remove a member from a group (the PI runs this): kick them "
+                     "from the group's Slack channel, remove them as a GitHub "
+                     "collaborator on the group's repo, and mark them removed in "
+                     "the roster. The inverse of onboarding a member.")
+@click.argument("group")
+@click.argument("handle")
+@click.option("--delete", is_flag=True,
+              help="Delete the member's roster file instead of marking it "
+                   "'status: removed' (the default keeps it for the audit trail).")
+@click.option("--yes", is_flag=True,
+              help="Skip the confirmation prompt.")
+def group_remove_member(group: str, handle: str, delete: bool, yes: bool) -> None:
+    from ..core import centre_provision as _cp
+    from ..core import registrar as _R
+    if not _R.group_exists(group):
+        raise click.ClickException(f"no lab or core named {group!r}.")
+    norm = handle.lstrip("@")
+    info = _R.read_group_member(group, norm)
+    if info is None:
+        raise click.ClickException(f"@{norm} is not a member of {group}.")
+    if not yes:
+        click.confirm(
+            f"Remove @{norm} ({info['email'] or 'no email'}) from {group}? "
+            "This kicks them from the Slack channel and the GitHub repo",
+            abort=True)
+    probes = _cp.deprovision_member_from_group(group, handle=norm, delete=delete)
+    click.echo(f"Removing @{norm} from {group}:")
+    for p in probes:
+        icon = "✓" if p.status == "ok" else ("!" if p.status == "warn" else "✗")
+        click.echo(f"  [{icon}] {p.name}: {p.detail}")
+
+
 _TOOLKIT_README = """# {group} toolkit — group agents + governance
 
 This is **{group}**'s private toolkit. It holds the group's own Claude Code
