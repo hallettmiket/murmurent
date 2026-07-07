@@ -218,6 +218,21 @@ def test_member_without_overrides_is_empty(world):
     assert resp.member.location.department is None
 
 
+def test_member_email_falls_back_to_top_level(world, tmp_path):
+    """A member whose file has only a top-level ``email:`` (how the join flow
+    writes it) sees that email in BOTH the footer and the Profile modal — it is
+    not blank, and they don't have to re-type it."""
+    (tmp_path / "lab-mgmt" / "members" / "newbie.md").write_text(
+        "---\nhandle: '@newbie'\nfull_name: Newbie\nrole: member\n"
+        "status: active\nlab: hallett\nemail: newbie@uwo.ca\n---\n",
+        encoding="utf-8")
+    resp = snapshot.build_response("newbie", today=_dt.date(2026, 5, 8))
+    assert resp.member.contact.email == "newbie@uwo.ca"      # footer
+    assert resp.member_settings.email == "newbie@uwo.ca"     # Profile modal
+    # No contact block was set, so everything else stays blank.
+    assert resp.member.contact.orcid is None
+
+
 def test_pi_identity_reads_only_the_pi_own_profile(world):
     """The PI block shows the PI's *own* frontmatter (mhallet set email + orcid
     + office in the fixture); nothing comes from a hardcoded default."""

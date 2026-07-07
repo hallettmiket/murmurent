@@ -229,7 +229,8 @@ def _identity(handle: str, full_name: str | None, role: str) -> C.IdentityBlock:
         name=full_name or profile.get("full_name") or handle,
         role=role,
         lab=str(profile.get("lab") or "hallett"),
-        contact=_merge_contact(profile.get("contact")),
+        contact=_merge_contact(profile.get("contact"),
+                               fallback_email=str(profile.get("email") or "")),
         location=_merge_location(profile.get("location")),
         is_active=is_active,
     )
@@ -243,7 +244,8 @@ def _pi_identity() -> C.IdentityBlock:
         name=str(full_name) if full_name else _pi_handle(),
         role="Principal Investigator",
         lab=str(profile.get("lab") or "hallett"),
-        contact=_merge_contact(profile.get("contact")),
+        contact=_merge_contact(profile.get("contact"),
+                               fallback_email=str(profile.get("email") or "")),
         location=_merge_location(profile.get("location")),
     )
 
@@ -261,13 +263,20 @@ def _load_member_profile(handle: str) -> dict:
         return {}
 
 
-def _merge_contact(meta: dict | None) -> C.MemberContact:
-    """Merge a member's ``contact:`` frontmatter on top of the lab defaults."""
+def _merge_contact(meta: dict | None, *, fallback_email: str = "") -> C.MemberContact:
+    """Merge a member's ``contact:`` frontmatter on top of the lab defaults.
+
+    ``fallback_email`` surfaces the member's top-level ``email:`` (captured at
+    join time) when they haven't set ``contact.email`` themselves — so a new
+    member's known email shows in the footer + Profile instead of blank.
+    """
     base = _LAB_DEFAULT_CONTACT.model_dump()
     if isinstance(meta, dict):
         for key in C.MemberContact.model_fields:
             if meta.get(key):
                 base[key] = str(meta[key])
+    if not base.get("email") and fallback_email:
+        base["email"] = str(fallback_email)
     return C.MemberContact(**base)
 
 
@@ -331,7 +340,7 @@ def _member_settings(profile: dict) -> C.MemberSettings:
         obsidian_vault_name=_s(vault_name),
         notebook_subfolder=str(notebook_subfolder),
         oracle_subfolder=str(oracle_subfolder),
-        email=_s(contact_d.get("email")),
+        email=_s(contact_d.get("email") or profile.get("email")),
         orcid=_s(contact_d.get("orcid")),
         bluesky=_s(contact_d.get("bluesky")),
         github=_s(contact_d.get("github")),
