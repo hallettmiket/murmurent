@@ -1,0 +1,177 @@
+"""
+Purpose: card ISSUANCE + import — the admin-registrar side of PI onboarding and
+the PI/member side of accepting a card. Ties together:
+
+  - ``centre_root`` (the centre CA root key),
+  - ``idcert`` (signing, proof-of-possession, chain verification), and
+  - ``identity_card`` (role derivation from the registry + local materialization
+    of a scoped registry so the dashboard resolver works).
+
+The bottom-up PI flow this implements:
+
+  1. PI runs ``wigamig enroll`` → a proof-of-possession request (signed by their
+     machine key, carrying their public key). They send it to the mayor.
+  2. Mayor runs ``issue_pi_card`` → verifies the PoP, confirms the handle is a
+     registered PI/leader, and signs a PI card with the **centre root key**.
+  3. PI runs ``verify_and_import_pi_card`` → checks the card chains to the pinned
+     centre root, then materializes their role locally.
+
+Trust boundary: a card is verified against the **pinned** centre root
+(``idcert.verify_or_pin_root`` / TOFU). The pin must come from the centre's
+*published* signing recipient, confirmed out-of-band — never from the same
+channel that delivered the card. Revocation (the fail-closed CRL) bites at
+*access* time (the dashboard, Phase 5), not at import — holding a revoked card
+grants nothing on its own.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from . import centre_init as _ci
+from . import centre_root as _cr
+from . import idcert as _cert
+from . import identity_card as _ic
+from . import idkeys as _k
+
+
+class IssuanceError(RuntimeError):
+    """Issuance or import of a signed card failed."""
+
+
+def _home() -> Path:
+    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+
+
+def cards_dir() -> Path:
+    return _home() / "cards"
+
+
+def _safe(name: str) -> str:
+    return "".join(c if (c.isalnum() or c in "-_") else "_" for c in str(name or ""))
+
+
+# ---------------------------------------------------------------------------
+# Mayor / admin-registrar side: issue a signed PI card
+# ---------------------------------------------------------------------------
+
+def issue_pi_card(handle: str, *, enrollment: dict, actor: str = "",
+                  env: dict | None = None, issued_at=None,
+                  ttl_days: int = _cert.DEFAULT_TTL_DAYS,
+                  expected_nonce: str | None = None) -> dict:
+    """Issue a centre-root-signed PI card for a registered PI/leader.
+
+    ``enrollment`` is the PI's proof-of-possession request (from ``wigamig
+    enroll``); its embedded public key is what gets bound into the card, and its
+    self-signature is verified first so we only ever certify a key the PI proved
+    they hold. Requires a centre, the centre root key, and ``handle`` resolving
+    to a ``lab_pi`` / ``core_leader`` in the registry."""
+    centre = _ci.read_centre(env=env)
+    if centre is None:
+        raise IssuanceError("no centre initialised; run `wigamig centre-init` first")
+    if not _cr.have_root_key():
+        raise IssuanceError("no centre root key; run `wigamig centre-root-keygen` first")
+
+    pubkey = (enrollment.get("payload") or {}).get("pubkey") if isinstance(enrollment, dict) else None
+    if not pubkey:
+        raise IssuanceError("enrollment request has no public key")
+    if not _cert.verify_enrollment(enrollment, expected_nonce=expected_nonce):
+        raise IssuanceError("proof-of-possession failed (bad enrollment signature/nonce)")
+
+    # Derive the PI's role(s) from the registry (reuses the scoped-card logic).
+    try:
+        scoped = _ic.build_card(handle, env=env, issued_by=actor, issued_at=issued_at)
+    except ValueError as exc:
+        raise IssuanceError(str(exc)) from exc
+    kinds = {r.get("kind") for r in scoped["roles"]}
+    if not (kinds & {"lab_pi", "core_leader"}):
+        raise IssuanceError(
+            f"@{scoped['netname']} is not a PI or core leader in this centre "
+            "(a PI card is only for lab PIs / core leaders)")
+
+    root = _cr.load_root_private()
+    return _cert.issue_pi_card(
+        handle=scoped["netname"], pi_pubkey=pubkey,
+        centre=centre.unique_name or centre.install_id,
+        root_priv=root, issuer_handle=actor or centre.founding_mayor,
+        roles=scoped["roles"], issued_at=issued_at, ttl_days=ttl_days)
+
+
+# ---------------------------------------------------------------------------
+# PI side: enroll (prove key possession) + verify-and-import
+# ---------------------------------------------------------------------------
+
+def make_enrollment(handle: str, *, nonce: str | None = None,
+                    group: str = "", env: dict | None = None) -> dict:
+    """Build this machine's proof-of-possession enrollment request. Requires a
+    local keypair (``wigamig identity-init`` / first-run auto-mint)."""
+    if not _k.have_keys():
+        raise IssuanceError("no local keypair; run `wigamig identity-init` first")
+    centre = _ci.read_centre(env=env)
+    centre_name = (centre.unique_name or centre.install_id) if centre else ""
+    priv = _k.load_private()
+    return _cert.make_enrollment_request(
+        handle, priv=priv, nonce=nonce or os.urandom(8).hex(),
+        centre=centre_name, group=group)
+
+
+def _scoped_from_signed(payload: dict) -> dict:
+    """Rebuild the (unsigned) scoped-card shape ``identity_card.import_card``
+    expects from an *authenticated* signed-card payload."""
+    return {
+        "version": _ic.CARD_VERSION,
+        "netname": str(payload["subject"]["handle"]).lstrip("@"),
+        "centre": payload.get("centre", ""),
+        "roles": payload.get("roles", []),
+        "issued_by": (payload.get("issuer") or {}).get("handle", ""),
+        "issued_at": payload.get("issued_at", ""),
+    }
+
+
+def verify_and_import_pi_card(card, *, trust_root: str | None = None,
+                              env: dict | None = None, now=None,
+                              require_crl: bool = False, crl=None) -> tuple:
+    """PI side: verify a signed PI card is authentic + for this centre, then
+    materialize the role locally so the dashboard resolves it. Returns
+    ``(Verdict, actions)``.
+
+    ``trust_root`` (the centre's published ``ed25519:`` signing recipient) is
+    pinned on first import (TOFU) — a later mismatch fails closed. Import checks
+    authenticity (signature + chain + expiry + pin), not revocation; the
+    fail-closed CRL check runs at access time."""
+    card = _cert.loads(card) if isinstance(card, str) else card
+    payload = card.get("payload") or {}
+    centre_name = payload.get("centre") or ""
+    if payload.get("kind") != "pi":
+        raise IssuanceError("verify_and_import_pi_card: not a PI card")
+
+    if trust_root:
+        ok, reason = _cert.verify_or_pin_root(centre_name, trust_root)
+        if not ok:
+            raise IssuanceError(f"trust anchor: {reason}")
+    pinned = _cert.load_pinned_root(centre_name)
+    if pinned is None:
+        raise IssuanceError(
+            f"no pinned trust anchor for centre '{centre_name}'. Pass --trust-root "
+            "with the centre's published signing recipient (confirm its "
+            "fingerprint out-of-band first).")
+
+    v = _cert.verify_pi_card(card, root_pub=pinned, now=now, crl=crl,
+                             centre=centre_name, require_crl=require_crl)
+    if not v.ok:
+        raise IssuanceError(f"card rejected: {v.reason}")
+
+    actions = _ic.import_card(_scoped_from_signed(payload), env=env)
+    # Keep the signed card too — the crypto proof for later access-time checks.
+    d = cards_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{_safe(centre_name)}_pi.json").write_text(_cert.dumps(card), encoding="utf-8")
+    actions.append(f"stored signed PI card ({cards_dir()})")
+    return v, actions
+
+
+__all__ = [
+    "IssuanceError", "issue_pi_card", "make_enrollment",
+    "verify_and_import_pi_card", "cards_dir",
+]
