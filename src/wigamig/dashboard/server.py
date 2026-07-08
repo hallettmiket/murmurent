@@ -569,6 +569,23 @@ def create_app() -> FastAPI:
                         "~/.wigamig/user, or import your own identity card "
                         "(`wigamig identity-import`)."),
             )
+        # CARD VERIFICATION: if this machine holds a signed identity card, it must
+        # still verify — chain to the pinned centre root, not expired, not revoked
+        # (when a CRL is available), not tampered. A bad card is refused even when
+        # ~/.wigamig/user matches (identity attestation; live authz stays on the
+        # registry below). No card / no anchor → falls through untouched.
+        try:
+            from ..core import issuance as _iss
+            _cstatus, _creason = _iss.verify_local_identity()
+        except Exception:
+            _cstatus, _creason = ("no_card", "")
+        if _cstatus == "reject":
+            raise HTTPException(
+                status_code=403,
+                detail=(f"Your wigamig identity card failed verification "
+                        f"({_creason}). It may be expired or revoked — ask your "
+                        "PI/mayor to re-issue it (`wigamig import-card`)."),
+            )
         # Cross-lab scoping: look up which lab this handle belongs to via the
         # registrar registry and point lab_mgmt_repo_root() at that lab's
         # lab-mgmt repo for the duration of the request. Falls through to
