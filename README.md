@@ -132,4 +132,4 @@ uv run pytest
 
 ## Authors
 
-Mike Hallett &mdash; hallett.mike.t@gmail.com
+Mike Hallett &mdash; michael.hallett@example.edu
