@@ -17,19 +17,27 @@ new institution stands it up by having one person (the **mayor**) bootstrap a
 
 ## Join an existing wigamig
 
-**Most people start here.** If your lab, centre, or institution already uses
-wigamig and you simply want to join, you do **not** install any software, and
-you do **not** need to know where anything is hosted.
+**Most people start here.** Membership in wigamig is a **signed certificate**,
+not just a name in a list — so joining means getting a card cryptographically
+issued to your key. Which path you take depends on whether you're starting a
+group or joining one.
+
+**Starting a lab or core (you're the PI):**
 
 1. Open the public directory:
    **[github.com/hallettmiket/wigamig_public](https://github.com/hallettmiket/wigamig_public)**
 2. Find your institution and note its **registrar email**.
-3. **Email the registrar** — say who you are (your netname is fine), your
-   institution, and which lab or core you'd like to join.
+3. **Email the registrar** an encrypted join request (the one-line
+   `wigamig-join.sh` script in the hub does this for you). Nothing about you is
+   posted publicly — the request is encrypted to the registrar's key.
 
-Your request goes **straight to the registrar, privately** — nothing about you
-is posted publicly (the directory collects nothing; that's why it has no form).
-The registrar replies and takes it from there.
+Once approved, the mayor issues you a signed **PI card**; you `wigamig
+import-card` it and you're set.
+
+**Joining an existing group (member):** you clone wigamig, mint your key on first
+run, prove you hold it (`wigamig enroll`), and your **PI** issues you a signed
+member card. The full step-by-step for every role — member, PI, mayor — is in
+**[`docs/identity.md`](docs/identity.md)**.
 
 Everything below is only for people **setting up** wigamig at a new institution
 (administrators) or **building** wigamig itself (developers).
@@ -111,16 +119,22 @@ short:
    you ever need to (re)create it: `wigamig centre-age-keygen`. The public key
    is stamped on your centre profile.
 
-2. **Get listed on the public hub** so members can find you. Nothing is posted
+2. **Root signing key (the identity CA).** Run **`wigamig centre-root-keygen`** —
+   this creates the key that signs PI cards and the revocation list, and pins it
+   as your trust anchor. **Back it up offline** (losing it or leaking it is a
+   centre-level event): see [`docs/centre_root_key.md`](docs/centre_root_key.md).
+   How membership cards work end-to-end: [`docs/identity.md`](docs/identity.md).
+
+3. **Get listed on the public hub** so members can find you. Nothing is posted
    to GitHub automatically. Run **`wigamig centre-hub-publish`** — it clones the
    [`wigamig_public`](https://github.com/hallettmiket/wigamig_public) hub (if you
-   don't already have it) and writes your row (`Institution (Centre) <TAB>
-   join-email <TAB> age-public-key`) into `join/directory.tsv` and the README
-   table for you. It then prints a `git push` for you to run — you commit and
-   push yourself, so publishing stays a deliberate act. (Manual alternative +
-   details: [`docs/connect_to_hub.md`](docs/connect_to_hub.md).)
+   don't already have it), writes your directory row + README table entry, and
+   (once the root key exists) publishes your **signing key + revocation list** as
+   machine-readable files so members can verify identity cards. It then prints a
+   `git push` for you to run — you commit and push yourself, so publishing stays a
+   deliberate act. (Manual alternative: [`docs/connect_to_hub.md`](docs/connect_to_hub.md).)
 
-3. **Set up Slack** (the centre's communication fabric). You create a Slack
+4. **Set up Slack** (the centre's communication fabric). You create a Slack
    workspace named `wigamig-<unique-name>`, add a bot token, and smoke-test it
    with `wigamig centre-slack-smoke`. Full guide:
    [`docs/slack_setup.md`](docs/slack_setup.md).

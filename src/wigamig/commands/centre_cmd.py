@@ -823,6 +823,38 @@ def import_signed_card_cmd(card_file: str, trust_root: str) -> None:
     click.echo("\nRestart your wigamig dashboard; the login will now show your role.")
 
 
+@click.command("centre-pin",
+                help="MEMBER: fetch a centre's published signing key + CRL from a "
+                     "local wigamig_public checkout and pin it as your trust "
+                     "anchor. Confirm the fingerprint out-of-band with "
+                     "--fingerprint. After this your dashboard enforces card "
+                     "revocation fully (not just expiry).")
+@click.argument("unique_name")
+@click.option("--hub-dir", type=click.Path(file_okay=False), default=None,
+              help="Your wigamig_public checkout (default: ~/repos/wigamig_public).")
+@click.option("--fingerprint", default="",
+              help="Expected root fingerprint (confirm out-of-band before pinning).")
+def centre_pin(unique_name: str, hub_dir: str | None, fingerprint: str) -> None:
+    from ..core import hub_fetch as _hf
+    from pathlib import Path as _P
+    try:
+        out = _hf.pin_from_hub(unique_name, hub_dir=_P(hub_dir) if hub_dir else None,
+                               expect_fingerprint=fingerprint or None)
+    except _hf.HubFetchError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"✓ pinned centre '{unique_name}' root — fingerprint:\n    {out['fingerprint']}")
+    click.echo(f"  {out['pinned']}")
+    if not fingerprint:
+        click.echo("  ! trust-on-first-use — confirm this fingerprint with the mayor "
+                   "out-of-band, then re-run with --fingerprint to be sure.")
+    if out["crl_imported"]:
+        click.echo(f"  imported CRL (serial {out['crl_serial']}) — revocation now "
+                   "enforced on your dashboard.")
+    else:
+        click.echo("  no CRL published yet (nothing revoked, or the mayor hasn't "
+                   "published one).")
+
+
 @click.command("revoke",
                 help="MAYOR: revoke an identity card — adds it to the centre CRL "
                      "and republishes. Identify the card by --handle (looked up in "
@@ -1035,6 +1067,26 @@ def centre_hub_publish(hub_dir: str | None, remote: str | None, submit: bool) ->
     click.echo(f"directory.tsv: {res.directory_action}")
     click.echo(f"README table:  {res.readme_action}")
     click.echo(f"\nYour directory row:\n    {res.row}")
+
+    # Phase 6: machine-readable trust material — the self-signed centre entry
+    # (age + signing pubkeys) and the signed CRL, so members can pin the anchor
+    # and enforce revocation. Requires the centre root key.
+    from ..core import centre_root as _cr
+    from ..core import revocation as _rev2
+    extra_files: list[str] = []
+    _unique = prof.unique_name or prof.install_id
+    if _cr.have_root_key():
+        entry = _cr.build_installation_entry(
+            unique_name=_unique, institution=prof.institution, name=prof.name,
+            join_email=prof.join_email, age_recipient=prof.age_recipient)
+        crl = _rev2.current_crl(_unique)
+        extra_files = _hp.write_centre_artifacts(res.hub_dir, unique_name=_unique,
+                                                 entry=entry, crl=crl)
+        click.echo(f"trust material: wrote {', '.join(extra_files)}")
+    else:
+        click.echo("trust material: skipped (no centre root key — run "
+                   "`wigamig centre-root-keygen` to publish your signing key + CRL "
+                   "so members can verify identity cards)")
     both_unchanged = (res.directory_action == "unchanged"
                       and res.readme_action == "unchanged")
     # NOTE: "unchanged" means the FILES already carry your row locally — NOT
@@ -1063,7 +1115,9 @@ def centre_hub_publish(hub_dir: str | None, remote: str | None, submit: bool) ->
             click.echo("\nYou have write access. Publish with:")
             click.echo("    wigamig centre-hub-publish --submit      # commits + pushes for you")
             click.echo("  …or by hand:")
-            click.echo(f"    cd {res.hub_dir} && git add join/directory.tsv README.md "
+            _byhand = "join/directory.tsv README.md" + (
+                " centres/ crl/" if extra_files else "")
+            click.echo(f"    cd {res.hub_dir} && git add {_byhand} "
                        f'&& git commit -m "{message}" && git push')
         else:
             click.echo("\nYou don't own the hub, so listing goes in as a pull request "
@@ -1079,18 +1133,21 @@ def centre_hub_publish(hub_dir: str | None, remote: str | None, submit: bool) ->
             "--submit needs the GitHub CLI to detect access and open a PR. "
             "Install `gh` and run `gh auth login`, then retry. (Or publish by "
             f"hand from {res.hub_dir}.)")
+    _files = list(_hp._FILES) + extra_files
     try:
         if push_ok:
-            out = _hp.submit_direct(res.hub_dir, message)
+            out = _hp.submit_direct(res.hub_dir, message, files=_files)
             click.echo(f"\n✓ {out.detail} — you're listed on the public hub.")
         else:
             branch = f"list-{(prof.unique_name or 'centre')}"
             title = f"directory: list {prof.name} ({prof.institution})"
             body = ("Adds a wigamig_public directory row for this centre "
-                    "(registrar contact + age public key). Opened by "
-                    "`wigamig centre-hub-publish`. No member data is included.")
+                    "(registrar contact + age public key" +
+                    (", signing key + CRL" if extra_files else "") +
+                    "). Opened by `wigamig centre-hub-publish`. No member data "
+                    "is included.")
             out = _hp.submit_pr(res.hub_dir, slug, branch=branch, message=message,
-                                title=title, body=body)
+                                title=title, body=body, files=_files)
             click.echo(f"\n✓ pull request opened: {out.detail}")
             click.echo("  The hub maintainer reviews + merges it; then you're listed.")
     except _hp.HubPublishError as exc:

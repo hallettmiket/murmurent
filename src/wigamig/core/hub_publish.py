@@ -18,6 +18,7 @@ Design notes
 
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 from dataclasses import dataclass
@@ -28,6 +29,42 @@ DEFAULT_HUB_REMOTE = "https://github.com/hallettmiket/wigamig_public.git"
 
 class HubPublishError(RuntimeError):
     """Raised for actionable hub-publish failures (bad state, clone error)."""
+
+
+def _safe(name: str) -> str:
+    return "".join(c if (c.isalnum() or c in "-_") else "_" for c in str(name or ""))
+
+
+# ---------------------------------------------------------------------------
+# Machine-readable trust material (phase 6): the self-signed centre entry
+# (age + signing pubkeys) and the signed CRL, so members can pin the anchor and
+# enforce revocation. The human README table stays as-is (for finding the email);
+# these JSON files are what verifiers actually consume.
+# ---------------------------------------------------------------------------
+
+def centre_entry_path(hub_dir: Path, unique_name: str) -> Path:
+    return Path(hub_dir) / "centres" / f"{_safe(unique_name)}.json"
+
+
+def crl_path(hub_dir: Path, unique_name: str) -> Path:
+    return Path(hub_dir) / "crl" / f"{_safe(unique_name)}.json"
+
+
+def write_centre_artifacts(hub_dir: Path, *, unique_name: str, entry: dict,
+                           crl: dict | None = None) -> list[str]:
+    """Write the self-signed centre entry (and CRL, if given) into the hub.
+    Returns the repo-relative paths written (for staging)."""
+    written: list[str] = []
+    ep = centre_entry_path(hub_dir, unique_name)
+    ep.parent.mkdir(parents=True, exist_ok=True)
+    ep.write_text(json.dumps(entry, indent=2), encoding="utf-8")
+    written.append(f"centres/{_safe(unique_name)}.json")
+    if crl is not None:
+        cp = crl_path(hub_dir, unique_name)
+        cp.parent.mkdir(parents=True, exist_ok=True)
+        cp.write_text(json.dumps(crl, indent=2), encoding="utf-8")
+        written.append(f"crl/{_safe(unique_name)}.json")
+    return written
 
 
 @dataclass
@@ -286,10 +323,12 @@ def gh_login(runner=subprocess.run) -> str | None:
 _FILES = ["join/directory.tsv", "README.md"]
 
 
-def submit_direct(hub_dir: Path, message: str, runner=subprocess.run) -> SubmitResult:
-    """Commit the two files and push to origin. For a mayor WITH write access."""
+def submit_direct(hub_dir: Path, message: str, *, files: list[str] | None = None,
+                  runner=subprocess.run) -> SubmitResult:
+    """Commit the listing files and push to origin. For a mayor WITH write access.
+    ``files`` overrides the default set (e.g. to include the trust artifacts)."""
     h = str(hub_dir)
-    _run(["git", "-C", h, "add", *_FILES], runner)
+    _run(["git", "-C", h, "add", *(files or _FILES)], runner)
     rc, out, err = _run(["git", "-C", h, "commit", "-m", message], runner)
     if rc != 0 and "nothing to commit" not in (out + err):
         raise HubPublishError(f"git commit failed: {(err or out).strip()}")
@@ -300,7 +339,8 @@ def submit_direct(hub_dir: Path, message: str, runner=subprocess.run) -> SubmitR
 
 
 def submit_pr(hub_dir: Path, slug: str, *, branch: str, message: str,
-              title: str, body: str, runner=subprocess.run) -> SubmitResult:
+              title: str, body: str, files: list[str] | None = None,
+              runner=subprocess.run) -> SubmitResult:
     """Fork the hub, push a branch to the fork, and open a PR against upstream.
 
     For a mayor WITHOUT write access — the standard contribution path. Idempotent:
@@ -318,7 +358,7 @@ def submit_pr(hub_dir: Path, slug: str, *, branch: str, message: str,
     rc, _, err = _run(["git", "-C", h, "checkout", "-B", branch], runner)
     if rc != 0:
         raise HubPublishError(f"could not create branch {branch}: {err.strip()}")
-    _run(["git", "-C", h, "add", *_FILES], runner)
+    _run(["git", "-C", h, "add", *(files or _FILES)], runner)
     rc, out, err = _run(["git", "-C", h, "commit", "-m", message], runner)
     if rc != 0 and "nothing to commit" not in (out + err):
         raise HubPublishError(f"git commit failed: {(err or out).strip()}")
