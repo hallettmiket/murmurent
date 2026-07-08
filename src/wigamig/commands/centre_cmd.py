@@ -684,6 +684,98 @@ def identity_import(card_file: str) -> None:
     click.echo("\nRestart your wigamig dashboard; the login will now show your role.")
 
 
+@click.command("enroll",
+                help="Produce a proof-of-possession enrollment request (proves "
+                     "you hold your key) to send to the mayor/PI so they can issue "
+                     "you a signed identity card. Requires a local keypair "
+                     "(`wigamig identity-init`).")
+@click.option("--nonce", default="", help="Challenge nonce (default: random).")
+@click.option("--group", default="", help="Group you're enrolling into (optional).")
+@click.option("--out", "out_file", type=click.Path(dir_okay=False), default=None,
+              help="Write the request to a file (default: print).")
+def enroll(nonce: str, group: str, out_file: str | None) -> None:
+    from ..core import issuance as _iss
+    from ..core import identity as _id
+    ident = _id.resolve(allow_unknown=True)
+    try:
+        req = _iss.make_enrollment(ident.at_handle, nonce=nonce or None, group=group)
+    except _iss.IssuanceError as exc:
+        raise click.ClickException(str(exc)) from exc
+    text = __import__("json").dumps(req, indent=2)
+    if out_file:
+        from pathlib import Path as _P
+        _P(out_file).write_text(text, encoding="utf-8")
+        click.echo(f"✓ wrote enrollment request for {ident.at_handle} to {out_file}")
+        click.echo("  Send it to your mayor; they run `wigamig issue-pi-card <file>`.")
+    else:
+        click.echo(text)
+
+
+@click.command("issue-pi-card",
+                help="MAYOR: issue a centre-root-signed PI card from a PI's "
+                     "enrollment request. Verifies proof-of-possession, confirms "
+                     "the handle is a registered PI/leader, and signs with the "
+                     "centre root key. Output is the signed card — send it to the "
+                     "PI to `wigamig import-card`.")
+@click.argument("enrollment_file")
+@click.option("--handle", default="", help="PI handle (default: from the enrollment).")
+@click.option("--actor", default="", help="Issuing mayor handle (audit).")
+@click.option("--out", "out_file", type=click.Path(dir_okay=False), default=None,
+              help="Write the signed card to a file (default: print).")
+def issue_pi_card_cmd(enrollment_file: str, handle: str, actor: str,
+                      out_file: str | None) -> None:
+    from ..core import issuance as _iss
+    import json as _json
+    from pathlib import Path as _P
+    if not actor:
+        actor = os.environ.get("WIGAMIG_USER", "")
+    try:
+        enrollment = _json.loads(_P(enrollment_file).expanduser().read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise click.ClickException(f"cannot read enrollment: {exc}") from exc
+    if not handle:
+        handle = (enrollment.get("payload") or {}).get("handle", "")
+    try:
+        card = _iss.issue_pi_card(handle, enrollment=enrollment, actor=actor)
+    except _iss.IssuanceError as exc:
+        raise click.ClickException(str(exc)) from exc
+    from ..core import idcert as _cert
+    text = _cert.dumps(card)
+    subj = card["payload"]["subject"]["handle"]
+    if out_file:
+        _P(out_file).write_text(text, encoding="utf-8")
+        click.echo(f"✓ signed PI card for {subj} → {out_file}")
+        click.echo("  Send it to them (with the centre's signing recipient so they "
+                   "can pin it); they run `wigamig import-card <file> --trust-root <pubkey>`.")
+    else:
+        click.echo(text)
+
+
+@click.command("import-card",
+                help="Import a SIGNED identity card you were issued. Verifies it "
+                     "chains to the centre root (pin it with --trust-root the first "
+                     "time — use the centre's published signing recipient, "
+                     "fingerprint confirmed out-of-band) and materializes your "
+                     "role locally.")
+@click.argument("card_file")
+@click.option("--trust-root", "trust_root", default="",
+              help="Centre signing recipient (ed25519:...) to pin on first import.")
+def import_signed_card_cmd(card_file: str, trust_root: str) -> None:
+    from ..core import issuance as _iss
+    import sys as _sys
+    text = _sys.stdin.read() if card_file == "-" else \
+        __import__("pathlib").Path(card_file).expanduser().read_text(encoding="utf-8")
+    try:
+        verdict, actions = _iss.verify_and_import_pi_card(
+            text, trust_root=trust_root or None)
+    except _iss.IssuanceError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"✓ card verified ({verdict.handle}, role: {verdict.kind}) and imported")
+    for a in actions:
+        click.echo(f"  • {a}")
+    click.echo("\nRestart your wigamig dashboard; the login will now show your role.")
+
+
 @click.command("identity-init",
                 help="Create THIS machine's ed25519 signing keypair — your unique "
                      "wigamig ID (a fingerprint your PI/mayor binds an identity "
