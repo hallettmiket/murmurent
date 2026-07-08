@@ -751,26 +751,73 @@ def issue_pi_card_cmd(enrollment_file: str, handle: str, actor: str,
         click.echo(text)
 
 
+@click.command("issue-member-card",
+                help="PI / group-registrar: sign a member card for a member's "
+                     "enrollment request, chaining it to the centre via your own "
+                     "PI card. Verifies proof-of-possession. Output is a BUNDLE "
+                     "(member card + your PI card) — send it to the member to "
+                     "`wigamig import-card`.")
+@click.argument("enrollment_file")
+@click.option("--group", required=True, help="The group you lead to add them to.")
+@click.option("--handle", default="", help="Member handle (default: from the enrollment).")
+@click.option("--out", "out_file", type=click.Path(dir_okay=False), default=None,
+              help="Write the bundle to a file (default: print).")
+def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
+                          out_file: str | None) -> None:
+    from ..core import issuance as _iss
+    import json as _json
+    from pathlib import Path as _P
+    try:
+        enrollment = _json.loads(_P(enrollment_file).expanduser().read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise click.ClickException(f"cannot read enrollment: {exc}") from exc
+    if not handle:
+        handle = (enrollment.get("payload") or {}).get("handle", "")
+    try:
+        bundle = _iss.issue_member_card(handle, enrollment=enrollment, group=group)
+    except _iss.IssuanceError as exc:
+        raise click.ClickException(str(exc)) from exc
+    text = _json.dumps(bundle, indent=2)
+    subj = bundle["member_card"]["payload"]["subject"]["handle"]
+    if out_file:
+        _P(out_file).write_text(text, encoding="utf-8")
+        click.echo(f"✓ signed member card for {subj} (group {group}) → {out_file}")
+        click.echo("  Send it to them (with the centre's signing recipient to pin); "
+                   "they run `wigamig import-card <file> --trust-root <pubkey>`.")
+    else:
+        click.echo(text)
+
+
 @click.command("import-card",
-                help="Import a SIGNED identity card you were issued. Verifies it "
-                     "chains to the centre root (pin it with --trust-root the first "
-                     "time — use the centre's published signing recipient, "
-                     "fingerprint confirmed out-of-band) and materializes your "
-                     "role locally.")
+                help="Import a SIGNED identity card you were issued (a PI card, or "
+                     "a member-card bundle). Verifies it chains to the centre root "
+                     "(pin it with --trust-root the first time — use the centre's "
+                     "published signing recipient, fingerprint confirmed "
+                     "out-of-band) and materializes your role locally.")
 @click.argument("card_file")
 @click.option("--trust-root", "trust_root", default="",
               help="Centre signing recipient (ed25519:...) to pin on first import.")
 def import_signed_card_cmd(card_file: str, trust_root: str) -> None:
     from ..core import issuance as _iss
+    import json as _json
     import sys as _sys
     text = _sys.stdin.read() if card_file == "-" else \
         __import__("pathlib").Path(card_file).expanduser().read_text(encoding="utf-8")
     try:
-        verdict, actions = _iss.verify_and_import_pi_card(
-            text, trust_root=trust_root or None)
+        obj = _json.loads(text)
+    except ValueError as exc:
+        raise click.ClickException(f"not valid card JSON: {exc}") from exc
+    try:
+        if isinstance(obj, dict) and "member_card" in obj:
+            verdict, actions = _iss.verify_and_import_member_card(
+                obj, trust_root=trust_root or None)
+        else:
+            verdict, actions = _iss.verify_and_import_pi_card(
+                obj, trust_root=trust_root or None)
     except _iss.IssuanceError as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo(f"✓ card verified ({verdict.handle}, role: {verdict.kind}) and imported")
+    grp = f", group: {verdict.group}" if verdict.group else ""
+    click.echo(f"✓ card verified ({verdict.handle}, role: {verdict.kind}{grp}) and imported")
     for a in actions:
         click.echo(f"  • {a}")
     click.echo("\nRestart your wigamig dashboard; the login will now show your role.")
