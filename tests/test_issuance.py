@@ -187,6 +187,38 @@ def test_standalone_pi_self_issues_and_runs_a_lab(monkeypatch, tmp_path):
     assert R.lab_mgmt_path_for_handle("allie")[0] == "xia_lab"
 
 
+def test_cli_whoami_shows_trust_root_for_pi(monkeypatch, tmp_path):
+    from wigamig.cli import cli
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.setenv("WIGAMIG_USER", "mhallet")
+    K.generate_keypair()
+    ISS.self_issue_pi_card("@mhallet", "lab_mh")
+    res = CliRunner().invoke(cli, ["whoami"])
+    assert res.exit_code == 0, res.output
+    assert "trust root" in res.output
+    assert K.encode_public(K.load_public()) in res.output   # retrievable any time
+
+
+def test_cli_issue_member_card_prints_trust_root_when_standalone(monkeypatch, tmp_path):
+    from wigamig.cli import cli
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.setenv("WIGAMIG_USER", "mhallet")
+    K.generate_keypair()
+    out = ISS.self_issue_pi_card("@mhallet", "lab_mh")
+    allie = Ed25519PrivateKey.generate()
+    m_req = C.make_enrollment_request("@allie", priv=allie, nonce="a1", group="lab_mh")
+    ef = tmp_path / "e.json"
+    ef.write_text(json.dumps(m_req), encoding="utf-8")
+    bf = tmp_path / "b.json"
+    res = CliRunner().invoke(cli, ["issue-member-card", str(ef), "--group", "lab_mh",
+                                   "--out", str(bf)])
+    assert res.exit_code == 0, res.output
+    assert out["trust_root"] in res.output          # PI told exactly what to hand over
+    assert "import-card" in res.output
+
+
 def test_standalone_pi_requires_a_group_name(monkeypatch, tmp_path):
     monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "h"))
     monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "li"))
