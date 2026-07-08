@@ -1,7 +1,7 @@
 # wigamig
 
-Shared agentic-AI infrastructure for a bioconvergence centre. It lets research
-groups work independently, pool agents and data when collaboration helps, and
+Shared agentic-AI infrastructure for academic researchers, labs cores and research centers. 
+It lets research groups work independently, pool agents and data when collaboration helps, and
 accumulate institutional knowledge across every project. See
 [`CLAUDE.md`](CLAUDE.md) for the architectural overview and [`docs/`](docs/) for
 the full design.
