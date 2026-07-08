@@ -159,6 +159,109 @@ def test_cli_enroll_produces_valid_request(monkeypatch, tmp_path):
     assert C.verify_enrollment(req, expected_nonce="abc")
 
 
+# ---- member cards (group registrar = the PI) --------------------------------
+
+def _install_machine_key(priv):
+    """Make ``priv`` this machine's idkeys key (so the PI machine signs member
+    cards with the same key bound in its PI card)."""
+    from cryptography.hazmat.primitives import serialization
+    p = K.private_key_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_bytes(priv.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption()))
+    K._pub_for(p).write_text(K.encode_public(priv.public_key()) + "\n", encoding="utf-8")
+
+
+def _carded_pi(mayor_world, monkeypatch, tmp_path, home="pi_home"):
+    """Issue a PI card for @yxia266 and import it onto a fresh PI machine whose
+    machine key IS the PI's key. Leaves env pointed at the PI machine."""
+    pi_priv = Ed25519PrivateKey.generate()
+    req = C.make_enrollment_request("@yxia266", priv=pi_priv, nonce="p1",
+                                    centre="western-qa")
+    pi_card = ISS.issue_pi_card("@yxia266", enrollment=req, actor="@tbrowne5")
+    root_pub = mayor_world["root_pub"]
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / home))
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / (home + "_li")))
+    _install_machine_key(pi_priv)
+    ISS.verify_and_import_pi_card(pi_card, trust_root=root_pub)
+    return {"pi_priv": pi_priv, "root_pub": root_pub}
+
+
+def _member_enrollment(handle="@allie", nonce="a1", group="yxia_lab"):
+    priv = Ed25519PrivateKey.generate()
+    req = C.make_enrollment_request(handle, priv=priv, nonce=nonce,
+                                    centre="western-qa", group=group)
+    return priv, req
+
+
+def test_member_card_full_chain(mayor_world, monkeypatch, tmp_path):
+    ctx = _carded_pi(mayor_world, monkeypatch, tmp_path)
+    _priv, m_req = _member_enrollment()
+    bundle = ISS.issue_member_card("@allie", enrollment=m_req, group="yxia_lab")
+    assert bundle["member_card"]["payload"]["kind"] == "member"
+    assert bundle["pi_card"]["payload"]["subject"]["handle"] == "@yxia266"
+    # member machine imports the bundle and now resolves as a member of the lab
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "allie_home"))
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "allie_li"))
+    verdict, actions = ISS.verify_and_import_member_card(bundle, trust_root=ctx["root_pub"])
+    assert verdict.ok and verdict.handle == "@allie" and verdict.group == "yxia_lab"
+    match = R.lab_mgmt_path_for_handle("allie")
+    assert match is not None and match[0] == "yxia_lab"
+    assert IC.machine_netname() == "allie"
+
+
+def test_member_card_requires_leading_the_group(mayor_world, monkeypatch, tmp_path):
+    _carded_pi(mayor_world, monkeypatch, tmp_path)
+    _priv, m_req = _member_enrollment(group="")
+    with pytest.raises(ISS.IssuanceError, match="do not lead"):
+        ISS.issue_member_card("@allie", enrollment=m_req, group="some_other_lab")
+
+
+def test_member_card_rejects_bad_proof_of_possession(mayor_world, monkeypatch, tmp_path):
+    _carded_pi(mayor_world, monkeypatch, tmp_path)
+    _priv, m_req = _member_enrollment()
+    m_req["payload"]["handle"] = "@evil"  # tamper → self-signature invalid
+    with pytest.raises(ISS.IssuanceError, match="possession"):
+        ISS.issue_member_card("@allie", enrollment=m_req, group="yxia_lab")
+
+
+def test_member_card_from_forged_pi_rejected(mayor_world, monkeypatch, tmp_path):
+    ctx = _carded_pi(mayor_world, monkeypatch, tmp_path)
+    _priv, m_req = _member_enrollment()
+    good = ISS.issue_member_card("@allie", enrollment=m_req, group="yxia_lab")
+    # attacker re-signs the member card with their own key, keeps the real PI card
+    attacker = Ed25519PrivateKey.generate()
+    forged = C.issue_member_card(handle="@allie", member_pubkey=m_req["payload"]["pubkey"],
+                                 group="yxia_lab", centre="western-qa",
+                                 pi_priv=attacker, pi_handle="@yxia266")
+    bad_bundle = {"member_card": forged, "pi_card": good["pi_card"]}
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "allie2"))
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "allie2_li"))
+    with pytest.raises(ISS.IssuanceError, match="rejected"):
+        ISS.verify_and_import_member_card(bad_bundle, trust_root=ctx["root_pub"])
+
+
+def test_cli_member_card_round_trip(mayor_world, monkeypatch, tmp_path):
+    from wigamig.cli import cli
+    ctx = _carded_pi(mayor_world, monkeypatch, tmp_path)  # env at the PI machine
+    runner = CliRunner()
+    _priv, m_req = _member_enrollment()
+    enroll_f = tmp_path / "m_enroll.json"
+    enroll_f.write_text(json.dumps(m_req), encoding="utf-8")
+    bundle_f = tmp_path / "bundle.json"
+    r = runner.invoke(cli, ["issue-member-card", str(enroll_f), "--group", "yxia_lab",
+                            "--out", str(bundle_f)])
+    assert r.exit_code == 0, r.output
+    # member machine imports it
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "allie_cli"))
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "allie_cli_li"))
+    r2 = runner.invoke(cli, ["import-card", str(bundle_f), "--trust-root", ctx["root_pub"]])
+    assert r2.exit_code == 0, r2.output
+    assert "verified" in r2.output and "member" in r2.output
+    assert R.lab_mgmt_path_for_handle("allie")[0] == "yxia_lab"
+
+
 def test_cli_issue_and_import_round_trip(mayor_world, monkeypatch, tmp_path):
     from wigamig.cli import cli
     runner = CliRunner()

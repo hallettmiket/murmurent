@@ -26,6 +26,7 @@ grants nothing on its own.
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
@@ -171,7 +172,98 @@ def verify_and_import_pi_card(card, *, trust_root: str | None = None,
     return v, actions
 
 
+# ---------------------------------------------------------------------------
+# Group-registrar (PI) side: issue a member card signed with the PI's own key
+# ---------------------------------------------------------------------------
+
+def issue_member_card(handle: str, *, enrollment: dict, group: str,
+                      env: dict | None = None, issued_at=None,
+                      ttl_days: int = _cert.DEFAULT_TTL_DAYS,
+                      expected_nonce: str | None = None) -> dict:
+    """PI/group-registrar side: sign a member card for ``handle`` in ``group``
+    with the PI's OWN machine key, chaining to the centre root via the PI's card.
+
+    Runs on the PI's machine: it uses the PI's local identity card to confirm
+    they lead ``group``, verifies the member's proof-of-possession, then returns
+    a **bundle** ``{"member_card", "pi_card"}`` so the member receives the whole
+    chain (member → PI → root) needed to verify."""
+    if not _k.have_keys():
+        raise IssuanceError("no local keypair; you need your own key to sign member cards")
+    local = _ic.local_card(env=env)
+    if not local:
+        raise IssuanceError("no identity card on this machine; import your PI card first")
+    centre_name = local.get("centre") or ""
+    led = {r.get("group"): r.get("kind") for r in local.get("roles", [])
+           if r.get("kind") in ("lab_pi", "core_leader")}
+    if group not in led:
+        raise IssuanceError(
+            f"you do not lead group '{group}' — cannot issue its member cards")
+    group_kind = "core" if led[group] == "core_leader" else "lab"
+
+    pi_card_path = cards_dir() / f"{_safe(centre_name)}_pi.json"
+    if not pi_card_path.is_file():
+        raise IssuanceError(
+            "your signed PI card is missing (needed to chain member cards to the "
+            "root); re-import it with `wigamig import-card`")
+    pi_card = _cert.loads(pi_card_path.read_text(encoding="utf-8"))
+
+    pubkey = (enrollment.get("payload") or {}).get("pubkey") if isinstance(enrollment, dict) else None
+    if not pubkey:
+        raise IssuanceError("enrollment request has no public key")
+    if not _cert.verify_enrollment(enrollment, expected_nonce=expected_nonce):
+        raise IssuanceError("proof-of-possession failed (bad enrollment signature/nonce)")
+
+    pi_handle = str(local.get("netname") or "").lstrip("@")
+    roles = [{"kind": "member", "group": group, "pi": f"@{pi_handle}",
+              "group_kind": group_kind}]
+    member_card = _cert.issue_member_card(
+        handle=handle, member_pubkey=pubkey, group=group, centre=centre_name,
+        pi_priv=_k.load_private(), pi_handle=pi_handle, roles=roles,
+        issued_at=issued_at, ttl_days=ttl_days)
+    return {"member_card": member_card, "pi_card": pi_card}
+
+
+def verify_and_import_member_card(bundle, *, trust_root: str | None = None,
+                                  env: dict | None = None, now=None,
+                                  require_crl: bool = False, crl=None) -> tuple:
+    """Member side: verify a member card chains member → PI → the pinned centre
+    root, then materialize the role locally. ``bundle`` is
+    ``{"member_card", "pi_card"}`` (dict or its JSON)."""
+    if isinstance(bundle, str):
+        bundle = json.loads(bundle)
+    member_card = bundle.get("member_card") if isinstance(bundle, dict) else None
+    pi_card = bundle.get("pi_card") if isinstance(bundle, dict) else None
+    if not (isinstance(member_card, dict) and isinstance(pi_card, dict)):
+        raise IssuanceError("not a member-card bundle (need member_card + pi_card)")
+    centre_name = (member_card.get("payload") or {}).get("centre") or ""
+
+    if trust_root:
+        ok, reason = _cert.verify_or_pin_root(centre_name, trust_root)
+        if not ok:
+            raise IssuanceError(f"trust anchor: {reason}")
+    pinned = _cert.load_pinned_root(centre_name)
+    if pinned is None:
+        raise IssuanceError(
+            f"no pinned trust anchor for centre '{centre_name}'. Pass --trust-root "
+            "with the centre's published signing recipient (fingerprint confirmed "
+            "out-of-band).")
+
+    v = _cert.verify_member_card(member_card, pi_card, root_pub=pinned, now=now,
+                                 crl=crl, centre=centre_name, require_crl=require_crl)
+    if not v.ok:
+        raise IssuanceError(f"card rejected: {v.reason}")
+
+    actions = _ic.import_card(_scoped_from_signed(member_card["payload"]), env=env)
+    d = cards_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{_safe(centre_name)}_member.json").write_text(
+        json.dumps(bundle, indent=2), encoding="utf-8")
+    actions.append(f"stored signed member-card bundle ({cards_dir()})")
+    return v, actions
+
+
 __all__ = [
     "IssuanceError", "issue_pi_card", "make_enrollment",
-    "verify_and_import_pi_card", "cards_dir",
+    "verify_and_import_pi_card", "issue_member_card",
+    "verify_and_import_member_card", "cards_dir",
 ]
