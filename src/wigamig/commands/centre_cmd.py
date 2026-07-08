@@ -823,6 +823,64 @@ def import_signed_card_cmd(card_file: str, trust_root: str) -> None:
     click.echo("\nRestart your wigamig dashboard; the login will now show your role.")
 
 
+@click.command("revoke",
+                help="MAYOR: revoke an identity card — adds it to the centre CRL "
+                     "and republishes. Identify the card by --handle (looked up in "
+                     "this machine's issuance ledger), --card-id, or --fingerprint. "
+                     "Needs the centre root key.")
+@click.option("--handle", default="", help="Revoke the card issued to this handle.")
+@click.option("--card-id", "card_id", default="", help="Revoke by card id.")
+@click.option("--fingerprint", default="", help="Revoke by key fingerprint.")
+def revoke_cmd(handle: str, card_id: str, fingerprint: str) -> None:
+    from ..core import revocation as _rev
+    prof = _ci.read_centre()
+    if prof is None:
+        raise click.ClickException("no centre initialised; run `wigamig centre-init` first.")
+    centre = prof.unique_name or prof.install_id
+    try:
+        if handle:
+            crl = _rev.revoke_member(centre, handle)
+        elif card_id or fingerprint:
+            crl = _rev.revoke(centre, card_id=card_id or None,
+                              fingerprint=fingerprint or None)
+        else:
+            raise click.ClickException("specify --handle, --card-id, or --fingerprint.")
+    except _rev.RevocationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    n = len(crl["payload"]["revoked"])
+    click.echo(f"✓ revoked. CRL serial {crl['payload']['serial']}, "
+               f"{n} entr{'y' if n == 1 else 'ies'}.")
+    click.echo("  Publish it to members so verifiers see the revocation: "
+               "`wigamig crl --out crl.json`.")
+
+
+@click.command("crl",
+                help="Show or export the centre's current root-signed revocation "
+                     "list (CRL). On the mayor's machine it is freshly re-signed; "
+                     "elsewhere it prints the last imported CRL.")
+@click.option("--out", "out_file", type=click.Path(dir_okay=False), default=None,
+              help="Write the signed CRL to a file (default: print).")
+def crl_cmd(out_file: str | None) -> None:
+    from ..core import revocation as _rev
+    import json as _json
+    prof = _ci.read_centre()
+    if prof is None:
+        raise click.ClickException("no centre initialised; run `wigamig centre-init` first.")
+    centre = prof.unique_name or prof.install_id
+    crl = _rev.current_crl(centre)
+    if crl is None:
+        raise click.ClickException(
+            "no CRL available (need the centre root key, or an imported CRL).")
+    text = _json.dumps(crl, indent=2)
+    if out_file:
+        from pathlib import Path as _P
+        _P(out_file).write_text(text, encoding="utf-8")
+        click.echo(f"✓ wrote CRL (serial {crl['payload']['serial']}, "
+                   f"{len(crl['payload']['revoked'])} revoked) → {out_file}")
+    else:
+        click.echo(text)
+
+
 @click.command("identity-init",
                 help="Create THIS machine's ed25519 signing keypair — your unique "
                      "wigamig ID (a fingerprint your PI/mayor binds an identity "
@@ -1179,6 +1237,19 @@ def group_remove_member(group: str, handle: str, delete: bool, yes: bool) -> Non
     for p in probes:
         icon = "✓" if p.status == "ok" else ("!" if p.status == "warn" else "✗")
         click.echo(f"  [{icon}] {p.name}: {p.detail}")
+    # Defense-in-depth: revoke their identity card in the centre CRL. Live access
+    # was already pulled above (Slack/GitHub/registry); this stops the card itself
+    # from verifying. Best-effort — needs the centre root key (mayor's machine).
+    from ..core import revocation as _rev
+    prof = _ci.read_centre()
+    if prof is not None:
+        centre = prof.unique_name or prof.install_id
+        try:
+            crl = _rev.revoke_member(centre, norm)
+            click.echo(f"  [✓] card-revocation: added to CRL (serial "
+                       f"{crl['payload']['serial']})")
+        except _rev.RevocationError as exc:
+            click.echo(f"  [!] card-revocation: deferred — {exc}")
 
 
 _TOOLKIT_README = """# {group} toolkit — group agents + governance

@@ -92,11 +92,13 @@ def issue_pi_card(handle: str, *, enrollment: dict, actor: str = "",
             "(a PI card is only for lab PIs / core leaders)")
 
     root = _cr.load_root_private()
-    return _cert.issue_pi_card(
-        handle=scoped["netname"], pi_pubkey=pubkey,
-        centre=centre.unique_name or centre.install_id,
+    centre_name = centre.unique_name or centre.install_id
+    card = _cert.issue_pi_card(
+        handle=scoped["netname"], pi_pubkey=pubkey, centre=centre_name,
         root_priv=root, issuer_handle=actor or centre.founding_mayor,
         roles=scoped["roles"], issued_at=issued_at, ttl_days=ttl_days)
+    _record_issued(centre_name, card, "pi")
+    return card
 
 
 # ---------------------------------------------------------------------------
@@ -220,6 +222,7 @@ def issue_member_card(handle: str, *, enrollment: dict, group: str,
         handle=handle, member_pubkey=pubkey, group=group, centre=centre_name,
         pi_priv=_k.load_private(), pi_handle=pi_handle, roles=roles,
         issued_at=issued_at, ttl_days=ttl_days)
+    _record_issued(centre_name, member_card, "member")
     return {"member_card": member_card, "pi_card": pi_card}
 
 
@@ -262,8 +265,61 @@ def verify_and_import_member_card(bundle, *, trust_root: str | None = None,
     return v, actions
 
 
+# ---------------------------------------------------------------------------
+# Issuance ledger + local card verification (used by the dashboard gate)
+# ---------------------------------------------------------------------------
+
+def _record_issued(centre_name: str, card: dict, kind: str) -> None:
+    """Best-effort: record an issued card so a later removal can revoke it by
+    handle. Never break issuance if the ledger write fails."""
+    try:
+        from . import revocation as _rev
+        p = card["payload"]
+        _rev.record_issued(centre_name, handle=p["subject"]["handle"],
+                           card_id=p["card_id"],
+                           fingerprint=p["subject"]["fingerprint"], kind=kind)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def verify_local_identity(*, env: dict | None = None, now=None) -> tuple[str, str]:
+    """Verify THIS machine's stored signed card still holds. Returns
+    ``(status, reason)`` where status is ``"no_card"`` (nothing to check — fall
+    through to registry authz), ``"ok"``, or ``"reject"``.
+
+    Checks the chain to the pinned root + expiry + tamper, and revocation when a
+    CRL is available (fresh-signed on the mayor's machine, or a distributed CRL on
+    a member's). A member with no distributed CRL still gets expiry/tamper
+    enforcement — remote revocation there arrives with CRL distribution."""
+    local = _ic.local_card(env=env)
+    if not local:
+        return ("no_card", "")
+    centre = local.get("centre") or ""
+    pinned = _cert.load_pinned_root(centre)
+    if pinned is None:
+        return ("ok", "")  # no anchor → can't crypto-verify; registry authz applies
+    from . import revocation as _rev
+    crl = _rev.current_crl(centre)
+    require = crl is not None
+
+    member_p = cards_dir() / f"{_safe(centre)}_member.json"
+    pi_p = cards_dir() / f"{_safe(centre)}_pi.json"
+    if member_p.is_file():
+        b = json.loads(member_p.read_text(encoding="utf-8"))
+        v = _cert.verify_member_card(b.get("member_card"), b.get("pi_card"),
+                                     root_pub=pinned, now=now, crl=crl,
+                                     centre=centre, require_crl=require)
+    elif pi_p.is_file():
+        v = _cert.verify_pi_card(_cert.loads(pi_p.read_text(encoding="utf-8")),
+                                 root_pub=pinned, now=now, crl=crl, centre=centre,
+                                 require_crl=require)
+    else:
+        return ("no_card", "")
+    return ("ok", "") if v.ok else ("reject", v.reason)
+
+
 __all__ = [
     "IssuanceError", "issue_pi_card", "make_enrollment",
     "verify_and_import_pi_card", "issue_member_card",
-    "verify_and_import_member_card", "cards_dir",
+    "verify_and_import_member_card", "verify_local_identity", "cards_dir",
 ]
