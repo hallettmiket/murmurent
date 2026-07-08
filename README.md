@@ -3,148 +3,115 @@
 Shared agentic-AI infrastructure for a bioconvergence centre. It lets research
 groups work independently, pool agents and data when collaboration helps, and
 accumulate institutional knowledge across every project. See
-[`CLAUDE.md`](CLAUDE.md) for the architectural overview and
-[`docs/`](docs/) for the full design.
+[`CLAUDE.md`](CLAUDE.md) for the architectural overview and [`docs/`](docs/) for
+the full design.
 
-Wigamig is **institution-agnostic** — it is not tied to any one university. A
-new institution stands it up by having one person (the **mayor**) bootstrap a
+Wigamig is **institution-agnostic** — not tied to any one university. A new
+institution stands it up by having one person (the **mayor**) bootstrap a
 *centre*; everyone else joins afterward.
 
-> **Just want to join a wigamig that already runs at your institution?**
-> You don't install anything — jump to [Join an existing wigamig](#join-an-existing-wigamig).
+## Download Wigamig
 
----
-
-## Join an existing wigamig
-
-**Most people start here.** Membership in wigamig is a **signed certificate**,
-not just a name in a list — so joining means getting a card cryptographically
-issued to your key. Which path you take depends on whether you're starting a
-group or joining one.
-
-**Starting a lab or core (you're the PI):**
-
-1. Open the public directory:
-   **[github.com/hallettmiket/wigamig_public](https://github.com/hallettmiket/wigamig_public)**
-2. Find your institution and note its **registrar email**.
-3. **Email the registrar** an encrypted join request (the one-line
-   `wigamig-join.sh` script in the hub does this for you). Nothing about you is
-   posted publicly — the request is encrypted to the registrar's key.
-
-Once approved, the mayor issues you a signed **PI card**; you `wigamig
-import-card` it and you're set.
-
-**Joining an existing group (member):** you clone wigamig, mint your key on first
-run, prove you hold it (`wigamig enroll`), and your **PI** issues you a signed
-member card. The full step-by-step for every role — member, PI, mayor — is in
-**[`docs/identity.md`](docs/identity.md)**.
-
-Everything below is only for people **setting up** wigamig at a new institution
-(administrators) or **building** wigamig itself (developers).
-
----
-
-## Install wigamig at your institution (administrator / mayor)
-
-If you are setting up wigamig at a new institution, you are the **mayor** — the
-human who bootstraps the centre and becomes its first registrar. You do this on
-your **laptop** (personal workstation); the centre is later synced to an
-always-online server.
-
-### Prerequisites
-
-- **git** — required.
-- **[uv](https://docs.astral.sh/uv/)** — the installer adds it for you if missing.
-- **[Claude Code](https://claude.com/claude-code)** — install it and run it once
-  to log in (OAuth). The installer can't do this for you.
-- **[GitHub CLI `gh`](https://cli.github.com/)**, authenticated (`gh auth login`)
-  — needed when the centre creates its GitHub org/repos.
-
-### One command
-
-The repo is public, so you can bootstrap from nothing:
+**Everyone — member, PI, or mayor — starts by installing wigamig.** The code is
+public; one command does it (you only need `git`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hallettmiket/wigamig/main/scripts/bootstrap.sh | bash
 ```
 
-Prefer to read the script before running it (recommended)? Clone first, then run
-the same script locally:
+Prefer to read the script first (recommended)? Clone, then run it:
 
 ```bash
 git clone https://github.com/hallettmiket/wigamig ~/repos/wigamig
-cd ~/repos/wigamig
-./scripts/bootstrap.sh
+cd ~/repos/wigamig && ./scripts/bootstrap.sh
 ```
 
-Either way, [`scripts/bootstrap.sh`](scripts/bootstrap.sh) is **idempotent** —
-safe to re-run — and does the following:
+[`scripts/bootstrap.sh`](scripts/bootstrap.sh) is idempotent: it installs the
+`wigamig` command, wires the shared agents/rules/skills into `~/.claude/`, and
+registers the data-governance hooks. On your first run it mints your **identity
+key** (your unique ID). Then set your personal info — `wigamig whoami` shows your
+handle + key, and the dashboard (`wigamig dashboard --hifi`) has the rest.
 
-1. Checks prerequisites (installs `uv` if missing; warns if Claude Code / `gh`
-   aren't logged in — those need a human).
-2. Clones or updates `~/repos/wigamig`.
-3. Installs the `wigamig` CLI.
-4. Wires the commons (agents, rules, skills) into `~/.claude/`.
-5. Registers the data-governance hooks + MCP servers.
-6. Prints the next step and offers to launch the dashboard.
+Then find your situation below.
 
-### Become the founding registrar
+## I'm a member of a lab that already uses wigamig
 
-The installer leaves you one step from a live centre — the **centre-setup form**:
+Set your info, then ask your **PI** for a **membership ID** (a signed identity
+certificate). Run the one `wigamig import-card` command they give you, and your
+dashboard recognises your role. That's it — you never touch the mayor or the
+public directory.
+
+## I'm a PI of a lab or core
+
+1. Install wigamig (above) and set your lab's parameters.
+2. **Register your lab with your institution's mayor.** Find your institution in
+   the [wigamig implementations directory](https://github.com/hallettmiket/wigamig_public)
+   and send the encrypted request its `wigamig-join.sh` generates. The mayor
+   approves and sends you back your **PI ID**.
+3. **Accept members by issuing them IDs.** When a member sends a `wigamig enroll`
+   request, sign and return it:
+   ```bash
+   wigamig issue-member-card <their-request> --group <your-lab>
+   ```
+
+Full identity flow (enroll → issue → import → revoke): [`docs/identity.md`](docs/identity.md).
+
+## I want to run wigamig at my institution (become the mayor)
+
+You bootstrap a new **centre** and become its founding registrar — see the
+detailed setup just below. You then register PIs and send each one their ID.
+
+---
+
+## Setting up a centre (mayor)
+
+You do this on your **laptop**; the centre is later synced to an always-online
+server. Beyond `git`, you'll want:
+
+- **[Claude Code](https://claude.com/claude-code)** — installed and logged in once (OAuth).
+- **[GitHub CLI `gh`](https://cli.github.com/)**, authenticated (`gh auth login`) —
+  for the centre's GitHub org/repos.
+- **[uv](https://docs.astral.sh/uv/)** — the installer adds it if missing.
+
+After running `bootstrap.sh` (above), bootstrap the centre:
 
 ```bash
 wigamig dashboard --hifi --port 8771
 # open http://localhost:8771/registrar and fill in the one-time setup form
 ```
 
-...or bootstrap headlessly from the CLI:
+...or headlessly:
 
 ```bash
 wigamig centre-init --mayor @<your-handle> \
   --name "<Centre name>" --institution "<Institution>" \
   --unique-name <short-id> --server-host <wigamig-server-host>
-
 wigamig centre-status      # confirms you are the founding registrar
 ```
 
-### After bootstrap: make your centre joinable
+### Make your centre joinable
 
-`centre-init` creates the centre but does **not** publish anything or wire
-Slack — those stay deliberate, opt-in steps. The `/registrar` page shows a
-**Slack** card and a **Public hub listing** card walking you through them; in
-short:
+`centre-init` creates the centre but publishes nothing and wires no Slack — those
+stay deliberate, opt-in steps:
 
-1. **Encryption key for join requests.** `centre-init` generates an `age`
-   keypair automatically (so members can send you encrypted join requests). If
-   you ever need to (re)create it: `wigamig centre-age-keygen`. The public key
-   is stamped on your centre profile.
-
-2. **Root signing key (the identity CA).** Run **`wigamig centre-root-keygen`** —
-   this creates the key that signs PI cards and the revocation list, and pins it
-   as your trust anchor. **Back it up offline** (losing it or leaking it is a
-   centre-level event): see [`docs/centre_root_key.md`](docs/centre_root_key.md).
-   How membership cards work end-to-end: [`docs/identity.md`](docs/identity.md).
-
-3. **Get listed on the public hub** so members can find you. Nothing is posted
-   to GitHub automatically. Run **`wigamig centre-hub-publish`** — it clones the
-   [`wigamig_public`](https://github.com/hallettmiket/wigamig_public) hub (if you
-   don't already have it), writes your directory row + README table entry, and
-   (once the root key exists) publishes your **signing key + revocation list** as
-   machine-readable files so members can verify identity cards. It then prints a
-   `git push` for you to run — you commit and push yourself, so publishing stays a
-   deliberate act. (Manual alternative: [`docs/connect_to_hub.md`](docs/connect_to_hub.md).)
-
-4. **Set up Slack** (the centre's communication fabric). You create a Slack
-   workspace named `wigamig-<unique-name>`, add a bot token, and smoke-test it
-   with `wigamig centre-slack-smoke`. Full guide:
+1. **Encryption key for join requests.** `centre-init` generates an `age` keypair
+   automatically (PIs encrypt their join requests to it); recreate with
+   `wigamig centre-age-keygen`.
+2. **Root signing key (the identity CA).** `wigamig centre-root-keygen` — signs PI
+   IDs + the revocation list. **Back it up offline** (see
+   [`docs/centre_root_key.md`](docs/centre_root_key.md)).
+3. **List your centre** in the implementations directory: `wigamig centre-hub-publish`
+   clones [`wigamig_public`](https://github.com/hallettmiket/wigamig_public),
+   writes your directory row, and publishes your **signing key + revocation list**
+   so members can verify IDs. It prints a `git push` for you to run.
+4. **Set up Slack.** Create a `wigamig-<unique-name>` workspace + bot token and
+   smoke-test with `wigamig centre-slack-smoke`. Guide:
    [`docs/slack_setup.md`](docs/slack_setup.md).
 
-Once the centre exists on your laptop, move it to the always-online **wigamig
-server** by following [`docs/setup.md`](docs/setup.md) → *"Deploying a centre on
-a dedicated Ubuntu server"*. Onboarding of other labs, cores, and members comes
-after that — each person self-onboards; you approve from `/registrar`.
-
----
+Then move the centre to the always-online **wigamig server** —
+[`docs/setup.md`](docs/setup.md) → *"Deploying a centre on a dedicated Ubuntu
+server"*. Labs, cores, and members onboard after that; you approve from
+`/registrar`.
 
 ## Install (developer)
 
