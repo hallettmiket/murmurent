@@ -47,9 +47,27 @@ def test_falls_back_to_machine_sentinel(monkeypatch, tmp_path):
     li = tmp_path / "lab_info"
     li.mkdir()
     monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(li))
+    # a centre must exist for the legacy machine sentinel to apply
+    (li / "centre.md").write_text(
+        "---\nname: T\ninstitution: U\nfounding_mayor: '@bob'\ncreated: 2026-01-01\n---\n",
+        encoding="utf-8")
     sentinel = tmp_path / "machine_registrar"
     sentinel.write_text("bob\n", encoding="utf-8")
     monkeypatch.setattr(R, "REGISTRAR_SENTINEL", sentinel)
-    # no registry list, no scoped file → legacy per-machine sentinel
+    # centre present, no registry list, no scoped file → legacy per-machine sentinel
     assert R.is_registrar("bob") is True
     assert R.is_registrar("alice") is False
+
+
+def test_machine_sentinel_ignored_without_a_centre(monkeypatch, tmp_path):
+    """Regression: a stale ~/.wigamig/registrar must NOT confer registrar access
+    on a fresh / centre-less install (the 'signed in as registrar with no centre'
+    bug)."""
+    li = tmp_path / "lab_info"
+    li.mkdir()
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(li))
+    sentinel = tmp_path / "machine_registrar"
+    sentinel.write_text("mhallet\n", encoding="utf-8")   # leftover from a removed centre
+    monkeypatch.setattr(R, "REGISTRAR_SENTINEL", sentinel)
+    # no centre.md anywhere → nobody is a registrar, sentinel or not
+    assert R.is_registrar("mhallet") is False

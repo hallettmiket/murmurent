@@ -1414,6 +1414,7 @@ from .commands.centre_cmd import identity_card as _identity_card
 from .commands.centre_cmd import identity_import as _identity_import
 from .commands.centre_cmd import identity_init as _identity_init
 from .commands.centre_cmd import whoami as _whoami
+from .commands.init_cmd import init_command as _init_command
 from .commands.centre_cmd import enroll as _enroll
 from .commands.centre_cmd import issue_pi_card_cmd as _issue_pi_card_cmd
 from .commands.centre_cmd import issue_member_card_cmd as _issue_member_card_cmd
@@ -1439,6 +1440,7 @@ cli.add_command(_identity_card)
 cli.add_command(_identity_import)
 cli.add_command(_identity_init)
 cli.add_command(_whoami)
+cli.add_command(_init_command)
 cli.add_command(_enroll)
 cli.add_command(_issue_pi_card_cmd)
 cli.add_command(_issue_member_card_cmd)

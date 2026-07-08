@@ -19,12 +19,16 @@ public; one command does it (you only need `git`):
 curl -fsSL https://raw.githubusercontent.com/hallettmiket/wigamig/main/scripts/bootstrap.sh | bash
 ```
 
-Prefer to read the script first (recommended)? Clone, then run it:
+Prefer to read the script first (recommended)? Clone it **wherever you like**,
+then run it — it installs whatever clone you run it from:
 
 ```bash
-git clone https://github.com/hallettmiket/wigamig ~/repos/wigamig
-cd ~/repos/wigamig && ./scripts/bootstrap.sh
+git clone https://github.com/hallettmiket/wigamig
+cd wigamig && ./scripts/bootstrap.sh
 ```
+
+(`~/repos/wigamig` is a common spot but not required. The `curl` one-liner above
+clones there by default; override it with `WIGAMIG_REPO_DIR=/your/path`.)
 
 [`scripts/bootstrap.sh`](scripts/bootstrap.sh) is idempotent: it installs the
 `wigamig` command, wires the shared agents/rules/skills into `~/.claude/`, and

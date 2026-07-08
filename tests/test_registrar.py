@@ -37,6 +37,13 @@ def isolated(monkeypatch, tmp_path):
     monkeypatch.setattr(
         registrar, "REGISTRAR_SENTINEL", tmp_path / "registrar_sentinel"
     )
+    # A registrar only exists within a centre — the machine sentinel is honoured
+    # only once a centre is bootstrapped (a fresh install grants nobody registrar
+    # access). These tests model a registrar's environment, so treat the centre as
+    # bootstrapped. (Mock rather than write centre.md, since some tests mkdir the
+    # lab_info dir themselves.)
+    from wigamig.core import centre_init as _ci
+    monkeypatch.setattr(_ci, "is_initialised", lambda env=None: True)
     # Also block other resolvers so the test doesn't leak the real user.
     monkeypatch.setenv("WIGAMIG_USER", "mhallet")
     return tmp_path
@@ -1035,6 +1042,11 @@ def test_lab_dashboard_identity_has_is_registrar_flag(isolated, tmp_path, monkey
 def test_lab_dashboard_is_registrar_false_for_non_registrar(isolated, tmp_path, monkeypatch):
     """Switching to a non-registrar handle flips the flag false."""
     _seed_registrar(isolated)
+    # This models a single-lab install with NO centre registry, so the scoping
+    # gate must fall through and let the lab member in. Undo the fixture's
+    # "centre initialised" mock for this case.
+    from wigamig.core import centre_init as _ci
+    monkeypatch.setattr(_ci, "is_initialised", lambda env=None: False)
     lab_dir = _make_lab_mgmt(
         tmp_path, lab_id="hallett", pi="mhallet",
         members=[("mhallet", "pi"), ("bob", "postdoc")],

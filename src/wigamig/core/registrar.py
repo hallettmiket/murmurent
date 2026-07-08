@@ -171,15 +171,31 @@ def is_registrar(handle: str, env: dict[str, str] | None = None) -> bool:
     declared = registrars(env)
     if declared:
         return norm in declared
-    # Fallback 1: a registrar declared in the centre's own lab_info root.
+    # Fallback 1: a registrar declared in the centre's own lab_info root (scoped
+    # to WIGAMIG_LAB_INFO_ROOT, so it only exists for a configured centre).
     scoped = _lab_info_registrar(env)
     if scoped is not None:
         return norm == scoped
-    # Fallback 2: legacy per-machine sentinel.
+    # Fallback 2: the legacy per-MACHINE sentinel (~/.wigamig/registrar) is only
+    # meaningful once a centre actually exists on this machine. A fresh or
+    # centre-less install must grant NOBODY registrar access — otherwise a stale
+    # sentinel left behind by a removed centre silently confers registrar powers.
+    if not _centre_initialised(env):
+        return False
     legacy = registrar_handle()
     if legacy is None:
         return False
     return norm == legacy
+
+
+def _centre_initialised(env: dict[str, str] | None = None) -> bool:
+    """True iff a centre is bootstrapped on this machine (``centre.md`` present).
+    Lazy import avoids a circular dependency with ``centre_init``."""
+    try:
+        from . import centre_init as _ci
+        return _ci.is_initialised(env)
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _lab_info_registrar(env: dict[str, str] | None = None) -> str | None:
