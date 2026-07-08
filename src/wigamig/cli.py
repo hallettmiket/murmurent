@@ -36,8 +36,17 @@ def _stub(*_args, **_kwargs) -> None:
 
 @click.group(help="wigamig — group-level agentic infrastructure CLI.")
 @click.version_option(__version__, prog_name="wigamig")
-def cli() -> None:
+@click.pass_context
+def cli(ctx: click.Context) -> None:
     """Top-level entry point."""
+    # Clone-first identity: the first real command a member runs after cloning
+    # mints THIS machine's ed25519 keypair (their unique wigamig ID). Idempotent
+    # + best-effort; ``WIGAMIG_NO_AUTOKEY`` (set by the test suite) opts out. Only
+    # runs when a subcommand is actually being invoked, not for bare/--help/--version.
+    if ctx.invoked_subcommand:
+        from .core import identity_bootstrap as _ib
+
+        _ib.ensure_local_keypair()
 
 
 # ---------------------------------------------------------------------------
@@ -1398,10 +1407,13 @@ from .commands.centre_cmd import centre_status as _centre_status_cmd
 from .commands.centre_cmd import centre_slack_smoke as _centre_slack_smoke
 from .commands.centre_cmd import centre_slack_setup as _centre_slack_setup
 from .commands.centre_cmd import centre_age_keygen as _centre_age_keygen
+from .commands.centre_cmd import centre_root_keygen as _centre_root_keygen
 from .commands.centre_cmd import centre_set as _centre_set
 from .commands.centre_cmd import onboard_check as _onboard_check
 from .commands.centre_cmd import identity_card as _identity_card
 from .commands.centre_cmd import identity_import as _identity_import
+from .commands.centre_cmd import identity_init as _identity_init
+from .commands.centre_cmd import whoami as _whoami
 from .commands.centre_cmd import centre_hub_publish as _centre_hub_publish
 from .commands.centre_cmd import group_setup as _group_setup
 from .commands.centre_cmd import group_reconcile_cmd as _group_reconcile_cmd
@@ -1413,10 +1425,13 @@ cli.add_command(_centre_status_cmd)
 cli.add_command(_centre_slack_smoke)
 cli.add_command(_centre_slack_setup)
 cli.add_command(_centre_age_keygen)
+cli.add_command(_centre_root_keygen)
 cli.add_command(_centre_set)
 cli.add_command(_onboard_check)
 cli.add_command(_identity_card)
 cli.add_command(_identity_import)
+cli.add_command(_identity_init)
+cli.add_command(_whoami)
 cli.add_command(_centre_hub_publish)
 cli.add_command(_group_setup)
 cli.add_command(_group_reconcile_cmd)
