@@ -78,6 +78,7 @@ REQUIRED_KEYS = ("name", "institution", "founding_mayor")
 # All recognised keys (anything else is preserved but ignored by readers).
 KNOWN_KEYS = (
     "name", "institution", "unique_name", "join_email", "age_recipient",
+    "signing_recipient",
     "slack_workspace",
     "slack_invite_url", "mayor_channel_id", "github_org",
     "data_server", "server_host", "server_account", "cc_install_path",
@@ -105,6 +106,7 @@ class CentreProfile:
     unique_name: str = ""                  # non-institution-specific install id
     join_email: str = ""                   # public contact address for join requests
     age_recipient: str = ""                # public age key joiners encrypt to
+    signing_recipient: str = ""            # centre root ed25519 signing pubkey (verifies cards)
     slack_workspace: str = ""
     slack_invite_url: str = ""             # workspace join link (mayor pastes it)
     mayor_channel_id: str = ""             # private mayor↔CC events channel
@@ -170,6 +172,7 @@ def read_centre(env: dict[str, str] | None = None) -> CentreProfile | None:
         unique_name=str(meta.get("unique_name") or "").strip(),
         join_email=str(meta.get("join_email") or "").strip(),
         age_recipient=str(meta.get("age_recipient") or "").strip(),
+        signing_recipient=str(meta.get("signing_recipient") or "").strip(),
         slack_workspace=str(meta.get("slack_workspace") or "").strip(),
         slack_invite_url=str(meta.get("slack_invite_url") or "").strip(),
         mayor_channel_id=str(meta.get("mayor_channel_id") or "").strip(),
@@ -204,6 +207,7 @@ def _render_centre(profile: CentreProfile) -> str:
         "unique_name": profile.unique_name,
         "join_email": profile.join_email,
         "age_recipient": profile.age_recipient,
+        "signing_recipient": profile.signing_recipient,
         "slack_workspace": profile.slack_workspace,
         "slack_invite_url": profile.slack_invite_url,
         "mayor_channel_id": profile.mayor_channel_id,

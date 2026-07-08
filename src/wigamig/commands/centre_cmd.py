@@ -593,6 +593,44 @@ def centre_age_keygen() -> None:
     click.echo(f"✓ public recipient (publish this in the directory):\n    {recipient}")
 
 
+@click.command("centre-root-keygen",
+                help="Generate the centre's ROOT signing key — the certificate "
+                     "authority that signs PI identity cards. Writes the private "
+                     "key to ~/.wigamig/keys/, pins its fingerprint as this "
+                     "machine's trust anchor, and stores the public signing "
+                     "recipient on the centre. --rotate replaces an existing root "
+                     "(all cards must then be re-issued).")
+@click.option("--rotate", is_flag=True,
+              help="Replace an existing root key (rotation — invalidates all cards).")
+def centre_root_keygen(rotate: bool) -> None:
+    from ..core import centre_root as _cr
+    prof = _ci.read_centre()
+    if prof is None:
+        raise click.ClickException("no centre initialised; run `wigamig centre-init` first.")
+    if _cr.have_root_key() and not rotate:
+        fp = _cr.root_fingerprint()
+        click.echo(f"✓ centre root key already present — fingerprint:\n    {fp}")
+        click.echo(f"  public signing recipient:\n    {_cr.root_public()}")
+        click.echo("  (use --rotate to replace it — this invalidates every issued card)")
+        return
+    existed = _cr.have_root_key()
+    fp = _cr.generate_root_key(overwrite=rotate)
+    pub = _cr.root_public()
+    _cr.bootstrap_root(prof.unique_name or prof.install_id)  # pin anchor
+    _ci.update_centre({"signing_recipient": pub})
+    verb = "rotated" if (existed and rotate) else "generated"
+    click.echo(f"✓ centre root key {verb} — fingerprint:\n    {fp}")
+    click.echo(f"✓ private key: {_cr.root_key_path()}  (mode 0600 — the whole centre "
+               "depends on this staying secret)")
+    click.echo(f"✓ public signing recipient (publish in the directory):\n    {pub}")
+    click.echo("\n⚠ BACK IT UP NOW — offline, encrypted, OFF this laptop. If you lose "
+               "this key you lose the centre; if it leaks, someone can impersonate "
+               "the whole centre. See docs/centre_root_key.md (rotation runbook).")
+    if existed and rotate:
+        click.echo("⚠ ROTATION: every PI/member card signed by the old key is now "
+                   "stale. Re-issue them and publish the new CRL.")
+
+
 @click.command("identity-card",
                 help="MAYOR: generate a scoped identity card for a member — their "
                      "netname + only their own group's role — to hand them so their "
@@ -644,6 +682,52 @@ def identity_import(card_file: str) -> None:
     for a in actions:
         click.echo(f"  • {a}")
     click.echo("\nRestart your wigamig dashboard; the login will now show your role.")
+
+
+@click.command("identity-init",
+                help="Create THIS machine's ed25519 signing keypair — your unique "
+                     "wigamig ID (a fingerprint your PI/mayor binds an identity "
+                     "card to). Idempotent; normally minted automatically on your "
+                     "first wigamig command after cloning. --rotate replaces an "
+                     "existing key (you then need a re-issued card).")
+@click.option("--rotate", is_flag=True,
+              help="Replace an existing keypair with a fresh one.")
+def identity_init(rotate: bool) -> None:
+    from ..core import idkeys as _k
+    existed = _k.have_keys()
+    if existed and not rotate:
+        click.echo(f"✓ keypair already present — your wigamig ID:\n    {_k.local_fingerprint()}")
+        click.echo(f"  private key: {_k.private_key_path()} (mode 0600 — never share it)")
+        click.echo("  (use --rotate to replace it)")
+        return
+    fp = _k.generate_keypair(overwrite=rotate)
+    verb = "rotated" if (existed and rotate) else "created"
+    click.echo(f"✓ keypair {verb} — your wigamig ID (fingerprint):\n    {fp}")
+    click.echo(f"  private key: {_k.private_key_path()} (mode 0600 — never share it)")
+    if existed and rotate:
+        click.echo("  NOTE: your old identity card is now stale — ask your PI/mayor "
+                   "to re-issue one bound to this new key.")
+
+
+@click.command("whoami",
+                help="Show who THIS machine is: your wigamig handle, your unique "
+                     "key ID (fingerprint), and whether an identity card has been "
+                     "imported.")
+def whoami() -> None:
+    from ..core import idkeys as _k
+    from ..core import identity as _id
+    from ..core import identity_card as _ic
+    ident = _id.resolve(allow_unknown=True)
+    fp = _k.local_fingerprint()
+    click.echo(f"handle:   {ident.at_handle}  (via {ident.source})")
+    click.echo(f"key ID:   {fp or '— none yet (run `wigamig identity-init`)'}")
+    card = _ic.local_card()
+    if card:
+        centre = card.get("centre") or "?"
+        roles = ", ".join(sorted({r.get("kind", "?") for r in card.get("roles", [])})) or "—"
+        click.echo(f"card:     centre '{centre}'; roles: {roles}")
+    else:
+        click.echo("card:     none imported yet")
 
 
 @click.command("onboard-check",

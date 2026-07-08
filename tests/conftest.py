@@ -34,3 +34,12 @@ def _no_live_slack(monkeypatch):
     getattr(_sn._token, "cache_clear", lambda: None)()
     yield
     getattr(_sn._token, "cache_clear", lambda: None)()
+
+
+@pytest.fixture(autouse=True)
+def _no_autokey(monkeypatch):
+    """Never mint an ed25519 keypair in the developer's real ``~/.wigamig`` just
+    because a test invoked the CLI (the ``cli`` group callback auto-generates one
+    on first run). Bootstrap tests opt back in with ``monkeypatch.delenv`` + an
+    isolated ``WIGAMIG_HOME``."""
+    monkeypatch.setenv("WIGAMIG_NO_AUTOKEY", "1")

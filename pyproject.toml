@@ -27,6 +27,9 @@ dependencies = [
     "slack-sdk>=3.30",
     "anthropic>=0.40",
     "mcp>=1.0",
+    # ed25519 identity-card signing (core/idkeys.py). Hard dep — the identity
+    # chain must be available in every install, not gated behind an extra.
+    "cryptography>=42",
 ]
 
 [project.optional-dependencies]
