@@ -159,6 +159,42 @@ def test_cli_enroll_produces_valid_request(monkeypatch, tmp_path):
     assert C.verify_enrollment(req, expected_nonce="abc")
 
 
+# ---- standalone PI (no mayor / centre) --------------------------------------
+
+def test_standalone_pi_self_issues_and_runs_a_lab(monkeypatch, tmp_path):
+    # PI machine — no centre, no mayor, just their own identity key.
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi_home"))
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    K.generate_keypair()
+    out = ISS.self_issue_pi_card("@yxia266", "xia_lab")
+    trust = out["trust_root"]
+    assert trust.startswith("ed25519:")
+    # the PI now resolves locally as their lab's PI
+    assert R.lab_mgmt_path_for_handle("yxia266")[0] == "xia_lab"
+
+    # a member enrolls; the PI issues them a card with NO centre in sight
+    allie = Ed25519PrivateKey.generate()
+    m_req = C.make_enrollment_request("@allie", priv=allie, nonce="a1", group="xia_lab")
+    bundle = ISS.issue_member_card("@allie", enrollment=m_req, group="xia_lab")
+    assert bundle["member_card"]["payload"]["kind"] == "member"
+
+    # the member imports it, pinning the PI's key (the trust root) — chains
+    # member -> PI(self-root), no centre.
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "allie_home"))
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "allie_li"))
+    verdict, _actions = ISS.verify_and_import_member_card(bundle, trust_root=trust)
+    assert verdict.ok and verdict.handle == "@allie" and verdict.group == "xia_lab"
+    assert R.lab_mgmt_path_for_handle("allie")[0] == "xia_lab"
+
+
+def test_standalone_pi_requires_a_group_name(monkeypatch, tmp_path):
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "h"))
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "li"))
+    K.generate_keypair()
+    with pytest.raises(ISS.IssuanceError, match="name is required"):
+        ISS.self_issue_pi_card("@yxia266", "")
+
+
 # ---- member cards (group registrar = the PI) --------------------------------
 
 def _install_machine_key(priv):

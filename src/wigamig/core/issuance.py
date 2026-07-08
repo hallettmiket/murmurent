@@ -102,6 +102,52 @@ def issue_pi_card(handle: str, *, enrollment: dict, actor: str = "",
 
 
 # ---------------------------------------------------------------------------
+# Standalone PI: self-issue your own PI ID (no mayor / centre needed)
+# ---------------------------------------------------------------------------
+
+def self_issue_pi_card(handle: str, group: str, *, group_kind: str = "lab",
+                       env: dict | None = None, issued_at=None,
+                       ttl_days: int = _cert.DEFAULT_TTL_DAYS) -> dict:
+    """A PI self-issues their own **PI ID**: a PI card signed by their OWN key,
+    making them the root (certificate authority) of their own lab/core. No mayor
+    or centre is required — you can immediately issue member cards, and members
+    pin your key as their trust anchor.
+
+    Your key is the constant: if the lab later joins a centre, the mayor issues a
+    SEPARATE centre-signed PI card attesting this same key, and your members'
+    cards keep verifying (only the trust anchor changes). Returns
+    ``{pi_card, trust_root, realm}`` — hand ``trust_root`` to members so they can
+    ``import-card --trust-root <it>``.
+    """
+    if not _k.have_keys():
+        raise IssuanceError("no local keypair; run `wigamig identity-init` first")
+    if not group.strip():
+        raise IssuanceError("a lab/core name is required to self-issue your PI ID")
+    priv = _k.load_private()
+    pub = priv.public_key()
+    pub_str = _k.encode_public(pub)
+    at = "@" + str(handle).lstrip("@").strip().lower()
+    # The lab's own trust realm (analogue of a centre's unique_name), namespaced
+    # by handle so two standalone labs can't collide locally.
+    realm = _safe(f"{at.lstrip('@')}-{group}")
+    kind = "core_leader" if group_kind == "core" else "lab_pi"
+    roles = [{"kind": kind, "group": group, "pi": at}]
+    # Self-signed: issuer key == subject key == this PI's key.
+    card = _cert.issue_pi_card(handle=at, pi_pubkey=pub, centre=realm,
+                               root_priv=priv, issuer_handle=at, roles=roles,
+                               issued_at=issued_at, ttl_days=ttl_days)
+    # Pin our own key as the anchor for our realm; materialize our identity card
+    # so issue_member_card + the dashboard resolve us as this group's PI.
+    _cert.pin_root(realm, pub_str)
+    _ic.import_card(_scoped_from_signed(card["payload"]), env=env)
+    d = cards_dir()
+    d.mkdir(parents=True, exist_ok=True)
+    (d / f"{_safe(realm)}_pi.json").write_text(_cert.dumps(card), encoding="utf-8")
+    _record_issued(realm, card, "pi")
+    return {"pi_card": card, "trust_root": pub_str, "realm": realm}
+
+
+# ---------------------------------------------------------------------------
 # PI side: enroll (prove key possession) + verify-and-import
 # ---------------------------------------------------------------------------
 
@@ -319,7 +365,7 @@ def verify_local_identity(*, env: dict | None = None, now=None) -> tuple[str, st
 
 
 __all__ = [
-    "IssuanceError", "issue_pi_card", "make_enrollment",
+    "IssuanceError", "issue_pi_card", "self_issue_pi_card", "make_enrollment",
     "verify_and_import_pi_card", "issue_member_card",
     "verify_and_import_member_card", "verify_local_identity", "cards_dir",
 ]

@@ -823,6 +823,32 @@ def import_signed_card_cmd(card_file: str, trust_root: str) -> None:
     click.echo("\nRestart your wigamig dashboard; the login will now show your role.")
 
 
+@click.command("pi-init",
+                help="Self-issue your PI ID for a lab or core you lead — no mayor "
+                     "or centre needed. You become your group's certificate "
+                     "authority and can immediately issue member IDs. Members pin "
+                     "the printed trust root to import their cards.")
+@click.argument("group")
+@click.option("--core", is_flag=True, help="This group is a core (default: lab).")
+def pi_init(group: str, core: bool) -> None:
+    from ..core import issuance as _iss
+    from ..core import identity as _id
+    ident = _id.resolve(allow_unknown=True)
+    try:
+        out = _iss.self_issue_pi_card(ident.at_handle, group,
+                                      group_kind="core" if core else "lab")
+    except _iss.IssuanceError as exc:
+        raise click.ClickException(str(exc)) from exc
+    what = "core" if core else "lab"
+    click.echo(f"✓ your PI ID for '{group}' is ready — you are this {what}'s root.")
+    click.echo(f"  Give members this trust root so they can import their cards:\n"
+               f"    {out['trust_root']}")
+    click.echo(f"  Issue a member ID:  wigamig issue-member-card <their-enroll.json> "
+               f"--group {group}")
+    click.echo("  (A mayor can ALSO issue you a centre PI ID later — that's separate, "
+               "for joining a centre; your members' cards keep working.)")
+
+
 @click.command("centre-pin",
                 help="MEMBER: fetch a centre's published signing key + CRL from a "
                      "local wigamig_public checkout and pin it as your trust "

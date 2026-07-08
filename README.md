@@ -47,16 +47,25 @@ public directory.
 
 ## I'm a PI of a lab or core
 
-1. Install wigamig (above) and set your lab's parameters.
-2. **Register your lab with your institution's mayor.** Find your institution in
-   the [wigamig implementations directory](https://github.com/hallettmiket/wigamig_public)
-   and send the encrypted request its `wigamig-join.sh` generates. The mayor
-   approves and sends you back your **PI ID**.
-3. **Accept members by issuing them IDs.** When a member sends a `wigamig enroll`
+**You don't need a mayor to run a lab.** You are your own lab's certificate
+authority.
+
+1. Install wigamig (above), then **self-issue your PI ID** — this makes you your
+   lab's root and prints a **trust root** to give your members:
+   ```bash
+   wigamig pi-init <your-lab>          # (or answer "PI" in `wigamig init`)
+   ```
+2. **Accept members by issuing them IDs.** When a member sends a `wigamig enroll`
    request, sign and return it:
    ```bash
    wigamig issue-member-card <their-request> --group <your-lab>
    ```
+   They import it with `wigamig import-card <bundle> --trust-root <your-trust-root>`.
+3. **Optional — join a centre.** If your institution runs a wigamig centre,
+   register with its mayor (the [implementations directory](https://github.com/hallettmiket/wigamig_public)
+   → `wigamig-join.sh`). The mayor issues you a **separate** centre PI ID that
+   attests your *same key* to the centre — your members' cards keep working
+   unchanged; only the trust anchor gains a higher root.
 
 Full identity flow (enroll → issue → import → revoke): [`docs/identity.md`](docs/identity.md).
 
