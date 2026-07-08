@@ -9,9 +9,16 @@ centre root key  ──signs──▶  PI card  ──(PI's key) signs──▶ 
    (the mayor)                (a lab PI / core leader)         (a group member)
 ```
 
-A card only verifies if it was signed by the group's **real** PI, whose own card
-was signed by the **centre root**. So you cannot claim a group you're not in, and
-each person has a unique cryptographic ID (their public-key **fingerprint**).
+A card only verifies if it was signed by the group's **real** PI. So you cannot
+claim a group you're not in, and each person has a unique cryptographic ID (their
+public-key **fingerprint**).
+
+**A mayor is optional.** By default a PI is their **own root** — a lab runs
+standalone (`wigamig pi-init`), the PI signs member cards, and members pin the
+PI's key. When a lab *joins* a centre, the mayor adds a higher root: the centre
+root signs the PI's card, so those same member cards also chain up to the centre
+(only the trust anchor changes — nothing is re-issued). Your **key** is the
+constant across both.
 
 ## Two ideas kept separate
 
@@ -58,7 +65,20 @@ wigamig issue-member-card enroll.json --group <group> --out bundle.json
 Signs the member's card with **your** key and bundles your PI card so the member
 can verify the whole chain. You can only issue for a group you lead.
 
-## Onboarding a PI (mayor / admin registrar)
+## Run a lab standalone (PI, no mayor)
+
+You self-issue your own PI ID and become your lab's root — no centre needed:
+
+```bash
+wigamig pi-init <your-lab>      # prints a trust root; give it to your members
+```
+
+Now issue member cards as above; members import with
+`wigamig import-card <bundle> --trust-root <your-trust-root>`. If you later join a
+centre, the mayor issues you a **separate** centre PI card attesting the same key
+(see below) — your members keep working, they just gain a higher anchor.
+
+## Onboarding a PI into a centre (mayor / admin registrar)
 
 ```bash
 # one-time: create the centre's root signing key (the CA)

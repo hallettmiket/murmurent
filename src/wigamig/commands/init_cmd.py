@@ -82,12 +82,27 @@ def run_init() -> None:
         click.echo("  • Ask your PI for a membership ID (a signed certificate).")
         click.echo("  • Import it:  wigamig import-card <file> --trust-root <centre-signing-key>")
     elif role == "pi":
-        click.echo("  • Register your lab with your institution's mayor: find your "
-                   "institution at")
-        click.echo("    https://github.com/hallettmiket/wigamig_public and run its "
-                   "wigamig-join.sh.")
-        click.echo("  • Once you have your PI ID, issue member IDs with:  "
-                   "wigamig issue-member-card")
+        group = profile.get("group") or ""
+        # Self-issue the PI's own PI ID now — a lab can run standalone, no mayor
+        # needed. The PI becomes their group's root and can issue member IDs
+        # immediately.
+        if group and click.confirm(
+                f"Generate your PI ID for '{group}' now, so you can issue member "
+                "IDs? (No mayor needed — you'll be your lab's root.)", default=True):
+            from ..core import issuance as _iss
+            try:
+                out = _iss.self_issue_pi_card(f"@{handle}", group)
+                click.echo(f"  ✓ PI ID ready. Give members this trust root:\n"
+                           f"      {out['trust_root']}")
+                click.echo(f"  • Issue a member ID:  wigamig issue-member-card "
+                           f"<their-request> --group {group}")
+            except _iss.IssuanceError as exc:
+                click.echo(f"  ! could not self-issue PI ID: {exc}")
+        else:
+            click.echo("  • Self-issue your PI ID any time:  wigamig pi-init <lab-name>")
+        click.echo("  • Optional — to join a centre, register with its mayor "
+                   "(https://github.com/hallettmiket/wigamig_public → wigamig-join.sh). "
+                   "That's a SEPARATE, centre-level PI ID; your members keep working.")
     else:  # mayor
         click.echo("  • Bootstrap your centre — the dashboard has a one-time setup form:")
         click.echo("      wigamig dashboard --hifi --port 8771   → http://localhost:8771/registrar")
