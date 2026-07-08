@@ -109,6 +109,12 @@ fi
 # 3. centre reset (all levels) ----------------------------------------------
 say "3. centre state"
 rmrf "$WIG/lab_info" "centre registry (lab_info/)"
+# The per-machine registrar sentinel is a claim to be a registrar OF the centre;
+# once the centre is gone it's meaningless and must not linger (a stale sentinel
+# used to still read as 'registrar' on the next install). The saved netname goes
+# too, so the next install resolves a fresh identity.
+rmrf "$WIG/registrar" "registrar sentinel (~/.wigamig/registrar)"
+rmrf "$WIG/user" "saved netname (~/.wigamig/user)"
 
 # 3b. uninstall the tool entirely (only with --uninstall) -------------------
 # Completely removes every wigamig executable: the uv-tool install AND any

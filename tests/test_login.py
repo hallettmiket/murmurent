@@ -105,8 +105,11 @@ def test_is_registrar_prefers_registry_list_over_sentinel(isolated):
     assert registrar.is_registrar("the_pi") is False
 
 
-def test_is_registrar_falls_back_to_sentinel_when_list_empty(isolated):
-    # Legacy single-registrar install: no registry list, sentinel honoured.
+def test_is_registrar_falls_back_to_sentinel_when_list_empty(isolated, monkeypatch):
+    # Legacy single-registrar install: a centre exists, no registry list, so the
+    # sentinel is honoured. (The sentinel is only valid within a centre.)
+    from wigamig.core import centre_init as _ci
+    monkeypatch.setattr(_ci, "is_initialised", lambda env=None: True)
     registrar.REGISTRAR_SENTINEL.write_text("the_pi\n", encoding="utf-8")
     # Write an empty-registrars registry on disk.
     registrar.write_registry(Registry(registrars=[]))

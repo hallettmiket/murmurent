@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# Purpose: One-command administrator (mayor) install for wigamig. Chains the
-#          five manual setup steps into a single idempotent run and lands the
-#          mayor at the centre-setup form.
+# Purpose: One-command install of wigamig for ANYONE — member, PI, or mayor.
+#          Installs the CLI + commons + hooks, then hands off to `wigamig init`,
+#          the one-time role-picker that sets up your session. This script does
+#          NOT assume you are the mayor.
 # Author:  Mike Hallett (with Claude Code)
 #
 # Two ways to run it:
@@ -56,7 +57,7 @@ if [[ -n "$SELF" && -f "$SELF" ]]; then
   fi
 fi
 
-echo "wigamig administrator (mayor) install"
+echo "wigamig install"
 echo "repo dir: $REPO_DIR   branch: $BRANCH"
 
 # ── 1. Prerequisites ─────────────────────────────────────────────────────────
@@ -135,31 +136,24 @@ bash "$REPO_DIR/scripts/setup.sh"
 step "5/6 registering data-governance hooks + MCP servers"
 wigamig install --hooks
 
-# ── 6. Bootstrap the centre ──────────────────────────────────────────────────
-step "6/6 ready to bootstrap the centre"
+# ── 6. Set up your session ───────────────────────────────────────────────────
+step "6/6 wigamig is installed — now set up your session"
 cat <<'EOF'
-  The commons is installed. You are ready to become the founding registrar.
+  Run the one-time setup. It picks your role (member / PI / mayor) and collects
+  the info to initialise your session:
 
-  Launch the dashboard and fill in the one-time centre-setup form:
+      wigamig init
 
-      wigamig dashboard --hifi --port 8771
-      # then open http://localhost:8771/registrar
-
-  ...or bootstrap headlessly from the CLI:
-
-      wigamig centre-init --mayor @<your-handle> \
-        --name "<Centre name>" --institution "<Institution>" \
-        --unique-name <short-id> --server-host <wigamig-server-host>
-
-  Confirm with:  wigamig centre-status
+  (Members ask their PI for a membership ID; PIs register with their mayor;
+   only mayors bootstrap a centre. `wigamig init` walks you through your path.)
 EOF
 
 if [[ "${NO_LAUNCH:-0}" != "1" && -t 0 ]]; then
-  printf "\nLaunch the dashboard now? [y/N] "
+  printf "\nRun `wigamig init` now? [Y/n] "
   read -r reply
-  if [[ "$reply" == "y" || "$reply" == "Y" ]]; then
-    exec wigamig dashboard --hifi --port 8771
+  if [[ -z "$reply" || "$reply" == "y" || "$reply" == "Y" ]]; then
+    exec wigamig init
   fi
 fi
 
-ok "done."
+ok "done. Run 'wigamig init' when you're ready."
