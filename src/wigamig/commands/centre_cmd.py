@@ -779,11 +779,21 @@ def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
         raise click.ClickException(str(exc)) from exc
     text = _json.dumps(bundle, indent=2)
     subj = bundle["member_card"]["payload"]["subject"]["handle"]
+    # Tell the PI exactly which trust root the member must pin. If the PI card is
+    # self-signed (standalone lab), it's the PI's own key; otherwise it's the
+    # centre's signing recipient.
+    pi_p = bundle["pi_card"]["payload"]
+    self_rooted = (pi_p.get("issuer") or {}).get("fingerprint") == pi_p["subject"]["fingerprint"]
     if out_file:
         _P(out_file).write_text(text, encoding="utf-8")
         click.echo(f"✓ signed member card for {subj} (group {group}) → {out_file}")
-        click.echo("  Send it to them (with the centre's signing recipient to pin); "
-                   "they run `wigamig import-card <file> --trust-root <pubkey>`.")
+        if self_rooted:
+            root = pi_p["subject"]["pubkey"]
+            click.echo(f"  Send them this file + your trust root:\n    {root}")
+            click.echo(f"  They run:  wigamig import-card {out_file} --trust-root {root}")
+        else:
+            click.echo("  Send them this file; they pin your centre's signing recipient "
+                       "(`wigamig centre-pin <centre>`), then `wigamig import-card <file>`.")
     else:
         click.echo(text)
 
@@ -977,12 +987,18 @@ def whoami() -> None:
     click.echo(f"handle:   {ident.at_handle}  (via {ident.source})")
     click.echo(f"key ID:   {fp or '— none yet (run `wigamig identity-init`)'}")
     card = _ic.local_card()
+    roles = set()
     if card:
         centre = card.get("centre") or "?"
-        roles = ", ".join(sorted({r.get("kind", "?") for r in card.get("roles", [])})) or "—"
-        click.echo(f"card:     centre '{centre}'; roles: {roles}")
+        roles = {r.get("kind", "?") for r in card.get("roles", [])}
+        rtxt = ", ".join(sorted(roles)) or "—"
+        click.echo(f"card:     centre '{centre}'; roles: {rtxt}")
     else:
         click.echo("card:     none imported yet")
+    # For a PI/leader, surface the trust root members must pin — it's your public
+    # key, safe to share, and you'll need it every time you card a new member.
+    if fp and roles & {"lab_pi", "core_leader"}:
+        click.echo(f"trust root (give to members):\n    {_k.encode_public(_k.load_public())}")
 
 
 @click.command("onboard-check",

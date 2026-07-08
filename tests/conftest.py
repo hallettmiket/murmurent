@@ -43,3 +43,14 @@ def _no_autokey(monkeypatch):
     on first run). Bootstrap tests opt back in with ``monkeypatch.delenv`` + an
     isolated ``WIGAMIG_HOME``."""
     monkeypatch.setenv("WIGAMIG_NO_AUTOKEY", "1")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_wigamig_home(monkeypatch, tmp_path):
+    """Point ``WIGAMIG_HOME`` at a per-test temp dir. Everything that reads
+    ``~/.wigamig`` at runtime — the dashboard's netname enforcement + card
+    verification, key generation, the issuance/revocation stores — is then
+    isolated, so a test can neither read nor pollute the developer's real home
+    (a leaked ``identity.yaml`` there used to 403 unrelated dashboard tests).
+    Tests that need a specific home simply set ``WIGAMIG_HOME`` again."""
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "_wig_home"))
