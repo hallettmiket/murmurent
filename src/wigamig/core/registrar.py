@@ -68,7 +68,15 @@ class InvalidCollaboration(RegistrarError):
 # Identity
 # -----------------------------------------------------------------
 
-REGISTRAR_SENTINEL = Path.home() / ".wigamig" / "registrar"
+def _wig_home() -> Path:
+    """This machine's ``~/.wigamig`` root, honouring ``WIGAMIG_HOME`` so tools,
+    scripts, and tests that isolate it never write into the real home."""
+    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+
+
+# Per-machine sentinel. Honours WIGAMIG_HOME (evaluated per process), so e.g. the
+# identity smoke test — which sets WIGAMIG_HOME — cannot clobber the real one.
+REGISTRAR_SENTINEL = _wig_home() / "registrar"
 LAB_INFO_ENV_VAR = "WIGAMIG_LAB_INFO_ROOT"
 DEFAULT_LAB_INFO_ROOT = Path.home() / ".wigamig" / "lab_info"
 REGISTRY_FILENAME = "_registry.yaml"
@@ -151,9 +159,11 @@ def is_registrar(handle: str, env: dict[str, str] | None = None) -> bool:
     """Return True iff ``handle`` is an authoritative centre registrar.
 
     Truth lives in ``_registry.yaml:registrars:`` (committed, git-tracked).
-    If that list is empty (fresh install, pre-Phase-A), fall back to the
-    per-machine ``~/.wigamig/registrar`` sentinel for backward compat —
-    so existing single-registrar installs keep working without a migration.
+    If that list is empty (fresh install, pre-Phase-A), fall back — in order — to
+    a ``<lab_info>/registrar`` file (git-tracked, scoped to this centre's data
+    root, so it isolates cleanly) and then the per-machine
+    ``~/.wigamig/registrar`` sentinel, for backward compat with single-registrar
+    installs.
     """
     norm = _normalize(handle)
     if not norm:
@@ -161,11 +171,33 @@ def is_registrar(handle: str, env: dict[str, str] | None = None) -> bool:
     declared = registrars(env)
     if declared:
         return norm in declared
-    # Fallback: legacy single-handle sentinel.
+    # Fallback 1: a registrar declared in the centre's own lab_info root.
+    scoped = _lab_info_registrar(env)
+    if scoped is not None:
+        return norm == scoped
+    # Fallback 2: legacy per-machine sentinel.
     legacy = registrar_handle()
     if legacy is None:
         return False
     return norm == legacy
+
+
+def _lab_info_registrar(env: dict[str, str] | None = None) -> str | None:
+    """The single registrar handle declared in ``<lab_info>/registrar``, or None.
+
+    Scoped to ``WIGAMIG_LAB_INFO_ROOT`` (unlike the machine sentinel), so it is
+    naturally isolated per install/test."""
+    p = lab_info_root(env) / "registrar"
+    if not p.is_file():
+        return None
+    try:
+        text = p.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    for line in text.splitlines():
+        if line.strip():
+            return _normalize(line)
+    return None
 
 
 # -----------------------------------------------------------------
