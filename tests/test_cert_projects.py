@@ -84,6 +84,32 @@ def test_set_status_preserves_metadata():
     assert p.code_repo == "~/repos/p"
 
 
+def test_slack_channel_for():
+    assert CP.slack_channel_for("ghost") == ""            # unregistered → ""
+    CP.upsert("p", lab="lab_mh")
+    assert CP.slack_channel_for("p") == ""                # registered, no channel
+    CP.upsert("p", lab="lab_mh", slack_channel_id="C42")
+    assert CP.slack_channel_for("p") == "C42"
+
+
+def test_project_name_for_cwd(monkeypatch, tmp_path):
+    from wigamig.core import repo as R
+    # not in a project repo → None
+    monkeypatch.chdir(tmp_path)
+    assert CP.project_name_for_cwd() is None
+    # a repo with CHARTER carrying a project name → that name
+    proj = tmp_path / "myrepo"
+    (proj).mkdir()
+    (proj / R.CHARTER_FILENAME).write_text(
+        "---\nproject: rna_atlas\n---\n", encoding="utf-8")
+    assert CP.project_name_for_cwd(proj) == "rna_atlas"
+    # CHARTER without a project field → falls back to the dir name
+    p2 = tmp_path / "barerepo"
+    p2.mkdir()
+    (p2 / R.CHARTER_FILENAME).write_text("---\nlead: '@x'\n---\n", encoding="utf-8")
+    assert CP.project_name_for_cwd(p2) == "barerepo"
+
+
 def test_write_rejects_dangling_symlink(monkeypatch, tmp_path):
     """A dangling lab-mgmt symlink fails cleanly (CertProjectError), not with an
     opaque FileExistsError deep in mkdir."""
