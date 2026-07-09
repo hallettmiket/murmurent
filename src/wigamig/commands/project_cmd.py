@@ -34,11 +34,9 @@ from ..core.projects import (
     ProjectSummary,
     find_project,
     iter_local_projects,
-    lab_mgmt_project_registry_path,
     load_summary,
     project_path,
     projects_for_member,
-    render_registry_entry,
 )
 from ..core.repo import MEMBERS_FILENAME, lab_mgmt_repo_root, read_members, require_project_repo
 
@@ -242,20 +240,15 @@ def cmd_new(
             check=True,
         )
 
-    # Lab-mgmt registry entry
+    # Register in the cert-project registry — the authoritative project store
+    # (which replaced the CHARTER-mirror registry). The CHARTER repo is now an
+    # *attribute* (code_repo) of this project, not what defines it. Members are
+    # uncertified until project cards are issued. Best-effort: a dangling/
+    # uninitialised lab-mgmt shouldn't fail project creation.
     repo = find_project(name)
     if repo is None:
         raise click.ClickException(f"Internal error: project {name} not visible after creation.")
     summary = load_summary(repo)
-    registry_path = lab_mgmt_project_registry_path(name)
-    registry_path.parent.mkdir(parents=True, exist_ok=True)
-    if not registry_path.exists():
-        registry_path.write_text(render_registry_entry(summary, today=_today()), encoding="utf-8")
-
-    # Register in the cert-project registry — the authoritative project model. The
-    # CHARTER repo above is now an *attribute* (code_repo) of this project, not what
-    # defines it. Members are uncertified until project cards are issued. Best-effort:
-    # a dangling/uninitialised lab-mgmt shouldn't fail project creation.
     try:
         from ..core import cert_projects as _cp
         _cp.register_from_summary(summary, code_repo=str(repo.path), today=_today())
@@ -419,16 +412,15 @@ def cmd_new_remote(
         charter_text = head + sep + body + sep2 + tail
     (pointer_dir / "CHARTER.md").write_text(charter_text, encoding="utf-8")
 
-    # Lab-mgmt registry entry with host fields.
-    registry_path = lab_mgmt_project_registry_path(name)
-    registry_path.parent.mkdir(parents=True, exist_ok=True)
-    registry_path.write_text(
-        render_registry_entry(
-            summary, today=_today(),
-            host_name=host_name, remote_path=remote_path,
-        ),
-        encoding="utf-8",
-    )
+    # Register in the cert-project registry (authoritative) with the remote clone
+    # location, so `wigamig reconcile` can reach the tree on its host.
+    try:
+        from ..core import cert_projects as _cp
+        _cp.register_from_summary(summary, code_repo=str(pointer_dir),
+                                  host=host_name, remote_path=remote_path,
+                                  today=_today())
+    except _cp.CertProjectError:
+        pass
 
     click.echo(
         f"Project {name!r} created on {host_name} at {remote_path}.\n"

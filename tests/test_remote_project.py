@@ -185,7 +185,7 @@ def test_cmd_new_remote_writes_pointer_and_registry(world, lab-server, fake_ssh)
     assert meta["host"] == "lab-server"
     assert meta["remote_path"] == "/home/the_pi/repos/myproj"
     # lab-mgmt registry entry has host: + remote_path:
-    registry = world["lab_mgmt"] / "projects" / "myproj.md"
+    registry = world["lab_mgmt"] / "cert_projects" / "myproj.md"
     assert registry.is_file()
     text = registry.read_text(encoding="utf-8")
     assert "host: lab-server" in text

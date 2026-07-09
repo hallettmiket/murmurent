@@ -282,34 +282,17 @@ def _set_registry_status(
     timestamp: str | None,
     env: dict[str, str] | None = None,
 ) -> None:
-    """Mirror the status flip in ``lab_mgmt/projects/<name>.md`` if present.
-
-    The lab-mgmt project registry file is the canonical cross-project
-    lookup the dashboard consults. Keeping it in sync with CHARTER avoids
-    "the project shows archived in one view, active in another."
-    Missing file is a no-op (legacy projects without a registry entry).
+    """Flip the status in the cert-project registry (the authoritative store that
+    replaced the CHARTER-mirror registry), keeping it in sync with CHARTER so a
+    project doesn't read "archived" in one view and "active" in another. Missing
+    cert-project is a no-op (legacy projects not yet backfilled). Best-effort — a
+    dangling/uninitialised lab-mgmt must not break archive/unarchive.
     """
-    import yaml as _yaml
-
-    from .frontmatter import parse_file as _pf
-
-    path = lab_mgmt_project_registry_path(name, env)
-    if not path.is_file():
-        return
-    parsed = _pf(path)
-    meta = dict(parsed.meta or {})
-    meta["status"] = status
-    if status == "archived":
-        if timestamp:
-            meta["decommissioned_at"] = timestamp
-        if by_handle:
-            meta["decommissioned_by"] = by_handle
-    else:
-        meta.pop("decommissioned_at", None)
-        meta.pop("decommissioned_by", None)
-    front = _yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).strip()
-    body = parsed.body or ""
-    path.write_text(f"---\n{front}\n---\n\n{body.lstrip()}", encoding="utf-8")
+    try:
+        from . import cert_projects as _cp
+        _cp.set_status(name, status, env=env)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def archive_project(

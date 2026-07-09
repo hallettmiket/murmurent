@@ -41,10 +41,6 @@ import yaml
 from . import charter as _charter
 from . import preflight as _pf
 from . import project_cc_init as _cci
-from .projects import (
-    lab_mgmt_project_registry_path,
-    render_registry_entry,
-)
 from .projects import ProjectSummary
 from .repo import wigamig_repo_root
 
@@ -193,56 +189,32 @@ def make_wigamig_project(
         choreography=choreography,
         members=members,
     )
+    # Register the project in the cert-project registry — the authoritative
+    # project store (which replaced the CHARTER-mirror registry). Carries the
+    # clone location (code_repo + host/remote_path) so `wigamig reconcile` can
+    # find orphaned/unreachable clones.
+    host_name = ssh_remote or "local"
+    remote_path = ""
+    if ssh_remote:
+        rh = (remote_home or "").rstrip("/")
+        # Match cmd_new_remote's convention: remote clones live at
+        # <project_root>/<name>; project_root defaults to ~/repos.
+        remote_path = f"{rh}/repos/{project}" if rh else f"~/repos/{project}"
     try:
-        registry_path = lab_mgmt_project_registry_path(project)
-    except Exception as exc:
-        # lab_mgmt repo not configured on this machine — skip silently
-        # rather than fail. The user can still work locally.
+        from . import cert_projects as _cp
+        _cp.register_from_summary(summary, code_repo=str(clone_path),
+                                  host=host_name, remote_path=remote_path,
+                                  today=today)
+        result.registry_path = _cp.project_path(project)
         result.probes.append(_pf.Probe(
-            name="lab_mgmt registry", status="warn",
+            name="cert-project registry", status="ok",
+            detail=f"registered {project}", required=False,
+        ))
+    except Exception as exc:  # noqa: BLE001 — lab_mgmt not configured / dangling
+        result.probes.append(_pf.Probe(
+            name="cert-project registry", status="warn",
             detail=f"skipped: {exc}", required=False,
         ))
-        registry_path = None
-
-    if registry_path is not None:
-        result.registry_path = registry_path
-        if registry_path.exists():
-            result.probes.append(_pf.Probe(
-                name="lab_mgmt registry", status="ok",
-                detail=f"{registry_path} (already exists, preserved)",
-                required=False,
-            ))
-        else:
-            try:
-                registry_path.parent.mkdir(parents=True, exist_ok=True)
-                host_name = ssh_remote or "local"
-                remote_path = ""
-                if ssh_remote:
-                    rh = (remote_home or "").rstrip("/")
-                    # Match cmd_new_remote's convention: remote clones
-                    # live at <project_root>/<name>; the project_root
-                    # default is ~/repos which we expand against rh
-                    # when known.
-                    if rh:
-                        remote_path = f"{rh}/repos/{project}"
-                    else:
-                        remote_path = f"~/repos/{project}"
-                registry_path.write_text(
-                    render_registry_entry(
-                        summary, today=today,
-                        host_name=host_name, remote_path=remote_path,
-                    ),
-                    encoding="utf-8",
-                )
-                result.probes.append(_pf.Probe(
-                    name="lab_mgmt registry", status="ok",
-                    detail=f"wrote {registry_path}", required=False,
-                ))
-            except OSError as exc:
-                result.probes.append(_pf.Probe(
-                    name="lab_mgmt registry", status="warn",
-                    detail=f"write failed: {exc}", required=False,
-                ))
 
     # ---- 3. Installation manifest --------------------------------------
     # Match the schema workspace_initialize used to write directly so

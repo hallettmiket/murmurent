@@ -45,7 +45,7 @@ def test_project_new_creates_repo_and_registry(isolated_env):
     assert (summary.path / "MEMBERS").is_file()
     assert (summary.path / "exp").is_dir()
     assert lab_vm.project_raw_dir("dcis_sc_tutorial").is_dir()
-    registry = isolated_env / "lab-mgmt" / "projects" / "dcis_sc_tutorial.md"
+    registry = isolated_env / "lab-mgmt" / "cert_projects" / "dcis_sc_tutorial.md"
     assert registry.is_file()
 
 
