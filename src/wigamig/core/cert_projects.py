@@ -55,6 +55,13 @@ class CertProject:
     sensitivity: str = "standard"          # standard | restricted | clinical
     choreography: str | None = None
     code_repo: str = ""                    # optional: linked ~/repos/<name> code repo
+    # Where the code repo's working tree lives — so `wigamig reconcile` can find
+    # orphaned/unreachable clones from the cert-project registry (this metadata
+    # used to live only in the CHARTER-mirror registry). host="local" means this
+    # machine at ``code_repo``; a remote host name means the tree is at
+    # ``remote_path`` on that host and ``code_repo`` is a local pointer.
+    host: str = "local"
+    remote_path: str = ""
     slack_channel_id: str = ""             # provisioned in Phase C
     github_repo: str = ""                  # provisioned in Phase C, e.g. "org/name"
     members: tuple[str, ...] = ()          # certified member handles (@-prefixed)
@@ -65,7 +72,9 @@ class CertProject:
         return {"name": self.name, "lab": self.lab, "status": self.status,
                 "created": self.created, "lead": self.lead,
                 "sensitivity": self.sensitivity, "choreography": self.choreography,
-                "code_repo": self.code_repo, "slack_channel_id": self.slack_channel_id,
+                "code_repo": self.code_repo, "host": self.host,
+                "remote_path": self.remote_path,
+                "slack_channel_id": self.slack_channel_id,
                 "github_repo": self.github_repo, "members": list(self.members),
                 "certs": [dict(c) for c in self.certs]}
 
@@ -114,6 +123,8 @@ def _parse(path: Path) -> CertProject:
         sensitivity=str(meta.get("sensitivity") or "standard").strip().lower() or "standard",
         choreography=str(chor) if chor else None,
         code_repo=str(meta.get("code_repo") or ""),
+        host=str(meta.get("host") or "local") or "local",
+        remote_path=str(meta.get("remote_path") or ""),
         slack_channel_id=str(meta.get("slack_channel_id") or ""),
         github_repo=str(meta.get("github_repo") or ""),
         members=members,
@@ -154,6 +165,10 @@ def _render(p: CertProject) -> str:
         meta["choreography"] = p.choreography
     if p.code_repo:
         meta["code_repo"] = p.code_repo
+    if p.host and p.host != "local":
+        meta["host"] = p.host
+    if p.remote_path:
+        meta["remote_path"] = p.remote_path
     if p.slack_channel_id:
         meta["slack_channel_id"] = p.slack_channel_id
     if p.github_repo:
@@ -179,6 +194,7 @@ def upsert(name: str, *, lab: str, member: str | None = None,
            cert: dict | None = None, status: str | None = None,
            lead: str | None = None, sensitivity: str | None = None,
            choreography: str | None = None, code_repo: str | None = None,
+           host: str | None = None, remote_path: str | None = None,
            slack_channel_id: str | None = None, github_repo: str | None = None,
            today: str | None = None, env: dict | None = None) -> CertProject:
     """Create or update a cert project. Optionally add a certified ``member``
@@ -210,6 +226,7 @@ def upsert(name: str, *, lab: str, member: str | None = None,
         sensitivity=(str(sensitivity).strip().lower() if sensitivity else cur.sensitivity),
         choreography=_keep(choreography, cur.choreography),
         code_repo=_keep(code_repo, cur.code_repo),
+        host=_keep(host, cur.host), remote_path=_keep(remote_path, cur.remote_path),
         slack_channel_id=_keep(slack_channel_id, cur.slack_channel_id),
         github_repo=_keep(github_repo, cur.github_repo),
         members=tuple(members), certs=tuple(certs))
@@ -217,18 +234,21 @@ def upsert(name: str, *, lab: str, member: str | None = None,
     return updated
 
 
-def register_from_summary(summary, *, code_repo: str = "",
-                          env: dict | None = None, today: str | None = None) -> str:
+def register_from_summary(summary, *, code_repo: str = "", host: str = "local",
+                          remote_path: str = "", env: dict | None = None,
+                          today: str | None = None) -> str:
     """Upsert a cert-project from a CHARTER ``ProjectSummary`` (or any object with
     ``name``/``lab``/``status``/``lead``/``sensitivity``/``choreography``/
-    ``members``). Members are recorded UNCERTIFIED (no cert entries) — issuing
+    ``members``). ``host``/``remote_path`` record where the clone lives (for
+    reconcile). Members are recorded UNCERTIFIED (no cert entries) — issuing
     project cards certifies them later. Idempotent. Returns the project name."""
     lab = getattr(summary, "lab", "") or ""
     upsert(summary.name, lab=lab, status=getattr(summary, "status", "active"),
            lead=getattr(summary, "lead", ""),
            sensitivity=getattr(summary, "sensitivity", "standard"),
            choreography=getattr(summary, "choreography", None),
-           code_repo=code_repo, today=today, env=env)
+           code_repo=code_repo, host=host, remote_path=remote_path,
+           today=today, env=env)
     cur = get(summary.name, env)
     existing = {_norm(m) for m in (cur.members if cur else ())}
     for m in getattr(summary, "members", ()):
@@ -252,7 +272,14 @@ def backfill_from_charter(*, env: dict | None = None,
             s = _proj.load_summary(repo)
         except Exception:  # noqa: BLE001
             continue
-        register_from_summary(s, code_repo=str(repo.path), env=env, today=today)
+        # A remote-pointer project's tree lives on another host; capture that so
+        # reconcile can reach it. Local projects → host="local".
+        host, remote_path = "local", ""
+        pointer = _proj.read_remote_pointer(repo.path)
+        if pointer is not None:
+            host, remote_path = pointer
+        register_from_summary(s, code_repo=str(repo.path), host=host,
+                              remote_path=remote_path, env=env, today=today)
         touched.append(s.name)
     return touched
 

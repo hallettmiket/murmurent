@@ -94,6 +94,17 @@ def test_write_rejects_dangling_symlink(monkeypatch, tmp_path):
         CP.upsert("p", lab="lab_mh")
 
 
+def test_clone_location_round_trips():
+    CP.upsert("rp", lab="lab_mh", code_repo="~/repos/rp",
+              host="lab-server", remote_path="/srv/rp")
+    p = CP.get("rp")
+    assert p.host == "lab-server" and p.remote_path == "/srv/rp"
+    # membership upsert preserves clone location
+    CP.upsert("rp", lab="lab_mh", member="@allie")
+    p2 = CP.get("rp")
+    assert p2.host == "lab-server" and p2.remote_path == "/srv/rp"
+
+
 def test_backfill_from_charter(monkeypatch, tmp_path):
     """Existing CHARTER code-projects are mirrored into the cert-project registry
     with their name/lab/sensitivity/lead/members and a code_repo link."""
