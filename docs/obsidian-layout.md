@@ -9,14 +9,20 @@ root of your vault.
 
 ## Where the vault lives
 
-Resolve the absolute path on this machine with:
+Resolve the path on this machine with:
 
 ```bash
-wigamig vault path
+wigamig oracle path
 ```
 
-The resolver reads Obsidian's `obsidian.json` registry (the most
-recently opened vault), or `$WIGAMIG_OBSIDIAN_VAULT` if set.
+This prints your personal Oracle dir (`<vault>/oracle`); the **vault
+root** is its parent directory. The resolver reads Obsidian's
+`obsidian.json` registry (the most recently opened vault), or
+`$WIGAMIG_OBSIDIAN_VAULT` if set.
+
+To check that wigamig can actually *read* the vault on this machine
+(the common macOS Full Disk Access failure on iCloud-backed vaults),
+run `wigamig oracle doctor`.
 
 ## Subfolders wigamig knows about
 

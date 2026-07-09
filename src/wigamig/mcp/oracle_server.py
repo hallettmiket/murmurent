@@ -34,6 +34,7 @@ Design notes:
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from dataclasses import asdict, dataclass
@@ -42,7 +43,13 @@ from typing import Any, Iterable
 
 import yaml
 
+from ..core import obsidian as _obsidian
 from ..core import oracle_publish as _op
+
+# Env override so the notebook tier is resolvable without machine.yaml
+# (symmetric with WIGAMIG_PERSONAL_ORACLE_DIR for the personal tier).
+ENV_NOTEBOOK = "WIGAMIG_NOTEBOOK_DIR"
+DEFAULT_NOTEBOOK_SUBFOLDER = "lab-notebook"
 
 VALID_KINDS: tuple[str, ...] = ("personal", "lab", "notebook", "both", "all")
 # Backwards-compat: ``both`` originally meant {personal, lab}. ``all``
@@ -101,26 +108,66 @@ def _safe_lab_dir() -> Path | None:
 
 
 def _safe_notebook_dir() -> Path | None:
-    """Resolve ``<vault>/<notebook_subfolder>`` from the per-machine
-    settings. Returns ``None`` when no vault is registered, when the
-    notebook subdir is unset, or when the path doesn't exist on disk.
+    """Resolve ``<vault>/<notebook_subfolder>`` on this machine.
 
-    The path may exist but be unreadable (macOS Full Disk Access on
-    iCloud-backed vaults) — :func:`_iter_notebook_paths` handles
-    EPERM gracefully so a sandbox restriction never crashes the MCP
-    server."""
+    Uses the **same fallback chain** as
+    :func:`wigamig.core.oracle_publish.personal_oracle_dir` so the
+    notebook tier survives a missing ``~/.wigamig/machine.yaml`` (the
+    old implementation read only ``machine.yaml.obsidian_vault_path`` and
+    returned ``None`` whenever that file was absent, silently killing the
+    notebook tier):
+
+      1. ``$WIGAMIG_NOTEBOOK_DIR`` — an explicit override (tests + power
+         users), pointing straight at the notebook dir.
+      2. ``machine.yaml`` ``obsidian_vault_path`` + ``notebook_subfolder``.
+      3. The most-recently-opened Obsidian vault (from ``obsidian.json``)
+         + the machine's notebook subfolder (default ``lab-notebook``).
+
+    Returns ``None`` when no vault resolves at all, or when the resolved
+    path doesn't exist. The path may exist but be unreadable (macOS Full
+    Disk Access on iCloud-backed vaults) — :func:`_iter_paths` handles
+    the EPERM gracefully so a sandbox restriction never crashes the MCP
+    server (see also ``wigamig oracle doctor``)."""
+    # 1. Explicit override wins — trust it verbatim (existence is checked
+    #    below like every other branch).
+    pin = os.environ.get(ENV_NOTEBOOK, "").strip()
+    if pin:
+        return _dir_if_exists(Path(pin).expanduser())
+
+    # 2 + 3. Resolve the vault root, then append the notebook subfolder.
+    sub = DEFAULT_NOTEBOOK_SUBFOLDER
+    vault_root: Path | None = None
     try:
         from ..dashboard import machine_settings as _ms
         s = _ms.load()
+        if s.notebook_subfolder:
+            sub = s.notebook_subfolder
+        if s.obsidian_vault_path:
+            vault_root = Path(s.obsidian_vault_path).expanduser()
     except Exception:
-        return None
-    vault = s.obsidian_vault_path or ""
-    sub = s.notebook_subfolder or ""
-    if not vault or not sub:
-        return None
-    p = Path(vault).expanduser() / sub
-    # Path may exist but be unreadable; ``is_dir()`` returns False on
-    # EPERM, so we use exists() + a follow-up listdir attempt instead.
+        # machine_settings is best-effort (optional dashboard deps); fall
+        # through to obsidian.json discovery.
+        pass
+
+    if vault_root is None:
+        try:
+            v = _obsidian.preferred_vault()
+        except Exception:
+            v = None
+        if v is None:
+            return None
+        vault_root = v.path
+
+    return _dir_if_exists(vault_root / sub)
+
+
+def _dir_if_exists(p: Path) -> Path | None:
+    """Return ``p`` if it exists, else ``None``.
+
+    ``exists()`` swallows OSError and returns False, so an EPERM on the
+    parent reads as "absent" here — that's fine: the notebook tier just
+    stays empty, and ``wigamig oracle doctor`` is the tool that names the
+    Full-Disk-Access cause explicitly."""
     try:
         return p if p.exists() else None
     except OSError:

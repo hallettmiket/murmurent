@@ -493,3 +493,69 @@ def test_install_does_not_emit_null_matcher(tmp_path):
                 f"Either set a real matcher string or omit the key. "
                 f"Bad entry: {entry}"
             )
+
+
+# ---------------------------------------------------------------------------
+# _safe_notebook_dir resolution (fallback chain — no machine.yaml required)
+# ---------------------------------------------------------------------------
+
+
+class _Settings:
+    """Minimal stand-in for MachineSettings — the resolver only reads
+    ``obsidian_vault_path`` and ``notebook_subfolder``."""
+
+    def __init__(self, vault: str | None = None, sub: str = "lab-notebook"):
+        self.obsidian_vault_path = vault
+        self.notebook_subfolder = sub
+
+
+def test_notebook_dir_env_override_wins(monkeypatch, tmp_path):
+    """``$WIGAMIG_NOTEBOOK_DIR`` short-circuits the whole chain (symmetric
+    with the dashboard's notebook_folder() + WIGAMIG_PERSONAL_ORACLE_DIR)."""
+    nb = tmp_path / "custom-nb"
+    nb.mkdir()
+    monkeypatch.setenv("WIGAMIG_NOTEBOOK_DIR", str(nb))
+    assert srv._safe_notebook_dir() == nb
+
+
+def test_notebook_dir_falls_back_to_obsidian_registry(monkeypatch, tmp_path):
+    """Regression for the bug this change fixes: with no machine.yaml
+    (``obsidian_vault_path`` is None) the resolver must fall back to the
+    most-recently-opened Obsidian vault + notebook subfolder. The OLD
+    code returned None here, silently killing the notebook tier on every
+    machine that hadn't saved a machine.yaml."""
+    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    vault_root = tmp_path / "vault"
+    (vault_root / "lab-notebook").mkdir(parents=True)
+    from wigamig.dashboard import machine_settings as _ms
+    from wigamig.core.obsidian import Vault
+    monkeypatch.setattr(_ms, "load", lambda **k: _Settings(vault=None))
+    monkeypatch.setattr(srv._obsidian, "preferred_vault",
+                        lambda: Vault(name="vault", path=vault_root, ts=1))
+    assert srv._safe_notebook_dir() == vault_root / "lab-notebook"
+
+
+def test_notebook_dir_uses_machine_yaml_when_present(monkeypatch, tmp_path):
+    """When machine.yaml carries a vault path + custom subfolder, those
+    win and the Obsidian registry is not consulted."""
+    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    vault_root = tmp_path / "myvault"
+    (vault_root / "daily").mkdir(parents=True)
+    from wigamig.dashboard import machine_settings as _ms
+    monkeypatch.setattr(_ms, "load",
+                        lambda **k: _Settings(vault=str(vault_root), sub="daily"))
+    monkeypatch.setattr(
+        srv._obsidian, "preferred_vault",
+        lambda: (_ for _ in ()).throw(AssertionError("registry must not be read")),
+    )
+    assert srv._safe_notebook_dir() == vault_root / "daily"
+
+
+def test_notebook_dir_none_when_nothing_resolves(monkeypatch):
+    """No env, no machine.yaml vault, no Obsidian registry → None, and no
+    crash."""
+    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    from wigamig.dashboard import machine_settings as _ms
+    monkeypatch.setattr(_ms, "load", lambda **k: _Settings(vault=None))
+    monkeypatch.setattr(srv._obsidian, "preferred_vault", lambda: None)
+    assert srv._safe_notebook_dir() is None

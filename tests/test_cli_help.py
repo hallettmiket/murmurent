@@ -69,3 +69,35 @@ def test_stub_commands_emit_v1_message() -> None:
     result = runner.invoke(cli, ["doctor"])
     assert result.exit_code == 0
     assert "not yet implemented" in result.output
+
+
+def test_oracle_doctor_reports_ok_when_readable(tmp_path, monkeypatch) -> None:
+    """`wigamig oracle doctor` actually reads an entry and reports OK
+    (exit 0) when the vault is accessible."""
+    oracle_dir = tmp_path / "vault" / "oracle"
+    oracle_dir.mkdir(parents=True)
+    (oracle_dir / "2026-05-16_x.md").write_text(
+        "---\ntitle: x\n---\n\nbody\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("WIGAMIG_PERSONAL_ORACLE_DIR", str(oracle_dir))
+    result = CliRunner().invoke(cli, ["oracle", "doctor"])
+    assert result.exit_code == 0, result.output
+    assert "OK" in result.output
+
+
+def test_oracle_doctor_blocked_exits_nonzero(tmp_path, monkeypatch) -> None:
+    """A Full-Disk-Access denial must exit non-zero with the actionable
+    hint — the whole point of the probe is to be loud, not silent."""
+    from wigamig.core import oracle_publish as _op
+
+    monkeypatch.setattr(
+        _op, "probe_personal_oracle",
+        lambda: _op.VaultProbe(
+            status=_op.PROBE_BLOCKED,
+            detail="Operation not permitted — grant Full Disk Access.",
+            path="/some/vault/oracle",
+        ),
+    )
+    result = CliRunner().invoke(cli, ["oracle", "doctor"])
+    assert result.exit_code != 0
+    assert "Full Disk Access" in result.output

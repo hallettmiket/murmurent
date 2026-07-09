@@ -218,3 +218,85 @@ def test_personal_oracle_dir_honors_env_override(world):
     setups where Obsidian isn't installed."""
     p = _op.personal_oracle_dir()
     assert p == world["vault"] / "oracle"
+
+
+# ---------------------------------------------------------------------------
+# probe_personal_oracle — the Full Disk Access read probe (oracle doctor)
+# ---------------------------------------------------------------------------
+
+
+def _write_entry(dir_: Path, name: str) -> Path:
+    """Minimal schema-shaped entry — the probe only needs a readable
+    ``.md`` file, not valid frontmatter."""
+    p = dir_ / name
+    p.write_text("---\ntitle: x\n---\n\nbody\n", encoding="utf-8")
+    return p
+
+
+def test_probe_ok_when_entry_is_readable(world):
+    """Happy path: dir resolves, an entry exists, and the read succeeds."""
+    _write_entry(world["vault"] / "oracle", "2026-05-16_readable.md")
+    probe = _op.probe_personal_oracle()
+    assert probe.status == _op.PROBE_OK
+    assert probe.sample and probe.sample.endswith("2026-05-16_readable.md")
+    assert probe.path == str(world["vault"] / "oracle")
+
+
+def test_probe_empty_when_dir_has_no_entries(world):
+    """Dir resolves + readable but holds no entries yet — a benign state,
+    NOT the blocked/FDA failure."""
+    probe = _op.probe_personal_oracle()
+    assert probe.status == _op.PROBE_EMPTY
+
+
+def test_probe_missing_when_dir_absent(world):
+    """Resolved path doesn't exist yet (fresh install / agent hasn't
+    written). Distinct from 'blocked'."""
+    import shutil
+    shutil.rmtree(world["vault"] / "oracle")
+    probe = _op.probe_personal_oracle()
+    assert probe.status == _op.PROBE_MISSING
+
+
+def test_probe_unregistered_when_no_vault(monkeypatch):
+    """No env override and no Obsidian registry → unregistered, and the
+    probe never raises."""
+    monkeypatch.delenv("WIGAMIG_PERSONAL_ORACLE_DIR", raising=False)
+    monkeypatch.setattr(_op, "personal_oracle_dir",
+                        lambda: (_ for _ in ()).throw(_op.OracleError("no vault")))
+    probe = _op.probe_personal_oracle()
+    assert probe.status == _op.PROBE_UNREGISTERED
+    assert "no vault" in probe.detail
+
+
+def test_probe_blocked_on_listing_eperm(world, monkeypatch):
+    """The classic iCloud/Full-Disk-Access symptom: the dir stats fine
+    but enumerating its contents raises PermissionError. Must report
+    BLOCKED with the actionable FDA hint, not degrade to empty."""
+    _write_entry(world["vault"] / "oracle", "2026-05-16_x.md")
+
+    def _boom(self, *_a, **_kw):
+        raise PermissionError("Operation not permitted")
+
+    monkeypatch.setattr(Path, "rglob", _boom)
+    probe = _op.probe_personal_oracle()
+    assert probe.status == _op.PROBE_BLOCKED
+    assert "Full Disk Access" in probe.detail
+
+
+def test_probe_blocked_on_read_eperm(world, monkeypatch):
+    """Enumeration can succeed while a per-file read is denied. That is
+    still a BLOCKED result — the read is what the MCP actually needs."""
+    _write_entry(world["vault"] / "oracle", "2026-05-16_x.md")
+
+    real_read = Path.read_text
+
+    def _boom(self, *a, **kw):
+        if self.suffix == ".md":
+            raise PermissionError("Operation not permitted")
+        return real_read(self, *a, **kw)
+
+    monkeypatch.setattr(Path, "read_text", _boom)
+    probe = _op.probe_personal_oracle()
+    assert probe.status == _op.PROBE_BLOCKED
+    assert probe.sample and probe.sample.endswith("2026-05-16_x.md")
