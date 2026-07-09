@@ -22,6 +22,11 @@
 #   --nuke-credentials     also remove ~/.config/wigamig (slack-token + keys)
 #   --nuke-keys            with --level data, ALSO remove ~/.wigamig/keys + age
 #                          (a fully fresh identity; default keeps them)
+#   --nuke-labs            ALSO remove this machine's wigamig lab-management repos
+#                          (~/repos/wigamig_*  — they hold the roster). Backed up
+#                          into the tarball first; REFUSES any repo with
+#                          uncommitted or unpushed commits (push it, or don't nuke
+#                          it). Default: labs are only LISTED and left untouched.
 #   --uninstall            first completely REMOVE the existing wigamig
 #                          install(s) — the uv-tool one AND stray conda/pipx
 #                          copies — before any reinstall. With --level centre
@@ -49,12 +54,14 @@ YES=0
 NUKE_INSTALL=0
 NUKE_CREDS=0
 NUKE_KEYS=0
+NUKE_LABS=0
 UNINSTALL=0
 
 WIG="$HOME/.wigamig"
 CFG="$HOME/.config/wigamig"
 BACKUPS="$HOME/.wigamig_backups"
 REPO="${WIGAMIG_REPO:-$HOME/repos/wigamig}"
+REPOS_ROOT="${WIGAMIG_REPOS_ROOT:-$HOME/repos}"
 
 usage() { grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
@@ -68,6 +75,7 @@ while [ $# -gt 0 ]; do
     --nuke-installations) NUKE_INSTALL=1; shift ;;
     --nuke-credentials) NUKE_CREDS=1; shift ;;
     --nuke-keys) NUKE_KEYS=1; shift ;;
+    --nuke-labs) NUKE_LABS=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
     -h|--help) usage 0 ;;
     *) echo "unknown arg: $1" >&2; usage 1 ;;
@@ -89,6 +97,7 @@ say "=== wigamig reset — level: $LEVEL${DRY:+ }$([ "$DRY" = 1 ] && echo '(dry-
 say "    repo:        $REPO"
 say "    nuke creds:  $([ "$NUKE_CREDS" = 1 ] && echo yes || echo NO)"
 say "    nuke installs: $([ "$NUKE_INSTALL" = 1 ] && echo yes || echo NO)"
+say "    nuke labs:   $([ "$NUKE_LABS" = 1 ] && echo yes || echo NO)"
 [ "$LEVEL" = data ] && say "    nuke keys:   $([ "$NUKE_KEYS" = 1 ] && echo yes || echo NO)"
 say ""
 
@@ -202,6 +211,58 @@ fi
 say "6. opt-in nukes"
 if [ "$NUKE_INSTALL" = 1 ]; then rmrf "$WIG/installations" "installations/ (OTHER PROJECTS)"; else say "  (keep) installations/"; fi
 if [ "$NUKE_CREDS" = 1 ];   then rmrf "$CFG" "credentials (~/.config/wigamig: slack-token + keys)"; else say "  (keep) credentials"; fi
+
+# 7. wigamig lab-management repos (~/repos/wigamig_*) ------------------------
+# These hold the lab ROSTER (members/*.md) — the source of truth for identity.
+# They live under ~/repos, which reset otherwise NEVER touches, so by default we
+# only LIST them (so you know they survive). --nuke-labs removes them, but only
+# after backing each into the tarball and refusing any with uncommitted/unpushed
+# work (losing the roster to a reset must be a deliberate, safe act).
+say "7. wigamig lab repos ($REPOS_ROOT/wigamig_*)"
+LAB_REPOS=()
+if [ -d "$REPOS_ROOT" ]; then
+  for d in "$REPOS_ROOT"/wigamig_*; do
+    [ -d "$d/.git" ] || continue
+    # the wigamig repo + its manuscript aren't lab-mgmt repos; skip by name
+    case "$(basename "$d")" in wigamig|wigamig_manuscript|wigamig_public) continue ;; esac
+    LAB_REPOS+=("$d")
+  done
+fi
+if [ "${#LAB_REPOS[@]}" = 0 ]; then
+  say "  (none found)"
+else
+  for d in "${LAB_REPOS[@]}"; do
+    dirty=""; unpushed=""
+    [ -n "$(git -C "$d" status --porcelain 2>/dev/null)" ] && dirty="uncommitted"
+    # unpushed = commits with no upstream, or ahead of upstream
+    if git -C "$d" rev-parse --abbrev-ref --symbolic-full-name '@{u}' >/dev/null 2>&1; then
+      [ "$(git -C "$d" rev-list '@{u}..HEAD' --count 2>/dev/null || echo 0)" != 0 ] && unpushed="ahead-of-remote"
+    else
+      [ -n "$(git -C "$d" log -1 --oneline 2>/dev/null)" ] && unpushed="no-remote"
+    fi
+    flags="$dirty${dirty:+,}$unpushed"
+    if [ "$NUKE_LABS" != 1 ]; then
+      say "  (keep) $(basename "$d")${flags:+  [$flags]}   — use --nuke-labs to remove"
+      continue
+    fi
+    if [ -n "$dirty" ] || [ -n "$unpushed" ]; then
+      say "  !! REFUSING $(basename "$d")  [$flags] — push/commit it first, then re-run"
+      continue
+    fi
+    # safe to remove: back it up into a tarball, then delete
+    if [ "$DRY" = 1 ]; then
+      say "  DRY: would back up + remove $(basename "$d")  ($d)"
+    else
+      mkdir -p "$BACKUPS"; chmod 700 "$BACKUPS"
+      LBK="$BACKUPS/labrepo_$(basename "$d")_${TS}.tgz"
+      tar -czf "$LBK" -C "$(dirname "$d")" "$(basename "$d")" 2>/dev/null && chmod 600 "$LBK" 2>/dev/null || true
+      say "  backup: $LBK"
+      rm -rf "$d"; say "  removed $(basename "$d")"
+      # the pinned pointer is now dangling — drop it so pi-init is first-run again
+      rmrf "$WIG/lab_mgmt_path" "lab_mgmt pointer (dangling)"
+    fi
+  done
+fi
 
 say ""
 say "=== done (level: $LEVEL$([ "$DRY" = 1 ] && echo ', dry-run — nothing changed'))"

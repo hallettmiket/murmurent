@@ -240,6 +240,7 @@ def test_issuance_writes_the_roster(monkeypatch, tmp_path):
     out = ISS.self_issue_pi_card("@yxia266", "lab_mh")
     lab_repo = R.lab_repo_path("lab_mh")
     assert (lab_repo / "members").is_dir()
+    assert (lab_repo / ".git").exists()                         # version-controlled
     assert R.lab_mgmt_repo_root() == lab_repo                    # pointer resolves here
     pi_rec = M.parse_member(M.member_path("yxia266"))
     assert pi_rec.role == "pi" and pi_rec.email == "pi@x.edu" and pi_rec.github == "pigh"

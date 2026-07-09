@@ -30,9 +30,27 @@ Opt-in extras (only with the flag): `--nuke-installations` (also wipes
 `~/.wigamig/installations/` — **other projects' manifests**),
 `--nuke-credentials` (also wipes `~/.config/wigamig/` — the **slack-token +
 keys**), `--nuke-keys` (with `--level data`, **also** removes `~/.wigamig/keys/`
-+ `age/` for a fully fresh identity; default keeps them), `--uninstall` (first
-**completely removes** the existing wigamig install — the uv-tool one *and* stray
-conda/pipx copies that shadow it — before any reinstall).
++ `age/` for a fully fresh identity; default keeps them), `--nuke-labs` (also
+removes this machine's **lab-management repos** `~/repos/wigamig_*` — they hold
+the roster; see below), `--uninstall` (first **completely removes** the existing
+wigamig install — the uv-tool one *and* stray conda/pipx copies that shadow it —
+before any reinstall).
+
+### Lab repos (`~/repos/wigamig_*`) — the roster
+
+A PI's lab-management repo (`~/repos/wigamig_<group>`, created by `pi-init` /
+`wigamig init`) holds `members/*.md` — the **roster**, which is the source of
+truth for member identity (card fingerprints included). It lives under
+`~/repos`, which reset **never** touches by default, so **every** reset just
+**lists** these repos and leaves them alone.
+
+`--nuke-labs` removes them, but safely: each is **tar'd into the backup dir
+first**, and any repo with **uncommitted or unpushed** work is **refused**
+(you'll be told to push/commit it first). A standalone lab with **no git remote**
+is always refused — its roster is the only copy. After a successful nuke the
+dangling `lab_mgmt_path` pointer is dropped, so `pi-init` is first-run again.
+Only reach for `--nuke-labs` when the user explicitly wants the lab's roster gone
+from this machine and has confirmed it's pushed somewhere safe.
 
 ### Completely removing the old install
 
@@ -78,7 +96,10 @@ base/envs + pipx and removes any wigamig it finds. Working clones under
   so even a full wipe can't delete it. Never pass a flag to skip it; there
   isn't one.
 - **Never** touches `~/repos/*` working clones, `~/.claude/CLAUDE.md`,
-  `~/.claude/memory/`, or `~/.claude/projects/`.
+  `~/.claude/memory/`, or `~/.claude/projects/` — with **one** opt-in exception:
+  `--nuke-labs` removes `~/repos/wigamig_*` lab-management repos (backed up first,
+  and only when they have no uncommitted/unpushed work). Nothing else under
+  `~/repos` is ever touched.
 - **Credentials and other-project installs are preserved by default.** On this
   machine `~/.config/wigamig/slack-token` + `keys/` are real, and
   `~/.wigamig/installations/` holds manifests for the user's *other* projects

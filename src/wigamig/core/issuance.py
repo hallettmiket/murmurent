@@ -53,6 +53,24 @@ def _safe(name: str) -> str:
     return "".join(c if (c.isalnum() or c in "-_") else "_" for c in str(name or ""))
 
 
+def _git_init_lab_repo(lab_repo: Path) -> None:
+    """Make the lab's management repo a real git repo so the roster is
+    version-controlled (and pushable to the lab's git provider later). Best-effort
+    and idempotent — a missing ``git`` or an existing repo is not an error."""
+    import shutil
+    import subprocess
+    if (lab_repo / ".git").exists() or not shutil.which("git"):
+        return
+    try:
+        subprocess.run(["git", "init", "-q"], cwd=str(lab_repo),  # noqa: S603,S607
+                       check=False, capture_output=True, timeout=15)
+        gi = lab_repo / ".gitignore"
+        if not gi.is_file():
+            gi.write_text(".DS_Store\n", encoding="utf-8")
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
 # ---------------------------------------------------------------------------
 # Mayor / admin-registrar side: issue a signed PI card
 # ---------------------------------------------------------------------------
@@ -155,6 +173,7 @@ def self_issue_pi_card(handle: str, group: str, *, group_kind: str = "lab",
     if not lab_md.is_file():
         lab_md.write_text(f"---\nlab: {group}\npi: '{at}'\nkind: {group_kind}\n---\n\n"
                           f"# {group}\n", encoding="utf-8")
+    _git_init_lab_repo(lab_repo)          # version-control the roster (best-effort)
     _repo.set_lab_mgmt_path(lab_repo)
     prof = _read_profile(env)
     _mem.upsert_member(at, role="pi", email=str(prof.get("email") or ""),
