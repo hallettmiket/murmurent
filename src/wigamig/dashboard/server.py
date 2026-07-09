@@ -92,6 +92,19 @@ class AddMemberBody(BaseModel):
     role: str = "staff"
 
 
+class ProjectRepoBody(BaseModel):
+    """JSON body for ``POST /api/project/{project}/repos`` — assign a repo to a
+    project (code / manuscript / data / infra)."""
+
+    repo_name: str
+    role: str = "code"
+    path: str = ""
+    host: str = "local"
+    remote_path: str = ""
+    remote_url: str = ""
+    overleaf: bool = False
+
+
 class WorkspaceLaunchBody(BaseModel):
     """JSON body for ``POST /api/workspace/launch``."""
 
@@ -3202,6 +3215,32 @@ def create_app() -> FastAPI:
         except _cprov.CertProvisionError as exc:
             raise HTTPException(status_code=404, detail=str(exc))
         return {"ok": True, "slack": slack, "github": github}
+
+    @app.post("/api/project/{project}/repos")
+    def add_project_repo_endpoint(
+        project: str,
+        body: ProjectRepoBody,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """PI-only: assign a repo (code / manuscript / data / infra) to a cert
+        project. Idempotent by repo name. This is how a project gains its
+        manuscript repo (role=manuscript, overleaf=true) alongside its code repo."""
+        from ..core import cert_projects as _cp
+
+        _require_pi(user)
+        role = (body.role or "code").strip().lower()
+        if role not in _cp.VALID_REPO_ROLES:
+            raise HTTPException(status_code=400,
+                                detail=f"role must be one of {_cp.VALID_REPO_ROLES}")
+        try:
+            cp = _cp.add_repo(project, role=role, repo_name=body.repo_name,
+                              host=body.host or "local", path=body.path,
+                              remote_path=body.remote_path, remote_url=body.remote_url,
+                              overleaf=bool(body.overleaf))
+        except _cp.CertProjectError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True, "project": project,
+                "repos": [r.to_dict() for r in cp.repos]}
 
     @app.post("/api/project/{project}/reconcile")
     def reconcile_cert_project_endpoint(
