@@ -195,3 +195,87 @@ def test_teardown_unprovisioned_is_noop():
                          channel_archiver=lambda c: (True, "x"),
                          collab_remover=lambda o, n, l: (True, "x"))
     assert out["channel_archived"] is None and out["collaborators_removed"] == []
+
+
+# ---- reconcile --------------------------------------------------------------
+
+def test_reconcile_slack_invites_missing_and_kicks_extras():
+    _seed_project_with_members()          # certified: allie, bob, nomail
+    CP.upsert("rna_atlas", lab="lab_mh", slack_channel_id="C1")
+    acted = {"invited": None, "kicked": []}
+
+    # channel currently holds allie (U1), a bot, and an interloper (Uextra)
+    def ids_fetcher(channel_id):
+        return {"U1", "Ubot", "Uextra"}
+
+    # certified members resolve: allie→U1 (present), bob→U3 (missing), nomail→None
+    def uid_resolver(handles, email_map):
+        return {"allie": "U1", "bob": "U3", "nomail": None}
+
+    def inviter(channel_id, handles, *, member_email_map):
+        acted["invited"] = list(handles)
+        return {"invited": handles, "already_in": [], "unresolved": [], "error": None}
+
+    def kicker(channel_id, uid):
+        acted["kicked"].append(uid)
+        return (True, "kicked")
+
+    out = CPROV.reconcile_slack("rna_atlas", ids_fetcher=ids_fetcher,
+                                uid_resolver=uid_resolver, inviter=inviter,
+                                kicker=kicker, bot_uid="Ubot")
+    assert out["to_invite"] == ["bob"] and acted["invited"] == ["bob"]
+    assert out["to_kick"] == ["Uextra"] and acted["kicked"] == ["Uextra"]  # bot kept
+    assert out["unresolved"] == ["nomail"] and out["in_sync"] is False
+
+
+def test_reconcile_slack_check_only_makes_no_changes():
+    _seed_project_with_members()
+    CP.upsert("rna_atlas", lab="lab_mh", slack_channel_id="C1")
+    calls = {"kick": 0, "invite": 0}
+    out = CPROV.reconcile_slack(
+        "rna_atlas", apply=False,
+        ids_fetcher=lambda c: {"Uextra"},
+        uid_resolver=lambda h, e: {"allie": "U1", "bob": "U3", "nomail": "U4"},
+        inviter=lambda *a, **k: calls.__setitem__("invite", calls["invite"] + 1),
+        kicker=lambda *a, **k: calls.__setitem__("kick", calls["kick"] + 1),
+        bot_uid=None)
+    assert calls == {"kick": 0, "invite": 0}          # apply=False → no side effects
+    assert set(out["to_invite"]) == {"allie", "bob", "nomail"}
+    assert out["to_kick"] == ["Uextra"] and out["invited"] == [] and out["kicked"] == []
+
+
+def test_reconcile_slack_not_provisioned():
+    _seed_project_with_members()          # no slack_channel_id
+    out = CPROV.reconcile_slack("rna_atlas")
+    assert out["ok"] is False and out["error"] == "not_provisioned"
+
+
+def test_reconcile_github_adds_and_removes():
+    _seed_project_with_github()           # certified logins: allie-gh, bobgh (nogh none)
+    CP.upsert("rna_atlas", lab="lab_mh", github_repo="hallettmiket/rna_atlas")
+    acted = {"added": [], "removed": []}
+
+    # repo currently has bobgh + a stale collaborator "ex-member" + the owner
+    def fetcher(org, name):
+        return {"bobgh", "ex-member", "mhallet"}
+
+    def adder(org, name, login):
+        acted["added"].append(login)
+        return (True, "added")
+
+    def remover(org, name, login):
+        acted["removed"].append(login)
+        return (True, "removed")
+
+    out = CPROV.reconcile_github("rna_atlas", collaborators_fetcher=fetcher,
+                                 adder=adder, remover=remover,
+                                 owner_logins=["mhallet"])
+    assert out["to_add"] == ["allie-gh"] and acted["added"] == ["allie-gh"]
+    assert out["to_remove"] == ["ex-member"] and acted["removed"] == ["ex-member"]
+    assert out["in_sync"] is False        # owner protected, not removed
+
+
+def test_reconcile_github_not_provisioned():
+    _seed_project_with_github()
+    out = CPROV.reconcile_github("rna_atlas")
+    assert out["ok"] is False and out["error"] == "not_provisioned"
