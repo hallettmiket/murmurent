@@ -82,3 +82,28 @@ def test_set_status_preserves_metadata():
     p = CP.get("p")
     assert p.status == "archived" and p.sensitivity == "clinical"
     assert p.code_repo == "~/repos/p"
+
+
+def test_backfill_from_charter(monkeypatch, tmp_path):
+    """Existing CHARTER code-projects are mirrored into the cert-project registry
+    with their name/lab/sensitivity/lead/members and a code_repo link."""
+    from wigamig.core import charter as _charter
+    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
+    repo = tmp_path / "repos" / "dcis_sc"
+    repo.mkdir(parents=True)
+    (repo / "CHARTER.md").write_text(
+        "---\nproject: dcis_sc\nlab: hallett\nsensitivity: clinical\n"
+        "lead: '@allie'\nchoreography: clinical_cohort\n"
+        "reb_number: WREM-1\nreb_expires: '2027-01-01'\ndata_residency: ca\n"
+        "members: ['@allie', '@bob']\n---\n\n# dcis_sc\n", encoding="utf-8")
+
+    touched = CP.backfill_from_charter()
+    assert "dcis_sc" in touched
+    p = CP.get("dcis_sc")
+    assert p.lab == "hallett" and p.sensitivity == "clinical" and p.lead == "@allie"
+    assert p.choreography == "clinical_cohort"
+    assert str(repo) in p.code_repo
+    assert set(p.members) == {"@allie", "@bob"}
+    # idempotent: a second run doesn't duplicate members
+    CP.backfill_from_charter()
+    assert list(CP.get("dcis_sc").members).count("@allie") == 1

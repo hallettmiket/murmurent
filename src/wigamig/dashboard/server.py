@@ -3165,6 +3165,26 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail=str(exc))
         return {"ok": True}
 
+    @app.post("/api/project/{project}/cert-delete")
+    def cert_delete_project_endpoint(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """PI-only "remove project" for a cert-project: revoke every project card
+        (the CRL) and archive the registry record. The Slack channel + GitHub repo
+        teardown is a later phase; this handles the identity layer."""
+        from ..core import issuance as _iss
+        from ..core import revocation as _rev
+
+        _require_pi(user)
+        try:
+            out = _iss.delete_project(project)
+        except _iss.IssuanceError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        except _rev.RevocationError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        return {"ok": True, "group": out["group"], "revoked": out["revoked"]}
+
     @app.post("/api/project/{project}/provision/install")
     def provision_install(
         project: str,
