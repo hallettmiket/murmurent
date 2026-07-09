@@ -217,6 +217,26 @@ def upsert(name: str, *, lab: str, member: str | None = None,
     return updated
 
 
+def register_from_summary(summary, *, code_repo: str = "",
+                          env: dict | None = None, today: str | None = None) -> str:
+    """Upsert a cert-project from a CHARTER ``ProjectSummary`` (or any object with
+    ``name``/``lab``/``status``/``lead``/``sensitivity``/``choreography``/
+    ``members``). Members are recorded UNCERTIFIED (no cert entries) — issuing
+    project cards certifies them later. Idempotent. Returns the project name."""
+    lab = getattr(summary, "lab", "") or ""
+    upsert(summary.name, lab=lab, status=getattr(summary, "status", "active"),
+           lead=getattr(summary, "lead", ""),
+           sensitivity=getattr(summary, "sensitivity", "standard"),
+           choreography=getattr(summary, "choreography", None),
+           code_repo=code_repo, today=today, env=env)
+    cur = get(summary.name, env)
+    existing = {_norm(m) for m in (cur.members if cur else ())}
+    for m in getattr(summary, "members", ()):
+        if _norm(m) not in existing:
+            upsert(summary.name, lab=lab, member=m, today=today, env=env)
+    return summary.name
+
+
 def backfill_from_charter(*, env: dict | None = None,
                           today: str | None = None) -> list[str]:
     """Populate the cert-project registry from existing CHARTER code-projects, so
@@ -232,15 +252,7 @@ def backfill_from_charter(*, env: dict | None = None,
             s = _proj.load_summary(repo)
         except Exception:  # noqa: BLE001
             continue
-        upsert(s.name, lab=(s.lab or ""), status=s.status, lead=s.lead,
-               sensitivity=s.sensitivity, choreography=s.choreography,
-               code_repo=str(repo.path), today=today, env=env)
-        # Seed members (without certs — these are legacy, uncertified members).
-        cur = get(s.name, env)
-        existing = {_norm(m) for m in (cur.members if cur else ())}
-        for m in s.members:
-            if _norm(m) not in existing:
-                upsert(s.name, lab=(s.lab or ""), member=m, today=today, env=env)
+        register_from_summary(s, code_repo=str(repo.path), env=env, today=today)
         touched.append(s.name)
     return touched
 
@@ -257,5 +269,6 @@ def set_status(name: str, status: str, *, env: dict | None = None) -> CertProjec
     return updated
 
 
-__all__ = ["CertProject", "REGISTRY_DIR", "registry_dir", "project_path", "get",
-           "iter_projects", "projects_for_member", "upsert", "set_status"]
+__all__ = ["CertProject", "CertProjectError", "REGISTRY_DIR", "registry_dir",
+           "project_path", "get", "iter_projects", "projects_for_member", "upsert",
+           "set_status", "register_from_summary", "backfill_from_charter"]

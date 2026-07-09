@@ -252,6 +252,16 @@ def cmd_new(
     if not registry_path.exists():
         registry_path.write_text(render_registry_entry(summary, today=_today()), encoding="utf-8")
 
+    # Register in the cert-project registry — the authoritative project model. The
+    # CHARTER repo above is now an *attribute* (code_repo) of this project, not what
+    # defines it. Members are uncertified until project cards are issued. Best-effort:
+    # a dangling/uninitialised lab-mgmt shouldn't fail project creation.
+    try:
+        from ..core import cert_projects as _cp
+        _cp.register_from_summary(summary, code_repo=str(repo.path), today=_today())
+    except _cp.CertProjectError:
+        pass
+
     if not skip_github:
         if repo_kind == "local":
             if not local_repo_root:

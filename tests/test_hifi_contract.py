@@ -193,17 +193,21 @@ def test_response_validates_against_pydantic(world):
 
 
 def test_cert_project_surfaces_in_the_one_project_list(world):
-    """A cert-project (no CHARTER repo) is merged into the single Projects list
-    and flagged is_cert; CHARTER projects stay is_cert False."""
+    """One unified Projects list: a cert-only project (no CHARTER repo) appears
+    alongside CHARTER-backed projects, and every project created via `project new`
+    is registered as a cert-project too (is_cert), since cert-projects are now the
+    authoritative model."""
     from wigamig.core import cert_projects as CP
     CP.upsert("rna_atlas", lab="hallett", member="@allie",
               cert={"fingerprint": "fa", "card_id": "cA"},
               lead="@mhallet", sensitivity="standard")
     resp = snapshot.build_response("allie", today=_dt.date(2026, 5, 8))
     by_name = {p.name: p for p in resp.projects}
+    # the cert-only project shows up, flagged, with its certified member
     assert "rna_atlas" in by_name and by_name["rna_atlas"].is_cert
     assert "@allie" in by_name["rna_atlas"].cert_members
-    assert by_name["dcis_test"].is_cert is False        # CHARTER project untouched
+    # dcis_test was created via cmd_new (the world fixture) → now also a cert-project
+    assert by_name["dcis_test"].is_cert is True
 
 
 def test_cert_project_visibility_scoped_to_lab(world):
