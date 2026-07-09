@@ -475,6 +475,30 @@ def project_backfill() -> None:
                f"registry: {', '.join(sorted(names))}")
 
 
+@project_group.command("provision-slack",
+                       help="(PI) Create the cert-project's private Slack channel "
+                            "and invite its certified members. Idempotent; needs a "
+                            "Slack bot token.")
+@click.argument("name")
+def project_provision_slack(name: str) -> None:
+    from .core import cert_provision as _cprov
+    try:
+        out = _cprov.provision_slack(name)
+    except _cprov.CertProvisionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not out["ok"]:
+        raise click.ClickException(
+            f"could not create channel ({out.get('error')}): {out.get('detail')}")
+    verb = "created + " if out["created"] else "reused; "
+    click.echo(f"✓ channel {verb}synced ({out['channel_id']}).")
+    if out["invited"]:
+        click.echo(f"  invited: {', '.join(out['invited'])}")
+    if out["already_in"]:
+        click.echo(f"  already in: {', '.join(out['already_in'])}")
+    for u in out["unresolved"]:
+        click.echo(f"  ! {u.get('handle')}: {u.get('reason')}")
+
+
 # ---------------------------------------------------------------------------
 # experiment
 # ---------------------------------------------------------------------------
