@@ -282,18 +282,18 @@ def detect_orphan_installations() -> list[DriftFinding]:
 
 
 def detect_orphan_registries() -> list[DriftFinding]:
-    """For each cert-project with a linked code repo, verify the working
-    tree is still on the recorded host. Archived cert-projects and
-    cert-only projects (no ``code_repo``) are skipped.
+    """For each active cert-project, verify EACH of its repos (a project may
+    have several — code + manuscript + …) is still on its recorded host.
+    Cert-only projects (no repos) and archived ones are skipped.
 
-    The cert-project registry (``<lab-mgmt>/cert_projects/<name>.md``) is
-    the authoritative project store — it carries the clone location
-    (``code_repo`` / ``host`` / ``remote_path``) this detector used to
-    read from the legacy CHARTER-mirror registry.
+    A single missing repo is a ``warn`` (the project still lives via its other
+    clones — e.g. the code repo is present but a manuscript repo was removed);
+    only when EVERY repo is gone is the project an ``actionable`` orphan whose
+    repair (in ``apply``) flips ``status: archived`` in the cert-project
+    frontmatter (lab history is preserved, not deleted).
 
-    Repair (in ``apply``) flips ``status: archived`` in the cert-project
-    frontmatter rather than deleting — the lab history of who-owned-what
-    is worth preserving.
+    The cert-project registry (``<lab-mgmt>/cert_projects/<name>.md``) is the
+    authoritative project store, carrying each repo's clone location.
     """
     findings: list[DriftFinding] = []
     from . import cert_projects as _cp
@@ -309,58 +309,76 @@ def detect_orphan_registries() -> list[DriftFinding]:
             suggested_action="check the lab-mgmt repo is present (wigamig pi-init)",
         )]
 
-    # Group remote entries by host for batched probes.
-    remote_targets: dict[str, list[tuple[str, str, str]]] = {}
-    for cp in projects:
-        if cp.status == "archived":
-            continue
-        if not cp.code_repo:          # cert-only project: no clone to reconcile
-            continue
-        artefact = str(_cp.project_path(cp.name))
-        if cp.host == "local":
-            if not _is_local_path_alive(cp.code_repo):
-                findings.append(DriftFinding(
-                    kind="orphan_registry",
-                    severity="actionable",
-                    target=cp.name,
-                    host="local",
-                    detail=f"registry says {cp.code_repo} but the clone is gone",
-                    suggested_action="flip cert-project status: archived",
-                    artefact_path=artefact,
-                ))
-        else:
-            remote_path = cp.remote_path or f"~/repos/{cp.name}"
-            remote_targets.setdefault(cp.host, []).append(
-                (cp.name, remote_path, artefact)
-            )
+    def _loc(r) -> str:
+        return r.path if r.host == "local" else \
+            f"{r.host}:{r.remote_path or '~/repos/' + r.name}"
 
+    # 1. Local repos: aliveness now. Remote repos: queue for a batched SSH probe.
+    remote_targets: dict[str, list[tuple[str, str, str]]] = {}  # host → (proj, repo, path)
+    per_project: dict[str, dict] = {}    # name → {cp, entries: [[repo, alive|None]]}
+    for cp in projects:
+        if cp.status == "archived" or not cp.repos:   # cert-only: nothing to reconcile
+            continue
+        entries: list[list] = []
+        for r in cp.repos:
+            if r.host == "local":
+                alive = _is_local_path_alive(r.path) if r.path else True
+                entries.append([r, alive])
+            else:
+                remote_targets.setdefault(r.host, []).append(
+                    (cp.name, r.name, r.remote_path or f"~/repos/{r.name}"))
+                entries.append([r, None])             # pending remote probe
+        per_project[cp.name] = {"cp": cp, "entries": entries}
+
+    # 2. Probe remotes, fill in aliveness (unreachable host → treat its repos gone).
+    remote_alive: dict[tuple[str, str], bool] = {}
     for host_name, items in remote_targets.items():
         try:
             host_obj = _hosts.resolve(host_name)
         except _hosts.HostNotFound:
-            for project, remote_path, reg_p in items:
+            for project, repo_name, _rp in items:
+                remote_alive[(project, repo_name)] = False
+            continue
+        results = _ssh_probe_paths(host_obj, [rp for _, _, rp in items])
+        for project, repo_name, rp in items:
+            remote_alive[(project, repo_name)] = results.get(rp, True)
+    for pname, info in per_project.items():
+        for e in info["entries"]:
+            if e[1] is None:
+                e[1] = remote_alive.get((pname, e[0].name), True)
+
+    # 3. Per project: a single missing repo is a WARN (the project still lives via
+    #    its other clones); ALL repos gone is ACTIONABLE (archive the project).
+    for pname, info in per_project.items():
+        cp = info["cp"]
+        artefact = str(_cp.project_path(pname))
+        entries = info["entries"]
+        missing = [r for (r, alive) in entries if not alive]
+        if not missing:
+            continue
+        if any(alive for (_r, alive) in entries):     # some clones still present
+            for r in missing:
                 findings.append(DriftFinding(
                     kind="orphan_registry",
                     severity="warn",
-                    target=project,
-                    host=host_name,
-                    detail=f"ssh host {host_name!r} is not registered any more",
-                    suggested_action="flip registry status: archived",
-                    artefact_path=reg_p,
+                    target=f"{pname}/{r.name}",
+                    host=r.host,
+                    detail=f"repo {r.name!r} ({r.role}) at {_loc(r)} is gone; "
+                           f"{pname} still has other clones",
+                    suggested_action=f"re-clone {r.name}, or drop it from the project",
+                    artefact_path=artefact,
                 ))
-            continue
-        results = _ssh_probe_paths(host_obj, [p for _, p, _ in items])
-        for project, remote_path, reg_p in items:
-            if not results.get(remote_path, True):
-                findings.append(DriftFinding(
-                    kind="orphan_registry",
-                    severity="actionable",
-                    target=project,
-                    host=host_name,
-                    detail=f"registry says {host_name}:{remote_path} but the clone is gone",
-                    suggested_action="flip registry status: archived",
-                    artefact_path=reg_p,
-                ))
+        else:                                         # every clone gone → orphan
+            locs = ", ".join(_loc(r) for (r, _a) in entries)
+            findings.append(DriftFinding(
+                kind="orphan_registry",
+                severity="actionable",
+                target=pname,
+                host=entries[0][0].host if entries else "local",
+                detail=f"all clones gone ({locs})",
+                suggested_action="flip cert-project status: archived",
+                artefact_path=artefact,
+            ))
     return findings
 
 

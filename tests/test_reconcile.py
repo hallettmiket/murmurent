@@ -199,6 +199,41 @@ def test_archived_registry_skipped(world):
     assert findings == []
 
 
+def test_multi_repo_one_gone_is_warn_not_orphan(world):
+    """A project whose code repo is present but manuscript repo is gone is a
+    WARN (project still lives), NOT an actionable project-orphan."""
+    from wigamig.core import cert_projects as CP
+    _make_clone(world["repos"], "proj_x")            # live code clone
+    CP.upsert("proj_x", lab="hallett", code_repo=str(world["repos"] / "proj_x"))
+    CP.add_repo("proj_x", role="manuscript", repo_name="proj_x_manuscript",
+                path=str(world["repos"] / "proj_x_manuscript"))   # never created → gone
+    findings = _rec.detect_orphan_registries()
+    assert [f.severity for f in findings] == ["warn"]
+    assert findings[0].target == "proj_x/proj_x_manuscript"
+    assert "manuscript" in findings[0].detail
+
+
+def test_multi_repo_all_gone_is_actionable_orphan(world):
+    """When EVERY repo of a project is gone, it's an actionable orphan (archive)."""
+    from wigamig.core import cert_projects as CP
+    CP.upsert("dead_x", lab="hallett", code_repo=str(world["repos"] / "dead_x"))
+    CP.add_repo("dead_x", role="manuscript", repo_name="dead_x_manuscript",
+                path=str(world["repos"] / "dead_x_manuscript"))
+    findings = _rec.detect_orphan_registries()
+    assert [f.severity for f in findings] == ["actionable"]
+    assert findings[0].target == "dead_x" and "all clones gone" in findings[0].detail
+
+
+def test_multi_repo_all_present_no_findings(world):
+    from wigamig.core import cert_projects as CP
+    _make_clone(world["repos"], "live_x")
+    _make_clone(world["repos"], "live_x_manuscript")
+    CP.upsert("live_x", lab="hallett", code_repo=str(world["repos"] / "live_x"))
+    CP.add_repo("live_x", role="manuscript", repo_name="live_x_manuscript",
+                path=str(world["repos"] / "live_x_manuscript"))
+    assert _rec.detect_orphan_registries() == []
+
+
 def test_detect_missing_charter(world):
     """Working tree present, CHARTER.md deleted — warn, no auto-fix."""
     _make_clone(world["repos"], "charterless", with_charter=False)
