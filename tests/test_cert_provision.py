@@ -105,3 +105,61 @@ def test_provision_reports_missing_token_gracefully():
 def test_provision_unknown_project_raises():
     with pytest.raises(CPROV.CertProvisionError, match="no cert-project"):
         CPROV.provision_slack("ghost")
+
+
+# ---- GitHub provisioning ----------------------------------------------------
+
+def _seed_project_with_github():
+    MEM.upsert_member("@allie", github="allie-gh", role="postdoc")
+    MEM.upsert_member("@bob", github="bobgh", role="student")
+    MEM.upsert_member("@nogh", role="student")               # no github login
+    CP.upsert("rna_atlas", lab="lab_mh", member="@allie",
+              cert={"fingerprint": "fa", "card_id": "cA"})
+    CP.upsert("rna_atlas", lab="lab_mh", member="@bob",
+              cert={"fingerprint": "fb", "card_id": "cB"})
+    CP.upsert("rna_atlas", lab="lab_mh", member="@nogh",
+              cert={"fingerprint": "fx", "card_id": "cX"})
+
+
+def test_member_github_map_from_roster():
+    _seed_project_with_github()
+    assert CPROV.member_github_map(["@allie", "bob", "nogh"]) == {
+        "allie": "allie-gh", "bob": "bobgh"}
+
+
+def test_provision_github_creates_repo_and_adds_collaborators():
+    _seed_project_with_github()
+    made = {"collabs": []}
+
+    def repo_creator(org, name):
+        made["repo"] = f"{org}/{name}"
+        return (True, "created")
+
+    def collaborator(org, name, login):
+        made["collabs"].append(login)
+        return (True, "invited")
+
+    out = CPROV.provision_github("rna_atlas", org="hallettmiket",
+                                 repo_creator=repo_creator, collaborator=collaborator)
+    assert out["ok"] and out["repo"] == "hallettmiket/rna_atlas"
+    assert made["repo"] == "hallettmiket/rna_atlas"
+    assert set(made["collabs"]) == {"allie-gh", "bobgh"}      # nogh skipped
+    assert CP.get("rna_atlas").github_repo == "hallettmiket/rna_atlas"
+    statuses = {c["handle"]: c["status"] for c in out["collaborators"]}
+    assert statuses == {"allie": "ok", "bob": "ok", "nogh": "no_github"}
+
+
+def test_provision_github_needs_an_org():
+    _seed_project_with_github()
+    out = CPROV.provision_github("rna_atlas", org="",
+                                 repo_creator=lambda o, n: (True, "x"))
+    # no org passed and no lab.md github_org → clean no_github_org report
+    assert out["ok"] is False and out["error"] == "no_github_org"
+
+
+def test_provision_github_repo_create_failure_is_clean():
+    _seed_project_with_github()
+    out = CPROV.provision_github("rna_atlas", org="hallettmiket",
+                                 repo_creator=lambda o, n: (False, "gh CLI not installed"))
+    assert out["ok"] is False and out["error"] == "repo_create_failed"
+    assert CP.get("rna_atlas").github_repo == ""             # nothing stamped

@@ -45,6 +45,18 @@ def member_email_map(handles=None) -> dict[str, str]:
     return out
 
 
+def member_github_map(handles=None) -> dict[str, str]:
+    """``{bare-lowercased-handle: github-login}`` from the lab roster, optionally
+    limited to ``handles``. The roster is the source of truth for github login."""
+    want = None if handles is None else {str(h).lstrip("@").lower() for h in handles}
+    out: dict[str, str] = {}
+    for m in _mem.iter_members():
+        h = m.handle.lstrip("@").lower()
+        if m.github and (want is None or h in want):
+            out[h] = m.github
+    return out
+
+
 def _default_creator(name: str):
     from . import centre_provision as _prov
     return _prov.slack_create_channel(name, private=True)
@@ -92,5 +104,79 @@ def provision_slack(project: str, *, lab: str | None = None,
             "unresolved": inv.get("unresolved", []), "error": inv.get("error")}
 
 
+# ---------------------------------------------------------------------------
+# GitHub repo provisioning — a private repo per cert-project, certified members
+# as collaborators (keyed off each member's github login on the roster).
+# ---------------------------------------------------------------------------
+
+def _default_repo_creator(org: str, name: str):
+    """Create a private ``org/name`` repo if missing. Returns ``(ok, detail)``."""
+    from . import project_provision as _pp
+    if not _pp._gh_available():
+        return (False, "gh CLI not installed")
+    if _pp._gh(["repo", "view", f"{org}/{name}"]).returncode == 0:
+        return (True, "exists")
+    res = _pp._gh(["repo", "create", f"{org}/{name}", "--private"])
+    if res.returncode == 0:
+        return (True, "created")
+    return (False, (res.stderr or res.stdout or "").strip() or "gh repo create failed")
+
+
+def _default_collaborator(org: str, name: str, login: str):
+    """Grant ``login`` push access on ``org/name`` (idempotent). ``(ok, detail)``."""
+    from . import project_provision as _pp
+    if not _pp._gh_available():
+        return (False, "gh CLI not installed")
+    res = _pp._gh(["api", "-X", "PUT", f"repos/{org}/{name}/collaborators/{login}",
+                   "-f", "permission=push"])
+    return (res.returncode == 0, (res.stderr or res.stdout or "").strip())
+
+
+def provision_github(project: str, *, org: str | None = None, lab: str | None = None,
+                     env: dict | None = None, repo_creator=None,
+                     collaborator=None) -> dict:
+    """Ensure a private GitHub repo for cert-project ``project`` and add its
+    certified members as collaborators (by their github login on the roster).
+    Stamps ``github_repo`` on the record. ``org`` defaults to ``lab.md``'s
+    github_org. Injectable ``repo_creator`` / ``collaborator`` seams default to
+    the real ``gh`` calls and degrade gracefully when gh is missing."""
+    cp = _cp.get(project, env)
+    if cp is None:
+        raise CertProvisionError(f"no cert-project named {project!r}")
+    if not org:
+        try:
+            from .lab import load_lab_config
+            org = load_lab_config().github_org
+        except Exception:  # noqa: BLE001
+            org = ""
+    if not org:
+        return {"ok": False, "error": "no_github_org",
+                "detail": "no github org (set github_org in lab.md or pass --org)",
+                "repo": None, "collaborators": []}
+    repo_creator = repo_creator or _default_repo_creator
+    collaborator = collaborator or _default_collaborator
+
+    ok, detail = repo_creator(org, project)
+    if not ok:
+        return {"ok": False, "error": "repo_create_failed", "detail": detail,
+                "repo": None, "collaborators": []}
+    repo = f"{org}/{project}"
+    _cp.upsert(project, lab=(lab or cp.lab), github_repo=repo, env=env)
+
+    gh_map = member_github_map([m.lstrip("@") for m in cp.members])
+    results: list[dict] = []
+    for m in cp.members:
+        h = m.lstrip("@").lower()
+        login = gh_map.get(h)
+        if not login:
+            results.append({"handle": h, "status": "no_github",
+                            "detail": "no github login on roster"})
+            continue
+        cok, cdetail = collaborator(org, project, login)
+        results.append({"handle": h, "login": login,
+                        "status": "ok" if cok else "fail", "detail": cdetail})
+    return {"ok": True, "repo": repo, "collaborators": results}
+
+
 __all__ = ["CertProvisionError", "slack_channel_name", "member_email_map",
-           "provision_slack"]
+           "member_github_map", "provision_slack", "provision_github"]
