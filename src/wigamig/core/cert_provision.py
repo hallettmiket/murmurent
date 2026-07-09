@@ -382,6 +382,39 @@ def reconcile_github(project: str, *, env: dict | None = None, apply: bool = Tru
             "in_sync": not to_add and not to_remove}
 
 
+# ---------------------------------------------------------------------------
+# Onboarding — is each certified member actually in the Slack workspace? On
+# Free/Pro Slack there's no invite API, so we report status + let the PI hand out
+# the workspace invite link; a paid admin token could auto-invite (not required).
+# ---------------------------------------------------------------------------
+
+def workspace_check(project: str, *, env: dict | None = None,
+                    slack_resolver=None) -> dict:
+    """For each certified member of ``project``, report whether they're in the
+    Slack workspace (email resolves to a Slack uid). Reuses the unified
+    ``lab_identity`` resolver. Returns ``{project, in_workspace: [...],
+    missing: [...], no_email: [...]}`` — ``missing`` are members to hand the
+    workspace invite link. No token/resolver ⇒ everyone with an email lands in
+    ``missing`` (can't confirm), which is the safe onboarding default."""
+    cp = _cp.get(project, env)
+    if cp is None:
+        raise CertProvisionError(f"no cert-project named {project!r}")
+    from . import lab_identity as _li
+    in_ws: list[dict] = []
+    missing: list[dict] = []
+    no_email: list[str] = []
+    for m in cp.members:
+        ident = _li.member_identity(m, slack_resolver=slack_resolver)
+        h = m.lstrip("@")
+        if ident is None or not ident.get("email"):
+            no_email.append(h)
+            continue
+        row = {"handle": h, "email": ident["email"], "slack_uid": ident.get("slack_uid")}
+        (in_ws if ident.get("in_workspace") else missing).append(row)
+    return {"project": project, "in_workspace": in_ws, "missing": missing,
+            "no_email": no_email}
+
+
 __all__ = ["CertProvisionError", "slack_channel_name", "member_email_map",
            "member_github_map", "provision_slack", "provision_github", "teardown",
-           "reconcile_slack", "reconcile_github"]
+           "reconcile_slack", "reconcile_github", "workspace_check"]
