@@ -29,6 +29,50 @@ from .preflight import Probe
 
 _AGENT_NAME_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
+_OVERLEAF_MARKER = "<!-- wigamig:overleaf-manuscript -->"
+
+
+def _overleaf_manuscript_claude_md(project: str, repo_name: str) -> str:
+    """The CLAUDE.md a manuscript repo (role=manuscript, Overleaf-synced) gets, so
+    any CC session in it follows the pull-first rules (see rules/manuscript.md)."""
+    title = repo_name or project or "manuscript"
+    return (f"{_OVERLEAF_MARKER}\n"
+            f"# CLAUDE.md — {title} (Overleaf-synced manuscript)\n\n"
+            f"This repo is the manuscript for **{project or title}**, synchronised "
+            "with **Overleaf via GitHub**. Overleaf pushes to `main`, so the remote "
+            "can be ahead of your local clone at any time. Rules (managed by "
+            "wigamig — see the commons' `rules/manuscript.md`):\n\n"
+            "- **`git pull` BEFORE editing.** Skipping this risks clobbering edits "
+            "made in Overleaf and produces painful conflicts.\n"
+            "- **Commit + push promptly** after a coherent block so Overleaf can "
+            "fetch.\n"
+            "- **No feature branches** — Overleaf only tracks `main`.\n"
+            "- **No bulk reformatting** (rewrapping, reordering) — Overleaf reads "
+            "whitespace churn as content changes and it buries real edits.\n"
+            "- **Do not compile locally**; Overleaf compiles. Do not edit "
+            "`*.aux`/`*.bbl`/`*.blg`/`*.log`/`*.out`/`*.synctex.gz`.\n"
+            "- **On a `git pull` conflict, Overleaf edits are authoritative** — "
+            "stop and ask before resolving.\n")
+
+
+def write_overleaf_manuscript_note(repo_dir, *, project: str = "",
+                                   repo_name: str = "") -> bool:
+    """Ensure an Overleaf-manuscript ``CLAUDE.md`` in ``repo_dir`` (a manuscript
+    repo's clone). Idempotent: writes only when the dir exists and has no CLAUDE.md
+    (a user-authored one is preserved). Returns True when it wrote the note."""
+    d = Path(repo_dir).expanduser()
+    if not d.is_dir():
+        return False
+    claude_md = d / "CLAUDE.md"
+    if claude_md.is_file():
+        return False
+    try:
+        claude_md.write_text(_overleaf_manuscript_claude_md(project, repo_name),
+                             encoding="utf-8")
+        return True
+    except OSError:
+        return False
+
 
 def bootstrap_local(
     project_dir: Path,
