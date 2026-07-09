@@ -42,19 +42,31 @@ def _norm(handle: str) -> str:
 
 @dataclass
 class CertProject:
-    """One cert-scoped project in a lab's registry."""
+    """One cert-scoped project in a lab's registry — the authoritative project
+    record. A project's identity is its certified membership; a ``code_repo``
+    (a ``~/repos/<name>`` CHARTER repo) is an *optional* attribute, not what
+    defines the project."""
 
     name: str
     lab: str
     status: str = "active"                 # "active" | "archived"
     created: str = ""
+    lead: str = ""                         # project lead handle (defaults to lab PI)
+    sensitivity: str = "standard"          # standard | restricted | clinical
+    choreography: str | None = None
+    code_repo: str = ""                    # optional: linked ~/repos/<name> code repo
+    slack_channel_id: str = ""             # provisioned in Phase C
+    github_repo: str = ""                  # provisioned in Phase C, e.g. "org/name"
     members: tuple[str, ...] = ()          # certified member handles (@-prefixed)
     # One entry per issued project card: {handle, fingerprint, card_id}.
     certs: tuple[dict, ...] = ()
 
     def to_dict(self) -> dict:
         return {"name": self.name, "lab": self.lab, "status": self.status,
-                "created": self.created, "members": list(self.members),
+                "created": self.created, "lead": self.lead,
+                "sensitivity": self.sensitivity, "choreography": self.choreography,
+                "code_repo": self.code_repo, "slack_channel_id": self.slack_channel_id,
+                "github_repo": self.github_repo, "members": list(self.members),
                 "certs": [dict(c) for c in self.certs]}
 
 
@@ -70,11 +82,18 @@ def _parse(path: Path) -> CertProject:
     meta = parse_file(path).meta or {}
     members = tuple(str(m) for m in (meta.get("members") or []))
     certs = tuple(dict(c) for c in (meta.get("certs") or []) if isinstance(c, dict))
+    chor = meta.get("choreography")
     return CertProject(
         name=str(meta.get("project") or path.stem),
         lab=str(meta.get("lab") or ""),
         status=str(meta.get("status") or "active").strip().lower() or "active",
         created=str(meta.get("created") or ""),
+        lead=str(meta.get("lead") or ""),
+        sensitivity=str(meta.get("sensitivity") or "standard").strip().lower() or "standard",
+        choreography=str(chor) if chor else None,
+        code_repo=str(meta.get("code_repo") or ""),
+        slack_channel_id=str(meta.get("slack_channel_id") or ""),
+        github_repo=str(meta.get("github_repo") or ""),
         members=members,
         certs=certs,
     )
@@ -108,8 +127,17 @@ def projects_for_member(handle: str, env: dict | None = None) -> list[CertProjec
 
 def _render(p: CertProject) -> str:
     meta = {"project": p.name, "lab": p.lab, "status": p.status,
-            "created": p.created, "members": list(p.members),
-            "certs": [dict(c) for c in p.certs]}
+            "created": p.created, "lead": p.lead, "sensitivity": p.sensitivity}
+    if p.choreography:
+        meta["choreography"] = p.choreography
+    if p.code_repo:
+        meta["code_repo"] = p.code_repo
+    if p.slack_channel_id:
+        meta["slack_channel_id"] = p.slack_channel_id
+    if p.github_repo:
+        meta["github_repo"] = p.github_repo
+    meta["members"] = list(p.members)
+    meta["certs"] = [dict(c) for c in p.certs]
     front = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).strip()
     return (f"---\n{front}\n---\n\n# {p.name}\n\n"
             "Cert-scoped project (Slack↔CC Phase B). Members are recorded here as "
@@ -126,11 +154,16 @@ def _write(p: CertProject, env: dict | None = None) -> Path:
 
 def upsert(name: str, *, lab: str, member: str | None = None,
            cert: dict | None = None, status: str | None = None,
+           lead: str | None = None, sensitivity: str | None = None,
+           choreography: str | None = None, code_repo: str | None = None,
+           slack_channel_id: str | None = None, github_repo: str | None = None,
            today: str | None = None, env: dict | None = None) -> CertProject:
     """Create or update a cert project. Optionally add a certified ``member``
-    (with their ``cert`` = {handle, fingerprint, card_id}). Idempotent: a member
-    already present is de-duplicated and their cert entry replaced. Called by
-    ``issuance.issue_project_card`` so the registry mirrors issued cards."""
+    (with their ``cert`` = {handle, fingerprint, card_id}) and/or set project
+    metadata. Any metadata argument left ``None`` keeps its current value, so a
+    metadata-free membership upsert (from ``issue_project_card``) never clobbers a
+    project's sensitivity/lead/etc. Idempotent: a member already present is
+    de-duplicated and their cert entry replaced."""
     today = today or _dt.date.today().isoformat()
     cur = get(name, env)
     if cur is None:
@@ -146,9 +179,16 @@ def upsert(name: str, *, lab: str, member: str | None = None,
             entry = {"handle": at, **{k: cert[k] for k in ("fingerprint", "card_id")
                                       if k in cert}}
             certs.append(entry)
+    _keep = lambda new, old: old if new is None else new  # noqa: E731
     updated = CertProject(
         name=cur.name, lab=cur.lab or str(lab),
         status=(status or cur.status), created=cur.created or today,
+        lead=_keep(lead, cur.lead),
+        sensitivity=(str(sensitivity).strip().lower() if sensitivity else cur.sensitivity),
+        choreography=_keep(choreography, cur.choreography),
+        code_repo=_keep(code_repo, cur.code_repo),
+        slack_channel_id=_keep(slack_channel_id, cur.slack_channel_id),
+        github_repo=_keep(github_repo, cur.github_repo),
         members=tuple(members), certs=tuple(certs))
     _write(updated, env)
     return updated
@@ -160,8 +200,8 @@ def set_status(name: str, status: str, *, env: dict | None = None) -> CertProjec
     cur = get(name, env)
     if cur is None:
         return None
-    updated = CertProject(name=cur.name, lab=cur.lab, status=str(status).strip().lower(),
-                          created=cur.created, members=cur.members, certs=cur.certs)
+    from dataclasses import replace
+    updated = replace(cur, status=str(status).strip().lower())
     _write(updated, env)
     return updated
 

@@ -53,3 +53,32 @@ def test_iter_projects_skips_and_sorts():
     CP.upsert("beta", lab="lab_mh")
     CP.upsert("alpha", lab="lab_mh")
     assert [p.name for p in CP.iter_projects()] == ["alpha", "beta"]
+
+
+def test_enrichment_fields_round_trip():
+    CP.upsert("p", lab="lab_mh", lead="@the_pi", sensitivity="Clinical",
+              choreography="hub", code_repo="~/repos/p", github_repo="org/p")
+    p = CP.get("p")
+    assert p.lead == "@the_pi" and p.sensitivity == "clinical"   # normalized
+    assert p.choreography == "hub" and p.code_repo == "~/repos/p"
+    assert p.github_repo == "org/p"
+
+
+def test_membership_upsert_preserves_metadata():
+    CP.upsert("p", lab="lab_mh", lead="@the_pi", sensitivity="restricted",
+              code_repo="~/repos/p")
+    # a later membership-only upsert (as issue_project_card does) must NOT wipe
+    # the previously-set project metadata
+    CP.upsert("p", lab="lab_mh", member="@allie",
+              cert={"fingerprint": "f", "card_id": "c"})
+    p = CP.get("p")
+    assert p.sensitivity == "restricted" and p.lead == "@the_pi"
+    assert p.code_repo == "~/repos/p" and "@allie" in p.members
+
+
+def test_set_status_preserves_metadata():
+    CP.upsert("p", lab="lab_mh", sensitivity="clinical", code_repo="~/repos/p")
+    CP.set_status("p", "archived")
+    p = CP.get("p")
+    assert p.status == "archived" and p.sensitivity == "clinical"
+    assert p.code_repo == "~/repos/p"
