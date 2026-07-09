@@ -569,6 +569,30 @@ def project_workspace_check(name: str) -> None:
         click.echo(f"  · {h}: no email on roster — can't check")
 
 
+@project_group.command("channel",
+                       help="Print the Slack channel id for a project (the repo "
+                            "you're in by default). Used by /wigamig-push to post "
+                            "the release note to the project's own channel.")
+@click.option("--project", "project", default="", help="Project name (default: "
+              "the project repo you're in).")
+def project_channel(project: str) -> None:
+    from .core import cert_projects as _cp
+    name = project or _cp.project_name_for_cwd()
+    if not name:
+        raise click.ClickException(
+            "not inside a project repo (no CHARTER.md found); pass --project")
+    if _cp.get(name) is None:
+        raise click.ClickException(
+            f"no cert-project registered for {name!r} — run `wigamig project "
+            f"backfill` or create it")
+    channel = _cp.slack_channel_for(name)
+    if not channel:
+        raise click.ClickException(
+            f"project {name!r} has no Slack channel yet — run `wigamig project "
+            f"provision-slack {name}`")
+    click.echo(channel)
+
+
 # ---------------------------------------------------------------------------
 # experiment
 # ---------------------------------------------------------------------------

@@ -284,6 +284,31 @@ def backfill_from_charter(*, env: dict | None = None,
     return touched
 
 
+def project_name_for_cwd(start=None, env: dict | None = None) -> str | None:
+    """Resolve the project name for the repo containing ``start`` (default cwd) —
+    from its CHARTER.md ``project`` field, else the repo dir name. None if not
+    inside a project repo."""
+    from . import repo as _repo
+    pr = _repo.find_project_repo(start)
+    if pr is None:
+        return None
+    try:
+        from .frontmatter import parse_file as _pf
+        name = (_pf(pr.charter_path).meta or {}).get("project")
+        if name:
+            return str(name)
+    except Exception:  # noqa: BLE001
+        pass
+    return pr.path.name
+
+
+def slack_channel_for(name: str, env: dict | None = None) -> str:
+    """The provisioned Slack channel id for cert-project ``name``. Empty string if
+    the project isn't registered or has no channel yet."""
+    cp = get(name, env)
+    return cp.slack_channel_id if cp else ""
+
+
 def set_status(name: str, status: str, *, env: dict | None = None) -> CertProject | None:
     """Flip a cert project's lifecycle status (``active``/``archived``). Missing
     project is a no-op returning None."""

@@ -1,6 +1,6 @@
 ---
 name: wigamig-push
-description: Wigamig-aware stage/commit/push for a wigamig-enabled repo. Excludes per-machine + secret-shaped files, refuses to commit large files that belong in refined/, never touches /data/lab_vm/raw|refined, and posts a release note to #claude-test after the push.
+description: Wigamig-aware stage/commit/push for a wigamig-enabled repo. Excludes per-machine + secret-shaped files, refuses to commit large files that belong in refined/, never touches /data/lab_vm/raw|refined, and posts a release note to the project's own Slack channel after the push.
 user_invocable: true
 ---
 
@@ -48,13 +48,28 @@ Once the pre-flight passes, follow the standard commit-push flow with these wiga
 
 ## After the push: Slack release note
 
-Per `rules/slack.md`, post a notification to **`#claude-test`** (channel ID `C0B3D9DS6SE`) using the `mcp__claude_ai_Slack__slack_send_message` tool. The message body:
+Post the release note to **the project's own Slack channel** — this repo is a
+project (it has a `CHARTER.md`), so its activity belongs in its channel, not the
+centre-wide dev channel. Resolve the channel id first:
 
+```bash
+wigamig project channel        # prints the cert-project's Slack channel id
+```
+
+- If it prints a channel id → post there with `mcp__claude_ai_Slack__slack_send_message` (`channel_id` = that id).
+- If it exits with **"no Slack channel yet"** → the project isn't provisioned.
+  Tell the user to run `wigamig project provision-slack <project>` (PI only), and
+  **skip the Slack post** (don't fall back to #claude-test — a project's notes go
+  to its own channel only). The push still succeeded.
+- If it exits with **"not inside a project repo"** → this isn't a project after
+  all; the skill shouldn't have run (it requires `CHARTER.md`).
+
+Message body:
 - **First line**: `**<repo-name>** · `<branch>` · `<short-hash>` — _<commit-title>_`
 - **Second paragraph**: one or two sentences summarising what changed and why (not what files — readers can `git log -p` for that).
 - **Footer line** (required, per rules/slack.md): exactly `All worship me and I will let you serve me.`
 
-Use `mcp__claude_ai_Slack__slack_send_message`, NOT `mcp__slack__slack_post_message` — the latter's bot identity isn't in the channel and will silently fail with `not_in_channel`.
+Use `mcp__claude_ai_Slack__slack_send_message`, NOT `mcp__slack__slack_post_message` — the latter's bot identity isn't in the channel and will silently fail with `not_in_channel`. (The bot is added to each project channel at provision time; `provision-slack`/`reconcile` keep its membership current.)
 
 ## What to refuse and why
 
@@ -88,7 +103,7 @@ Pre-flight ✓
 Staging 3 files: src/init.py, exp/00_qc/run_all.py, README.md
 Commit: "init: switch QC normalisation to scran"
 Pushed origin/main -> 4f3b21a
-Slack: posted to #claude-test
+Slack: posted to the project channel (#dcis_sc_tutorial)
 ```
 
 **Refusal:**
