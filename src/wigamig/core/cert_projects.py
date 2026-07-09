@@ -70,8 +70,30 @@ class CertProject:
                 "certs": [dict(c) for c in self.certs]}
 
 
+class CertProjectError(RuntimeError):
+    """A cert-project registry operation could not be completed (e.g. the
+    lab-mgmt repo is missing or its path is a dangling symlink)."""
+
+
 def registry_dir(env: dict | None = None) -> Path:
     return lab_mgmt_repo_root(env) / REGISTRY_DIR
+
+
+def _require_writable_root(env: dict | None = None) -> Path:
+    """Resolve the lab-mgmt repo root and reject the states that would otherwise
+    surface as an opaque ``FileExistsError`` deep in ``mkdir`` — a dangling
+    ``~/repos/lab_mgmt`` symlink (from an older layout) or a path occupied by a
+    non-directory. A plain-missing root is fine: ``mkdir(parents=True)`` creates
+    it (matching pi-init / the create flow)."""
+    root = lab_mgmt_repo_root(env)
+    # ``exists()`` follows symlinks, so a dangling link reads as missing.
+    if root.is_symlink() and not root.exists():
+        raise CertProjectError(
+            f"lab-mgmt path {root} is a dangling symlink (points to a missing "
+            f"target). Fix or remove it, then run `wigamig pi-init <lab>`.")
+    if root.exists() and not root.is_dir():
+        raise CertProjectError(f"lab-mgmt path {root} is not a directory.")
+    return root
 
 
 def project_path(name: str, env: dict | None = None) -> Path:
@@ -146,6 +168,7 @@ def _render(p: CertProject) -> str:
 
 
 def _write(p: CertProject, env: dict | None = None) -> Path:
+    _require_writable_root(env)
     path = project_path(p.name, env)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_render(p), encoding="utf-8")
