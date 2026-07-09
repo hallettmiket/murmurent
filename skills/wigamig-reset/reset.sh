@@ -9,10 +9,19 @@
 #   full     install + remove machine-local CACHES (workspaces/, *.log,
 #            dashboard.pid, security/ agent cache). Still KEEPS credentials,
 #            installations/, decommissions/, audit logs, hosts/machine yaml.
+#   data     wipe ALL data you entered into ~/.wigamig (lab_info, profile.yaml,
+#            hosts/machine/master_folders yaml, inventory/, cores/, onboarding/,
+#            decommissions/, security/, identity/cards/trust/revocation, logs,
+#            …) — everything EXCEPT your key material. KEEPS keys/, age/,
+#            installations/ (other projects), and ~/.config/wigamig. Robust: it
+#            keeps an allowlist and removes the rest, so new data files are
+#            caught automatically. No reinstall.
 #
 # Destructive extras (never happen without the explicit flag):
 #   --nuke-installations   also remove ~/.wigamig/installations (other projects)
 #   --nuke-credentials     also remove ~/.config/wigamig (slack-token + keys)
+#   --nuke-keys            with --level data, ALSO remove ~/.wigamig/keys + age
+#                          (a fully fresh identity; default keeps them)
 #   --uninstall            first completely REMOVE the existing wigamig
 #                          install(s) — the uv-tool one AND stray conda/pipx
 #                          copies — before any reinstall. With --level centre
@@ -39,6 +48,7 @@ DRY=0
 YES=0
 NUKE_INSTALL=0
 NUKE_CREDS=0
+NUKE_KEYS=0
 UNINSTALL=0
 
 WIG="$HOME/.wigamig"
@@ -52,18 +62,19 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --level) LEVEL="${2:-}"; shift 2 ;;
     --level=*) LEVEL="${1#*=}"; shift ;;
-    centre|install|full) LEVEL="$1"; shift ;;   # bare level as convenience
+    centre|install|full|data) LEVEL="$1"; shift ;;   # bare level as convenience
     --dry-run|-n) DRY=1; shift ;;
     --yes|-y) YES=1; shift ;;
     --nuke-installations) NUKE_INSTALL=1; shift ;;
     --nuke-credentials) NUKE_CREDS=1; shift ;;
+    --nuke-keys) NUKE_KEYS=1; shift ;;
     --uninstall) UNINSTALL=1; shift ;;
     -h|--help) usage 0 ;;
     *) echo "unknown arg: $1" >&2; usage 1 ;;
   esac
 done
 
-case "$LEVEL" in centre|install|full) ;; *) echo "bad --level: $LEVEL" >&2; exit 2 ;; esac
+case "$LEVEL" in centre|install|full|data) ;; *) echo "bad --level: $LEVEL" >&2; exit 2 ;; esac
 
 say()  { printf '%s\n' "$*"; }
 run()  { if [ "$DRY" = 1 ]; then say "  DRY: $*"; else eval "$*"; fi; }
@@ -78,6 +89,7 @@ say "=== wigamig reset — level: $LEVEL${DRY:+ }$([ "$DRY" = 1 ] && echo '(dry-
 say "    repo:        $REPO"
 say "    nuke creds:  $([ "$NUKE_CREDS" = 1 ] && echo yes || echo NO)"
 say "    nuke installs: $([ "$NUKE_INSTALL" = 1 ] && echo yes || echo NO)"
+[ "$LEVEL" = data ] && say "    nuke keys:   $([ "$NUKE_KEYS" = 1 ] && echo yes || echo NO)"
 say ""
 
 if [ "$YES" != 1 ] && [ "$DRY" != 1 ]; then
@@ -115,6 +127,22 @@ rmrf "$WIG/lab_info" "centre registry (lab_info/)"
 # too, so the next install resolves a fresh identity.
 rmrf "$WIG/registrar" "registrar sentinel (~/.wigamig/registrar)"
 rmrf "$WIG/user" "saved netname (~/.wigamig/user)"
+
+# 3d. data reset — wipe ALL entered data, keep only key material -------------
+if [ "$LEVEL" = data ]; then
+  say "3d. wiping all entered data (keeping key material + other projects)"
+  # Allowlist of what to KEEP under ~/.wigamig; everything else is removed, so
+  # any data file — existing or added later — is caught without an explicit list.
+  KEEP="keys age installations"
+  [ "$NUKE_KEYS" = 1 ] && KEEP="installations"   # --nuke-keys: also wipe keys/ + age/
+  for entry in "$WIG"/* "$WIG"/.[!.]*; do
+    [ -e "$entry" ] || continue                  # skip an unmatched dotfile glob
+    base="$(basename "$entry")"
+    keepit=0
+    for k in $KEEP; do [ "$base" = "$k" ] && keepit=1; done
+    if [ "$keepit" = 1 ]; then say "  (keep) $base"; else rmrf "$entry" "$base"; fi
+  done
+fi
 
 # 3b. uninstall the tool entirely (only with --uninstall) -------------------
 # Completely removes every wigamig executable: the uv-tool install AND any
