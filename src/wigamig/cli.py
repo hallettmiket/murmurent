@@ -499,6 +499,28 @@ def project_provision_slack(name: str) -> None:
         click.echo(f"  ! {u.get('handle')}: {u.get('reason')}")
 
 
+@project_group.command("provision-github",
+                       help="(PI) Create the cert-project's private GitHub repo "
+                            "and add its certified members as collaborators. "
+                            "Idempotent; needs the gh CLI.")
+@click.argument("name")
+@click.option("--org", default="", help="GitHub org (default: lab.md github_org).")
+def project_provision_github(name: str, org: str) -> None:
+    from .core import cert_provision as _cprov
+    try:
+        out = _cprov.provision_github(name, org=org or None)
+    except _cprov.CertProvisionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not out["ok"]:
+        raise click.ClickException(
+            f"could not provision repo ({out.get('error')}): {out.get('detail')}")
+    click.echo(f"✓ repo {out['repo']} ready.")
+    for c in out["collaborators"]:
+        mark = {"ok": "✓", "fail": "!", "no_github": "·"}.get(c.get("status"), "·")
+        who = c.get("login") or c.get("handle")
+        click.echo(f"  {mark} {c.get('handle')} → {who}: {c.get('detail', c.get('status'))}")
+
+
 # ---------------------------------------------------------------------------
 # experiment
 # ---------------------------------------------------------------------------
