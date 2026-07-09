@@ -20,13 +20,19 @@ then run for real**.
 | `centre` (default) | `~/.wigamig/lab_info/` only → centre-init is first-run again | everything else |
 | `install` | centre + reinstall the tool from `~/repos/wigamig` (`uv tool install --force --python 3.12 -e '.[dashboard,slack,mcp]'`) + `scripts/setup.sh` + `wigamig install --hooks` | credentials, installations, audit |
 | `full` | install + machine-local **caches** (`workspaces/`, `*.log`, `dashboard.pid`, `security/agent_cache`, stale `RESUME.md`) | credentials, `installations/`, `decommissions/`, audit logs, `hosts.yaml`/`machine.yaml` |
+| `data` | **all data you entered** into `~/.wigamig` — `lab_info/`, `profile.yaml`, `hosts`/`machine`/`master_folders` yaml, `inventory/`, `cores/`, `onboarding/`, `decommissions/`, `security/`, identity/cards/trust/revocation, logs — everything *except* key material (allowlist-based, so new files are caught) | `keys/`, `age/`, `installations/` (other projects), and `~/.config/wigamig`. **No reinstall.** |
+
+Use `data` for "wipe everything I've entered and start over, but keep my keys and
+credentials." It's the level to reach for when `full` leaves too much behind
+(`full` keeps `profile.yaml`, `hosts.yaml`, `inventory/`, etc.).
 
 Opt-in extras (only with the flag): `--nuke-installations` (also wipes
 `~/.wigamig/installations/` — **other projects' manifests**),
 `--nuke-credentials` (also wipes `~/.config/wigamig/` — the **slack-token +
-keys**), `--uninstall` (first **completely removes** the existing wigamig
-install — the uv-tool one *and* stray conda/pipx copies that shadow it — before
-any reinstall).
+keys**), `--nuke-keys` (with `--level data`, **also** removes `~/.wigamig/keys/`
++ `age/` for a fully fresh identity; default keeps them), `--uninstall` (first
+**completely removes** the existing wigamig install — the uv-tool one *and* stray
+conda/pipx copies that shadow it — before any reinstall).
 
 ### Completely removing the old install
 
