@@ -105,6 +105,19 @@ def test_delete_host_removes(world):
     assert "biodatsci" not in {h["name"] for h in listing["hosts"]}
 
 
+def test_delete_host_requires_pi(world, monkeypatch):
+    """Decommissioning a host is destructive → PI only. A non-PI actor is
+    refused and the host survives (regression for the missing-auth gap that was
+    silently writing '@unknown' decommission reports)."""
+    monkeypatch.delenv("WIGAMIG_USER", raising=False)   # no PI fallback
+    client = TestClient(create_app())
+    client.post("/api/hosts", json={"name": "biodatsci", "ssh_host": "biodatsci"})
+    res = client.delete("/api/hosts/biodatsci?user=intruder")
+    assert res.status_code == 403
+    listing = client.get("/api/hosts").json()
+    assert "biodatsci" in {h["name"] for h in listing["hosts"]}   # not removed
+
+
 def test_delete_local_refused(world):
     client = TestClient(create_app())
     res = client.delete("/api/hosts/local")

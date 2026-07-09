@@ -3315,9 +3315,15 @@ def create_app() -> FastAPI:
         written to ``~/.wigamig/decommissions/`` listing the paths on
         that machine the user may want to clean up by hand (wigamig_base
         directories, vault, etc.). ``local`` cannot be removed.
+
+        PI only — decommissioning a host is destructive (writes a report,
+        drops the registry row) and must be attributed to a real actor, not
+        the silent ``unknown`` default the actor label used to fall back to.
         """
         from ..core import hosts as _hosts
         from ..core import decommission as _deco
+
+        actor = _require_pi(user).lstrip("@")
 
         # Capture host details BEFORE removal so the report has data.
         try:
@@ -3333,8 +3339,6 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except _hosts.HostError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-        actor = (user or "").strip().lstrip("@") or "unknown"
         items: list[_deco.CleanupItem] = []
         if host is not None:
             ssh_target = (host.ssh_host or name) if host.is_remote else None
