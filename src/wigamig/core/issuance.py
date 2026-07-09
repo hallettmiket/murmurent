@@ -144,25 +144,59 @@ def self_issue_pi_card(handle: str, group: str, *, group_kind: str = "lab",
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{_safe(realm)}_pi.json").write_text(_cert.dumps(card), encoding="utf-8")
     _record_issued(realm, card, "pi")
-    return {"pi_card": card, "trust_root": pub_str, "realm": realm}
+
+    # Establish the lab's own management repo (the roster's home) and pin it, then
+    # write the PI's own record — the roster is the single source of truth.
+    from . import membership as _mem
+    from . import repo as _repo
+    lab_repo = _repo.lab_repo_path(group)
+    (lab_repo / "members").mkdir(parents=True, exist_ok=True)
+    lab_md = lab_repo / "lab.md"
+    if not lab_md.is_file():
+        lab_md.write_text(f"---\nlab: {group}\npi: '{at}'\nkind: {group_kind}\n---\n\n"
+                          f"# {group}\n", encoding="utf-8")
+    _repo.set_lab_mgmt_path(lab_repo)
+    prof = _read_profile(env)
+    _mem.upsert_member(at, role="pi", email=str(prof.get("email") or ""),
+                       github=str(prof.get("github") or ""),
+                       card_fingerprint=card["payload"]["subject"]["fingerprint"],
+                       card_id=card["payload"]["card_id"])
+    return {"pi_card": card, "trust_root": pub_str, "realm": realm,
+            "lab_repo": str(lab_repo)}
 
 
 # ---------------------------------------------------------------------------
 # PI side: enroll (prove key possession) + verify-and-import
 # ---------------------------------------------------------------------------
 
+def _read_profile(env: dict | None = None) -> dict:
+    """The member's ``~/.wigamig/profile.yaml`` (from ``wigamig init``), or {}."""
+    import yaml
+    p = _home() / "profile.yaml"
+    if not p.is_file():
+        return {}
+    try:
+        return yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def make_enrollment(handle: str, *, nonce: str | None = None,
                     group: str = "", env: dict | None = None) -> dict:
     """Build this machine's proof-of-possession enrollment request. Requires a
-    local keypair (``wigamig identity-init`` / first-run auto-mint)."""
+    local keypair (``wigamig identity-init`` / first-run auto-mint). Carries the
+    member's email + github (from their ``wigamig init`` profile) so the PI can
+    record them on the roster in one round trip."""
     if not _k.have_keys():
         raise IssuanceError("no local keypair; run `wigamig identity-init` first")
     centre = _ci.read_centre(env=env)
     centre_name = (centre.unique_name or centre.install_id) if centre else ""
+    prof = _read_profile(env)
     priv = _k.load_private()
     return _cert.make_enrollment_request(
         handle, priv=priv, nonce=nonce or os.urandom(8).hex(),
-        centre=centre_name, group=group)
+        centre=centre_name, group=group,
+        email=str(prof.get("email") or ""), github=str(prof.get("github") or ""))
 
 
 def _scoped_from_signed(payload: dict) -> dict:
@@ -269,6 +303,14 @@ def issue_member_card(handle: str, *, enrollment: dict, group: str,
         pi_priv=_k.load_private(), pi_handle=pi_handle, roles=roles,
         issued_at=issued_at, ttl_days=ttl_days)
     _record_issued(centre_name, member_card, "member")
+    # Roster is the source of truth: record the member with the email + github
+    # they carried in their enrollment and the card's fingerprint/id.
+    from . import membership as _mem
+    ep = enrollment.get("payload") or {}
+    _mem.upsert_member(handle, role="staff", email=str(ep.get("email") or ""),
+                       github=str(ep.get("github") or ""),
+                       card_fingerprint=member_card["payload"]["subject"]["fingerprint"],
+                       card_id=member_card["payload"]["card_id"])
     return {"member_card": member_card, "pi_card": pi_card}
 
 

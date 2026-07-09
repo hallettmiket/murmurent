@@ -63,10 +63,13 @@ def run_init() -> None:
     choice = click.prompt("Choose", type=click.Choice(list(ROLES)), default="1")
     role = ROLES[choice][0]
 
-    # 4. Contact info (everyone).
+    # 4. Contact info (everyone). Email + GitHub are the join keys for the lab's
+    # Slack channel + GitHub repo, so they travel with your enrollment.
     name = click.prompt("Your full name", default="")
     email = click.prompt("Your email", default="")
-    profile = {"handle": f"@{handle}", "role": role, "name": name, "email": email}
+    github = click.prompt("Your GitHub username (optional)", default="").strip().lstrip("@")
+    profile = {"handle": f"@{handle}", "role": role, "name": name, "email": email,
+               "github": github}
 
     # 5. Role-specific info.
     if role == "pi":

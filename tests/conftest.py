@@ -54,3 +54,11 @@ def _isolate_wigamig_home(monkeypatch, tmp_path):
     (a leaked ``identity.yaml`` there used to 403 unrelated dashboard tests).
     Tests that need a specific home simply set ``WIGAMIG_HOME`` again."""
     monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "_wig_home"))
+
+
+@pytest.fixture(autouse=True)
+def _isolate_repos_root(monkeypatch, tmp_path):
+    """Point ``WIGAMIG_REPOS_ROOT`` at a per-test temp dir so anything that creates
+    a lab-mgmt repo (``pi-init`` → ``~/repos/wigamig_<lab>``) never writes into the
+    developer's real ``~/repos``."""
+    monkeypatch.setenv("WIGAMIG_REPOS_ROOT", str(tmp_path / "_repos"))
