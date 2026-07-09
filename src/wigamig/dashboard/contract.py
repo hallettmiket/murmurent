@@ -336,6 +336,29 @@ class PersonalOracleEntry(BaseModel):
     path: str      # e.g. "oracle/memory_entry.md" for click-to-open
 
 
+class VaultHealth(BaseModel):
+    """Whether wigamig can actually READ the member's Obsidian vault on this
+    machine. ``status`` is one of ok / empty / missing / unregistered / blocked
+    (blocked = the macOS Full-Disk-Access failure that otherwise makes the Oracle
+    personal + notebook tiers silently return empty). ``detail`` carries the fix
+    hint on ``blocked``."""
+
+    status: str = "unregistered"
+    detail: str = ""
+    path: str | None = None
+
+
+class AgentActivity(BaseModel):
+    """One line from the live agent-activity log (``~/.wigamig/agents.log``, fed
+    by the SubagentStop / PreToolUse(Agent) hook). Lets the dashboard show what
+    subagents are doing — the browser equivalent of the tmux BR pane."""
+
+    time: str = ""          # "HH:MM"
+    agent: str = ""         # subagent type (e.g. "blacksmith")
+    text: str = ""          # the ≤200-char verdict, or the starting description
+    started: bool = False   # True = a "starting" line; False = a done/verdict line
+
+
 class PersonalOracleBlock(BaseModel):
     """The member's personal Oracle panel data."""
 
@@ -919,6 +942,8 @@ class DashboardResponse(BaseModel):
     oracle_drafts: list[OracleEntry] = []  # PI-only; awaiting approval
     personal_oracle: PersonalOracleBlock = PersonalOracleBlock(folder="oracle/")
     lab_oracle_folder: str = ""   # short display path for the lab oracle vault root
+    vault_health: VaultHealth = VaultHealth()  # can wigamig actually READ the vault?
+    agents_activity: list[AgentActivity] = []  # live subagent feed (newest first)
     requests_pending: list[JoinRequestRow] = []  # PI: all pending; member: theirs only
     requests_mine: list[JoinRequestRow] = []     # the viewer's outgoing requests
     group_members: list[str] = []                # all known @handles (for forms)

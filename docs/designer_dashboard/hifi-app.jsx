@@ -5612,16 +5612,42 @@ function OracleDraftRow({ entry }) {
 function PersonalOraclePanel({ data, span="c-4" }) {
   const block = data || { folder: "oracle/", entry_count: 0, recent: [] };
   const recent = block.recent || [];
+  // Vault read-access health: without Full Disk Access the vault silently reads
+  // empty, so surface it here — an empty panel could mean "blocked", not "no notes".
+  const vh = window.DATA.vault_health || { status: "unregistered", detail: "", path: null };
+  const HEALTH = {
+    ok:           { chip: "✓ readable",    color: "var(--green)",  bg: "rgba(79,107,58,0.10)", bd: "rgba(79,107,58,0.30)" },
+    empty:        { chip: "✓ readable",    color: "var(--green)",  bg: "rgba(79,107,58,0.10)", bd: "rgba(79,107,58,0.30)" },
+    missing:      { chip: "no oracle dir", color: "var(--amber, #8a6d3b)", bg: "rgba(138,109,59,0.10)", bd: "rgba(138,109,59,0.30)" },
+    unregistered: { chip: "no vault",      color: "var(--muted-ink, #888)", bg: "rgba(136,136,136,0.10)", bd: "rgba(136,136,136,0.30)" },
+    blocked:      { chip: "⚠ BLOCKED",     color: "var(--red)",    bg: "rgba(160,50,50,0.10)", bd: "rgba(160,50,50,0.35)" },
+  };
+  const hs = HEALTH[vh.status] || HEALTH.unregistered;
   return (
     <div className={"panel "+span}>
       <header>
         <h2>Oracle · personal</h2>
-        <span className="meta">{block.entry_count} entries</span>
+        <span style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:0.5,
+              padding:"1px 6px", borderRadius:2, color:hs.color,
+              background:hs.bg, border:"1px solid "+hs.bd}}
+              title={vh.path ? "vault oracle dir: "+vh.path : "no vault registered"}>
+          {hs.chip}
+        </span>
       </header>
       <div className="muted" style={{padding:"2px 14px 6px",
            fontSize:11, borderBottom:"1px solid var(--rule)"}}>
         <code className="mono">{block.folder}</code>
+        <span style={{marginLeft:8}}>{block.entry_count} entries</span>
       </div>
+      {vh.status === "blocked" && (
+        <div style={{margin:"8px 14px", padding:"8px 10px", borderRadius:3,
+             color:"var(--red)", background:"rgba(160,50,50,0.08)",
+             border:"1px solid rgba(160,50,50,0.30)", fontSize:12, lineHeight:1.5}}>
+          <strong>Vault not readable — Full Disk Access needed.</strong> Entries
+          below may be incomplete (blocked reads look like "no entries"). Grant FDA
+          to VS Code, quit + relaunch, then run <code className="mono">wigamig oracle doctor</code>.
+        </div>
+      )}
       <div className="body" style={{padding:"6px 0"}}>
         {recent.map((e, i) => (
           <div key={i} style={{padding:"9px 14px", borderBottom:"1px solid var(--rule)"}}>
@@ -5641,6 +5667,64 @@ function PersonalOraclePanel({ data, span="c-4" }) {
           <div className="muted" style={{padding:"14px", fontSize:13}}>
             No personal oracle entries yet. Ask the Oracle to remember
             something and it'll show up here.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// A deterministic, vivid colour per agent name — same agent always gets the same
+// hue, so the live feed is scannable at a glance.
+const AGENT_PALETTE = [
+  "#c0392b", "#d35400", "#b7791f", "#2e7d32", "#0b7285", "#1565c0",
+  "#5b3a91", "#8e2f6b", "#00838f", "#4e342e", "#37474f", "#6a1b9a",
+];
+function agentColour(name) {
+  let h = 0;
+  for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
+  return AGENT_PALETTE[h % AGENT_PALETTE.length];
+}
+
+function AgentsPanel({ activity, span="c-12" }) {
+  const feed = activity || [];
+  return (
+    <div className={"panel "+span}>
+      <header>
+        <h2>Agents · live</h2>
+        <span className="meta">{feed.length ? feed.length + " recent" : "idle"}</span>
+      </header>
+      <div className="muted" style={{padding:"2px 14px 6px", fontSize:11,
+           borderBottom:"1px solid var(--rule)"}}>
+        subagent activity from <code className="mono">~/.wigamig/agents.log</code>
+        {" "}· newest first
+      </div>
+      <div className="body" style={{padding:"6px 0", maxHeight:280, overflowY:"auto"}}>
+        {feed.map((a, i) => {
+          const col = agentColour(a.agent);
+          return (
+            <div key={i} style={{display:"flex", gap:10, alignItems:"baseline",
+                 padding:"7px 14px", borderBottom:"1px solid var(--rule)",
+                 borderLeft:"3px solid "+col, opacity: a.started ? 0.72 : 1}}>
+              <span className="mono muted" style={{fontSize:10, whiteSpace:"nowrap"}}>{a.time}</span>
+              <span style={{fontFamily:"var(--mono)", fontSize:11, fontWeight:700,
+                    letterSpacing:0.3, color:"#fff", background:col,
+                    padding:"1px 7px", borderRadius:3, whiteSpace:"nowrap"}}>
+                {a.agent}
+              </span>
+              <span style={{fontSize:12.5, lineHeight:1.4, color:"var(--ink)",
+                    fontStyle: a.started ? "italic" : "normal",
+                    fontWeight: a.started ? 400 : 500}}>
+                {a.started ? "▸ " : ""}{a.text}
+              </span>
+            </div>
+          );
+        })}
+        {feed.length === 0 && (
+          <div className="muted" style={{padding:"14px", fontSize:13}}>
+            No recent agent activity. When you dispatch an agent (or one finishes),
+            its verdict shows up here. Requires the agent-log hook
+            (<code className="mono">wigamig install --hooks</code>).
           </div>
         )}
       </div>
@@ -7822,6 +7906,11 @@ function App() {
           <NotebookPanel span="c-5" />
           <LabOraclePanel entries={D.oracle_recent} drafts={D.oracle_drafts}
                           labFolder={D.lab_oracle_folder} span="c-4" />
+        </div>
+
+        {/* Live subagent feed — the browser equivalent of the tmux BR pane. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <AgentsPanel activity={D.agents_activity} span="c-12" />
         </div>
 
         {/* Lab members + inventory: things you check, but not every day. */}
