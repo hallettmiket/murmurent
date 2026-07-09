@@ -3239,7 +3239,15 @@ def create_app() -> FastAPI:
                               overleaf=bool(body.overleaf))
         except _cp.CertProjectError as exc:
             raise HTTPException(status_code=404, detail=str(exc))
-        return {"ok": True, "project": project,
+        # An Overleaf manuscript repo cloned locally gets the pull-first CLAUDE.md
+        # note so any CC session in it follows the manuscript rules. Best-effort.
+        note_written = False
+        if role == "manuscript" and bool(body.overleaf) and (body.host or "local") == "local" \
+                and body.path:
+            from ..core import project_cc_init as _cci
+            note_written = _cci.write_overleaf_manuscript_note(
+                body.path, project=project, repo_name=body.repo_name)
+        return {"ok": True, "project": project, "overleaf_note": note_written,
                 "repos": [r.to_dict() for r in cp.repos]}
 
     @app.post("/api/project/{project}/reconcile")
