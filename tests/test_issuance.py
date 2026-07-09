@@ -219,6 +219,48 @@ def test_cli_issue_member_card_prints_trust_root_when_standalone(monkeypatch, tm
     assert "import-card" in res.output
 
 
+def test_issuance_writes_the_roster(monkeypatch, tmp_path):
+    """pi-init + issue-member-card make the roster (members/*.md) the single source
+    of truth: PI + member land there with email, github, and card fingerprint/id;
+    revoke_member reads the fingerprint back from the roster."""
+    import yaml as _yaml
+    from wigamig.core import centre_root as CR
+    from wigamig.core import membership as M
+    from wigamig.core import repo as R
+    from wigamig.core import revocation as REV
+
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.delenv("WIGAMIG_LAB_MGMT_REPO", raising=False)   # use the pinned pointer
+    K.generate_keypair()
+    (tmp_path / "pi").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "pi" / "profile.yaml").write_text(
+        _yaml.safe_dump({"email": "pi@x.edu", "github": "pigh"}), encoding="utf-8")
+
+    out = ISS.self_issue_pi_card("@yxia266", "lab_mh")
+    lab_repo = R.lab_repo_path("lab_mh")
+    assert (lab_repo / "members").is_dir()
+    assert R.lab_mgmt_repo_root() == lab_repo                    # pointer resolves here
+    pi_rec = M.parse_member(M.member_path("yxia266"))
+    assert pi_rec.role == "pi" and pi_rec.email == "pi@x.edu" and pi_rec.github == "pigh"
+    assert pi_rec.card_fingerprint == out["pi_card"]["payload"]["subject"]["fingerprint"]
+
+    # a member enrolls (email/github travel in the enrollment) -> on the roster
+    allie = Ed25519PrivateKey.generate()
+    m_req = C.make_enrollment_request("@allie", priv=allie, nonce="a1", group="lab_mh",
+                                      email="allie@x.edu", github="@alliegh")
+    bundle = ISS.issue_member_card("@allie", enrollment=m_req, group="lab_mh")
+    allie_rec = M.parse_member(M.member_path("allie"))
+    assert allie_rec.email == "allie@x.edu" and allie_rec.github == "alliegh"
+    assert allie_rec.status == "active"
+    assert allie_rec.card_fingerprint == bundle["member_card"]["payload"]["subject"]["fingerprint"]
+
+    # revoke_member reads the fingerprint from the roster
+    CR.generate_root_key()
+    crl = REV.revoke_member("lab_mh", "allie")
+    assert allie_rec.card_fingerprint in crl["payload"]["revoked"]
+
+
 def test_standalone_pi_requires_a_group_name(monkeypatch, tmp_path):
     monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "h"))
     monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "li"))

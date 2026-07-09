@@ -103,6 +103,19 @@ def _pinned_lab_mgmt_path() -> Path | None:
     return Path(txt).expanduser() if txt else None
 
 
+def repos_root() -> Path:
+    """The base directory for working clones — ``~/repos`` by default, overridable
+    with ``$WIGAMIG_REPOS_ROOT`` (tests isolate it)."""
+    return Path(os.environ.get("WIGAMIG_REPOS_ROOT", str(Path.home() / "repos"))).expanduser()
+
+
+def lab_repo_path(group: str) -> Path:
+    """The lab-management repo for ``group`` — ``<repos>/wigamig_<group>`` — named so
+    it is unmistakably a wigamig repo."""
+    safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in str(group or ""))
+    return repos_root() / f"wigamig_{safe}"
+
+
 def set_lab_mgmt_path(path: str | Path) -> None:
     """Persistently point ``lab_mgmt_repo_root()`` at a lab's own management repo
     (e.g. ``~/repos/wigamig_lab_mh``). Honours ``WIGAMIG_HOME``. An explicit

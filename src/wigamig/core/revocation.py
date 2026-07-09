@@ -143,13 +143,26 @@ def revoke(centre: str, *, card_id: str | None = None,
 
 
 def revoke_member(centre: str, handle: str) -> dict:
-    """Revoke the card recorded for ``handle`` in this machine's issuance ledger."""
-    rec = lookup_issued(centre, handle)
+    """Revoke a member's card. Reads the fingerprint/id from the **roster** (the
+    source of truth) first, then falls back to this machine's issuance ledger."""
+    rec = None
+    try:
+        from . import membership as _mem
+        p = _mem.member_path(handle)
+        if p.is_file():
+            m = _mem.parse_member(p)
+            if m.card_fingerprint or m.card_id:
+                rec = {"card_id": m.card_id, "fingerprint": m.card_fingerprint}
+    except Exception:  # noqa: BLE001
+        pass
+    if not rec:
+        rec = lookup_issued(centre, handle)          # ledger fallback
     if not rec:
         raise RevocationError(
-            f"no issued card on record for @{_norm(handle)} on this machine — "
-            "revoke on the machine that issued it, or pass --fingerprint")
-    return revoke(centre, card_id=rec.get("card_id"), fingerprint=rec.get("fingerprint"))
+            f"no issued card on record for @{_norm(handle)} — revoke on the "
+            "machine that issued it, or pass --fingerprint")
+    return revoke(centre, card_id=rec.get("card_id") or None,
+                  fingerprint=rec.get("fingerprint") or None)
 
 
 # ---------------------------------------------------------------------------
