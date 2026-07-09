@@ -861,16 +861,14 @@ def revoke_project_cmd(project: str, lab: str) -> None:
     from ..core import issuance as _iss
     from ..core import revocation as _rev
     try:
-        centre, group = _iss.project_context(project, lab=lab or None)
+        out = _iss.delete_project(project, lab=lab or None)
     except _iss.IssuanceError as exc:
         raise click.ClickException(str(exc)) from exc
-    try:
-        crl = _rev.revoke_project(centre, group)
     except _rev.RevocationError as exc:
         raise click.ClickException(str(exc)) from exc
-    n = len(_rev.project_ledger(centre, group))
-    click.echo(f"✓ revoked project {group}: {n} card(s) added to the CRL "
-               f"(serial {crl['payload']['serial']}).")
+    click.echo(f"✓ revoked project {out['group']}: {out['revoked']} card(s) added "
+               f"to the CRL (serial {out['crl']['payload']['serial']}); registry "
+               f"entry archived.")
     click.echo("  Members' access ends when they next fetch the CRL / hit a "
                "fail-closed check. Slack/GitHub teardown is a later phase.")
 

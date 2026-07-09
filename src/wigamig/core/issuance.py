@@ -431,6 +431,17 @@ def issue_project_card(handle: str, *, enrollment: dict, project: str,
         pi_priv=_k.load_private(), pi_handle=pi_handle, roles=roles,
         issued_at=issued_at, ttl_days=ttl_days)
     _record_project_issued(centre_name, group, card)
+    # Mirror the cert into the lab's cert-project registry (best-effort — the
+    # per-project ledger above is the revocation source of truth regardless).
+    try:
+        from . import cert_projects as _cp
+        p = card["payload"]
+        _cp.upsert(proj, lab=lab, member=handle,
+                   cert={"handle": p["subject"]["handle"],
+                         "fingerprint": p["subject"]["fingerprint"],
+                         "card_id": p["card_id"]}, env=env)
+    except Exception:  # noqa: BLE001
+        pass
     return {"member_card": card, "pi_card": pi_card, "group": group,
             "lab": lab, "project": proj}
 
@@ -446,6 +457,25 @@ def _record_project_issued(centre_name: str, group: str, card: dict) -> None:
                                    fingerprint=p["subject"]["fingerprint"])
     except Exception:  # noqa: BLE001
         pass
+
+
+def delete_project(project: str, *, lab: str | None = None,
+                   env: dict | None = None) -> dict:
+    """PI-only "delete a project" at the identity layer: revoke every project card
+    (the CRL) and archive the registry record. Raises ``IssuanceError`` if the
+    caller doesn't lead the project's lab, and ``RevocationError`` (from
+    ``revoke_project``) if there is nothing to revoke or no signing key. Slack /
+    GitHub teardown is a later phase."""
+    from . import revocation as _rev
+    centre, group = project_context(project, lab=lab, env=env)
+    n = len(_rev.project_ledger(centre, group))
+    crl = _rev.revoke_project(centre, group)
+    try:
+        from . import cert_projects as _cp
+        _cp.set_status(_norm_project(project), "archived", env=env)
+    except Exception:  # noqa: BLE001
+        pass
+    return {"group": group, "revoked": n, "crl": crl}
 
 
 def verify_and_import_member_card(bundle, *, trust_root: str | None = None,
