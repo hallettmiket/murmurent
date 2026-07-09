@@ -120,6 +120,29 @@ def test_write_rejects_dangling_symlink(monkeypatch, tmp_path):
         CP.upsert("p", lab="lab_mh")
 
 
+def test_render_retires_top_level_code_repo_but_reads_back(tmp_path):
+    CP.upsert("p", lab="lab_mh", code_repo="/r/p", host="local")
+    text = CP.project_path("p").read_text()
+    # stage 6: top-level code_repo/host/remote_path are no longer written;
+    # `repos:` is the on-disk representation (host lives nested inside it).
+    assert "\ncode_repo:" not in text
+    assert "\nhost:" not in text and "\nremote_path:" not in text
+    assert "repos:" in text
+    assert CP.get("p").code_repo == "/r/p"        # still derived on read
+
+
+def test_old_format_file_with_code_repo_still_reads(tmp_path, monkeypatch):
+    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lm"))
+    d = tmp_path / "lm" / "cert_projects"
+    d.mkdir(parents=True)
+    (d / "old.md").write_text(
+        "---\nproject: old\nlab: lab_mh\nstatus: active\n"
+        "code_repo: /r/old\nhost: local\n---\n\n# old\n", encoding="utf-8")
+    p = CP.get("old")
+    assert p.code_repo == "/r/old"
+    assert len(p.repos) == 1 and p.repos[0].role == "code" and p.repos[0].path == "/r/old"
+
+
 def test_legacy_code_repo_reads_as_a_single_code_repo():
     # a pre-multi-repo project (only code_repo) reads with a synthesized repos list
     CP.upsert("legacy", lab="lab_mh", code_repo="/Users/x/repos/legacy", host="local")

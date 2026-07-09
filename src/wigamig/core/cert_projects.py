@@ -243,21 +243,15 @@ def _render(p: CertProject) -> str:
             "created": p.created, "lead": p.lead, "sensitivity": p.sensitivity}
     if p.choreography:
         meta["choreography"] = p.choreography
-    if p.code_repo:
-        meta["code_repo"] = p.code_repo
-    if p.host and p.host != "local":
-        meta["host"] = p.host
-    if p.remote_path:
-        meta["remote_path"] = p.remote_path
     if p.slack_channel_id:
         meta["slack_channel_id"] = p.slack_channel_id
     if p.github_repo:
         meta["github_repo"] = p.github_repo
-    # The authoritative repo set (code + manuscript + …). Emitted only when a
-    # project has repos beyond a bare synthesized code repo, to keep single-repo
-    # files tidy; readers reconstruct a code RepoRef from code_repo either way.
-    if p.repos and not (len(p.repos) == 1 and p.repos[0].role == "code"
-                        and not p.repos[0].remote_url and not p.repos[0].overleaf):
+    # The authoritative repo set (code + manuscript + …) is now the ONLY on-disk
+    # representation — the legacy top-level code_repo/host/remote_path are no
+    # longer written (stage 6). Old files that still carry them read fine: _parse
+    # synthesizes a code RepoRef from them, and cp.code_repo is derived on read.
+    if p.repos:
         meta["repos"] = [r.to_dict() for r in p.repos]
     meta["members"] = list(p.members)
     meta["certs"] = [dict(c) for c in p.certs]
