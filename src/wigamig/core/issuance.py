@@ -470,12 +470,22 @@ def delete_project(project: str, *, lab: str | None = None,
     centre, group = project_context(project, lab=lab, env=env)
     n = len(_rev.project_ledger(centre, group))
     crl = _rev.revoke_project(centre, group)
+    proj = _norm_project(project)
+    # Tear down provisioned infra BEFORE flipping status, while the registry still
+    # carries the channel id / repo / members. Best-effort: the cert revocation
+    # above is the real enforcement, so infra failures never block the delete.
+    teardown = None
     try:
-        from . import cert_projects as _cp
-        _cp.set_status(_norm_project(project), "archived", env=env)
+        from . import cert_provision as _cprov
+        teardown = _cprov.teardown(proj, env=env)
     except Exception:  # noqa: BLE001
         pass
-    return {"group": group, "revoked": n, "crl": crl}
+    try:
+        from . import cert_projects as _cp
+        _cp.set_status(proj, "archived", env=env)
+    except Exception:  # noqa: BLE001
+        pass
+    return {"group": group, "revoked": n, "crl": crl, "teardown": teardown}
 
 
 def verify_and_import_member_card(bundle, *, trust_root: str | None = None,

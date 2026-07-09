@@ -178,5 +178,68 @@ def provision_github(project: str, *, org: str | None = None, lab: str | None = 
     return {"ok": True, "repo": repo, "collaborators": results}
 
 
+# ---------------------------------------------------------------------------
+# Teardown — archive the Slack channel + drop GitHub collaborators. Best-effort;
+# called from issuance.delete_project after the certs are revoked (the revocation
+# is the security-critical enforcement; infra teardown is cleanup).
+# ---------------------------------------------------------------------------
+
+def _default_channel_archiver(channel_id: str):
+    """Slack ``conversations.archive``. Returns ``(ok, detail)``."""
+    from ..dashboard import slack_notify as _sn
+    tok = _sn._token()
+    if not tok:
+        return (False, "no slack token configured")
+    try:
+        import httpx
+        r = httpx.post("https://slack.com/api/conversations.archive",
+                       headers={"Authorization": f"Bearer {tok}"},
+                       json={"channel": channel_id}, timeout=10)
+        j = r.json()
+        return (bool(j.get("ok")), "archived" if j.get("ok")
+                else j.get("error", "archive_failed"))
+    except Exception as exc:  # noqa: BLE001
+        return (False, str(exc))
+
+
+def _default_collab_remover(org: str, name: str, login: str):
+    """Remove ``login`` as a collaborator on ``org/name``. Returns ``(ok, detail)``."""
+    from . import project_provision as _pp
+    if not _pp._gh_available():
+        return (False, "gh CLI not installed")
+    res = _pp._gh(["api", "-X", "DELETE",
+                   f"repos/{org}/{name}/collaborators/{login}"])
+    return (res.returncode == 0, (res.stderr or res.stdout or "").strip() or "removed")
+
+
+def teardown(project: str, *, env: dict | None = None,
+             channel_archiver=None, collab_remover=None) -> dict:
+    """Tear down a cert-project's provisioned infra: archive its Slack channel and
+    remove its GitHub collaborators. Best-effort + injectable; a project with no
+    provisioned channel/repo is a clean no-op. Does NOT revoke certs or archive
+    the registry record — that is ``issuance.delete_project``'s job."""
+    cp = _cp.get(project, env)
+    if cp is None:
+        raise CertProvisionError(f"no cert-project named {project!r}")
+    archiver = channel_archiver or _default_channel_archiver
+    remover = collab_remover or _default_collab_remover
+    out: dict = {"channel_archived": None, "collaborators_removed": []}
+    if cp.slack_channel_id:
+        ok, detail = archiver(cp.slack_channel_id)
+        out["channel_archived"] = {"channel_id": cp.slack_channel_id,
+                                   "ok": ok, "detail": detail}
+    if cp.github_repo and "/" in cp.github_repo:
+        org, name = cp.github_repo.split("/", 1)
+        gh_map = member_github_map([m.lstrip("@") for m in cp.members])
+        for m in cp.members:
+            login = gh_map.get(m.lstrip("@").lower())
+            if not login:
+                continue
+            ok, detail = remover(org, name, login)
+            out["collaborators_removed"].append(
+                {"handle": m.lstrip("@"), "login": login, "ok": ok, "detail": detail})
+    return out
+
+
 __all__ = ["CertProvisionError", "slack_channel_name", "member_email_map",
-           "member_github_map", "provision_slack", "provision_github"]
+           "member_github_map", "provision_slack", "provision_github", "teardown"]

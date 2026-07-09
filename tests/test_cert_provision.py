@@ -163,3 +163,35 @@ def test_provision_github_repo_create_failure_is_clean():
                                  repo_creator=lambda o, n: (False, "gh CLI not installed"))
     assert out["ok"] is False and out["error"] == "repo_create_failed"
     assert CP.get("rna_atlas").github_repo == ""             # nothing stamped
+
+
+# ---- teardown ---------------------------------------------------------------
+
+def test_teardown_archives_channel_and_removes_collaborators():
+    _seed_project_with_github()
+    CP.upsert("rna_atlas", lab="lab_mh", slack_channel_id="C777",
+              github_repo="hallettmiket/rna_atlas")
+    done = {"removed": []}
+
+    def archiver(channel_id):
+        done["archived"] = channel_id
+        return (True, "archived")
+
+    def remover(org, name, login):
+        done["removed"].append(f"{org}/{name}:{login}")
+        return (True, "removed")
+
+    out = CPROV.teardown("rna_atlas", channel_archiver=archiver, collab_remover=remover)
+    assert done["archived"] == "C777"
+    assert out["channel_archived"]["ok"] is True
+    assert set(done["removed"]) == {"hallettmiket/rna_atlas:allie-gh",
+                                    "hallettmiket/rna_atlas:bobgh"}   # nogh skipped
+    assert {c["login"] for c in out["collaborators_removed"]} == {"allie-gh", "bobgh"}
+
+
+def test_teardown_unprovisioned_is_noop():
+    _seed_project_with_github()   # no slack_channel_id / github_repo set
+    out = CPROV.teardown("rna_atlas",
+                         channel_archiver=lambda c: (True, "x"),
+                         collab_remover=lambda o, n, l: (True, "x"))
+    assert out["channel_archived"] is None and out["collaborators_removed"] == []
