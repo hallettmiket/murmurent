@@ -2152,6 +2152,39 @@ function ProjectsPanel({ projects, span="c-5" }) {
     }
   };
 
+  // Remove a cert-project (PI only): revoke every project card via the CRL and
+  // archive the registry record. Distinct from "archive" (CHARTER soft-delete) —
+  // this tears down the certified membership at the identity layer.
+  const certDeleteProj = async (name) => {
+    const ok = window.confirm(
+      `Remove cert-project "${name}"?\n\n` +
+      "wigamig will:\n" +
+      "  • revoke every project card (added to the CRL)\n" +
+      "  • archive the project's registry record\n\n" +
+      "Members lose access when they next hit a fail-closed check. The Slack " +
+      "channel + GitHub repo are left alone (teardown is a later phase)."
+    );
+    if (!ok) return;
+    setBusyDecom(name);
+    try {
+      const r = await fetch(
+        "/api/project/" + encodeURIComponent(name) + "/cert-delete",
+        { method: "POST", headers: { Accept: "application/json" } },
+      );
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      window.alert("Cert-project '" + name + "' removed.\n\n" +
+                   (j.revoked || 0) + " card(s) revoked (" + (j.group || name) + ").");
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+    } catch (ex) {
+      window.alert("Remove failed: " + (ex.message || ex));
+    } finally {
+      setBusyDecom(null);
+    }
+  };
+
   const unarchiveProj = async (name) => {
     setBusyDecom(name);
     try {
@@ -2225,6 +2258,21 @@ function ProjectsPanel({ projects, span="c-5" }) {
                   <td>
                     <div style={{fontWeight:500, display:"inline-flex", alignItems:"center", gap:6}}>
                       {p.name}
+                      {p.is_cert && (
+                        <span
+                          title={"Cert-scoped project — membership is certified via "
+                                 + "project cards"
+                                 + ((p.cert_members && p.cert_members.length)
+                                    ? ": " + p.cert_members.join(", ") : ".")}
+                          style={{
+                            fontFamily:"var(--mono)", fontSize:10, letterSpacing:0.5,
+                            padding:"1px 5px", borderRadius:2,
+                            color:"var(--blue, #3a5f8a)", background:"rgba(58,95,138,0.10)",
+                            border:"1px solid rgba(58,95,138,0.30)",
+                          }}>
+                          🔑 cert
+                        </span>
+                      )}
                       {p.host && p.host !== "local" && (
                         <span
                           title={"This project's working tree lives on " + p.host +
@@ -2251,15 +2299,17 @@ function ProjectsPanel({ projects, span="c-5" }) {
                     <td style={{textAlign:"right"}} onClick={(e) => e.stopPropagation()}>
                       <button
                         type="button"
-                        title="Decommission this project (soft delete; reversible). Writes a manual-cleanup report."
+                        title={p.is_cert
+                          ? "Remove this cert-project: revoke every project card (CRL) and archive the record."
+                          : "Decommission this project (soft delete; reversible). Writes a manual-cleanup report."}
                         disabled={busyDecom === p.name}
-                        onClick={() => archiveProj(p.name)}
+                        onClick={() => p.is_cert ? certDeleteProj(p.name) : archiveProj(p.name)}
                         style={{
                           background:"transparent", border:"1px solid var(--rule-strong)",
                           borderRadius:2, padding:"1px 6px", cursor:"pointer",
                           fontSize:11, color:"var(--red)", fontFamily:"var(--mono)",
                         }}>
-                        {busyDecom === p.name ? "…" : "archive"}
+                        {busyDecom === p.name ? "…" : (p.is_cert ? "remove" : "archive")}
                       </button>
                     </td>
                   )}
