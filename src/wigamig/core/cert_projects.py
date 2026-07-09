@@ -194,6 +194,34 @@ def upsert(name: str, *, lab: str, member: str | None = None,
     return updated
 
 
+def backfill_from_charter(*, env: dict | None = None,
+                          today: str | None = None) -> list[str]:
+    """Populate the cert-project registry from existing CHARTER code-projects, so
+    the authoritative store reflects projects that predate the cert model. For
+    each ``~/repos/<name>`` with a CHARTER.md, upsert a cert-project carrying its
+    name/lab/sensitivity/lead/members and a ``code_repo`` link. Idempotent — a
+    project already in the registry keeps its (authoritative) membership; only
+    absent metadata is filled. Returns the names touched."""
+    from . import projects as _proj                       # lazy: avoid import cycle
+    touched: list[str] = []
+    for repo in _proj.iter_local_projects(env):
+        try:
+            s = _proj.load_summary(repo)
+        except Exception:  # noqa: BLE001
+            continue
+        upsert(s.name, lab=(s.lab or ""), status=s.status, lead=s.lead,
+               sensitivity=s.sensitivity, choreography=s.choreography,
+               code_repo=str(repo.path), today=today, env=env)
+        # Seed members (without certs — these are legacy, uncertified members).
+        cur = get(s.name, env)
+        existing = {_norm(m) for m in (cur.members if cur else ())}
+        for m in s.members:
+            if _norm(m) not in existing:
+                upsert(s.name, lab=(s.lab or ""), member=m, today=today, env=env)
+        touched.append(s.name)
+    return touched
+
+
 def set_status(name: str, status: str, *, env: dict | None = None) -> CertProject | None:
     """Flip a cert project's lifecycle status (``active``/``archived``). Missing
     project is a no-op returning None."""

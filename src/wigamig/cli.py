@@ -458,6 +458,20 @@ def project_sensitivity(name: str, set_value: str | None) -> None:
     project_cmd.cmd_sensitivity(name, set_value)
 
 
+@project_group.command("backfill",
+                       help="Mirror existing CHARTER code-projects into the "
+                            "cert-project registry (the authoritative model). "
+                            "Idempotent; run once to migrate.")
+def project_backfill() -> None:
+    from .core import cert_projects as _cp
+    names = _cp.backfill_from_charter()
+    if not names:
+        click.echo("No CHARTER projects found under ~/repos to backfill.")
+        return
+    click.echo(f"✓ backfilled {len(names)} project(s) into the cert-project "
+               f"registry: {', '.join(sorted(names))}")
+
+
 # ---------------------------------------------------------------------------
 # experiment
 # ---------------------------------------------------------------------------

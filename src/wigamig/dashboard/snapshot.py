@@ -98,6 +98,30 @@ def build_response(
     member_profile_for_lab = _load_member_profile(norm)
     viewer_lab = str(member_profile_for_lab.get("lab") or "")
     all_project_summaries = [load_summary(repo) for repo in iter_local_projects()]
+    charter_names = {p.name for p in all_project_summaries}
+    # Cert-projects are the authoritative project model; merge them into the one
+    # project list, keyed by name. A cert-project with a matching CHARTER repo
+    # enriches that row (its name is flagged is_cert below); one without a repo
+    # appears on its own (a code repo is optional). With zero cert-projects this
+    # loop is a no-op, so the list is identical to the CHARTER-only behaviour.
+    from ..core import cert_projects as _cp
+    cert_projects_all = _cp.iter_projects()
+    cert_names = {cp.name for cp in cert_projects_all}
+    cert_members_by_name = {cp.name: list(cp.members) for cp in cert_projects_all}
+    for cp in cert_projects_all:
+        if cp.name in charter_names:
+            continue
+        all_project_summaries.append(ProjectSummary(
+            name=cp.name,
+            path=(Path(cp.code_repo).expanduser() if cp.code_repo
+                  else Path(f"~/repos/{cp.name}").expanduser()),
+            sensitivity=cp.sensitivity or "standard",
+            lead=cp.lead or _pi_handle(),
+            members=tuple(cp.members),
+            choreography=cp.choreography,
+            lab=cp.lab or None,
+            status=cp.status,
+        ))
     def _is_member(p) -> bool:
         return any(m.lstrip("@").lower() == norm for m in p.members)
     def _visible_to_viewer(p) -> bool:
@@ -156,8 +180,10 @@ def build_response(
         ),
         spark=_spark(all_seas, today_d),
         spark_labels=_spark_labels(today_d),
-        projects=_projects(project_summaries, all_seas, today_d),
-        archived_projects=_projects(archived_summaries, all_seas, today_d),
+        projects=_projects(project_summaries, all_seas, today_d,
+                           cert_names=cert_names, cert_members=cert_members_by_name),
+        archived_projects=_projects(archived_summaries, all_seas, today_d,
+                                    cert_names=cert_names, cert_members=cert_members_by_name),
         peers=_peers(
             snap,
             project_summaries,
@@ -953,7 +979,12 @@ def _projects(
     projects: list[ProjectSummary],
     all_seas: list[tuple[str, Sea]],
     today_d: _dt.date,
+    *,
+    cert_names: set[str] | None = None,
+    cert_members: dict[str, list[str]] | None = None,
 ) -> list[C.ProjectRow]:
+    cert_names = cert_names or set()
+    cert_members = cert_members or {}
     rows: list[C.ProjectRow] = []
     for p in projects:
         open_seas = 0
@@ -1063,6 +1094,8 @@ def _projects(
                 status=p.status,
                 decommissioned_at=p.decommissioned_at,
                 decommissioned_by=p.decommissioned_by,
+                is_cert=p.name in cert_names,
+                cert_members=cert_members.get(p.name, []),
             )
         )
     return rows

@@ -275,6 +275,12 @@ class ProjectRow(BaseModel):
     status: str = "active"
     decommissioned_at: str | None = None
     decommissioned_by: str | None = None
+    # Cert-project unification: True when this row is backed by a cert-project
+    # record (the authoritative model). ``cert_members`` are the certified member
+    # handles (for the 🔑 chip + PI "Remove" action). A code repo is optional, so
+    # a cert project can be ``is_cert`` with no CHARTER on disk.
+    is_cert: bool = False
+    cert_members: list[str] = []
 
 
 class PeerRow(BaseModel):
