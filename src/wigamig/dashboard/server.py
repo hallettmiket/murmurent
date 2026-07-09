@@ -3185,6 +3185,42 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc))
         return {"ok": True, "group": out["group"], "revoked": out["revoked"]}
 
+    @app.post("/api/project/{project}/provision")
+    def provision_cert_project_endpoint(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+    ) -> dict:
+        """PI-only: provision a cert-project's private Slack channel + GitHub repo
+        and sync both to its certified members. No-ops gracefully (reports
+        missing_token / no_github_org) without a Slack token / gh."""
+        from ..core import cert_provision as _cprov
+
+        _require_pi(user)
+        try:
+            slack = _cprov.provision_slack(project)
+            github = _cprov.provision_github(project)
+        except _cprov.CertProvisionError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True, "slack": slack, "github": github}
+
+    @app.post("/api/project/{project}/reconcile")
+    def reconcile_cert_project_endpoint(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        check: bool = Query(False, description="Report drift only; make no changes."),
+    ) -> dict:
+        """PI-only: reconcile a cert-project's Slack channel + GitHub repo
+        membership to its certified members. ``check=true`` reports drift only."""
+        from ..core import cert_provision as _cprov
+
+        _require_pi(user)
+        try:
+            slack = _cprov.reconcile_slack(project, apply=not check)
+            github = _cprov.reconcile_github(project, apply=not check)
+        except _cprov.CertProvisionError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True, "check": check, "slack": slack, "github": github}
+
     @app.post("/api/project/{project}/provision/install")
     def provision_install(
         project: str,
