@@ -267,6 +267,7 @@ def test_project_scoped_card_issue_and_revoke(monkeypatch, tmp_path):
     that chains member → PI → the PI's own root, and can revoke the whole project
     with their own key (no centre root needed)."""
     import yaml as _yaml
+    from wigamig.core import cert_projects as CP
     from wigamig.core import revocation as REV
 
     monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
@@ -298,10 +299,21 @@ def test_project_scoped_card_issue_and_revoke(monkeypatch, tmp_path):
     assert "allie" in REV.project_ledger(realm, "lab_mh/rna_atlas")
     assert ISS.project_context("rna_atlas") == (realm, "lab_mh/rna_atlas")
 
-    # PI revokes the whole project with their OWN key (no centre root key present)
+    # the cert-project registry mirrors the issued card
+    reg = CP.get("rna_atlas")
+    assert reg is not None and reg.lab == "lab_mh" and reg.status == "active"
+    assert "@allie" in reg.members
+    assert reg.certs[0]["fingerprint"] == card["payload"]["subject"]["fingerprint"]
+    assert CP.projects_for_member("allie") and not CP.projects_for_member("ghost")
+
+    # PI deletes the project with their OWN key (no centre root key present):
+    # revokes every card AND archives the registry entry
     assert not REV._cr.have_root_key()
-    crl = REV.revoke_project(realm, "lab_mh/rna_atlas")
-    assert card["payload"]["card_id"] in crl["payload"]["revoked"]
+    res = ISS.delete_project("rna_atlas")
+    assert res["revoked"] == 1
+    assert card["payload"]["card_id"] in res["crl"]["payload"]["revoked"]
+    assert CP.get("rna_atlas").status == "archived"
+    assert not CP.projects_for_member("allie")     # archived → not in the member lens
     # the CRL verifies against the PI's pinned root, and the card now reads revoked
     v2 = C.verify_member_card(card, pi_card, root_pub=root, centre=realm,
                               crl=REV.current_crl(realm), require_crl=True)
