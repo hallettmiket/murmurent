@@ -18,10 +18,10 @@ What we detect (all four enabled by default):
      ``~/.wigamig/installations/<name>.yaml`` whose target working
      tree no longer exists on the host it points to. Common cause:
      user ``rm -rf``'d the clone locally, or lab-server wiped a repo.
-  2. **orphan_registry** — entry at
-     ``~/repos/lab_mgmt/projects/<name>.md`` whose host+remote_path
-     resolves to a tree that no longer exists. Repair flips
-     ``status: archived`` in the registry frontmatter so the lab
+  2. **orphan_registry** — a cert-project at
+     ``<lab-mgmt>/cert_projects/<name>.md`` whose code_repo (host +
+     remote_path) resolves to a tree that no longer exists. Repair flips
+     ``status: archived`` in the cert-project frontmatter so the lab
      history is preserved (we don't hard-delete shared records).
   3. **missing_charter** — working tree is present on a host
      wigamig knows about, but ``CHARTER.md`` was deleted. Surfaces
@@ -52,7 +52,6 @@ from . import hosts as _hosts
 from . import remote as _remote
 from . import repo_inventory as _inv
 from .frontmatter import parse_file, dump_document
-from .projects import lab_mgmt_project_registry_path
 
 
 # Where install manifests live. snapshot.INSTALLATIONS_DIR is the
@@ -282,57 +281,56 @@ def detect_orphan_installations() -> list[DriftFinding]:
 
 
 def detect_orphan_registries() -> list[DriftFinding]:
-    """For each lab_mgmt/projects/<name>.md, verify the working tree
-    is still on the recorded host. Already-archived entries
-    (``status: archived``) are skipped.
+    """For each cert-project with a linked code repo, verify the working
+    tree is still on the recorded host. Archived cert-projects and
+    cert-only projects (no ``code_repo``) are skipped.
 
-    Repair (in ``apply``) flips ``status: archived`` in the registry
-    frontmatter rather than deleting — the lab history of who-owned-
-    what is worth preserving.
+    The cert-project registry (``<lab-mgmt>/cert_projects/<name>.md``) is
+    the authoritative project store — it carries the clone location
+    (``code_repo`` / ``host`` / ``remote_path``) this detector used to
+    read from the legacy CHARTER-mirror registry.
+
+    Repair (in ``apply``) flips ``status: archived`` in the cert-project
+    frontmatter rather than deleting — the lab history of who-owned-what
+    is worth preserving.
     """
     findings: list[DriftFinding] = []
+    from . import cert_projects as _cp
     try:
-        registry_dir = lab_mgmt_project_registry_path("__sentinel__").parent
+        projects = _cp.iter_projects()
     except Exception as exc:
         return [DriftFinding(
             kind="orphan_registry",
             severity="warn",
             target="(none)",
             host="local",
-            detail=f"can't reach lab_mgmt repo: {exc}",
-            suggested_action="check ~/repos/lab_mgmt is cloned",
+            detail=f"can't reach the cert-project registry: {exc}",
+            suggested_action="check the lab-mgmt repo is present (wigamig pi-init)",
         )]
-    if not registry_dir.is_dir():
-        return findings
 
-    # Group remote registry entries by host for batched probes.
+    # Group remote entries by host for batched probes.
     remote_targets: dict[str, list[tuple[str, str, str]]] = {}
-    for reg_path in sorted(registry_dir.glob("*.md")):
-        try:
-            parsed = parse_file(reg_path)
-        except Exception:
+    for cp in projects:
+        if cp.status == "archived":
             continue
-        meta = parsed.meta or {}
-        if meta.get("status") == "archived":
+        if not cp.code_repo:          # cert-only project: no clone to reconcile
             continue
-        project = str(meta.get("project") or reg_path.stem)
-        host_name = str(meta.get("host") or "local")
-        if host_name == "local":
-            local_path = str(meta.get("path") or "")
-            if not _is_local_path_alive(local_path):
+        artefact = str(_cp.project_path(cp.name))
+        if cp.host == "local":
+            if not _is_local_path_alive(cp.code_repo):
                 findings.append(DriftFinding(
                     kind="orphan_registry",
                     severity="actionable",
-                    target=project,
+                    target=cp.name,
                     host="local",
-                    detail=f"registry says {local_path} but the clone is gone",
-                    suggested_action="flip registry status: archived",
-                    artefact_path=str(reg_path),
+                    detail=f"registry says {cp.code_repo} but the clone is gone",
+                    suggested_action="flip cert-project status: archived",
+                    artefact_path=artefact,
                 ))
         else:
-            remote_path = str(meta.get("remote_path") or f"~/repos/{project}")
-            remote_targets.setdefault(host_name, []).append(
-                (project, remote_path, str(reg_path))
+            remote_path = cp.remote_path or f"~/repos/{cp.name}"
+            remote_targets.setdefault(cp.host, []).append(
+                (cp.name, remote_path, artefact)
             )
 
     for host_name, items in remote_targets.items():
