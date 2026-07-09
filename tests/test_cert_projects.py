@@ -84,6 +84,16 @@ def test_set_status_preserves_metadata():
     assert p.code_repo == "~/repos/p"
 
 
+def test_write_rejects_dangling_symlink(monkeypatch, tmp_path):
+    """A dangling lab-mgmt symlink fails cleanly (CertProjectError), not with an
+    opaque FileExistsError deep in mkdir."""
+    link = tmp_path / "lab_mgmt_link"
+    link.symlink_to(tmp_path / "does_not_exist")
+    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(link))
+    with pytest.raises(CP.CertProjectError, match="dangling symlink"):
+        CP.upsert("p", lab="lab_mh")
+
+
 def test_backfill_from_charter(monkeypatch, tmp_path):
     """Existing CHARTER code-projects are mirrored into the cert-project registry
     with their name/lab/sensitivity/lead/members and a code_repo link."""

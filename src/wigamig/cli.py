@@ -464,7 +464,10 @@ def project_sensitivity(name: str, set_value: str | None) -> None:
                             "Idempotent; run once to migrate.")
 def project_backfill() -> None:
     from .core import cert_projects as _cp
-    names = _cp.backfill_from_charter()
+    try:
+        names = _cp.backfill_from_charter()
+    except _cp.CertProjectError as exc:
+        raise click.ClickException(str(exc)) from exc
     if not names:
         click.echo("No CHARTER projects found under ~/repos to backfill.")
         return
