@@ -40,12 +40,85 @@ def _norm(handle: str) -> str:
     return str(handle or "").strip().lstrip("@").lower()
 
 
+VALID_REPO_ROLES = ("code", "manuscript", "data", "infra")
+
+
+@dataclass
+class RepoRef:
+    """One repo belonging to a project. A project may have several — e.g. a code
+    repo plus a manuscript repo (Overleaf-synced), the way ``wigamig`` and
+    ``wigamig_manuscript`` pair up. ``host="local"`` means this machine at
+    ``path``; a remote host name means the tree is at ``remote_path`` on that host
+    and ``path`` is a local pointer."""
+
+    name: str
+    role: str = "code"                     # code | manuscript | data | infra
+    host: str = "local"
+    path: str = ""                         # local clone / pointer path
+    remote_path: str = ""                  # path on `host` when host != local
+    remote_url: str = ""                   # git remote (optional)
+    overleaf: bool = False                 # manuscript repo synced with Overleaf
+
+    def to_dict(self) -> dict:
+        d: dict = {"name": self.name, "role": self.role, "host": self.host,
+                   "path": self.path}
+        if self.remote_path:
+            d["remote_path"] = self.remote_path
+        if self.remote_url:
+            d["remote_url"] = self.remote_url
+        if self.overleaf:
+            d["overleaf"] = True
+        return d
+
+    @staticmethod
+    def from_dict(d: dict) -> "RepoRef":
+        return RepoRef(
+            name=str(d.get("name") or ""),
+            role=str(d.get("role") or "code").strip().lower() or "code",
+            host=str(d.get("host") or "local") or "local",
+            path=str(d.get("path") or ""),
+            remote_path=str(d.get("remote_path") or ""),
+            remote_url=str(d.get("remote_url") or ""),
+            overleaf=bool(d.get("overleaf")))
+
+
+def _primary_repo(repos) -> "RepoRef | None":
+    """The project's primary repo — the ``code`` one, else the first."""
+    for r in repos:
+        if r.role == "code":
+            return r
+    return repos[0] if repos else None
+
+
+def _normalize_repos(project_name: str, code_repo: str, host: str,
+                     remote_path: str, repos) -> tuple:
+    """Reconcile the (legacy) single ``code_repo``/``host``/``remote_path`` with
+    the ``repos`` list so both always agree. Returns
+    ``(repos_tuple, code_repo, host, remote_path)``:
+    - no ``repos`` but a ``code_repo`` → synthesize a single ``code`` RepoRef
+      (this is how every pre-multi-repo file reads correctly);
+    - ``repos`` present → mirror the primary (code) repo back into
+      ``code_repo``/``host``/``remote_path`` for back-compat readers."""
+    repos = list(repos or [])
+    if not repos and code_repo:
+        rname = Path(code_repo).name or project_name
+        repos = [RepoRef(name=rname, role="code", host=host or "local",
+                         path=code_repo, remote_path=remote_path or "")]
+    prim = _primary_repo(repos)
+    if prim is not None:
+        code_repo = prim.path or code_repo
+        host = prim.host or "local"
+        remote_path = prim.remote_path or ""
+    return tuple(repos), code_repo, host, (remote_path or "")
+
+
 @dataclass
 class CertProject:
     """One cert-scoped project in a lab's registry — the authoritative project
-    record. A project's identity is its certified membership; a ``code_repo``
-    (a ``~/repos/<name>`` CHARTER repo) is an *optional* attribute, not what
-    defines the project."""
+    record. A project's identity is its certified membership; its **repos** (code,
+    manuscript, …) are attributes, not what defines it. ``code_repo``/``host``/
+    ``remote_path`` mirror the primary (``code``) repo for backward compatibility;
+    ``repos`` is the authoritative full list."""
 
     name: str
     lab: str
@@ -54,19 +127,17 @@ class CertProject:
     lead: str = ""                         # project lead handle (defaults to lab PI)
     sensitivity: str = "standard"          # standard | restricted | clinical
     choreography: str | None = None
-    code_repo: str = ""                    # optional: linked ~/repos/<name> code repo
-    # Where the code repo's working tree lives — so `wigamig reconcile` can find
-    # orphaned/unreachable clones from the cert-project registry (this metadata
-    # used to live only in the CHARTER-mirror registry). host="local" means this
-    # machine at ``code_repo``; a remote host name means the tree is at
-    # ``remote_path`` on that host and ``code_repo`` is a local pointer.
-    host: str = "local"
-    remote_path: str = ""
+    code_repo: str = ""                    # primary (code) repo path — mirrors repos[code]
+    host: str = "local"                    # primary repo's host
+    remote_path: str = ""                  # primary repo's remote path (host != local)
     slack_channel_id: str = ""             # provisioned in Phase C
     github_repo: str = ""                  # provisioned in Phase C, e.g. "org/name"
     members: tuple[str, ...] = ()          # certified member handles (@-prefixed)
     # One entry per issued project card: {handle, fingerprint, card_id}.
     certs: tuple[dict, ...] = ()
+    # Full repo set (code + manuscript + …). Authoritative; code_repo mirrors the
+    # code repo within it.
+    repos: tuple[RepoRef, ...] = ()
 
     def to_dict(self) -> dict:
         return {"name": self.name, "lab": self.lab, "status": self.status,
@@ -76,7 +147,8 @@ class CertProject:
                 "remote_path": self.remote_path,
                 "slack_channel_id": self.slack_channel_id,
                 "github_repo": self.github_repo, "members": list(self.members),
-                "certs": [dict(c) for c in self.certs]}
+                "certs": [dict(c) for c in self.certs],
+                "repos": [r.to_dict() for r in self.repos]}
 
 
 class CertProjectError(RuntimeError):
@@ -114,21 +186,29 @@ def _parse(path: Path) -> CertProject:
     members = tuple(str(m) for m in (meta.get("members") or []))
     certs = tuple(dict(c) for c in (meta.get("certs") or []) if isinstance(c, dict))
     chor = meta.get("choreography")
+    name = str(meta.get("project") or path.stem)
+    raw_repos = [RepoRef.from_dict(r) for r in (meta.get("repos") or [])
+                 if isinstance(r, dict)]
+    # Old files have no ``repos:`` — synthesize one ``code`` RepoRef from the
+    # legacy code_repo/host/remote_path so every existing project reads correctly.
+    repos, code_repo, host, remote_path = _normalize_repos(
+        name, str(meta.get("code_repo") or ""),
+        str(meta.get("host") or "local") or "local",
+        str(meta.get("remote_path") or ""), raw_repos)
     return CertProject(
-        name=str(meta.get("project") or path.stem),
+        name=name,
         lab=str(meta.get("lab") or ""),
         status=str(meta.get("status") or "active").strip().lower() or "active",
         created=str(meta.get("created") or ""),
         lead=str(meta.get("lead") or ""),
         sensitivity=str(meta.get("sensitivity") or "standard").strip().lower() or "standard",
         choreography=str(chor) if chor else None,
-        code_repo=str(meta.get("code_repo") or ""),
-        host=str(meta.get("host") or "local") or "local",
-        remote_path=str(meta.get("remote_path") or ""),
+        code_repo=code_repo, host=host, remote_path=remote_path,
         slack_channel_id=str(meta.get("slack_channel_id") or ""),
         github_repo=str(meta.get("github_repo") or ""),
         members=members,
         certs=certs,
+        repos=repos,
     )
 
 
@@ -173,6 +253,12 @@ def _render(p: CertProject) -> str:
         meta["slack_channel_id"] = p.slack_channel_id
     if p.github_repo:
         meta["github_repo"] = p.github_repo
+    # The authoritative repo set (code + manuscript + …). Emitted only when a
+    # project has repos beyond a bare synthesized code repo, to keep single-repo
+    # files tidy; readers reconstruct a code RepoRef from code_repo either way.
+    if p.repos and not (len(p.repos) == 1 and p.repos[0].role == "code"
+                        and not p.repos[0].remote_url and not p.repos[0].overleaf):
+        meta["repos"] = [r.to_dict() for r in p.repos]
     meta["members"] = list(p.members)
     meta["certs"] = [dict(c) for c in p.certs]
     front = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).strip()
@@ -195,14 +281,20 @@ def upsert(name: str, *, lab: str, member: str | None = None,
            lead: str | None = None, sensitivity: str | None = None,
            choreography: str | None = None, code_repo: str | None = None,
            host: str | None = None, remote_path: str | None = None,
-           slack_channel_id: str | None = None, github_repo: str | None = None,
+           repos=None, slack_channel_id: str | None = None,
+           github_repo: str | None = None,
            today: str | None = None, env: dict | None = None) -> CertProject:
     """Create or update a cert project. Optionally add a certified ``member``
     (with their ``cert`` = {handle, fingerprint, card_id}) and/or set project
     metadata. Any metadata argument left ``None`` keeps its current value, so a
     metadata-free membership upsert (from ``issue_project_card``) never clobbers a
     project's sensitivity/lead/etc. Idempotent: a member already present is
-    de-duplicated and their cert entry replaced."""
+    de-duplicated and their cert entry replaced.
+
+    ``repos`` (a list of ``RepoRef`` or dicts) replaces the whole repo set; the
+    primary (code) repo is mirrored back into code_repo/host/remote_path. When
+    ``repos`` is None, the legacy code_repo/host/remote_path drive a synthesized
+    single ``code`` repo (backward compatible)."""
     today = today or _dt.date.today().isoformat()
     cur = get(name, env)
     if cur is None:
@@ -219,19 +311,53 @@ def upsert(name: str, *, lab: str, member: str | None = None,
                                       if k in cert}}
             certs.append(entry)
     _keep = lambda new, old: old if new is None else new  # noqa: E731
+    # Resolve the repo set + the mirrored primary fields.
+    if repos is not None:
+        rr = [r if isinstance(r, RepoRef) else RepoRef.from_dict(r) for r in repos]
+        new_repos, n_code, n_host, n_remote = _normalize_repos(
+            cur.name, "", "local", "", rr)
+    else:
+        # legacy path: code_repo/host/remote_path (or kept) drive the primary repo
+        n_code = _keep(code_repo, cur.code_repo)
+        n_host = _keep(host, cur.host)
+        n_remote = _keep(remote_path, cur.remote_path)
+        new_repos, n_code, n_host, n_remote = _normalize_repos(
+            cur.name, n_code, n_host, n_remote, list(cur.repos))
+        # If the primary code repo path changed, update it in the set.
+        if code_repo is not None or host is not None or remote_path is not None:
+            new_repos, n_code, n_host, n_remote = _normalize_repos(
+                cur.name, n_code, n_host, n_remote,
+                [r for r in new_repos if r.role != "code"])
     updated = CertProject(
         name=cur.name, lab=cur.lab or str(lab),
         status=(status or cur.status), created=cur.created or today,
         lead=_keep(lead, cur.lead),
         sensitivity=(str(sensitivity).strip().lower() if sensitivity else cur.sensitivity),
         choreography=_keep(choreography, cur.choreography),
-        code_repo=_keep(code_repo, cur.code_repo),
-        host=_keep(host, cur.host), remote_path=_keep(remote_path, cur.remote_path),
+        code_repo=n_code, host=n_host, remote_path=n_remote,
         slack_channel_id=_keep(slack_channel_id, cur.slack_channel_id),
         github_repo=_keep(github_repo, cur.github_repo),
-        members=tuple(members), certs=tuple(certs))
+        members=tuple(members), certs=tuple(certs), repos=new_repos)
     _write(updated, env)
     return updated
+
+
+def add_repo(name: str, *, role: str = "code", repo_name: str = "",
+             host: str = "local", path: str = "", remote_path: str = "",
+             remote_url: str = "", overleaf: bool = False,
+             env: dict | None = None) -> CertProject:
+    """Add (or replace, by repo name) a repo on an existing cert project. Use for
+    a project's manuscript/data repos beyond the primary code repo. A repo with a
+    duplicate ``repo_name`` is replaced. Requires the project to exist."""
+    cur = get(name, env)
+    if cur is None:
+        raise CertProjectError(f"no cert-project named {name!r}")
+    rname = repo_name or (Path(path).name if path else name)
+    ref = RepoRef(name=rname, role=str(role).strip().lower() or "code", host=host,
+                  path=path, remote_path=remote_path, remote_url=remote_url,
+                  overleaf=bool(overleaf))
+    kept = [r for r in cur.repos if r.name != rname]
+    return upsert(name, lab=cur.lab, repos=[*kept, ref], env=env)
 
 
 def register_from_summary(summary, *, code_repo: str = "", host: str = "local",
@@ -321,6 +447,8 @@ def set_status(name: str, status: str, *, env: dict | None = None) -> CertProjec
     return updated
 
 
-__all__ = ["CertProject", "CertProjectError", "REGISTRY_DIR", "registry_dir",
-           "project_path", "get", "iter_projects", "projects_for_member", "upsert",
-           "set_status", "register_from_summary", "backfill_from_charter"]
+__all__ = ["CertProject", "RepoRef", "VALID_REPO_ROLES", "CertProjectError",
+           "REGISTRY_DIR", "registry_dir", "project_path", "get", "iter_projects",
+           "projects_for_member", "upsert", "add_repo", "set_status",
+           "register_from_summary", "backfill_from_charter", "slack_channel_for",
+           "project_name_for_cwd"]
