@@ -234,6 +234,37 @@ def test_multi_repo_all_present_no_findings(world):
     assert _rec.detect_orphan_registries() == []
 
 
+def test_orphan_installation_partial_repos_is_warn(world):
+    """A local install whose manifest lists two repos — code present, manuscript
+    gone — is a WARN (install still lives), not an actionable manifest-archive."""
+    _make_clone(world["repos"], "mp")            # code repo present
+    (world["installations"] / "mp.yaml").write_text(yaml.safe_dump({
+        "project": "mp", "member": "@mhallet", "machine_type": "laptop",
+        "status": "active", "repos": [
+            {"name": "mp", "role": "code", "path": str(world["repos"] / "mp"),
+             "present": True},
+            {"name": "mp_manuscript", "role": "manuscript",
+             "path": str(world["repos"] / "mp_manuscript"), "present": False},
+        ]}), encoding="utf-8")
+    findings = _rec.detect_orphan_installations()
+    assert [f.severity for f in findings] == ["warn"]
+    assert findings[0].target == "mp/mp_manuscript"
+
+
+def test_orphan_installation_all_repos_gone_is_actionable(world):
+    (world["installations"] / "gone.yaml").write_text(yaml.safe_dump({
+        "project": "gone", "member": "@mhallet", "machine_type": "laptop",
+        "repos": [
+            {"name": "gone", "role": "code", "path": str(world["repos"] / "gone"),
+             "present": False},
+            {"name": "gone_ms", "role": "manuscript",
+             "path": str(world["repos"] / "gone_ms"), "present": False},
+        ]}), encoding="utf-8")
+    findings = _rec.detect_orphan_installations()
+    assert [f.severity for f in findings] == ["actionable"]
+    assert findings[0].target == "gone"
+
+
 def test_detect_missing_charter(world):
     """Working tree present, CHARTER.md deleted — warn, no auto-fix."""
     _make_clone(world["repos"], "charterless", with_charter=False)

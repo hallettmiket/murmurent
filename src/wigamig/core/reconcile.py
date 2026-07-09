@@ -235,18 +235,40 @@ def detect_orphan_installations() -> list[DriftFinding]:
                 (project, f"{proot}/{project}")
             )
         else:
-            # Local install — check the laptop's ~/repos/<project>.
-            local_path = str(Path(f"~/repos/{project}").expanduser())
-            if not _is_local_path_alive(local_path):
+            # Local install — check EACH of the project's repos the manifest
+            # records on this machine (a project may have code + manuscript + …).
+            # Legacy manifests have no ``repos`` block → fall back to the derived
+            # ~/repos/<project>. A single missing repo is a warn (install still
+            # lives); ALL gone archives the manifest.
+            repos = [r for r in (data.get("repos") or [])
+                     if isinstance(r, dict) and r.get("path")]
+            checks = [(str(r.get("name") or project), str(r.get("path"))) for r in repos] \
+                or [(project, f"~/repos/{project}")]
+            missing = [(nm, pth) for nm, pth in checks
+                       if not _is_local_path_alive(str(Path(pth).expanduser()))]
+            if missing and len(missing) == len(checks):
+                locs = ", ".join(p for _n, p in checks)
                 findings.append(DriftFinding(
                     kind="orphan_installation",
                     severity="actionable",
                     target=project,
                     host="local",
-                    detail=f"manifest points at {local_path} but the clone is gone",
+                    detail=f"manifest points at {locs} but the clone(s) are gone",
                     suggested_action="archive the installation manifest",
                     artefact_path=str(manifest_path),
                 ))
+            else:
+                for nm, pth in missing:
+                    findings.append(DriftFinding(
+                        kind="orphan_installation",
+                        severity="warn",
+                        target=f"{project}/{nm}",
+                        host="local",
+                        detail=f"repo {nm!r} at {pth} is gone; {project} still has "
+                               "other clones here",
+                        suggested_action="re-clone it, or drop it from the project",
+                        artefact_path=str(manifest_path),
+                    ))
 
     # Now resolve each remote group via one SSH call.
     for ssh_remote, items in remote_targets.items():

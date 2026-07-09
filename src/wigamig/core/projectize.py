@@ -243,6 +243,27 @@ def make_wigamig_project(
         "last_checked": today,
         "issues": [],
     }
+    # Installation = project × machine: record which of the project's repos (code +
+    # manuscript + …) are cloned on THIS machine. Best-effort — reconcile is the
+    # authoritative aliveness check; this is a snapshot at install time.
+    installed_repos: list[dict] = []
+    try:
+        from . import cert_projects as _cp
+        cp = _cp.get(project)
+        refs = list(cp.repos) if (cp and cp.repos) else []
+    except Exception:  # noqa: BLE001 — lab-mgmt unavailable / dangling
+        refs = []
+    if not refs:                        # no cert-project → the single code clone
+        p = Path(str(clone_path)).expanduser()
+        installed_repos = [{"name": p.name, "role": "code",
+                            "path": str(clone_path), "present": p.is_dir()}]
+    else:
+        for r in refs:
+            lp = Path(r.path).expanduser() if r.path else None
+            present = bool(lp) and lp.is_dir() and r.host == "local"
+            installed_repos.append({"name": r.name, "role": r.role,
+                                    "path": r.path, "present": present})
+    manifest["repos"] = installed_repos
     try:
         installations_dir.mkdir(parents=True, exist_ok=True)
         manifest_path = installations_dir / f"{project}.yaml"

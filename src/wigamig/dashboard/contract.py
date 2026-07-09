@@ -694,13 +694,26 @@ class NotebookBlock(BaseModel):
     yesterday_excerpt: NotebookYesterday
 
 
+class InstalledRepo(BaseModel):
+    """One of a project's repos as it exists on THIS machine — an installation is
+    a project on a machine, and a project may have several repos (code +
+    manuscript + …), each of which may or may not be cloned here."""
+
+    name: str
+    role: str = "code"                         # code | manuscript | data | infra
+    path: str = ""                             # clone/pointer path on this machine
+    present: bool = False                      # is it actually cloned here?
+
+
 class InstallationRow(BaseModel):
-    """One member-project-machine triple, persisted to disk by the install wizard.
+    """One member-project-machine record: **a project placed on a machine** where
+    it's developed with wigamig. A project may carry several repos (``repos``);
+    this manifest records which of them are actually cloned on this machine.
 
     Manifest lives at ``~/.wigamig/installations/<project>.yaml`` — per-machine
     state, not shared across machines. If a user installs the same project on
-    two machines, each machine has its own manifest under its own
-    ``~/.wigamig/installations/`` directory.
+    two machines, each machine has its own manifest (and may have a different
+    subset of the project's repos cloned).
     """
 
     member: str                                # ``@handle``
@@ -718,6 +731,7 @@ class InstallationRow(BaseModel):
     mount_point: str | None = None
     components: list[str] = []                 # infra installed (git, vscode, …)
     agents: list[str] = []                     # agent set provisioned
+    repos: list[InstalledRepo] = []           # the project's repos on this machine
     status: Literal["active", "issues", "pending"] = "active"
     created: str | None = None                 # ISO date
     last_checked: str | None = None
