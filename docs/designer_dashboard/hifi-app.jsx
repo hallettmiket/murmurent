@@ -1849,6 +1849,81 @@ function SeasPanel({ seas, span="c-7" }) {
 
 /* ───────── project detail rows + provision buttons ───────── */
 /* ───────── project detail rows + provision buttons ───────── */
+const REPO_ROLE_COLOUR = { code: "#1565c0", manuscript: "#8e2f6b",
+                           data: "#2e7d32", infra: "#6a1b9a" };
+
+// The project's repo set (code + manuscript + …) + a PI "add repo" affordance.
+// This is where a project gains its manuscript repo alongside its code repo.
+function ProjectReposBlock({ proj: p, isPI, userParam }) {
+  const repos = p.repos || [];
+  const [show, setShow] = React.useState(false);
+  const [f, setF] = React.useState({ repo_name: "", role: "manuscript", path: "",
+                                     overleaf: true });
+  const [busy, setBusy] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const submit = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const q = userParam ? "?user=" + encodeURIComponent(userParam.replace(/^@/, "")) : "";
+      const r = await fetch("/api/project/" + encodeURIComponent(p.name) + "/repos" + q,
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(f) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error((typeof j.detail === "string" ? j.detail : null) || r.statusText);
+      setShow(false); setF({ repo_name: "", role: "manuscript", path: "", overleaf: true });
+      if (typeof window.__wigamigFetchData === "function") {
+        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      }
+    } catch (ex) { setErr(String(ex.message || ex)); } finally { setBusy(false); }
+  };
+  return (
+    <div style={{marginBottom:8, paddingBottom:8, borderBottom:"1px solid var(--rule)"}}>
+      <div style={{display:"flex", alignItems:"center", gap:8, flexWrap:"wrap"}}>
+        <span style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+              textTransform:"uppercase", color:"var(--muted)"}}>repos</span>
+        {repos.map((r, i) => (
+          <span key={i} title={(r.host && r.host !== "local" ? r.host + ":" : "") + (r.path || "")}
+                style={{fontFamily:"var(--mono)", fontSize:11, padding:"1px 7px",
+                borderRadius:3, color:"#fff", background:REPO_ROLE_COLOUR[r.role] || "#555"}}>
+            {r.role}: {r.name}{r.overleaf ? " · OL" : ""}
+          </span>
+        ))}
+        {repos.length === 0 && <span className="muted" style={{fontSize:11}}>none assigned</span>}
+        {isPI && !show && (
+          <button className="btn sm" onClick={() => setShow(true)}>+ add repo</button>
+        )}
+      </div>
+      {isPI && show && (
+        <div style={{marginTop:6, display:"flex", gap:6, flexWrap:"wrap", alignItems:"center"}}>
+          <input placeholder="repo name (e.g. X_manuscript)" value={f.repo_name}
+                 onChange={e => setF({...f, repo_name: e.target.value})}
+                 style={{fontSize:12, padding:"2px 6px", width:180}} />
+          <select value={f.role} onChange={e => setF({...f, role: e.target.value,
+                  overleaf: e.target.value === "manuscript"})}
+                  style={{fontSize:12, padding:"2px 4px"}}>
+            <option value="code">code</option>
+            <option value="manuscript">manuscript</option>
+            <option value="data">data</option>
+            <option value="infra">infra</option>
+          </select>
+          <input placeholder="path (~/repos/…)" value={f.path}
+                 onChange={e => setF({...f, path: e.target.value})}
+                 style={{fontSize:12, padding:"2px 6px", width:200}} />
+          <label style={{fontSize:11, display:"flex", alignItems:"center", gap:3}}>
+            <input type="checkbox" checked={f.overleaf}
+                   onChange={e => setF({...f, overleaf: e.target.checked})} /> Overleaf
+          </label>
+          <button className="btn sm" disabled={busy || !f.repo_name} onClick={submit}>
+            {busy ? "…" : "add"}
+          </button>
+          <button className="btn sm" onClick={() => { setShow(false); setErr(null); }}>cancel</button>
+          {err && <span style={{color:"var(--red)", fontSize:11}}>{err}</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProjectDetailRows({ proj: p }) {
   const persona = window.DATA.persona || "member";
   const isPI = persona === "pi";
@@ -1958,6 +2033,7 @@ function ProjectDetailRows({ proj: p }) {
 
   return (
     <div>
+      <ProjectReposBlock proj={p} isPI={isPI} userParam={userParam} />
       {/* Remote — project identity (github OR local bare repo) */}
       <div style={row}>
         <span style={lbl}>{remoteLabel}</span>

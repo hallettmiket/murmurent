@@ -235,6 +235,31 @@ def test_cert_project_surfaces_in_the_one_project_list(world):
     assert by_name["dcis_test"].is_cert is True
 
 
+def test_add_project_repo_endpoint(world):
+    """PI assigns a manuscript repo to a cert-project; non-PI is refused. The repo
+    also shows up in the project's dashboard row."""
+    from fastapi.testclient import TestClient
+    from wigamig.dashboard.server import create_app
+    from wigamig.core import cert_projects as CP
+    client = TestClient(create_app())
+    r = client.post("/api/project/dcis_test/repos?user=the_pi",
+                    json={"repo_name": "dcis_test_manuscript", "role": "manuscript",
+                          "path": "~/repos/dcis_test_manuscript", "overleaf": True})
+    assert r.status_code == 200
+    assert "manuscript" in {x["role"] for x in r.json()["repos"]}
+    ms = [x for x in CP.get("dcis_test").repos if x.role == "manuscript"]
+    assert ms and ms[0].overleaf is True
+    # surfaced in the dashboard project row
+    resp = snapshot.build_response("the_pi", today=_dt.date(2026, 5, 8))
+    row = {p.name: p for p in resp.projects}["dcis_test"]
+    assert any(rr["role"] == "manuscript" for rr in row.repos)
+    # a bad role is rejected, and a non-PI actor can't assign
+    assert client.post("/api/project/dcis_test/repos?user=the_pi",
+                       json={"repo_name": "x", "role": "bogus"}).status_code == 400
+    assert client.post("/api/project/dcis_test/repos?user=allie",
+                       json={"repo_name": "x", "role": "data"}).status_code == 403
+
+
 def test_cert_project_visibility_scoped_to_lab(world):
     """A cert-project in another lab, with the viewer not a member, is hidden."""
     from wigamig.core import cert_projects as CP

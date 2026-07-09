@@ -281,6 +281,9 @@ class ProjectRow(BaseModel):
     # a cert project can be ``is_cert`` with no CHARTER on disk.
     is_cert: bool = False
     cert_members: list[str] = []
+    # Multi-repo: the project's repo set (code + manuscript + …). Each is
+    # {name, role, host, path, overleaf}. Empty for legacy/CHARTER-only rows.
+    repos: list[dict] = []
 
 
 class PeerRow(BaseModel):

@@ -108,6 +108,10 @@ def build_response(
     cert_projects_all = _cp.iter_projects()
     cert_names = {cp.name for cp in cert_projects_all}
     cert_members_by_name = {cp.name: list(cp.members) for cp in cert_projects_all}
+    cert_repos_by_name = {
+        cp.name: [{"name": r.name, "role": r.role, "host": r.host,
+                   "path": r.path, "overleaf": r.overleaf} for r in cp.repos]
+        for cp in cert_projects_all}
     for cp in cert_projects_all:
         if cp.name in charter_names:
             continue
@@ -183,9 +187,11 @@ def build_response(
         spark=_spark(all_seas, today_d),
         spark_labels=_spark_labels(today_d),
         projects=_projects(project_summaries, all_seas, today_d,
-                           cert_names=cert_names, cert_members=cert_members_by_name),
+                           cert_names=cert_names, cert_members=cert_members_by_name,
+                           cert_repos=cert_repos_by_name),
         archived_projects=_projects(archived_summaries, all_seas, today_d,
-                                    cert_names=cert_names, cert_members=cert_members_by_name),
+                                    cert_names=cert_names, cert_members=cert_members_by_name,
+                                    cert_repos=cert_repos_by_name),
         peers=_peers(
             snap,
             project_summaries,
@@ -1033,9 +1039,11 @@ def _projects(
     *,
     cert_names: set[str] | None = None,
     cert_members: dict[str, list[str]] | None = None,
+    cert_repos: dict[str, list[dict]] | None = None,
 ) -> list[C.ProjectRow]:
     cert_names = cert_names or set()
     cert_members = cert_members or {}
+    cert_repos = cert_repos or {}
     rows: list[C.ProjectRow] = []
     for p in projects:
         open_seas = 0
@@ -1147,6 +1155,7 @@ def _projects(
                 decommissioned_by=p.decommissioned_by,
                 is_cert=p.name in cert_names,
                 cert_members=cert_members.get(p.name, []),
+                repos=cert_repos.get(p.name, []),
             )
         )
     return rows
