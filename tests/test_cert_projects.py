@@ -120,6 +120,47 @@ def test_write_rejects_dangling_symlink(monkeypatch, tmp_path):
         CP.upsert("p", lab="lab_mh")
 
 
+def test_legacy_code_repo_reads_as_a_single_code_repo():
+    # a pre-multi-repo project (only code_repo) reads with a synthesized repos list
+    CP.upsert("legacy", lab="lab_mh", code_repo="/Users/x/repos/legacy", host="local")
+    p = CP.get("legacy")
+    assert len(p.repos) == 1
+    r = p.repos[0]
+    assert r.role == "code" and r.path == "/Users/x/repos/legacy" and r.name == "legacy"
+    assert p.code_repo == "/Users/x/repos/legacy"          # mirror preserved
+
+
+def test_multi_repo_project_round_trips():
+    CP.upsert("rna_atlas", lab="lab_mh", code_repo="/Users/x/repos/rna_atlas")
+    CP.add_repo("rna_atlas", role="manuscript", repo_name="rna_atlas_manuscript",
+                path="/Users/x/repos/rna_atlas_manuscript", overleaf=True)
+    p = CP.get("rna_atlas")
+    roles = {r.role for r in p.repos}
+    assert roles == {"code", "manuscript"}
+    ms = next(r for r in p.repos if r.role == "manuscript")
+    assert ms.name == "rna_atlas_manuscript" and ms.overleaf is True
+    # code_repo mirror still points at the code repo
+    assert p.code_repo == "/Users/x/repos/rna_atlas"
+
+
+def test_add_repo_replaces_by_name_and_needs_project():
+    CP.upsert("p", lab="lab_mh", code_repo="/r/p")
+    CP.add_repo("p", role="data", repo_name="p_data", path="/r/p_data_v1")
+    CP.add_repo("p", role="data", repo_name="p_data", path="/r/p_data_v2")  # replace
+    data = [r for r in CP.get("p").repos if r.name == "p_data"]
+    assert len(data) == 1 and data[0].path == "/r/p_data_v2"
+    with pytest.raises(CP.CertProjectError, match="no cert-project"):
+        CP.add_repo("ghost", path="/r/x")
+
+
+def test_remote_primary_repo_mirrors_host():
+    CP.upsert("rp", lab="lab_mh", code_repo="~/repos/rp", host="biodatsci",
+              remote_path="/srv/rp")
+    p = CP.get("rp")
+    assert p.repos[0].host == "biodatsci" and p.repos[0].remote_path == "/srv/rp"
+    assert p.host == "biodatsci" and p.remote_path == "/srv/rp"   # mirror
+
+
 def test_clone_location_round_trips():
     CP.upsert("rp", lab="lab_mh", code_repo="~/repos/rp",
               host="biodatsci", remote_path="/srv/rp")
