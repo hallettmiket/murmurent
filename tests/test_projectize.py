@@ -69,14 +69,15 @@ def test_make_wigamig_project_writes_all_four_artefacts(world):
         installations_dir=world["installations"],
     )
     assert (clone / "CHARTER.md").is_file()
-    assert (world["lab_mgmt"] / "projects" / "hockey_stats.md").is_file()
+    # The authoritative registry is now the cert-project store, not the mirror.
+    assert (world["lab_mgmt"] / "cert_projects" / "hockey_stats.md").is_file()
     manifest_p = world["installations"] / "hockey_stats.yaml"
     assert manifest_p.is_file()
     # bootstrap_local symlinked the requested agent.
     assert (clone / ".claude" / "agents" / "blacksmith.md").is_symlink()
     # And the response carries paths to every artefact for the UI.
     assert res.charter_path == clone / "CHARTER.md"
-    assert res.registry_path == world["lab_mgmt"] / "projects" / "hockey_stats.md"
+    assert res.registry_path == world["lab_mgmt"] / "cert_projects" / "hockey_stats.md"
     assert res.manifest_path == manifest_p
 
 
@@ -193,8 +194,8 @@ def test_ssh_install_skips_local_bootstrap_but_writes_manifest(world):
     assert m["ssh_remote"] == "biodatsci"
     assert m["remote_home"] == "/home/UWO/mhallet"
     assert m["access"] == "direct"  # has_direct_access still True by default
-    # Registry entry got the remote_path filled in (cmd_new_remote shape).
-    reg_text = (world["lab_mgmt"] / "projects" / "remote_only.md").read_text()
+    # Cert-project entry got the remote clone location filled in.
+    reg_text = (world["lab_mgmt"] / "cert_projects" / "remote_only.md").read_text()
     assert "host: biodatsci" in reg_text
     assert "/home/UWO/mhallet/repos/remote_only" in reg_text
     # No local bootstrap probes (would be cc_agent: <name>).

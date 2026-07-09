@@ -211,7 +211,7 @@ def test_remote_adopt_happy_path(world, monkeypatch):
     assert body["ok"] is True
     assert body["host"] == "biodatsci"
     # Local side effects: lab_mgmt registry + installation manifest.
-    assert (world["lab_mgmt"] / "projects" / "demo.md").is_file()
+    assert (world["lab_mgmt"] / "cert_projects" / "demo.md").is_file()
     manifest = world["home"] / ".wigamig" / "installations" / "demo.yaml"
     assert manifest.is_file()
     m = yaml.safe_load(manifest.read_text())

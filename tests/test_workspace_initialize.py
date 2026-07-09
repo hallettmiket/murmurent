@@ -135,7 +135,7 @@ def test_initialize_writes_charter_for_bare_clone(isolated, tmp_path, monkeypatc
     assert "project: demo" in charter
     assert "@mhallet" in charter
     # Lab-mgmt registry entry too.
-    assert (isolated["tmp"] / "lab-mgmt" / "projects" / "demo.md").is_file()
+    assert (isolated["tmp"] / "lab-mgmt" / "cert_projects" / "demo.md").is_file()
     # Manifest as before.
     assert (isolated["installs"] / "demo.yaml").is_file()
 
@@ -211,7 +211,7 @@ def test_initialize_ssh_install_on_bare_repo_no_local_dir(isolated, tmp_path, mo
     assert payload["ok"] is True
 
     # Lab-mgmt registry entry exists with the remote-host fields.
-    reg = isolated["tmp"] / "lab-mgmt" / "projects" / "freshrepo.md"
+    reg = isolated["tmp"] / "lab-mgmt" / "cert_projects" / "freshrepo.md"
     assert reg.is_file()
     reg_text = reg.read_text()
     assert "host: biodatsci" in reg_text
