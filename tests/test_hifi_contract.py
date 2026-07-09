@@ -155,6 +155,8 @@ HIFI_TOP_LEVEL_KEYS = {
     "oracle_drafts",
     "personal_oracle",
     "lab_oracle_folder",
+    "vault_health",
+    "agents_activity",
     "requests_pending",
     "requests_mine",
     "group_members",
@@ -190,6 +192,29 @@ def test_response_validates_against_pydantic(world):
     resp = snapshot.build_response("allie", today=_dt.date(2026, 5, 8))
     payload = resp.model_dump(by_alias=True)
     contract.DashboardResponse.model_validate(payload)
+
+
+def test_agents_activity_parses_the_log(monkeypatch, tmp_path):
+    from wigamig.dashboard import snapshot as _snap
+    log = tmp_path / "agents.log"
+    # exactly the format scripts/wigamig_log_agent_event.sh writes (ANSI + blanks)
+    log.write_text(
+        "\x1b[32m[15:20] blacksmith: starting — build the thing\x1b[0m\n\n"
+        "\x1b[91m[15:22] blacksmith: Done — shipped it, 12 tests green\x1b[0m\n\n"
+        "garbage line that doesn't match\n",
+        encoding="utf-8")
+    monkeypatch.setenv("WIGAMIG_AGENT_LOG", str(log))
+    feed = _snap._agents_activity(limit=10)
+    assert [a.agent for a in feed] == ["blacksmith", "blacksmith"]   # newest first
+    assert feed[0].time == "15:22" and feed[0].started is False
+    assert feed[0].text.startswith("Done —")
+    assert feed[1].started is True and feed[1].text == "build the thing"  # prefix stripped
+
+
+def test_agents_activity_missing_log_is_empty(monkeypatch, tmp_path):
+    from wigamig.dashboard import snapshot as _snap
+    monkeypatch.setenv("WIGAMIG_AGENT_LOG", str(tmp_path / "nope.log"))
+    assert _snap._agents_activity() == []
 
 
 def test_cert_project_surfaces_in_the_one_project_list(world):

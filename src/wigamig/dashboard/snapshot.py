@@ -167,6 +167,8 @@ def build_response(
         oracle_drafts=_oracle_drafts(effective_persona, limit=20),
         personal_oracle=_personal_oracle(limit=5),
         lab_oracle_folder=_lab_oracle_folder(lab_name),
+        vault_health=_vault_health(),
+        agents_activity=_agents_activity(limit=16),
         requests_pending=_requests_pending(effective_persona, norm),
         requests_mine=_requests_mine(norm),
         group_members=_group_members(),
@@ -465,6 +467,55 @@ def _lab_oracle_folder(lab_name: str) -> str:
     is retained for callers but no longer parameterizes the folder name.
     """
     return "lab_oracle/"
+
+
+def _vault_health() -> C.VaultHealth:
+    """Whether wigamig can actually READ the personal Oracle vault dir on this
+    machine. Surfaces the macOS Full-Disk-Access failure that otherwise makes the
+    Oracle personal + notebook tiers silently return empty. Best-effort."""
+    try:
+        from ..core import oracle_publish as _op
+        p = _op.probe_personal_oracle()
+        return C.VaultHealth(status=p.status, detail=p.detail, path=p.path)
+    except Exception:  # noqa: BLE001
+        return C.VaultHealth(status="unregistered", detail="")
+
+
+_AGENT_LINE_RE = __import__("re").compile(r"^\[(\d\d:\d\d)\]\s+(\S+?):\s+(.*)$")
+_ANSI_RE = __import__("re").compile(r"\x1b\[[0-9;]*m")
+
+
+def _agents_activity(*, limit: int = 16) -> list[C.AgentActivity]:
+    """Parse the tail of ``~/.wigamig/agents.log`` (the SubagentStop /
+    PreToolUse(Agent) hook feed) into structured, newest-first entries so the
+    dashboard can show a live agents panel. Best-effort — a missing log is just an
+    empty feed."""
+    import os
+    log = Path(os.environ.get("WIGAMIG_AGENT_LOG",
+                              str(Path.home() / ".wigamig" / "agents.log")))
+    if not log.is_file():
+        return []
+    try:
+        lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+    out: list[C.AgentActivity] = []
+    for raw in reversed(lines):                       # newest first
+        line = _ANSI_RE.sub("", raw).strip()
+        if not line:
+            continue
+        m = _AGENT_LINE_RE.match(line)
+        if not m:
+            continue
+        time_s, agent, text = m.group(1), m.group(2), m.group(3)
+        started = text.startswith("starting")
+        if started:
+            text = text.split("—", 1)[1].strip() if "—" in text else text
+        out.append(C.AgentActivity(time=time_s, agent=agent, text=text[:200],
+                                   started=started))
+        if len(out) >= limit:
+            break
+    return out
 
 
 def _master_folders_summary() -> dict:
