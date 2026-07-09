@@ -333,6 +333,121 @@ def issue_member_card(handle: str, *, enrollment: dict, group: str,
     return {"member_card": member_card, "pi_card": pi_card}
 
 
+# ---------------------------------------------------------------------------
+# PROJECT-scoped cards — bind a member's key to a project within a lab
+# (group == "<lab>/<project>"). Structurally a member card (member → PI → root),
+# so existing verifiers accept it; only the group shape + role differ. Recorded
+# in a per-project ledger so the whole project can be revoked at once.
+# ---------------------------------------------------------------------------
+
+def _norm_project(project: str) -> str:
+    return _safe(str(project or "").strip())
+
+
+def project_group(lab: str, project: str) -> str:
+    """Composite group string for a project-scoped card: ``<lab>/<project>``."""
+    return f"{str(lab or '').strip()}/{_norm_project(project)}"
+
+
+def _leader_groups(env: dict | None = None) -> tuple[str, dict]:
+    """This machine's local card centre + ``{group: kind}`` for the groups it
+    leads (lab_pi / core_leader). Raises if there is no local card."""
+    local = _ic.local_card(env=env)
+    if not local:
+        raise IssuanceError("no identity card on this machine; import your PI card first")
+    led = {r.get("group"): r.get("kind") for r in local.get("roles", [])
+           if r.get("kind") in ("lab_pi", "core_leader")}
+    return (local.get("centre") or ""), led
+
+
+def _resolve_project_lab(led: dict, project: str, lab: str | None) -> str:
+    """Pick which lab owns ``project``: the given ``lab`` (must be one we lead), or
+    the sole led group, else demand disambiguation."""
+    labs = list(led)
+    if lab:
+        if lab not in led:
+            raise IssuanceError(f"you do not lead '{lab}' — cannot issue its project cards")
+        return lab
+    if len(labs) == 1:
+        return labs[0]
+    if not labs:
+        raise IssuanceError("you lead no lab/core — cannot issue project cards")
+    raise IssuanceError(
+        f"you lead multiple groups {labs}; pass a lab to say which one owns "
+        f"project '{project}'")
+
+
+def project_context(project: str, *, lab: str | None = None,
+                    env: dict | None = None) -> tuple[str, str]:
+    """Resolve ``(centre, group)`` for a project the caller leads, where
+    ``centre`` is the local trust realm and ``group`` is ``<lab>/<project>``.
+    Used by both issuance and revocation so they agree on the ledger key."""
+    centre_name, led = _leader_groups(env)
+    lab = _resolve_project_lab(led, project, lab)
+    proj = _norm_project(project)
+    if not proj:
+        raise IssuanceError("project name is required")
+    return centre_name, project_group(lab, proj)
+
+
+def issue_project_card(handle: str, *, enrollment: dict, project: str,
+                       lab: str | None = None, env: dict | None = None,
+                       issued_at=None, ttl_days: int = _cert.DEFAULT_TTL_DAYS,
+                       expected_nonce: str | None = None) -> dict:
+    """PI side: issue a PROJECT-scoped card binding ``handle``'s key to a project
+    within a lab the caller leads. Verifies proof-of-possession, then signs a card
+    whose ``group`` is the composite ``<lab>/<project>`` and whose role is
+    ``project_member``. Chains member → PI → root exactly like a lab member card.
+    Recorded in a per-project ledger (NOT the handle-keyed one) so a project card
+    never clobbers the member's lab card and the project can be revoked wholesale."""
+    if not _k.have_keys():
+        raise IssuanceError("no local keypair; you need your own key to sign project cards")
+    centre_name, led = _leader_groups(env)
+    lab = _resolve_project_lab(led, project, lab)
+    proj = _norm_project(project)
+    if not proj:
+        raise IssuanceError("project name is required")
+    group = project_group(lab, proj)
+
+    pi_card_path = cards_dir() / f"{_safe(centre_name)}_pi.json"
+    if not pi_card_path.is_file():
+        raise IssuanceError(
+            "your signed PI card is missing (needed to chain project cards to the "
+            "root); re-import it with `wigamig import-card`")
+    pi_card = _cert.loads(pi_card_path.read_text(encoding="utf-8"))
+
+    pubkey = (enrollment.get("payload") or {}).get("pubkey") if isinstance(enrollment, dict) else None
+    if not pubkey:
+        raise IssuanceError("enrollment request has no public key")
+    if not _cert.verify_enrollment(enrollment, expected_nonce=expected_nonce):
+        raise IssuanceError("proof-of-possession failed (bad enrollment signature/nonce)")
+
+    local = _ic.local_card(env=env) or {}
+    pi_handle = str(local.get("netname") or "").lstrip("@")
+    roles = [{"kind": "project_member", "group": group, "lab": lab,
+              "project": proj, "pi": f"@{pi_handle}"}]
+    card = _cert.issue_member_card(
+        handle=handle, member_pubkey=pubkey, group=group, centre=centre_name,
+        pi_priv=_k.load_private(), pi_handle=pi_handle, roles=roles,
+        issued_at=issued_at, ttl_days=ttl_days)
+    _record_project_issued(centre_name, group, card)
+    return {"member_card": card, "pi_card": pi_card, "group": group,
+            "lab": lab, "project": proj}
+
+
+def _record_project_issued(centre_name: str, group: str, card: dict) -> None:
+    """Best-effort: index a project card in the per-project revocation ledger."""
+    try:
+        from . import revocation as _rev
+        p = card["payload"]
+        _rev.record_project_issued(centre_name, group,
+                                   handle=p["subject"]["handle"],
+                                   card_id=p["card_id"],
+                                   fingerprint=p["subject"]["fingerprint"])
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def verify_and_import_member_card(bundle, *, trust_root: str | None = None,
                                   env: dict | None = None, now=None,
                                   require_crl: bool = False, crl=None) -> tuple:

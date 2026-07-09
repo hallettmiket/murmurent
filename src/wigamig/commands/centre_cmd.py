@@ -691,12 +691,17 @@ def identity_import(card_file: str) -> None:
                      "(`wigamig identity-init`).")
 @click.option("--nonce", default="", help="Challenge nonce (default: random).")
 @click.option("--group", default="", help="Group you're enrolling into (optional).")
+@click.option("--project", default="", help="Project you're enrolling into "
+              "(optional; your PI issues a project-scoped card).")
 @click.option("--out", "out_file", type=click.Path(dir_okay=False), default=None,
               help="Write the request to a file (default: print).")
-def enroll(nonce: str, group: str, out_file: str | None) -> None:
+def enroll(nonce: str, group: str, project: str, out_file: str | None) -> None:
     from ..core import issuance as _iss
     from ..core import identity as _id
     ident = _id.resolve(allow_unknown=True)
+    # --project is a hint the PI reads; the actual composite group (<lab>/<project>)
+    # is set at issuance. A bare --project fills the group hint for readability.
+    group = group or project
     try:
         req = _iss.make_enrollment(ident.at_handle, nonce=nonce or None, group=group)
     except _iss.IssuanceError as exc:
@@ -796,6 +801,78 @@ def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
                        "(`wigamig centre-pin <centre>`), then `wigamig import-card <file>`.")
     else:
         click.echo(text)
+
+
+@click.command("issue-project-card",
+                help="PI: sign a PROJECT-scoped card for a member's enrollment, "
+                     "binding their key to a project within a lab you lead (group "
+                     "becomes <lab>/<project>). Output is a BUNDLE — send it to the "
+                     "member to `wigamig import-card`.")
+@click.argument("enrollment_file")
+@click.option("--project", required=True, help="Project to add them to.")
+@click.option("--lab", default="", help="Lab that owns the project "
+              "(default: the sole lab you lead).")
+@click.option("--handle", default="", help="Member handle (default: from the enrollment).")
+@click.option("--out", "out_file", type=click.Path(dir_okay=False), default=None,
+              help="Write the bundle to a file (default: print).")
+def issue_project_card_cmd(enrollment_file: str, project: str, lab: str,
+                           handle: str, out_file: str | None) -> None:
+    from ..core import issuance as _iss
+    import json as _json
+    from pathlib import Path as _P
+    try:
+        enrollment = _json.loads(_P(enrollment_file).expanduser().read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise click.ClickException(f"cannot read enrollment: {exc}") from exc
+    if not handle:
+        handle = (enrollment.get("payload") or {}).get("handle", "")
+    try:
+        bundle = _iss.issue_project_card(handle, enrollment=enrollment,
+                                         project=project, lab=lab or None)
+    except _iss.IssuanceError as exc:
+        raise click.ClickException(str(exc)) from exc
+    text = _json.dumps(bundle, indent=2)
+    subj = bundle["member_card"]["payload"]["subject"]["handle"]
+    group = bundle["group"]
+    pi_p = bundle["pi_card"]["payload"]
+    self_rooted = (pi_p.get("issuer") or {}).get("fingerprint") == pi_p["subject"]["fingerprint"]
+    if out_file:
+        _P(out_file).write_text(text, encoding="utf-8")
+        click.echo(f"✓ signed project card for {subj} (project {group}) → {out_file}")
+        if self_rooted:
+            root = pi_p["subject"]["pubkey"]
+            click.echo(f"  Send them this file + your trust root:\n    {root}")
+            click.echo(f"  They run:  wigamig import-card {out_file} --trust-root {root}")
+        else:
+            click.echo("  Send them this file; they pin your centre's signing recipient, "
+                       "then `wigamig import-card <file>`.")
+    else:
+        click.echo(text)
+
+
+@click.command("revoke-project",
+                help="PI: revoke ALL cards issued for a project you lead (the "
+                     "PI-only 'delete a project' at the identity layer). Adds every "
+                     "project card to the CRL in one bump and republishes.")
+@click.option("--project", required=True, help="Project to revoke.")
+@click.option("--lab", default="", help="Lab that owns the project "
+              "(default: the sole lab you lead).")
+def revoke_project_cmd(project: str, lab: str) -> None:
+    from ..core import issuance as _iss
+    from ..core import revocation as _rev
+    try:
+        centre, group = _iss.project_context(project, lab=lab or None)
+    except _iss.IssuanceError as exc:
+        raise click.ClickException(str(exc)) from exc
+    try:
+        crl = _rev.revoke_project(centre, group)
+    except _rev.RevocationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    n = len(_rev.project_ledger(centre, group))
+    click.echo(f"✓ revoked project {group}: {n} card(s) added to the CRL "
+               f"(serial {crl['payload']['serial']}).")
+    click.echo("  Members' access ends when they next fetch the CRL / hit a "
+               "fail-closed check. Slack/GitHub teardown is a later phase.")
 
 
 @click.command("import-card",
