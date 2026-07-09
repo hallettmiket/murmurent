@@ -77,24 +77,15 @@ def _write_registry(lab_mgmt: Path, project: str, *,
                     host: str = "local", path: str | None = None,
                     remote_path: str | None = None,
                     status: str | None = None) -> Path:
-    p = lab_mgmt / "projects" / f"{project}.md"
-    meta_lines = [
-        f"project: {project}",
-        f"path: {path or '/repos/' + project}",
-        "sensitivity: standard",
-        "lead: '@mhallet'",
-    ]
-    if host != "local":
-        meta_lines.append(f"host: {host}")
-        meta_lines.append(f"remote_path: {remote_path or '/home/u/repos/' + project}")
-    if status:
-        meta_lines.append(f"status: {status}")
-    meta_lines.append("members:\n  - '@mhallet'")
-    p.write_text(
-        "---\n" + "\n".join(meta_lines) + "\n---\n\n# " + project + "\n",
-        encoding="utf-8",
-    )
-    return p
+    """Create a cert-project entry (the authoritative project registry that
+    reconcile now reads). ``path`` is the local code_repo; ``host``/``remote_path``
+    mark a remote-tree project. Returns the cert-project file path."""
+    from wigamig.core import cert_projects as _cp
+    rp = (remote_path or "/home/u/repos/" + project) if host != "local" else ""
+    _cp.upsert(project, lab="hallett", member="@mhallet",
+               code_repo=(path or "/repos/" + project), host=host,
+               remote_path=rp, status=(status or "active"))
+    return _cp.project_path(project)
 
 
 def _make_clone(repos: Path, name: str, with_charter: bool = True) -> Path:
