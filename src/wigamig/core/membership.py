@@ -86,6 +86,8 @@ class MemberRecord:
     status: str
     email: str = ""  # used to resolve the member's Slack account (users.lookupByEmail)
     github: str = ""  # GitHub login, for repo collaborator management
+    card_fingerprint: str = ""  # the member's identity-card key fingerprint (revocation index)
+    card_id: str = ""           # the issued card's id (revocation index)
     certifications: list[str] = field(default_factory=list)
     created: str | None = None
     deactivated_at: str | None = None
@@ -117,6 +119,8 @@ def parse_member(path: Path) -> MemberRecord:
         status=str(meta.get("status") or ACTIVE),
         email=str(meta.get("email") or "").strip(),
         github=str(meta.get("github") or "").strip().lstrip("@"),
+        card_fingerprint=str(meta.get("card_fingerprint") or "").strip(),
+        card_id=str(meta.get("card_id") or "").strip(),
         certifications=[str(c) for c in (meta.get("certifications") or [])],
         created=str(meta.get("created")) if meta.get("created") else None,
         deactivated_at=str(meta.get("deactivated_at")) if meta.get("deactivated_at") else None,
@@ -172,6 +176,9 @@ def add(
     full_name: str,
     role: str = "staff",
     email: str = "",
+    github: str = "",
+    card_fingerprint: str = "",
+    card_id: str = "",
     certifications: list[str] | None = None,
     today: _dt.date | None = None,
 ) -> MemberRecord:
@@ -194,9 +201,56 @@ def add(
         role=role,
         status=ACTIVE,
         email=(email or "").strip(),
+        github=(github or "").strip().lstrip("@"),
+        card_fingerprint=(card_fingerprint or "").strip(),
+        card_id=(card_id or "").strip(),
         certifications=list(certifications or []),
         created=today.isoformat(),
     )
+    _write(rec)
+    return rec
+
+
+def upsert_member(
+    handle: str,
+    *,
+    full_name: str | None = None,
+    role: str | None = None,
+    email: str | None = None,
+    github: str | None = None,
+    card_fingerprint: str | None = None,
+    card_id: str | None = None,
+    today: _dt.date | None = None,
+) -> MemberRecord:
+    """Add the member if absent, else update the provided fields (``None`` leaves a
+    field unchanged). Re-activates a previously-removed member. This is what card
+    issuance calls so the roster stays the single source of truth: a carded member
+    always appears in ``members/<handle>.md`` with their email, github, and the
+    card's fingerprint/id (the revocation index)."""
+    norm = _strip_at(handle)
+    p = member_path(norm)
+    if not p.is_file():
+        return add(handle=norm, full_name=full_name or norm,
+                   role=role or "staff", email=email or "", github=github or "",
+                   card_fingerprint=card_fingerprint or "", card_id=card_id or "",
+                   today=today)
+    rec = parse_member(p)
+    if full_name is not None:
+        rec.full_name = full_name.strip() or rec.handle
+    if role is not None:
+        if role not in VALID_ROLES:
+            raise MembershipError(f"role must be one of {VALID_ROLES}; got {role!r}")
+        rec.role = role
+    if email is not None:
+        rec.email = email.strip()
+    if github is not None:
+        rec.github = github.strip().lstrip("@")
+    if card_fingerprint is not None:
+        rec.card_fingerprint = card_fingerprint.strip()
+    if card_id is not None:
+        rec.card_id = card_id.strip()
+    rec.status = ACTIVE            # (re-)carding a member makes them active
+    rec.deactivated_at = None
     _write(rec)
     return rec
 
@@ -360,6 +414,12 @@ def _write(rec: MemberRecord) -> Path:
     }
     if rec.email:
         meta["email"] = rec.email
+    if rec.github:
+        meta["github"] = rec.github
+    if rec.card_fingerprint:
+        meta["card_fingerprint"] = rec.card_fingerprint
+    if rec.card_id:
+        meta["card_id"] = rec.card_id
     if rec.certifications:
         meta["certifications"] = list(rec.certifications)
     if rec.created:
