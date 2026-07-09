@@ -85,6 +85,7 @@ class MemberRecord:
     role: str
     status: str
     email: str = ""  # used to resolve the member's Slack account (users.lookupByEmail)
+    github: str = ""  # GitHub login, for repo collaborator management
     certifications: list[str] = field(default_factory=list)
     created: str | None = None
     deactivated_at: str | None = None
@@ -115,6 +116,7 @@ def parse_member(path: Path) -> MemberRecord:
         role=str(meta.get("role") or "staff"),
         status=str(meta.get("status") or ACTIVE),
         email=str(meta.get("email") or "").strip(),
+        github=str(meta.get("github") or "").strip().lstrip("@"),
         certifications=[str(c) for c in (meta.get("certifications") or [])],
         created=str(meta.get("created")) if meta.get("created") else None,
         deactivated_at=str(meta.get("deactivated_at")) if meta.get("deactivated_at") else None,
