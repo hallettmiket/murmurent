@@ -4,8 +4,9 @@ Purpose: Detect + (optionally) repair drift between wigamig's recorded
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-17
 Input: ``~/.wigamig/installations/*.yaml`` (this-machine install
-       records), ``~/repos/lab_mgmt/projects/*.md`` (lab registry),
-       registered hosts (``~/.wigamig/hosts.yaml``), and the live
+       records), the cert-project registry (``<lab-mgmt>/cert_projects/*.md`` —
+       the authoritative project store that replaced the CHARTER-mirror
+       registry), registered hosts (``~/.wigamig/hosts.yaml``), and the live
        state of working trees on those hosts (filesystem locally,
        SSH probe remotely).
 Output: ``ReconcileReport`` — list of :class:`DriftFinding` rows.
