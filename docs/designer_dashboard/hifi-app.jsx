@@ -2185,6 +2185,64 @@ function ProjectsPanel({ projects, span="c-5" }) {
     }
   };
 
+  // Provision a cert-project's Slack channel + GitHub repo, membership = certs.
+  const provisionProj = async (name) => {
+    setBusyDecom(name);
+    try {
+      const r = await fetch(
+        "/api/project/" + encodeURIComponent(name) + "/provision",
+        { method: "POST", headers: { Accept: "application/json" } },
+      );
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      const s = j.slack || {}, g = j.github || {};
+      const slackMsg = s.ok
+        ? "Slack: channel " + (s.created ? "created" : "reused") +
+          " (" + (s.channel_id || "?") + "), invited " + ((s.invited || []).length)
+        : "Slack: " + (s.error || "skipped");
+      const ghMsg = g.ok
+        ? "GitHub: " + g.repo + ", " +
+          ((g.collaborators || []).filter(c => c.status === "ok").length) + " collaborator(s)"
+        : "GitHub: " + (g.error || "skipped");
+      window.alert("Provisioned '" + name + "'.\n\n" + slackMsg + "\n" + ghMsg);
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+    } catch (ex) {
+      window.alert("Provision failed: " + (ex.message || ex));
+    } finally {
+      setBusyDecom(null);
+    }
+  };
+
+  // Reconcile channel/repo membership back to the certified members.
+  const reconcileProj = async (name) => {
+    setBusyDecom(name);
+    try {
+      const r = await fetch(
+        "/api/project/" + encodeURIComponent(name) + "/reconcile",
+        { method: "POST", headers: { Accept: "application/json" } },
+      );
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      const s = j.slack || {}, g = j.github || {};
+      const line = (label, o, add, rm) => o && o.ok
+        ? label + ": " + (o.in_sync ? "in sync" :
+            "+" + ((o[add] || []).length) + " -" + ((o[rm] || []).length))
+        : label + ": " + ((o && o.error) || "n/a");
+      window.alert("Reconciled '" + name + "'.\n\n" +
+                   line("Slack", s, "invited", "kicked") + "\n" +
+                   line("GitHub", g, "added", "removed"));
+      if (typeof window.__wigamigFetchData === "function") {
+        await window.__wigamigFetchData(window.DATA.persona);
+      }
+    } catch (ex) {
+      window.alert("Reconcile failed: " + (ex.message || ex));
+    } finally {
+      setBusyDecom(null);
+    }
+  };
+
   const unarchiveProj = async (name) => {
     setBusyDecom(name);
     try {
@@ -2296,7 +2354,35 @@ function ProjectsPanel({ projects, span="c-5" }) {
                   <td className="num"><strong>{p.open_seas}</strong></td>
                   <td className="muted" style={{fontSize:12}}>{p.last_activity}</td>
                   {isPI && (
-                    <td style={{textAlign:"right"}} onClick={(e) => e.stopPropagation()}>
+                    <td style={{textAlign:"right", whiteSpace:"nowrap"}} onClick={(e) => e.stopPropagation()}>
+                      {p.is_cert && (
+                        <>
+                          <button
+                            type="button"
+                            title="Provision this cert-project's Slack channel + GitHub repo; sync membership to the certified members."
+                            disabled={busyDecom === p.name}
+                            onClick={() => provisionProj(p.name)}
+                            style={{
+                              background:"transparent", border:"1px solid var(--rule-strong)",
+                              borderRadius:2, padding:"1px 6px", cursor:"pointer",
+                              fontSize:11, color:"var(--ink)", fontFamily:"var(--mono)", marginRight:4,
+                            }}>
+                            provision
+                          </button>
+                          <button
+                            type="button"
+                            title="Reconcile the channel + repo membership back to the certified members."
+                            disabled={busyDecom === p.name}
+                            onClick={() => reconcileProj(p.name)}
+                            style={{
+                              background:"transparent", border:"1px solid var(--rule-strong)",
+                              borderRadius:2, padding:"1px 6px", cursor:"pointer",
+                              fontSize:11, color:"var(--ink)", fontFamily:"var(--mono)", marginRight:4,
+                            }}>
+                            reconcile
+                          </button>
+                        </>
+                      )}
                       <button
                         type="button"
                         title={p.is_cert
