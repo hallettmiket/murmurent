@@ -72,11 +72,44 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
     explicit = env.get("WIGAMIG_LAB_MGMT_REPO")
     if explicit:
         return Path(explicit).expanduser()
+    pinned = _pinned_lab_mgmt_path()          # persistent pointer (set by pi-init)
+    if pinned is not None:
+        return pinned
     if DEFAULT_LAB_MGMT_REPO.exists():
         return DEFAULT_LAB_MGMT_REPO
     if LEGACY_LAB_MGMT_REPO.exists():
         return LEGACY_LAB_MGMT_REPO
     return DEFAULT_LAB_MGMT_REPO
+
+
+def _wig_home() -> Path:
+    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+
+
+def _lab_mgmt_pointer_path() -> Path:
+    return _wig_home() / "lab_mgmt_path"
+
+
+def _pinned_lab_mgmt_path() -> Path | None:
+    """This machine's pinned lab-mgmt repo (written by ``set_lab_mgmt_path``), or
+    None. Lets a standalone PI's roster resolve without an exported env var."""
+    p = _lab_mgmt_pointer_path()
+    if not p.is_file():
+        return None
+    try:
+        txt = p.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return Path(txt).expanduser() if txt else None
+
+
+def set_lab_mgmt_path(path: str | Path) -> None:
+    """Persistently point ``lab_mgmt_repo_root()`` at a lab's own management repo
+    (e.g. ``~/repos/wigamig_lab_mh``). Honours ``WIGAMIG_HOME``. An explicit
+    ``$WIGAMIG_LAB_MGMT_REPO`` still overrides it."""
+    p = _lab_mgmt_pointer_path()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(str(Path(path).expanduser()) + "\n", encoding="utf-8")
 
 
 @contextmanager
