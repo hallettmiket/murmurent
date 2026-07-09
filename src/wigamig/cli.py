@@ -549,6 +549,26 @@ def project_reconcile(name: str, check: bool) -> None:
                    f" — +{len(g['to_add'])} add, -{len(g['to_remove'])} remove")
 
 
+@project_group.command("workspace-check",
+                       help="(PI) Report which of a cert-project's certified "
+                            "members are in the Slack workspace (so you know who "
+                            "still needs the workspace invite link).")
+@click.argument("name")
+def project_workspace_check(name: str) -> None:
+    from .core import cert_provision as _cprov
+    try:
+        out = _cprov.workspace_check(name)
+    except _cprov.CertProvisionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"project {name} — Slack workspace membership")
+    for r in out["in_workspace"]:
+        click.echo(f"  ✓ {r['handle']} ({r['email']}) in workspace")
+    for r in out["missing"]:
+        click.echo(f"  ✗ {r['handle']} ({r['email']}) NOT in workspace — send the invite link")
+    for h in out["no_email"]:
+        click.echo(f"  · {h}: no email on roster — can't check")
+
+
 # ---------------------------------------------------------------------------
 # experiment
 # ---------------------------------------------------------------------------

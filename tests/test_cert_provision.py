@@ -279,3 +279,32 @@ def test_reconcile_github_not_provisioned():
     _seed_project_with_github()
     out = CPROV.reconcile_github("rna_atlas")
     assert out["ok"] is False and out["error"] == "not_provisioned"
+
+
+# ---- workspace check --------------------------------------------------------
+
+def test_workspace_check_splits_in_missing_and_no_email():
+    _seed_project_with_members()          # allie+bob have emails, nomail doesn't
+
+    # allie is in the workspace, bob is not
+    def resolver(email):
+        return "U_allie" if email == "allie@uwo.ca" else None
+
+    out = CPROV.workspace_check("rna_atlas", slack_resolver=resolver)
+    assert [r["handle"] for r in out["in_workspace"]] == ["allie"]
+    assert [r["handle"] for r in out["missing"]] == ["bob"]
+    assert out["no_email"] == ["nomail"]
+    assert out["in_workspace"][0]["slack_uid"] == "U_allie"
+
+
+def test_workspace_check_no_resolver_marks_all_missing():
+    _seed_project_with_members()
+    # a resolver that always fails (no token) → emailed members can't be confirmed
+    out = CPROV.workspace_check("rna_atlas", slack_resolver=lambda e: None)
+    assert {r["handle"] for r in out["missing"]} == {"allie", "bob"}
+    assert out["in_workspace"] == [] and out["no_email"] == ["nomail"]
+
+
+def test_workspace_check_unknown_project_raises():
+    with pytest.raises(CPROV.CertProvisionError, match="no cert-project"):
+        CPROV.workspace_check("ghost")
