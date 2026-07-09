@@ -93,6 +93,30 @@ def lookup_issued(centre: str, handle: str) -> dict | None:
 
 
 # ---------------------------------------------------------------------------
+# Per-project ledger — index project cards by (centre, group) so a whole
+# project can be revoked at once. Separate from the handle-keyed ledger above,
+# so a project card never overwrites a member's lab-card record.
+# ---------------------------------------------------------------------------
+
+def _project_ledger_path(centre: str, group: str) -> Path:
+    return _dir() / f"{_safe(centre)}.{_safe(group)}.project.json"
+
+
+def record_project_issued(centre: str, group: str, *, handle: str,
+                          card_id: str, fingerprint: str) -> None:
+    """Record a project-scoped card so :func:`revoke_project` can find it."""
+    p = _project_ledger_path(centre, group)
+    led = _load(p, {})
+    led[_norm(handle)] = {"card_id": card_id, "fingerprint": fingerprint}
+    _save(p, led)
+
+
+def project_ledger(centre: str, group: str) -> dict:
+    """The ``{handle: {card_id, fingerprint}}`` index for project ``group``."""
+    return _load(_project_ledger_path(centre, group), {})
+
+
+# ---------------------------------------------------------------------------
 # Revoke + publish (root-key holder only)
 # ---------------------------------------------------------------------------
 
@@ -110,20 +134,32 @@ def _add(centre: str, ids) -> dict:
     return st
 
 
-def build_fresh_crl(centre: str) -> dict:
-    """Root-sign the current revoked set with a fresh ``issued_at`` (so the CRL
-    passes the verifier's freshness check). Requires the centre root key."""
-    if not _cr.have_root_key():
+def _crl_signing_priv():
+    """The key that signs this machine's CRLs: the centre root key (mayor) if
+    present, else this machine's own identity key. A standalone PI is their lab's
+    CA — their machine key IS the lab's trust anchor (pinned at ``pi-init``), so a
+    CRL they sign verifies against that pin. Returns None if neither key exists."""
+    if _cr.have_root_key():
+        return _cr.load_root_private()
+    from . import idkeys as _k
+    return _k.load_private() if _k.have_keys() else None
+
+
+def build_fresh_crl(centre: str, *, signing_priv=None) -> dict:
+    """Sign the current revoked set with a fresh ``issued_at`` (so the CRL passes
+    the verifier's freshness check). Signs with ``signing_priv`` when given, else
+    the centre root key; raises if neither is available."""
+    priv = signing_priv or (_cr.load_root_private() if _cr.have_root_key() else None)
+    if priv is None:
         raise RevocationError("no centre root key on this machine")
     st = _load(_state_path(centre), {"serial": 0, "revoked": []})
     return _cert.build_crl(centre=centre, revoked=st.get("revoked", []),
-                           root_priv=_cr.load_root_private(),
-                           serial=int(st.get("serial", 0)))
+                           root_priv=priv, serial=int(st.get("serial", 0)))
 
 
-def publish(centre: str) -> dict:
-    """Build + persist a fresh root-signed CRL. Returns it."""
-    crl = build_fresh_crl(centre)
+def publish(centre: str, *, signing_priv=None) -> dict:
+    """Build + persist a fresh signed CRL. Returns it."""
+    crl = build_fresh_crl(centre, signing_priv=signing_priv)
     _save(_signed_path(centre), crl)
     return crl
 
@@ -163,6 +199,28 @@ def revoke_member(centre: str, handle: str) -> dict:
             "machine that issued it, or pass --fingerprint")
     return revoke(centre, card_id=rec.get("card_id") or None,
                   fingerprint=rec.get("fingerprint") or None)
+
+
+def revoke_project(centre: str, group: str) -> dict:
+    """Revoke EVERY card issued for project ``group`` (``<lab>/<project>``): union
+    all their ids + fingerprints into the CRL in a single serial bump, then
+    republish. Works for a centre mayor (root key) OR a standalone PI (their
+    machine key signs their own lab's CRL). This is the PI-only "delete a project"
+    teardown at the identity layer."""
+    priv = _crl_signing_priv()
+    if priv is None:
+        raise RevocationError(
+            "no signing key on this machine (need the centre root key or your PI key)")
+    led = project_ledger(centre, group)
+    if not led:
+        raise RevocationError(f"no issued cards on record for project '{group}'")
+    ids = []
+    for rec in led.values():
+        ids.extend(i for i in (rec.get("card_id"), rec.get("fingerprint")) if i)
+    if not ids:
+        raise RevocationError(f"project '{group}' ledger has no revocable ids")
+    _add(centre, ids)
+    return publish(centre, signing_priv=priv)
 
 
 # ---------------------------------------------------------------------------

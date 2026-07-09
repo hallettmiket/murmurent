@@ -262,6 +262,52 @@ def test_issuance_writes_the_roster(monkeypatch, tmp_path):
     assert allie_rec.card_fingerprint in crl["payload"]["revoked"]
 
 
+def test_project_scoped_card_issue_and_revoke(monkeypatch, tmp_path):
+    """A standalone PI issues a PROJECT-scoped card (group == '<lab>/<project>')
+    that chains member → PI → the PI's own root, and can revoke the whole project
+    with their own key (no centre root needed)."""
+    import yaml as _yaml
+    from wigamig.core import revocation as REV
+
+    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
+    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.delenv("WIGAMIG_LAB_MGMT_REPO", raising=False)
+    K.generate_keypair()
+    (tmp_path / "pi").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "pi" / "profile.yaml").write_text(
+        _yaml.safe_dump({"email": "pi@x.edu", "github": "pigh"}), encoding="utf-8")
+    out = ISS.self_issue_pi_card("@yxia266", "lab_mh")
+    realm, root = out["realm"], out["trust_root"]
+
+    # member enrolls into the project; PI issues a project-scoped card
+    allie = Ed25519PrivateKey.generate()
+    req = C.make_enrollment_request("@allie", priv=allie, nonce="p1",
+                                    group="rna_atlas")
+    bundle = ISS.issue_project_card("@allie", enrollment=req, project="rna_atlas")
+    assert bundle["group"] == "lab_mh/rna_atlas"
+    card, pi_card = bundle["member_card"], bundle["pi_card"]
+    assert card["payload"]["group"] == "lab_mh/rna_atlas"
+    assert card["payload"]["roles"][0]["kind"] == "project_member"
+
+    # chains member -> PI -> the PI's own root, and reports the composite group
+    v = C.verify_member_card(card, pi_card, root_pub=root, centre=realm,
+                             require_crl=False)
+    assert v.ok and v.group == "lab_mh/rna_atlas"
+
+    # the per-project ledger indexes the member; project_context agrees on the key
+    assert "allie" in REV.project_ledger(realm, "lab_mh/rna_atlas")
+    assert ISS.project_context("rna_atlas") == (realm, "lab_mh/rna_atlas")
+
+    # PI revokes the whole project with their OWN key (no centre root key present)
+    assert not REV._cr.have_root_key()
+    crl = REV.revoke_project(realm, "lab_mh/rna_atlas")
+    assert card["payload"]["card_id"] in crl["payload"]["revoked"]
+    # the CRL verifies against the PI's pinned root, and the card now reads revoked
+    v2 = C.verify_member_card(card, pi_card, root_pub=root, centre=realm,
+                              crl=REV.current_crl(realm), require_crl=True)
+    assert not v2.ok and v2.reason == "revoked"
+
+
 def test_standalone_pi_requires_a_group_name(monkeypatch, tmp_path):
     monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "h"))
     monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "li"))
