@@ -521,6 +521,34 @@ def project_provision_github(name: str, org: str) -> None:
         click.echo(f"  {mark} {c.get('handle')} → {who}: {c.get('detail', c.get('status'))}")
 
 
+@project_group.command("reconcile",
+                       help="(PI) Sync a cert-project's Slack channel + GitHub "
+                            "repo membership back to its certified members. "
+                            "--check reports drift without changing anything.")
+@click.argument("name")
+@click.option("--check", is_flag=True, help="Report drift only; make no changes.")
+def project_reconcile(name: str, check: bool) -> None:
+    from .core import cert_provision as _cprov
+    apply = not check
+    try:
+        s = _cprov.reconcile_slack(name, apply=apply)
+        g = _cprov.reconcile_github(name, apply=apply)
+    except _cprov.CertProvisionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"project {name} — {'check (no changes)' if check else 'reconcile'}")
+    if s.get("error") == "not_provisioned":
+        click.echo("  slack:  (no channel provisioned)")
+    else:
+        click.echo(f"  slack:  {'in sync' if s['in_sync'] else 'drift'}"
+                   f" — +{len(s['to_invite'])} invite, -{len(s['to_kick'])} kick"
+                   + (f", {len(s['unresolved'])} unresolved" if s['unresolved'] else ""))
+    if g.get("error") == "not_provisioned":
+        click.echo("  github: (no repo provisioned)")
+    else:
+        click.echo(f"  github: {'in sync' if g['in_sync'] else 'drift'}"
+                   f" — +{len(g['to_add'])} add, -{len(g['to_remove'])} remove")
+
+
 # ---------------------------------------------------------------------------
 # experiment
 # ---------------------------------------------------------------------------

@@ -241,5 +241,147 @@ def teardown(project: str, *, env: dict | None = None,
     return out
 
 
+# ---------------------------------------------------------------------------
+# Reconcile — bring a cert-project's Slack channel + GitHub repo membership back
+# in line with its CERTIFIED members (someone added/removed by hand, or a member
+# whose cert was revoked but who lingers). Injectable fetch/apply seams so it's
+# testable without live Slack/gh; ``apply=False`` returns the drift without
+# changing anything.
+# ---------------------------------------------------------------------------
+
+def _diff(desired, actual) -> tuple[list, list]:
+    """Return ``(to_add, to_remove)`` as sorted lists, compared case-insensitively
+    on the values themselves (values are ids/logins, already the compare key)."""
+    d, a = {str(x) for x in desired}, {str(x) for x in actual}
+    return sorted(d - a), sorted(a - d)
+
+
+def _default_channel_ids_fetcher(channel_id: str) -> set:
+    from ..dashboard import slack_notify as _sn
+    return _sn._channel_member_ids(channel_id)
+
+
+def _default_uid_resolver(handles, email_map):
+    from ..dashboard import slack_notify as _sn
+    out = {}
+    for h in handles:
+        email = email_map.get(h)
+        out[h] = _sn._lookup_user_id_by_email(email) if email else None
+    return out
+
+
+def _default_kicker(channel_id: str, uid: str):
+    from ..dashboard import slack_notify as _sn
+    tok = _sn._token()
+    if not tok:
+        return (False, "no slack token configured")
+    try:
+        import httpx
+        r = httpx.post("https://slack.com/api/conversations.kick",
+                       headers={"Authorization": f"Bearer {tok}"},
+                       json={"channel": channel_id, "user": uid}, timeout=10)
+        j = r.json()
+        return (bool(j.get("ok")), "kicked" if j.get("ok") else j.get("error", "kick_failed"))
+    except Exception as exc:  # noqa: BLE001
+        return (False, str(exc))
+
+
+def _default_collaborators_fetcher(org: str, name: str) -> set:
+    from . import project_provision as _pp
+    if not _pp._gh_available():
+        return set()
+    res = _pp._gh(["api", f"repos/{org}/{name}/collaborators", "--jq", ".[].login"])
+    if res.returncode != 0:
+        return set()
+    return {ln.strip() for ln in (res.stdout or "").splitlines() if ln.strip()}
+
+
+def reconcile_slack(project: str, *, env: dict | None = None, apply: bool = True,
+                    remove_extras: bool = True, ids_fetcher=None,
+                    uid_resolver=None, inviter=None, kicker=None,
+                    bot_uid: str | None = None) -> dict:
+    """Sync a cert-project's Slack channel membership to its certified members:
+    invite missing, kick extras (never ``bot_uid``). ``apply=False`` reports the
+    drift without changing anything. Injectable seams; reports ``not_provisioned``
+    if the project has no channel yet."""
+    cp = _cp.get(project, env)
+    if cp is None:
+        raise CertProvisionError(f"no cert-project named {project!r}")
+    if not cp.slack_channel_id:
+        return {"ok": False, "error": "not_provisioned", "invited": [],
+                "kicked": [], "unresolved": []}
+    ids_fetcher = ids_fetcher or _default_channel_ids_fetcher
+    uid_resolver = uid_resolver or _default_uid_resolver
+    inviter = inviter or _default_inviter
+    kicker = kicker or _default_kicker
+
+    handles = [m.lstrip("@").lower() for m in cp.members]
+    resolved = uid_resolver(handles, member_email_map(handles))
+    desired_uids = {u for u in resolved.values() if u}
+    unresolved = [h for h, u in resolved.items() if not u]
+    actual = set(ids_fetcher(cp.slack_channel_id))
+
+    to_invite = [h for h, u in resolved.items() if u and u not in actual]
+    keep = desired_uids | ({bot_uid} if bot_uid else set())
+    to_kick = sorted(actual - keep) if remove_extras else []
+
+    invited, kicked = [], []
+    if apply:
+        if to_invite:
+            inviter(cp.slack_channel_id, to_invite, member_email_map=member_email_map(to_invite))
+            invited = to_invite
+        for uid in to_kick:
+            ok, _d = kicker(cp.slack_channel_id, uid)
+            if ok:
+                kicked.append(uid)
+    return {"ok": True, "channel_id": cp.slack_channel_id,
+            "invited": invited if apply else [], "to_invite": to_invite,
+            "kicked": kicked if apply else [], "to_kick": to_kick,
+            "unresolved": unresolved,
+            "in_sync": not to_invite and not to_kick}
+
+
+def reconcile_github(project: str, *, env: dict | None = None, apply: bool = True,
+                     remove_extras: bool = True, collaborators_fetcher=None,
+                     adder=None, remover=None, owner_logins=None) -> dict:
+    """Sync a cert-project's GitHub repo collaborators to its certified members:
+    add missing, remove extras (never ``owner_logins`` — the repo owner can't be a
+    collaborator). ``apply=False`` reports drift only. Reports ``not_provisioned``
+    if the project has no repo yet."""
+    cp = _cp.get(project, env)
+    if cp is None:
+        raise CertProvisionError(f"no cert-project named {project!r}")
+    if not (cp.github_repo and "/" in cp.github_repo):
+        return {"ok": False, "error": "not_provisioned", "added": [], "removed": []}
+    org, name = cp.github_repo.split("/", 1)
+    collaborators_fetcher = collaborators_fetcher or _default_collaborators_fetcher
+    adder = adder or _default_collaborator
+    remover = remover or _default_collab_remover
+
+    handles = [m.lstrip("@").lower() for m in cp.members]
+    desired = set(member_github_map(handles).values())
+    actual = set(collaborators_fetcher(org, name))
+    protect = {str(l) for l in (owner_logins or [])}
+
+    to_add = sorted(desired - actual)
+    to_remove = sorted(actual - desired - protect) if remove_extras else []
+
+    added, removed = [], []
+    if apply:
+        for login in to_add:
+            ok, _d = adder(org, name, login)
+            if ok:
+                added.append(login)
+        for login in to_remove:
+            ok, _d = remover(org, name, login)
+            if ok:
+                removed.append(login)
+    return {"ok": True, "repo": cp.github_repo,
+            "added": added if apply else [], "to_add": to_add,
+            "removed": removed if apply else [], "to_remove": to_remove,
+            "in_sync": not to_add and not to_remove}
+
+
 __all__ = ["CertProvisionError", "slack_channel_name", "member_email_map",
-           "member_github_map", "provision_slack", "provision_github", "teardown"]
+           "member_github_map", "provision_slack", "provision_github", "teardown",
+           "reconcile_slack", "reconcile_github"]
