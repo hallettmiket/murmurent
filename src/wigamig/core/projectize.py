@@ -14,9 +14,10 @@ need the same four side effects, in this order:
 
   1. **CHARTER.md** at the clone root — skipped if present (refuses to
      overwrite hand-edited metadata).
-  2. **Lab-mgmt registry** entry at ``lab_mgmt/projects/<name>.md`` —
-     skipped if present. Writing the file does NOT commit it; the user
-     decides when to publish to lab_mgmt.
+  2. **Cert-project registry** entry at ``<lab-mgmt>/cert_projects/<name>.md``
+     (the authoritative project store that replaced the CHARTER-mirror
+     registry) — carries name/lab/sensitivity/lead/members + the clone
+     location (code_repo/host/remote_path) so reconcile can find it.
   3. **Installation manifest** at ``~/.wigamig/installations/<name>.yaml``
      — written every time, carries member + paths + agents picked.
   4. **Layer-2 CC bootstrap** — ``.claude/agents/`` symlinks into the

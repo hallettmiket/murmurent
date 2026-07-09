@@ -6305,7 +6305,10 @@ function HostsModal({ onClose }) {
   const removeHost = async (name) => {
     if (!window.confirm(`Remove host ${name}? (local cannot be removed)`)) return;
     try {
-      const r = await fetch("/api/hosts/" + encodeURIComponent(name), { method: "DELETE" });
+      const _actor = (window.DATA.member && window.DATA.member.handle) || "";
+      const r = await fetch("/api/hosts/" + encodeURIComponent(name)
+        + "?user=" + encodeURIComponent(_actor.replace(/^@/, "")),
+        { method: "DELETE" });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
         throw new Error(j.detail || ("HTTP " + r.status));
@@ -6366,7 +6369,7 @@ function HostsModal({ onClose }) {
                             onClick={() => runTest(h.name)}>
                       {testing[h.name] ? "…" : "test"}
                     </button>
-                    {h.name !== "local" && (
+                    {h.name !== "local" && (window.DATA.persona === "pi") && (
                       <button className="btn sm" onClick={() => removeHost(h.name)}
                               style={{marginLeft:4, color:"var(--red)"}}>remove</button>
                     )}
@@ -6625,7 +6628,7 @@ function MachineCard({ machine, isCurrent, onEditClick, onRemove, onScanDirsSave
           {onEditClick && (
             <button type="button" className="btn sm" onClick={onEditClick}>edit</button>
           )}
-          {onRemove && (
+          {onRemove && (window.DATA.persona === "pi") && (
             <button type="button" className="btn sm" onClick={onRemove}
                     style={{color:"var(--red)"}}>remove</button>
           )}
@@ -6876,7 +6879,10 @@ function MachinesModal({ onClose }) {
   const removeHost = async (name) => {
     if (!window.confirm(`Remove machine "${name}"?`)) return;
     try {
-      const r = await fetch("/api/hosts/" + encodeURIComponent(name), { method: "DELETE" });
+      const _actor = (window.DATA.member && window.DATA.member.handle) || "";
+      const r = await fetch("/api/hosts/" + encodeURIComponent(name)
+        + "?user=" + encodeURIComponent(_actor.replace(/^@/, "")),
+        { method: "DELETE" });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
         throw new Error(j.detail || ("HTTP " + r.status));
@@ -7020,7 +7026,10 @@ function MachinesPanel({ span = "c-5" }) {
   const removeHost = async (name) => {
     if (!window.confirm(`Remove machine "${name}"?`)) return;
     try {
-      const r = await fetch("/api/hosts/" + encodeURIComponent(name), { method: "DELETE" });
+      const _actor = (window.DATA.member && window.DATA.member.handle) || "";
+      const r = await fetch("/api/hosts/" + encodeURIComponent(name)
+        + "?user=" + encodeURIComponent(_actor.replace(/^@/, "")),
+        { method: "DELETE" });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
         throw new Error(j.detail || ("HTTP " + r.status));
