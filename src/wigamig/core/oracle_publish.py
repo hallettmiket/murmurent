@@ -137,6 +137,122 @@ def iter_vault_drafts() -> list[Path]:
 
 
 # ---------------------------------------------------------------------------
+# Read-access probe (Full Disk Access diagnosis)
+# ---------------------------------------------------------------------------
+
+# The macOS Full Disk Access (TCC) hint. iCloud-backed Obsidian vaults
+# under ``~/Library/Mobile Documents/`` are TCC-protected: Obsidian can
+# read them, but the terminal + ``claude`` + the MCP server process may
+# not. When that happens the oracle MCP degrades silently to an empty
+# personal/notebook tier (by design, so a sandbox denial never crashes
+# search) — which looks exactly like "no entries yet". This probe exists
+# so the failure is *loud and actionable* instead of invisible.
+_FDA_HINT = (
+    "cannot read the Obsidian vault at {path}: Operation not permitted.\n"
+    "This is almost always macOS Full Disk Access: iCloud-backed vaults "
+    "under ~/Library/Mobile Documents/ are TCC-protected.\n"
+    "Fix: System Settings -> Privacy & Security -> Full Disk Access, then "
+    "grant access to your terminal app AND the `claude` binary, then retry."
+)
+
+# Probe status vocabulary. ``blocked`` is the one that matters — it means
+# the dir resolved but reads are denied (the FDA case). The others are
+# benign / informational.
+PROBE_OK = "ok"                    # resolved + a real .md read succeeded
+PROBE_EMPTY = "empty"             # resolved + readable, but no entries yet
+PROBE_MISSING = "missing"        # resolved, but the dir doesn't exist yet
+PROBE_UNREGISTERED = "unregistered"  # no vault registered on this machine
+PROBE_BLOCKED = "blocked"        # resolved, but reads denied (EPERM / FDA)
+
+
+@dataclass(frozen=True)
+class VaultProbe:
+    """Outcome of :func:`probe_personal_oracle`.
+
+    ``status`` is one of the ``PROBE_*`` constants. ``ok`` for the caller
+    means the vault is genuinely readable on this machine; ``blocked`` is
+    the loud Full-Disk-Access failure the CLI surfaces non-zero.
+    """
+
+    status: str
+    detail: str
+    path: str | None = None       # the resolved oracle dir, when known
+    sample: str | None = None     # the .md file we managed (or tried) to read
+
+
+def probe_personal_oracle() -> VaultProbe:
+    """Resolve the personal Oracle dir and try to actually *read* a file.
+
+    Unlike :func:`personal_oracle_dir` (which only resolves a path from
+    ``obsidian.json`` and never touches the vault), this walks into the
+    dir and reads one ``.md`` entry so a Full Disk Access denial surfaces
+    as :data:`PROBE_BLOCKED` instead of the MCP's silent empty result.
+
+    Never raises — every failure mode maps to a ``VaultProbe`` the CLI /
+    dashboard can render.
+    """
+    try:
+        d = personal_oracle_dir()
+    except OracleError as exc:
+        return VaultProbe(status=PROBE_UNREGISTERED, detail=str(exc))
+
+    # ``exists()`` swallows OSError and returns False, so a TCC denial on
+    # the parent can masquerade as "missing". Probe the read explicitly
+    # below and let a PermissionError there be the authoritative signal.
+    try:
+        exists = d.exists()
+    except OSError:
+        return VaultProbe(
+            status=PROBE_BLOCKED, detail=_FDA_HINT.format(path=d), path=str(d),
+        )
+    if not exists:
+        return VaultProbe(
+            status=PROBE_MISSING,
+            detail=(
+                f"personal Oracle dir does not exist yet: {d}\n"
+                "(the Oracle agent creates it on first write, or it may be "
+                "an unreadable iCloud path — run this after granting Full "
+                "Disk Access if you expected entries)"
+            ),
+            path=str(d),
+        )
+
+    # List entries; a denial here is the classic iCloud/FDA symptom
+    # (the dir stats fine but its contents can't be enumerated).
+    try:
+        md_files = sorted(p for p in d.rglob("*.md") if p.is_file())
+    except (OSError, PermissionError):
+        return VaultProbe(
+            status=PROBE_BLOCKED, detail=_FDA_HINT.format(path=d), path=str(d),
+        )
+    if not md_files:
+        return VaultProbe(
+            status=PROBE_EMPTY,
+            detail=f"Oracle dir is readable but has no .md entries yet: {d}",
+            path=str(d),
+        )
+
+    # Actually read one entry — enumeration can succeed while per-file
+    # reads are denied on some sandbox configurations.
+    sample = md_files[0]
+    try:
+        sample.read_text(encoding="utf-8")
+    except (OSError, PermissionError):
+        return VaultProbe(
+            status=PROBE_BLOCKED,
+            detail=_FDA_HINT.format(path=d),
+            path=str(d),
+            sample=str(sample),
+        )
+    return VaultProbe(
+        status=PROBE_OK,
+        detail=f"read {sample.name} successfully — vault is accessible",
+        path=str(d),
+        sample=str(sample),
+    )
+
+
+# ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
 

@@ -1343,6 +1343,41 @@ def oracle_path_cmd() -> None:
         raise click.ClickException(str(exc)) from exc
 
 
+@oracle_group.command(
+    "doctor",
+    help="Check that wigamig can actually READ your Obsidian vault "
+         "(diagnoses the macOS Full Disk Access failure on iCloud vaults).",
+)
+def oracle_doctor_cmd() -> None:
+    """Probe the personal Oracle dir for real read access.
+
+    ``wigamig oracle path`` only resolves a path from Obsidian's registry
+    — it never touches the vault, so it "works" even when reads are
+    blocked. This command walks in and reads an entry, turning the MCP's
+    silent degrade-to-empty into a loud, actionable error. Exits non-zero
+    when access is blocked so scripts / CI can gate on it.
+    """
+    from .core import oracle_publish as _op
+
+    probe = _op.probe_personal_oracle()
+    label = {
+        _op.PROBE_OK: "[green]OK[/green]",
+        _op.PROBE_EMPTY: "[green]OK[/green] (empty)",
+        _op.PROBE_MISSING: "[yellow]MISSING[/yellow]",
+        _op.PROBE_UNREGISTERED: "[yellow]NO VAULT[/yellow]",
+        _op.PROBE_BLOCKED: "[bold red]BLOCKED[/bold red]",
+    }.get(probe.status, probe.status)
+    console = Console()
+    if probe.path:
+        console.print(f"Personal Oracle dir: {probe.path}")
+    console.print(f"Read access: {label}")
+    # A blocked read is the failure worth shouting about — surface it as a
+    # non-zero ClickException so it can't be mistaken for "no entries".
+    if probe.status == _op.PROBE_BLOCKED:
+        raise click.ClickException(probe.detail)
+    console.print(probe.detail)
+
+
 @oracle_group.command("vault-drafts", help="List personal-vault Oracle drafts awaiting publish.")
 def oracle_vault_drafts_cmd() -> None:
     from .core import oracle_publish as _op
