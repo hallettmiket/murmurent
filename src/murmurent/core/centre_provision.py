@@ -9,7 +9,7 @@ concerns the user flagged in item (0) of the post-smoke design
 conversation:
 
   - **Per-project filesystem ACLs** on shared lab servers via a
-    sudo-grantable script (``/opt/wigamig/wigamig_project_acl.sh``).
+    sudo-grantable script (``/opt/wigamig/murmurent_project_acl.sh``).
   - **Cross-lab membership tracking** so a project's member set is
     declared once, regardless of which labs the members come from.
   - **Reconcile loop** that diffs desired state (the project's
@@ -61,7 +61,7 @@ from .registrar import (
 
 
 PROJECTS_SUBDIR = "projects"
-ACL_SUDO_SCRIPT = "/opt/wigamig/wigamig_project_acl.sh"
+ACL_SUDO_SCRIPT = "/opt/wigamig/murmurent_project_acl.sh"
 
 
 class CentreProvisionError(RuntimeError):
@@ -249,10 +249,10 @@ def apply_fs_acl(
     """Apply the ACL grant for ``project``'s members on ``machine``.
 
     Invokes ``WIGAMIG_PROJECT_ACL_SCRIPT`` (default
-    ``/opt/wigamig/wigamig_project_acl.sh``) via sudo. The script is
+    ``/opt/wigamig/murmurent_project_acl.sh``) via sudo. The script is
     expected to be present on the lab server with a NOPASSWD sudoers
     entry; the sysadmin installs it once (see
-    ``scripts/wigamig_project_acl.sh`` in the murmurent repo for the
+    ``scripts/murmurent_project_acl.sh`` in the murmurent repo for the
     template).
 
     When ``machine`` is None, runs locally. Otherwise wraps in ssh.

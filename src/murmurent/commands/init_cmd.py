@@ -104,7 +104,7 @@ def run_init() -> None:
         else:
             click.echo("  • Self-issue your PI ID any time:  murmurent pi-init <lab-name>")
         click.echo("  • Optional — to join a centre, register with its mayor "
-                   "(https://github.com/hallettmiket/wigamig_public → wigamig-join.sh). "
+                   "(https://github.com/hallettmiket/murmurent_public → murmurent-join.sh). "
                    "That's a SEPARATE, centre-level PI ID; your members keep working.")
     else:  # mayor
         click.echo("  • Bootstrap your centre — the dashboard has a one-time setup form:")

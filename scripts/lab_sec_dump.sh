@@ -6,7 +6,7 @@
 #          Writes one timestamped directory per run; never overwrites
 #          history.
 # Install: root:root mode 0755 at /opt/wigamig/lab_sec_dump.sh.
-#          Granted via /etc/sudoers.d/wigamig_sec_dump (see template).
+#          Granted via /etc/sudoers.d/murmurent_sec_dump (see template).
 # Invoke:  `sudo -n /opt/wigamig/lab_sec_dump.sh`
 #          REFUSES ARGUMENTS — keeps the sudo grant a single fixed
 #          command with no parameter-injection surface.

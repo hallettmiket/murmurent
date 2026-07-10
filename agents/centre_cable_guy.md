@@ -128,7 +128,7 @@ Reads `<lab_info>/projects/<project>.md` for the desired member set
 2. **GitHub repo**: defer to `core.project_provision.provision_project_remote`
    (existing logic — don't duplicate). You just call it.
 3. **Filesystem ACLs**: for each registered lab server, run
-   `/opt/wigamig/wigamig_project_acl.sh` via sudo to create
+   `/opt/wigamig/murmurent_project_acl.sh` via sudo to create
    `<lab_vm_root>/wigamig/{raw,refined}/<project>/` with an
    inheriting ACE granting `r-x` to the project's Unix group and
    `r-x-c` to the core's group when applicable.
@@ -190,7 +190,7 @@ up centre-scope access.
   archive the channel rather than delete; the registrar can restore.
 - **ACL changes go through the sudo script.** You don't run
   `nfs4_setfacl` directly. The script
-  `/opt/wigamig/wigamig_project_acl.sh` is the only place that has
+  `/opt/wigamig/murmurent_project_acl.sh` is the only place that has
   the privilege, and it logs every invocation.
 - **One project at a time.** Reconcile loops process projects
   sequentially so a single bad ACL doesn't cascade.

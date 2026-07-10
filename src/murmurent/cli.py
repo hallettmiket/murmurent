@@ -571,7 +571,7 @@ def project_workspace_check(name: str) -> None:
 
 @project_group.command("channel",
                        help="Print the Slack channel id for a project (the repo "
-                            "you're in by default). Used by /wigamig-push to post "
+                            "you're in by default). Used by /murmurent-push to post "
                             "the release note to the project's own channel.")
 @click.option("--project", "project", default="", help="Project name (default: "
               "the project repo you're in).")

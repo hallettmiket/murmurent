@@ -9,7 +9,7 @@ breakdowns, code listings) follows after one blank line.
 
 The murmurent VSCode workflow shows live subagent activity in the BR
 (bottom-right) pane via `tail -F ~/.wigamig/agents.log`. The hook
-handler ([scripts/wigamig_log_agent_event.sh](../scripts/wigamig_log_agent_event.sh))
+handler ([scripts/murmurent_log_agent_event.sh](../scripts/murmurent_log_agent_event.sh))
 captures each subagent's `last_assistant_message` on `SubagentStop`,
 strips newlines, and truncates to 200 chars. Whatever sits in the
 first 200 chars of your reply is the *only* thing the user sees in

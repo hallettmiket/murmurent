@@ -224,9 +224,9 @@ def _cc_settings_for_ssh_template() -> str:
     via an *unquoted* heredoc on the remote so ``$WIG`` expands to
     ``$HOME/repos/wigamig`` at runtime — the script sets ``WIG`` just
     above this block. The hook path therefore comes out as e.g.
-    ``/home/UWO/mhallet/repos/wigamig/scripts/wigamig_log_agent_event.sh``,
+    ``/home/UWO/mhallet/repos/wigamig/scripts/murmurent_log_agent_event.sh``,
     which is what we want on every host."""
-    cmd = "$WIG/scripts/wigamig_log_agent_event.sh"
+    cmd = "$WIG/scripts/murmurent_log_agent_event.sh"
     return (
         '{\n'
         '  "//": "Per-project CC hooks for the murmurent subagent reporter.",\n'

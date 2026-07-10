@@ -38,7 +38,7 @@ def world(monkeypatch, tmp_path):
     (commons / "agents").mkdir(parents=True)
     (commons / "agents" / "blacksmith.md").write_text("# blacksmith\n")
     (commons / "scripts").mkdir(parents=True)
-    (commons / "scripts" / "wigamig_log_agent_event.sh").write_text("#!/usr/bin/env bash\n")
+    (commons / "scripts" / "murmurent_log_agent_event.sh").write_text("#!/usr/bin/env bash\n")
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("WIGAMIG_REPO_ROOT", str(commons))
     proj = home / "repos" / "demo"
@@ -169,4 +169,4 @@ def test_ssh_chrome_writes_appear_in_remote_adopt_script():
     # Hook path is resolved at remote-runtime via $WIG (script sets
     # it to $HOME/repos/wigamig); the literal $WIG/scripts/... must
     # appear so the unquoted heredoc expands it correctly.
-    assert "$WIG/scripts/wigamig_log_agent_event.sh" in s
+    assert "$WIG/scripts/murmurent_log_agent_event.sh" in s

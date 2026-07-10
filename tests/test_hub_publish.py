@@ -10,7 +10,7 @@ from murmurent.core import hub_publish as H
 
 
 DIRECTORY = (
-    "# murmurent institution directory — machine-readable, read by wigamig-join.sh.\n"
+    "# murmurent institution directory — machine-readable, read by murmurent-join.sh.\n"
     "# institution\temail\tage_recipient\n"
     "Western University (Bioconvergence Centre)\n"
 )
@@ -144,8 +144,8 @@ def _runner(responses=None, record=None):
 
 
 @pytest.mark.parametrize("url,slug", [
-    ("https://github.com/hallettmiket/wigamig_public.git", "hallettmiket/wigamig_public"),
-    ("git@github.com:hallettmiket/wigamig_public.git", "hallettmiket/wigamig_public"),
+    ("https://github.com/hallettmiket/murmurent_public.git", "hallettmiket/murmurent_public"),
+    ("git@github.com:hallettmiket/murmurent_public.git", "hallettmiket/murmurent_public"),
     ("https://github.com/foo/bar", "foo/bar"),
 ])
 def test_parse_upstream_slug(url, slug):
@@ -179,15 +179,15 @@ def test_submit_direct_sequence(tmp_path):
 def test_submit_pr_sequence(tmp_path):
     rec = []
     resp = {"api user": _Proc(0, "mhallet\n"),
-            "pr create": _Proc(0, "https://github.com/hallettmiket/wigamig_public/pull/7\n")}
-    res = H.submit_pr(tmp_path, "hallettmiket/wigamig_public", branch="list-nirvana",
+            "pr create": _Proc(0, "https://github.com/hallettmiket/murmurent_public/pull/7\n")}
+    res = H.submit_pr(tmp_path, "hallettmiket/murmurent_public", branch="list-nirvana",
                       message="m", title="t", body="b", runner=_runner(resp, rec))
     assert res.mode == "pr" and res.detail.endswith("/pull/7")
     joined = [" ".join(c) for c in rec]
-    assert any("repo fork hallettmiket/wigamig_public --remote --remote-name fork" in j for j in joined)
+    assert any("repo fork hallettmiket/murmurent_public --remote --remote-name fork" in j for j in joined)
     assert any("checkout -B list-nirvana" in j for j in joined)
     assert any("push -u fork list-nirvana --force" in j for j in joined)
-    assert any("pr create --repo hallettmiket/wigamig_public --head mhallet:list-nirvana" in j for j in joined)
+    assert any("pr create --repo hallettmiket/murmurent_public --head mhallet:list-nirvana" in j for j in joined)
 
 
 def test_submit_pr_reuses_existing_pr(tmp_path):
@@ -221,7 +221,7 @@ def test_command_submit_publishes_even_when_files_unchanged(monkeypatch, tmp_pat
         hub_dir=tmp_path, cloned=False, directory_action="unchanged",
         readme_action="unchanged", row="Western University (Western Samadhi)\tm@uwo.ca\tage1abc"))
     monkeypatch.setattr(H, "gh_available", lambda *a, **k: True)
-    monkeypatch.setattr(H, "upstream_slug", lambda *a, **k: "hallettmiket/wigamig_public")
+    monkeypatch.setattr(H, "upstream_slug", lambda *a, **k: "hallettmiket/murmurent_public")
     monkeypatch.setattr(H, "can_push", lambda *a, **k: True)
     called = {}
     def fake_direct(hub_dir, msg, **k):

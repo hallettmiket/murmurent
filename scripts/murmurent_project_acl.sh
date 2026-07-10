@@ -5,12 +5,12 @@
 #
 # Install:
 #   1. As root on the lab server:
-#        install -m 0755 wigamig_project_acl.sh /opt/wigamig/wigamig_project_acl.sh
+#        install -m 0755 murmurent_project_acl.sh /opt/wigamig/murmurent_project_acl.sh
 #   2. Add a sudoers fragment so a specific service account can run it
 #      without a password:
-#        echo '<user> ALL=(root) NOPASSWD: /opt/wigamig/wigamig_project_acl.sh' \
-#          > /etc/sudoers.d/wigamig_project_acl
-#        chmod 0440 /etc/sudoers.d/wigamig_project_acl
+#        echo '<user> ALL=(root) NOPASSWD: /opt/wigamig/murmurent_project_acl.sh' \
+#          > /etc/sudoers.d/murmurent_project_acl
+#        chmod 0440 /etc/sudoers.d/murmurent_project_acl
 #
 # Behavior:
 #   - Creates <LAB_VM_ROOT>/wigamig/{raw,refined}/<project>/ if missing.
@@ -42,7 +42,7 @@ log() {
 }
 
 die() {
-  printf 'wigamig_project_acl: ERROR: %s\n' "$*" >&2
+  printf 'murmurent_project_acl: ERROR: %s\n' "$*" >&2
   log "ERROR $*"
   exit 1
 }

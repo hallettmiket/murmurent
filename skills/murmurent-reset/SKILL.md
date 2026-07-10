@@ -1,5 +1,5 @@
 ---
-name: wigamig-reset
+name: murmurent-reset
 description: Back up, then reset murmurent machine state to a fresh start so `murmurent centre-init` runs first-run again. Tiered (centre / install / full) with a mandatory backup, a dry-run preview, and credentials + other-project installs protected behind explicit --nuke flags. Use when the user wants a clean slate / fresh copy from the repo.
 user_invocable: true
 ---
@@ -77,8 +77,8 @@ base/envs + pipx and removes any murmurent it finds. Working clones under
    never infer those.
 
 2. **Dry-run first, always.** Run:
-   `bash ~/.claude/skills/wigamig-reset/reset.sh --level <lvl> --dry-run [nukes]`
-   (or the repo path `skills/wigamig-reset/reset.sh`). Show the user the exact
+   `bash ~/.claude/skills/murmurent-reset/reset.sh --level <lvl> --dry-run [nukes]`
+   (or the repo path `skills/murmurent-reset/reset.sh`). Show the user the exact
    list of what it would remove and the backup path.
 
 3. **Confirm, then execute.** Only after the user is happy, re-run with `--yes`

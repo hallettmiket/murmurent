@@ -1,7 +1,7 @@
 """Prepare this centre's listing in the public ``murmurent_public`` hub.
 
 A brand-new mayor is listed on the public directory by adding one row to
-``join/directory.tsv`` (machine-readable, read by ``wigamig-join.sh``) and one
+``join/directory.tsv`` (machine-readable, read by ``murmurent-join.sh``) and one
 row to the README table (human-readable). This module automates the mechanical
 parts — clone the hub if it isn't already local, then add/update the centre's
 row in both files — but deliberately stops **before** ``git commit``/``push``:
@@ -78,7 +78,7 @@ class HubPublishResult:
 
 def default_hub_dir() -> Path:
     """Where the mayor's working clone of the public hub lives."""
-    return Path.home() / "repos" / "wigamig_public"
+    return Path.home() / "repos" / "murmurent_public"
 
 
 def directory_label(institution: str, name: str) -> str:

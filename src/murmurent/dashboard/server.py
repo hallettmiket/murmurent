@@ -1233,7 +1233,7 @@ def create_app() -> FastAPI:
                 ),
             }
 
-        # ---- Local project: open via scripts/open_wigamig.sh ----
+        # ---- Local project: open via scripts/open_murmurent.sh ----
         # The newer launcher (2026-05-17) detects monitors via JXA+AppKit
         # and positions the window at 80% of the chosen display
         # (external if attached, else laptop). It does NOT spawn iTerm
@@ -1242,7 +1242,7 @@ def create_app() -> FastAPI:
         # start_workspace.sh remains in the tree for the iTerm-windows
         # workflow but is no longer the dashboard's default.
         project_dir = project_path(body.project)
-        script = wigamig_repo_root() / "scripts" / "open_wigamig.sh"
+        script = wigamig_repo_root() / "scripts" / "open_murmurent.sh"
         if not script.is_file():
             raise HTTPException(status_code=500, detail=f"launcher missing: {script}")
 
@@ -1267,7 +1267,7 @@ def create_app() -> FastAPI:
             "sea_id": body.sea_id,
             "cmd": cmd,
             "note": (
-                "Launched via open_wigamig.sh — VSCode opens at 80% of "
+                "Launched via open_murmurent.sh — VSCode opens at 80% of "
                 "the chosen display. Arrange the 4 quadrants once and "
                 "VSCode persists the layout per folder."
             ),
@@ -2538,8 +2538,8 @@ def create_app() -> FastAPI:
                 "error": "sudoers entry not installed on " + host_name,
                 "remediation": (
                     "Ask your sysadmin to install "
-                    "/etc/sudoers.d/wigamig_sec_dump from the template at "
-                    "scripts/sudoers.d/wigamig_sec_dump in this repo. "
+                    "/etc/sudoers.d/murmurent_sec_dump from the template at "
+                    "scripts/sudoers.d/murmurent_sec_dump in this repo. "
                     "See docs/security-dashboard.md#tier-2-setup."
                 ),
                 "stderr": res.stderr.strip()[:500],
@@ -7159,7 +7159,7 @@ def create_app() -> FastAPI:
         def dashboard_index() -> HTMLResponse:
             """Member / PI lab dashboard. Reached from the login page
             with ``?user=<handle>&persona=member|pi``."""
-            return _html_page("Wigamig Dashboard Hi-Fi.html")
+            return _html_page("Murmurent Dashboard Hi-Fi.html")
 
         @app.get("/registrar", response_class=HTMLResponse)
         def registrar_index() -> HTMLResponse:

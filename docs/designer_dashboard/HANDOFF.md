@@ -5,9 +5,9 @@ This package contains the design spec for the redesigned murmurent dashboard. It
 ## Files in this handoff
 | file | role |
 |---|---|
-| `Wigamig Dashboard Hi-Fi.html` | the source of truth — open in a browser to see the live design |
-| `Wigamig Dashboard Wireframes.html` | exploration phase — 4 layout directions; "Command Bridge" was selected |
-| `hifi-data.jsx` | mock data shape — mirror this in `wigamig.core.dashboard.DashboardSnapshot` |
+| `Murmurent Dashboard Hi-Fi.html` | the source of truth — open in a browser to see the live design |
+| `Murmurent Dashboard Wireframes.html` | exploration phase — 4 layout directions; "Command Bridge" was selected |
+| `hifi-data.jsx` | mock data shape — mirror this in `murmurent.core.dashboard.DashboardSnapshot` |
 | `hifi-app.jsx` | top-level layout + all section panels |
 | `hifi-notebook.jsx` | the lab-notebook entry view (Obsidian-style daily notes) |
 | `HANDOFF.md` | this file |

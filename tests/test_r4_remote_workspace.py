@@ -284,7 +284,7 @@ def _seed_local_for_launch(repos: Path, lab_mgmt: Path, name: str = "loc") -> No
 
 def test_workspace_launch_local_uses_open_wigamig_sh(world, monkeypatch):
     """The dashboard's local-project launch now invokes
-    scripts/open_wigamig.sh — the 80%-window launcher with monitor
+    scripts/open_murmurent.sh — the 80%-window launcher with monitor
     detection — instead of the older scripts/start_workspace.sh that
     spawned a VSCode + iTerm 65/35 split. The agent-log role moved
     into VSCode's BR pane via the murmurent hook, so iTerm windows are
@@ -311,10 +311,10 @@ def test_workspace_launch_local_uses_open_wigamig_sh(world, monkeypatch):
     assert res.status_code == 200, res.text
     body = res.json()
     assert body["ok"] is True
-    assert body["launcher"].endswith("/open_wigamig.sh")
+    assert body["launcher"].endswith("/open_murmurent.sh")
     # First argv element is the launcher; second is the project dir.
     assert launched["argv"] is not None
-    assert launched["argv"][0].endswith("/open_wigamig.sh")
+    assert launched["argv"][0].endswith("/open_murmurent.sh")
     assert launched["argv"][1].endswith("/loc")
 
 

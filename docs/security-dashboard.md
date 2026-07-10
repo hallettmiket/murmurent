@@ -253,7 +253,7 @@ carries the core's short id in its `project` field. Categories:
 
 Murmurent ships [`scripts/lab_sec_dump.sh`](../scripts/lab_sec_dump.sh)
 (the root-owned snapshot script) and
-[`scripts/sudoers.d/wigamig_sec_dump`](../scripts/sudoers.d/wigamig_sec_dump)
+[`scripts/sudoers.d/murmurent_sec_dump`](../scripts/sudoers.d/murmurent_sec_dump)
 (the NOPASSWD grant template, currently authorising `mhallet` and
 `vdumeaux`). One-time install on the target host:
 
@@ -267,25 +267,25 @@ git pull
 #    Defence-in-depth: detects in-flight tampering before the script
 #    runs as root. Mismatch -> STOP, do not install.
 (cd scripts && shasum -a 256 -c lab_sec_dump.sh.sha256)
-(cd scripts/sudoers.d && shasum -a 256 -c wigamig_sec_dump.sha256)
+(cd scripts/sudoers.d && shasum -a 256 -c murmurent_sec_dump.sha256)
 # Expected (both):
 #   lab_sec_dump.sh: OK
-#   wigamig_sec_dump: OK
+#   murmurent_sec_dump: OK
 
 # 3. Install the root-owned snapshot script.
 sudo install -m 0755 -o root -g root \
     scripts/lab_sec_dump.sh /opt/wigamig/lab_sec_dump.sh
 
-# 4. Install the sudoers grant. Edit scripts/sudoers.d/wigamig_sec_dump
+# 4. Install the sudoers grant. Edit scripts/sudoers.d/murmurent_sec_dump
 #    first if the authorised handles need to change.
 sudo install -m 0440 -o root -g root \
-    scripts/sudoers.d/wigamig_sec_dump /etc/sudoers.d/wigamig_sec_dump
+    scripts/sudoers.d/murmurent_sec_dump /etc/sudoers.d/murmurent_sec_dump
 
 # 5. Validate the sudoers file (REQUIRED — a bad sudoers file can lock
 #    everyone out of sudo).
-sudo visudo -c -f /etc/sudoers.d/wigamig_sec_dump
+sudo visudo -c -f /etc/sudoers.d/murmurent_sec_dump
 # Expected:
-#   /etc/sudoers.d/wigamig_sec_dump: parsed OK
+#   /etc/sudoers.d/murmurent_sec_dump: parsed OK
 
 # 6. Smoke test — no password should be prompted.
 sudo -n /opt/wigamig/lab_sec_dump.sh
@@ -342,14 +342,14 @@ cron to prune `.snapshot/` entries older than N months.
 
 ### Authorising more people
 
-Edit `/etc/sudoers.d/wigamig_sec_dump` (via `sudo visudo -f`) and add a
+Edit `/etc/sudoers.d/murmurent_sec_dump` (via `sudo visudo -f`) and add a
 line in the same form:
 
 ```
 new_handle  ALL=(root) NOPASSWD: /opt/wigamig/lab_sec_dump.sh
 ```
 
-Then run `sudo visudo -c -f /etc/sudoers.d/wigamig_sec_dump` to validate.
+Then run `sudo visudo -c -f /etc/sudoers.d/murmurent_sec_dump` to validate.
 
 ### Adjusting the lab tree being audited
 
