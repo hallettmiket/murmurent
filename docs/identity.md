@@ -58,10 +58,9 @@ below to fetch it from the public hub instead).
 
 **Sending `enroll.json` to your PI** is unauthenticated hand-off — murmurent
 can't automate the member→PI leg, since the PI has to be the one who decides
-to trust you. `enroll` prints the concrete next step: if you're already in
-your lab's Slack workspace (you usually are), **DM your PI the file
-directly**; otherwise email or paste it works fine too. Either way your PI
-needs the file/JSON in hand before they can run `issue-member-card`.
+to trust you. `enroll` prints the concrete next step: **DM your PI the file
+directly on Slack** (you're already in your lab's workspace). Your PI needs
+the file/JSON in hand before they can run `issue-member-card`.
 
 ## Vouching for a member (PI / group registrar)
 

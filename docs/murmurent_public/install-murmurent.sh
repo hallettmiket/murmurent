@@ -8,8 +8,12 @@
 #   5. registers the murmurent hooks + tools.
 #
 # You do NOT need to be approved for a centre to run this — the code is public.
-# This just gets your machine ready. Joining a lab/core still happens by email
-# (see murmurent-join.sh) and the Mayor's reply.
+# This just gets your machine ready. What happens next depends on your role —
+# `murmurent init` (offered at the end, or run any time) asks and walks you
+# through it: members ask their PI for a membership ID over Slack (no email,
+# no mayor involved), PIs can self-issue their own lab's ID immediately (no
+# mayor needed) or register their lab with an institution's mayor by email
+# (see murmurent-join.sh), and mayors bootstrap a whole new centre.
 #
 #   Download + run:
 #     curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/murmurent_public/main/install-murmurent.sh
@@ -109,10 +113,25 @@ main() {
   say "If 'murmurent' isn't found yet, close and reopen your terminal (uv adds"
   say "it to your PATH). Check it with:  murmurent --version"
   say ""
-  say "Next: watch your email for the Mayor's reply + your Slack invite. Once"
-  say "you're added to your lab/core, the rest of onboarding is walked through"
-  say "for you there."
+  say "Run the one-time setup. It picks your role (member / PI / mayor) and"
+  say "collects the info to initialise your session:"
+  say ""
+  say "    murmurent init"
+  say ""
+  say "(Members ask their PI for a membership ID — no mayor involved; PIs can"
+  say "self-issue their own lab's ID immediately, or register it with a mayor;"
+  say "only mayors bootstrap a centre. 'murmurent init' walks you through your"
+  say "path.)"
   say "──────────────────────────────────────────────────────────────────────"
+
+  if [ -t 0 ] && command -v murmurent >/dev/null 2>&1; then
+    case "$(ask "Run 'murmurent init' now? [Y/n] ")" in
+      n*|N*) say "OK. Run 'murmurent init' when you're ready." ;;
+      *) murmurent init ;;
+    esac
+  else
+    say "Run 'murmurent init' when you're ready."
+  fi
 }
 
 main "$@"
