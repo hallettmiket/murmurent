@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# Purpose: One-command install of wigamig for ANYONE — member, PI, or mayor.
-#          Installs the CLI + commons + hooks, then hands off to `wigamig init`,
+# Purpose: One-command install of murmurent for ANYONE — member, PI, or mayor.
+#          Installs the CLI + commons + hooks, then hands off to `murmurent init`,
 #          the one-time role-picker that sets up your session. This script does
 #          NOT assume you are the mayor.
 # Author:  Mike Hallett (with Claude Code)
@@ -9,19 +9,19 @@
 # Two ways to run it:
 #
 #   A. Convenience one-liner (repo is public — no clone needed first):
-#        curl -fsSL https://raw.githubusercontent.com/hallettmiket/wigamig/main/scripts/bootstrap.sh | bash
+#        curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts/bootstrap.sh | bash
 #
 #   B. Inspect-then-run (recommended): clone first, read this file, then:
-#        git clone https://github.com/hallettmiket/wigamig ~/repos/wigamig
+#        git clone https://github.com/hallettmiket/murmurent ~/repos/wigamig
 #        cd ~/repos/wigamig && ./scripts/bootstrap.sh
 #
 # What it does (each step is idempotent — safe to re-run):
 #   1. Checks prerequisites (git, uv — installs uv if missing; warns about
 #      Claude Code + gh, which need interactive login and can't be automated).
 #   2. Clones or updates ~/repos/wigamig (skipped if run from inside a clone).
-#   3. Installs the wigamig CLI (`uv tool install`).
+#   3. Installs the murmurent CLI (`uv tool install`).
 #   4. Wires the commons into ~/.claude/ (agents, rules, skills) via setup.sh.
-#   5. Registers the data-governance hooks + MCP servers (`wigamig install --hooks`).
+#   5. Registers the data-governance hooks + MCP servers (`murmurent install --hooks`).
 #   6. Prints the next step: launch the dashboard and fill the centre-setup form.
 #
 # What it deliberately does NOT do (out of scope / needs a human):
@@ -37,7 +37,7 @@
 
 set -euo pipefail
 
-REPO_URL="https://github.com/hallettmiket/wigamig.git"
+REPO_URL="https://github.com/hallettmiket/murmurent.git"
 REPO_DIR="${WIGAMIG_REPO_DIR:-$HOME/repos/wigamig}"
 BRANCH="${WIGAMIG_BRANCH:-main}"
 
@@ -57,7 +57,7 @@ if [[ -n "$SELF" && -f "$SELF" ]]; then
   fi
 fi
 
-echo "wigamig install"
+echo "murmurent install"
 echo "repo dir: $REPO_DIR   branch: $BRANCH"
 
 # ── 1. Prerequisites ─────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ if command -v claude >/dev/null 2>&1; then
   ok "Claude Code: present"
 else
   warn "Claude Code CLI not found. Install it from https://claude.com/claude-code"
-  warn "and run it once to log in (OAuth). wigamig agents need it, but this"
+  warn "and run it once to log in (OAuth). murmurent agents need it, but this"
   warn "installer will still finish; you can add Claude Code afterwards."
 fi
 
@@ -101,7 +101,7 @@ else
 fi
 
 # ── 2. Source ────────────────────────────────────────────────────────────────
-step "2/6 wigamig source at $REPO_DIR"
+step "2/6 murmurent source at $REPO_DIR"
 if [[ "${RUN_FROM_CLONE:-0}" == "1" ]]; then
   ok "running from an existing clone — not re-cloning"
 elif [[ -d "$REPO_DIR/.git" ]]; then
@@ -117,16 +117,16 @@ else
 fi
 
 # ── 3. CLI ───────────────────────────────────────────────────────────────────
-step "3/6 installing the wigamig CLI"
+step "3/6 installing the murmurent CLI"
 # Install EDITABLE (-e) from the working clone: a non-editable `uv tool install .`
 # relocates the package into site-packages, where the dashboard's static assets
 # (docs/designer_dashboard/, not shipped in the wheel) can't be found -> the
-# hi-fi dashboard 500s. Pin 3.12 (wigamig needs >=3.12). Dashboard/Slack/MCP
+# hi-fi dashboard 500s. Pin 3.12 (murmurent needs >=3.12). Dashboard/Slack/MCP
 # deps are hard deps in pyproject, so they come along automatically.
 ( cd "$REPO_DIR" && uv tool install --reinstall --python 3.12 -e . >/dev/null )
 export PATH="$HOME/.local/bin:$PATH"
-command -v wigamig >/dev/null 2>&1 || fail "wigamig not on PATH after install (check ~/.local/bin)"
-ok "wigamig: $(wigamig --version 2>/dev/null | head -1)"
+command -v murmurent >/dev/null 2>&1 || fail "murmurent not on PATH after install (check ~/.local/bin)"
+ok "murmurent: $(murmurent --version 2>/dev/null | head -1)"
 
 # ── 4. Commons ───────────────────────────────────────────────────────────────
 step "4/6 wiring the commons into ~/.claude/ (agents, rules, skills)"
@@ -134,26 +134,26 @@ bash "$REPO_DIR/scripts/setup.sh"
 
 # ── 5. Hooks + MCP ───────────────────────────────────────────────────────────
 step "5/6 registering data-governance hooks + MCP servers"
-wigamig install --hooks
+murmurent install --hooks
 
 # ── 6. Set up your session ───────────────────────────────────────────────────
-step "6/6 wigamig is installed — now set up your session"
+step "6/6 murmurent is installed — now set up your session"
 cat <<'EOF'
   Run the one-time setup. It picks your role (member / PI / mayor) and collects
   the info to initialise your session:
 
-      wigamig init
+      murmurent init
 
   (Members ask their PI for a membership ID; PIs register with their mayor;
-   only mayors bootstrap a centre. `wigamig init` walks you through your path.)
+   only mayors bootstrap a centre. `murmurent init` walks you through your path.)
 EOF
 
 if [[ "${NO_LAUNCH:-0}" != "1" && -t 0 ]]; then
-  printf "\nRun `wigamig init` now? [Y/n] "
+  printf "\nRun `murmurent init` now? [Y/n] "
   read -r reply
   if [[ -z "$reply" || "$reply" == "y" || "$reply" == "Y" ]]; then
-    exec wigamig init
+    exec murmurent init
   fi
 fi
 
-ok "done. Run 'wigamig init' when you're ready."
+ok "done. Run 'murmurent init' when you're ready."

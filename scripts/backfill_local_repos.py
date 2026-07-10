@@ -8,7 +8,7 @@ Output: ``<project>/.claude/agents/`` populated with symlinks + a
         ``<project>/CLAUDE.md`` stub. Prints traffic-light status per project.
 
 Walks ``~/repos/`` and for each subdir containing a ``CHARTER.md``,
-calls :func:`wigamig.core.project_cc_init.bootstrap_local`. The agent
+calls :func:`murmurent.core.project_cc_init.bootstrap_local`. The agent
 selection comes from the matching installation manifest when present;
 otherwise no per-project symlinks are created (Layer 1 — the
 machine-wide ``~/.claude/agents/`` — already covers everything, so the
@@ -31,8 +31,8 @@ from pathlib import Path
 
 import yaml
 
-from wigamig.core.project_cc_init import bootstrap_local
-from wigamig.core.repo import wigamig_repo_root
+from murmurent.core.project_cc_init import bootstrap_local
+from murmurent.core.repo import wigamig_repo_root
 
 GREEN, YELLOW, RED, RESET = "\033[32m", "\033[33m", "\033[31m", "\033[0m"
 PILL = {"ok": GREEN + "✓" + RESET, "warn": YELLOW + "!" + RESET, "fail": RED + "✗" + RESET}

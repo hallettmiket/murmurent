@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Purpose: Create "Wigamig Dashboard.app" — a one-click macOS launcher for the
+# Purpose: Create "Murmurent Dashboard.app" — a one-click macOS launcher for the
 #          wigamig hi-fi dashboard.  Run once after cloning or reinstalling.
 # Author:  Mike Hallett
 # Date:    2026-05-11
 # Usage:   bash scripts/create_mac_app.sh [--dest /path/to/output/dir]
 #
-# Output:  ~/Applications/Wigamig Dashboard.app  (or --dest if given)
+# Output:  ~/Applications/Murmurent Dashboard.app  (or --dest if given)
 
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_NAME="Wigamig Dashboard"
+APP_NAME="Murmurent Dashboard"
 DEST_DIR="${HOME}/Applications"
 ICON_SRC="${REPO_DIR}/assets/mustang_logo.jpg"
 
@@ -71,7 +71,7 @@ WIGAMIG_USER="\$(head -1 "\$HOME/.wigamig/user" 2>/dev/null | tr -d '[:space:]')
 export WIGAMIG_USER
 mkdir -p "\$HOME/.wigamig"
 cd "\$REPO_DIR"
-nohup "\$UV" run wigamig dashboard --hifi --port "\$PORT" > "\$LOG" 2>&1 &
+nohup "\$UV" run murmurent dashboard --hifi --port "\$PORT" > "\$LOG" 2>&1 &
 echo \$! > "\$PID_FILE"
 
 # Poll until the server is ready (max ~9 s)
@@ -104,9 +104,9 @@ cat > "${APP_PATH}/Contents/Info.plist" << 'PLIST_EOF'
     <key>CFBundleIdentifier</key>
     <string>ca.uwo.hallett.wigamig-dashboard</string>
     <key>CFBundleName</key>
-    <string>Wigamig Dashboard</string>
+    <string>Murmurent Dashboard</string>
     <key>CFBundleDisplayName</key>
-    <string>Wigamig Dashboard</string>
+    <string>Murmurent Dashboard</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleVersion</key>
@@ -142,7 +142,7 @@ apply_icon() {
     done
     # iconutil requires the directory to be named *.iconset
     mv "$iconset" "${iconset}.iconset"
-    iconutil -c icns "${iconset}.iconset" -o "${app}/Contents/Resources/wigamig.icns" 2>/dev/null
+    iconutil -c icns "${iconset}.iconset" -o "${app}/Contents/Resources/murmurent.icns" 2>/dev/null
     rm -rf "${iconset}.iconset"
 }
 

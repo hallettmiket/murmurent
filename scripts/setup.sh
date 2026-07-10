@@ -24,9 +24,9 @@
 
 set -euo pipefail
 
-# Ensure ~/.local/bin (where `uv tool install` puts the wigamig shim) is
+# Ensure ~/.local/bin (where `uv tool install` puts the murmurent shim) is
 # on PATH — non-login shells (this script's default invocation) don't
-# source ~/.profile, so wigamig won't be findable without this.
+# source ~/.profile, so murmurent won't be findable without this.
 export PATH="$HOME/.local/bin:$PATH"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -136,18 +136,18 @@ else
 fi
 
 echo
-echo "[4/5] Installing wigamig hooks + MCP into ~/.claude/settings.json"
-# Prefer the user's wigamig binary if on PATH; fall back to module
+echo "[4/5] Installing murmurent hooks + MCP into ~/.claude/settings.json"
+# Prefer the user's murmurent binary if on PATH; fall back to module
 # invocation through the repo's venv. The --hooks flag is the only
 # phase implemented so far.
-if command -v wigamig >/dev/null 2>&1; then
-  wigamig install --hooks && ok "hooks installed"
+if command -v murmurent >/dev/null 2>&1; then
+  murmurent install --hooks && ok "hooks installed"
 else
-  warn "wigamig CLI not on PATH; trying repo-relative invocation"
-  if [[ -x "$REPO_DIR/.venv/bin/wigamig" ]]; then
-    "$REPO_DIR/.venv/bin/wigamig" install --hooks && ok "hooks installed (via .venv)"
+  warn "murmurent CLI not on PATH; trying repo-relative invocation"
+  if [[ -x "$REPO_DIR/.venv/bin/murmurent" ]]; then
+    "$REPO_DIR/.venv/bin/murmurent" install --hooks && ok "hooks installed (via .venv)"
   else
-    fail "wigamig binary not found — run \`uv tool install --python 3.12 -e .\` from $REPO_DIR first"
+    fail "murmurent binary not found — run \`uv tool install --python 3.12 -e .\` from $REPO_DIR first"
     exit 2
   fi
 fi
@@ -186,14 +186,14 @@ else
 fi
 
 # ── macOS one-click dashboard launcher (every member: mayor, PI, member) ──────
-# Creates ~/Applications/Wigamig Dashboard.app so anyone gets a Dock/Launchpad
+# Creates ~/Applications/Murmurent Dashboard.app so anyone gets a Dock/Launchpad
 # icon that starts the dashboard and opens it in their default browser.
 # Best-effort + macOS-only; non-Darwin platforms skip silently.
 echo
 echo "macOS dashboard launcher:"
 if [[ "$(uname -s)" == "Darwin" ]]; then
   if bash "$REPO_DIR/scripts/create_mac_app.sh" >/dev/null 2>&1; then
-    ok "created ~/Applications/Wigamig Dashboard.app — drag it to your Dock for one-click access"
+    ok "created ~/Applications/Murmurent Dashboard.app — drag it to your Dock for one-click access"
   else
     warn "couldn't create the launcher app (run scripts/create_mac_app.sh manually)"
   fi
@@ -205,4 +205,4 @@ echo
 echo "Done. Verify with:"
 echo "  ls -la ~/.claude/agents/   # should show symlinks into $AGENTS_SRC"
 echo "  ls -la ~/.claude/skills/   # should show symlinks into $SKILLS_SRC"
-echo "  grep -c wigamig.hooks ~/.claude/settings.json   # should be > 0"
+echo "  grep -c murmurent.hooks ~/.claude/settings.json   # should be > 0"
