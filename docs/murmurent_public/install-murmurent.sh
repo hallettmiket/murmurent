@@ -1,23 +1,23 @@
 #!/usr/bin/env sh
-# install-wigamig.sh — one command that installs the wigamig software on your
+# install-murmurent.sh — one command that installs the murmurent software on your
 # computer. It:
 #   1. checks you have git (and installs 'uv', the Python installer, if needed),
-#   2. downloads the public wigamig code to ~/repos/wigamig,
-#   3. installs the `wigamig` command,
+#   2. downloads the public murmurent code to ~/repos/murmurent,
+#   3. installs the `murmurent` command,
 #   4. wires the shared agents + rules into ~/.claude/,
-#   5. registers the wigamig hooks + tools.
+#   5. registers the murmurent hooks + tools.
 #
 # You do NOT need to be approved for a centre to run this — the code is public.
 # This just gets your machine ready. Joining a lab/core still happens by email
-# (see wigamig-join.sh) and the Mayor's reply.
+# (see murmurent-join.sh) and the Mayor's reply.
 #
 #   Download + run:
-#     curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/wigamig_public/main/install-wigamig.sh
-#     sh install-wigamig.sh
+#     curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/murmurent_public/main/install-murmurent.sh
+#     sh install-murmurent.sh
 set -eu
 
-REPO_URL="https://github.com/hallettmiket/wigamig.git"
-DEST="$HOME/repos/wigamig"
+REPO_URL="https://github.com/hallettmiket/murmurent.git"
+DEST="$HOME/repos/murmurent"
 
 say() { printf '%s\n' "$*"; }
 ask() { printf '%s' "$1" >&2; IFS= read -r _a || _a=""; printf '%s' "$_a"; }
@@ -35,7 +35,7 @@ need_git() {
 need_uv() {
   command -v uv >/dev/null 2>&1 && return 0
   say ""
-  say "wigamig installs with 'uv' (a small, standard Python tool). You don't"
+  say "murmurent installs with 'uv' (a small, standard Python tool). You don't"
   say "have it yet."
   case "$(ask 'Install uv now (from https://astral.sh, the official installer)? [Y/n] ')" in
     n*|N*) say "OK. Install uv from https://docs.astral.sh/uv/ then re-run."; exit 1 ;;
@@ -68,22 +68,22 @@ get_code() {
     if [ -e "$DEST" ]; then
       say "$DEST exists but isn't a git clone. Move it aside and re-run."; exit 1
     fi
-    say "Downloading wigamig to $DEST ..."
+    say "Downloading murmurent to $DEST ..."
     git clone "$REPO_URL" "$DEST"
   fi
 }
 
 # --- 3. install + wire -----------------------------------------------------
 main() {
-  say "This installs the wigamig software on your computer. Nothing is sent"
-  say "anywhere; it only sets up files under ~/repos/wigamig and ~/.claude/."
+  say "This installs the murmurent software on your computer. Nothing is sent"
+  say "anywhere; it only sets up files under ~/repos/murmurent and ~/.claude/."
   say ""
   need_git
   need_uv
   get_code
 
-  say ""; say "Installing the 'wigamig' command ..."
-  # Editable (-e) install from the clone, pinned to Python 3.12 (wigamig needs
+  say ""; say "Installing the 'murmurent' command ..."
+  # Editable (-e) install from the clone, pinned to Python 3.12 (murmurent needs
   # >=3.12 — uv fetches a managed 3.12 if the system default is older). The
   # dashboard (fastapi/uvicorn), Slack, and MCP deps are HARD deps in pyproject,
   # so they install automatically. -e keeps the package in the clone so the
@@ -95,19 +95,19 @@ main() {
   ( cd "$DEST" && bash scripts/setup.sh )
 
   say ""; say "Registering hooks + tools ..."
-  if command -v wigamig >/dev/null 2>&1; then
-    wigamig install --hooks
+  if command -v murmurent >/dev/null 2>&1; then
+    murmurent install --hooks
   else
-    ( cd "$DEST" && uv tool run wigamig install --hooks ) || \
-      say "  (run 'wigamig install --hooks' once 'wigamig' is on your PATH)"
+    ( cd "$DEST" && uv tool run murmurent install --hooks ) || \
+      say "  (run 'murmurent install --hooks' once 'murmurent' is on your PATH)"
   fi
 
   say ""
   say "──────────────────────────────────────────────────────────────────────"
-  say "✓ wigamig is installed."
+  say "✓ murmurent is installed."
   say ""
-  say "If 'wigamig' isn't found yet, close and reopen your terminal (uv adds"
-  say "it to your PATH). Check it with:  wigamig --version"
+  say "If 'murmurent' isn't found yet, close and reopen your terminal (uv adds"
+  say "it to your PATH). Check it with:  murmurent --version"
   say ""
   say "Next: watch your email for the Mayor's reply + your Slack invite. Once"
   say "you're added to your lab/core, the rest of onboarding is walked through"

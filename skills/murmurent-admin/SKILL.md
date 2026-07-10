@@ -1,5 +1,5 @@
 ---
-name: wigamig-admin
+name: murmurent-admin
 description: Prime context before admin-level (centre / mayor / registrar) work on murmurent. Reloads murmurent's purpose from the manuscript and code, pins the Obsidian maps/legends and Claude-Code guidance to the top of context, and enforces the manuscript pull-first rule. Use before designing or changing the administrative layer, the mayor/centre bootstrap, the join flow, or provisioning.
 user_invocable: true
 ---
@@ -59,7 +59,7 @@ precisely when you reference them:
 | `github.com/hallettmiket/wigamig` | reference implementation (**public**): agents, rules, hooks, MCP servers, CLI, dashboard. This is what a new mayor clones to bootstrap a centre. |
 | `github.com/hallettmiket/murmurent_manuscript` | the paper (private; Overleaf-synced) |
 | `github.com/hallettmiket/lab_mgmt` | per-group governance repo (private; registry + lab Oracle publish gateway) |
-| `github.com/hallettmiket/wigamig_public` *(planned — Phase 2)* | global onboarding hub for self-service join. **Not yet created**; onboarding is the phase after the admin level. |
+| `github.com/hallettmiket/murmurent_public` *(planned — Phase 2)* | global onboarding hub for self-service join. **Not yet created**; onboarding is the phase after the admin level. |
 
 ## 4. Then act
 

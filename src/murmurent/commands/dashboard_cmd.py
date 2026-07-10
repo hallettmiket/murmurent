@@ -78,7 +78,7 @@ def _launch_hifi(*, host: str, port: int) -> int:
             "editable from the clone (the deps are hard deps, so this is all it "
             "takes):\n"
             "    cd ~/repos/wigamig && uv tool install --force --python 3.12 -e .\n"
-            "Or run the /wigamig-reset skill at --level install."
+            "Or run the /murmurent-reset skill at --level install."
         ) from exc
 
     click.echo(f"Hi-fi dashboard: http://{host}:{port}/")

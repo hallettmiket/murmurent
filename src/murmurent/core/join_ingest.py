@@ -46,7 +46,7 @@ INGEST_LABEL = "ingested"
 JOIN_LABEL = "join-request"
 
 # Issue-form heading → our field name (headings come from
-# docs/wigamig_public/.github/ISSUE_TEMPLATE/join.yml).
+# docs/murmurent_public/.github/ISSUE_TEMPLATE/join.yml).
 _FIELD_HEADINGS = {
     "institution": "institution",
     "what are you requesting?": "kind",

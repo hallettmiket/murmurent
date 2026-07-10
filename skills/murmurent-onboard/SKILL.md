@@ -1,5 +1,5 @@
 ---
-name: wigamig-onboard
+name: murmurent-onboard
 description: Mayor/registrar helper — process an incoming ENCRYPTED join request end to end. Takes the age-encrypted request a prospective member emailed, decrypts + files it, shows you who's asking, and (on your OK) approves + provisions it (lab/core Slack channel, GitHub repo, FS ACLs) or declines. Use when a join-request email arrives.
 user_invocable: true
 ---
@@ -89,7 +89,7 @@ Translate them:
 
 **So who approves what:** you (mayor) approve `lab`/`core`/`admin`; the **PI**
 approves `member` requests for their own group (they get the Slack ping). When
-you `/wigamig-onboard` a `member` request, confirm with — or hand it to — that
+you `/murmurent-onboard` a `member` request, confirm with — or hand it to — that
 group's PI rather than approving it yourself.
 
 ## Guardrails

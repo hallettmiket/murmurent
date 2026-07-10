@@ -36,4 +36,4 @@ Overleaf can fetch them. Do not sit on uncommitted manuscript changes.
 
 The manuscript is the authoritative description of murmurent's purpose and
 architecture. When doing admin-level or design work, read it (and the
-code) before acting — see the `/wigamig-admin` skill.
+code) before acting — see the `/murmurent-admin` skill.

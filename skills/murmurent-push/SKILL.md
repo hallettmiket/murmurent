@@ -1,5 +1,5 @@
 ---
-name: wigamig-push
+name: murmurent-push
 description: Murmurent-aware stage/commit/push for a wigamig-enabled repo. Excludes per-machine + secret-shaped files, refuses to commit large files that belong in refined/, never touches /data/lab_vm/raw|refined, and posts a release note to the project's own Slack channel after the push.
 user_invocable: true
 ---
@@ -94,7 +94,7 @@ Use `mcp__claude_ai_Slack__slack_send_message`, NOT `mcp__slack__slack_post_mess
 
 **Happy path:**
 ```
-> /wigamig-push
+> /murmurent-push
 Pre-flight ✓
   - CHARTER.md present
   - no /data/lab_vm/* in diff
@@ -108,7 +108,7 @@ Slack: posted to the project channel (#dcis_sc_tutorial)
 
 **Refusal:**
 ```
-> /wigamig-push
+> /murmurent-push
 Pre-flight ✗
   - File data/raw_dump.bam is 412 MB — move to /data/lab_vm/refined/<project>/.
     rules/project-structure.md: data/ is for tiny in-repo files only.

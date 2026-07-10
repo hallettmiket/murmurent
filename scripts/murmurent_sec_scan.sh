@@ -9,7 +9,7 @@
 # any file under /data/lab_vm/raw or /data/lab_vm/refined (CC rule 9).
 #
 # Usage:
-#   wigamig_sec_scan.sh [--lab-vm-root /data/lab_vm]
+#   murmurent_sec_scan.sh [--lab-vm-root /data/lab_vm]
 #                       [--projects-root ~/repos]
 #                       [--lab-group labgroup]
 #                       [--home-warn-gb 100]

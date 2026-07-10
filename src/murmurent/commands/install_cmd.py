@@ -29,14 +29,14 @@ HOOK_REGISTRATIONS: list[dict[str, Any]] = [
         # entrypoint.
         "event": "PreToolUse",
         "matcher": "Agent",
-        "command": "<WIGAMIG_REPO>/scripts/wigamig_log_agent_event.sh",
+        "command": "<WIGAMIG_REPO>/scripts/murmurent_log_agent_event.sh",
         "env": {},
         "label": "murmurent-agent-report-pre",
     },
     {
         "event": "SubagentStop",
         "matcher": None,
-        "command": "<WIGAMIG_REPO>/scripts/wigamig_log_agent_event.sh",
+        "command": "<WIGAMIG_REPO>/scripts/murmurent_log_agent_event.sh",
         "env": {},
         "label": "murmurent-agent-report-stop",
     },

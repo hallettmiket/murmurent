@@ -197,7 +197,7 @@ def test_response_validates_against_pydantic(world):
 def test_agents_activity_parses_the_log(monkeypatch, tmp_path):
     from murmurent.dashboard import snapshot as _snap
     log = tmp_path / "agents.log"
-    # exactly the format scripts/wigamig_log_agent_event.sh writes (ANSI + blanks)
+    # exactly the format scripts/murmurent_log_agent_event.sh writes (ANSI + blanks)
     log.write_text(
         "\x1b[32m[15:20] blacksmith: starting — build the thing\x1b[0m\n\n"
         "\x1b[91m[15:22] blacksmith: Done — shipped it, 12 tests green\x1b[0m\n\n"

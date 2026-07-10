@@ -1,4 +1,4 @@
-# /etc/systemd/system/wigamig-dashboard.service
+# /etc/systemd/system/murmurent-dashboard.service
 #
 # Run the wigamig hi-fi dashboard headless on a dedicated Ubuntu server.
 # After landing the centre on the server (see docs/setup.md), edit the

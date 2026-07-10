@@ -6,8 +6,8 @@ in a consistent 4-quadrant layout with live agent reporting.
 ## Opening a project
 
 ```bash
-scripts/open_wigamig.sh                   # opens murmurent itself
-scripts/open_wigamig.sh ~/repos/<other>   # opens another repo
+scripts/open_murmurent.sh                 # opens murmurent itself
+scripts/open_murmurent.sh ~/repos/<other> # opens another repo
 ```
 
 The launcher (macOS only) enumerates displays via
@@ -55,7 +55,7 @@ text is what we can control.
 ## Live agent reporter (BR pane)
 
 User-global hooks in `~/.claude/settings.json` invoke
-[`scripts/wigamig_log_agent_event.sh`](../scripts/wigamig_log_agent_event.sh)
+[`scripts/murmurent_log_agent_event.sh`](../scripts/murmurent_log_agent_event.sh)
 on:
 
 - `PreToolUse(Agent)` → writes `<agent>: starting — <description>`

@@ -9,7 +9,7 @@ Output: Dashboard rows, slack summaries, CLI tables.
 
 Single source of truth for the row schema rendered in
 ``docs/designer_dashboard/security-app.jsx`` and serialised both by the
-remote bash scanner (``scripts/wigamig_sec_scan.sh``) and the Python
+remote bash scanner (``scripts/murmurent_sec_scan.sh``) and the Python
 laptop-side scanners. Keeping it in one place means a rule_id added on
 either side automatically flows through the JSONL persistence layer
 without code changes.

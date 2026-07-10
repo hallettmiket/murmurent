@@ -1,5 +1,5 @@
 """
-Purpose: Generate wigamig_app_icon.png — Western-purple app icon for the
+Purpose: Generate murmurent_app_icon.png — Western-purple app icon for the
          macOS dashboard launcher.
 Author:  Mike Hallett
 Date:    2026-05-11
@@ -111,6 +111,6 @@ def generate_icon(output_path: Path, size: int = 512) -> None:
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-        print("Usage: python wigamig_app_icon.py <output.png>", file=sys.stderr)
+        print("Usage: python murmurent_app_icon.py <output.png>", file=sys.stderr)
         sys.exit(1)
     generate_icon(Path(sys.argv[1]))

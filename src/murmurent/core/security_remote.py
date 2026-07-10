@@ -1,6 +1,6 @@
 """
 Purpose: SSH dispatcher for the unprivileged Tier-1 security scanner.
-         Reads ``scripts/wigamig_sec_scan.sh`` locally, ships it to the
+         Reads ``scripts/murmurent_sec_scan.sh`` locally, ships it to the
          target host over a single SSH session, parses the JSONL output.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-19
@@ -29,7 +29,7 @@ from .repo import wigamig_repo_root
 from .security_findings import Finding, rollup_by_directory
 
 
-SCANNER_SCRIPT = Path("scripts/wigamig_sec_scan.sh")
+SCANNER_SCRIPT = Path("scripts/murmurent_sec_scan.sh")
 
 
 @dataclass
@@ -60,7 +60,7 @@ class ScanResult:
 
 
 def _read_scanner_script() -> str:
-    """Locate ``scripts/wigamig_sec_scan.sh`` in the murmurent repo."""
+    """Locate ``scripts/murmurent_sec_scan.sh`` in the murmurent repo."""
     repo = wigamig_repo_root()
     path = repo / SCANNER_SCRIPT
     if not path.is_file():

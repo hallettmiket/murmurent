@@ -63,7 +63,7 @@ authority.
    They import it with `murmurent import-card <bundle> --trust-root <your-trust-root>`.
 3. **Optional — join a centre.** If your institution runs a murmurent centre,
    register with its mayor (the [implementations directory](https://github.com/hallettmiket/wigamig_public)
-   → `wigamig-join.sh`). The mayor issues you a **separate** centre PI ID that
+   → `murmurent-join.sh`). The mayor issues you a **separate** centre PI ID that
    attests your *same key* to the centre — your members' cards keep working
    unchanged; only the trust anchor gains a higher root.
 

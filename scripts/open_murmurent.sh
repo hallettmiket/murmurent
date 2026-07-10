@@ -11,8 +11,8 @@
 # across opens.
 #
 # Usage:
-#   scripts/open_wigamig.sh                  # opens wigamig itself
-#   scripts/open_wigamig.sh ~/repos/<other>  # opens another repo
+#   scripts/open_murmurent.sh                # opens murmurent itself
+#   scripts/open_murmurent.sh ~/repos/<other>  # opens another repo
 #
 # macOS only — uses /usr/bin/python3 + AppKit for screen enumeration
 # (PyObjC ships with the system Python on every modern macOS) and

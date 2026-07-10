@@ -2,7 +2,7 @@
 
 Maintainer-facing notes for the global `wigamig_public` repo. It does **not**
 live on the hub itself — the hub's own README
-([`docs/wigamig_public/README.md`](wigamig_public/README.md)) is kept trivially
+([`docs/murmurent_public/README.md`](murmurent_public/README.md)) is kept trivially
 simple for prospective members.
 
 ## What the hub is (and is NOT)
@@ -30,7 +30,7 @@ Already done. It's created once for the whole ecosystem; an individual mayor doe
 ```bash
 gh repo create hallettmiket/wigamig_public --public
 git clone https://github.com/hallettmiket/wigamig_public /tmp/wigamig_public
-cp -R docs/wigamig_public/. /tmp/wigamig_public/
+cp -R docs/murmurent_public/. /tmp/murmurent_public/
 cd /tmp/wigamig_public && git add -A \
   && git commit -m "seed wigamig_public directory" && git push
 gh repo edit hallettmiket/wigamig_public --enable-issues=false   # no data collection

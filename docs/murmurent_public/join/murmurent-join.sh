@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# wigamig-join.sh — the one script a prospective member runs to join a wigamig
+# murmurent-join.sh — the one script a prospective member runs to join a murmurent
 # institution. It:
 #   1. installs `age` (encryption) if you don't have it,
 #   2. asks you a few questions (no file to edit),
@@ -11,11 +11,11 @@
 # read the result.
 #
 #   Download + run:
-#     curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/wigamig_public/main/join/wigamig-join.sh
-#     sh wigamig-join.sh
+#     curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/murmurent_public/main/join/murmurent-join.sh
+#     sh murmurent-join.sh
 set -eu
 
-HUB_RAW="https://raw.githubusercontent.com/hallettmiket/wigamig_public/main"
+HUB_RAW="https://raw.githubusercontent.com/hallettmiket/murmurent_public/main"
 
 say()  { printf '%s\n' "$*"; }
 ask()  { # ask "prompt" -> echoes the answer
@@ -154,7 +154,7 @@ EOF
   elif command -v xclip >/dev/null 2>&1;   then printf '%s' "$BODY" | xclip -selection clipboard; COPIED=1
   else COPIED=0; fi
 
-  SUBJECT="wigamig%20join%20request"
+  SUBJECT="murmurent%20join%20request"
   BODY_ENC="$(printf '%s' "$BODY" | urlencode)"
   OPEN=""
   command -v open >/dev/null 2>&1 && OPEN="open"
@@ -167,7 +167,7 @@ EOF
     say ""
     say "If the message is empty (some email apps ignore a pre-filled body):"
   else
-    say "Email this to: ${EMAIL}   (subject: wigamig join request)"
+    say "Email this to: ${EMAIL}   (subject: murmurent join request)"
     say "Put the encrypted request in the body:"
   fi
   if [ "$COPIED" = 1 ]; then
@@ -180,7 +180,7 @@ EOF
   say "──────────────────────────────────────────────────────────────────────"
   say "WHAT HAPPENS NEXT — please read:"
   say ""
-  say "  1. The Mayor (the person who runs wigamig at ${INSTITUTION})"
+  say "  1. The Mayor (the person who runs murmurent at ${INSTITUTION})"
   say "     will REPLY TO YOU BY EMAIL. Watch your inbox (and spam folder)."
   say "  2. That reply will include a SLACK INVITE to the '${INSTITUTION}'"
   say "     wigamig workspace. Accept it — Slack is where everything happens"
@@ -194,29 +194,29 @@ EOF
   offer_install
 }
 
-# --- optional: download + install the wigamig software ---------------------
+# --- optional: download + install the murmurent software -------------------
 offer_install() {
   say ""
-  say "You can INSTALL the wigamig software now, while you wait for the reply —"
+  say "You can INSTALL the murmurent software now, while you wait for the reply —"
   say "the code is public, so this doesn't need anyone's approval. It just gets"
   say "your computer ready so you're set the moment you're added."
-  case "$(ask 'Download + install wigamig now? [Y/n] ')" in
+  case "$(ask 'Download + install murmurent now? [Y/n] ')" in
     n*|N*) say ""; say "No problem. When you're ready, run:";
-           say "  curl -fsSL -O $HUB_RAW/install-wigamig.sh && sh install-wigamig.sh";
+           say "  curl -fsSL -O $HUB_RAW/install-murmurent.sh && sh install-murmurent.sh";
            return 0 ;;
   esac
   if ! command -v curl >/dev/null 2>&1; then
     say "Need 'curl' to fetch the installer. Install curl, then run:"
-    say "  curl -fsSL -O $HUB_RAW/install-wigamig.sh && sh install-wigamig.sh"
+    say "  curl -fsSL -O $HUB_RAW/install-murmurent.sh && sh install-murmurent.sh"
     return 0
   fi
   INST="$(mktemp)"
-  if curl -fsSL "$HUB_RAW/install-wigamig.sh" -o "$INST" 2>/dev/null; then
+  if curl -fsSL "$HUB_RAW/install-murmurent.sh" -o "$INST" 2>/dev/null; then
     sh "$INST"; rm -f "$INST"
   else
     rm -f "$INST"
     say "Couldn't fetch the installer just now. Try again later with:"
-    say "  curl -fsSL -O $HUB_RAW/install-wigamig.sh && sh install-wigamig.sh"
+    say "  curl -fsSL -O $HUB_RAW/install-murmurent.sh && sh install-murmurent.sh"
   fi
 }
 

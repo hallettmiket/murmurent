@@ -116,15 +116,15 @@ sudo -u murmurent pipx install murmurent
 
 # Project ACL script (item 0c) + sudoers fragment.
 sudo install -m 0755 \
-  ~wigamig/.../scripts/wigamig_project_acl.sh \
-  /opt/wigamig/wigamig_project_acl.sh
-echo 'murmurent ALL=(root) NOPASSWD: /opt/wigamig/wigamig_project_acl.sh' \
-  | sudo tee /etc/sudoers.d/wigamig_project_acl
-sudo chmod 0440 /etc/sudoers.d/wigamig_project_acl
+  ~murmurent/.../scripts/murmurent_project_acl.sh \
+  /opt/wigamig/murmurent_project_acl.sh
+echo 'murmurent ALL=(root) NOPASSWD: /opt/wigamig/murmurent_project_acl.sh' \
+  | sudo tee /etc/sudoers.d/murmurent_project_acl
+sudo chmod 0440 /etc/sudoers.d/murmurent_project_acl
 
-# Systemd unit (template at scripts/wigamig-dashboard.service).
+# Systemd unit (template at scripts/murmurent-dashboard.service).
 sudo install -m 0644 \
-  ~wigamig/.../scripts/wigamig-dashboard.service \
+  ~murmurent/.../scripts/murmurent-dashboard.service \
   /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now wigamig-dashboard

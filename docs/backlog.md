@@ -85,11 +85,11 @@ is therefore "everything is drift" — a placeholder.
 - `_fetch_slack_members(channel_id)` via Slack `conversations.members`
 - `_fetch_github_collaborators(org, repo)` via `gh api`
 - `_fetch_fs_acl(machine, project)` via `ssh <machine> sudo
-  wigamig_project_acl.sh --inspect <project>` (new sub-command on
+  murmurent_project_acl.sh --inspect <project>` (new sub-command on
   the existing sudo script)
 
 **First step.** Add the `--inspect` sub-command to
-`scripts/wigamig_project_acl.sh` and have it emit a JSON snapshot of
+`scripts/murmurent_project_acl.sh` and have it emit a JSON snapshot of
 the wgm_<project> group members on the host.
 
 ---
