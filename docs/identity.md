@@ -46,24 +46,46 @@ the card is revoked — treat it like an SSH key.
 
 ```bash
 murmurent enroll --group <group> --out enroll.json    # proves you hold your key (PoP)
-# → send enroll.json to your PI
-# ← they send back a signed card bundle (bundle.json) + the centre's fingerprint
+# → send enroll.json to your PI (the command tells you how)
+# ← they send back a signed card bundle + the trust root to pin
 murmurent import-card bundle.json --trust-root <ed25519:…pubkey>
 murmurent whoami                                       # now shows your group role
 ```
 
-`--trust-root` is the centre's published signing key; confirm its fingerprint
-with the mayor/PI out-of-band the first time (see `centre-pin` below to fetch it
-from the public hub instead).
+`--trust-root` is the group's (or centre's) published signing key; confirm its
+fingerprint with the PI/mayor out-of-band the first time (see `centre-pin`
+below to fetch it from the public hub instead).
+
+**Sending `enroll.json` to your PI** is unauthenticated hand-off — murmurent
+can't automate the member→PI leg, since the PI has to be the one who decides
+to trust you. `enroll` prints the concrete next step: if you're already in
+your lab's Slack workspace (you usually are), **DM your PI the file
+directly**; otherwise email or paste it works fine too. Either way your PI
+needs the file/JSON in hand before they can run `issue-member-card`.
 
 ## Vouching for a member (PI / group registrar)
 
 ```bash
-murmurent issue-member-card enroll.json --group <group> --out bundle.json
+murmurent issue-member-card enroll.json --group <group>
 ```
 
 Signs the member's card with **your** key and bundles your PI card so the member
 can verify the whole chain. You can only issue for a group you lead.
+
+**Sending the bundle back is where Slack *is* automated** — the leg from PI
+back to member goes through the group's own bot token, which you (the PI)
+control, so murmurent can safely send it for you. By default this command:
+
+1. reads the member's email from their enrollment request,
+2. resolves it to a Slack user id in your lab's workspace (via
+   `murmurent group-slack-setup`'s token),
+3. DMs them the bundle + the exact `import-card` command to run.
+
+If your lab's Slack isn't connected, or the lookup fails, it falls back to
+printing the bundle for you to send by hand — nothing is lost, you just do
+that last step yourself. Pass `--dm <slack_user_id>` to target a known user
+id directly (skips the email lookup), or `--out bundle.json` to also write
+the bundle to disk, or `--no-dm` to always skip Slack.
 
 ## Run a lab standalone (PI, no mayor)
 

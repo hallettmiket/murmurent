@@ -380,13 +380,17 @@ def _open_dm(user_id: str, tok: str | None = None) -> str | None:
     return None
 
 
-def _post(channel: str, text: str) -> bool:
+def _post(channel: str, text: str, *, token: str | None = None) -> bool:
     """Low-level POST to Slack. Returns True on success, False otherwise.
 
     Intentionally fire-and-forget: dashboard events should never fail
     because Slack is down or the token is wrong.
+
+    ``token`` overrides the centre bot token — used by group-scoped senders
+    (e.g. ``group_reconcile.send_group_dm``) whose recipient only exists in
+    the group's OWN Slack workspace, not the centre's.
     """
-    tok = _token()
+    tok = token if token is not None else _token()
     if not tok:
         return False
     channel = _route(channel)

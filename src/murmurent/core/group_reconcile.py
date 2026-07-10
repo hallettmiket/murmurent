@@ -31,19 +31,44 @@ class GroupReconcileResult:
     applied: bool = False
 
 
+def _group_slack_token_path(group: str) -> Path:
+    return Path.home() / ".config" / "murmurent" / "groups" / group / "slack-token"
+
+
 def resolve_group_slack_token(group: str, *, allow_file: bool = True) -> str:
     """The group's OWN Slack bot token: env ``MURMURENT_GROUP_SLACK_TOKEN`` first,
     then ``~/.config/murmurent/groups/<group>/slack-token`` (the PI's machine)."""
     tok = os.environ.get("MURMURENT_GROUP_SLACK_TOKEN", "").strip()
     if tok or not allow_file:
         return tok
-    f = Path.home() / ".config" / "murmurent" / "groups" / group / "slack-token"
+    f = _group_slack_token_path(group)
     try:
         if f.is_file():
             return f.read_text(encoding="utf-8").strip()
     except OSError:
         pass
     return ""
+
+
+def write_group_slack_token(group: str, token: str) -> Path:
+    """Store the group's own Slack bot token on disk, mode 0600, at the same
+    path :func:`resolve_group_slack_token` reads from. Called by
+    ``murmurent group-slack-setup`` once the token has been validated live —
+    this is the ONLY writer for that path, so a PI has a supported way to
+    hand murmurent their lab's bot token."""
+    token = token.strip()
+    if not token:
+        raise ValueError("token is empty — refusing to write an empty slack-token file.")
+    f = _group_slack_token_path(group)
+    f.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # O_CREAT's mode only applies to a freshly-created file, so chmod
+    # afterward too — covers the re-run case where the file pre-existed
+    # with looser permissions than 0600.
+    fd = os.open(f, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write(token + "\n")
+    os.chmod(f, 0o600)
+    return f
 
 
 def group_roster(group: str, *, env: dict[str, str] | None = None) -> dict[str, dict]:
@@ -95,6 +120,55 @@ def _slack_user_exists(email: str, token: str):
     except Exception:  # noqa: BLE001
         pass
     return None
+
+
+def resolve_group_slack_user_id(email: str, token: str) -> str | None:
+    """The Slack user id for ``email`` in the group's OWN workspace, or None
+    if not found / on error. Same call as :func:`_slack_user_exists` but
+    returns the id so a caller can DM them directly."""
+    if not (email and token):
+        return None
+    try:
+        import httpx
+        r = httpx.get("https://slack.com/api/users.lookupByEmail",
+                      headers={"Authorization": f"Bearer {token}"},
+                      params={"email": email}, timeout=5).json()
+        if r.get("ok"):
+            return (r.get("user") or {}).get("id") or None
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def send_group_dm(group: str, *, text: str, slack_user_id: str = "",
+                   email: str = "", token: str | None = None) -> tuple[bool, str]:
+    """DM ``text`` to a member via the group's OWN Slack workspace (the token
+    from :func:`resolve_group_slack_token`, or ``token`` to override).
+
+    Resolves ``slack_user_id`` from ``email`` via ``users.lookupByEmail`` when
+    not given directly. Never raises — a Slack outage or missing token can't
+    break card issuance; the caller falls back to manual delivery. Returns
+    ``(ok, detail)``."""
+    from ..dashboard import slack_notify as _sn
+
+    tok = token if token is not None else resolve_group_slack_token(group)
+    if not tok:
+        return False, (f"no Slack token for '{group}' — run "
+                        f"`murmurent group-slack-setup {group}` first")
+
+    uid = slack_user_id
+    if not uid:
+        if not email:
+            return False, "member has no email on file — can't resolve their Slack account"
+        uid = resolve_group_slack_user_id(email, tok)
+        if not uid:
+            return False, f"couldn't find {email} in the group's Slack workspace"
+
+    channel = _sn._open_dm(uid, tok)
+    if not channel:
+        return False, "couldn't open a DM (does the bot have the im:write scope?)"
+    ok = _sn._post(channel, text, token=tok)
+    return (ok, "sent" if ok else "Slack post failed")
 
 
 def _gh_add_collaborator(repo: str, login: str, *, runner=subprocess.run):
