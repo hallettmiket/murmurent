@@ -1597,6 +1597,7 @@ from .commands.centre_cmd import crl_cmd as _crl_cmd
 from .commands.centre_cmd import centre_pin as _centre_pin
 from .commands.centre_cmd import centre_hub_publish as _centre_hub_publish
 from .commands.centre_cmd import group_setup as _group_setup
+from .commands.centre_cmd import group_slack_setup as _group_slack_setup
 from .commands.centre_cmd import group_reconcile_cmd as _group_reconcile_cmd
 from .commands.centre_cmd import group_remove_member as _group_remove_member
 from .commands.centre_cmd import group_init_toolkit as _group_init_toolkit
@@ -1626,6 +1627,7 @@ cli.add_command(_crl_cmd)
 cli.add_command(_centre_pin)
 cli.add_command(_centre_hub_publish)
 cli.add_command(_group_setup)
+cli.add_command(_group_slack_setup)
 cli.add_command(_group_reconcile_cmd)
 cli.add_command(_group_remove_member)
 cli.add_command(_group_init_toolkit)

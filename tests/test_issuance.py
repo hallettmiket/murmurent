@@ -213,10 +213,73 @@ def test_cli_issue_member_card_prints_trust_root_when_standalone(monkeypatch, tm
     ef.write_text(json.dumps(m_req), encoding="utf-8")
     bf = tmp_path / "b.json"
     res = CliRunner().invoke(cli, ["issue-member-card", str(ef), "--group", "lab_mh",
-                                   "--out", str(bf)])
+                                   "--out", str(bf), "--no-dm"])
     assert res.exit_code == 0, res.output
     assert out["trust_root"] in res.output          # PI told exactly what to hand over
     assert "import-card" in res.output
+
+
+def _issue_member_card_setup(monkeypatch, tmp_path, *, email="allie@x.edu"):
+    """Standalone PI + one member enrollment request on disk — shared setup
+    for the --dm wiring tests below."""
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.setenv("MURMURENT_USER", "the_pi")
+    K.generate_keypair()
+    ISS.self_issue_pi_card("@the_pi", "lab_mh")
+    allie = Ed25519PrivateKey.generate()
+    m_req = C.make_enrollment_request("@allie", priv=allie, nonce="a1", group="lab_mh",
+                                      email=email)
+    ef = tmp_path / "e.json"
+    ef.write_text(json.dumps(m_req), encoding="utf-8")
+    return ef
+
+
+def test_cli_issue_member_card_dms_by_default(monkeypatch, tmp_path):
+    """Without --no-dm, issue-member-card attempts Slack delivery via the
+    group's own token, resolving the member's Slack account from the email
+    they carried in their enrollment request."""
+    from murmurent.cli import cli
+    from murmurent.core import group_reconcile as GR
+    ef = _issue_member_card_setup(monkeypatch, tmp_path)
+    seen = {}
+    def fake_send_group_dm(group, *, text, slack_user_id="", email="", token=None):
+        seen.update(group=group, slack_user_id=slack_user_id, email=email)
+        return True, "sent"
+    monkeypatch.setattr(GR, "send_group_dm", fake_send_group_dm)
+    res = CliRunner().invoke(cli, ["issue-member-card", str(ef), "--group", "lab_mh"])
+    assert res.exit_code == 0, res.output
+    assert "DM'd @allie their card on Slack" in res.output
+    assert seen == {"group": "lab_mh", "slack_user_id": "", "email": "allie@x.edu"}
+
+
+def test_cli_issue_member_card_dm_failure_falls_back_to_manual(monkeypatch, tmp_path):
+    from murmurent.cli import cli
+    from murmurent.core import group_reconcile as GR
+    ef = _issue_member_card_setup(monkeypatch, tmp_path)
+    monkeypatch.setattr(GR, "send_group_dm",
+                        lambda *a, **kw: (False, "no Slack token for 'lab_mh' — run "
+                                                   "`murmurent group-slack-setup lab_mh` first"))
+    res = CliRunner().invoke(cli, ["issue-member-card", str(ef), "--group", "lab_mh"])
+    assert res.exit_code == 0, res.output
+    assert "could not DM on Slack" in res.output
+    assert "send them this bundle yourself" in res.output
+    assert "import-card" in res.output
+
+
+def test_cli_issue_member_card_explicit_dm_target_overrides_email(monkeypatch, tmp_path):
+    from murmurent.cli import cli
+    from murmurent.core import group_reconcile as GR
+    ef = _issue_member_card_setup(monkeypatch, tmp_path)
+    seen = {}
+    def fake_send_group_dm(group, *, text, slack_user_id="", email="", token=None):
+        seen.update(slack_user_id=slack_user_id)
+        return True, "sent"
+    monkeypatch.setattr(GR, "send_group_dm", fake_send_group_dm)
+    res = CliRunner().invoke(cli, ["issue-member-card", str(ef), "--group", "lab_mh",
+                                   "--dm", "U999"])
+    assert res.exit_code == 0, res.output
+    assert seen["slack_user_id"] == "U999"
 
 
 def test_issuance_writes_the_roster(monkeypatch, tmp_path):
@@ -420,7 +483,7 @@ def test_cli_member_card_round_trip(mayor_world, monkeypatch, tmp_path):
     enroll_f.write_text(json.dumps(m_req), encoding="utf-8")
     bundle_f = tmp_path / "bundle.json"
     r = runner.invoke(cli, ["issue-member-card", str(enroll_f), "--group", "yxia_lab",
-                            "--out", str(bundle_f)])
+                            "--out", str(bundle_f), "--no-dm"])
     assert r.exit_code == 0, r.output
     # member machine imports it
     monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "allie_cli"))

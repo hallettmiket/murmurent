@@ -247,6 +247,168 @@ def test_group_setup_cli(world):
     assert prof["github"] == "hallettmiket/dcis" and prof["slack_workspace"] == "T0DCIS"
 
 
+def test_group_slack_setup_cli_happy_path(world, monkeypatch):
+    from click.testing import CliRunner
+    from murmurent.commands.centre_cmd import group_slack_setup
+    from murmurent.core import centre_provision as CP, group_reconcile as GR
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+
+    fake_home = world / "home2"
+    monkeypatch.setattr("pathlib.Path.home", lambda: fake_home)
+    monkeypatch.setattr(CP, "slack_auth_test", lambda token: CP.SlackAuthResult(
+        ok=True, team_id="T0DCIS", team_name="dcis-lab", bot_user="dcis"))
+
+    res = CliRunner().invoke(group_slack_setup, [
+        "dcis", "--non-interactive",
+        "--token", "xoxb-dcis",
+        "--invite-url", "https://join.slack.com/dcis",
+    ])
+    assert res.exit_code == 0, res.output
+
+    prof = R.read_group_profile("dcis")
+    assert prof["slack_workspace"] == "T0DCIS"
+    assert prof["slack_invite_url"] == "https://join.slack.com/dcis"
+    assert GR.resolve_group_slack_token("dcis") == "xoxb-dcis"
+    token_path = fake_home / ".config" / "murmurent" / "groups" / "dcis" / "slack-token"
+    assert (token_path.stat().st_mode & 0o777) == 0o600
+
+
+def test_group_slack_setup_cli_recovers_duplicated_prefix_paste(world, monkeypatch):
+    """Regression for the exact failure a PI hit: typing 'xoxb-' before
+    pasting a token that already includes it. The command must normalize
+    it rather than send the garbled string to Slack."""
+    from click.testing import CliRunner
+    from murmurent.commands.centre_cmd import group_slack_setup
+    from murmurent.core import centre_provision as CP, group_reconcile as GR
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+
+    fake_home = world / "home4"
+    monkeypatch.setattr("pathlib.Path.home", lambda: fake_home)
+    seen = {}
+    def fake_auth_test(token):
+        seen["token"] = token
+        return CP.SlackAuthResult(ok=True, team_id="T0DCIS", team_name="dcis-lab", bot_user="dcis")
+    monkeypatch.setattr(CP, "slack_auth_test", fake_auth_test)
+
+    res = CliRunner().invoke(group_slack_setup, [
+        "dcis", "--non-interactive", "--token", "xoxb-xoxb-realtoken123"])
+    assert res.exit_code == 0, res.output
+    assert seen["token"] == "xoxb-realtoken123"          # duplicated prefix collapsed
+    assert GR.resolve_group_slack_token("dcis") == "xoxb-realtoken123"
+
+
+def test_group_slack_setup_cli_bad_token_writes_nothing(world, monkeypatch):
+    from click.testing import CliRunner
+    from murmurent.commands.centre_cmd import group_slack_setup
+    from murmurent.core import centre_provision as CP, group_reconcile as GR
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+
+    fake_home = world / "home3"
+    monkeypatch.setattr("pathlib.Path.home", lambda: fake_home)
+    monkeypatch.setattr(CP, "slack_auth_test", lambda token: CP.SlackAuthResult(
+        ok=False, error="invalid_auth", detail="the token is wrong or has been revoked."))
+
+    res = CliRunner().invoke(group_slack_setup, [
+        "dcis", "--non-interactive", "--token", "xoxb-bad"])
+    assert res.exit_code == 1
+    assert "invalid_auth" in res.output
+    assert GR.resolve_group_slack_token("dcis") == ""
+    assert not (fake_home / ".config" / "murmurent" / "groups" / "dcis").exists()
+    assert R.read_group_profile("dcis").get("slack_workspace", "") == ""
+
+
+def test_group_slack_setup_cli_unknown_group(world):
+    from click.testing import CliRunner
+    from murmurent.commands.centre_cmd import group_slack_setup
+    res = CliRunner().invoke(group_slack_setup, [
+        "no-such-group", "--non-interactive", "--token", "xoxb-x"])
+    assert res.exit_code != 0
+    assert "no lab or core named" in res.output
+
+
+def test_group_slack_setup_cli_non_interactive_requires_token(world):
+    from click.testing import CliRunner
+    from murmurent.commands.centre_cmd import group_slack_setup
+    R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
+    res = CliRunner().invoke(group_slack_setup, ["dcis", "--non-interactive"])
+    assert res.exit_code != 0
+    assert "--token is required" in res.output
+
+
+def test_send_group_dm_no_token_is_actionable(monkeypatch, tmp_path):
+    from murmurent.core import group_reconcile as GR
+    monkeypatch.delenv("MURMURENT_GROUP_SLACK_TOKEN", raising=False)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    ok, detail = GR.send_group_dm("dcis", text="hi", email="a@x")
+    assert ok is False
+    assert "group-slack-setup dcis" in detail
+
+
+def test_send_group_dm_no_email_or_uid_is_actionable():
+    from murmurent.core import group_reconcile as GR
+    ok, detail = GR.send_group_dm("dcis", text="hi", token="xoxb-x")
+    assert ok is False
+    assert "no email on file" in detail
+
+
+def test_send_group_dm_email_not_found_in_workspace(monkeypatch):
+    from murmurent.core import group_reconcile as GR
+    monkeypatch.setattr(GR, "resolve_group_slack_user_id", lambda email, token: None)
+    ok, detail = GR.send_group_dm("dcis", text="hi", email="a@x", token="xoxb-x")
+    assert ok is False
+    assert "couldn't find a@x" in detail
+
+
+def test_send_group_dm_dm_open_failure(monkeypatch):
+    from murmurent.core import group_reconcile as GR
+    from murmurent.dashboard import slack_notify as SN
+    monkeypatch.setattr(GR, "resolve_group_slack_user_id", lambda email, token: "U123")
+    monkeypatch.setattr(SN, "_open_dm", lambda uid, tok: None)
+    ok, detail = GR.send_group_dm("dcis", text="hi", email="a@x", token="xoxb-x")
+    assert ok is False
+    assert "couldn't open a DM" in detail
+
+
+def test_send_group_dm_happy_path_via_explicit_uid(monkeypatch):
+    """An explicit --dm slack_user_id skips email resolution entirely."""
+    from murmurent.core import group_reconcile as GR
+    from murmurent.dashboard import slack_notify as SN
+    calls = {}
+    def fake_open_dm(uid, tok):
+        calls["uid"] = uid
+        return "D999"
+    monkeypatch.setattr(SN, "_open_dm", fake_open_dm)
+    def fake_post(channel, text, *, token=None):
+        calls["channel"] = channel
+        calls["token"] = token
+        calls["text"] = text
+        return True
+    monkeypatch.setattr(SN, "_post", fake_post)
+    ok, detail = GR.send_group_dm("dcis", text="your card", slack_user_id="U777",
+                                   token="xoxb-x")
+    assert ok is True and detail == "sent"
+    assert calls == {"uid": "U777", "channel": "D999", "token": "xoxb-x", "text": "your card"}
+
+
+def test_send_group_dm_post_failure(monkeypatch):
+    from murmurent.core import group_reconcile as GR
+    from murmurent.dashboard import slack_notify as SN
+    monkeypatch.setattr(SN, "_open_dm", lambda uid, tok: "D999")
+    monkeypatch.setattr(SN, "_post", lambda channel, text, **kw: False)
+    ok, detail = GR.send_group_dm("dcis", text="hi", slack_user_id="U777", token="xoxb-x")
+    assert ok is False
+    assert detail == "Slack post failed"
+
+
+def test_resolve_group_slack_user_id_happy_path(monkeypatch):
+    from murmurent.core import group_reconcile as GR
+    from unittest.mock import patch, MagicMock
+    mock = MagicMock()
+    mock.json.return_value = {"ok": True, "user": {"id": "U555"}}
+    with patch("httpx.get", return_value=mock):
+        assert GR.resolve_group_slack_user_id("a@x", "xoxb-x") == "U555"
+
+
 def test_group_reconcile_reports_and_applies(world):
     from murmurent.core import group_reconcile as GR
     from murmurent.core.frontmatter import parse_file, dump_document
@@ -286,6 +448,43 @@ def test_resolve_group_slack_token_env_then_file(monkeypatch, tmp_path):
     assert GR.resolve_group_slack_token("dcis") == "xoxb-group"
     monkeypatch.setenv("MURMURENT_GROUP_SLACK_TOKEN", "xoxb-env")
     assert GR.resolve_group_slack_token("dcis") == "xoxb-env"   # env wins
+
+
+def test_write_group_slack_token_round_trips(monkeypatch, tmp_path):
+    """write_group_slack_token is the only writer for the path
+    resolve_group_slack_token reads — round-trip them against each other."""
+    from murmurent.core import group_reconcile as GR
+    monkeypatch.delenv("MURMURENT_GROUP_SLACK_TOKEN", raising=False)
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+
+    path = GR.write_group_slack_token("dcis", "  xoxb-fresh  ")
+    assert path == tmp_path / ".config" / "murmurent" / "groups" / "dcis" / "slack-token"
+    assert path.read_text(encoding="utf-8") == "xoxb-fresh\n"
+    assert (path.stat().st_mode & 0o777) == 0o600
+
+    assert GR.resolve_group_slack_token("dcis") == "xoxb-fresh"
+
+
+def test_write_group_slack_token_overwrites_and_fixes_perms(monkeypatch, tmp_path):
+    """Re-running group-slack-setup should replace the old token and
+    reassert 0600 even if the file previously had looser permissions."""
+    from murmurent.core import group_reconcile as GR
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+
+    first = GR.write_group_slack_token("dcis", "xoxb-old")
+    first.chmod(0o644)   # simulate a loosely-permissioned pre-existing file
+    second = GR.write_group_slack_token("dcis", "xoxb-new")
+
+    assert first == second
+    assert second.read_text(encoding="utf-8") == "xoxb-new\n"
+    assert (second.stat().st_mode & 0o777) == 0o600
+
+
+def test_write_group_slack_token_refuses_empty(monkeypatch, tmp_path):
+    from murmurent.core import group_reconcile as GR
+    monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
+    with pytest.raises(ValueError):
+        GR.write_group_slack_token("dcis", "   ")
 
 
 def test_group_init_toolkit_scaffolds(world, tmp_path):

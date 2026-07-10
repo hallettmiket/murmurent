@@ -6,6 +6,10 @@ lab/core** (named after the group, members-only), and **`#general`** for
 broadcasts. This guide is the one-time setup a **mayor** does so those channels
 get created and populated automatically.
 
+> Looking for a **lab/core's own** Slack workspace instead (the PI-level
+> setup)? See [`docs/group_slack_setup.md`](group_slack_setup.md) and
+> `murmurent group-slack-setup <group>`. This page is centre-wide only.
+
 Slack workspaces can't be created by API, so a few steps are manual — they're
 marked **[manual]**.
 
@@ -65,7 +69,7 @@ Either export it, or store it in the token file (mode 0600):
 ```bash
 export MURMURENT_SLACK_TOKEN=xoxb-...
 #   ...or, to persist it for the dashboard/server:
-umask 077; printf '%s\n' 'xoxb-...' > ~/.config/wigamig/slack-token
+umask 077; printf '%s\n' 'xoxb-...' > ~/.config/murmurent/slack-token
 ```
 
 `MURMURENT_SLACK_TOKEN` and the legacy `SLACK_BOT_TOKEN` both work.

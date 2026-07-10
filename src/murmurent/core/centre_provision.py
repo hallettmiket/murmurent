@@ -875,6 +875,83 @@ def _live_slack_create_channel(
     return res.channel_id if res.ok else None
 
 
+@dataclass
+class SlackAuthResult:
+    """Outcome of a live Slack ``auth.test`` call. Used to validate a bot
+    token (group or centre) WITHOUT creating anything — cheaper and safer
+    than :func:`slack_create_channel` for a plain "is this token good?"
+    check, and it surfaces the workspace's ``team_id`` so a caller can
+    auto-fill ``slack_workspace`` instead of asking the PI to hunt for it."""
+
+    ok: bool
+    team_id: str = ""
+    team_name: str = ""
+    bot_user: str = ""
+    error: str = ""
+    detail: str = ""
+
+
+def slack_auth_test(token: str) -> SlackAuthResult:
+    """Live Slack ``auth.test``. Confirms the token is valid and returns the
+    workspace id/name + bot username on success.
+
+    Unlike :func:`slack_create_channel`, this creates nothing and needs no
+    OAuth scope beyond a valid token — safe to call as a first validation
+    step before a PI's token is trusted enough to write to disk.
+    """
+    import httpx
+
+    if not token:
+        return SlackAuthResult(
+            ok=False, error="missing_token",
+            detail="no token given.",
+        )
+    try:
+        r = httpx.post(
+            "https://slack.com/api/auth.test",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return SlackAuthResult(
+            ok=False, error="transport",
+            detail=f"network error: {exc}",
+        )
+    try:
+        data = r.json()
+    except Exception as exc:  # noqa: BLE001
+        return SlackAuthResult(
+            ok=False, error="bad_response",
+            detail=f"non-JSON response from Slack (HTTP {r.status_code}): {exc}",
+        )
+    if data.get("ok"):
+        return SlackAuthResult(
+            ok=True,
+            team_id=str(data.get("team_id") or ""),
+            team_name=str(data.get("team") or ""),
+            bot_user=str(data.get("user") or ""),
+            detail=f"authenticated (HTTP {r.status_code})",
+        )
+    err = str(data.get("error") or "unknown")
+    hints = {
+        "not_authed": "no token given.",
+        "invalid_auth": "the token is wrong or has been revoked — "
+                         "re-copy the Bot User OAuth Token (starts 'xoxb-') "
+                         "from OAuth & Permissions and try again.",
+        "account_inactive": "the token's app/workspace was deleted or "
+                             "the app was uninstalled — reinstall it.",
+        "token_revoked": "the token was revoked — reinstall the app to "
+                          "get a fresh one.",
+        "missing_scope": "your bot token lacks a required OAuth scope; "
+                          "see the scopes table in the setup guide, add "
+                          "them under OAuth & Permissions, and reinstall.",
+    }
+    return SlackAuthResult(
+        ok=False, error=err,
+        detail=hints.get(err, f"Slack returned error={err!r} (raw: {data})"),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Reconcile loop (diff desired vs actual)
 # ---------------------------------------------------------------------------

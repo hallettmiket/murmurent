@@ -24,6 +24,7 @@ from click.testing import CliRunner
 
 from murmurent.commands.centre_cmd import (
     centre_slack_smoke as cli_smoke,
+    _normalize_slack_token,
 )
 from murmurent.core import centre_provision as CP
 
@@ -247,3 +248,97 @@ def test_cli_default_channel_is_timestamped(monkeypatch):
     with patch("httpx.post", side_effect=fake_post):
         CliRunner().invoke(cli_smoke)
     assert captured["name"].startswith("murmurent-smoke-")
+
+
+# ---- slack_auth_test (group-slack-setup's token validator) -------------
+
+def _auth_response(ok: bool, *, team_id: str = "T0FAKE", team_name: str = "acme",
+                    bot_user: str = "mh", error: str = "",
+                    status_code: int = 200) -> MagicMock:
+    mock = MagicMock()
+    mock.status_code = status_code
+    body = {"ok": ok}
+    if ok:
+        body.update(team_id=team_id, team=team_name, user=bot_user)
+    else:
+        body["error"] = error
+    mock.json.return_value = body
+    return mock
+
+
+def test_auth_test_empty_token_is_actionable():
+    res = CP.slack_auth_test("")
+    assert res.ok is False
+    assert res.error == "missing_token"
+
+
+def test_auth_test_happy_path_returns_team_and_bot():
+    with patch("httpx.post", return_value=_auth_response(
+            True, team_id="T0DCIS", team_name="dcis-lab", bot_user="dcis")):
+        res = CP.slack_auth_test("xoxb-real")
+    assert res.ok is True
+    assert res.team_id == "T0DCIS"
+    assert res.team_name == "dcis-lab"
+    assert res.bot_user == "dcis"
+
+
+def test_auth_test_creates_nothing(monkeypatch):
+    """Unlike slack_create_channel, auth.test must not POST a channel-create
+    payload — it's meant to be safe to call before a token is trusted."""
+    captured = {}
+    def fake_post(url, **kw):
+        captured["url"] = url
+        return _auth_response(True)
+    with patch("httpx.post", side_effect=fake_post):
+        CP.slack_auth_test("xoxb-real")
+    assert captured["url"] == "https://slack.com/api/auth.test"
+
+
+@pytest.mark.parametrize("err,hint_substr", [
+    ("invalid_auth",    "revoked"),
+    ("account_inactive", "uninstalled"),
+    ("token_revoked",   "reinstall"),
+    ("missing_scope",   "scope"),
+    ("not_authed",      "no token"),
+])
+def test_auth_test_known_errors_get_actionable_hints(err, hint_substr):
+    with patch("httpx.post", return_value=_auth_response(False, error=err)):
+        res = CP.slack_auth_test("xoxb-bad")
+    assert res.ok is False
+    assert res.error == err
+    assert hint_substr.lower() in res.detail.lower()
+
+
+def test_auth_test_network_error_classified_as_transport():
+    import httpx as _httpx
+    with patch("httpx.post", side_effect=_httpx.ConnectError("dns fail")):
+        res = CP.slack_auth_test("xoxb-x")
+    assert res.ok is False
+    assert res.error == "transport"
+
+
+# ---- _normalize_slack_token (group-slack-setup paste-safety) -----------
+
+def test_normalize_token_passthrough_for_clean_token():
+    assert _normalize_slack_token("xoxb-123-456-abcDEF") == "xoxb-123-456-abcDEF"
+
+
+def test_normalize_token_collapses_duplicated_prefix():
+    """Typing 'xoxb-' before pasting a token that already includes it —
+    the exact mistake the prompt used to invite — must be recovered."""
+    assert _normalize_slack_token("xoxb-xoxb-123-456") == "xoxb-123-456"
+
+
+def test_normalize_token_collapses_triple_duplicated_prefix():
+    assert _normalize_slack_token("xoxb-xoxb-xoxb-123") == "xoxb-123"
+
+
+def test_normalize_token_strips_stray_whitespace_and_control_chars():
+    """A hidden-input paste under bracketed-paste mode can pick up escape
+    bytes around the real token; only Slack's token alphabet survives."""
+    assert _normalize_slack_token("  xoxb-123-456 \n") == "xoxb-123-456"
+    assert _normalize_slack_token("\x1b[200~xoxb-123-456\x1b[201~") == "xoxb-123-456"
+
+
+def test_normalize_token_empty_stays_empty():
+    assert _normalize_slack_token("   ") == ""

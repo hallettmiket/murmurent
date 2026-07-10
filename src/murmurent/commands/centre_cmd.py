@@ -699,6 +699,8 @@ def enroll(nonce: str, group: str, project: str, out_file: str | None) -> None:
     from ..core import issuance as _iss
     from ..core import identity as _id
     ident = _id.resolve(allow_unknown=True)
+    is_project = bool(project)
+    is_group = bool(group) and not is_project
     # --project is a hint the PI reads; the actual composite group (<lab>/<project>)
     # is set at issuance. A bare --project fills the group hint for readability.
     group = group or project
@@ -707,13 +709,35 @@ def enroll(nonce: str, group: str, project: str, out_file: str | None) -> None:
     except _iss.IssuanceError as exc:
         raise click.ClickException(str(exc)) from exc
     text = __import__("json").dumps(req, indent=2)
-    if out_file:
-        from pathlib import Path as _P
-        _P(out_file).write_text(text, encoding="utf-8")
-        click.echo(f"✓ wrote enrollment request for {ident.at_handle} to {out_file}")
-        click.echo("  Send it to your mayor; they run `murmurent issue-pi-card <file>`.")
-    else:
+    if not out_file:
+        # Bare JSON on stdout is for scripting/piping — keep it pure, no
+        # trailing prose, so callers can parse it directly.
         click.echo(text)
+        return
+
+    from pathlib import Path as _P
+    _P(out_file).write_text(text, encoding="utf-8")
+    click.echo(f"✓ wrote enrollment request for {ident.at_handle} to {out_file}")
+    click.echo()
+    if is_group:
+        click.echo(f"Send the file {out_file} to your PI — they lead '{group}' and "
+                   "are who signs your member ID:")
+        click.echo("  • On Slack: DM your PI directly (you're already in their lab's "
+                   "workspace) — attach the file, or paste its contents in.")
+        click.echo(f"  • They run:  murmurent issue-member-card {out_file} --group {group}")
+        click.echo("  • If their lab's Slack is connected (`group-slack-setup`), "
+                   "murmurent DMs your signed card straight back to you — otherwise "
+                   "they'll send it to you by hand.")
+        click.echo("  • Either way, you finish with:  murmurent import-card <bundle-file> "
+                   "--trust-root <the root they give you>")
+    elif is_project:
+        click.echo(f"Send the file {out_file} to your PI so they can issue your "
+                   "project card:")
+        click.echo(f"  murmurent issue-project-card {out_file} --project {project} "
+                   "--lab <lab>")
+    else:
+        click.echo(f"Send the file {out_file} to your mayor; they run "
+                   "`murmurent issue-pi-card <file>`.")
 
 
 @click.command("issue-pi-card",
@@ -760,16 +784,24 @@ def issue_pi_card_cmd(enrollment_file: str, handle: str, actor: str,
                 help="PI / group-registrar: sign a member card for a member's "
                      "enrollment request, chaining it to the centre via your own "
                      "PI card. Verifies proof-of-possession. Output is a BUNDLE "
-                     "(member card + your PI card) — send it to the member to "
-                     "`murmurent import-card`.")
+                     "(member card + your PI card). By default, DMs it straight "
+                     "to the member on your lab's Slack (resolved from their "
+                     "enrollment email, or pass --dm); use --no-dm to skip that "
+                     "and send it yourself.")
 @click.argument("enrollment_file")
 @click.option("--group", required=True, help="The group you lead to add them to.")
 @click.option("--handle", default="", help="Member handle (default: from the enrollment).")
 @click.option("--out", "out_file", type=click.Path(dir_okay=False), default=None,
               help="Write the bundle to a file (default: print).")
+@click.option("--dm", "dm_user_id", default="",
+              help="Slack user id to DM the bundle to. Default: auto-resolve from "
+                   "the member's enrollment email in the group's Slack workspace.")
+@click.option("--no-dm", is_flag=True,
+              help="Don't attempt Slack delivery — just print/write the bundle.")
 def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
-                          out_file: str | None) -> None:
+                          out_file: str | None, dm_user_id: str, no_dm: bool) -> None:
     from ..core import issuance as _iss
+    from ..core import group_reconcile as _gr
     import json as _json
     from pathlib import Path as _P
     try:
@@ -789,18 +821,37 @@ def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
     # centre's signing recipient.
     pi_p = bundle["pi_card"]["payload"]
     self_rooted = (pi_p.get("issuer") or {}).get("fingerprint") == pi_p["subject"]["fingerprint"]
+    if self_rooted:
+        root = pi_p["subject"]["pubkey"]
+        import_hint = f"murmurent import-card <bundle-file> --trust-root {root}"
+    else:
+        import_hint = ("murmurent centre-pin <centre>, then "
+                       "murmurent import-card <bundle-file>")
+
     if out_file:
         _P(out_file).write_text(text, encoding="utf-8")
         click.echo(f"✓ signed member card for {subj} (group {group}) → {out_file}")
-        if self_rooted:
-            root = pi_p["subject"]["pubkey"]
-            click.echo(f"  Send them this file + your trust root:\n    {root}")
-            click.echo(f"  They run:  murmurent import-card {out_file} --trust-root {root}")
-        else:
-            click.echo("  Send them this file; they pin your centre's signing recipient "
-                       "(`murmurent centre-pin <centre>`), then `murmurent import-card <file>`.")
     else:
         click.echo(text)
+
+    if no_dm:
+        click.echo(f"\nSend them this bundle; they run:\n    {import_hint}")
+        return
+
+    member_email = str((enrollment.get("payload") or {}).get("email") or "")
+    dm_text = (
+        f"Your murmurent member ID for '{group}' is ready. Save the JSON below "
+        f"as a file (e.g. bundle.json), then run:\n\n"
+        f"    {import_hint}\n\n"
+        f"```\n{text}\n```"
+    )
+    ok, detail = _gr.send_group_dm(group, text=dm_text, slack_user_id=dm_user_id,
+                                    email=member_email)
+    if ok:
+        click.echo(f"\n✓ DM'd {subj} their card on Slack")
+    else:
+        click.echo(f"\n! could not DM on Slack ({detail}) — send them this bundle "
+                   f"yourself:\n    {import_hint}")
 
 
 @click.command("issue-project-card",
@@ -1344,6 +1395,149 @@ def group_setup(group: str, sets: tuple[str, ...], non_interactive: bool) -> Non
     if not prof.get("github"):
         click.echo("\nTip: create a PRIVATE group repo (your agent toolkit + lab-mgmt), "
                    f"then set it:  murmurent group-setup {group} --set github=<org>/<repo>")
+
+
+_GROUP_SLACK_SCOPES = [
+    ("groups:write",      "create the group's private channels"),
+    ("chat:write",        "post events + broadcasts"),
+    ("im:write",          "open a real DM to a member (onboarding), not just "
+                           "the bot's App messages tab"),
+    ("users:read.email",  "resolve a member's email → their Slack account"),
+    ("groups:read",       "look up channel ids by name"),
+    ("channels:read",     "look up channel ids by name"),
+]
+
+
+def _normalize_slack_token(raw: str) -> str:
+    """Clean up a bot token as typed/pasted at a terminal prompt.
+
+    Handles two real-world mistakes:
+      - stray whitespace / control characters a hidden (no-echo) paste can
+        pick up from a terminal's bracketed-paste sequences;
+      - a duplicated 'xoxb-' prefix from typing it before pasting a token
+        that already includes it (easy to do since the prompt can't show
+        you what you've entered so far).
+    """
+    import re
+    # Strip whole ANSI/CSI escape sequences first (e.g. the bracketed-paste
+    # markers ESC[200~ / ESC[201~ some terminals wrap pasted text in) — do
+    # this BEFORE the character allow-list below, or a sequence's numeric
+    # payload (the "200"/"201") would survive as if it were part of the token.
+    cleaned = re.sub(r"\x1b\[[0-9;]*[A-Za-z~]", "", raw)
+    # Keep only the characters a Slack token can actually contain —
+    # drops any other stray control/whitespace bytes a hidden paste picked up.
+    cleaned = re.sub(r"[^A-Za-z0-9._-]", "", cleaned)
+    cleaned = re.sub(r"^(xoxb-)+", "xoxb-", cleaned)
+    return cleaned
+
+
+@click.command("group-slack-setup",
+                help="PI: connect your lab's OWN Slack workspace to murmurent. "
+                     "Walks through creating a bot token, validates it live, "
+                     "and stores it at "
+                     "~/.config/murmurent/groups/<group>/slack-token (mode 0600) "
+                     "so `murmurent group-reconcile` can use it.")
+@click.argument("group")
+@click.option("--token", default="",
+              help="Bot token (starts 'xoxb-'). Omit to be prompted (hidden input).")
+@click.option("--invite-url", default="",
+              help="The workspace's join link (Invite people → Copy invite link). "
+                   "Omit to be prompted.")
+@click.option("--workspace", default="",
+              help="Override the auto-detected workspace id (normally read "
+                   "from the token via auth.test — you shouldn't need this).")
+@click.option("--non-interactive", is_flag=True,
+              help="Don't print the walkthrough or prompt; use --token/--invite-url only.")
+@click.option("--skip-validate", is_flag=True,
+              help="Skip the live auth.test check and store the token as given. "
+                   "Only for scripted/offline setups — an untested token may not work.")
+def group_slack_setup(group: str, token: str, invite_url: str, workspace: str,
+                       non_interactive: bool, skip_validate: bool) -> None:
+    from ..core import centre_provision as _cp
+    from ..core import group_reconcile as _gr
+    from ..core import registrar as _R
+
+    if not _R.group_exists(group):
+        raise click.ClickException(
+            f"no lab or core named {group!r} — create it first (a lab/core join request).")
+
+    if not non_interactive:
+        click.echo(f"Connecting '{group}'s Slack workspace to murmurent.\n")
+        click.echo("This has one manual step (Slack has no API to create an app "
+                    "for you) — click through it once, then the rest is automatic:\n")
+        click.echo(f"  1. Go to https://api.slack.com/apps, signed in as the "
+                    f"account that owns your lab's Slack workspace.")
+        click.echo(f"  2. Create New App → From scratch. Name it '{group}' "
+                    f"(or anything — this is just how members see the sender "
+                    f"of DMs), pick your lab's workspace, Create App.")
+        click.echo("  3. Left sidebar → OAuth & Permissions → scroll to "
+                    "Scopes → Bot Token Scopes → Add an OAuth Scope, and add:")
+        for scope, why in _GROUP_SLACK_SCOPES:
+            click.echo(f"       {scope:<20} {why}")
+        click.echo("  4. Scroll back up → OAuth Tokens for Your Workspace → "
+                    "Install to Workspace → Allow.")
+        click.echo("  5. Copy the Bot User OAuth Token (starts 'xoxb-') from "
+                    "that same page.")
+        click.echo("  6. In Slack: Invite people → Copy invite link — that's "
+                    "the link new members use to join your lab's workspace; "
+                    "have it ready for the next prompt.")
+        click.echo("\nFull guide with click-by-click detail: "
+                    "docs/group_slack_setup.md\n")
+
+    if not token:
+        if non_interactive:
+            raise click.ClickException("--token is required with --non-interactive.")
+        token = click.prompt(
+            "Paste the Bot User OAuth Token you copied in step 5 "
+            "(just paste it whole — it already starts with 'xoxb-', "
+            "don't type that part yourself)",
+            hide_input=True)
+    token = _normalize_slack_token(token)
+    if token:
+        click.echo(f"  (received {len(token)} characters, ending "
+                   f"'…{token[-4:]}' — hidden input doesn't echo, this "
+                   f"is just to confirm something came through)")
+
+    resolved_workspace = workspace
+    if not skip_validate:
+        res = _cp.slack_auth_test(token)
+        if not res.ok:
+            click.echo(f"✗ token validation failed: error={res.error}")
+            click.echo(f"  detail: {res.detail}")
+            raise click.exceptions.Exit(1)
+        click.echo(f"✓ token is valid — workspace: {res.team_name or '(unnamed)'} "
+                   f"({res.team_id}), bot: @{res.bot_user or '?'}")
+        if not resolved_workspace:
+            resolved_workspace = res.team_id
+    elif not resolved_workspace:
+        click.echo("! --skip-validate with no --workspace: slack_workspace will "
+                    "be left unset. Pass --workspace T… if you know it.")
+
+    if not invite_url:
+        if non_interactive:
+            invite_url = ""
+        else:
+            invite_url = click.prompt(
+                "Workspace invite link (Invite people → Copy invite link)",
+                default="", show_default=False).strip()
+
+    path = _gr.write_group_slack_token(group, token)
+    click.echo(f"✓ saved bot token to {path} (mode 0600)")
+
+    fields: dict[str, str] = {}
+    if resolved_workspace:
+        fields["slack_workspace"] = resolved_workspace
+    if invite_url:
+        fields["slack_invite_url"] = invite_url
+    if fields:
+        _R.update_group_profile(group, fields)
+        click.echo(f"✓ saved to the group's lab.md: {', '.join(fields)}")
+
+    click.echo(f"\nNext: murmurent group-reconcile {group}")
+    click.echo("  Checks each active lab member against your Slack workspace "
+               "(flags anyone missing + gives you the invite link to send them) "
+               "and, with --apply, adds members as GitHub collaborators on your "
+               "lab's repo. Report-only by default — safe to re-run any time.")
 
 
 @click.command("group-reconcile",
