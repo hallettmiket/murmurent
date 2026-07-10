@@ -10,8 +10,8 @@ localhost laptop; a hole the moment the dashboard is exposed (e.g. on the
 murmurent server behind Caddy).
 
 **Model — shared registrar secret → signed session cookie (Option A):**
-the registrar sets one secret (``$WIGAMIG_DASHBOARD_SECRET`` or
-``~/.wigamig/dashboard_secret``). A login exchanges the secret for a
+the registrar sets one secret (``$MURMURENT_DASHBOARD_SECRET`` or
+``~/.murmurent/dashboard_secret``). A login exchanges the secret for a
 short-lived, HMAC-signed cookie; a middleware then requires that cookie on
 every *mutating* request (POST/PUT/PATCH/DELETE), except a small public
 allowlist. The secret proves membership of the trusted operator group;
@@ -36,8 +36,8 @@ import os
 import time
 from pathlib import Path
 
-ENV_VAR = "WIGAMIG_DASHBOARD_SECRET"
-SECRET_FILE = Path.home() / ".wigamig" / "dashboard_secret"
+ENV_VAR = "MURMURENT_DASHBOARD_SECRET"
+SECRET_FILE = Path.home() / ".murmurent" / "dashboard_secret"
 COOKIE_NAME = "wigamig_session"
 DEFAULT_TTL = 12 * 3600  # 12 hours
 

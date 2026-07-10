@@ -42,17 +42,17 @@ The dashboard's `obsidian://` URL will then jump to the right file.
 
 ### Picking a different editor
 
-Default order: `$WIGAMIG_NOTEBOOK_EDITOR` → `$EDITOR` → `obsidian://` → `code` → platform default.
+Default order: `$MURMURENT_NOTEBOOK_EDITOR` → `$EDITOR` → `obsidian://` → `code` → platform default.
 
 ```bash
 # Force Obsidian (assumes lab-notebook is registered as a vault)
-export WIGAMIG_NOTEBOOK_EDITOR=obsidian
+export MURMURENT_NOTEBOOK_EDITOR=obsidian
 
 # Force VS Code
-export WIGAMIG_NOTEBOOK_EDITOR="code -g {path}"
+export MURMURENT_NOTEBOOK_EDITOR="code -g {path}"
 
 # Force a specific binary with arguments
-export WIGAMIG_NOTEBOOK_EDITOR="vim {path}"
+export MURMURENT_NOTEBOOK_EDITOR="vim {path}"
 ```
 
 ### Sharing daily journals

@@ -21,8 +21,8 @@ from murmurent.core import idkeys as K
 
 @pytest.fixture(autouse=True)
 def _home(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "wig"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "wig"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
 
 
 # ---- key lifecycle ----------------------------------------------------------

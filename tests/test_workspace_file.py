@@ -23,8 +23,8 @@ def world(monkeypatch, tmp_path):
     lab_vm_root = tmp_path / "lab_vm" / "data"
     vault = tmp_path / "obsidian" / "vault"
 
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(repos))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(lab_vm_root))
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(repos))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(lab_vm_root))
     monkeypatch.setattr(wf, "WORKSPACE_DIR", tmp_path / "workspaces")
     # Force the personal-oracle fallback path so it does not leak from
     # the developer's real home dir into the test.

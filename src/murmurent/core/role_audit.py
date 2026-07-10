@@ -4,13 +4,13 @@ Author: Mike Hallett (with Claude Code)
 Date: 2026-05-13
 Input: Calls from the FastAPI login endpoints recording who picked which
        role at what time from what source address.
-Output: JSON Lines file at ``~/.wigamig/role_audit.log`` (one event per line).
+Output: JSON Lines file at ``~/.murmurent/role_audit.log`` (one event per line).
 
 This is a **local** auditing trail. The user has access to it — anyone
 holding the laptop can read or rotate it — but every role choice the
 dashboard server witnesses lands here, so even a fabricated role claim
 leaves a record. Separate from ``dashboard/audit_log.py`` (which logs
-*domain* events to the lab-mgmt repo) and from ``~/.claude/wigamig-audit/``
+*domain* events to the lab-mgmt repo) and from ``~/.claude/murmurent-audit/``
 (which logs every Claude tool call).
 
 Each row is a JSON object with keys::
@@ -32,8 +32,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-DEFAULT_LOG_PATH = Path.home() / ".wigamig" / "role_audit.log"
-ENV_VAR = "WIGAMIG_ROLE_AUDIT_LOG"
+DEFAULT_LOG_PATH = Path.home() / ".murmurent" / "role_audit.log"
+ENV_VAR = "MURMURENT_ROLE_AUDIT_LOG"
 
 VALID_ROLES = frozenset({"member", "pi", "registrar", "core_leader"})
 

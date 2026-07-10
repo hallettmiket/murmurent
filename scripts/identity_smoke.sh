@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # End-to-end smoke test of the murmurent signed-identity lifecycle (phases 0-5),
 # simulating a MAYOR, a PI, and a MEMBER on ONE machine via separate
-# WIGAMIG_HOME roots. Non-destructive: everything lives under a fresh temp dir.
+# MURMURENT_HOME roots. Non-destructive: everything lives under a fresh temp dir.
 # Requires `murmurent` on PATH.
 set -euo pipefail
 
@@ -11,10 +11,10 @@ PY="$(head -1 "$(command -v murmurent)" | sed 's/^#!//')"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/wig-smoke.XXXXXX")"
 echo "workdir: $WORK"
 
-# `centre-init` writes ~/.wigamig/registrar via Path.home() — it ignores
-# WIGAMIG_HOME — so back it up and restore it on exit. Keeps the smoke test from
+# `centre-init` writes ~/.murmurent/registrar via Path.home() — it ignores
+# MURMURENT_HOME — so back it up and restore it on exit. Keeps the smoke test from
 # clobbering your real registrar sentinel.
-_SENTINEL="$HOME/.wigamig/registrar"
+_SENTINEL="$HOME/.murmurent/registrar"
 _SENTINEL_BAK="$(cat "$_SENTINEL" 2>/dev/null || true)"
 _restore_sentinel(){
   if [ -n "$_SENTINEL_BAK" ]; then
@@ -29,12 +29,12 @@ MAYOR="$WORK/mayor"; PI="$WORK/pi"; MEMBER="$WORK/member"
 LABINFO="$WORK/mayor_labinfo"; LABMGMT="$WORK/mayor_labmgmt"
 hr(){ echo; echo "===== $* ====="; }
 
-mayor_env(){ export WIGAMIG_HOME="$MAYOR" WIGAMIG_LAB_INFO_ROOT="$LABINFO" \
-             WIGAMIG_LAB_MGMT_REPO="$LABMGMT" WIGAMIG_USER=tbrowne5; }
-pi_env(){ export WIGAMIG_HOME="$PI" WIGAMIG_LAB_INFO_ROOT="$WORK/pi_labinfo" \
-          WIGAMIG_USER=yxia266; unset WIGAMIG_LAB_MGMT_REPO; }
-member_env(){ export WIGAMIG_HOME="$MEMBER" WIGAMIG_LAB_INFO_ROOT="$WORK/mem_labinfo" \
-              WIGAMIG_USER=allie; unset WIGAMIG_LAB_MGMT_REPO; }
+mayor_env(){ export MURMURENT_HOME="$MAYOR" MURMURENT_LAB_INFO_ROOT="$LABINFO" \
+             MURMURENT_LAB_MGMT_REPO="$LABMGMT" MURMURENT_USER=tbrowne5; }
+pi_env(){ export MURMURENT_HOME="$PI" MURMURENT_LAB_INFO_ROOT="$WORK/pi_labinfo" \
+          MURMURENT_USER=yxia266; unset MURMURENT_LAB_MGMT_REPO; }
+member_env(){ export MURMURENT_HOME="$MEMBER" MURMURENT_LAB_INFO_ROOT="$WORK/mem_labinfo" \
+              MURMURENT_USER=allie; unset MURMURENT_LAB_MGMT_REPO; }
 
 # ---------------- MAYOR: bootstrap ----------------
 hr "MAYOR: bootstrap centre + root CA"

@@ -164,13 +164,13 @@ def main(
     """Read stdin, write the decision JSON to stdout.
 
     ``mode`` is ``"pre"`` (default) or ``"post"``. Inferred from
-    ``$WIGAMIG_PHI_HOOK_MODE`` when not passed. The shipped install registers
+    ``$MURMURENT_PHI_HOOK_MODE`` when not passed. The shipped install registers
     two hook entries — one per mode — pointing at this same module.
     """
     src = stdin or sys.stdin
     dst = stdout or sys.stdout
     if mode is None:
-        mode = os.environ.get("WIGAMIG_PHI_HOOK_MODE", "pre").lower()
+        mode = os.environ.get("MURMURENT_PHI_HOOK_MODE", "pre").lower()
 
     raw = src.read()
     if not raw.strip():

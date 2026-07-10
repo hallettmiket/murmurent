@@ -32,7 +32,7 @@ def age_available() -> bool:
 
 def default_key_path() -> Path:
     """Where the mayor's private key lives (per-machine, mode 0600)."""
-    return Path.home() / ".wigamig" / "age" / "mayor.key"
+    return Path.home() / ".murmurent" / "age" / "mayor.key"
 
 
 def keygen(key_path: Path | None = None) -> str:

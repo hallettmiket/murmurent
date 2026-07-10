@@ -45,15 +45,15 @@ def cmd_dashboard(
 
     if not handle:
         raise click.ClickException(
-            "No member identity resolved. Set $WIGAMIG_USER or write your handle to "
-            "~/.wigamig/user (e.g. `echo mhallet > ~/.wigamig/user`)."
+            "No member identity resolved. Set $MURMURENT_USER or write your handle to "
+            "~/.murmurent/user (e.g. `echo mhallet > ~/.murmurent/user`)."
         )
 
     snap = dashboard.build_snapshot(handle)
 
     if pi_view and not snap.is_pi:
         raise click.ClickException(
-            "--pi requires WIGAMIG_USER=mhallet (or PI gh handle); v1 hardcodes PI to @mhallet."
+            "--pi requires MURMURENT_USER=mhallet (or PI gh handle); v1 hardcodes PI to @mhallet."
         )
 
     if outstanding:

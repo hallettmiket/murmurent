@@ -27,11 +27,11 @@ from murmurent.dashboard.server import create_app
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
-    monkeypatch.setenv("WIGAMIG_USER", "mhallet")
-    monkeypatch.setenv("WIGAMIG_DECOMMISSION_DIR", str(tmp_path / "decommissions"))
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    monkeypatch.setenv("MURMURENT_USER", "mhallet")
+    monkeypatch.setenv("MURMURENT_DECOMMISSION_DIR", str(tmp_path / "decommissions"))
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "projects").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "lab.md").write_text(

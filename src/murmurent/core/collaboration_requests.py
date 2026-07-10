@@ -1,7 +1,7 @@
 """
 Purpose: Centre-level "PI proposes a cross-lab collaboration; registrar approves"
          workflow. The proposed collaboration's spec is filed in
-         ``~/.wigamig/lab_info/collaboration_requests/<id>.md`` (the
+         ``~/.murmurent/lab_info/collaboration_requests/<id>.md`` (the
          registrar's own repo). Approval creates the registry entry via
          the existing ``core.registrar.create_collaboration`` flow.
 Author: Mike Hallett (with Claude Code)
@@ -107,8 +107,8 @@ def _lab_info_root(env: dict[str, str] | None = None) -> Path:
     import os
 
     source = os.environ if env is None else env
-    base = source.get("WIGAMIG_LAB_INFO_ROOT")
-    return Path(base).expanduser() if base else Path("~/.wigamig/lab_info").expanduser()
+    base = source.get("MURMURENT_LAB_INFO_ROOT")
+    return Path(base).expanduser() if base else Path("~/.murmurent/lab_info").expanduser()
 
 
 def requests_dir(env: dict[str, str] | None = None) -> Path:

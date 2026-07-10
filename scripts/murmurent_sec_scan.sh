@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Purpose: Unprivileged Tier-1 security scanner for a wigamig lab member's
+# Purpose: Unprivileged Tier-1 security scanner for a murmurent lab member's
 #          slice of a server (typically a shared lab box like biodatsci).
 #          Emits one JSONL finding per line on stdout, progress messages
 #          on stderr. Side-effect-free — pure read-only system calls.
@@ -16,12 +16,12 @@
 #                       [--repo-large-mb 50]
 #
 # Designed to run over SSH in a single batched session (see
-# src/wigamig/core/security_remote.py). The Python parser reads stdout
+# src/murmurent/core/security_remote.py). The Python parser reads stdout
 # line-by-line; each line is either a JSON finding object or a progress
 # marker (``{"_kind":"progress","message":...}``).
 #
 # WARNING: do not add any code path that writes under /data/lab_vm.
-# The wigamig raw_guard hook would block it on a laptop, but on the
+# The murmurent raw_guard hook would block it on a laptop, but on the
 # server we rely on review. Read-only system calls only:
 #   find, stat, getfacl, ls, du, last, awk, sed, grep, crontab -l,
 #   systemctl --user list-units, id, getent.
@@ -30,12 +30,12 @@ set -u
 # NOT set -e: a denied directory read shouldn't abort the entire scan.
 
 # --- defaults --------------------------------------------------------------
-LAB_VM_ROOT="${WIGAMIG_LAB_VM_ROOT:-/data/lab_vm}"
-PROJECTS_ROOT="${WIGAMIG_PROJECTS_ROOT:-$HOME/repos}"
-LAB_GROUP="${WIGAMIG_LAB_GROUP:-}"
-HOME_WARN_GB="${WIGAMIG_HOME_WARN_GB:-100}"
-REPO_LARGE_MB="${WIGAMIG_REPO_LARGE_MB:-50}"
-HOST_NAME="${WIGAMIG_HOST_NAME:-$(hostname -s 2>/dev/null || echo local)}"
+LAB_VM_ROOT="${MURMURENT_LAB_VM_ROOT:-/data/lab_vm}"
+PROJECTS_ROOT="${MURMURENT_PROJECTS_ROOT:-$HOME/repos}"
+LAB_GROUP="${MURMURENT_LAB_GROUP:-}"
+HOME_WARN_GB="${MURMURENT_HOME_WARN_GB:-100}"
+REPO_LARGE_MB="${MURMURENT_REPO_LARGE_MB:-50}"
+HOST_NAME="${MURMURENT_HOST_NAME:-$(hostname -s 2>/dev/null || echo local)}"
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -58,7 +58,7 @@ MY_HANDLE="@${ME}"
 # coreutils only wraps executables, not shell functions, so we apply it
 # at the primitive level. When unavailable, the primitives run unwrapped
 # — better to risk a slow scan than to silently skip them.
-SCAN_TIMEOUT="${WIGAMIG_SCAN_TIMEOUT:-180}"
+SCAN_TIMEOUT="${MURMURENT_SCAN_TIMEOUT:-180}"
 
 # Prefix to put in front of slow commands. Expands to nothing when
 # ``timeout`` isn't available — callers still work.
@@ -388,8 +388,8 @@ scan_dotfiles() {
 }
 
 scan_wigamig() {
-    progress "scanning ~/.wigamig"
-    local d="$HOME/.wigamig"
+    progress "scanning ~/.murmurent"
+    local d="$HOME/.murmurent"
     [[ -d "$d" ]] || return 0
     # WIGAMIG-MANIFEST-PERM-01: installation manifests world-readable.
     while IFS= read -r f; do
@@ -399,7 +399,7 @@ scan_wigamig() {
         # World-read = ends in 4/5/6/7 (mod-4-bit set in last octet).
         local last="${m: -1}"
         if [[ "$last" == "4" || "$last" == "5" || "$last" == "6" || "$last" == "7" ]]; then
-            emit_finding "warn" "wigamig" "WIGAMIG-MANIFEST-PERM-01" \
+            emit_finding "warn" "murmurent" "WIGAMIG-MANIFEST-PERM-01" \
                 "$f" "$m" "0640 (owner+group)" \
                 "chmod o-r '$f'"
         fi

@@ -4,7 +4,7 @@ Purpose: ``Finding`` dataclass + JSONL (de)serializer for the security
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-19
 Input: Constructor args from scanners (Python or bash-emitted JSONL);
-       read paths from ``~/.wigamig/security/<host>/<date>.jsonl``.
+       read paths from ``~/.murmurent/security/<host>/<date>.jsonl``.
 Output: Dashboard rows, slack summaries, CLI tables.
 
 Single source of truth for the row schema rendered in
@@ -214,8 +214,8 @@ def _rollup_key(f: Finding) -> str:
     if f.category in ("repos", "raw", "refined") and f.project:
         # Find the **highest** ancestor whose basename matches the
         # project name. Walk top-down so that a path like
-        # ``/home/u/repos/wigamig/src/wigamig/foo.py`` rolls up at
-        # ``/home/u/repos/wigamig``, not the nested ``src/wigamig``.
+        # ``/home/u/repos/wigamig/src/murmurent/foo.py`` rolls up at
+        # ``/home/u/repos/wigamig``, not the nested ``src/murmurent``.
         # Falls back to immediate parent if no match (defensive).
         parts = p.parts
         for i in range(len(parts)):

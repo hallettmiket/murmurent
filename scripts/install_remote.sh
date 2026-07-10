@@ -30,7 +30,7 @@
 #   4. uv tool install --reinstall .   → registers `murmurent` on the host's
 #                                        PATH at ~/.local/bin/murmurent.
 #   5. Sanity probes: murmurent --version, ls /data/lab_vm/{raw,refined},
-#      gh auth status, mkdir -p ~/.wigamig.
+#      gh auth status, mkdir -p ~/.murmurent.
 #
 # Stdout is human-readable; any failure prints a clear "FAILED:" line and
 # the script exits non-zero so callers (e.g. `murmurent host add`) can react.
@@ -39,7 +39,7 @@ set -euo pipefail
 
 SCRIPT_NAME="$(basename "$0")"
 LAPTOP_REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-WIGAMIG_REPO_URL="https://github.com/hallettmiket/murmurent.git"
+MURMURENT_REPO_URL="https://github.com/hallettmiket/murmurent.git"
 BRANCH="main"
 HOST=""
 
@@ -115,7 +115,7 @@ if ssh_run 'test -d ~/repos/wigamig/.git'; then
   REMOTE_COMMIT="$(ssh_run 'cd ~/repos/wigamig && git rev-parse --short HEAD')"
   ok "repo updated to ${REMOTE_COMMIT} (${BRANCH})"
 else
-  ssh_run "git clone --branch ${BRANCH} ${WIGAMIG_REPO_URL} ~/repos/wigamig"
+  ssh_run "git clone --branch ${BRANCH} ${MURMURENT_REPO_URL} ~/repos/wigamig"
   REMOTE_COMMIT="$(ssh_run 'cd ~/repos/wigamig && git rev-parse --short HEAD')"
   ok "repo cloned to ~/repos/wigamig at ${REMOTE_COMMIT}"
 fi
@@ -126,11 +126,11 @@ step "4/5 murmurent CLI installation on ${HOST}"
 # -e (editable) + --python 3.12: a non-editable install relocates the package
 # away from the clone, breaking the dashboard's static assets; py3.12 is required.
 ssh_run 'export PATH=$HOME/.local/bin:$PATH; cd ~/repos/wigamig && uv tool install --reinstall --python 3.12 -e .'
-WIGAMIG_VERSION="$(ssh_run 'export PATH=$HOME/.local/bin:$PATH; murmurent --version 2>/dev/null || true')"
-if [[ -z "$WIGAMIG_VERSION" ]]; then
+MURMURENT_VERSION="$(ssh_run 'export PATH=$HOME/.local/bin:$PATH; murmurent --version 2>/dev/null || true')"
+if [[ -z "$MURMURENT_VERSION" ]]; then
   fail "murmurent --version returned no output on the remote host"
 fi
-ok "murmurent installed: ${WIGAMIG_VERSION}"
+ok "murmurent installed: ${MURMURENT_VERSION}"
 
 # ── Step 4b: wire murmurent into the remote ~/.claude/ as the default ─────────
 # Same script that runs locally — re-points ~/.claude/agents at the
@@ -143,15 +143,15 @@ ssh_run 'export PATH=$HOME/.local/bin:$PATH; bash ~/repos/wigamig/scripts/setup.
 
 # ── Step 5: sanity probes ────────────────────────────────────────────────────
 step "5/5 sanity probes on ${HOST}"
-ssh_run 'mkdir -p $HOME/.wigamig'
-ok "~/.wigamig present"
+ssh_run 'mkdir -p $HOME/.murmurent'
+ok "~/.murmurent present"
 
 # Lab-VM data directories — warn but don't fail.
 if ssh_run 'test -d /data/lab_vm/wigamig/raw && test -d /data/lab_vm/wigamig/refined'; then
   ok "/data/lab_vm/{raw,refined} present"
 else
   warn "/data/lab_vm/{raw,refined} not found on ${HOST}. murmurent will fall back"
-  warn "to \$WIGAMIG_LAB_VM_ROOT (default ~/lab_vm/data) — set it on the remote"
+  warn "to \$MURMURENT_LAB_VM_ROOT (default ~/lab_vm/data) — set it on the remote"
   warn "user's shell or via the host's murmurent settings before creating projects."
 fi
 
@@ -172,7 +172,7 @@ echo
 echo "Install complete."
 echo "  host:         ${HOST}"
 echo "  remote user:  ${REMOTE_USER}@${REMOTE_HOSTNAME}"
-echo "  murmurent:      ${WIGAMIG_VERSION}"
+echo "  murmurent:      ${MURMURENT_VERSION}"
 echo "  uv:           ${UV_VERSION}"
 echo "  repo commit:  ${REMOTE_COMMIT}"
 echo

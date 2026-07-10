@@ -26,7 +26,7 @@ def world(monkeypatch, tmp_path):
     """Stand up an isolated ~/repos and a fake murmurent commons.
 
     The adopt endpoint resolves clone paths against ``Path.home()``, so
-    we point ``$HOME`` at tmp_path. ``$WIGAMIG_REPO_ROOT`` aims the
+    we point ``$HOME`` at tmp_path. ``$MURMURENT_REPO_ROOT`` aims the
     layer-2 bootstrap at a fake commons that has the agents/ dir the
     real one would.
     """
@@ -36,8 +36,8 @@ def world(monkeypatch, tmp_path):
     (commons / "agents").mkdir(parents=True)
     (commons / "agents" / "blacksmith.md").write_text("# blacksmith\n")
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("WIGAMIG_REPO_ROOT", str(commons))
-    monkeypatch.setenv("WIGAMIG_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
+    monkeypatch.setenv("MURMURENT_REPO_ROOT", str(commons))
+    monkeypatch.setenv("MURMURENT_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
     return {"home": home, "repos": home / "repos", "commons": commons}
 
 

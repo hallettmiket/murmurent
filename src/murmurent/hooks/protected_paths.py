@@ -1,7 +1,7 @@
 """
 Purpose: Claude Code ``PreToolUse`` hook that refuses any tool call that would
          delete or overwrite an existing file under murmurent's protected roots
-         (``$WIGAMIG_LAB_VM_ROOT/refined/`` + production ``/data/lab_vm/wigamig/refined/``
+         (``$MURMURENT_LAB_VM_ROOT/refined/`` + production ``/data/lab_vm/wigamig/refined/``
          + every registered Obsidian vault). Creating NEW files and mkdir of
          missing folders is allowed — the lab's versioning convention says
          "make a new file_2.csv, never overwrite file.csv."
@@ -66,12 +66,12 @@ def _refined_prefixes() -> list[str]:
     """Return refined/ prefixes covered by this hook.
 
     Always includes ``/data/lab_vm/wigamig/refined/`` (production) plus the
-    refined subdir of ``$WIGAMIG_LAB_VM_ROOT`` if set (or the dev
+    refined subdir of ``$MURMURENT_LAB_VM_ROOT`` if set (or the dev
     default ``~/wigamig/refined/``). Defense in depth: even if the env
     var points elsewhere, production is still blocked.
     """
     prefixes: list[str] = [str(PRODUCTION_REFINED_ROOT)]
-    env = os.environ.get("WIGAMIG_LAB_VM_ROOT")
+    env = os.environ.get("MURMURENT_LAB_VM_ROOT")
     base = Path(env).expanduser() if env else DEFAULT_LAB_VM_ROOT
     prefixes.append(str(base / "refined"))
     return _dedup_prefixes(prefixes)
@@ -88,14 +88,14 @@ def _notebook_prefixes() -> list[str]:
     (``oracle_server._safe_notebook_dir``).
 
     Resolution order:
-      1. ``$WIGAMIG_NOTEBOOK_ROOT`` — explicit override (one path)
+      1. ``$MURMURENT_NOTEBOOK_ROOT`` — explicit override (one path)
       2. ``<vault>/<notebook_subfolder>`` from per-machine settings
     Both, if both are set. Returns an empty list when neither resolves
     — the hook silently skips notebook protection in that case rather
     than guessing (and never falls back to protecting the vault root).
     """
     out: list[str] = []
-    explicit = os.environ.get("WIGAMIG_NOTEBOOK_ROOT")
+    explicit = os.environ.get("MURMURENT_NOTEBOOK_ROOT")
     if explicit:
         out.append(str(Path(explicit).expanduser()))
     try:

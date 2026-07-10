@@ -23,8 +23,8 @@ from murmurent.core import revocation as REV
 
 @pytest.fixture(autouse=True)
 def _home(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "wig"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "wig"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "li"))
 
 
 def _publish(hub, unique="qa"):
@@ -71,7 +71,7 @@ def test_read_entry_missing(tmp_path):
 def test_pin_from_hub_pins_and_imports_crl(tmp_path, monkeypatch):
     hub = tmp_path / "hub"
     root_pub, fpr = _publish(hub)
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "member"))  # fresh member machine
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "member"))  # fresh member machine
     out = HF.pin_from_hub("qa", hub_dir=hub, expect_fingerprint=fpr)
     assert out["fingerprint"] == fpr and out["crl_imported"] is True
     assert C.load_pinned_root("qa") == root_pub
@@ -80,7 +80,7 @@ def test_pin_from_hub_pins_and_imports_crl(tmp_path, monkeypatch):
 def test_pin_fingerprint_mismatch_fails_closed(tmp_path, monkeypatch):
     hub = tmp_path / "hub"
     _publish(hub)
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "member"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "member"))
     with pytest.raises(HF.HubFetchError, match="mismatch"):
         HF.pin_from_hub("qa", hub_dir=hub, expect_fingerprint="SHA256:wrong")
     assert C.load_pinned_root("qa") is None  # nothing pinned on refusal
@@ -91,7 +91,7 @@ def test_pin_fingerprint_mismatch_fails_closed(tmp_path, monkeypatch):
 def test_distribution_enforces_revocation_end_to_end(tmp_path, monkeypatch):
     hub = tmp_path / "hub"
     # --- mayor: root key, a PI card, publish entry + (empty) CRL ---
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "mayor"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "mayor"))
     CR.generate_root_key()
     root = CR.load_root_private()
     fpr = CR.root_fingerprint()
@@ -103,8 +103,8 @@ def test_distribution_enforces_revocation_end_to_end(tmp_path, monkeypatch):
                               crl=REV.current_crl("qa"))
 
     # --- member: pin from hub + hold the card → verifies OK ---
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "member"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "member_li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "member"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "member_li"))
     HF.pin_from_hub("qa", hub_dir=hub, expect_fingerprint=fpr)
     IC.import_card({"version": IC.CARD_VERSION, "netname": "yxia266", "centre": "qa",
                     "roles": [{"kind": "lab_pi", "group": "xia_lab", "pi": "@yxia266"}],
@@ -114,14 +114,14 @@ def test_distribution_enforces_revocation_end_to_end(tmp_path, monkeypatch):
     assert ISS.verify_local_identity()[0] == "ok"
 
     # --- mayor: revoke + republish the CRL ---
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "mayor"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "mayor"))
     REV.revoke("qa", card_id=card["payload"]["card_id"])
     HP.write_centre_artifacts(hub, unique_name="qa", entry=entry,
                               crl=REV.current_crl("qa"))
 
     # --- member: re-pin (re-imports the updated CRL) → now REJECTED ---
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "member"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "member_li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "member"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "member_li"))
     HF.pin_from_hub("qa", hub_dir=hub, expect_fingerprint=fpr)
     assert ISS.verify_local_identity() == ("reject", "revoked")
 
@@ -131,9 +131,9 @@ def test_distribution_enforces_revocation_end_to_end(tmp_path, monkeypatch):
 def test_cli_centre_pin(tmp_path, monkeypatch):
     from murmurent.cli import cli
     hub = tmp_path / "hub"
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "mayor"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "mayor"))
     root_pub, fpr = _publish(hub)
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "member"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "member"))
     res = CliRunner().invoke(cli, ["centre-pin", "qa", "--hub-dir", str(hub),
                                    "--fingerprint", fpr])
     assert res.exit_code == 0, res.output

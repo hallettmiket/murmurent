@@ -33,7 +33,7 @@ from murmurent.dashboard.server import create_app
 @pytest.fixture
 def isolated(monkeypatch, tmp_path):
     """Redirect every registrar-touched path into tmp_path."""
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
     monkeypatch.setattr(
         registrar, "REGISTRAR_SENTINEL", tmp_path / "registrar_sentinel"
     )
@@ -45,7 +45,7 @@ def isolated(monkeypatch, tmp_path):
     from murmurent.core import centre_init as _ci
     monkeypatch.setattr(_ci, "is_initialised", lambda env=None: True)
     # Also block other resolvers so the test doesn't leak the real user.
-    monkeypatch.setenv("WIGAMIG_USER", "mhallet")
+    monkeypatch.setenv("MURMURENT_USER", "mhallet")
     return tmp_path
 
 
@@ -1019,7 +1019,7 @@ def test_snapshot_profile_handle_always_set(isolated):
 
 def test_lab_dashboard_identity_has_is_registrar_flag(isolated, tmp_path, monkeypatch):
     """The lab dashboard exposes ``member.is_registrar=True`` only for the
-    handle declared in ~/.wigamig/registrar — used to gate the
+    handle declared in ~/.murmurent/registrar — used to gate the
     "→ registrar" cross-link in the PI dashboard footer."""
     _seed_registrar(isolated)
     lab_dir = _make_lab_mgmt(
@@ -1028,9 +1028,9 @@ def test_lab_dashboard_identity_has_is_registrar_flag(isolated, tmp_path, monkey
     )
     # Point the lab dashboard at the seeded lab-mgmt + provide the
     # other roots its snapshot expects.
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos_empty"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm_empty"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_dir))
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos_empty"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm_empty"))
     (tmp_path / "repos_empty").mkdir()
     (tmp_path / "lab_vm_empty").mkdir()
     client = TestClient(create_app())
@@ -1051,9 +1051,9 @@ def test_lab_dashboard_is_registrar_false_for_non_registrar(isolated, tmp_path, 
         tmp_path, lab_id="hallett", pi="mhallet",
         members=[("mhallet", "pi"), ("bob", "postdoc")],
     )
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos_empty"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm_empty"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_dir))
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos_empty"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm_empty"))
     (tmp_path / "repos_empty").mkdir()
     (tmp_path / "lab_vm_empty").mkdir()
     client = TestClient(create_app())

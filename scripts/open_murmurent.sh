@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Open a wigamig repo in VSCode, sized to 80% of available screen space.
+# Open a murmurent repo in VSCode, sized to 80% of available screen space.
 # If a second monitor is present, place on that monitor; otherwise use
 # the laptop screen.
 #
-# This is the launcher half of the "wigamig in VSCode" workflow. The
+# This is the launcher half of the "murmurent in VSCode" workflow. The
 # inner 4-quadrant layout (CC top-left, code top-right, shell bottom-
 # left, agent log bottom-right) is configured per-folder via
 # .vscode/settings.json + .vscode/tasks.json — VSCode persists the
@@ -89,7 +89,7 @@ WIN_H=$(( SH * SCALE_NUM / SCALE_DEN ))
 WIN_X=$(( SX + (SW - WIN_W) / 2 ))
 WIN_Y=$(( SY + (SH - WIN_H) / 2 ))
 
-echo "wigamig launcher"
+echo "murmurent launcher"
 echo "  repo:    $REPO"
 echo "  display: $PLACE  (${SW}x${SH} at ${SX},${SY})"
 echo "  window:  ${WIN_W}x${WIN_H} at ${WIN_X},${WIN_Y}"

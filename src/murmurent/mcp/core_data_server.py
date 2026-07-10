@@ -14,16 +14,16 @@ Run as a server::
 
 Design (Phase 5d of the cores rollout, plan §8):
 
-  - The MCP runs on the lab server, close to ``$WIGAMIG_LAB_VM_ROOT``.
+  - The MCP runs on the lab server, close to ``$MURMURENT_LAB_VM_ROOT``.
     Members' Claude Code sessions connect via stdio over SSH (same
     pattern as the existing ``murmurent-oracle`` server).
-  - Identity comes from ``$WIGAMIG_USER`` set by the murmurent shell
+  - Identity comes from ``$MURMURENT_USER`` set by the murmurent shell
     wrapper, fallback ``$USER``. We use ``core.lab.load_lab_config().lab``
     to determine the caller's lab and gate per-job reads on
     ``manifest.requester_lab == caller_lab``.
   - Core staff (leader / registrar) see every job in their core;
     other-lab readers only see their own bookings.
-  - All reads logged to ``~/.wigamig/cores/<core>/access.log`` so the
+  - All reads logged to ``~/.murmurent/cores/<core>/access.log`` so the
     leader has an audit trail.
 
 Tools shipped in 5d (sketch):
@@ -67,7 +67,7 @@ class AccessDenied(RuntimeError):
 
 
 def _caller_handle() -> str:
-    raw = (os.environ.get("WIGAMIG_USER")
+    raw = (os.environ.get("MURMURENT_USER")
            or os.environ.get("USER") or "").strip()
     return raw.lstrip("@").lower()
 
@@ -103,7 +103,7 @@ def _can_read_job(core: str, manifest: dict[str, Any]) -> tuple[bool, str]:
     ``(ok, reason)``; reason is empty on success."""
     handle = _caller_handle()
     if not handle:
-        return False, "no WIGAMIG_USER / USER set"
+        return False, "no MURMURENT_USER / USER set"
     if _is_core_staff(core, handle):
         return True, ""
     caller_lab = _caller_lab()
@@ -117,9 +117,9 @@ def _can_read_job(core: str, manifest: dict[str, Any]) -> tuple[bool, str]:
 
 
 def _audit_log(core: str, event: str, **fields: Any) -> None:
-    """Append one JSON line to ~/.wigamig/cores/<core>/access.log."""
+    """Append one JSON line to ~/.murmurent/cores/<core>/access.log."""
     try:
-        home = Path(os.environ.get("WIGAMIG_HOME") or (Path.home() / ".wigamig"))
+        home = Path(os.environ.get("MURMURENT_HOME") or (Path.home() / ".murmurent"))
         log = home / "cores" / core / "access.log"
         log.parent.mkdir(parents=True, exist_ok=True)
         rec = {
@@ -310,7 +310,7 @@ def _build_server():  # pragma: no cover - only when SDK installed
             "Read per-job deliverables from a core's job directory. "
             "Identity check: caller's lab must match the job's "
             "requester_lab (or caller must be core staff). All reads "
-            "logged to ~/.wigamig/cores/<core>/access.log."
+            "logged to ~/.murmurent/cores/<core>/access.log."
         ),
     )
 

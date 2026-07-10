@@ -1,6 +1,6 @@
 """
 Purpose: ``PostToolUse`` hook that appends one jsonl row per tool call to
-         ``~/.claude/wigamig-audit/YYYY-MM-DD.log``.
+         ``~/.claude/murmurent-audit/YYYY-MM-DD.log``.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-07
 Input: PostToolUse payload JSON on stdin.
@@ -19,8 +19,8 @@ from typing import IO, Any
 from ..core.identity import resolve as resolve_identity
 from ..core.repo import find_project_repo
 
-DEFAULT_LOG_DIR = Path("~/.claude/wigamig-audit").expanduser()
-ENV_LOG_DIR = "WIGAMIG_AUDIT_LOG_DIR"
+DEFAULT_LOG_DIR = Path("~/.claude/murmurent-audit").expanduser()
+ENV_LOG_DIR = "MURMURENT_AUDIT_LOG_DIR"
 MAX_ARGS_SUMMARY = 200
 
 

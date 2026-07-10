@@ -1,7 +1,7 @@
 """
 Purpose: Post dashboard event notifications to Slack.
          Uses the Slack Web API (chat.postMessage) with a bot token
-         stored in $WIGAMIG_SLACK_TOKEN or ~/.config/wigamig/slack-token.
+         stored in $MURMURENT_SLACK_TOKEN or ~/.config/wigamig/slack-token.
          All functions are no-ops when no token is configured, so the
          server starts cleanly without Slack auth.
 Author: Mike Hallett (with Claude Code)
@@ -45,7 +45,7 @@ def _default_channel() -> str:
     group) channel applies.
 
     Once a centre is initialised **and** has run ``centre-slack-setup`` — i.e.
-    it has a private mayor↔CC channel (``mayor_channel_id`` = ``#wigamig-ops``,
+    it has a private mayor↔CC channel (``mayor_channel_id`` = ``#murmurent-ops``,
     visible only to the mayor + the bot) — system messages default THERE instead
     of the historical shared dev channel. The dev channel (``_CHAN_DEFAULT``) is
     used only as a last resort: development, or a centre that hasn't wired its
@@ -74,10 +74,10 @@ def _route(channel: str) -> str:
 def _token() -> str | None:
     """Return the bot token, or None if not configured.
 
-    Resolution: ``$WIGAMIG_SLACK_TOKEN`` → ``~/.config/wigamig/slack-token``
+    Resolution: ``$MURMURENT_SLACK_TOKEN`` → ``~/.config/wigamig/slack-token``
     → the legacy ``$SLACK_BOT_TOKEN`` (unified with centre_provision so a
     single token drives both channel creation and posting/invites)."""
-    env = os.environ.get("WIGAMIG_SLACK_TOKEN", "").strip()
+    env = os.environ.get("MURMURENT_SLACK_TOKEN", "").strip()
     if env:
         return env
     if _TOKEN_FILE.is_file():
@@ -427,7 +427,7 @@ class SlackPostResult:
 def _post_error_hint(error: str, channel: str) -> str:
     """Map a Slack error code to an actionable, mayor-readable explanation."""
     hints = {
-        "no_token": "no Slack token — set $WIGAMIG_SLACK_TOKEN or put it in "
+        "no_token": "no Slack token — set $MURMURENT_SLACK_TOKEN or put it in "
                     "~/.config/wigamig/slack-token.",
         "channel_not_found": f"channel {channel} was not found. The bot token is "
                     "almost certainly for a DIFFERENT Slack workspace than this "

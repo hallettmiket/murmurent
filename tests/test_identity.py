@@ -28,7 +28,7 @@ def test_user_file_beats_gh(monkeypatch: pytest.MonkeyPatch, tmp_path) -> None:
 
     Reproduces the bug where a user with Western netname ``mhallet`` and
     GitHub login ``mth`` was rendered as ``mth`` because the FastAPI
-    server only consulted ``gh api user`` and not ``~/.wigamig/user``.
+    server only consulted ``gh api user`` and not ``~/.murmurent/user``.
     """
     monkeypatch.delenv(ENV_VAR, raising=False)
     fake_user_file = tmp_path / "user"

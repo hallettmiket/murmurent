@@ -103,7 +103,7 @@ In `bbb_drug_screen`:
 - `pytest` for tests.
 - `streamlit` for the dashboard viewer.
 - Anthropic's `mcp` Python SDK for the inventory MCP server.
-- Simulated lab VM at `~/lab_vm/data/{raw, refined, clinical}`. Use env var `WIGAMIG_LAB_VM_ROOT` (default `~/lab_vm/data`) so production can swap to `/data/lab_vm/`.
+- Simulated lab VM at `~/lab_vm/data/{raw, refined, clinical}`. Use env var `MURMURENT_LAB_VM_ROOT` (default `~/lab_vm/data`) so production can swap to `/data/lab_vm/`.
 
 ### Repos and GitHub
 
@@ -145,14 +145,14 @@ Other subcommands referenced in the design may stub out with a clear "not implem
 
 Deployed to `~/.claude/hooks/`, registered in `~/.claude/settings.json`:
 
-1. **Raw-data guard** (`PreToolUse`, matches `Write|Edit|Bash|NotebookEdit`): refuses tool calls that mutate paths under `$WIGAMIG_LAB_VM_ROOT/raw/`.
+1. **Raw-data guard** (`PreToolUse`, matches `Write|Edit|Bash|NotebookEdit`): refuses tool calls that mutate paths under `$MURMURENT_LAB_VM_ROOT/raw/`.
 2. **Project-context injection** (`UserPromptSubmit`): walks cwd to find active project (marker: `CHARTER.md`), reads charter, MEMBERS, active SEAs, prepends as `<system-reminder>`.
 3. **PHI pattern detection** (`PreToolUse` + `PostToolUse`, only when active project's `sensitivity == clinical`): refuses outbound prompts containing OHIP-shaped, MRN-shaped, SIN-shaped, or DOB-near-name patterns; redacts in returned content.
-4. **Audit log** (`PostToolUse`): appends jsonl per call to `~/.claude/wigamig-audit/YYYY-MM-DD.log`.
+4. **Audit log** (`PostToolUse`): appends jsonl per call to `~/.claude/murmurent-audit/YYYY-MM-DD.log`.
 
 ### MCP server
 
-Inventory MCP at `src/wigamig/mcp/inventory_server.py`. Tools:
+Inventory MCP at `src/murmurent/mcp/inventory_server.py`. Tools:
 - `inventory_list(filter)` — supports `low`, `expiring <days>`, `out`.
 - `inventory_show(name)`.
 - `inventory_provision(plan_path)` — reads frontmatter `reagents:` from a notebook entry, intersects with inventory, returns gaps and expiring lots.
@@ -166,7 +166,7 @@ Register in `~/.claude/settings.json` under `mcpServers`. Wraps the markdown fil
 
 - **Snapshot generator** (Python script): walks lab-mgmt repo, both project repos, and the simulated lab VM; produces `lab_mgmt/dashboards/<handle>.md` for each member with all panels populated. Idempotent.
 - **Streamlit viewer**: reads the snapshot, calls inventory MCP live for the inventory panel; renders Outstanding analysis (yellow at >2 weeks since `complete` and not `examined`; red at >2 months); renders Security and compliance with red for missing required.
-- Member view by default; PI view auto-enabled when run as `@mike` (env var `WIGAMIG_USER`).
+- Member view by default; PI view auto-enabled when run as `@mike` (env var `MURMURENT_USER`).
 - `murmurent dashboard` opens Streamlit on localhost.
 - `murmurent dashboard --snapshot` prints the markdown.
 - `murmurent dashboard --outstanding` prints the Outstanding analysis section as a terminal summary.
@@ -223,7 +223,7 @@ The smoke test passes when each of these stories runs end-to-end:
 2. As @bob, claim SEA #1 (already claimed in seed; verify behaviour for already-claimed), work in `exp/2_alignment_count_matrix/`, run a fake analysis script, push to a personal branch.
 3. As @allie, run `murmurent sea examine 3`; the deliberation document is scaffolded with empty agent-contribution sections; manually invoke bookworm and adversary in CC to fill in their sections; commit; run `murmurent sea conclude 3` and gather approvals.
 4. As any persona inside `dcis_sc_tutorial`, paste the string `1234-567-890-AB` into a CC prompt — the PHI hook refuses with a clear message naming the pattern type.
-5. As any persona, attempt to write to a file under `$WIGAMIG_LAB_VM_ROOT/raw/dcis_sc_tutorial/` — the raw-data guard refuses with a clear message.
+5. As any persona, attempt to write to a file under `$MURMURENT_LAB_VM_ROOT/raw/dcis_sc_tutorial/` — the raw-data guard refuses with a clear message.
 6. Inside CC in any persona's session, ask "what reagents do we have low or expiring?" — CC calls `inventory_list` via the MCP and reports correctly: `4_oht` expired, `nebnext_kit` low, `livedead_stain` expiring soon.
 7. As @mike, run `murmurent dashboard` and see the PI compliance grid surface @cassie's missing TCPS 2 certification in red.
 8. All four repos are visible at `https://github.com/hallettmiket/{murmurent, lab_mgmt, dcis_sc_tutorial, bbb_drug_screen}` (the latter three private), with the seed content committed.

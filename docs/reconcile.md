@@ -8,7 +8,7 @@ dry-run; `--apply` repairs the actionable subset.
 
 | Kind | Severity | Auto-repair? | Repair action |
 |---|---|---|---|
-| `orphan_installation` | actionable | ✓ | Move `~/.wigamig/installations/<name>.yaml` into `installations/.archive/<name>_<date>.yaml` |
+| `orphan_installation` | actionable | ✓ | Move `~/.murmurent/installations/<name>.yaml` into `installations/.archive/<name>_<date>.yaml` |
 | `orphan_registry` | actionable | ✓ | Set `status: archived` + `archived_at: <date>` in the lab_mgmt registry frontmatter (file preserved — lab history is shared) |
 | `missing_charter` | warn | ✗ | User decides: re-adopt the clone, or remove from murmurent |
 | `unadopted_clone` | info | ✗ | Click ↑ adopt in the Repos panel |
@@ -55,9 +55,9 @@ routine surfaces drift in Slack; you decide whether to run
 
 ## Recovery from auto-archive
 
-Archived manifests live in `~/.wigamig/installations/.archive/`
+Archived manifests live in `~/.murmurent/installations/.archive/`
 with a date suffix. To restore: copy the file back to
-`~/.wigamig/installations/<name>.yaml`.
+`~/.murmurent/installations/<name>.yaml`.
 
 Archived registry entries keep `status: archived` in the
 frontmatter. To restore: remove the `status:` and `archived_at:`
@@ -66,6 +66,6 @@ lab_mgmt repo so other group members see the restoration.
 
 ## See also
 
-- [`src/wigamig/core/reconcile.py`](../src/wigamig/core/reconcile.py) — detection + repair logic.
-- [`src/wigamig/commands/reconcile_cmd.py`](../src/wigamig/commands/reconcile_cmd.py) — CLI wrapper + Slack body formatter.
+- [`src/murmurent/core/reconcile.py`](../src/murmurent/core/reconcile.py) — detection + repair logic.
+- [`src/murmurent/commands/reconcile_cmd.py`](../src/murmurent/commands/reconcile_cmd.py) — CLI wrapper + Slack body formatter.
 - [`tests/test_reconcile.py`](../tests/test_reconcile.py) — drift-detection contract pins.

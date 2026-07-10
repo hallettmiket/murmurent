@@ -23,7 +23,7 @@ def _make_source(root: Path) -> Path:
 
 
 def test_plan_classifies_with_profile(tmp_path, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "vm"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "vm"))
     src = _make_source(tmp_path)
     plan = ingest.plan_ingest(
         project="dcis_sc_tutorial",
@@ -41,7 +41,7 @@ def test_plan_classifies_with_profile(tmp_path, monkeypatch):
 
 
 def test_execute_ingest_chmods_raw(tmp_path, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "vm"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "vm"))
     src = _make_source(tmp_path)
     plan = ingest.plan_ingest(
         project="p",
@@ -61,7 +61,7 @@ def test_execute_ingest_chmods_raw(tmp_path, monkeypatch):
 
 
 def test_unknown_instrument_raises(tmp_path, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "vm"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "vm"))
     src = _make_source(tmp_path)
     with pytest.raises(KeyError):
         ingest.plan_ingest(

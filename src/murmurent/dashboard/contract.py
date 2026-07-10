@@ -68,7 +68,7 @@ class IdentityBlock(BaseModel):
     # Auto-detected from PI handle today; ``project lead → can_pi`` is v2.
     can_pi: bool = False
     is_active: bool = True  # Phase 13: deactivated members can read but not act
-    # Phase A+: True iff this handle matches ``~/.wigamig/registrar``.
+    # Phase A+: True iff this handle matches ``~/.murmurent/registrar``.
     # The lab dashboard uses this to show a cross-link to /registrar.
     is_registrar: bool = False
     # Murmurent-level "lab security admin" flag — set by the PI from the
@@ -118,7 +118,7 @@ class MemberSettings(BaseModel):
 
 
 class MachineSettings(BaseModel):
-    """Per-machine settings, stored in ``~/.wigamig/machine.yaml``.
+    """Per-machine settings, stored in ``~/.murmurent/machine.yaml``.
 
     These paths differ between a user's laptop and a lab server, so they
     cannot live in the git-synced ``<lab-mgmt>/members/<handle>.md``.
@@ -352,7 +352,7 @@ class VaultHealth(BaseModel):
 
 
 class AgentActivity(BaseModel):
-    """One line from the live agent-activity log (``~/.wigamig/agents.log``, fed
+    """One line from the live agent-activity log (``~/.murmurent/agents.log``, fed
     by the SubagentStop / PreToolUse(Agent) hook). Lets the dashboard show what
     subagents are doing — the browser equivalent of the tmux BR pane."""
 
@@ -713,7 +713,7 @@ class InstallationRow(BaseModel):
     it's developed with murmurent. A project may carry several repos (``repos``);
     this manifest records which of them are actually cloned on this machine.
 
-    Manifest lives at ``~/.wigamig/installations/<project>.yaml`` — per-machine
+    Manifest lives at ``~/.murmurent/installations/<project>.yaml`` — per-machine
     state, not shared across machines. If a user installs the same project on
     two machines, each machine has its own manifest (and may have a different
     subset of the project's repos cloned).

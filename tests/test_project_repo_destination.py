@@ -27,10 +27,10 @@ def world(monkeypatch, tmp_path):
     lab_vm = tmp_path / "lab_vm"
     bare_root = tmp_path / "lab_vm_bare" / "git_repos"
 
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(repos))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_mgmt))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(lab_vm))
-    monkeypatch.setenv("WIGAMIG_USER", "mhallet")
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(repos))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_mgmt))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(lab_vm))
+    monkeypatch.setenv("MURMURENT_USER", "mhallet")
 
     (lab_mgmt / "members").mkdir(parents=True)
     (lab_mgmt / "projects").mkdir(parents=True)

@@ -2,7 +2,7 @@
 Purpose: Resolve the simulated lab-VM root and project/experiment data dirs.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-07
-Input: ``$WIGAMIG_LAB_VM_ROOT`` env var (default ``~/lab_vm/data``); project +
+Input: ``$MURMURENT_LAB_VM_ROOT`` env var (default ``~/lab_vm/data``); project +
        experiment slugs.
 Output: Helpers that return canonical raw / refined / clinical paths and create
         the per-experiment directory tree.
@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 
 DEFAULT_LAB_VM_ROOT = Path("~/lab_vm/data").expanduser()
-ENV_VAR = "WIGAMIG_LAB_VM_ROOT"
+ENV_VAR = "MURMURENT_LAB_VM_ROOT"
 RAW_SUBDIR = "raw"
 REFINED_SUBDIR = "refined"
 CLINICAL_SUBDIR = "clinical"
@@ -22,7 +22,7 @@ INSTRUMENT_OUTPUTS_SUBDIR = "instrument_outputs"
 
 
 def lab_vm_root(env: dict[str, str] | None = None) -> Path:
-    """Return the simulated lab-VM root, honouring ``$WIGAMIG_LAB_VM_ROOT``.
+    """Return the simulated lab-VM root, honouring ``$MURMURENT_LAB_VM_ROOT``.
 
     Production deployments set this to ``/data/lab_vm/`` (per the lab data-storage
     rule). Tutorial / smoke-test deployments default to ``~/lab_vm/data``.

@@ -76,8 +76,8 @@ def world(monkeypatch, tmp_path):
     lab_oracle = lab_root / "oracle"
     lab_oracle.mkdir(parents=True)
 
-    monkeypatch.setenv("WIGAMIG_PERSONAL_ORACLE_DIR", str(vault_oracle))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_root))
+    monkeypatch.setenv("MURMURENT_PERSONAL_ORACLE_DIR", str(vault_oracle))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_root))
 
     # Personal entries
     _write_entry(vault_oracle, "2026-04-16_mmp11",
@@ -318,7 +318,7 @@ def test_publish_draft_routes_to_core(world, monkeypatch):
                  date="2026-05-16",
                  project="general")
 
-    monkeypatch.setenv("WIGAMIG_USER", "mhallet")
+    monkeypatch.setenv("MURMURENT_USER", "mhallet")
     result = srv.tool_publish_draft("publishable_via_mcp")
     assert "2026-05-16_publishable_via_mcp.md" in result["target"]
     assert result["commit_sha"]
@@ -334,7 +334,7 @@ def test_publish_draft_routes_to_core(world, monkeypatch):
 def test_missing_personal_dir_degrades_to_lab_only(monkeypatch, world):
     """If the user's vault isn't resolvable, search still works — just
     over the lab tier alone, no exception."""
-    monkeypatch.setenv("WIGAMIG_PERSONAL_ORACLE_DIR", "/nonexistent/path")
+    monkeypatch.setenv("MURMURENT_PERSONAL_ORACLE_DIR", "/nonexistent/path")
     rows = srv.tool_list("both")
     kinds = {r["kind"] for r in rows}
     assert kinds == {"lab"}
@@ -510,11 +510,11 @@ class _Settings:
 
 
 def test_notebook_dir_env_override_wins(monkeypatch, tmp_path):
-    """``$WIGAMIG_NOTEBOOK_DIR`` short-circuits the whole chain (symmetric
-    with the dashboard's notebook_folder() + WIGAMIG_PERSONAL_ORACLE_DIR)."""
+    """``$MURMURENT_NOTEBOOK_DIR`` short-circuits the whole chain (symmetric
+    with the dashboard's notebook_folder() + MURMURENT_PERSONAL_ORACLE_DIR)."""
     nb = tmp_path / "custom-nb"
     nb.mkdir()
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_DIR", str(nb))
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_DIR", str(nb))
     assert srv._safe_notebook_dir() == nb
 
 
@@ -524,7 +524,7 @@ def test_notebook_dir_falls_back_to_obsidian_registry(monkeypatch, tmp_path):
     most-recently-opened Obsidian vault + notebook subfolder. The OLD
     code returned None here, silently killing the notebook tier on every
     machine that hadn't saved a machine.yaml."""
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_DIR", raising=False)
     vault_root = tmp_path / "vault"
     (vault_root / "lab-notebook").mkdir(parents=True)
     from murmurent.dashboard import machine_settings as _ms
@@ -538,7 +538,7 @@ def test_notebook_dir_falls_back_to_obsidian_registry(monkeypatch, tmp_path):
 def test_notebook_dir_uses_machine_yaml_when_present(monkeypatch, tmp_path):
     """When machine.yaml carries a vault path + custom subfolder, those
     win and the Obsidian registry is not consulted."""
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_DIR", raising=False)
     vault_root = tmp_path / "myvault"
     (vault_root / "daily").mkdir(parents=True)
     from murmurent.dashboard import machine_settings as _ms
@@ -554,7 +554,7 @@ def test_notebook_dir_uses_machine_yaml_when_present(monkeypatch, tmp_path):
 def test_notebook_dir_none_when_nothing_resolves(monkeypatch):
     """No env, no machine.yaml vault, no Obsidian registry → None, and no
     crash."""
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_DIR", raising=False)
     from murmurent.dashboard import machine_settings as _ms
     monkeypatch.setattr(_ms, "load", lambda **k: _Settings(vault=None))
     monkeypatch.setattr(srv._obsidian, "preferred_vault", lambda: None)

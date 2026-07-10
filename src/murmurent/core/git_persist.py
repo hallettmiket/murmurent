@@ -20,7 +20,7 @@ Design choices:
   - Best-effort push: returns a yellow probe on failure instead of red.
     The PI can ``git push`` manually later.
   - No-op on non-git paths: writing the file when its parent isn't a
-    git checkout just skips silently — saves to ``~/.wigamig/`` (which
+    git checkout just skips silently — saves to ``~/.murmurent/`` (which
     is intentionally not git-tracked) still work.
 """
 
@@ -88,7 +88,7 @@ def commit_and_push(
 
     Steps:
       1. ``git status`` — locate the repo. Skipped + ``ok`` if the file
-         isn't inside a git checkout (e.g. ~/.wigamig saves).
+         isn't inside a git checkout (e.g. ~/.murmurent saves).
       2. ``git add`` — stage the file.
       3. ``git commit`` — only if there is actually a diff against HEAD;
          skipped silently when the saved values match HEAD exactly.

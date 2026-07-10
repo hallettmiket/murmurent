@@ -10,7 +10,7 @@ Input: Project name; member's Obsidian config (vault + subfolders); lab
        real directory are silently skipped — VSCode renders broken
        workspace roots as red error tiles, which scares users.
 Output: A JSON dict ready to serialise as ``<project>.code-workspace`` and
-        a helper that writes it to ``~/.wigamig/workspaces/``.
+        a helper that writes it to ``~/.murmurent/workspaces/``.
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from typing import Iterable
 from ..core import lab_vm
 from ..core.projects import project_path
 
-WORKSPACE_DIR = Path.home() / ".wigamig" / "workspaces"
+WORKSPACE_DIR = Path.home() / ".murmurent" / "workspaces"
 DEFAULT_NOTEBOOK_SUBFOLDER = "lab-notebook"
 DEFAULT_ORACLE_SUBFOLDER = "oracle"
 PERSONAL_ORACLE_FALLBACK = Path.home() / ".claude" / "agent-memory" / "oracle"
@@ -164,7 +164,7 @@ def build_payload(folders: Iterable[WorkspaceFolder]) -> dict:
 
 
 def quickstart_help_dir(project: str) -> Path:
-    """Return ``~/.wigamig/workspaces/<project>_help/``."""
+    """Return ``~/.murmurent/workspaces/<project>_help/``."""
     return WORKSPACE_DIR / f"{project}_help"
 
 
@@ -243,7 +243,7 @@ def _write_quickstart_help(project: str) -> WorkspaceFolder:
 
 
 def workspace_file_path(project: str) -> Path:
-    """Return ``~/.wigamig/workspaces/<project>.code-workspace``."""
+    """Return ``~/.murmurent/workspaces/<project>.code-workspace``."""
     return WORKSPACE_DIR / f"{project}.code-workspace"
 
 

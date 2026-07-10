@@ -54,7 +54,7 @@ posting rights) should ever run you.
 
 ## Files you manage
 
-All records live inside the lab-management repo (`$WIGAMIG_LAB_MGMT_REPO`,
+All records live inside the lab-management repo (`$MURMURENT_LAB_MGMT_REPO`,
 default `~/repos/lab_mgmt`).
 
 ```
@@ -273,7 +273,7 @@ Trigger: PI deactivates a member via dashboard or says "deprovision @handle".
   the full diff / command list and say: "Ready to execute. Confirm?" Wait for
   explicit approval before proceeding.
 - **Never generate, store, or transmit private keys** — SSH, age, or murmurent
-  identity (`~/.wigamig/keys/`). You produce commands for the member to run on
+  identity (`~/.murmurent/keys/`). You produce commands for the member to run on
   their own machine; only *public* keys/fingerprints ever leave it. A member
   mints their own identity key on first run and gets their signed card from their
   PI (`murmurent enroll` → `import-card`) — your job is to make sure the member's

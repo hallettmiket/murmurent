@@ -1,7 +1,7 @@
 #!/bin/bash
 # scripts/start_workspace.sh
 #
-# Open a multi-pane workspace for a wigamig project:
+# Open a multi-pane workspace for a murmurent project:
 #   Left ~65%:  VSCode at the project repo
 #   Right ~35%: iTerm2 windows stacked vertically, one per selected
 #               agent, each tailing outputs/<agent>/progress.log
@@ -18,9 +18,9 @@
 #
 # Environment overrides for the display geometry (defaults to the
 # primary display at 1920x1080 logical pts):
-#   WIGAMIG_DISPLAY_X, _Y, _WIDTH, _HEIGHT — display rectangle
-#   WIGAMIG_LEFT_PCT (default 65) — VSCode pane width as a percent
-#   WIGAMIG_WORKSPACE_FILE — path to a .code-workspace file. When set and
+#   MURMURENT_DISPLAY_X, _Y, _WIDTH, _HEIGHT — display rectangle
+#   MURMURENT_LEFT_PCT (default 65) — VSCode pane width as a percent
+#   MURMURENT_WORKSPACE_FILE — path to a .code-workspace file. When set and
 #       readable, VSCode opens that multi-root workspace instead of the
 #       bare project directory. The dashboard launcher writes this file
 #       so users see repo + refined/ + notebook + oracle side-by-side.
@@ -48,11 +48,11 @@ fi
 CODE="/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
 [[ -x "$CODE" ]] || CODE="code"   # fall back to PATH
 
-DISPLAY_X="${WIGAMIG_DISPLAY_X:-0}"
-DISPLAY_Y="${WIGAMIG_DISPLAY_Y:-0}"
-DISPLAY_WIDTH="${WIGAMIG_DISPLAY_WIDTH:-1920}"
-DISPLAY_HEIGHT="${WIGAMIG_DISPLAY_HEIGHT:-1080}"
-LEFT_PCT="${WIGAMIG_LEFT_PCT:-65}"
+DISPLAY_X="${MURMURENT_DISPLAY_X:-0}"
+DISPLAY_Y="${MURMURENT_DISPLAY_Y:-0}"
+DISPLAY_WIDTH="${MURMURENT_DISPLAY_WIDTH:-1920}"
+DISPLAY_HEIGHT="${MURMURENT_DISPLAY_HEIGHT:-1080}"
+LEFT_PCT="${MURMURENT_LEFT_PCT:-65}"
 MENU_BAR=25
 
 # VSCode pane: left LEFT_PCT% of the display.
@@ -69,7 +69,7 @@ AGENT_BOTTOM=$(( DISPLAY_Y + DISPLAY_HEIGHT ))
 USABLE_HEIGHT=$(( AGENT_BOTTOM - AGENT_TOP ))
 ROW_H=$(( USABLE_HEIGHT / N_AGENTS ))
 
-echo "=== wigamig workspace ==="
+echo "=== murmurent workspace ==="
 echo "project: $PROJECT_DIR"
 echo "agents:  ${AGENTS[*]} ($N_AGENTS panes)"
 [[ -n "$SEA_ID" ]] && echo "focus:   SEA #$SEA_ID"
@@ -82,11 +82,11 @@ for A in "${AGENTS[@]}"; do
 done
 
 # 1. Open VSCode at the project repo, position it on the left.
-#    Prefer a generated multi-root workspace when WIGAMIG_WORKSPACE_FILE
+#    Prefer a generated multi-root workspace when MURMURENT_WORKSPACE_FILE
 #    points at a real file, so non-IT users see refined/, notebook, and
 #    Oracle alongside the repo without manual folder-add.
-if [[ -n "${WIGAMIG_WORKSPACE_FILE:-}" && -f "${WIGAMIG_WORKSPACE_FILE}" ]]; then
-  "$CODE" "${WIGAMIG_WORKSPACE_FILE}" &
+if [[ -n "${MURMURENT_WORKSPACE_FILE:-}" && -f "${MURMURENT_WORKSPACE_FILE}" ]]; then
+  "$CODE" "${MURMURENT_WORKSPACE_FILE}" &
 else
   "$CODE" "$PROJECT_DIR" &
 fi

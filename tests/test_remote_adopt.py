@@ -146,12 +146,12 @@ def world(monkeypatch, tmp_path):
         "---\nhandle: '@mhallet'\nfull_name: 'Mike Hallett'\nrole: pi\nstatus: active\nlab: hallett\n---\n"
     )
     hosts_file = tmp_path / "hosts.yaml"
-    installs = home / ".wigamig" / "installations"
+    installs = home / ".murmurent" / "installations"
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("WIGAMIG_REPO_ROOT", str(commons))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_mgmt))
-    monkeypatch.setenv("WIGAMIG_HOSTS_FILE", str(hosts_file))
-    monkeypatch.setenv("WIGAMIG_USER", "mhallet")
+    monkeypatch.setenv("MURMURENT_REPO_ROOT", str(commons))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_mgmt))
+    monkeypatch.setenv("MURMURENT_HOSTS_FILE", str(hosts_file))
+    monkeypatch.setenv("MURMURENT_USER", "mhallet")
     # INSTALLATIONS_DIR was captured at module-import time using the
     # real Path.home() — setenv(HOME) is too late. Patch the module
     # attribute so the endpoint's `from .snapshot import INSTALLATIONS_DIR`
@@ -212,7 +212,7 @@ def test_remote_adopt_happy_path(world, monkeypatch):
     assert body["host"] == "biodatsci"
     # Local side effects: lab_mgmt registry + installation manifest.
     assert (world["lab_mgmt"] / "cert_projects" / "demo.md").is_file()
-    manifest = world["home"] / ".wigamig" / "installations" / "demo.yaml"
+    manifest = world["home"] / ".murmurent" / "installations" / "demo.yaml"
     assert manifest.is_file()
     m = yaml.safe_load(manifest.read_text())
     assert m["ssh_remote"] == "biodatsci"

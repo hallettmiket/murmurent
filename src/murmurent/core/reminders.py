@@ -5,7 +5,7 @@ Author: Mike Hallett (with Claude Code)
 Date: 2026-05-22
 
 Idempotency: each (request_id, window) pair is recorded in
-``~/.wigamig/cores/<core>/reminders_sent.json`` after a successful
+``~/.murmurent/cores/<core>/reminders_sent.json`` after a successful
 send. Re-running the scanner (every 15 min via CC ``/routine``) is a
 no-op for already-sent reminders.
 
@@ -48,7 +48,7 @@ class DueReminder:
 
 
 def _wigamig_home() -> Path:
-    return Path(os.environ.get("WIGAMIG_HOME") or (Path.home() / ".wigamig"))
+    return Path(os.environ.get("MURMURENT_HOME") or (Path.home() / ".murmurent"))
 
 
 def _ledger_path(core: str) -> Path:

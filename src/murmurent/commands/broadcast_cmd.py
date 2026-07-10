@@ -37,7 +37,7 @@ def broadcast() -> None:
 @click.option("--message", required=True,
               help="Message body. Wrap in single quotes if it has shell chars.")
 @click.option("--sender", default="",
-              help="@handle of the sender. Defaults to $WIGAMIG_USER.")
+              help="@handle of the sender. Defaults to $MURMURENT_USER.")
 @click.option("--apply", is_flag=True, default=False,
               help="Actually send + log. Without this flag: dry-run only.")
 @click.option("--tag", "tags", multiple=True,
@@ -46,10 +46,10 @@ def cmd_send(audience: str, message: str, sender: str,
               apply: bool, tags: tuple[str, ...]) -> None:
     import os
     if not sender:
-        sender = os.environ.get("WIGAMIG_USER", "")
+        sender = os.environ.get("MURMURENT_USER", "")
     if not sender:
         raise click.ClickException(
-            "--sender not provided and $WIGAMIG_USER is unset.")
+            "--sender not provided and $MURMURENT_USER is unset.")
     try:
         cid = _bc.channel_id_for(audience)
     except _bc.BroadcastError as exc:

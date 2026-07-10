@@ -90,8 +90,8 @@ function NbRail() {
   const onOpenDay = async (iso) => {
     try {
       const r = await window.postNotebookEdit(iso);
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
     } catch (ex) {
       alert("Could not open " + iso + ".md: " + (ex.message || ex));

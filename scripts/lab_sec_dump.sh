@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Purpose: Root-owned snapshot script for the wigamig Tier-2 security
+# Purpose: Root-owned snapshot script for the murmurent Tier-2 security
 #          audit. Reads the real NFSv4 ACLs on /data/lab_vm/{raw,refined}
 #          via the sudo-only /root/data4 mount, the authoritative sshd
 #          policy (`sshd -T`), and a lab-wide authorized_keys summary.
 #          Writes one timestamped directory per run; never overwrites
 #          history.
-# Install: root:root mode 0755 at /opt/wigamig/lab_sec_dump.sh.
+# Install: root:root mode 0755 at /opt/murmurent/lab_sec_dump.sh.
 #          Granted via /etc/sudoers.d/murmurent_sec_dump (see template).
-# Invoke:  `sudo -n /opt/wigamig/lab_sec_dump.sh`
+# Invoke:  `sudo -n /opt/murmurent/lab_sec_dump.sh`
 #          REFUSES ARGUMENTS — keeps the sudo grant a single fixed
 #          command with no parameter-injection surface.
 #
@@ -37,11 +37,11 @@ LAB_GROUP="ssmd-ud-vmlab"     # owner group on snapshot dir; readers
 # Snapshot output is on LOCAL DISK (ext4) rather than OneFS:
 #  - Root on biodatsci isn't a principal in the OneFS ACLs, so even on
 #    the v4 mount we can't ``mkdir`` under /root/data4/lab_vm/wigamig/.
-#  - Local /var/lib/wigamig is plain POSIX — root writes freely; chgrp
+#  - Local /var/lib/murmurent is plain POSIX — root writes freely; chgrp
 #    + chmod 0750 give the lab group real read access.
 # The v4 mount is still READ-only for our purposes: nfs4_getfacl needs
 # it to enumerate ACLs on raw/refined for the Tier-2 audit.
-WRITE_BASE="/var/lib/wigamig/.snapshot"
+WRITE_BASE="/var/lib/murmurent/.snapshot"
 READ_BASE="$WRITE_BASE"   # same path on local disk — no NFS view to map.
 V4_ROOT="/root/data4/lab_vm"  # the sudo-only NFSv4 mount (for ACL reads)
 LAB_MEMBERS_DIR="/data/lab_vm/wigamig"   # used for member-handle discovery
@@ -76,7 +76,7 @@ if [[ ! -d "/root/data4/lab_vm" ]]; then
 fi
 
 # -- Prepare output dir -----------------------------------------------------
-# Ensure the parent ``/var/lib/wigamig/.snapshot`` exists with the right
+# Ensure the parent ``/var/lib/murmurent/.snapshot`` exists with the right
 # ownership (root:LAB_GROUP, mode 0750). First-run-friendly: idempotent
 # on re-installs.
 mkdir -p "$WRITE_BASE"

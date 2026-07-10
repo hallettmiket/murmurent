@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
-# Purpose: Apply per-project NFSv4 ACLs on a lab server's wigamig tree.
+# Purpose: Apply per-project NFSv4 ACLs on a lab server's murmurent tree.
 #          Designed to be called via sudo from `centre_cable_guy`'s
 #          provision/reconcile loop.
 #
 # Install:
 #   1. As root on the lab server:
-#        install -m 0755 murmurent_project_acl.sh /opt/wigamig/murmurent_project_acl.sh
+#        install -m 0755 murmurent_project_acl.sh /opt/murmurent/murmurent_project_acl.sh
 #   2. Add a sudoers fragment so a specific service account can run it
 #      without a password:
-#        echo '<user> ALL=(root) NOPASSWD: /opt/wigamig/murmurent_project_acl.sh' \
+#        echo '<user> ALL=(root) NOPASSWD: /opt/murmurent/murmurent_project_acl.sh' \
 #          > /etc/sudoers.d/murmurent_project_acl
 #        chmod 0440 /etc/sudoers.d/murmurent_project_acl
 #
 # Behavior:
 #   - Creates <LAB_VM_ROOT>/wigamig/{raw,refined}/<project>/ if missing.
-#   - Creates a wigamig project Unix group `wgm_<project>` if missing
+#   - Creates a murmurent project Unix group `wgm_<project>` if missing
 #     (capped at 16 chars; long project names truncated + suffixed).
 #   - Adds each named member (passed by Western netname / OS account)
 #     to that group via `usermod -aG`.
 #   - Sets a per-directory NFSv4 ACL that grants the project group
 #     `rxtTncy` on `refined/` and `rxtTncy` on `raw/` (read-only;
-#     the existing wigamig hooks enforce the "no write" rule at
+#     the existing murmurent hooks enforce the "no write" rule at
 #     the application layer; this ACL is belt-and-suspenders).
 #   - Logs every invocation to /var/log/wigamig/project_acl.log.
 #
@@ -32,8 +32,8 @@
 
 set -euo pipefail
 
-LAB_VM_ROOT="${WIGAMIG_LAB_VM_ROOT:-/data/lab_vm}"
-LOG_FILE="${WIGAMIG_PROJECT_ACL_LOG:-/var/log/wigamig/project_acl.log}"
+LAB_VM_ROOT="${MURMURENT_LAB_VM_ROOT:-/data/lab_vm}"
+LOG_FILE="${MURMURENT_PROJECT_ACL_LOG:-/var/log/wigamig/project_acl.log}"
 SLUG_RE='^[a-z0-9][a-z0-9_]{1,30}$'
 
 log() {

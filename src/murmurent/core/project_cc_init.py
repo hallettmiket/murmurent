@@ -218,7 +218,7 @@ def bootstrap_local(
     # CC hooks no longer live per-project — they're now merged into the
     # user-global ~/.claude/settings.json by `murmurent install --hooks`
     # so they fire for every project on this machine, sharing a single
-    # ~/.wigamig/agents.log. We don't write .claude/settings.json here
+    # ~/.murmurent/agents.log. We don't write .claude/settings.json here
     # any more.
     #
     # Defensive: if the user later creates a per-project

@@ -17,10 +17,10 @@ from murmurent.dashboard import sea_actions
 @pytest.fixture
 def world(monkeypatch, tmp_path):
     """Two-project universe with a few SEAs across the lifecycle."""
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "projects").mkdir(parents=True)
 
@@ -231,9 +231,9 @@ def test_endpoint_missing_sea_is_404(world):
 def test_endpoint_no_user_is_400(world, monkeypatch, tmp_path):
     from murmurent.core import identity as _identity
 
-    monkeypatch.delenv("WIGAMIG_USER", raising=False)
+    monkeypatch.delenv("MURMURENT_USER", raising=False)
     monkeypatch.setenv("PATH", "")  # block gh fallback
-    # Also block the ~/.wigamig/user fallback so the developer's saved
+    # Also block the ~/.murmurent/user fallback so the developer's saved
     # Western netname doesn't leak in.
     monkeypatch.setattr(_identity, "USER_FILE", tmp_path / "no_user_here")
     client = _client()

@@ -49,7 +49,7 @@ NOTEBOOK_DIR_NAME = "lab-notebook"
 PERSONAL_ORACLE_DIR = Path.home() / ".claude" / "agent-memory" / "oracle"
 # Per-machine installation manifests, written by the install wizard.
 # One YAML per project; see ``murmurent.dashboard.contract.InstallationRow``.
-INSTALLATIONS_DIR = Path.home() / ".wigamig" / "installations"
+INSTALLATIONS_DIR = Path.home() / ".murmurent" / "installations"
 
 
 # ---------------------------------------------------------------------------
@@ -492,13 +492,13 @@ _ANSI_RE = __import__("re").compile(r"\x1b\[[0-9;]*m")
 
 
 def _agents_activity(*, limit: int = 16) -> list[C.AgentActivity]:
-    """Parse the tail of ``~/.wigamig/agents.log`` (the SubagentStop /
+    """Parse the tail of ``~/.murmurent/agents.log`` (the SubagentStop /
     PreToolUse(Agent) hook feed) into structured, newest-first entries so the
     dashboard can show a live agents panel. Best-effort — a missing log is just an
     empty feed."""
     import os
-    log = Path(os.environ.get("WIGAMIG_AGENT_LOG",
-                              str(Path.home() / ".wigamig" / "agents.log")))
+    log = Path(os.environ.get("MURMURENT_AGENT_LOG",
+                              str(Path.home() / ".murmurent" / "agents.log")))
     if not log.is_file():
         return []
     try:
@@ -2076,7 +2076,7 @@ def _parse_markdown_blocks(body: str):
 
 
 def _installations(viewer_handle: str, persona: str) -> list[C.InstallationRow]:
-    """Load per-machine installation manifests from ``~/.wigamig/installations/``.
+    """Load per-machine installation manifests from ``~/.murmurent/installations/``.
 
     Each YAML file (one per installed project on this machine) is parsed
     into an :class:`InstallationRow`. Member personas see only their own

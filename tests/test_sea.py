@@ -13,9 +13,9 @@ from murmurent.core.projects import find_project
 
 @pytest.fixture
 def project(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
     (tmp_path / "lab-mgmt" / "projects").mkdir(parents=True)
     project_cmd.cmd_new(
         "p",
@@ -29,7 +29,7 @@ def project(monkeypatch, tmp_path):
 
 
 def test_request_then_list(project, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     sea_cmd.cmd_request(project_name="p", to_target="@bob", kind="experiment", description="run X")
     seas = sea.iter_seas(project)
     assert len(seas) == 1
@@ -41,9 +41,9 @@ def test_request_then_list(project, monkeypatch):
 
 
 def test_lifecycle_claim_complete(project, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     sea_cmd.cmd_request(project_name="p", to_target="@bob", kind="analysis", description="x")
-    monkeypatch.setenv("WIGAMIG_USER", "bob")
+    monkeypatch.setenv("MURMURENT_USER", "bob")
     sea_cmd.cmd_claim(1)
     s = sea.iter_seas(project)[0]
     assert s.state == "claimed" and s.claimed_at is not None
@@ -53,7 +53,7 @@ def test_lifecycle_claim_complete(project, monkeypatch):
 
 
 def test_decline_blocks_claim(project, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     sea_cmd.cmd_request(project_name="p", to_target="@bob", kind="skill", description="x")
     sea_cmd.cmd_decline(1, reason="out of scope")
     s = sea.iter_seas(project)[0]
@@ -63,19 +63,19 @@ def test_decline_blocks_claim(project, monkeypatch):
 
 
 def test_list_filters_by_direction(project, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     sea_cmd.cmd_request(project_name="p", to_target="@bob", kind="skill", description="a")
-    monkeypatch.setenv("WIGAMIG_USER", "cassie")
+    monkeypatch.setenv("MURMURENT_USER", "cassie")
     sea_cmd.cmd_request(project_name="p", to_target="@allie", kind="skill", description="b")
 
     runner = CliRunner()
-    monkeypatch.setenv("WIGAMIG_USER", "bob")
+    monkeypatch.setenv("MURMURENT_USER", "bob")
     result = runner.invoke(cli, ["sea", "list", "--incoming"])
     assert result.exit_code == 0, result.output
     assert "1" in result.output
     assert "2" not in result.output  # bob is not on SEA 2
 
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     result = runner.invoke(cli, ["sea", "list", "--outgoing"])
     assert result.exit_code == 0, result.output
     assert "1" in result.output  # allie filed SEA 1
@@ -83,7 +83,7 @@ def test_list_filters_by_direction(project, monkeypatch):
 
 
 def test_examine_then_conclude(project, monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     sea_cmd.cmd_request(project_name="p", to_target="@bob", kind="analysis", description="x")
     sea_cmd.cmd_claim(1)
     sea_cmd.cmd_complete(1, delivery="findings/x.md")

@@ -308,7 +308,7 @@ def cmd_new_remote(
          host's own lab-VM dirs.
       3. Write a *remote-pointer* directory at ``~/repos/<name>/``: just a
          CHARTER.md (with ``host:`` + ``remote_path:`` frontmatter) and a
-         ``.wigamig-remote-pointer`` marker. The dashboard's existing
+         ``.murmurent-remote-pointer`` marker. The dashboard's existing
          ``iter_local_projects`` picks this up and renders a 🌐 chip.
       4. Write the lab-mgmt registry entry with ``host:`` + ``remote_path:``.
 

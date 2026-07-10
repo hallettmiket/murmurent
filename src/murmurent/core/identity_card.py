@@ -10,10 +10,10 @@ module:
     handle's role(s), and produces a small, SCOPED identity card — the member's
     netname + only their own group's entry. A member never receives the whole
     centre's data.
-  - ``import_card(card)`` (MEMBER side): writes the card to ``~/.wigamig`` and
+  - ``import_card(card)`` (MEMBER side): writes the card to ``~/.murmurent`` and
     materializes a scoped ``lab_info/_registry.yaml`` (+ a minimal lab-mgmt) so
     the existing role resolver / scoping gate work locally, and stamps the
-    machine's netname in ``~/.wigamig/user``.
+    machine's netname in ``~/.murmurent/user``.
   - ``local_card()``: read this machine's card (for netname enforcement).
 
 Decentralized by design: no shared server or GitHub repo is required — the
@@ -34,9 +34,9 @@ CARD_VERSION = 1
 
 
 def _home() -> Path:
-    """The machine's ~/.wigamig root (identity + user files live here)."""
+    """The machine's ~/.murmurent root (identity + user files live here)."""
     import os
-    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+    return Path(os.environ.get("MURMURENT_HOME", str(Path.home() / ".murmurent")))
 
 
 def identity_path() -> Path:
@@ -119,7 +119,7 @@ def _group_kind(role: dict) -> str:
 def import_card(card: dict, *, env: dict[str, str] | None = None) -> list[str]:
     """Materialize a card onto this machine.
 
-    Writes ``~/.wigamig/identity.yaml`` + ``~/.wigamig/user`` and a SCOPED
+    Writes ``~/.murmurent/identity.yaml`` + ``~/.murmurent/user`` and a SCOPED
     ``lab_info/_registry.yaml`` (+ a minimal lab-mgmt dir per group) so the
     existing role resolver + scoping gate resolve this member locally. Returns
     a list of human-readable actions.
@@ -133,7 +133,7 @@ def import_card(card: dict, *, env: dict[str, str] | None = None) -> list[str]:
     home.mkdir(parents=True, exist_ok=True)
     (home / "user").write_text(netname + "\n", encoding="utf-8")
     identity_path().write_text(card_yaml(card), encoding="utf-8")
-    actions.append(f"netname set to @{netname} (~/.wigamig/user)")
+    actions.append(f"netname set to @{netname} (~/.murmurent/user)")
 
     # 2. Scoped registry + minimal lab-mgmt per group.
     lab_info = _R.lab_info_root(env)

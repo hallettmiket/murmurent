@@ -1,5 +1,5 @@
 """
-Purpose: Seed /tmp with a fake wigamig data layout for the four tutorial
+Purpose: Seed /tmp with a fake murmurent data layout for the four tutorial
          personas (mhallet, allie, bob, cassie). Idempotent — safe to re-run.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-11
@@ -141,7 +141,7 @@ def _seed_raw() -> None:
             readme.write_text(
                 f"# {project} — raw data\n\n"
                 "This directory mirrors what would be delivered by the instrument core.\n"
-                "Contents are placeholder files for the wigamig tutorial.\n",
+                "Contents are placeholder files for the murmurent tutorial.\n",
                 encoding="utf-8",
             )
 
@@ -154,7 +154,7 @@ def _seed_refined() -> None:
             readme = exp_dir / "README.md"
             if not readme.is_file():
                 readme.write_text(
-                    f"# {project}/{exp_slug}\n\nFake refined output for the wigamig tutorial.\n",
+                    f"# {project}/{exp_slug}\n\nFake refined output for the murmurent tutorial.\n",
                     encoding="utf-8",
                 )
         # A couple of placeholder result files

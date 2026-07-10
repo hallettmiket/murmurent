@@ -5,7 +5,7 @@ Author: Mike Hallett (with Claude Code)
 Date: 2026-05-19
 Input: ``--host``, optional path overrides, output format.
 Output: Rich table to stdout (default) or JSON; persists JSONL to
-        ``~/.wigamig/security/<host>/<UTC-date>.jsonl``.
+        ``~/.murmurent/security/<host>/<UTC-date>.jsonl``.
 
 Mirrors :mod:`murmurent.commands.reconcile_cmd` — a thin click wrapper
 around :mod:`core.security_remote` so the CC ``/routine`` skill can
@@ -30,7 +30,7 @@ from ..core.security_findings import (
 )
 
 
-PERSIST_ROOT = Path.home() / ".wigamig" / "security"
+PERSIST_ROOT = Path.home() / ".murmurent" / "security"
 
 
 def _persist(host_name: str, findings: list[Finding]) -> Path:

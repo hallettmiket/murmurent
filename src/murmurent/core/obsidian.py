@@ -12,7 +12,7 @@ Input: Obsidian's ``obsidian.json`` registry. Path varies per OS:
 Output: ``Vault`` dataclasses + ``preferred_vault()`` picker.
 
 Resolution order for the *preferred* vault:
-  1. ``$WIGAMIG_OBSIDIAN_VAULT`` — match by vault name (case-sensitive).
+  1. ``$MURMURENT_OBSIDIAN_VAULT`` — match by vault name (case-sensitive).
   2. The most-recently-opened vault (``ts`` field, descending).
   3. None when the registry is missing or has no vaults.
 """
@@ -80,13 +80,13 @@ def discover_vaults() -> list[Vault]:
 def preferred_vault() -> Vault | None:
     """Pick the user's preferred vault.
 
-    ``$WIGAMIG_OBSIDIAN_VAULT`` (vault name) wins; otherwise the
+    ``$MURMURENT_OBSIDIAN_VAULT`` (vault name) wins; otherwise the
     most-recently-opened vault.
     """
     vaults = discover_vaults()
     if not vaults:
         return None
-    pin = os.environ.get("WIGAMIG_OBSIDIAN_VAULT", "").strip()
+    pin = os.environ.get("MURMURENT_OBSIDIAN_VAULT", "").strip()
     if pin:
         for v in vaults:
             if v.name == pin:

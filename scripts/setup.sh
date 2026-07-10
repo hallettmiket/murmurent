@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Purpose: One-shot per-machine wiring of wigamig into ~/.claude/.
-#          Makes wigamig the default Claude Code commons for every
+# Purpose: One-shot per-machine wiring of murmurent into ~/.claude/.
+#          Makes murmurent the default Claude Code commons for every
 #          project on this machine — re-points ~/.claude/agents/ at
-#          wigamig's commons, links the wigamig CLAUDE.md as the
-#          global default, and installs wigamig's hooks + MCP servers
+#          murmurent's commons, links the murmurent CLAUDE.md as the
+#          global default, and installs murmurent's hooks + MCP servers
 #          into ~/.claude/settings.json.
 # Author:  Mike Hallett (with Claude Code)
 # Date:    2026-05-15
 # Usage:   bash scripts/setup.sh
 #
 # Idempotent. Re-running:
-#   - Replaces existing wigamig symlinks (no-op when target unchanged).
+#   - Replaces existing murmurent symlinks (no-op when target unchanged).
 #   - Replaces generic_cc symlinks at the same path (legacy migration).
 #   - SKIPS files in ~/.claude/agents/ that aren't symlinks
 #     (preserves user-authored agent files).
@@ -20,7 +20,7 @@
 # Side effects:
 #   - ~/.claude/agents/<agent>.md       → <repo>/agents/<agent>.md
 #   - ~/.claude/CLAUDE.md               → <repo>/CLAUDE.md          (if absent)
-#   - ~/.claude/settings.json           ← wigamig hooks + MCP merged in
+#   - ~/.claude/settings.json           ← murmurent hooks + MCP merged in
 
 set -euo pipefail
 
@@ -44,8 +44,8 @@ warn() { printf '  \033[33m!\033[0m %s\n' "$*"; }
 fail() { printf '  \033[31m✗\033[0m %s\n' "$*"; }
 
 if [[ ! -d "$AGENTS_SRC" ]]; then
-  fail "wigamig commons not found at $AGENTS_SRC"
-  fail "run this script from inside a wigamig clone (or fix REPO_DIR resolution)"
+  fail "murmurent commons not found at $AGENTS_SRC"
+  fail "run this script from inside a murmurent clone (or fix REPO_DIR resolution)"
   exit 1
 fi
 
@@ -68,23 +68,23 @@ for src in "$AGENTS_SRC"/*.md; do
     case "$target" in
       */repos/generic_cc/agents/*)
         ln -sfn "$src" "$dest"
-        ok "migrated $name (generic_cc → wigamig)"
+        ok "migrated $name (generic_cc → murmurent)"
         swept_legacy=$((swept_legacy + 1))
         ;;
       "$src")
-        ok "$name already wigamig"
+        ok "$name already murmurent"
         ;;
       *)
         ln -sfn "$src" "$dest"
-        ok "re-pointed $name → wigamig"
+        ok "re-pointed $name → murmurent"
         ;;
     esac
   elif [[ -f "$dest" ]]; then
-    warn "preserved user-authored $name (not a symlink) — delete it manually if you want wigamig's version"
+    warn "preserved user-authored $name (not a symlink) — delete it manually if you want murmurent's version"
     preserved=$((preserved + 1))
   else
     ln -sfn "$src" "$dest"
-    ok "created $name → wigamig"
+    ok "created $name → murmurent"
     created=$((created + 1))
   fi
 done
@@ -92,9 +92,9 @@ echo "  -- migrated $swept_legacy generic_cc symlinks, created $created new, pre
 
 echo
 echo "[2/5] Wiring ~/.claude/rules/ → $RULES_SRC/"
-# Same idempotent pattern as agents: replace existing wigamig symlinks,
+# Same idempotent pattern as agents: replace existing murmurent symlinks,
 # preserve user-authored .md files, create missing ones. Skips the step
-# entirely when wigamig has no rules/ dir yet (back-compat with older
+# entirely when murmurent has no rules/ dir yet (back-compat with older
 # clones that pre-date the rules layer).
 if [[ -d "$RULES_SRC" ]]; then
   mkdir -p "$CC_DIR/rules"
@@ -106,19 +106,19 @@ if [[ -d "$RULES_SRC" ]]; then
     dest="$CC_DIR/rules/$name"
     if [[ -L "$dest" ]]; then
       ln -sfn "$src" "$dest"
-      ok "re-pointed rules/$name → wigamig"
+      ok "re-pointed rules/$name → murmurent"
     elif [[ -f "$dest" ]]; then
-      warn "preserved user-authored rules/$name (not a symlink) — delete to use wigamig's version"
+      warn "preserved user-authored rules/$name (not a symlink) — delete to use murmurent's version"
       rules_preserved=$((rules_preserved + 1))
     else
       ln -sfn "$src" "$dest"
-      ok "created rules/$name → wigamig"
+      ok "created rules/$name → murmurent"
       rules_created=$((rules_created + 1))
     fi
   done
   echo "  -- created $rules_created new rules, preserved $rules_preserved user files."
 else
-  warn "no rules/ dir in wigamig — skipping"
+  warn "no rules/ dir in murmurent — skipping"
 fi
 
 echo
@@ -129,7 +129,7 @@ elif [[ -L "$CC_DIR/CLAUDE.md" ]]; then
   ln -sfn "$CLAUDE_MD_SRC" "$CC_DIR/CLAUDE.md"
   ok "re-pointed ~/.claude/CLAUDE.md → wigamig/CLAUDE.md"
 elif [[ -f "$CC_DIR/CLAUDE.md" ]]; then
-  warn "~/.claude/CLAUDE.md is a regular file — preserved. Delete or rename it if you want wigamig's version."
+  warn "~/.claude/CLAUDE.md is a regular file — preserved. Delete or rename it if you want murmurent's version."
 else
   ln -sfn "$CLAUDE_MD_SRC" "$CC_DIR/CLAUDE.md"
   ok "created ~/.claude/CLAUDE.md → wigamig/CLAUDE.md"
@@ -156,7 +156,7 @@ echo
 echo "[5/5] Wiring ~/.claude/skills/ → $SKILLS_SRC/"
 # Skills are directories (each contains SKILL.md), so we symlink the
 # DIRECTORY itself rather than per-file. Same idempotent pattern as
-# agents/rules: replace existing wigamig symlinks, preserve
+# agents/rules: replace existing murmurent symlinks, preserve
 # user-authored skill directories (don't clobber a hand-written
 # skill that happens to share a name).
 if [[ -d "$SKILLS_SRC" ]]; then
@@ -170,19 +170,19 @@ if [[ -d "$SKILLS_SRC" ]]; then
     dest="$CC_DIR/skills/$name"
     if [[ -L "$dest" ]]; then
       ln -sfn "$src_dir" "$dest"
-      ok "re-pointed skills/$name → wigamig"
+      ok "re-pointed skills/$name → murmurent"
     elif [[ -e "$dest" ]]; then
-      warn "preserved user-authored skills/$name (not a symlink) — delete to use wigamig's version"
+      warn "preserved user-authored skills/$name (not a symlink) — delete to use murmurent's version"
       skills_preserved=$((skills_preserved + 1))
     else
       ln -sfn "$src_dir" "$dest"
-      ok "created skills/$name → wigamig"
+      ok "created skills/$name → murmurent"
       skills_created=$((skills_created + 1))
     fi
   done
   echo "  -- created $skills_created new skills, preserved $skills_preserved user dirs."
 else
-  warn "no skills/ dir in wigamig — skipping"
+  warn "no skills/ dir in murmurent — skipping"
 fi
 
 # ── macOS one-click dashboard launcher (every member: mayor, PI, member) ──────

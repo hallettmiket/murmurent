@@ -25,14 +25,14 @@ Inventory MCP works in CC; PHI pattern detection fires inside clinical projects;
    - The six items per umbrella prompt with frontmatter per design (`name`, `lot`, `qty`, `unit`, `expiry`, `location`, `vendor`, `catalog_no`, `last_updated`, `status`, `protocols`)
    - Add as part of the seed script v4 (extends v3)
 
-2. **Inventory MCP server** at `src/wigamig/mcp/inventory_server.py`
+2. **Inventory MCP server** at `src/murmurent/mcp/inventory_server.py`
    - Uses Anthropic's `mcp` Python SDK
    - Tools: `inventory_list(filter)`, `inventory_show(name)`, `inventory_provision(plan_path)`, `inventory_set(name, fields)`, `inventory_add(...)`, `inventory_order(name)`
    - `inventory_provision` reads frontmatter `reagents:` from a notebook entry, intersects with inventory, returns gaps and expiring-soon
    - Permission check: `lab_manager` is hardcoded as `@mike` for v1 (real token-based auth is v2)
    - Independent test harness (without CC) that validates each tool
 
-3. **PHI pattern detection hook** at `src/wigamig/hooks/phi_check.py`
+3. **PHI pattern detection hook** at `src/murmurent/hooks/phi_check.py`
    - PreToolUse and PostToolUse
    - Active when active project's CHARTER has `sensitivity: clinical`
    - Patterns:
@@ -44,14 +44,14 @@ Inventory MCP works in CC; PHI pattern detection fires inside clinical projects;
    - Post: redact matches in returned content
    - Test harness with realistic-looking fake strings
 
-4. **Project-context injection hook** at `src/wigamig/hooks/context_inject.py`
+4. **Project-context injection hook** at `src/murmurent/hooks/context_inject.py`
    - UserPromptSubmit
    - Walks cwd to find active project; reads CHARTER (first paragraph), MEMBERS, current member's role, active SEAs (assigned to or from current user)
    - Prepends a `<system-reminder>` block to the user prompt
 
-5. **Audit log hook** at `src/wigamig/hooks/audit.py`
+5. **Audit log hook** at `src/murmurent/hooks/audit.py`
    - PostToolUse
-   - Append jsonl to `~/.claude/wigamig-audit/YYYY-MM-DD.log`: `ts`, `member`, `project`, `tool`, `args_summary`, `outcome`, `duration_ms`
+   - Append jsonl to `~/.claude/murmurent-audit/YYYY-MM-DD.log`: `ts`, `member`, `project`, `tool`, `args_summary`, `outcome`, `duration_ms`
 
 6. **Hook + MCP installer**
    - `murmurent install --hooks` deploys all four hooks (raw_guard from phase 2 + the three new ones) to `~/.claude/hooks/` and registers in `~/.claude/settings.json` with the right `match` rules
@@ -64,7 +64,7 @@ Inventory MCP works in CC; PHI pattern detection fires inside clinical projects;
 - [ ] In CC inside `dcis_sc_tutorial`, pasting `1234-567-890-AB` into a prompt is refused by the PHI hook with a message naming the pattern type
 - [ ] Same paste in `bbb_drug_screen` (sensitivity: standard) — no refusal
 - [ ] Submitting any prompt inside `dcis_sc_tutorial` injects a system reminder showing project name + role + active SEAs
-- [ ] Tool calls written to `~/.claude/wigamig-audit/YYYY-MM-DD.log` as jsonl
+- [ ] Tool calls written to `~/.claude/murmurent-audit/YYYY-MM-DD.log` as jsonl
 - [ ] `murmurent install --hooks` succeeds idempotently
 - [ ] PR opened on `hallettmiket/murmurent` from `feat/phase-4-mcp-hooks`
 

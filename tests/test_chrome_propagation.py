@@ -8,7 +8,7 @@ personality for every murmurent project:
     sidebar right, terminals default to editor area
   * ``.claude/settings.json`` — hooks block pointing at the murmurent
     commons agent-reporter so subagent events from this project
-    land in ``~/.wigamig/agents.log`` (which the BR pane tails)
+    land in ``~/.murmurent/agents.log`` (which the BR pane tails)
 
 Both files are skipped on re-bootstrap when present — user edits are
 sacred. Both files are written **alongside** the existing
@@ -40,7 +40,7 @@ def world(monkeypatch, tmp_path):
     (commons / "scripts").mkdir(parents=True)
     (commons / "scripts" / "murmurent_log_agent_event.sh").write_text("#!/usr/bin/env bash\n")
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("WIGAMIG_REPO_ROOT", str(commons))
+    monkeypatch.setenv("MURMURENT_REPO_ROOT", str(commons))
     proj = home / "repos" / "demo"
     proj.mkdir()
     return {"home": home, "commons": commons, "project": proj}

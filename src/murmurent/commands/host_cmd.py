@@ -3,7 +3,7 @@ Purpose: CLI handlers for ``murmurent host {list, add, remove, test}``.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-13
 Input: Arguments from the click subcommand layer.
-Output: Stdout messages + side effects on ~/.wigamig/hosts.yaml.
+Output: Stdout messages + side effects on ~/.murmurent/hosts.yaml.
 
 The ``host`` command tree lets a user register a remote machine
 (typically biodatsci.schulich.uwo.ca) so the dashboard can offer it as

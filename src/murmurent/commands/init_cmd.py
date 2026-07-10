@@ -24,7 +24,7 @@ ROLES = {
 
 
 def _home() -> Path:
-    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+    return Path(os.environ.get("MURMURENT_HOME", str(Path.home() / ".murmurent")))
 
 
 def profile_path() -> Path:

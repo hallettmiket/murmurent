@@ -1,5 +1,5 @@
 """
-Purpose: Generate clearly-fake instrument data for the wigamig smoke-test
+Purpose: Generate clearly-fake instrument data for the murmurent smoke-test
          tutorial. All values are obviously synthetic (fake OHIPs ``0000-000-NNN``,
          random base FASTQ, etc.); nothing here represents real PHI or real
          sequencing data.
@@ -7,7 +7,7 @@ Author: Mike Hallett (with Claude Code)
 Date: 2026-05-07
 Input: An output directory.
 Output: A directory of fake FASTQ + clinicopath CSV + count matrix CSV +
-        compound table CSV, suitable as a `wigamig experiment ingest` source.
+        compound table CSV, suitable as a `murmurent experiment ingest` source.
 """
 
 from __future__ import annotations
@@ -119,7 +119,7 @@ def write_summary_pdf(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     # Real PDF parsing is out of scope; we just want the file to look plausible
     # and have a `.pdf` extension so the ingest classifier marks it derived.
-    path.write_bytes(b"%PDF-1.4\n% fake summary PDF for wigamig smoke test\n%%EOF\n")
+    path.write_bytes(b"%PDF-1.4\n% fake summary PDF for murmurent smoke test\n%%EOF\n")
 
 
 def generate_dcis_sequencing(out_dir: Path, *, rng: random.Random) -> None:

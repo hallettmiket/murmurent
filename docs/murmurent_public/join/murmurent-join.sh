@@ -183,7 +183,7 @@ EOF
   say "  1. The Mayor (the person who runs murmurent at ${INSTITUTION})"
   say "     will REPLY TO YOU BY EMAIL. Watch your inbox (and spam folder)."
   say "  2. That reply will include a SLACK INVITE to the '${INSTITUTION}'"
-  say "     wigamig workspace. Accept it — Slack is where everything happens"
+  say "     murmurent workspace. Accept it — Slack is where everything happens"
   say "     from then on (you'll land in a channel for your lab/core)."
   say ""
   say "  So: expect (a) an EMAIL from the Mayor, and (b) a SLACK INVITE."

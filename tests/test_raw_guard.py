@@ -40,7 +40,7 @@ def _run(payload: dict, env: dict[str, str] | None = None) -> dict:
 
 
 def test_write_into_raw_denied(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": str(tmp_path / "raw" / "p" / "1_e" / "x.fastq.gz")},
@@ -51,7 +51,7 @@ def test_write_into_raw_denied(monkeypatch, tmp_path):
 
 
 def test_write_outside_raw_allowed(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": str(tmp_path / "refined" / "x.csv")},
@@ -60,7 +60,7 @@ def test_write_outside_raw_allowed(monkeypatch, tmp_path):
 
 
 def test_bash_redirect_into_raw_denied(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
     target = tmp_path / "raw" / "p" / "1_e" / "log.txt"
     payload = {
         "tool_name": "Bash",
@@ -71,7 +71,7 @@ def test_bash_redirect_into_raw_denied(monkeypatch, tmp_path):
 
 
 def test_bash_rm_on_raw_denied(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
     target = tmp_path / "raw" / "p" / "1_e" / "x.fastq.gz"
     payload = {
         "tool_name": "Bash",
@@ -81,7 +81,7 @@ def test_bash_rm_on_raw_denied(monkeypatch, tmp_path):
 
 
 def test_bash_chmod_writable_on_raw_denied(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
     target = tmp_path / "raw" / "p" / "1_e"
     payload = {
         "tool_name": "Bash",
@@ -91,7 +91,7 @@ def test_bash_chmod_writable_on_raw_denied(monkeypatch, tmp_path):
 
 
 def test_bash_read_on_raw_allowed(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
     target = tmp_path / "raw" / "p" / "1_e" / "x.fastq.gz"
     payload = {
         "tool_name": "Bash",
@@ -101,7 +101,7 @@ def test_bash_read_on_raw_allowed(monkeypatch, tmp_path):
 
 
 def test_read_tool_on_raw_allowed(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
     payload = {
         "tool_name": "Read",
         "tool_input": {"file_path": str(tmp_path / "raw" / "p" / "1_e" / "x.fastq.gz")},
@@ -111,7 +111,7 @@ def test_read_tool_on_raw_allowed(monkeypatch, tmp_path):
 
 def test_production_path_blocked_even_with_env(monkeypatch, tmp_path):
     """The production /data/lab_vm/wigamig/raw is always blocked, regardless of env."""
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": "/data/lab_vm/wigamig/raw/some_proj/exp/x.fastq.gz"},

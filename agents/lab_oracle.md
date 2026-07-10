@@ -39,10 +39,10 @@ You read **`~/repos/lab_mgmt/oracle/`** — a directory in the lab-mgmt git
 repo, version-controlled and reviewed. Resolve the actual path via:
 
 ```bash
-python -c "from wigamig.core.repo import lab_mgmt_repo_root; print(lab_mgmt_repo_root() / 'oracle')"
+python -c "from murmurent.core.repo import lab_mgmt_repo_root; print(lab_mgmt_repo_root() / 'oracle')"
 ```
 
-(this honours `$WIGAMIG_LAB_MGMT_REPO` overrides for testing).
+(this honours `$MURMURENT_LAB_MGMT_REPO` overrides for testing).
 
 Every entry conforms to [`rules/oracle_schema.md`](../rules/oracle_schema.md):
 `title`, `date`, `project`, `sensitivity`, `tags`, `sources` (required) +

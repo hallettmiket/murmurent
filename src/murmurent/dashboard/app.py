@@ -6,7 +6,7 @@ Purpose: Streamlit live view of the murmurent dashboard. Theme matches the
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-08
 Input: ``--user <handle>`` argv (passed by ``murmurent dashboard`` via streamlit
-       argv) or ``$WIGAMIG_USER`` env var. Empty handle is allowed; the page
+       argv) or ``$MURMURENT_USER`` env var. Empty handle is allowed; the page
        renders a login sidebar.
 Output: A locally-served Streamlit page.
 """
@@ -30,7 +30,7 @@ except ImportError:
     from murmurent.core import dashboard  # type: ignore[no-redef]
 
 
-USER_PREF_PATH = Path.home() / ".wigamig" / "user"
+USER_PREF_PATH = Path.home() / ".murmurent" / "user"
 
 # Western University brand palette, picked from the Hallett Lab website.
 WESTERN_PURPLE = "#4F2683"
@@ -45,7 +45,7 @@ MUTED = "#5b5b5b"
 
 def _parse_argv() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--user", default=os.environ.get("WIGAMIG_USER", ""))
+    parser.add_argument("--user", default=os.environ.get("MURMURENT_USER", ""))
     return parser.parse_args()
 
 
@@ -101,7 +101,7 @@ def _inject_theme() -> None:
           h2 {{ border-bottom: 1px solid {BORDER}; padding-bottom: 6px; }}
 
           /* Slim banner: lab + Western, NO land ack here. */
-          .wigamig-banner {{
+          .murmurent-banner {{
             background: {WESTERN_PURPLE};
             color: #fff;
             padding: 10px 22px;
@@ -111,34 +111,34 @@ def _inject_theme() -> None:
             gap: 14px;
             border-bottom: 3px solid {TIGER_ORANGE};
           }}
-          .wigamig-banner .lab {{
+          .murmurent-banner .lab {{
             font-family: 'EB Garamond', Georgia, serif;
             font-size: 20px;
             color: {TIGER_ORANGE};
           }}
-          .wigamig-banner .sep {{ color: rgba(255,255,255,0.4); }}
-          .wigamig-banner .uwo {{
+          .murmurent-banner .sep {{ color: rgba(255,255,255,0.4); }}
+          .murmurent-banner .uwo {{
             font-size: 11px; letter-spacing: 0.5px;
             color: rgba(255,255,255,0.85);
           }}
-          .wigamig-banner .who {{
+          .murmurent-banner .who {{
             margin-left: auto;
             font-size: 11px; color: rgba(255,255,255,0.85);
           }}
-          .wigamig-banner .who code {{
+          .murmurent-banner .who code {{
             background: rgba(255,255,255,0.12);
             color: #fff; padding: 2px 6px; border-radius: 1px;
           }}
 
           /* Box style for sections + nav buttons. */
-          .wigamig-card {{
+          .murmurent-card {{
             background: #fff;
             border: 1px solid {BORDER};
             border-radius: 2px;
             padding: 18px 22px;
             margin-bottom: 16px;
           }}
-          .wigamig-tag {{
+          .murmurent-tag {{
             display: inline-block;
             font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
             text-transform: uppercase;
@@ -147,11 +147,11 @@ def _inject_theme() -> None:
             padding: 2px 6px; border-radius: 1px;
             margin-right: 6px;
           }}
-          .wigamig-tag.tiger {{ color: {TIGER_ORANGE}; border-color: {TIGER_ORANGE}; }}
-          .wigamig-tag.muted {{ color: {MUTED}; border-color: {BORDER}; }}
+          .murmurent-tag.tiger {{ color: {TIGER_ORANGE}; border-color: {TIGER_ORANGE}; }}
+          .murmurent-tag.muted {{ color: {MUTED}; border-color: {BORDER}; }}
 
           /* Slim footer (no land ack here — it lives on the home page). */
-          .wigamig-footer {{
+          .murmurent-footer {{
             margin-top: 36px; padding: 14px 22px;
             border-top: 3px solid {TIGER_ORANGE};
             background: {WESTERN_PURPLE_DEEP};
@@ -159,14 +159,14 @@ def _inject_theme() -> None:
             font-size: 12px; line-height: 1.5;
             font-family: 'EB Garamond', Georgia, serif !important;
           }}
-          .wigamig-footer a {{
+          .murmurent-footer a {{
             color: {TIGER_ORANGE};
             text-decoration: none;
             border-bottom: 1px dotted {TIGER_ORANGE};
           }}
 
           /* Land acknowledgement card, home page only. */
-          .wigamig-land-ack {{
+          .murmurent-land-ack {{
             margin: 28px 0 8px 0;
             padding: 16px 20px;
             border-left: 4px solid {TIGER_ORANGE};
@@ -178,7 +178,7 @@ def _inject_theme() -> None:
             font-size: 14px;
             line-height: 1.55;
           }}
-          .wigamig-land-ack strong {{
+          .murmurent-land-ack strong {{
             font-style: normal;
             color: {WESTERN_PURPLE};
             text-transform: uppercase;
@@ -189,7 +189,7 @@ def _inject_theme() -> None:
           }}
 
           /* Per-tile caption under each nav button. */
-          .wigamig-nav-caption {{
+          .murmurent-nav-caption {{
             font-family: 'EB Garamond', Georgia, serif !important;
             font-size: 13px;
             color: {MUTED};
@@ -235,7 +235,7 @@ def _inject_theme() -> None:
           /* Compact 'back home' + form buttons (override large min-height
              when used inside a form). */
           [data-testid="stForm"] .stButton > button,
-          .wigamig-compact-btn .stButton > button {{
+          .murmurent-compact-btn .stButton > button {{
             min-height: 38px;
             padding: 6px 14px;
             font-size: 14px;
@@ -345,7 +345,7 @@ def _sidebar(current: str) -> None:
             "Username (e.g. mhallet)",
             value="",
             key="switch_user",
-            help="Saved to ~/.wigamig/user — useful if you log in from another machine.",
+            help="Saved to ~/.murmurent/user — useful if you log in from another machine.",
         )
         save = st.checkbox("Remember me", value=True, key="switch_save")
         if st.button("Switch", key="switch_btn") and new_handle.strip():

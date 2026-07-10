@@ -23,20 +23,20 @@ DEFAULT_SETTINGS_PATH = Path("~/.claude/settings.json").expanduser()
 HOOK_REGISTRATIONS: list[dict[str, Any]] = [
     {
         # murmurent agent reporter — writes coloured one-line events for
-        # PreToolUse(Agent) and SubagentStop to ~/.wigamig/agents.log,
+        # PreToolUse(Agent) and SubagentStop to ~/.murmurent/agents.log,
         # which the VSCode BR pane tails. Uses ``command`` rather than
         # ``module`` because the hook is a bash script, not a Python
         # entrypoint.
         "event": "PreToolUse",
         "matcher": "Agent",
-        "command": "<WIGAMIG_REPO>/scripts/murmurent_log_agent_event.sh",
+        "command": "<MURMURENT_REPO>/scripts/murmurent_log_agent_event.sh",
         "env": {},
         "label": "murmurent-agent-report-pre",
     },
     {
         "event": "SubagentStop",
         "matcher": None,
-        "command": "<WIGAMIG_REPO>/scripts/murmurent_log_agent_event.sh",
+        "command": "<MURMURENT_REPO>/scripts/murmurent_log_agent_event.sh",
         "env": {},
         "label": "murmurent-agent-report-stop",
     },
@@ -61,14 +61,14 @@ HOOK_REGISTRATIONS: list[dict[str, Any]] = [
         "event": "PreToolUse",
         "matcher": "Bash|WebFetch|WebSearch|mcp__slack__.*|mcp__claude_ai_Slack__.*",
         "module": "murmurent.hooks.phi_check",
-        "env": {"WIGAMIG_PHI_HOOK_MODE": "pre"},
+        "env": {"MURMURENT_PHI_HOOK_MODE": "pre"},
         "label": "murmurent-phi-pre",
     },
     {
         "event": "PostToolUse",
         "matcher": ".*",
         "module": "murmurent.hooks.phi_check",
-        "env": {"WIGAMIG_PHI_HOOK_MODE": "post"},
+        "env": {"MURMURENT_PHI_HOOK_MODE": "post"},
         "label": "murmurent-phi-post",
     },
     {
@@ -120,14 +120,14 @@ def _resolve_command(reg: dict[str, Any]) -> str:
         with optional env-var prefixes (the historic shape; covers
         raw_guard, phi_check, audit, etc.).
       - ``command``: a literal shell command — typically a path to a
-        bash script. Use ``<WIGAMIG_REPO>`` as a placeholder for the
+        bash script. Use ``<MURMURENT_REPO>`` as a placeholder for the
         murmurent clone root; it's expanded at install time so the
         resulting absolute path is correct on this machine.
     """
     env = reg.get("env") or {}
     if "command" in reg:
         from ..core.repo import wigamig_repo_root
-        cmd = str(reg["command"]).replace("<WIGAMIG_REPO>", str(wigamig_repo_root()))
+        cmd = str(reg["command"]).replace("<MURMURENT_REPO>", str(wigamig_repo_root()))
         parts = [f"{k}={v}" for k, v in env.items()] + [cmd]
         return " ".join(parts)
     parts = [f"{k}={v}" for k, v in env.items()]
@@ -149,9 +149,9 @@ def _matches_existing(entry: dict[str, Any], reg: dict[str, Any]) -> bool:
     if (entry.get("matcher") or None) != (reg.get("matcher") or None):
         return False
     body = reg.get("module") or reg.get("command") or ""
-    if "<WIGAMIG_REPO>" in body:
+    if "<MURMURENT_REPO>" in body:
         from ..core.repo import wigamig_repo_root
-        body = body.replace("<WIGAMIG_REPO>", str(wigamig_repo_root()))
+        body = body.replace("<MURMURENT_REPO>", str(wigamig_repo_root()))
     hooks = entry.get("hooks") or []
     for h in hooks:
         cmd = h.get("command", "")

@@ -1,29 +1,29 @@
 #!/bin/zsh -l
-# Double-click this file in Finder to open your wigamig dashboard.
+# Double-click this file in Finder to open your murmurent dashboard.
 #
 # Launches the hi-fi (FastAPI) dashboard at http://127.0.0.1:8770/ and
 # opens it in your default browser.
 #
 # Username resolution (first match wins):
-#   1. $WIGAMIG_USER if already set in the environment
-#   2. ~/.wigamig/user (single line containing your Western username, e.g.
+#   1. $MURMURENT_USER if already set in the environment
+#   2. ~/.murmurent/user (single line containing your Western username, e.g.
 #      "mhallet")
 #
 # If neither is set, the dashboard server still starts (the API will
 # 400 on /api/dashboard until you append ?user=<handle> to the URL or
-# set $WIGAMIG_USER and re-launch).
+# set $MURMURENT_USER and re-launch).
 
 set -e
 
 REPO_DIR="${0:A:h}"
 cd "$REPO_DIR"
 
-if [[ -z "$WIGAMIG_USER" ]]; then
-  if [[ -r "$HOME/.wigamig/user" ]]; then
-    WIGAMIG_USER="$(head -n1 "$HOME/.wigamig/user" | tr -d '[:space:]')"
+if [[ -z "$MURMURENT_USER" ]]; then
+  if [[ -r "$HOME/.murmurent/user" ]]; then
+    MURMURENT_USER="$(head -n1 "$HOME/.murmurent/user" | tr -d '[:space:]')"
   fi
 fi
-export WIGAMIG_USER
+export MURMURENT_USER
 
 if ! command -v uv >/dev/null 2>&1; then
   for candidate in "$HOME/.local/bin/uv" "$HOME/.cargo/bin/uv" /opt/homebrew/bin/uv /usr/local/bin/uv; do
@@ -43,13 +43,13 @@ if ! command -v uv >/dev/null 2>&1; then
   exit 1
 fi
 
-PORT="${WIGAMIG_DASHBOARD_PORT:-8770}"
+PORT="${MURMURENT_DASHBOARD_PORT:-8770}"
 URL="http://127.0.0.1:${PORT}/"
 
-if [[ -n "$WIGAMIG_USER" ]]; then
-  print "Launching wigamig dashboard for: $WIGAMIG_USER"
+if [[ -n "$MURMURENT_USER" ]]; then
+  print "Launching murmurent dashboard for: $MURMURENT_USER"
 else
-  print "Launching wigamig dashboard (no saved user — set \$WIGAMIG_USER or"
+  print "Launching murmurent dashboard (no saved user — set \$MURMURENT_USER or"
   print "add ?user=<handle> to the URL)."
 fi
 print "Repo:  $REPO_DIR"
@@ -67,4 +67,4 @@ print ""
     sleep 0.2
   done ) &
 
-exec uv run wigamig dashboard --hifi --port "$PORT"
+exec uv run murmurent dashboard --hifi --port "$PORT"

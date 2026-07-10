@@ -23,7 +23,7 @@ T0 = datetime(2026, 7, 8, 12, 0, 0, tzinfo=timezone.utc)
 
 @pytest.fixture(autouse=True)
 def _home(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "wig"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "wig"))
 
 
 @pytest.fixture

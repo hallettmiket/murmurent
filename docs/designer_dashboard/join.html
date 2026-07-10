@@ -173,7 +173,7 @@
       try {
         const r = await fetch("/api/centre/profile");
         if (r.status === 404) {
-          lead.textContent = "The centre hasn't been initialised yet. Ask the mayor to run wigamig centre-init.";
+          lead.textContent = "The centre hasn't been initialised yet. Ask the mayor to run murmurent centre-init.";
           document.querySelectorAll("button, input, select, textarea")
             .forEach(el => el.disabled = true);
           return;

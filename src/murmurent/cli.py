@@ -41,7 +41,7 @@ def cli(ctx: click.Context) -> None:
     """Top-level entry point."""
     # Clone-first identity: the first real command a member runs after cloning
     # mints THIS machine's ed25519 keypair (their unique murmurent ID). Idempotent
-    # + best-effort; ``WIGAMIG_NO_AUTOKEY`` (set by the test suite) opts out. Only
+    # + best-effort; ``MURMURENT_NO_AUTOKEY`` (set by the test suite) opts out. Only
     # runs when a subcommand is actually being invoked, not for bare/--help/--version.
     if ctx.invoked_subcommand:
         from .core import identity_bootstrap as _ib
@@ -177,7 +177,7 @@ def preference_validate() -> None:
 
 @cli.group("host", help="Manage remote install targets (laptops, biodatsci, …).")
 def host_group() -> None:
-    """Hosts are registered in ~/.wigamig/hosts.yaml; ``local`` is built-in."""
+    """Hosts are registered in ~/.murmurent/hosts.yaml; ``local`` is built-in."""
 
 
 @host_group.command("list", help="Print every registered host.")
@@ -1447,7 +1447,7 @@ def oracle_publish_cmd(slug: str, push: bool, dry_run: bool) -> None:
         committer = resolve_identity(allow_unknown=False).handle
     except Exception as exc:
         raise click.ClickException(
-            f"could not resolve your handle (set WIGAMIG_USER): {exc}"
+            f"could not resolve your handle (set MURMURENT_USER): {exc}"
         ) from exc
 
     try:

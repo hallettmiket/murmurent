@@ -1,5 +1,5 @@
 /*
- * wigamig dashboard — session login modal.
+ * murmurent dashboard — session login modal.
  *
  * When dashboard auth is enabled (a secret is configured server-side), any
  * mutating request without a valid session returns 401. This wraps

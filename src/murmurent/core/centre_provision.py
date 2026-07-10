@@ -9,7 +9,7 @@ concerns the user flagged in item (0) of the post-smoke design
 conversation:
 
   - **Per-project filesystem ACLs** on shared lab servers via a
-    sudo-grantable script (``/opt/wigamig/murmurent_project_acl.sh``).
+    sudo-grantable script (``/opt/murmurent/murmurent_project_acl.sh``).
   - **Cross-lab membership tracking** so a project's member set is
     declared once, regardless of which labs the members come from.
   - **Reconcile loop** that diffs desired state (the project's
@@ -61,7 +61,7 @@ from .registrar import (
 
 
 PROJECTS_SUBDIR = "projects"
-ACL_SUDO_SCRIPT = "/opt/wigamig/murmurent_project_acl.sh"
+ACL_SUDO_SCRIPT = "/opt/murmurent/murmurent_project_acl.sh"
 
 
 class CentreProvisionError(RuntimeError):
@@ -234,7 +234,7 @@ def set_slack_channel_id(
 
 def _acl_script_path(env: dict[str, str] | None = None) -> str:
     source = os.environ if env is None else env
-    return source.get("WIGAMIG_PROJECT_ACL_SCRIPT", ACL_SUDO_SCRIPT)
+    return source.get("MURMURENT_PROJECT_ACL_SCRIPT", ACL_SUDO_SCRIPT)
 
 
 def apply_fs_acl(
@@ -248,8 +248,8 @@ def apply_fs_acl(
 ) -> Probe:
     """Apply the ACL grant for ``project``'s members on ``machine``.
 
-    Invokes ``WIGAMIG_PROJECT_ACL_SCRIPT`` (default
-    ``/opt/wigamig/murmurent_project_acl.sh``) via sudo. The script is
+    Invokes ``MURMURENT_PROJECT_ACL_SCRIPT`` (default
+    ``/opt/murmurent/murmurent_project_acl.sh``) via sudo. The script is
     expected to be present on the lab server with a NOPASSWD sudoers
     entry; the sysadmin installs it once (see
     ``scripts/murmurent_project_acl.sh`` in the murmurent repo for the
@@ -295,18 +295,18 @@ def _default_runner(argv: list[str]) -> subprocess.CompletedProcess:
 # ---------------------------------------------------------------------------
 
 def _has_env_slack_token() -> bool:
-    """True iff a Slack bot token is set via env (WIGAMIG_SLACK_TOKEN or the
+    """True iff a Slack bot token is set via env (MURMURENT_SLACK_TOKEN or the
     legacy SLACK_BOT_TOKEN). Deliberately env-only — the ~/.config token file
     is NOT consulted here so the token-less test suite never triggers live
     Slack member invites even on a dev machine that has the file."""
-    return bool(os.environ.get("WIGAMIG_SLACK_TOKEN", "").strip()
+    return bool(os.environ.get("MURMURENT_SLACK_TOKEN", "").strip()
                 or os.environ.get("SLACK_BOT_TOKEN", "").strip())
 
 
 def resolve_slack_token(*, allow_file: bool = False) -> str:
     """Resolve a Slack bot token for EXPLICIT mayor commands.
 
-    Env first (``WIGAMIG_SLACK_TOKEN`` → ``SLACK_BOT_TOKEN``); when
+    Env first (``MURMURENT_SLACK_TOKEN`` → ``SLACK_BOT_TOKEN``); when
     ``allow_file`` is set, fall back to the mode-0600
     ``~/.config/wigamig/slack-token`` file — the same source the long-running
     dashboard uses — so a mayor doesn't have to re-export the token in every
@@ -314,7 +314,7 @@ def resolve_slack_token(*, allow_file: bool = False) -> str:
     keeping that path env-only (see :func:`_has_env_slack_token`) is what stops
     a stale token file from firing live Slack calls unattended.
     """
-    tok = (os.environ.get("WIGAMIG_SLACK_TOKEN", "").strip()
+    tok = (os.environ.get("MURMURENT_SLACK_TOKEN", "").strip()
            or os.environ.get("SLACK_BOT_TOKEN", "").strip())
     if tok or not allow_file:
         return tok
@@ -628,7 +628,7 @@ def provision_centre_slack(
     mayor_email: str = "",     # override for the mayor's Slack-account email
 ) -> list[Probe]:
     """Provision the centre's Slack fabric: the private mayor↔CC channel
-    (``#wigamig-ops``, stored as ``mayor_channel_id``) and the broadcast
+    (``#murmurent-ops``, stored as ``mayor_channel_id``) and the broadcast
     audience map (``admin`` → mayor channel, ``everyone`` → ``#general``).
 
     Explicit entry point — run by ``murmurent centre-slack-setup``, never
@@ -652,12 +652,12 @@ def provision_centre_slack(
     if channel_creator is not None:
         # Injected seam (tests): returns a channel id or None.
         try:
-            mayor_id = channel_creator("wigamig-ops", centre.slack_workspace) or ""
+            mayor_id = channel_creator("murmurent-ops", centre.slack_workspace) or ""
             probes.append(Probe(
                 name="mayor-channel",
                 status="ok" if mayor_id else "warn",
-                detail=(f"#wigamig-ops → {mayor_id}" if mayor_id
-                        else "#wigamig-ops could not be created")))
+                detail=(f"#murmurent-ops → {mayor_id}" if mayor_id
+                        else "#murmurent-ops could not be created")))
         except Exception as exc:  # noqa: BLE001
             probes.append(Probe(name="mayor-channel", status="warn",
                                 detail=f"slack error: {exc}"))
@@ -665,29 +665,29 @@ def provision_centre_slack(
         # Live path: use the structured API so we surface the actual Slack
         # error (missing_scope / invalid_auth / channel_not_found / …) instead
         # of a bare "could not be created".
-        res = slack_create_channel("wigamig-ops", workspace_id=centre.slack_workspace,
+        res = slack_create_channel("murmurent-ops", workspace_id=centre.slack_workspace,
                                    private=True, token=token)
         if res.ok:
             mayor_id = res.channel_id or ""
             probes.append(Probe(name="mayor-channel", status="ok",
-                                detail=f"#wigamig-ops → {mayor_id}"))
+                                detail=f"#murmurent-ops → {mayor_id}"))
         elif res.error == "name_taken":
             # Already exists → reuse it, so re-running setup is idempotent.
             try:
                 from ..dashboard import slack_notify as _sn
-                mayor_id = _sn._lookup_channel_id_by_name("wigamig-ops") or ""
+                mayor_id = _sn._lookup_channel_id_by_name("murmurent-ops") or ""
             except Exception:  # noqa: BLE001
                 mayor_id = ""
             if mayor_id:
                 probes.append(Probe(name="mayor-channel", status="ok",
-                                    detail=f"#wigamig-ops → {mayor_id} (existing)"))
+                                    detail=f"#murmurent-ops → {mayor_id} (existing)"))
             else:
                 probes.append(Probe(name="mayor-channel", status="warn",
-                                    detail="#wigamig-ops already exists but couldn't be "
+                                    detail="#murmurent-ops already exists but couldn't be "
                                            "resolved — add the `groups:read` scope and reinstall."))
         else:
             probes.append(Probe(name="mayor-channel", status="warn",
-                                detail=f"#wigamig-ops could not be created — "
+                                detail=f"#murmurent-ops could not be created — "
                                        f"{res.error}: {res.detail}"))
     if mayor_id:
         _ci.update_centre({"mayor_channel_id": mayor_id}, env=env)
@@ -697,7 +697,7 @@ def provision_centre_slack(
     bc = dict(profile.get("broadcast_channels") or {})
 
     # 1b. Invite the mayor to their own private channel. The bot CREATED
-    # #wigamig-ops, so it's the only member — the human mayor can't even see it
+    # #murmurent-ops, so it's the only member — the human mayor can't even see it
     # until they're added. Needs the mayor's email (registrar profile → centre
     # join_email) and users:read.email + invite scopes.
     if mayor_id and (channel_creator is None):
@@ -715,15 +715,15 @@ def provision_centre_slack(
                     member_email_map={mayor_handle.lstrip("@").lower(): mayor_email})
                 if mayor_handle in inv.get("invited", []):
                     probes.append(Probe(name="mayor-invite", status="ok",
-                                        detail=f"added {mayor_handle} to #wigamig-ops"))
+                                        detail=f"added {mayor_handle} to #murmurent-ops"))
                 elif mayor_handle in inv.get("already_in", []):
                     probes.append(Probe(name="mayor-invite", status="ok",
-                                        detail=f"{mayor_handle} already in #wigamig-ops"))
+                                        detail=f"{mayor_handle} already in #murmurent-ops"))
                 else:
                     why = (inv.get("unresolved") or [{}])[0].get("reason", "") \
                         or inv.get("error", "")
                     probes.append(Probe(name="mayor-invite", status="warn",
-                        detail=f"couldn't add {mayor_handle} to #wigamig-ops"
+                        detail=f"couldn't add {mayor_handle} to #murmurent-ops"
                                + (f" ({why})" if why else "")
                                + " — open the channel in Slack and add yourself."))
             except Exception as exc:  # noqa: BLE001
@@ -732,7 +732,7 @@ def provision_centre_slack(
         elif mayor_handle and not mayor_email:
             probes.append(Probe(name="mayor-invite", status="warn",
                 detail="no mayor email on record — set the centre join_email (or your "
-                       "registrar profile email) so you can be added to #wigamig-ops."))
+                       "registrar profile email) so you can be added to #murmurent-ops."))
     if mayor_id:
         bc["admin"] = mayor_id
     if channel_resolver is not None or token or _has_env_slack_token():
@@ -793,19 +793,19 @@ def slack_create_channel(
     """
     import os
     import httpx
-    # Unified token: prefer WIGAMIG_SLACK_TOKEN, fall back to the legacy
+    # Unified token: prefer MURMURENT_SLACK_TOKEN, fall back to the legacy
     # SLACK_BOT_TOKEN (both are workspace-scoped bot tokens). The posting /
     # invite path (dashboard/slack_notify) additionally honours the
     # ~/.config/wigamig/slack-token file.
     tok = token if token is not None else (
-        os.environ.get("WIGAMIG_SLACK_TOKEN", "").strip()
+        os.environ.get("MURMURENT_SLACK_TOKEN", "").strip()
         or os.environ.get("SLACK_BOT_TOKEN", "").strip()
     )
     if not tok:
         return SlackChannelResult(
             ok=False, channel_name=channel_name,
             error="missing_token",
-            detail="no Slack token: set $WIGAMIG_SLACK_TOKEN (or the legacy "
+            detail="no Slack token: set $MURMURENT_SLACK_TOKEN (or the legacy "
                     "$SLACK_BOT_TOKEN), or pass token=.",
         )
     payload: dict = {"name": channel_name, "is_private": bool(private)}

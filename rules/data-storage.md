@@ -1,7 +1,7 @@
 # Data storage — raw is immutable, refined is append-only
 
 All data except very small files in-repo lives under
-``$WIGAMIG_LAB_VM_ROOT`` (production: ``/data/lab_vm/wigamig/``):
+``$MURMURENT_LAB_VM_ROOT`` (production: ``/data/lab_vm/wigamig/``):
 
 - **``raw/<project>/``** — original data from the lab, a collaborator,
   or a public resource. **No code may modify these files**, including
@@ -18,11 +18,11 @@ The murmurent CC hooks (registered by ``murmurent install --hooks``)
 block these operations:
 
 - **Any write under ``raw/``** — via
-  [`raw_guard`](../src/wigamig/hooks/raw_guard.py). Covers Write,
+  [`raw_guard`](../src/murmurent/hooks/raw_guard.py). Covers Write,
   Edit, NotebookEdit, and Bash commands that rename, redirect,
   truncate, chmod, or delete files under raw.
 - **Delete or overwrite under ``refined/``** — via
-  [`protected_paths`](../src/wigamig/hooks/protected_paths.py).
+  [`protected_paths`](../src/murmurent/hooks/protected_paths.py).
   *New files* under refined/ are allowed (it's append-only); the
   hook only blocks operations that mutate something that already
   exists there.

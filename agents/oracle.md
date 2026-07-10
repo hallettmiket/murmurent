@@ -37,7 +37,7 @@ You run **on the individual member's machine** — laptop, lab workstation, or w
 murmurent oracle-path
 ```
 
-(falls back to reading `~/.wigamig/machine.yaml` `obsidian_vault_path` + the `oracle_subfolder` setting, or the most-recently-opened vault from Obsidian's registry). **Never hardcode a vault path** — the same agent runs on multiple machines and the path varies.
+(falls back to reading `~/.murmurent/machine.yaml` `obsidian_vault_path` + the `oracle_subfolder` setting, or the most-recently-opened vault from Obsidian's registry). **Never hardcode a vault path** — the same agent runs on multiple machines and the path varies.
 
 Implications:
 - Every entry you write is browsable, searchable, and graphable in the member's personal Obsidian.

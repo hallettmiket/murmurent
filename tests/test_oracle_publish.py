@@ -53,8 +53,8 @@ def world(monkeypatch, tmp_path):
     subprocess.run(["git", "add", "README.md"], cwd=lab, check=True)
     subprocess.run(["git", "commit", "-q", "-m", "seed"], cwd=lab, check=True)
 
-    monkeypatch.setenv("WIGAMIG_PERSONAL_ORACLE_DIR", str(vault / "oracle"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab))
+    monkeypatch.setenv("MURMURENT_PERSONAL_ORACLE_DIR", str(vault / "oracle"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab))
     return {"vault": vault, "lab": lab}
 
 
@@ -261,7 +261,7 @@ def test_probe_missing_when_dir_absent(world):
 def test_probe_unregistered_when_no_vault(monkeypatch):
     """No env override and no Obsidian registry → unregistered, and the
     probe never raises."""
-    monkeypatch.delenv("WIGAMIG_PERSONAL_ORACLE_DIR", raising=False)
+    monkeypatch.delenv("MURMURENT_PERSONAL_ORACLE_DIR", raising=False)
     monkeypatch.setattr(_op, "personal_oracle_dir",
                         lambda: (_ for _ in ()).throw(_op.OracleError("no vault")))
     probe = _op.probe_personal_oracle()

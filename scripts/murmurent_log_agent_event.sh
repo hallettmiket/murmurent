@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Hook handler invoked by Claude Code on subagent lifecycle events.
-# Writes one ANSI-coloured line per event to ~/.wigamig/agents.log so a
-# `tail -F` pane (the BR quadrant of the wigamig VSCode layout) can show
+# Writes one ANSI-coloured line per event to ~/.murmurent/agents.log so a
+# `tail -F` pane (the BR quadrant of the murmurent VSCode layout) can show
 # live "who is doing what" without flooding the user with raw tool
 # transcripts.
 #
@@ -16,7 +16,7 @@
 # failure so the hook itself is invisible.
 
 set -euo pipefail
-LOG="${WIGAMIG_AGENT_LOG:-$HOME/.wigamig/agents.log}"
+LOG="${MURMURENT_AGENT_LOG:-$HOME/.murmurent/agents.log}"
 mkdir -p "$(dirname "$LOG")"
 touch "$LOG"
 
@@ -25,11 +25,11 @@ touch "$LOG"
 INPUT="$(cat || true)"
 [[ -z "$INPUT" ]] && exit 0
 
-# Debug: when WIGAMIG_AGENT_HOOK_DEBUG=1, dump the raw payload + an
+# Debug: when MURMURENT_AGENT_HOOK_DEBUG=1, dump the raw payload + an
 # "EVENT" marker so we can see what fields each hook event provides.
 # Off by default — flip on to investigate schema drift.
-if [[ "${WIGAMIG_AGENT_HOOK_DEBUG:-0}" == "1" ]]; then
-    DEBUG_LOG="${WIGAMIG_AGENT_HOOK_DEBUG_LOG:-$HOME/.wigamig/agents_debug.log}"
+if [[ "${MURMURENT_AGENT_HOOK_DEBUG:-0}" == "1" ]]; then
+    DEBUG_LOG="${MURMURENT_AGENT_HOOK_DEBUG_LOG:-$HOME/.murmurent/agents_debug.log}"
     mkdir -p "$(dirname "$DEBUG_LOG")"
     {
         echo "=== $(date '+%H:%M') ==="

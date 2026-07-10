@@ -32,7 +32,7 @@ constant across both.
 ## Your key (everyone)
 
 The first `murmurent` command you run after cloning mints your keypair under
-`~/.wigamig/keys/` (0600). Its fingerprint is your unique ID.
+`~/.murmurent/keys/` (0600). Its fingerprint is your unique ID.
 
 ```bash
 murmurent identity-init          # explicit mint (idempotent; --rotate to replace)
@@ -128,5 +128,5 @@ registry actually claims this identity. Any failure → refused.
 ## Try it end-to-end
 
 `scripts/identity_smoke.sh` simulates a mayor, a PI, and a member on one machine
-(separate `WIGAMIG_HOME` roots) and runs the whole lifecycle including a
+(separate `MURMURENT_HOME` roots) and runs the whole lifecycle including a
 revocation. Related: `docs/centre_root_key.md` (root-key handling + rotation).

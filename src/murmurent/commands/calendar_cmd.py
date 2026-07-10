@@ -9,7 +9,7 @@ Run by the core leader once per machine that hosts the dashboard:
   $ murmurent core-calendar-auth --core biocore
 
 Prereq: drop the OAuth client_secret.json (type=Desktop) at
-  ~/.wigamig/cores/<core>/google_oauth_client.json
+  ~/.murmurent/cores/<core>/google_oauth_client.json
 The command prints the file location of the persisted refresh token on
 success, or a CalendarError-derived message on failure.
 """

@@ -27,23 +27,23 @@ signing) and must be kept as close to offline as your workflow allows.
 
 ## Where it lives
 
-- Private key: `~/.wigamig/keys/centre_root_ed25519` — mode **0600**, generated
+- Private key: `~/.murmurent/keys/centre_root_ed25519` — mode **0600**, generated
   by `murmurent centre-root-keygen`.
-- Public key: `~/.wigamig/keys/centre_root_ed25519.pub` and the centre's
+- Public key: `~/.murmurent/keys/centre_root_ed25519.pub` and the centre's
   `signing_recipient:` field in `centre.md`.
 - Pinned anchor (this machine's copy of the trusted fingerprint):
-  `~/.wigamig/trust/<unique_name>.root`.
+  `~/.murmurent/trust/<unique_name>.root`.
 
 ## MUST-do at generation time
 
 1. **Back it up immediately, offline, encrypted, OFF this laptop.**
    - Encrypt the private key before it leaves the machine, e.g.
-     `age -p ~/.wigamig/keys/centre_root_ed25519 > centre_root.age` (passphrase),
+     `age -p ~/.murmurent/keys/centre_root_ed25519 > centre_root.age` (passphrase),
      or to a hardware/paper backup.
    - Store the encrypted copy somewhere physically separate from the laptop (a
      locked drawer, an institutional secrets vault, a second encrypted device).
      **Not** another file on the same disk, and **never** in any git repo.
-2. **Never commit it.** The `murmurent-push` skill excludes `~/.wigamig/keys/**` by
+2. **Never commit it.** The `murmurent-push` skill excludes `~/.murmurent/keys/**` by
    path, but the key never belongs in a working tree in the first place.
 3. **Never wire it into CI or any automated signer.** A CI credential that can
    reach the root key turns a CI compromise into a centre compromise. Card

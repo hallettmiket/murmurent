@@ -142,14 +142,14 @@ def cmd_reconcile(name: str, apply: bool) -> None:
 @project.command("log")
 @click.argument("name")
 @click.option("--actor", default="",
-              help="Defaults to $WIGAMIG_USER.")
+              help="Defaults to $MURMURENT_USER.")
 @click.option("--action", required=True)
 @click.option("--detail", default="")
 def cmd_log(name: str, actor: str, action: str, detail: str) -> None:
     import os
     if not actor:
-        actor = os.environ.get("WIGAMIG_USER", "")
+        actor = os.environ.get("MURMURENT_USER", "")
     if not actor:
-        raise click.ClickException("--actor not set and $WIGAMIG_USER is empty")
+        raise click.ClickException("--actor not set and $MURMURENT_USER is empty")
     p = _cp.append_log(project=name, actor=actor, action=action, detail=detail)
     click.echo(f"Logged to {p}")

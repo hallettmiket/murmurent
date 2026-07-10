@@ -24,7 +24,7 @@ from .repo import lab_mgmt_repo_root, read_members
 def _pi_handle() -> str:
     """Resolve the PI handle from <lab-mgmt>/lab.md, fresh on every call.
 
-    Tests redirect ``WIGAMIG_LAB_MGMT_REPO`` per-fixture, so a module-level
+    Tests redirect ``MURMURENT_LAB_MGMT_REPO`` per-fixture, so a module-level
     constant goes stale. Always call this at the use site.
     """
     from .lab import pi_handle as _resolved
@@ -38,7 +38,7 @@ class _PiHandleProxy(str):
     Old code that does ``from .dashboard import PI_HANDLE`` keeps working;
     new code should call ``_pi_handle()`` directly. The proxy resolves
     on every comparison + every method call, so tests that re-point
-    WIGAMIG_LAB_MGMT_REPO see the right value.
+    MURMURENT_LAB_MGMT_REPO see the right value.
     """
 
     def __new__(cls):

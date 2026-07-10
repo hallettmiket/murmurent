@@ -6,9 +6,9 @@ murmurent ID (the thing a PI later binds an identity card to).
 
 Two entry points:
   - :func:`ensure_local_keypair` — the AUTO path, called from the CLI group
-    callback. Idempotent, best-effort, and gated by ``WIGAMIG_NO_AUTOKEY`` so the
+    callback. Idempotent, best-effort, and gated by ``MURMURENT_NO_AUTOKEY`` so the
     test suite (and anyone who wants to opt out) never mints a key as a side
-    effect of an unrelated command. Keys always land under ``~/.wigamig/keys``
+    effect of an unrelated command. Keys always land under ``~/.murmurent/keys``
     (never the CWD / a repo working tree) — see ``core/idkeys.py``.
   - :func:`local_identity` — read-only: who this machine is (resolved handle +
     key fingerprint + whether a card has been imported).
@@ -23,13 +23,13 @@ import os
 
 from . import idkeys as K
 
-AUTOKEY_OFF = "WIGAMIG_NO_AUTOKEY"
+AUTOKEY_OFF = "MURMURENT_NO_AUTOKEY"
 
 
 def ensure_local_keypair() -> str | None:
     """Mint this machine's keypair if absent (idempotent). AUTO path.
 
-    Returns the fingerprint, or ``None`` when opted out (``WIGAMIG_NO_AUTOKEY``)
+    Returns the fingerprint, or ``None`` when opted out (``MURMURENT_NO_AUTOKEY``)
     or if generation fails — this must NEVER raise into a CLI command, so a
     transient filesystem/permission hiccup can't block unrelated work.
     """

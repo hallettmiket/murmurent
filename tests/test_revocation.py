@@ -20,8 +20,8 @@ from murmurent.core import revocation as REV
 
 @pytest.fixture(autouse=True)
 def _home(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "wig"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "wig"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "li"))
 
 
 # ---- ledger + revoke core ---------------------------------------------------
@@ -86,8 +86,8 @@ def test_revoked_card_fails_verification():
 
 def _card_machine(monkeypatch, tmp_path, *, issued_at=None, ttl_days=90, home="m"):
     """A machine holding the root key, a pinned anchor, and a stored PI card."""
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / home))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / (home + "_li")))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / home))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / (home + "_li")))
     CR.generate_root_key()
     root = CR.load_root_private()
     C.pin_root("qa", CR.root_public())
@@ -112,7 +112,7 @@ def test_verify_local_identity_ok_then_revoked(monkeypatch, tmp_path):
 
 
 def test_verify_local_identity_no_card(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "empty"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "empty"))
     assert ISS.verify_local_identity()[0] == "no_card"
 
 

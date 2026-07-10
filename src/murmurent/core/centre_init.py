@@ -269,7 +269,7 @@ def init_centre(
 
     1. Write ``<lab_info>/centre.md`` with the profile.
     2. Add ``@founding_mayor`` to ``_registry.yaml:registrars:``.
-    3. Write the per-machine sentinel ``~/.wigamig/registrar`` with the
+    3. Write the per-machine sentinel ``~/.murmurent/registrar`` with the
        mayor's handle (used for git commit identity on this machine
        only — does NOT gate auth). Skipped when
        ``write_sentinel=False`` (useful in tests).

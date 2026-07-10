@@ -2,7 +2,7 @@
 Purpose: Per-machine registry of hosts murmurent can drive (locally + over SSH).
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-13
-Input: ``~/.wigamig/hosts.yaml`` (env-overridable via ``$WIGAMIG_HOSTS_FILE``).
+Input: ``~/.murmurent/hosts.yaml`` (env-overridable via ``$MURMURENT_HOSTS_FILE``).
 Output: :class:`Host` dataclasses + ``read`` / ``write`` / ``resolve`` helpers.
 
 The hosts file declares **where murmurent can install or open a project**.
@@ -40,8 +40,8 @@ from typing import Any
 
 import yaml
 
-DEFAULT_FILE = Path.home() / ".wigamig" / "hosts.yaml"
-ENV_VAR = "WIGAMIG_HOSTS_FILE"
+DEFAULT_FILE = Path.home() / ".murmurent" / "hosts.yaml"
+ENV_VAR = "MURMURENT_HOSTS_FILE"
 LOCAL_NAME = "local"
 VALID_KINDS = frozenset({"local", "ssh"})
 

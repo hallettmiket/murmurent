@@ -10,7 +10,7 @@ digraph install_modes {
   bgcolor="#FAF8F5";
   fontname="EB Garamond";
   labelloc="t";
-  label=<<B>wigamig &middot; project install modes</B><BR/><FONT POINT-SIZE="11">where does each artefact live? &middot; local laptop vs biodatsci</FONT>>;
+  label=<<B>murmurent &middot; project install modes</B><BR/><FONT POINT-SIZE="11">where does each artefact live? &middot; local laptop vs biodatsci</FONT>>;
   fontsize=18;
   fontcolor="#201436";
   compound=true;
@@ -53,7 +53,7 @@ digraph install_modes {
     L_laptop [label=<<B>laptop (macOS)</B>>,
               shape=plaintext, fillcolor="transparent"];
 
-    L_dashboard [label="wigamig dashboard\n(uvicorn :8770)",
+    L_dashboard [label="murmurent dashboard\n(uvicorn :8770)",
                  fillcolor="#FFE9CC", color="#F0A757"];
     L_repo      [label="~/repos/&lt;project&gt;\n(working tree)"];
     L_vault     [label="Obsidian vault\n~/Documents/Obsidian/&lt;vault&gt;",
@@ -82,7 +82,7 @@ digraph install_modes {
     // Laptop side
     R_laptop [label=<<B>laptop (macOS)</B>>,
               shape=plaintext, fillcolor="transparent"];
-    R_dashboard [label="wigamig dashboard\n(uvicorn :8770)",
+    R_dashboard [label="murmurent dashboard\n(uvicorn :8770)",
                  fillcolor="#FFE9CC", color="#F0A757"];
     R_vscode_remote [label="VSCode Remote-SSH\nclient",
                      shape=hexagon, fillcolor="#FFF1DB"];
@@ -98,16 +98,16 @@ digraph install_modes {
                  fillcolor="#FFFFFF"];
     R_vault     [label="/home/&lt;user&gt;/Obsidian/&lt;vault&gt;\n(authoritative copy)",
                  fillcolor="#FFFFFF"];
-    R_wigamig   [label="wigamig CLI on biodatsci\n(uv tool install)",
+    R_murmurent   [label="murmurent CLI on biodatsci\n(uv tool install)",
                  fillcolor="#FFFFFF"];
 
     // Local-to-remote arrows that cross the SSH boundary
-    R_dashboard -> R_wigamig   [label="ssh biodatsci  ", style=bold, color="#4F2683"];
+    R_dashboard -> R_murmurent   [label="ssh biodatsci  ", style=bold, color="#4F2683"];
     R_vscode_remote -> R_repo  [label="vscode-remote://", style=bold, color="#4F2683"];
     R_obs_local -> R_vault     [label="SSHFS mount",     style=bold, color="#4F2683"];
 
     // On biodatsci
-    R_wigamig -> R_repo        [label="project new"];
+    R_murmurent -> R_repo        [label="project new"];
     R_repo    -> R_lab_vm      [label="reads / writes"];
   }
 
@@ -121,7 +121,7 @@ digraph install_modes {
 <TABLE BORDER="0" CELLBORDER="0" CELLPADDING="2">
 <TR><TD ALIGN="LEFT"><B>Invariant:</B> exactly one Obsidian vault per user.</TD></TR>
 <TR><TD ALIGN="LEFT">Choose Mode A <I>or</I> Mode B &mdash; never both at once.</TD></TR>
-<TR><TD ALIGN="LEFT">Migration: <FONT FACE="Courier Prime">wigamig notebook move-to &lt;host&gt;</FONT></TD></TR>
+<TR><TD ALIGN="LEFT">Migration: <FONT FACE="Courier Prime">murmurent notebook move-to &lt;host&gt;</FONT></TD></TR>
 </TABLE>
           >];
   legend -> R_vault [style=invis];

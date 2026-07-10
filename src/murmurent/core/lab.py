@@ -27,7 +27,7 @@ LAB_FILE = "lab.md"
 
 # Hard-coded fallback used only when ``<lab-mgmt>/lab.md`` is missing
 # (e.g. a fresh clone, before ``murmurent install``). Tests reset this
-# via ``WIGAMIG_LAB_MGMT_REPO``.
+# via ``MURMURENT_LAB_MGMT_REPO``.
 _DEFAULT_LAB = ""  # institution-agnostic: no fabricated fallback lab
 _DEFAULT_PI = ""   # institution-agnostic: never invent a PI handle
 
@@ -66,7 +66,7 @@ def load_lab_config() -> LabConfig:
 
     Falls back to a default (lab=hallett, pi=mhallet) when the file is
     missing so murmurent still boots on a fresh checkout. Tests can set
-    ``WIGAMIG_LAB_MGMT_REPO`` to point at a fixture dir.
+    ``MURMURENT_LAB_MGMT_REPO`` to point at a fixture dir.
     """
     path = lab_path()
     if not path.is_file():

@@ -54,22 +54,22 @@ and watch the workspace for the channel.
 
 ---
 
-## 3. Hermetic test fixtures (`WIGAMIG_HOME` not pinned)
+## 3. Hermetic test fixtures (`MURMURENT_HOME` not pinned)
 
 **Problem.** Several test modules' fixtures set
-`WIGAMIG_LAB_INFO_ROOT` and `WIGAMIG_LAB_MGMT_REPO` but NOT
-`WIGAMIG_HOME`, so they read the developer's real
-`~/.wigamig/cores/*/google_calendar.json`,
-`~/.wigamig/cores/*/access.log`, etc. Most of the time this is
+`MURMURENT_LAB_INFO_ROOT` and `MURMURENT_LAB_MGMT_REPO` but NOT
+`MURMURENT_HOME`, so they read the developer's real
+`~/.murmurent/cores/*/google_calendar.json`,
+`~/.murmurent/cores/*/access.log`, etc. Most of the time this is
 harmless; when the developer has done any local smoke testing (e.g.
 left an expired OAuth token), 6+ booking tests flake.
 
 **Scope.** ~1 hour. One-line addition to each affected fixture:
-`monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "wigamig_home"))`.
+`monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "wigamig_home"))`.
 
-**First step.** `grep -L WIGAMIG_HOME tests/test_*.py` to find all
-test files that monkeypatch `WIGAMIG_LAB_INFO_ROOT` but not
-`WIGAMIG_HOME`, then add the pin.
+**First step.** `grep -L MURMURENT_HOME tests/test_*.py` to find all
+test files that monkeypatch `MURMURENT_LAB_INFO_ROOT` but not
+`MURMURENT_HOME`, then add the pin.
 
 ---
 
@@ -97,11 +97,11 @@ the wgm_<project> group members on the host.
 ## 5. `lab_mgmt` repo — purpose docs + (do NOT rename)
 
 **The user's question:** what is `lab_mgmt`? Who needs it? Should
-it be renamed to `wigamig-mgmt`?
+it be renamed to `murmurent-mgmt`?
 
 **Short answer.** `lab_mgmt` is the **per-group governance repo**
 (one per PI / lab). It is **distinct from** the centre-wide
-`~/.wigamig/lab_info/` tree, which is the registrar's. Contents:
+`~/.murmurent/lab_info/` tree, which is the registrar's. Contents:
 
 | Path | Purpose |
 |---|---|
@@ -113,12 +113,12 @@ it be renamed to `wigamig-mgmt`?
 | `compliance.md` | Group-level training requirements |
 | `audit/`, `roles/`, `keys/`, etc. | Smaller per-group state |
 
-**Who needs it.** Every member of a wigamig-enabled lab reads it;
+**Who needs it.** Every member of a murmurent-enabled lab reads it;
 only the PI writes (with delegation to roles like `lab_manager`).
 The default location is `~/repos/lab_mgmt`, overrideable via
-`$WIGAMIG_LAB_MGMT_REPO`.
+`$MURMURENT_LAB_MGMT_REPO`.
 
-**Rename recommendation.** **Do NOT rename to `wigamig-mgmt` or
+**Rename recommendation.** **Do NOT rename to `murmurent-mgmt` or
 `wigamig-lab`.** The current name correctly signals that this is the
 *lab's own* repo, not part of the murmurent commons. It belongs to the
 PI, lives under the lab's GitHub org (`<labpi>/lab_mgmt`), and is
@@ -138,7 +138,7 @@ shouldn't put here" table. Link it from `docs/setup.md`.
 
 **Problem.** `core/projects.py` defaults `DEFAULT_PROJECTS_ROOT` to
 `~/repos`. Every member is silently assumed to want their murmurent
-projects checked out there. The `$WIGAMIG_PROJECTS_ROOT` env var
+projects checked out there. The `$MURMURENT_PROJECTS_ROOT` env var
 overrides, but users have to know about it.
 
 **Scope.** ~1 day. During `cable_guy`'s onboarding flow, prompt the
@@ -178,9 +178,9 @@ one template:
 
 ---
 
-## 8. Smoke-test polish: `murmurent install --hooks` warns the user not to share their `~/.wigamig/registrar` sentinel
+## 8. Smoke-test polish: `murmurent install --hooks` warns the user not to share their `~/.murmurent/registrar` sentinel
 
-**Problem.** During item-2 dev, my own `~/.wigamig/registrar`
+**Problem.** During item-2 dev, my own `~/.murmurent/registrar`
 silently changed from `mhallet` to `tbrowne` (probably from a
 runtime smoke test I ran), which broke 30 historical tests until I
 reset it. The sentinel is per-machine identity for git commit
@@ -189,7 +189,7 @@ legacy fallback in `is_registrar()`.
 
 **Scope.** ~30 minutes. Three lines of clarifying behavior:
 - `murmurent install --hooks` should refuse to overwrite an existing
-  `~/.wigamig/registrar` without `--force`.
+  `~/.murmurent/registrar` without `--force`.
 - `murmurent centre-init` should default `--no-sentinel` when
   `--no-prompt` is passed (the scripted/server path).
 - Test fixtures that monkeypatch `R.REGISTRAR_SENTINEL` should be

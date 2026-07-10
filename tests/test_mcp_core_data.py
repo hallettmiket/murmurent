@@ -32,11 +32,11 @@ from murmurent.mcp import core_data_server as MCP
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "wigamig_home"))
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "wigamig_home"))
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "lab.md").write_text(
         "---\nlab: hallett\npi: '@mhallet'\n---\n", encoding="utf-8",
@@ -63,7 +63,7 @@ def test_list_my_jobs_filters_by_caller_lab(world, monkeypatch):
     _book(requester="@alice", lab="hallett")
     _book(requester="@bob",   lab="castellani")
     # alice (hallett) sees only the hallett job.
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_list_my_jobs(core="biocore")
     assert out["count"] == 1
     assert out["jobs"][0]["requester_lab"] == "hallett"
@@ -72,7 +72,7 @@ def test_list_my_jobs_filters_by_caller_lab(world, monkeypatch):
 def test_list_my_jobs_core_leader_sees_all(world, monkeypatch):
     _book(requester="@alice", lab="hallett")
     _book(requester="@bob",   lab="castellani")
-    monkeypatch.setenv("WIGAMIG_USER", "gary")
+    monkeypatch.setenv("MURMURENT_USER", "gary")
     out = MCP.tool_list_my_jobs(core="biocore")
     assert out["count"] == 2
 
@@ -80,14 +80,14 @@ def test_list_my_jobs_core_leader_sees_all(world, monkeypatch):
 def test_list_my_jobs_registrar_sees_all(world, monkeypatch):
     _book(requester="@alice", lab="hallett")
     _book(requester="@bob",   lab="castellani")
-    monkeypatch.setenv("WIGAMIG_USER", "mhallet")
+    monkeypatch.setenv("MURMURENT_USER", "mhallet")
     out = MCP.tool_list_my_jobs(core="biocore")
     assert out["count"] == 2
 
 
 def test_list_my_jobs_unknown_user_empty(world, monkeypatch):
     _book(requester="@alice", lab="hallett")
-    monkeypatch.setenv("WIGAMIG_USER", "")
+    monkeypatch.setenv("MURMURENT_USER", "")
     monkeypatch.setenv("USER", "")
     out = MCP.tool_list_my_jobs(core="biocore")
     assert out["count"] == 0
@@ -97,7 +97,7 @@ def test_list_my_jobs_unknown_user_empty(world, monkeypatch):
 
 def test_get_manifest_hit(world, monkeypatch):
     req = _book()
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_get_job_manifest("biocore", req.request_id)
     assert out["ok"] is True
     assert out["manifest"]["requester_lab"] == "hallett"
@@ -116,7 +116,7 @@ def test_get_manifest_denied(world, monkeypatch):
     m = json.loads(p.read_text())
     m["requester_lab"] = "castellani"
     p.write_text(json.dumps(m))
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_get_job_manifest("biocore", req.request_id)
     assert out["ok"] is False
     assert "not in the job" in out["error"]
@@ -127,7 +127,7 @@ def test_get_manifest_denied(world, monkeypatch):
 def test_list_job_files_hit(world, monkeypatch):
     req = _book()
     J.write_file("biocore", req.request_id, "refined/fit.png", b"X" * 50)
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_list_job_files("biocore", req.request_id)
     assert out["ok"] is True
     rels = sorted(f["relpath"] for f in out["files"])
@@ -140,7 +140,7 @@ def test_list_job_files_denied(world, monkeypatch):
     m = json.loads(p.read_text())
     m["requester_lab"] = "castellani"
     p.write_text(json.dumps(m))
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_list_job_files("biocore", req.request_id)
     assert out["ok"] is False
 
@@ -150,7 +150,7 @@ def test_list_job_files_denied(world, monkeypatch):
 def test_read_job_file_hit_base64(world, monkeypatch):
     req = _book()
     J.write_file("biocore", req.request_id, "refined/fit.png", b"PNGDATA")
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_read_job_file("biocore", req.request_id,
                                     "refined/fit.png")
     assert out["ok"] is True
@@ -160,7 +160,7 @@ def test_read_job_file_hit_base64(world, monkeypatch):
 
 def test_read_job_file_missing(world, monkeypatch):
     req = _book()
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_read_job_file("biocore", req.request_id,
                                     "refined/never.bin")
     assert out["ok"] is False
@@ -169,7 +169,7 @@ def test_read_job_file_missing(world, monkeypatch):
 def test_read_job_file_size_cap(world, monkeypatch):
     req = _book()
     J.write_file("biocore", req.request_id, "refined/big.bin", b"x" * 1000)
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_read_job_file("biocore", req.request_id,
                                     "refined/big.bin", max_bytes=100)
     assert out["ok"] is False
@@ -178,7 +178,7 @@ def test_read_job_file_size_cap(world, monkeypatch):
 
 def test_read_job_file_path_escape(world, monkeypatch):
     req = _book()
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_read_job_file("biocore", req.request_id,
                                     "../../etc/passwd")
     assert out["ok"] is False
@@ -190,7 +190,7 @@ def test_read_job_file_path_escape(world, monkeypatch):
 def test_access_log_records_calls(world, monkeypatch):
     req = _book()
     J.write_file("biocore", req.request_id, "refined/fit.png", b"x")
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     MCP.tool_list_my_jobs(core="biocore")
     MCP.tool_get_job_manifest("biocore", req.request_id)
     MCP.tool_read_job_file("biocore", req.request_id, "refined/fit.png")

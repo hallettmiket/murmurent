@@ -33,10 +33,10 @@ def world(monkeypatch, tmp_path):
     (commons / "agents" / "adversary.md").write_text("# adversary\n")
     lab_mgmt = tmp_path / "lab_mgmt"
     (lab_mgmt / "projects").mkdir(parents=True)
-    installations = home / ".wigamig" / "installations"
+    installations = home / ".murmurent" / "installations"
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("WIGAMIG_REPO_ROOT", str(commons))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_mgmt))
+    monkeypatch.setenv("MURMURENT_REPO_ROOT", str(commons))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_mgmt))
     return {
         "home": home, "repos": home / "repos", "commons": commons,
         "lab_mgmt": lab_mgmt, "installations": installations,
@@ -236,14 +236,14 @@ def test_missing_lab_mgmt_is_warn_not_fail(monkeypatch, tmp_path):
     commons = tmp_path / "wigamig_commons"
     (commons / "agents").mkdir(parents=True)
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("WIGAMIG_REPO_ROOT", str(commons))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", "/nope/does/not/exist")
+    monkeypatch.setenv("MURMURENT_REPO_ROOT", str(commons))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", "/nope/does/not/exist")
     clone = home / "repos" / "demo"
     (clone / ".git").mkdir(parents=True)
     res = p.make_wigamig_project(
         clone_path=clone, project="demo",
         lead="@x", members=["@x"],
-        installations_dir=home / ".wigamig" / "installations",
+        installations_dir=home / ".murmurent" / "installations",
     )
     # CHARTER still written.
     assert (clone / "CHARTER.md").is_file()

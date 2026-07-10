@@ -42,10 +42,10 @@ receptionist / accountant / centre-level security guard**; note there is
 Skim the centre/admin layer so you reuse what exists instead of
 re-implementing it:
 
-- `src/wigamig/core/centre_init.py` — centre profile / mayor bootstrap.
-- `src/wigamig/core/join_requests.py` — the join queue + approve dispatch.
-- `src/wigamig/core/centre_provision.py` — Slack/GitHub/FS provisioning.
-- `src/wigamig/core/registrar.py` — the registry + `is_registrar`.
+- `src/murmurent/core/centre_init.py` — centre profile / mayor bootstrap.
+- `src/murmurent/core/join_requests.py` — the join queue + approve dispatch.
+- `src/murmurent/core/centre_provision.py` — Slack/GitHub/FS provisioning.
+- `src/murmurent/core/registrar.py` — the registry + `is_registrar`.
 - `agents/registrar.md`, `agents/security_guard.md`, `agents/cable_guy.md`,
   `agents/centre_cable_guy.md` — the admin-layer agents.
 

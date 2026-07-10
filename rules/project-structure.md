@@ -6,8 +6,8 @@ locations that share the same name:
 | Location | Contents |
 |---|---|
 | ``~/repos/<project>/`` | working git clone (code) |
-| ``$WIGAMIG_LAB_VM_ROOT/raw/<project>/`` | raw inputs (read-only) |
-| ``$WIGAMIG_LAB_VM_ROOT/refined/<project>/`` | analysis outputs (append-only) |
+| ``$MURMURENT_LAB_VM_ROOT/raw/<project>/`` | raw inputs (read-only) |
+| ``$MURMURENT_LAB_VM_ROOT/refined/<project>/`` | analysis outputs (append-only) |
 
 The lab's GitHub org (``hallettmiket`` by default) hosts a private
 repo with the same name. Working clones are git-aware; the raw/
@@ -50,14 +50,14 @@ uses it.
 
 ## Refined mirrors exp
 
-The structure of ``$WIGAMIG_LAB_VM_ROOT/refined/<project>/``
+The structure of ``$MURMURENT_LAB_VM_ROOT/refined/<project>/``
 mirrors ``~/repos/<project>/exp/``:
 
 ```
 ~/repos/<project>/exp/3_qc/run_all.py
                           │
                           └─▶ writes to
-                              $WIGAMIG_LAB_VM_ROOT/refined/<project>/3_qc/...
+                              $MURMURENT_LAB_VM_ROOT/refined/<project>/3_qc/...
 ```
 
 That way the relationship between code and its data is one

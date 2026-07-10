@@ -9,7 +9,7 @@ Reads from two existing sources:
   - core/service_requests: enumerates jobs (we walk requests, the
     job_id == request_id)
   - core/jobs: per-job manifest + file listing
-  - ~/.wigamig/cores/<core>/access.log (MCP audit log): tells us
+  - ~/.murmurent/cores/<core>/access.log (MCP audit log): tells us
     whether the requester has pulled anything yet
 
 No new persistence; everything is computed on demand.
@@ -44,7 +44,7 @@ class DeliverableRow:
 
 
 def _access_log_path(core: str) -> Path:
-    home = Path(os.environ.get("WIGAMIG_HOME") or (Path.home() / ".wigamig"))
+    home = Path(os.environ.get("MURMURENT_HOME") or (Path.home() / ".murmurent"))
     return home / "cores" / core / "access.log"
 
 

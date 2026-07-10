@@ -2,7 +2,7 @@
 
 The single most-confusing piece of murmurent's filesystem layout is what
 `lab_mgmt` is, who needs it, and how it differs from
-`~/.wigamig/lab_info/`. This document is the short answer.
+`~/.murmurent/lab_info/`. This document is the short answer.
 
 ## TL;DR
 
@@ -18,15 +18,15 @@ GitHub org. The Hallett lab's lives at
 `castellani-lab/lab_mgmt` (or wherever the Castellani PI hosts it).
 
 The centre-wide registry (labs, cores, common SEAs, join requests)
-lives in a separate, distinct tree at `~/.wigamig/lab_info/`. That
+lives in a separate, distinct tree at `~/.murmurent/lab_info/`. That
 one is owned by the registrar, not by any single lab.
 
-## Why not rename it `wigamig-mgmt`?
+## Why not rename it `murmurent-mgmt`?
 
 Tempting — but no. The name `lab_mgmt` correctly signals "the lab's
 own management data," analogous to how a paper folder labelled "Lab
 Filing Cabinet" sits on the PI's bookshelf. Renaming to
-`wigamig-mgmt` would imply this is a wigamig-owned artifact you can
+`murmurent-mgmt` would imply this is a murmurent-owned artifact you can
 update from the commons. It isn't: every murmurent install reads
 multiple `lab_mgmt` repos (one per lab in the centre) and never
 writes across labs.
@@ -39,7 +39,7 @@ The clean conceptual boundary is:
                            ~/.claude/. Anyone can clone.
 ~/repos/lab_mgmt/        ← One lab's filing cabinet. PI-owned.
                            Members read; PI + delegates write.
-~/.wigamig/lab_info/     ← Centre registry. Registrar-owned.
+~/.murmurent/lab_info/     ← Centre registry. Registrar-owned.
                            Lists every lab + core + common SEA in
                            the centre.
 ```
@@ -98,8 +98,8 @@ lab_mgmt/
 | Lab PI | clone, write, push | `git clone git@github.com:<lab-org>/lab_mgmt ~/repos/lab_mgmt` |
 | Lab member (postdoc, student) | clone, read-only | same |
 | Core leader | clone OF THEIR CORE'S `lab_mgmt` (cores have their own) | same |
-| Registrar | reads multiple `lab_mgmt` repos via the centre registry | each lab's path is recorded in `~/.wigamig/lab_info/_registry.yaml` |
-| Mayor (bootstrap) | no | uses `~/.wigamig/lab_info/` instead |
+| Registrar | reads multiple `lab_mgmt` repos via the centre registry | each lab's path is recorded in `~/.murmurent/lab_info/_registry.yaml` |
+| Mayor (bootstrap) | no | uses `~/.murmurent/lab_info/` instead |
 | External customer | no | only sees the dashboard surfaces, not the underlying repo |
 
 If you're a new lab member, the cable_guy agent's `PROVISION_MEMBER`
@@ -115,7 +115,7 @@ using this order:
 
 1. **Thread-local override** — the dashboard sets this per-request
    so the registrar can switch between viewing different labs.
-2. **`$WIGAMIG_LAB_MGMT_REPO` env var** — for tests + scripted use.
+2. **`$MURMURENT_LAB_MGMT_REPO` env var** — for tests + scripted use.
 3. **`~/repos/lab_mgmt`** — the default if it exists.
 4. **`~/repos/hallett-lab-mgmt`** — legacy fallback from before the
    2026-05-14 rename. Will be removed in a future cleanup.
@@ -123,7 +123,7 @@ using this order:
    above exists (so first-clone instructions can write to a known
    location).
 
-The `WIGAMIG_LAB_MGMT_REPO` env var is the right knob for tests and
+The `MURMURENT_LAB_MGMT_REPO` env var is the right knob for tests and
 unusual deployments (e.g. multi-lab dev workstations). For a normal
 lab member, the default path just works.
 
@@ -145,9 +145,9 @@ but the inventory MCP refuses to commit-publish their changes unless
 they hold the `lab_manager` role. The PI's review on incoming PRs is
 the final gate.
 
-## `lab_mgmt` vs `~/.wigamig/lab_info/` — the comparison
+## `lab_mgmt` vs `~/.murmurent/lab_info/` — the comparison
 
-| Aspect | `~/repos/lab_mgmt` | `~/.wigamig/lab_info/` |
+| Aspect | `~/repos/lab_mgmt` | `~/.murmurent/lab_info/` |
 |---|---|---|
 | **Scope** | one lab | the whole centre |
 | **Owner** | the PI | the registrar |
@@ -170,6 +170,6 @@ lab specifics belong in `lab_mgmt`. Inter-lab relations belong in
   document for group-scope murmurent operations.
 - [`docs/cores_plan.md`](cores_plan.md) §4 — how a core's own
   `lab_mgmt` (yes, cores have one too, parallel to labs) mounts
-  inside `~/.wigamig/lab_info/cores/<core>/lab-mgmt/`.
+  inside `~/.murmurent/lab_info/cores/<core>/lab-mgmt/`.
 - [`agents/cable_guy.md`](../agents/cable_guy.md) — the per-lab
   cable_guy that owns most of the read/write surface on this repo.

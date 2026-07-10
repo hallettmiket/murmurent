@@ -1,6 +1,6 @@
 # /etc/sudoers.d/wigamig_sec_dump
 #
-# Grants NOPASSWD access to the wigamig Tier-2 security snapshot script
+# Grants NOPASSWD access to the murmurent Tier-2 security snapshot script
 # for the named Hallett lab PIs. The script is parameter-less and
 # refuses any args (see lab_sec_dump.sh) so this grant is exactly one
 # fixed command — no shell escape or arg injection surface.
@@ -13,5 +13,5 @@
 # Add a new authorised PI by adding another line in the same form.
 # Revoke by deleting the line (or the whole file).
 
-mhallet  ALL=(root) NOPASSWD: /opt/wigamig/lab_sec_dump.sh
-vdumeaux ALL=(root) NOPASSWD: /opt/wigamig/lab_sec_dump.sh
+mhallet  ALL=(root) NOPASSWD: /opt/murmurent/lab_sec_dump.sh
+vdumeaux ALL=(root) NOPASSWD: /opt/murmurent/lab_sec_dump.sh

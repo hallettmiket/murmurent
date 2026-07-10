@@ -5,7 +5,7 @@ Purpose: FastAPI app for the hi-fi dashboard. Serves the data contract at
          opened straight from the browser.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-08
-Input: ``WIGAMIG_USER`` environment variable (or ``?user=`` query param)
+Input: ``MURMURENT_USER`` environment variable (or ``?user=`` query param)
        to scope the snapshot to a member.
 Output: JSON + static files. Served via uvicorn.
 
@@ -75,7 +75,7 @@ class CreateProjectRequestBody(BaseModel):
     local_repo_root: str | None = None
     # Item 3 (R2/R3): which registered host this project should live on.
     # Defaults to "local" (this laptop); set to "biodatsci" (or any name
-    # in ~/.wigamig/hosts.yaml) to scaffold the project on that machine.
+    # in ~/.murmurent/hosts.yaml) to scaffold the project on that machine.
     host: str = "local"
     # 2026-05-15: optional override for the auto-derived Slack channel
     # name. ``None`` / "" → murmurent defaults to ``proj-<project>``.
@@ -368,7 +368,7 @@ class LoginSelectBody(BaseModel):
 
     The login landing page posts the (handle, role) the user picked.
     Server validates the role is one they actually hold, logs the
-    transition to ``~/.wigamig/role_audit.log``, and returns the URL
+    transition to ``~/.murmurent/role_audit.log``, and returns the URL
     the client should navigate to (``/dashboard`` or ``/registrar``).
     """
 
@@ -520,7 +520,7 @@ def create_app() -> FastAPI:
     # we check the cached report's mtime; if it's stale, fire a fresh
     # scan in a daemon thread so the user's first dashboard load isn't
     # blocked on SSH + ``gh repo list``. The scan writes to
-    # ``~/.wigamig/inventory/`` and the dashboard reads from there.
+    # ``~/.murmurent/inventory/`` and the dashboard reads from there.
     @app.on_event("startup")
     def _schedule_inventory_refresh() -> None:  # pragma: no cover (timing)
         import logging as _logging
@@ -566,11 +566,11 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "No user resolved. Set $WIGAMIG_USER or pass ?user=<handle>."
+                    "No user resolved. Set $MURMURENT_USER or pass ?user=<handle>."
                 ),
             )
         # NETNAME ENFORCEMENT: if THIS machine has an imported identity card, the
-        # signed-in netname must match its owner. Changing ~/.wigamig/user to an
+        # signed-in netname must match its owner. Changing ~/.murmurent/user to an
         # arbitrary netname must NOT grant access — murmurent refuses.
         from ..core import identity_card as _idcard
         _owner = _idcard.machine_netname()
@@ -579,13 +579,13 @@ def create_app() -> FastAPI:
                 status_code=403,
                 detail=(f"This machine is registered to @{_owner}. You signed in as "
                         f"@{handle.lstrip('@')} — access refused. Restore "
-                        "~/.wigamig/user, or import your own identity card "
+                        "~/.murmurent/user, or import your own identity card "
                         "(`murmurent identity-import`)."),
             )
         # CARD VERIFICATION: if this machine holds a signed identity card, it must
         # still verify — chain to the pinned centre root, not expired, not revoked
         # (when a CRL is available), not tampered. A bad card is refused even when
-        # ~/.wigamig/user matches (identity attestation; live authz stays on the
+        # ~/.murmurent/user matches (identity attestation; live authz stays on the
         # registry below). No card / no anchor → falls through untouched.
         try:
             from ..core import issuance as _iss
@@ -664,7 +664,7 @@ def create_app() -> FastAPI:
     def post_new_sea(
         project: str,
         body: NewSeaBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """File a new SEA in ``project``. Anyone in the project can call.
 
@@ -713,7 +713,7 @@ def create_app() -> FastAPI:
         project: str,
         sea_id: int,
         action: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
         body: SeaActionBody = Body(default_factory=SeaActionBody),
     ) -> dict:
         """Apply a SEA lifecycle action (claim / complete / examine / conclude / decline / reopen).
@@ -775,7 +775,7 @@ def create_app() -> FastAPI:
     @app.get("/api/decommissions")
     def list_decommission_reports(
         kind: str = Query("", description="Filter by entity kind (project/machine/user/installation/sea)."),
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """List decommission reports on this machine, newest first.
 
@@ -810,7 +810,7 @@ def create_app() -> FastAPI:
     @app.get("/api/decommissions/{filename}")
     def get_decommission_report(
         filename: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Return one decommission report's body so the UI can preview it.
 
@@ -836,7 +836,7 @@ def create_app() -> FastAPI:
     def archive_sea_endpoint(
         project: str,
         sea_id: int,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Soft-delete a SEA: hide it from active queues, preserve the file.
 
@@ -882,7 +882,7 @@ def create_app() -> FastAPI:
     def unarchive_sea_endpoint(
         project: str,
         sea_id: int,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Bring a previously-archived SEA back into active queues."""
         from ..core import sea as sea_core
@@ -906,7 +906,7 @@ def create_app() -> FastAPI:
     @app.post("/api/request/join")
     def request_join(
         body: JoinRequestBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """File a project-join request. Anyone can call this."""
         actor = _resolve_actor(user)
@@ -928,7 +928,7 @@ def create_app() -> FastAPI:
     @app.post("/api/request/create-project")
     def request_create_project(
         body: CreateProjectRequestBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Propose a new project (anyone can; PI approves to scaffold)."""
         actor = _resolve_actor(user)
@@ -957,7 +957,7 @@ def create_app() -> FastAPI:
         request_id: int,
         action: str,
         body: RequestActionBody = Body(default_factory=RequestActionBody),
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Approve or decline a project-join request. PI only."""
         actor = _resolve_actor(user)
@@ -1080,7 +1080,7 @@ def create_app() -> FastAPI:
     @app.post("/api/workspace/launch")
     def workspace_launch(
         body: WorkspaceLaunchBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Open VSCode + per-agent iTerm windows for a project.
 
@@ -1112,12 +1112,12 @@ def create_app() -> FastAPI:
 
         # ---- Remote project: VSCode Remote-SSH launch ----
         # Two routing sources, in priority order:
-        #   1. Installation manifest at ~/.wigamig/installations/<project>.yaml
+        #   1. Installation manifest at ~/.murmurent/installations/<project>.yaml
         #      with ``ssh_remote`` set. This is the canonical "this machine
         #      installed mp1 on biodatsci" signal — written by
         #      workspace_initialize. Wins because the user may have a local
         #      working tree AND a remote install for the same project.
-        #   2. Legacy ``.wigamig-remote-pointer`` marker in the local clone
+        #   2. Legacy ``.murmurent-remote-pointer`` marker in the local clone
         #      (the older "pure-remote pointer" design). Still honoured for
         #      back-compat with projects scaffolded before installations
         #      manifests existed.
@@ -1276,7 +1276,7 @@ def create_app() -> FastAPI:
     @app.post("/api/workspace/initialize")
     def workspace_initialize(
         body: WorkspaceInitializeBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Provision a project on this machine: mkdir raw/refined + write manifest.
 
@@ -1545,7 +1545,7 @@ def create_app() -> FastAPI:
                 infra_components=list(body.infra_components or []),
                 # Tests monkeypatch INSTALLATIONS_DIR on snapshot.py;
                 # honour it here so the manifest lands in the test
-                # filesystem, not the real ~/.wigamig.
+                # filesystem, not the real ~/.murmurent.
                 installations_dir=INSTALLATIONS_DIR,
             )
         except Exception as exc:
@@ -1609,7 +1609,7 @@ def create_app() -> FastAPI:
     @app.post("/api/member/settings")
     def save_member_settings(
         body: MemberSettingsBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Write the member's contact + location fields back to lab-mgmt.
 
@@ -1712,7 +1712,7 @@ def create_app() -> FastAPI:
     @app.post("/api/lab/settings")
     def save_lab_settings(
         body: LabSettingsBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Write lab-wide settings to ``<lab-mgmt>/lab.md`` frontmatter (PI only).
 
@@ -1869,7 +1869,7 @@ def create_app() -> FastAPI:
 
     @app.post("/api/lab/master_folders/init")
     def post_master_folders_init(
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Create any missing master folders on the lab server.
 
@@ -1909,7 +1909,7 @@ def create_app() -> FastAPI:
         """Return the cross-machine + GitHub repo inventory.
 
         Default mode reads the most recent cached report from
-        ``~/.wigamig/inventory/`` so the panel loads instantly. Pass
+        ``~/.murmurent/inventory/`` so the panel loads instantly. Pass
         ``?refresh=true`` to force a live re-scan — that hits ``gh
         repo list`` plus one SSH session per registered host. The
         result is also written to the cache so subsequent reads are
@@ -1958,7 +1958,7 @@ def create_app() -> FastAPI:
     @app.post("/api/inventory/adopt")
     def post_inventory_adopt(
         body: AdoptCloneBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Adopt an existing local git clone as a murmurent project.
 
@@ -1974,7 +1974,7 @@ def create_app() -> FastAPI:
             user should edit by hand, or remove and re-adopt)
 
         Defaults to this machine's settings for raw/refined/notebook
-        paths (read from ``~/.wigamig/machine.yaml``). The Repos-panel
+        paths (read from ``~/.murmurent/machine.yaml``). The Repos-panel
         adopt modal doesn't ask the user for those — they're a
         per-machine setting, not a per-project decision.
         """
@@ -2046,7 +2046,7 @@ def create_app() -> FastAPI:
             # instead of overwriting, so a 409 here would be
             # belt-and-braces. Skip — let the script decide and surface
             # the result as a probe.
-            actor = (user or os.environ.get("WIGAMIG_USER", "")).strip().lstrip("@") \
+            actor = (user or os.environ.get("MURMURENT_USER", "")).strip().lstrip("@") \
                 or body.lead.lstrip("@")
             wb = (host_obj.lab_vm_root or "~/wigamig").rstrip("/")
             try:
@@ -2122,7 +2122,7 @@ def create_app() -> FastAPI:
             ms = _ms.load()
         except Exception:
             ms = None
-        actor = (user or os.environ.get("WIGAMIG_USER", "")).strip().lstrip("@") or body.lead.lstrip("@")
+        actor = (user or os.environ.get("MURMURENT_USER", "")).strip().lstrip("@") or body.lead.lstrip("@")
         wb = ((ms.wigamig_base if ms else None) or "~/wigamig").rstrip("/")
 
         try:
@@ -2175,7 +2175,7 @@ def create_app() -> FastAPI:
     @app.post("/api/members")
     def add_member_endpoint(
         body: AddMemberBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Add a new member to the lab roster. PI only."""
         from ..core import membership as _m
@@ -2222,12 +2222,12 @@ def create_app() -> FastAPI:
         # -cf - latest/`` lets the latest symlink resolve to the real dir
         # via ``-h``; we ship a small archive (single MB scale) over ssh.
         #
-        # Snapshot lives on **local disk** at /var/lib/wigamig/.snapshot
+        # Snapshot lives on **local disk** at /var/lib/murmurent/.snapshot
         # (script v4+) — OneFS NFSv4 ACLs deny root write under
         # /data/lab_vm even via the v4 mount, so the snapshot can't live
         # on the OneFS share. The mount path stays standard FHS
-        # (/var/lib/wigamig) so a sysadmin can find it without a docs trip.
-        snapshot_base = "/var/lib/wigamig/.snapshot"
+        # (/var/lib/murmurent) so a sysadmin can find it without a docs trip.
+        snapshot_base = "/var/lib/murmurent/.snapshot"
         # **Sentinel-bracketed base64 stream**.
         #
         # ``bash -lc`` runs ~/.bashrc, which on biodatsci's Anaconda
@@ -2344,12 +2344,12 @@ def create_app() -> FastAPI:
     def security_findings_endpoint(
         host: str = Query(..., description="Registered host name."),
         refresh: bool = Query(False, description="Re-run the scan now."),
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Return security findings for ``host``.
 
         Default behaviour: read the latest cached JSONL from
-        ``~/.wigamig/security/<host>/latest.jsonl``. With ``refresh=1``
+        ``~/.murmurent/security/<host>/latest.jsonl``. With ``refresh=1``
         runs a fresh scan over SSH first (can take 20s+ on biodatsci).
 
         Gated by ``lab_sudo`` (set via ``/api/members/<h>/lab_sudo``) or
@@ -2385,7 +2385,7 @@ def create_app() -> FastAPI:
         except _hosts.HostNotFound:
             raise HTTPException(status_code=404, detail=f"host not registered: {host}")
 
-        persist_dir = _P.home() / ".wigamig" / "security" / host
+        persist_dir = _P.home() / ".murmurent" / "security" / host
         latest_path = persist_dir / "latest.jsonl"
         if refresh:
             # Resolve lab from the actor's frontmatter so the scanner
@@ -2465,7 +2465,7 @@ def create_app() -> FastAPI:
                 host=host, path=f"<{truncated} findings dropped>",
                 current_state=f"{len(out)} returned, {truncated} dropped",
                 expected_state=f"≤ {MAX_FINDINGS_IN_RESPONSE} findings",
-                suggested_fix="check ~/.wigamig/security/<host>/<date>.jsonl for the full set",
+                suggested_fix="check ~/.murmurent/security/<host>/<date>.jsonl for the full set",
                 detected_at=generated_at or "",
             ).to_dict())
         return {
@@ -2480,11 +2480,11 @@ def create_app() -> FastAPI:
     @app.post("/api/security/dump")
     def security_dump_endpoint(
         body: dict,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Trigger the Tier-2 root-owned snapshot on a registered host.
 
-        Runs ``ssh <host> sudo -n /opt/wigamig/lab_sec_dump.sh``. The
+        Runs ``ssh <host> sudo -n /opt/murmurent/lab_sec_dump.sh``. The
         ``-n`` flag means "fail rather than prompt for a password" — if
         the sudoers entry isn't installed, the caller gets a clear
         actionable error instead of a hang.
@@ -2523,7 +2523,7 @@ def create_app() -> FastAPI:
         remote = _remote.Remote(host_obj)
         try:
             res = remote.run(
-                "sudo -n /opt/wigamig/lab_sec_dump.sh",
+                "sudo -n /opt/murmurent/lab_sec_dump.sh",
                 check=False, timeout=600,
             )
         except _remote.RemoteError as exc:
@@ -2562,7 +2562,7 @@ def create_app() -> FastAPI:
     @app.post("/api/security/agent_review")
     def security_agent_review_endpoint(
         body: dict,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Run the LLM-driven security review on a project.
 
@@ -2630,7 +2630,7 @@ def create_app() -> FastAPI:
         # findings for this project + category set, then append the new
         # ones. Deterministic findings are preserved untouched.
         date = _dt2.datetime.utcnow().strftime("%Y-%m-%d")
-        target = _P.home() / ".wigamig" / "security" / host / f"{date}.jsonl"
+        target = _P.home() / ".murmurent" / "security" / host / f"{date}.jsonl"
         existing = read_jsonl(target) if target.is_file() else []
         kept = [
             f for f in existing
@@ -2666,7 +2666,7 @@ def create_app() -> FastAPI:
     @app.get("/api/security/personal")
     def security_personal_endpoint(
         host: str = Query(..., description="Registered host name."),
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Return only the calling user's own findings (member dashboard
         view). No lab_sudo gate; readable by any active member.
@@ -2680,7 +2680,7 @@ def create_app() -> FastAPI:
 
         actor = _resolve_actor(user)
         _require_active(actor)
-        latest_path = _P.home() / ".wigamig" / "security" / host / "latest.jsonl"
+        latest_path = _P.home() / ".murmurent" / "security" / host / "latest.jsonl"
         all_findings = read_jsonl(latest_path)
         mine = [f.to_dict() for f in all_findings
                 if f.owner_handle and f.owner_handle.lstrip("@").lower() == actor.lower()]
@@ -2690,7 +2690,7 @@ def create_app() -> FastAPI:
     def member_lab_sudo_endpoint(
         handle: str,
         body: dict,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Grant or revoke the ``lab_sudo`` flag on a lab member.
 
@@ -2730,7 +2730,7 @@ def create_app() -> FastAPI:
     def member_status_endpoint(
         handle: str,
         action: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Activate / deactivate a member. PI only."""
         from ..core import membership as _m
@@ -2772,7 +2772,7 @@ def create_app() -> FastAPI:
     def provision_slack(
         project: str,
         channel_name: str = Query("", description="Optional Slack channel name override; defaults to proj-<project>."),
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Create the Slack channel for a project. PI only. Idempotent.
 
@@ -2828,7 +2828,7 @@ def create_app() -> FastAPI:
     def link_slack_channel(
         project: str,
         body: LinkSlackChannelBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Persist a known Slack channel ID for ``project`` to CHARTER.md.
 
@@ -2860,7 +2860,7 @@ def create_app() -> FastAPI:
     @app.post("/api/project/{project}/provision/github")
     def provision_github(
         project: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Create the project's remote and push. PI only. Idempotent retry.
 
@@ -2950,7 +2950,7 @@ def create_app() -> FastAPI:
     @app.post("/api/project/{project}/sync_remote")
     def sync_project_remote(
         project: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Run the full provisioning pipeline with traffic-light progress.
 
@@ -3017,11 +3017,11 @@ def create_app() -> FastAPI:
     @app.delete("/api/installations/{project}")
     def delete_installation(
         project: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Disconnect a per-machine installation manifest.
 
-        Removes ``~/.wigamig/installations/<project>.yaml`` (a wigamig-
+        Removes ``~/.murmurent/installations/<project>.yaml`` (a wigamig-
         local pointer, not user data) and writes a decommission report
         listing the on-machine paths (raw/, refined/, notebook/) that
         the user may want to inspect or clean up. No files in those
@@ -3091,7 +3091,7 @@ def create_app() -> FastAPI:
     @app.post("/api/project/{project}/sync_slack_members")
     def sync_project_slack_members(
         project: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Invite every project member to the project's Slack channel.
 
@@ -3143,13 +3143,13 @@ def create_app() -> FastAPI:
     @app.post("/api/project/{project}/archive")
     def archive_project_endpoint(
         project: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Soft-delete (decommission) a project. PI only.
 
         Files on disk are NOT touched. The project's CHARTER.md frontmatter
         flips to ``status: archived`` with a timestamp; a markdown report
-        is written to ``~/.wigamig/decommissions/`` listing what the user
+        is written to ``~/.murmurent/decommissions/`` listing what the user
         may want to clean up manually (working clone, GitHub repo, Slack
         channel, lab-base raw/refined dirs, etc.). Reversible via
         ``unarchive``.
@@ -3166,7 +3166,7 @@ def create_app() -> FastAPI:
     @app.post("/api/project/{project}/unarchive")
     def unarchive_project_endpoint(
         project: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Bring a previously-archived project back to active. PI only."""
         from ..core import projects as _projects
@@ -3181,7 +3181,7 @@ def create_app() -> FastAPI:
     @app.post("/api/project/{project}/cert-delete")
     def cert_delete_project_endpoint(
         project: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """PI-only "remove project" for a cert-project: revoke every project card
         (the CRL) and archive the registry record. The Slack channel + GitHub repo
@@ -3201,7 +3201,7 @@ def create_app() -> FastAPI:
     @app.post("/api/project/{project}/provision")
     def provision_cert_project_endpoint(
         project: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """PI-only: provision a cert-project's private Slack channel + GitHub repo
         and sync both to its certified members. No-ops gracefully (reports
@@ -3220,7 +3220,7 @@ def create_app() -> FastAPI:
     def add_project_repo_endpoint(
         project: str,
         body: ProjectRepoBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """PI-only: assign a repo (code / manuscript / data / infra) to a cert
         project. Idempotent by repo name. This is how a project gains its
@@ -3253,7 +3253,7 @@ def create_app() -> FastAPI:
     @app.post("/api/project/{project}/reconcile")
     def reconcile_cert_project_endpoint(
         project: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
         check: bool = Query(False, description="Report drift only; make no changes."),
     ) -> dict:
         """PI-only: reconcile a cert-project's Slack channel + GitHub repo
@@ -3271,7 +3271,7 @@ def create_app() -> FastAPI:
     @app.post("/api/project/{project}/provision/install")
     def provision_install(
         project: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Create raw/ and refined/ installation dirs for a project. Never overwrites existing dirs."""
         actor = _resolve_actor(user)
@@ -3299,7 +3299,7 @@ def create_app() -> FastAPI:
             "project_root": h.project_root,
             # ``wigamig_base`` is the canonical 2026-05-14 name; ``lab_vm_root``
             # is the legacy field still persisted under the old key in
-            # ``~/.wigamig/hosts.yaml``. Expose both so the UI can use the new
+            # ``~/.murmurent/hosts.yaml``. Expose both so the UI can use the new
             # name while older code that reads ``lab_vm_root`` keeps working.
             "wigamig_base": h.lab_vm_root,
             "lab_vm_root": h.lab_vm_root,
@@ -3352,14 +3352,14 @@ def create_app() -> FastAPI:
     @app.delete("/api/hosts/{name}")
     def delete_host(
         name: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Disconnect a host (machine) from murmurent.
 
-        The host's row in ``~/.wigamig/hosts.yaml`` is removed (that file
+        The host's row in ``~/.murmurent/hosts.yaml`` is removed (that file
         is a local-only registry — removing the row doesn't touch
         anything on the actual machine). A decommission report is
-        written to ``~/.wigamig/decommissions/`` listing the paths on
+        written to ``~/.murmurent/decommissions/`` listing the paths on
         that machine the user may want to clean up by hand (wigamig_base
         directories, vault, etc.). ``local`` cannot be removed.
 
@@ -3552,9 +3552,9 @@ def create_app() -> FastAPI:
     #               (any one of the registered labs)
     #   - "pi":     handle equals the active lab's PI_HANDLE (lab.md:pi)
     #   - "registrar": handle is listed in _registry.yaml:registrars:
-    #                  (or, fallback, in the local ~/.wigamig/registrar
+    #                  (or, fallback, in the local ~/.murmurent/registrar
     #                   sentinel — legacy single-registrar installs)
-    # Each /api/login/select call is appended to ~/.wigamig/role_audit.log
+    # Each /api/login/select call is appended to ~/.murmurent/role_audit.log
     # with timestamp, source IP, and whether the role was granted.
 
     def _resolve_roles(handle: str) -> dict[str, object]:
@@ -3657,7 +3657,7 @@ def create_app() -> FastAPI:
     @app.get("/api/core/dashboard")
     def core_dashboard(
         core: str = Query(..., description="Short core id (e.g. 'biocore')."),
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Minimal data payload for the Core Dashboard at /core.
 
@@ -3751,7 +3751,7 @@ def create_app() -> FastAPI:
     def core_services_list(
         core: str,
         include_retired: bool = Query(False, description="Include retired services."),
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """List a core's service catalog. Phase 2b of the cores rollout
         (docs/cores_plan.md §11). Readable by any authenticated murmurent
@@ -3800,7 +3800,7 @@ def create_app() -> FastAPI:
     def core_training_list(
         core: str,
         include_retired: bool = Query(False, description="Include retired trainings."),
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """List a core's training catalog. Phase 2d. Readable by any
         authenticated murmurent member — training requirements gate
@@ -4137,7 +4137,7 @@ def create_app() -> FastAPI:
     def core_service_book(
         core: str, slug: str,
         body: dict,
-        user: str = Query("", description="Booking actor; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Booking actor; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Book a slot on ``core/<slug>`` for the calling member.
 
@@ -5200,7 +5200,7 @@ def create_app() -> FastAPI:
     def core_service_create(
         core: str,
         body: dict,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Add a service to the core's catalog. Gated to core leader OR
         registrar. Body matches the ServiceSummary fields (slug, name,
@@ -5242,7 +5242,7 @@ def create_app() -> FastAPI:
     def core_service_update(
         core: str, slug: str,
         body: dict,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Partial update of a service. Body is a {field: value} dict
         merged into the frontmatter (top-level keys replaced wholesale —
@@ -5264,7 +5264,7 @@ def create_app() -> FastAPI:
     @app.post("/api/core/{core}/services/{slug}/archive")
     def core_service_archive(
         core: str, slug: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Flip a service to status=retired. File preserved."""
         from ..core import services as _svc
@@ -5328,7 +5328,7 @@ def create_app() -> FastAPI:
         )
         if body.remember_user:
             try:
-                pref = Path.home() / ".wigamig" / "user"
+                pref = Path.home() / ".murmurent" / "user"
                 pref.parent.mkdir(parents=True, exist_ok=True)
                 pref.write_text(handle + "\n", encoding="utf-8")
             except OSError:
@@ -5450,7 +5450,7 @@ def create_app() -> FastAPI:
     @app.post("/api/sea_catalog")
     def catalog_upsert(
         body: CatalogEntryBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Create or update a catalog entry. PI only."""
         from ..core import sea_catalog as _catalog
@@ -5474,7 +5474,7 @@ def create_app() -> FastAPI:
     def catalog_action(
         slug: str,
         action: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Toggle accepting (enable/disable) or remove (delete). PI only."""
         from ..core import sea_catalog as _catalog
@@ -5522,7 +5522,7 @@ def create_app() -> FastAPI:
         request_id: int,
         action: str,
         body: InboundActionBody = Body(default_factory=InboundActionBody),
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Accept or decline an inbound cross-group SEA. PI only."""
         from ..core import cross_group as _xg
@@ -5557,7 +5557,7 @@ def create_app() -> FastAPI:
         slug: str,
         action: str,
         body: SeaActionBody = Body(default_factory=SeaActionBody),
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Approve or decline a draft oracle entry. PI only."""
         from ..core import slack_distill as _distill
@@ -5600,7 +5600,7 @@ def create_app() -> FastAPI:
 
     @app.post("/api/oracle/process")
     def oracle_process(
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Trigger a (stubbed) oracle distillation pass.
 
@@ -5737,7 +5737,7 @@ def create_app() -> FastAPI:
 
     # -----------------------------------------------------------------
     # Registrar (Phase A, read-only). Gated on is_registrar(); the
-    # registrar's handle is the first line of ``~/.wigamig/registrar``.
+    # registrar's handle is the first line of ``~/.murmurent/registrar``.
     # -----------------------------------------------------------------
 
     @app.get("/api/registrar/dashboard", response_model=C.RegistrarResponse)
@@ -5761,7 +5761,7 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/lab")
     def registrar_create_lab(
         body: RegistrarLabCreateBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Phase B: registrar creates a new lab.
 
@@ -5827,7 +5827,7 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/lab/{name}/archive")
     def registrar_archive_lab(
         name: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Soft-delete a lab: ``status -> archived``. Files are preserved."""
         from ..core import registrar as _reg
@@ -5841,7 +5841,7 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/lab/{name}/unarchive")
     def registrar_unarchive_lab(
         name: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Restore an archived lab: ``status -> active``.
 
@@ -5871,7 +5871,7 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/core")
     def registrar_create_core(
         body: RegistrarCoreCreateBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Phase E: registrar creates a new core."""
         from ..core import registrar as _reg
@@ -5899,7 +5899,7 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/core/{name}/archive")
     def registrar_archive_core(
         name: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         from ..core import registrar as _reg
         _require_registrar(user)
@@ -5912,7 +5912,7 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/core/{name}/unarchive")
     def registrar_unarchive_core(
         name: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         from ..core import registrar as _reg
         _require_registrar(user)
@@ -5928,7 +5928,7 @@ def create_app() -> FastAPI:
     def registrar_edit_core(
         name: str,
         body: RegistrarCoreEditBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         from ..core import registrar as _reg
         _require_registrar(user)
@@ -5948,7 +5948,7 @@ def create_app() -> FastAPI:
     def core_settings_update(
         core: str,
         body: RegistrarCoreEditBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Core-leader equivalent of ``POST /api/lab/settings``.
 
@@ -5976,7 +5976,7 @@ def create_app() -> FastAPI:
     def registrar_add_core_member(
         name: str,
         body: dict,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Add a staff member to a core. Body: {handle, full_name, role}.
         ``role`` defaults to 'staff'. Registrar-only."""
@@ -6009,7 +6009,7 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/core/{name}/members/{handle}/remove")
     def registrar_remove_core_member(
         name: str, handle: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Soft-remove (status=inactive) a core member. Refuses to remove
         the current leader. Registrar-only."""
@@ -6031,7 +6031,7 @@ def create_app() -> FastAPI:
     def registrar_rotate_core_leader(
         name: str,
         body: dict,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Rotate a core's leader. Body: {handle, full_name (optional)}.
         Old leader demoted to ``staff`` and kept on the roster.
@@ -6086,7 +6086,7 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/collaboration")
     def registrar_create_collaboration(
         body: RegistrarCollabCreateBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Phase D: registrar creates a cross-group collaboration."""
         from ..core import registrar as _reg
@@ -6113,7 +6113,7 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/collaboration/{name}/archive")
     def registrar_archive_collaboration(
         name: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         from ..core import registrar as _reg
         _require_registrar(user)
@@ -6126,7 +6126,7 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/collaboration/{name}/unarchive")
     def registrar_unarchive_collaboration(
         name: str,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         from ..core import registrar as _reg
         _require_registrar(user)
@@ -6142,7 +6142,7 @@ def create_app() -> FastAPI:
     def registrar_edit_collaboration(
         name: str,
         body: RegistrarCollabEditBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         from ..core import registrar as _reg
         _require_registrar(user)
@@ -6164,14 +6164,14 @@ def create_app() -> FastAPI:
     # a collab unilaterally — registrar-driven. Item #9 in the 2026-05-14
     # testing list flipped that ownership: PIs should propose; the
     # registrar approves or declines. Requests live in
-    # ``~/.wigamig/lab_info/collaboration_requests/`` (centre-scoped,
+    # ``~/.murmurent/lab_info/collaboration_requests/`` (centre-scoped,
     # shared with the registrar). On approval the existing
     # ``create_collaboration`` is invoked so all the invariants run.
 
     @app.post("/api/collaboration/propose")
     def propose_collaboration(
         body: ProposeCollaborationBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """File a new collaboration request. Any PI may call this."""
         from ..core import collaboration_requests as _creq
@@ -6193,7 +6193,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/collaboration/requests")
     def list_collaboration_requests(
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """List collab requests. Registrar sees everything; a PI sees
         their own + any where they're a named partner. Members see only
@@ -6235,7 +6235,7 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/collaboration_request/{req_id}/approve")
     def approve_collaboration_request(
         req_id: int,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Registrar approves a pending collab request → creates the
         collaboration entry in _registry.yaml via the existing flow."""
@@ -6257,7 +6257,7 @@ def create_app() -> FastAPI:
     def decline_collaboration_request(
         req_id: int,
         body: DeclineCollabRequestBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Registrar declines a pending collab request with a reason."""
         from ..core import collaboration_requests as _creq
@@ -6274,11 +6274,11 @@ def create_app() -> FastAPI:
     @app.post("/api/registrar/profile")
     def registrar_edit_profile(
         body: RegistrarProfileBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Update the registrar's centre-level profile.
 
-        Writes to ``$WIGAMIG_LAB_INFO_ROOT/registrar.md`` frontmatter.
+        Writes to ``$MURMURENT_LAB_INFO_ROOT/registrar.md`` frontmatter.
         Partial-POST: only fields present in the body are touched;
         empty string clears a field.
         """
@@ -6294,7 +6294,7 @@ def create_app() -> FastAPI:
     def registrar_edit_lab(
         name: str,
         body: RegistrarLabEditBody,
-        user: str = Query("", description="Actor handle; falls back to $WIGAMIG_USER."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Update lab metadata (display_name, PI handoff, slack, github, …).
 
@@ -6811,7 +6811,7 @@ def create_app() -> FastAPI:
                 status_code=409,
                 detail="centre already initialised; use /api/centre/profile PATCH to edit.",
             )
-        # Mayor resolution: explicit body > query user > $WIGAMIG_USER.
+        # Mayor resolution: explicit body > query user > $MURMURENT_USER.
         mayor = str((body or {}).get("mayor") or "").strip()
         if not mayor:
             try:
@@ -7185,7 +7185,7 @@ def create_app() -> FastAPI:
         def security_index() -> HTMLResponse:
             """Per-lab security dashboard. Gated by ``lab_sudo`` (set by
             PI from the LabSudoPanel) or by being the PI. Pulls findings
-            from ``~/.wigamig/security/<host>/latest.jsonl``.
+            from ``~/.murmurent/security/<host>/latest.jsonl``.
             See docs/security-dashboard.md for the rule catalog.
             """
             return HTMLResponse(

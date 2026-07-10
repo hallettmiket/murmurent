@@ -5,7 +5,7 @@ Date: 2026-05-14
 Input: kind/name/decommissioner/manual_cleanup_items lists from the
        per-entity archive helpers (projects, machines, installations,
        SEAs, users).
-Output: A markdown report at ``~/.wigamig/decommissions/<date>_<kind>_<slug>.md``
+Output: A markdown report at ``~/.murmurent/decommissions/<date>_<kind>_<slug>.md``
         listing what murmurent disconnected and what the user may want to
         clean up by hand.
 
@@ -32,13 +32,13 @@ import yaml
 def _decommission_dir() -> Path:
     """Resolve the report dir, env-overridable for test isolation.
 
-    ``$WIGAMIG_DECOMMISSION_DIR`` lets pytest redirect the output to a
-    tmp_path so test runs don't pollute the user's real ``~/.wigamig/``.
+    ``$MURMURENT_DECOMMISSION_DIR`` lets pytest redirect the output to a
+    tmp_path so test runs don't pollute the user's real ``~/.murmurent/``.
     """
-    env = os.environ.get("WIGAMIG_DECOMMISSION_DIR")
+    env = os.environ.get("MURMURENT_DECOMMISSION_DIR")
     if env:
         return Path(env).expanduser()
-    return Path("~/.wigamig/decommissions").expanduser()
+    return Path("~/.murmurent/decommissions").expanduser()
 
 
 # Resolved at import time for back-compat with anything that reads
@@ -80,7 +80,7 @@ def _slug(text: str) -> str:
 def report_path(record: DecommissionRecord, *, today: _dt.date | None = None) -> Path:
     """Compute the on-disk path for the decommission report.
 
-    Pattern: ``~/.wigamig/decommissions/YYYY-MM-DD_<kind>_<slug>.md``. If
+    Pattern: ``~/.murmurent/decommissions/YYYY-MM-DD_<kind>_<slug>.md``. If
     multiple reports for the same entity land on the same day, an integer
     suffix is appended (``_2``, ``_3``, …) per the project's versioning
     rule — the highest integer is the most recent.

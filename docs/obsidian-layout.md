@@ -18,7 +18,7 @@ murmurent oracle path
 This prints your personal Oracle dir (`<vault>/oracle`); the **vault
 root** is its parent directory. The resolver reads Obsidian's
 `obsidian.json` registry (the most recently opened vault), or
-`$WIGAMIG_OBSIDIAN_VAULT` if set.
+`$MURMURENT_OBSIDIAN_VAULT` if set.
 
 To check that murmurent can actually *read* the vault on this machine
 (the common macOS Full Disk Access failure on iCloud-backed vaults),
@@ -30,7 +30,7 @@ run `murmurent oracle doctor`.
 |---|---|---|
 | `oracle/` | Personal Oracle entries (per-entry .md files, `MEMORY.md` index) | `oracle` agent |
 | `oracle/drafts/` | Entries staged for `murmurent oracle publish` | `oracle` agent |
-| `lab-notebook/` (default — see your `~/.wigamig/machine.yaml` `notebook_subfolder`) | Daily lab-notebook entries | the notebook tooling (`murmurent notebook ...`) |
+| `lab-notebook/` (default — see your `~/.murmurent/machine.yaml` `notebook_subfolder`) | Daily lab-notebook entries | the notebook tooling (`murmurent notebook ...`) |
 
 The rest of the vault is yours. Murmurent never writes outside the
 folders listed here.
@@ -40,8 +40,8 @@ directories at different layers — don't confuse them:
 
 | Path | Purpose |
 |---|---|
-| `<vault>/lab-notebook/` (hyphen, singular) | Obsidian-side daily notebook entries. Configured per-machine via `~/.wigamig/machine.yaml: notebook_subfolder`. |
-| `$WIGAMIG_LAB_VM_ROOT/lab_notebooks/` (underscore, plural) | Murmurent data-storage layer's notebook directory under the lab-VM root. Part of the `raw/refined/lab_notebooks` triad. |
+| `<vault>/lab-notebook/` (hyphen, singular) | Obsidian-side daily notebook entries. Configured per-machine via `~/.murmurent/machine.yaml: notebook_subfolder`. |
+| `$MURMURENT_LAB_VM_ROOT/lab_notebooks/` (underscore, plural) | Murmurent data-storage layer's notebook directory under the lab-VM root. Part of the `raw/refined/lab_notebooks` triad. |
 
 The Obsidian one is where humans browse + edit. The lab-VM one is
 the staging/aggregation tier for cross-user notebook collation

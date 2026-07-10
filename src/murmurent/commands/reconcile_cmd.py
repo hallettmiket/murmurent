@@ -114,7 +114,7 @@ def _build_slack_body(report: _rec.ReconcileReport, *, applied: bool) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Click wiring (called from src/wigamig/cli.py)
+# Click wiring (called from src/murmurent/cli.py)
 # ---------------------------------------------------------------------------
 
 

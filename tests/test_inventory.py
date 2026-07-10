@@ -12,7 +12,7 @@ from murmurent.mcp import inventory_server
 
 @pytest.fixture
 def inv(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
     # The lab_manager is the PI declared in lab.md. Declare it explicitly — the
     # hardcoded "mhallet" default was removed, so a real lab.md is required.
     lab_mgmt = tmp_path / "lab-mgmt"
@@ -91,13 +91,13 @@ def test_mcp_tool_show(inv):
 
 
 def test_mcp_set_requires_lab_manager(inv, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_USER", "allie")  # not lab_manager
+    monkeypatch.setenv("MURMURENT_USER", "allie")  # not lab_manager
     with pytest.raises(PermissionError):
         inventory_server.tool_set("anti_cd31", {"status": "low"})
 
 
 def test_mcp_set_as_lab_manager(inv, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_USER", "mhallet")
+    monkeypatch.setenv("MURMURENT_USER", "mhallet")
     inventory_server.tool_set("anti_cd31", {"status": "low"})
     item = inventory.parse_item(inventory.item_path("anti_cd31"))
     assert item.status == "low"

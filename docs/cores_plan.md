@@ -115,22 +115,22 @@ Half a day of focused rename + grep verification + one back-compat shim per quer
 
 The right place was already wired up in murmurent:
 
-- The **centre registrar** ([src/wigamig/core/registrar.py](../src/wigamig/core/registrar.py)) maintains `~/.wigamig/lab_info/` as the centre-wide registry. Index file `_registry.yaml` + per-entity directories under `labs/`, `cores/`, `collaborations/`.
-- Each core gets a **self-contained per-core mini-repo** at `~/.wigamig/lab_info/cores/<name>/lab-mgmt/` — a directory tree that mirrors the per-lab `lab_mgmt/` layout (members/, projects/, requests/, audit/) but owned by the centre's registrar, not by any one lab's PI.
+- The **centre registrar** ([src/murmurent/core/registrar.py](../src/murmurent/core/registrar.py)) maintains `~/.murmurent/lab_info/` as the centre-wide registry. Index file `_registry.yaml` + per-entity directories under `labs/`, `cores/`, `collaborations/`.
+- Each core gets a **self-contained per-core mini-repo** at `~/.murmurent/lab_info/cores/<name>/lab-mgmt/` — a directory tree that mirrors the per-lab `lab_mgmt/` layout (members/, projects/, requests/, audit/) but owned by the centre's registrar, not by any one lab's PI.
 - Full CRUD already exists: `create_core`, `archive_core`, `unarchive_core`, edit endpoints, and a Cores panel on `/registrar` that calls into them.
 
 **Why this is the right architecture (now, with hindsight):**
 
 - Cores are governance-level entities (the registrar adds/removes them, not any single PI). Their natural home is the centre registry, not any one lab's repo.
-- "A core is a self-contained mini-lab-mgmt" — beautifully captures the shape: a core has the same internal structure as a lab (members, projects, audit, requests) but its lifecycle is centre-managed. The existing `~/.wigamig/lab_info/cores/<name>/lab-mgmt/` directly expresses this.
+- "A core is a self-contained mini-lab-mgmt" — beautifully captures the shape: a core has the same internal structure as a lab (members, projects, audit, requests) but its lifecycle is centre-managed. The existing `~/.murmurent/lab_info/cores/<name>/lab-mgmt/` directly expresses this.
 - Cross-membership (a core staff member also in a lab) works via shared handles: both registries reference the same member handle string; the member's identity record lives in whichever lab they primarily belong to.
-- All Phase 1+ work — registrar CRUD, security audit, slack-notify, training-compliance — already runs over `~/.wigamig/lab_info/` because the registrar dashboard's snapshot pulls from there. Zero migration needed.
+- All Phase 1+ work — registrar CRUD, security audit, slack-notify, training-compliance — already runs over `~/.murmurent/lab_info/` because the registrar dashboard's snapshot pulls from there. Zero migration needed.
 
-**Practical consequence**: Phase 0c (originally "extend lab_mgmt") was reverted (murmurent `3da0aa8`, lab_mgmt `b0b3a5e`) and redone by calling the existing `core.registrar.create_core("biocore", ...)` API, which scaffolds at `~/.wigamig/lab_info/cores/biocore/`. The existing registrar dashboard renders bioCORE without code changes — Phase 0d collapses from "build a Cores panel" to "verify the existing Cores panel + add coverage tests."
+**Practical consequence**: Phase 0c (originally "extend lab_mgmt") was reverted (murmurent `3da0aa8`, lab_mgmt `b0b3a5e`) and redone by calling the existing `core.registrar.create_core("biocore", ...)` API, which scaffolds at `~/.murmurent/lab_info/cores/biocore/`. The existing registrar dashboard renders bioCORE without code changes — Phase 0d collapses from "build a Cores panel" to "verify the existing Cores panel + add coverage tests."
 
-The §4b schema below describes the **per-core lab-mgmt** that the registrar scaffolds; the storage path is `~/.wigamig/lab_info/cores/<core>/lab-mgmt/` not `~/repos/lab_mgmt/cores/<core>/`. The rest of the plan stands.
+The §4b schema below describes the **per-core lab-mgmt** that the registrar scaffolds; the storage path is `~/.murmurent/lab_info/cores/<core>/lab-mgmt/` not `~/repos/lab_mgmt/cores/<core>/`. The rest of the plan stands.
 
-### 4b. Schema for `~/.wigamig/lab_info/cores/<core>/lab-mgmt/`
+### 4b. Schema for `~/.murmurent/lab_info/cores/<core>/lab-mgmt/`
 
 ```
 lab_mgmt/
@@ -524,7 +524,7 @@ Why Option 2:
 Sketch of the MCP server:
 
 ```
-murmurent-core-data  (new MCP server in src/wigamig/mcp/core_data_server.py)
+murmurent-core-data  (new MCP server in src/murmurent/mcp/core_data_server.py)
 
 Tools:
   list_my_jobs(state="completed", limit=20)
@@ -539,7 +539,7 @@ Tools:
       → returns a single archive blob (for offline analysis)
 
 Identity:
-  Honours WIGAMIG_USER env (set by the murmurent shell wrapper); falls back
+  Honours MURMURENT_USER env (set by the murmurent shell wrapper); falls back
   to the user's claim in the MCP call. Refuses if the caller's lab
   doesn't match the job's requester_lab field UNLESS the caller is a
   member of the core itself (core staff see all jobs in their core).

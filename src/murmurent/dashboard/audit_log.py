@@ -7,7 +7,7 @@ Date: 2026-05-08
 Input: Append-only JSONL files; one event per line.
 Output: ``Event`` dataclasses sorted newest-first.
 
-This is **not** the per-machine ``~/.claude/wigamig-audit/`` log used by
+This is **not** the per-machine ``~/.claude/murmurent-audit/`` log used by
 the PostToolUse hook (that one captures every Claude tool call). The
 chain here records *domain* events the lab cares about — SEA lifecycle
 transitions, project membership changes, oracle publishes — and is

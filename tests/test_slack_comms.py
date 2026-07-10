@@ -16,14 +16,14 @@ from murmurent.core import slack_comms as SC
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
     monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
-    monkeypatch.delenv("WIGAMIG_SLACK_TOKEN", raising=False)
+    monkeypatch.delenv("MURMURENT_SLACK_TOKEN", raising=False)
     fake_home = tmp_path / "home"
     fake_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(R, "REGISTRAR_SENTINEL",
-                        fake_home / ".wigamig" / "registrar")
+                        fake_home / ".murmurent" / "registrar")
     CI.init_centre(name="Demo", institution="Demo U", founding_mayor="@tbrowne",
                    unique_name="demo", slack_workspace="T0DEMO",
                    write_sentinel=False)
@@ -125,7 +125,7 @@ def test_provision_skips_invite_without_token_or_inviter(world, monkeypatch):
 
 def test_provision_centre_slack_creates_mayor_channel_and_seeds_broadcasts(world):
     probes = CP.provision_centre_slack(
-        channel_creator=lambda name, ws: "C0OPS" if name == "wigamig-ops" else None,
+        channel_creator=lambda name, ws: "C0OPS" if name == "murmurent-ops" else None,
         channel_resolver=lambda name: "C0GEN" if name == "general" else None,
     )
     # mayor channel id persisted on the centre
@@ -165,7 +165,7 @@ def test_provision_centre_slack_reuses_existing_mayor_channel(world, monkeypatch
 
 
 def test_resolve_slack_token_env_then_file(monkeypatch, tmp_path):
-    monkeypatch.delenv("WIGAMIG_SLACK_TOKEN", raising=False)
+    monkeypatch.delenv("MURMURENT_SLACK_TOKEN", raising=False)
     monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
     cfg = tmp_path / ".config" / "murmurent"
     cfg.mkdir(parents=True)
@@ -177,15 +177,15 @@ def test_resolve_slack_token_env_then_file(monkeypatch, tmp_path):
     # explicit command (allow_file=True): falls back to the file
     assert CP.resolve_slack_token(allow_file=True) == "xoxb-fromfile"
     # env always wins over the file
-    monkeypatch.setenv("WIGAMIG_SLACK_TOKEN", "xoxb-fromenv")
+    monkeypatch.setenv("MURMURENT_SLACK_TOKEN", "xoxb-fromenv")
     assert CP.resolve_slack_token(allow_file=True) == "xoxb-fromenv"
 
 
 def test_provision_centre_slack_invites_the_mayor(world, monkeypatch):
-    # The bot creates the private #wigamig-ops → the human mayor must be invited
+    # The bot creates the private #murmurent-ops → the human mayor must be invited
     # or they can't see it.
     CI.update_centre({"join_email": "tbrowne@demo.edu"})
-    monkeypatch.setenv("WIGAMIG_SLACK_TOKEN", "xoxb-x")
+    monkeypatch.setenv("MURMURENT_SLACK_TOKEN", "xoxb-x")
     monkeypatch.setattr(CP, "slack_create_channel",
         lambda name, **k: CP.SlackChannelResult(ok=True, channel_id="C0OPS", channel_name=name))
     seen = {}
@@ -204,7 +204,7 @@ def test_provision_centre_slack_invites_the_mayor(world, monkeypatch):
 def test_provision_centre_slack_mayor_email_override(world, monkeypatch):
     # --mayor-email must win over the centre join_email for the invite lookup.
     CI.update_centre({"join_email": "public@demo.edu"})
-    monkeypatch.setenv("WIGAMIG_SLACK_TOKEN", "xoxb-x")
+    monkeypatch.setenv("MURMURENT_SLACK_TOKEN", "xoxb-x")
     monkeypatch.setattr(CP, "slack_create_channel",
         lambda name, **k: CP.SlackChannelResult(ok=True, channel_id="C0OPS", channel_name=name))
     seen = {}
@@ -217,7 +217,7 @@ def test_provision_centre_slack_mayor_email_override(world, monkeypatch):
 
 
 def test_provision_centre_slack_warns_when_no_mayor_email(world, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_SLACK_TOKEN", "xoxb-x")
+    monkeypatch.setenv("MURMURENT_SLACK_TOKEN", "xoxb-x")
     monkeypatch.setattr(CP, "slack_create_channel",
         lambda name, **k: CP.SlackChannelResult(ok=True, channel_id="C0OPS", channel_name=name))
     probes = CP.provision_centre_slack(channel_resolver=lambda n: "C0GEN")

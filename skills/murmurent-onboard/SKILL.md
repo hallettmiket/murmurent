@@ -11,7 +11,7 @@ an explicit go-ahead before approving**, because approval provisions real infra.
 
 ## 0. Preconditions (check, don't assume)
 - A centre exists: `murmurent centre-status` (if not, stop — they need `centre-init`).
-- The private key exists: `~/.wigamig/age/mayor.key` (created by `centre-init` /
+- The private key exists: `~/.murmurent/age/mayor.key` (created by `centre-init` /
   `centre-age-keygen`). If missing, decryption can't work — say so and stop.
 
 ## 1. Get the encrypted request into a file
@@ -48,7 +48,7 @@ so wait for a clear yes. Confirm the **approver handle** too (their `@handle`);
 it's recorded in the audit log.
 
 ## 5. Approve (or decline)
-Set the actor once so you don't repeat it: `export WIGAMIG_USER=@<mayor>` (or pass
+Set the actor once so you don't repeat it: `export MURMURENT_USER=@<mayor>` (or pass
 `--actor @<mayor>`).
 ```bash
 murmurent join-request approve <id> --actor @<mayor>
@@ -56,7 +56,7 @@ murmurent join-request approve <id> --actor @<mayor>
 murmurent join-request decline <id> --actor @<mayor>
 ```
 **Slack provisioning is automatic here** — `approve` reads the bot token from
-`$WIGAMIG_SLACK_TOKEN` **or** the `~/.config/wigamig/slack-token` file, so the
+`$MURMURENT_SLACK_TOKEN` **or** the `~/.config/wigamig/slack-token` file, so the
 group's private channel gets created and members invited without exporting
 anything, *as long as that token file / env var is set for the centre's
 workspace*. If neither is present, the record is still approved and the Slack

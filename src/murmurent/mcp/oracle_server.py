@@ -47,8 +47,8 @@ from ..core import obsidian as _obsidian
 from ..core import oracle_publish as _op
 
 # Env override so the notebook tier is resolvable without machine.yaml
-# (symmetric with WIGAMIG_PERSONAL_ORACLE_DIR for the personal tier).
-ENV_NOTEBOOK = "WIGAMIG_NOTEBOOK_DIR"
+# (symmetric with MURMURENT_PERSONAL_ORACLE_DIR for the personal tier).
+ENV_NOTEBOOK = "MURMURENT_NOTEBOOK_DIR"
 DEFAULT_NOTEBOOK_SUBFOLDER = "lab-notebook"
 
 VALID_KINDS: tuple[str, ...] = ("personal", "lab", "notebook", "both", "all")
@@ -112,12 +112,12 @@ def _safe_notebook_dir() -> Path | None:
 
     Uses the **same fallback chain** as
     :func:`murmurent.core.oracle_publish.personal_oracle_dir` so the
-    notebook tier survives a missing ``~/.wigamig/machine.yaml`` (the
+    notebook tier survives a missing ``~/.murmurent/machine.yaml`` (the
     old implementation read only ``machine.yaml.obsidian_vault_path`` and
     returned ``None`` whenever that file was absent, silently killing the
     notebook tier):
 
-      1. ``$WIGAMIG_NOTEBOOK_DIR`` — an explicit override (tests + power
+      1. ``$MURMURENT_NOTEBOOK_DIR`` — an explicit override (tests + power
          users), pointing straight at the notebook dir.
       2. ``machine.yaml`` ``obsidian_vault_path`` + ``notebook_subfolder``.
       3. The most-recently-opened Obsidian vault (from ``obsidian.json``)

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>wigamig · Registrar dashboard</title>
+    <title>murmurent · Registrar dashboard</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -212,12 +212,12 @@
   </head>
   <body>
     <div class="banner">
-      <h1>wigamig <small>v1.0.0</small> &middot; Registrar dashboard</h1>
+      <h1>murmurent <small>v1.0.0</small> &middot; Registrar dashboard</h1>
       <div class="meta" id="banner-meta">loading…</div>
     </div>
 
     <div class="container" id="content">
-      <p class="muted">Loading registry from <code>~/.wigamig/lab_info/_registry.yaml</code>…</p>
+      <p class="muted">Loading registry from <code>~/.murmurent/lab_info/_registry.yaml</code>…</p>
     </div>
 
     <footer class="container" id="footer-meta" style="margin-top:32px; padding:0 28px;">
@@ -270,10 +270,10 @@
     }
 
     function renderMayorWizard() {
-      banner.textContent = "wigamig — first-time setup";
+      banner.textContent = "murmurent — first-time setup";
       const osUser = (userOverride || "").trim();
       root.innerHTML =
-        '<div class="panel"><header><h2>Welcome — let\'s set up your wigamig server.</h2></header>'
+        '<div class="panel"><header><h2>Welcome — let\'s set up your murmurent server.</h2></header>'
         + '<div style="padding:18px 20px;">'
         + '<p>Nothing is configured yet. As the <strong>mayor</strong>, '
         + 'fill in these centre-level details and you\'ll become the first '
@@ -293,7 +293,7 @@
         + '<input name="join_email" placeholder="wigamig-western@uwo.ca — the only thing listed in the public directory">'
         + '<label>Founding mayor (@handle)</label>'
         + '<input name="mayor" value="' + escapeHTML(osUser) + '" '
-        +   'placeholder="@tbrowne — defaults to ?user= or $WIGAMIG_USER">'
+        +   'placeholder="@tbrowne — defaults to ?user= or $MURMURENT_USER">'
         + secHdr('Communication &amp; code')
         + '<label>Slack workspace id</label>'
         + '<input name="slack_workspace" placeholder="T0WESTERN">'
@@ -305,7 +305,7 @@
         + '<label>Server host / IP</label>'
         + '<input name="server_host" placeholder="biodatsci.schulich.uwo.ca">'
         + '<label>SSH access account</label>'
-        + '<input name="server_account" placeholder="wigamig">'
+        + '<input name="server_account" placeholder="murmurent">'
         + '<label>Claude Code install path</label>'
         + '<input name="cc_install_path" placeholder="/opt/claude">'
         + secHdr('Storage &amp; vault')
@@ -375,7 +375,7 @@
         '<div class="error">' +
         '<strong>Cannot load registrar dashboard.</strong><br/>' +
         escapeHTML(detail) +
-        '<br/><br/>Declare your handle in <code>~/.wigamig/registrar</code> ' +
+        '<br/><br/>Declare your handle in <code>~/.murmurent/registrar</code> ' +
         '(one line, no @) and reload, or pass <code>?user=&lt;netname&gt;</code>.' +
         '</div>';
     }
@@ -593,7 +593,7 @@
         + '<div class="stat"><div class="label">members</div><div class="value">' + (s.total_members || 0) + '</div></div>'
         + '</div>';
 
-      // Centre identity — show the wigamig installation's own details at the
+      // Centre identity — show the murmurent installation's own details at the
       // top. The data comes from /api/centre/profile (fetched above); without
       // this the registrar page never displays what centre you're looking at.
       if (centre) {
@@ -604,7 +604,7 @@
           : '';
         const centreHtml = '<div class="panel" id="centre-card">'
           + '<header><h2>' + escapeHTML(centre.name || 'Centre') + '</h2>'
-          + '<span class="meta">wigamig installation'
+          + '<span class="meta">murmurent installation'
           + (centre.institution ? ' · ' + escapeHTML(centre.institution) : '')
           + '</span></header>'
           + '<div>'
@@ -625,7 +625,7 @@
         const dirRow = (centre.institution || 'Institution')
           + ' (' + (centre.name || 'centre') + ')\t'
           + (centre.join_email || 'YOUR_EMAIL') + '\t'
-          + (centre.age_recipient || 'age1…  (run: wigamig centre-age-keygen)');
+          + (centre.age_recipient || 'age1…  (run: murmurent centre-age-keygen)');
         const slackHtml = '<div class="panel" id="slack-setup-card">'
           + '<header><h2>Slack</h2><span class="meta">centre communication fabric</span></header>'
           + '<div>'
@@ -636,16 +636,16 @@
               ? '<p><strong>Workspace join link set ✓</strong> — new members are sent this to join the workspace:</p>'
                 + '<code class="cmd">' + escapeHTML(centre.slack_invite_url) + '</code>'
               : '<p><strong>No workspace join link set.</strong> New members can\'t join the workspace (so they can\'t be added to any channel) until you add one. In Slack open <span class="mono">' + escapeHTML(wsName) + ' → Invite people → Copy invite link</span>, then paste it in place of the placeholder and run:</p>'
-                + '<code class="cmd">wigamig centre-set slack_invite_url=PASTE-YOUR-INVITE-LINK</code>')
+                + '<code class="cmd">murmurent centre-set slack_invite_url=PASTE-YOUR-INVITE-LINK</code>')
           + '<p>As the mayor you set up Slack once. Follow these steps in order:</p>'
           + '<ol class="setup-steps">'
           + '<li>Create a Slack workspace named <span class="mono">' + escapeHTML(wsName) + '</span> (or reuse an existing one).</li>'
-          + '<li><strong>Create a channel named exactly <span class="mono">#general</span></strong> — new Slack workspaces don\'t include one (you may see <span class="mono">#social</span> instead). wigamig broadcasts to everyone through it.</li>'
-          + '<li><strong>Create a Slack app + bot token</strong> — this is what lets wigamig post and manage channels. Click by click:'
+          + '<li><strong>Create a channel named exactly <span class="mono">#general</span></strong> — new Slack workspaces don\'t include one (you may see <span class="mono">#social</span> instead). murmurent broadcasts to everyone through it.</li>'
+          + '<li><strong>Create a Slack app + bot token</strong> — this is what lets murmurent post and manage channels. Click by click:'
           +   '<ol style="list-style:lower-alpha;">'
           +     '<li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener"><span class="mono">api.slack.com/apps</span></a> and sign in as the account that owns your <span class="mono">' + escapeHTML(wsName) + '</span> workspace.</li>'
           +     '<li>Click <strong>Create New App → From scratch</strong>. Name it <span class="mono">mayor</span>, pick your workspace, click <strong>Create App</strong>.</li>'
-          +     '<li>Open <strong>App Home</strong> (left sidebar) and set the bot\'s <strong>Display Name</strong> + <strong>Default username</strong> to <span class="mono">mayor</span> — this is who PIs + members see as the sender of every wigamig DM, so messages read as <em>from the mayor</em>. (Already have an app? Rename it here.)</li>'
+          +     '<li>Open <strong>App Home</strong> (left sidebar) and set the bot\'s <strong>Display Name</strong> + <strong>Default username</strong> to <span class="mono">mayor</span> — this is who PIs + members see as the sender of every murmurent DM, so messages read as <em>from the mayor</em>. (Already have an app? Rename it here.)</li>'
           +     '<li>In the app\'s left sidebar, open <strong>OAuth &amp; Permissions</strong>.</li>'
           +     '<li>Scroll to <strong>Scopes → Bot Token Scopes</strong> (the <em>Bot</em> section, <strong>not</strong> "User Token Scopes"). Click <strong>Add an OAuth Scope</strong> and add <strong>every one</strong> of these seven:'
           +       '<div class="scopes">'
@@ -662,13 +662,13 @@
           +     '<li>Copy the <strong>Bot User OAuth Token</strong> — it starts with <span class="mono">xoxb-</span>.</li>'
           +   '</ol>'
           + '</li>'
-          + '<li><strong>Give wigamig the token</strong> — paste your <span class="mono">xoxb-…</span> token in place of the placeholder, then run (writes a mode-0600 file any terminal can read):'
+          + '<li><strong>Give murmurent the token</strong> — paste your <span class="mono">xoxb-…</span> token in place of the placeholder, then run (writes a mode-0600 file any terminal can read):'
           +   '<code class="cmd">umask 077; printf \'%s\\n\' \'xoxb-PASTE-YOUR-TOKEN\' &gt; ~/.config/wigamig/slack-token</code>'
           + '</li>'
-          + '<li>In Slack, <span class="mono">/invite</span> the bot into <span class="mono">#general</span> so it can post there. (It auto-joins private channels it creates, like <span class="mono">#wigamig-ops</span>.)</li>'
+          + '<li>In Slack, <span class="mono">/invite</span> the bot into <span class="mono">#general</span> so it can post there. (It auto-joins private channels it creates, like <span class="mono">#murmurent-ops</span>.)</li>'
           + '<li><strong>Verify, then provision</strong> — run these two, in order:'
-          +   '<code class="cmd">wigamig centre-slack-smoke</code>'
-          +   '<code class="cmd">wigamig centre-slack-setup</code>'
+          +   '<code class="cmd">murmurent centre-slack-smoke</code>'
+          +   '<code class="cmd">murmurent centre-slack-setup</code>'
           + '</li>'
           + '</ol>'
           + '<p class="meta">Same steps live in <span class="mono">docs/slack_setup.md</span>. If a scope is missing you\'ll get <span class="mono">missing_scope</span> — add it and <strong>Reinstall</strong> the app. Until a token is wired, channel + broadcast provisioning is skipped (no-op).</p>'
@@ -678,11 +678,11 @@
           + '<div>'
           + (centre.age_recipient
               ? '<p>Encryption key ready ✓ — members can send you an encrypted join request.</p>'
-              : '<p><strong>No encryption key yet.</strong> Run <span class="mono">wigamig centre-age-keygen</span> so members can send encrypted join requests.</p>')
+              : '<p><strong>No encryption key yet.</strong> Run <span class="mono">murmurent centre-age-keygen</span> so members can send encrypted join requests.</p>')
           + '<p>Your centre is <strong>not auto-posted</strong> to GitHub — nothing about you is published without your say-so. To be listed so members can find you, this row goes in the hub directory:</p>'
           + '<code class="cmd">' + escapeHTML(dirRow) + '</code>'
           + '<p><strong>Easiest:</strong> run the command below — it clones the hub (if you don\'t have it) and writes this row into <span class="mono">directory.tsv</span> + the README for you, then prints the <span class="mono">git push</span> to run from the printed folder:</p>'
-          + '<code class="cmd">wigamig centre-hub-publish</code>'
+          + '<code class="cmd">murmurent centre-hub-publish</code>'
           + '<p class="meta">You still commit + push yourself — that push is the only step that publishes anything public, so it stays deliberate. (Manual alternative: edit both files by hand; see <span class="mono">docs/connect_to_hub.md</span>.)</p>'
           + '</div></div>';
         html = centreHtml + slackHtml + hubHtml + html;
@@ -694,7 +694,7 @@
         + '<button class="btn" id="btn-new-lab">＋ new lab</button>'
         + '</span></header>';
       if ((data.labs || []).length === 0) {
-        html += '<div class="empty">No labs registered yet. Seed via <code>wigamig.core.registrar.bootstrap_from_existing_lab_mgmt(...)</code> or hand-edit <code>~/.wigamig/lab_info/_registry.yaml</code>.</div>';
+        html += '<div class="empty">No labs registered yet. Seed via <code>murmurent.core.registrar.bootstrap_from_existing_lab_mgmt(...)</code> or hand-edit <code>~/.murmurent/lab_info/_registry.yaml</code>.</div>';
       } else {
         html += '<table><thead><tr><th>name</th><th>PI</th><th>members</th><th>created</th><th>status</th><th style="text-align:right;">actions</th></tr></thead><tbody>';
         for (const lab of data.labs) html += renderLabRow(lab);
@@ -1094,7 +1094,7 @@
         const rows = data.seas || [];
         count.textContent = rows.length + (rows.length === 1 ? " SEA" : " SEAs");
         if (rows.length === 0) {
-          body.innerHTML = '<div class="empty">No common SEAs published yet. PIs publish from their own dashboard\'s "SEAs we offer" panel (or via <code>wigamig common-sea submit</code>).</div>';
+          body.innerHTML = '<div class="empty">No common SEAs published yet. PIs publish from their own dashboard\'s "SEAs we offer" panel (or via <code>murmurent common-sea submit</code>).</div>';
           return;
         }
         let html = '<table><thead><tr>'
@@ -1409,7 +1409,7 @@
       wrap.innerHTML =
         '<form class="modal" id="reg-profile-form" autocomplete="off">' +
           '<h2>Registrar profile</h2>' +
-          '<p class="muted">Saved to <code>~/.wigamig/lab_info/registrar.md</code>. This is the centre-level admin contact for the registrar role — separate from any lab membership you also hold.</p>' +
+          '<p class="muted">Saved to <code>~/.murmurent/lab_info/registrar.md</code>. This is the centre-level admin contact for the registrar role — separate from any lab membership you also hold.</p>' +
           '<label>full name</label>' +
           '<input name="full_name" value="' + v("full_name") + '" placeholder="e.g. Mike Hallett" />' +
           '<label>title (admin role)</label>' +

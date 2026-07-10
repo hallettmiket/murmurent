@@ -12,8 +12,8 @@ from murmurent.hooks import audit
 
 
 def test_writes_jsonl(tmp_path, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_AUDIT_LOG_DIR", str(tmp_path))
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_AUDIT_LOG_DIR", str(tmp_path))
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     payload = {
         "tool_name": "Bash",
         "tool_input": {"command": "ls"},
@@ -38,8 +38,8 @@ def test_writes_jsonl(tmp_path, monkeypatch):
 
 
 def test_truncates_long_args(tmp_path, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_AUDIT_LOG_DIR", str(tmp_path))
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_AUDIT_LOG_DIR", str(tmp_path))
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     big = "x" * 5000
     payload = {"tool_name": "Bash", "tool_input": {"command": big}}
     stdin = io.StringIO(json.dumps(payload))

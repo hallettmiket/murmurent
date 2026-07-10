@@ -16,7 +16,7 @@ defaults:
   language: en
   prose_style: terse
   dry_run: true
-  lab_info_root: ~/.wigamig/lab_info
+  lab_info_root: ~/.murmurent/lab_info
 ---
 
 # The Centre Cable Guy
@@ -53,7 +53,7 @@ yours.
 ## Files you read
 
 ```
-~/.wigamig/lab_info/
+~/.murmurent/lab_info/
 ├── registrar.md             # broadcast channels, centre admin
 ├── _registry.yaml           # canonical list of labs, cores, collaborations
 ├── cores/<core>/            # per-core membership + service catalog
@@ -71,7 +71,7 @@ You **never** modify any per-lab `lab_mgmt` repo — only the centre
 ```
 <lab_info>/projects/<project>.md           # desired state (member set, provider)
 <lab_info>/projects/<project>/provision_log.md  # audit trail
-~/.wigamig/cores/<core>/access.log         # MCP read audit (shared with security_guard)
+~/.murmurent/cores/<core>/access.log         # MCP read audit (shared with security_guard)
 ```
 
 Plus the side effects on:
@@ -128,7 +128,7 @@ Reads `<lab_info>/projects/<project>.md` for the desired member set
 2. **GitHub repo**: defer to `core.project_provision.provision_project_remote`
    (existing logic — don't duplicate). You just call it.
 3. **Filesystem ACLs**: for each registered lab server, run
-   `/opt/wigamig/murmurent_project_acl.sh` via sudo to create
+   `/opt/murmurent/murmurent_project_acl.sh` via sudo to create
    `<lab_vm_root>/wigamig/{raw,refined}/<project>/` with an
    inheriting ACE granting `r-x` to the project's Unix group and
    `r-x-c` to the core's group when applicable.
@@ -190,7 +190,7 @@ up centre-scope access.
   archive the channel rather than delete; the registrar can restore.
 - **ACL changes go through the sudo script.** You don't run
   `nfs4_setfacl` directly. The script
-  `/opt/wigamig/murmurent_project_acl.sh` is the only place that has
+  `/opt/murmurent/murmurent_project_acl.sh` is the only place that has
   the privilege, and it logs every invocation.
 - **One project at a time.** Reconcile loops process projects
   sequentially so a single bad ACL doesn't cascade.

@@ -12,7 +12,7 @@ from murmurent.core import cert_projects as CP
 
 @pytest.fixture(autouse=True)
 def _lab_mgmt(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab_mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab_mgmt"))
 
 
 def test_upsert_creates_then_adds_members():
@@ -115,7 +115,7 @@ def test_write_rejects_dangling_symlink(monkeypatch, tmp_path):
     opaque FileExistsError deep in mkdir."""
     link = tmp_path / "lab_mgmt_link"
     link.symlink_to(tmp_path / "does_not_exist")
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(link))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(link))
     with pytest.raises(CP.CertProjectError, match="dangling symlink"):
         CP.upsert("p", lab="lab_mh")
 
@@ -132,7 +132,7 @@ def test_render_retires_top_level_code_repo_but_reads_back(tmp_path):
 
 
 def test_old_format_file_with_code_repo_still_reads(tmp_path, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lm"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lm"))
     d = tmp_path / "lm" / "cert_projects"
     d.mkdir(parents=True)
     (d / "old.md").write_text(
@@ -199,7 +199,7 @@ def test_backfill_from_charter(monkeypatch, tmp_path):
     """Existing CHARTER code-projects are mirrored into the cert-project registry
     with their name/lab/sensitivity/lead/members and a code_repo link."""
     from murmurent.core import charter as _charter
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
     repo = tmp_path / "repos" / "dcis_sc"
     repo.mkdir(parents=True)
     (repo / "CHARTER.md").write_text(

@@ -1,4 +1,4 @@
-// Purpose: One-page system map of wigamig — identity & launch, the three
+// Purpose: One-page system map of murmurent — identity & launch, the three
 //          tiers (Commons / Guilds / Project namespaces), and the per-project
 //          data plane. Companion to docs/diagrams/install_modes.dot which
 //          drills into local-vs-biodatsci placement.
@@ -6,12 +6,12 @@
 // Date:    2026-05-13
 // Render:  bash scripts/render_diagrams.sh
 
-digraph wigamig_system_map {
+digraph murmurent_system_map {
   rankdir=TB;
   bgcolor="#FAF8F5";
   fontname="EB Garamond";
   labelloc="t";
-  label=<<B>wigamig &middot; system map</B><BR/><FONT POINT-SIZE="11">v1.0.0 &middot; bioconvergence centre infrastructure</FONT>>;
+  label=<<B>murmurent &middot; system map</B><BR/><FONT POINT-SIZE="11">v1.0.0 &middot; bioconvergence centre infrastructure</FONT>>;
   fontsize=18;
   fontcolor="#201436";
   splines=ortho;
@@ -51,9 +51,9 @@ digraph wigamig_system_map {
     icon       [label="Murmurent\nDashboard.app",       fillcolor="#FFE9CC", color="#F0A757"];
     launcher   [label="zsh launcher\n(create_mac_app.sh)"];
     uvicorn    [label="uvicorn :8770\nFastAPI app"];
-    sentinel_user [label="~/.wigamig/user\n(saved netname)",     shape=note, fillcolor="#FFF8E6"];
-    sentinel_reg  [label="~/.wigamig/registrar\n(legacy sentinel)", shape=note, fillcolor="#FFF8E6"];
-    audit         [label="~/.wigamig/role_audit.log\n(append-only)", shape=note, fillcolor="#FFF8E6"];
+    sentinel_user [label="~/.murmurent/user\n(saved netname)",     shape=note, fillcolor="#FFF8E6"];
+    sentinel_reg  [label="~/.murmurent/registrar\n(legacy sentinel)", shape=note, fillcolor="#FFF8E6"];
+    audit         [label="~/.murmurent/role_audit.log\n(append-only)", shape=note, fillcolor="#FFF8E6"];
 
     icon -> launcher -> uvicorn;
     launcher -> sentinel_user [style=dashed, label="reads"];

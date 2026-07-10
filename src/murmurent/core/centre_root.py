@@ -33,7 +33,7 @@ ROOT_KEY_NAME = "centre_root_ed25519"
 
 
 def _home() -> Path:
-    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+    return Path(os.environ.get("MURMURENT_HOME", str(Path.home() / ".murmurent")))
 
 
 def root_key_path() -> Path:

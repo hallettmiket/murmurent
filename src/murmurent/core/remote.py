@@ -4,7 +4,7 @@ Author: Mike Hallett (with Claude Code)
 Date: 2026-05-13
 Input: A :class:`~murmurent.core.hosts.Host` of kind ``ssh``.
 Output: :class:`RemoteResult` (stdout, stderr, returncode), plus an audit
-        line appended to ``~/.wigamig/remote_audit.log``.
+        line appended to ``~/.murmurent/remote_audit.log``.
 
 Everything that crosses the SSH boundary funnels through :class:`Remote`
 so we have exactly one place to:
@@ -29,8 +29,8 @@ from pathlib import Path
 
 from .hosts import Host, LOCAL_NAME
 
-AUDIT_LOG_PATH = Path.home() / ".wigamig" / "remote_audit.log"
-AUDIT_ENV_VAR = "WIGAMIG_REMOTE_AUDIT_LOG"
+AUDIT_LOG_PATH = Path.home() / ".murmurent" / "remote_audit.log"
+AUDIT_ENV_VAR = "MURMURENT_REMOTE_AUDIT_LOG"
 DEFAULT_TIMEOUT = 60  # seconds
 
 

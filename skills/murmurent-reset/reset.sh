@@ -2,14 +2,14 @@
 # reset.sh — back up, then reset murmurent machine state to a fresh start.
 #
 # Levels (default: centre):
-#   centre   remove ~/.wigamig/lab_info only  ->  `murmurent centre-init` is
+#   centre   remove ~/.murmurent/lab_info only  ->  `murmurent centre-init` is
 #            first-run again. Nothing else touched.
 #   install  centre + reinstall the tool from the repo (force, py3.12, extras)
 #            + re-run scripts/setup.sh + `murmurent install --hooks`.
 #   full     install + remove machine-local CACHES (workspaces/, *.log,
 #            dashboard.pid, security/ agent cache). Still KEEPS credentials,
 #            installations/, decommissions/, audit logs, hosts/machine yaml.
-#   data     wipe ALL data you entered into ~/.wigamig (lab_info, profile.yaml,
+#   data     wipe ALL data you entered into ~/.murmurent (lab_info, profile.yaml,
 #            hosts/machine/master_folders yaml, inventory/, cores/, onboarding/,
 #            decommissions/, security/, identity/cards/trust/revocation, logs,
 #            …) — everything EXCEPT your key material. KEEPS keys/, age/,
@@ -18,9 +18,9 @@
 #            caught automatically. No reinstall.
 #
 # Destructive extras (never happen without the explicit flag):
-#   --nuke-installations   also remove ~/.wigamig/installations (other projects)
+#   --nuke-installations   also remove ~/.murmurent/installations (other projects)
 #   --nuke-credentials     also remove ~/.config/wigamig (slack-token + keys)
-#   --nuke-keys            with --level data, ALSO remove ~/.wigamig/keys + age
+#   --nuke-keys            with --level data, ALSO remove ~/.murmurent/keys + age
 #                          (a fully fresh identity; default keeps them)
 #   --nuke-labs            ALSO remove this machine's murmurent lab-management repos
 #                          (~/repos/wigamig_*  — they hold the roster). Backed up
@@ -40,7 +40,7 @@
 #
 # Safety:
 #   * ALWAYS writes a timestamped backup tarball to ~/.wigamig_backups/ FIRST
-#     (outside ~/.wigamig, so a full wipe can't take the backup with it).
+#     (outside ~/.murmurent, so a full wipe can't take the backup with it).
 #   * --dry-run prints exactly what would happen and changes nothing.
 #   * Never touches ~/repos/* clones, ~/.claude/CLAUDE.md, ~/.claude/memory,
 #     or ~/.claude/projects.
@@ -57,11 +57,11 @@ NUKE_KEYS=0
 NUKE_LABS=0
 UNINSTALL=0
 
-WIG="$HOME/.wigamig"
+WIG="$HOME/.murmurent"
 CFG="$HOME/.config/wigamig"
 BACKUPS="$HOME/.wigamig_backups"
-REPO="${WIGAMIG_REPO:-$HOME/repos/wigamig}"
-REPOS_ROOT="${WIGAMIG_REPOS_ROOT:-$HOME/repos}"
+REPO="${MURMURENT_REPO:-$HOME/repos/wigamig}"
+REPOS_ROOT="${MURMURENT_REPOS_ROOT:-$HOME/repos}"
 
 usage() { grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
@@ -112,7 +112,7 @@ if [ "$DRY" = 1 ]; then say "  DRY: would pkill -f 'murmurent dashboard'";
 else pkill -f "murmurent dashboard" 2>/dev/null || true; sleep 1; fi
 
 # 2. ALWAYS back up first ---------------------------------------------------
-say "2. backing up (~/.wigamig + ~/.config/wigamig)"
+say "2. backing up (~/.murmurent + ~/.config/wigamig)"
 TS="$(date +%Y%m%d-%H%M%S)"
 BK="$BACKUPS/reset_${LEVEL}_${TS}.tgz"
 if [ "$DRY" = 1 ]; then
@@ -134,13 +134,13 @@ rmrf "$WIG/lab_info" "centre registry (lab_info/)"
 # once the centre is gone it's meaningless and must not linger (a stale sentinel
 # used to still read as 'registrar' on the next install). The saved netname goes
 # too, so the next install resolves a fresh identity.
-rmrf "$WIG/registrar" "registrar sentinel (~/.wigamig/registrar)"
-rmrf "$WIG/user" "saved netname (~/.wigamig/user)"
+rmrf "$WIG/registrar" "registrar sentinel (~/.murmurent/registrar)"
+rmrf "$WIG/user" "saved netname (~/.murmurent/user)"
 
 # 3d. data reset — wipe ALL entered data, keep only key material -------------
 if [ "$LEVEL" = data ]; then
   say "3d. wiping all entered data (keeping key material + other projects)"
-  # Allowlist of what to KEEP under ~/.wigamig; everything else is removed, so
+  # Allowlist of what to KEEP under ~/.murmurent; everything else is removed, so
   # any data file — existing or added later — is caught without an explicit list.
   KEEP="keys age installations"
   [ "$NUKE_KEYS" = 1 ] && KEEP="installations"   # --nuke-keys: also wipe keys/ + age/
@@ -180,7 +180,7 @@ fi
 if [ "$LEVEL" = install ] || [ "$LEVEL" = full ]; then
   say "4. reinstall from repo"
   if [ ! -d "$REPO" ]; then
-    say "  !! repo not found at $REPO — set WIGAMIG_REPO. Skipping reinstall."
+    say "  !! repo not found at $REPO — set MURMURENT_REPO. Skipping reinstall."
   else
     # Editable (-e) + py3.12. The dashboard/Slack/MCP deps are HARD deps in
     # pyproject, so a plain install carries them (no fragile extras/--with).

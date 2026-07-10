@@ -68,7 +68,7 @@ function _joinPath(root, project) {
 
 /* Phase 4: POST /api/sea/{project}/{id}/{action}, refetch on success.
  * Caller is the signed-in user (passed via ?user= if set on the URL,
- * otherwise the server resolves from $WIGAMIG_USER). */
+ * otherwise the server resolves from $MURMURENT_USER). */
 async function postSeaAction(project, id, action, body = {}) {
   const params = new URLSearchParams(window.location.search);
   const userParam = params.get("user");
@@ -107,12 +107,12 @@ function SeaActionButton({ sea, action, label, tone, needsDelivery }) {
     try {
       await postSeaAction(sea.project, sea.id, action, body);
       // Refresh the dashboard so the row picks up the new state.
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
     } catch (ex) {
       setErr(String(ex.message || ex));
-      console.warn("[wigamig] sea action failed", ex);
+      console.warn("[murmurent] sea action failed", ex);
     } finally {
       setBusy(false);
     }
@@ -146,8 +146,8 @@ function SeaActionMore({ sea }) {
     setOpen(false);
     try {
       await postSeaAction(sea.project, sea.id, "decline", { reason: reason.trim() });
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
     } catch (ex) {
       alert("Decline failed: " + (ex.message || ex));
@@ -159,7 +159,7 @@ function SeaActionMore({ sea }) {
   const onArchive = async () => {
     if (!window.confirm(
       `Archive SEA #${sea.id} in project "${sea.project}"?\n\n` +
-      "wigamig will:\n" +
+      "murmurent will:\n" +
       "  • flip the SEA's archived flag in its markdown file\n" +
       "  • write a decommission report\n\n" +
       "The SEA file is preserved; you can unarchive later. Not the same\n" +
@@ -176,8 +176,8 @@ function SeaActionMore({ sea }) {
       const r = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
     } catch (ex) {
       alert("Archive failed: " + (ex.message || ex));
@@ -256,7 +256,7 @@ function CmdBar({ query, setQuery }) {
   return (
     <div className="cmdbar">
       {showLabTop && <LabSettingsModal onClose={() => setShowLabTop(false)} />}
-      <div className="home">wigamig <small>v1.0.0</small></div>
+      <div className="home">murmurent <small>v1.0.0</small></div>
       <div className="search">
         <span className="mono muted" style={{fontSize:12}}>›</span>
         <input
@@ -474,7 +474,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
               + bootstraps <code>.claude/agents/</code>. The modal asks for lead, members, and sensitivity.
             </li>
             <li>
-              <span className="mono" style={{color:"var(--green)"}}>✓ wigamig</span> — fully wigamig-ready.
+              <span className="mono" style={{color:"var(--green)"}}>✓ murmurent</span> — fully wigamig-ready.
               See it in <em>Projects</em> and <em>Installations</em>; <strong>open</strong> it from the
               Installations row's launcher.
             </li>
@@ -572,13 +572,13 @@ function RepoInventoryRow({ row, knownHosts, onInstall, onAdopt }) {
   const hostCell = (host) => {
     const c = cloneByHost[host];
     if (c) {
-      const wig = c.is_wigamig_installed;
+      const wig = c.is_murmurent_installed;
       if (wig) {
         return (
           <span title={c.path} style={{
             fontSize:11, color:"var(--green)", fontFamily:"var(--mono)",
           }}>
-            ✓ wigamig
+            ✓ murmurent
           </span>
         );
       }
@@ -595,8 +595,8 @@ function RepoInventoryRow({ row, knownHosts, onInstall, onAdopt }) {
           {onAdopt && (
             <button className="btn sm" style={{fontSize:10.5, padding:"1px 5px"}}
                     title={host === "local"
-                      ? "Promote this clone to a wigamig project"
-                      : `Promote this clone on ${host} to a wigamig project (over SSH)`}
+                      ? "Promote this clone to a murmurent project"
+                      : `Promote this clone on ${host} to a murmurent project (over SSH)`}
                     onClick={() => onAdopt({
                       name: row.name,
                       path: c.path,
@@ -644,7 +644,7 @@ function RepoInventoryRow({ row, knownHosts, onInstall, onAdopt }) {
   );
 }
 
-/* ── AdoptCloneModal: promote a plain git clone to a wigamig project.
+/* ── AdoptCloneModal: promote a plain git clone to a murmurent project.
    Pops from the Repo Inventory's "↑ adopt" button on • clone rows
    for the local host. POSTs /api/inventory/adopt which writes
    CHARTER.md + runs the layer-2 CC bootstrap. Returns probes which
@@ -715,8 +715,8 @@ function AdoptCloneModal({ clone, onClose }) {
       // Refresh the whole dashboard snapshot (Projects, Installations,
       // peers, etc.) since adopt now lands rows in multiple panels.
       // The Repos panel re-fetches separately via onClose(true) below.
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
       // Auto-close on success after a beat so the user sees what landed.
       setTimeout(() => onClose(true), 1400);
@@ -746,7 +746,7 @@ function AdoptCloneModal({ clone, onClose }) {
         <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
           <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18,
                       color:"var(--purple-deep)"}}>
-            Adopt clone as wigamig project
+            Adopt clone as murmurent project
           </h2>
           <button type="button" className="btn sm ghost"
                   onClick={() => onClose(false)}>✕ close</button>
@@ -757,14 +757,14 @@ function AdoptCloneModal({ clone, onClose }) {
               Writes <code>CHARTER.md</code> + bootstraps <code>.claude/agents/</code> on
               {" "}<strong>{clone.host}</strong> over a single SSH session, at
               {" "}<code className="mono">{clone.path}</code>. After this, the
-              Repo Inventory will show <strong style={{color:"var(--green)"}}>✓ wigamig</strong> for
+              Repo Inventory will show <strong style={{color:"var(--green)"}}>✓ murmurent</strong> for
               this clone on {clone.host}, and a row appears in Projects + Installations.
             </>
           ) : (
             <>
               Writes <code>CHARTER.md</code> at <code className="mono">{clone.path}</code>
               {" "}and bootstraps <code>.claude/agents/</code>. After this, the
-              Repo Inventory will show <strong style={{color:"var(--green)"}}>✓ wigamig</strong> for
+              Repo Inventory will show <strong style={{color:"var(--green)"}}>✓ murmurent</strong> for
               this clone.
             </>
           )}
@@ -829,7 +829,7 @@ function AdoptCloneModal({ clone, onClose }) {
                placeholder="Personal hockey analytics." />
 
         <div style={lbl}>
-          wigamig agents to symlink — defaults to your install-wizard pick;
+          murmurent agents to symlink — defaults to your install-wizard pick;
           click pills to deselect
         </div>
         <div style={{display:"flex", flexWrap:"wrap", gap:6}}>
@@ -919,7 +919,7 @@ function InstallationsBox({ span = "c-12" }) {
     }
   };
 
-  // Soft-delete an installation: wigamig removes ~/.wigamig/
+  // Soft-delete an installation: murmurent removes ~/.murmurent/
   // installations/<project>.yaml and writes a cleanup report. It
   // intentionally does NOT touch any data on the target machine —
   // raw/, refined/, notebook/ stay. After the API returns we pop the
@@ -931,7 +931,7 @@ function InstallationsBox({ span = "c-12" }) {
       (inst.machine_type === "lab_server"
         ? `${inst.username}@${inst.hostname}`
         : `laptop (${inst.username})`) + "?\n\n" +
-      "wigamig will remove the row from this panel and write a cleanup\n" +
+      "murmurent will remove the row from this panel and write a cleanup\n" +
       "report. It will NOT delete any data on the target machine; the\n" +
       "next popup lists what you can delete yourself."
     );
@@ -949,8 +949,8 @@ function InstallationsBox({ span = "c-12" }) {
         report:  j.report,
         items:   j.cleanup_items || [],
       });
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
     } catch (ex) {
       window.alert("Disconnect failed: " + (ex.message || ex));
@@ -1075,7 +1075,7 @@ function InstallationsBox({ span = "c-12" }) {
                               borderRadius:2, padding:"2px 8px", cursor:"pointer",
                               fontSize:11, color:"var(--red)", fontFamily:"var(--mono)",
                             }}>
-                            × disconnect from wigamig
+                            × disconnect from murmurent
                           </button>
                         </div>
                       </td>
@@ -1098,7 +1098,7 @@ function InstallationsBox({ span = "c-12" }) {
 }
 
 /* InstallCleanupModal — shown immediately after a soft-delete. Lists
-   the paths wigamig deliberately did NOT touch (raw/, refined/,
+   the paths murmurent deliberately did NOT touch (raw/, refined/,
    notebook/, sshfs mount, etc) so the user can clean them up by hand
    if they want. The installation row in the table is already gone by
    the time this opens. Each item has a "copy" button so the user can
@@ -1135,11 +1135,11 @@ function InstallCleanupModal({ cleanup, onClose }) {
           <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
         </div>
         <p className="muted" style={{fontSize:12, margin:"6px 0 12px", lineHeight:1.55}}>
-          The row is gone from <strong>Installations</strong>. wigamig did
+          The row is gone from <strong>Installations</strong>. murmurent did
           <strong> not </strong> delete any data on the target machine — the
           paths below stay until you remove them yourself. A full report
           was written to <code className="mono" style={{fontSize:11}}>
-            {cleanup.report || "~/.wigamig/decommissions/"}
+            {cleanup.report || "~/.murmurent/decommissions/"}
           </code>.
         </p>
         {items.length === 0 ? (
@@ -1343,8 +1343,8 @@ function InstallModal({ initialProject, initialMachine, initialRepoUrl, onClose 
       const body = await res.json();
       setProbes(body.probes || []);
       setOverall(body.overall || "ok");
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
       // Server returns ok=false when a required probe failed; in that
       // case keep the wizard open so the user can see what to fix.
@@ -1716,8 +1716,8 @@ function NewSeaModal({ projects, onClose }) {
         try { detail = (await res.json()).detail || detail; } catch (_) {}
         throw new Error(detail);
       }
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
       onClose();
     } catch (ex) {
@@ -1871,8 +1871,8 @@ function ProjectReposBlock({ proj: p, isPI, userParam }) {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error((typeof j.detail === "string" ? j.detail : null) || r.statusText);
       setShow(false); setF({ repo_name: "", role: "manuscript", path: "", overleaf: true });
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
     } catch (ex) { setErr(String(ex.message || ex)); } finally { setBusy(false); }
   };
@@ -1937,7 +1937,7 @@ function ProjectDetailRows({ proj: p }) {
   // because the bot can't enumerate channels to find an existing one.
   const [recoverable, setRecoverable] = React.useState({});
   // Optional Slack channel-name override the PI can type in before
-  // pressing "Create Slack channel". Empty → server uses the wigamig
+  // pressing "Create Slack channel". Empty → server uses the murmurent
   // default (proj-<slug>) or the slack_channel_name already stored in
   // CHARTER. The placeholder shows whichever default would be used.
   const [slackChannelDraft, setSlackChannelDraft] = React.useState("");
@@ -1968,8 +1968,8 @@ function ProjectDetailRows({ proj: p }) {
         throw new Error((typeof d.detail === "string" ? d.detail : null) || r.statusText);
       }
       setDone(d => ({...d, [resource]: true}));
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
     } catch (ex) {
       setErrs(e => ({...e, [resource]: String(ex.message || ex)}));
@@ -2004,8 +2004,8 @@ function ProjectDetailRows({ proj: p }) {
       if (!r.ok) throw new Error(d.detail || r.statusText);
       setRecoverable(rec => ({...rec, slack: false}));
       setDone(dn => ({...dn, slack: true}));
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
     } catch (ex) {
       setErrs(e => ({...e, slack: String(ex.message || ex)}));
@@ -2201,10 +2201,10 @@ function ProjectsPanel({ projects, span="c-5" }) {
   const archiveProj = async (name) => {
     const ok = window.confirm(
       `Decommission project "${name}"?\n\n` +
-      "wigamig will:\n" +
+      "murmurent will:\n" +
       `  • flip the project's status to "archived" in CHARTER.md\n` +
-      "  • write a decommission report to ~/.wigamig/decommissions/\n\n" +
-      "wigamig will NOT delete any files (working clone, lab-base raw/refined, " +
+      "  • write a decommission report to ~/.murmurent/decommissions/\n\n" +
+      "murmurent will NOT delete any files (working clone, lab-base raw/refined, " +
       "Slack channel, GitHub repo are all left alone — review the report).\n\n" +
       "You can unarchive at any time from the Decommissioned section."
     );
@@ -2218,8 +2218,8 @@ function ProjectsPanel({ projects, span="c-5" }) {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
       window.alert("Project '" + name + "' decommissioned.\n\nReport: " + j.report);
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
     } catch (ex) {
       window.alert("Archive failed: " + (ex.message || ex));
@@ -2234,7 +2234,7 @@ function ProjectsPanel({ projects, span="c-5" }) {
   const certDeleteProj = async (name) => {
     const ok = window.confirm(
       `Remove cert-project "${name}"?\n\n` +
-      "wigamig will:\n" +
+      "murmurent will:\n" +
       "  • revoke every project card (added to the CRL)\n" +
       "  • archive the project's registry record\n\n" +
       "Members lose access when they next hit a fail-closed check. The Slack " +
@@ -2251,8 +2251,8 @@ function ProjectsPanel({ projects, span="c-5" }) {
       if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
       window.alert("Cert-project '" + name + "' removed.\n\n" +
                    (j.revoked || 0) + " card(s) revoked (" + (j.group || name) + ").");
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
     } catch (ex) {
       window.alert("Remove failed: " + (ex.message || ex));
@@ -2281,8 +2281,8 @@ function ProjectsPanel({ projects, span="c-5" }) {
           ((g.collaborators || []).filter(c => c.status === "ok").length) + " collaborator(s)"
         : "GitHub: " + (g.error || "skipped");
       window.alert("Provisioned '" + name + "'.\n\n" + slackMsg + "\n" + ghMsg);
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
     } catch (ex) {
       window.alert("Provision failed: " + (ex.message || ex));
@@ -2309,8 +2309,8 @@ function ProjectsPanel({ projects, span="c-5" }) {
       window.alert("Reconciled '" + name + "'.\n\n" +
                    line("Slack", s, "invited", "kicked") + "\n" +
                    line("GitHub", g, "added", "removed"));
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
     } catch (ex) {
       window.alert("Reconcile failed: " + (ex.message || ex));
@@ -2328,8 +2328,8 @@ function ProjectsPanel({ projects, span="c-5" }) {
       );
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
     } catch (ex) {
       window.alert("Unarchive failed: " + (ex.message || ex));
@@ -2755,8 +2755,8 @@ function AddMemberModal({ onClose }) {
         full_name: fullName.trim(),
         role,
       });
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
       onClose();
     } catch (ex) { setErr(String(ex.message || ex)); }
@@ -2814,19 +2814,19 @@ function LabMembersPanel({ peers, span="c-6" }) {
   const [busyHandle, setBusyHandle] = useState(null);
 
   const refresh = async () => {
-    if (typeof window.__wigamigFetchData === "function") {
-      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    if (typeof window.__murmurentFetchData === "function") {
+      try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
     }
   };
   const onToggle = async (peer) => {
     const action = peer.status === "active" ? "deactivate" : "activate";
     if (action === "deactivate" && !window.confirm(
       `Deactivate @${peer.handle}?\n\n` +
-      "wigamig will:\n" +
+      "murmurent will:\n" +
       "  • flip the member's status to inactive in members/" + peer.handle + ".md\n" +
       "  • write a decommission report listing the member's project\n" +
       "    memberships, age key, and slack pointer for review\n\n" +
-      "wigamig will NOT remove them from any project MEMBERS file, rotate\n" +
+      "murmurent will NOT remove them from any project MEMBERS file, rotate\n" +
       "their key, or kick them from Slack — review the report and decide.\n\n" +
       "You can reactivate at any time."
     )) return;
@@ -2957,8 +2957,8 @@ function SecurityAccessPanel({ peers, span = "c-12" }) {
     setBusy(peer.handle);
     try {
       await postLabSudo(peer.handle, grant);
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
     } catch (ex) { alert("lab_sudo update failed: " + (ex.message || ex)); }
     finally { setBusy(null); }
@@ -3059,8 +3059,8 @@ function AgentToggleButton({ agent }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState(null);
   const refresh = async () => {
-    if (typeof window.__wigamigFetchData === "function") {
-      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    if (typeof window.__murmurentFetchData === "function") {
+      try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
     }
   };
   const onToggle = async () => {
@@ -3161,7 +3161,7 @@ function AgentsPanel({ agents, span="c-4" }) {
         </div>
         {list.length === 0 && (
           <div className="muted" style={{padding:"14px", fontSize:13}}>
-            No agents installed. Run <code className="mono">wigamig agent list</code>.
+            No agents installed. Run <code className="mono">murmurent agent list</code>.
           </div>
         )}
       </div>
@@ -3244,7 +3244,7 @@ function NewProjectModal({ onClose }) {
     ? ms.lab_base.replace(/\/$/, "") + "/" + ls.git_repos_subpath
     : (ms.lab_base ? ms.lab_base.replace(/\/$/, "") + "/git_repos" : "");
   const [localRepoRoot, setLocalRepoRoot] = useState(defaultLocalRoot);
-  // Slack channel name override. Empty = wigamig default of
+  // Slack channel name override. Empty = murmurent default of
   // ``proj-<project>``. The placeholder updates live as the user types
   // the project name so it's obvious what will be created if they
   // leave this blank. Validation is server-side (normalize_channel_name).
@@ -3259,7 +3259,7 @@ function NewProjectModal({ onClose }) {
     fetch("/api/hosts", { credentials: "same-origin", headers: { Accept: "application/json" } })
       .then(r => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))
       .then(j => { if (!cancelled && Array.isArray(j.hosts) && j.hosts.length) setHosts(j.hosts); })
-      .catch(err => console.warn("[wigamig] /api/hosts failed; defaulting to local", err));
+      .catch(err => console.warn("[murmurent] /api/hosts failed; defaulting to local", err));
     return () => { cancelled = true; };
   }, []);
 
@@ -3296,8 +3296,8 @@ function NewProjectModal({ onClose }) {
         host,
         slack_channel_name: slackChannelName.trim() || null,
       });
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
       onClose();
     } catch (ex) { setErr(String(ex.message || ex)); }
@@ -3320,7 +3320,7 @@ function NewProjectModal({ onClose }) {
           Propose new project
         </h2>
         <p className="muted" style={{fontSize:12, margin:0}}>
-          PI approval required. On approval, wigamig scaffolds the project repo
+          PI approval required. On approval, murmurent scaffolds the project repo
           and adds the proposed members to MEMBERS.
         </p>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>name (snake_case)</label>
@@ -3404,7 +3404,7 @@ function NewProjectModal({ onClose }) {
         </select>
         {host !== "local" && (
           <div className="muted" style={{fontSize:11, marginTop:-4}}>
-            On approval, wigamig will SSH into <code>{host}</code> and
+            On approval, murmurent will SSH into <code>{host}</code> and
             scaffold the project at
             <code> {(hosts.find(h => h.name === host) || {}).project_root || "~/repos"}/{name.trim() || "<project>"}</code>.
             A local placeholder dir is created at <code>~/repos/{name.trim() || "<project>"}/</code>
@@ -3494,8 +3494,8 @@ function RequestActionRow({ req, isPI }) {
   const [probes, setProbes] = useState(null);
   const [overall, setOverall] = useState(null);
   const refresh = async () => {
-    if (typeof window.__wigamigFetchData === "function") {
-      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    if (typeof window.__murmurentFetchData === "function") {
+      try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
     }
   };
   const onApprove = async () => {
@@ -3629,8 +3629,8 @@ function NewJoinRequestButton() {
     setBusy(true); setErr(null);
     try {
       await postJoinRequest(project.trim(), justification.trim());
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
     } catch (ex) {
       setErr(String(ex.message || ex));
@@ -3752,8 +3752,8 @@ function CatalogEntryForm({ entry, onClose }) {
         prerequisites: prereqs.split(",").map(s => s.trim()).filter(Boolean),
         accepting: entry?.accepting !== false,
       });
-      if (typeof window.__wigamigFetchData === "function") {
-        await window.__wigamigFetchData(window.DATA.persona);
+      if (typeof window.__murmurentFetchData === "function") {
+        await window.__murmurentFetchData(window.DATA.persona);
       }
       onClose();
     } catch (ex) { setErr(String(ex.message || ex)); }
@@ -3857,8 +3857,8 @@ function SeaCatalogPanel({ entries, span="c-12" }) {
   const list = entries || [];
 
   const refresh = async () => {
-    if (typeof window.__wigamigFetchData === "function") {
-      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    if (typeof window.__murmurentFetchData === "function") {
+      try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
     }
   };
   const reloadCommonSeas = async () => {
@@ -5282,7 +5282,7 @@ function ProposeCollaborationModal({ onClose, onFiled }) {
 /* ───────── DecommissionsPanel — browse past soft-deletes ─────────
    The dashboard's "where did X go?" panel. Lists every decommission
    report on this machine, grouped by entity kind. Reports are local
-   to the machine (per ~/.wigamig/decommissions/) — there's no
+   to the machine (per ~/.murmurent/decommissions/) — there's no
    cross-machine aggregation, by design. PI-only because the report
    contents include private paths and project memberships. */
 
@@ -5362,7 +5362,7 @@ function DecommissionsPanel({ span = "c-12" }) {
             <div style={{padding:"14px 18px", color:"var(--muted)", fontSize:12}}>
               No decommission reports yet. They appear here when you archive a
               project, disconnect an installation, deactivate a member, etc.
-              Stored at <code>~/.wigamig/decommissions/</code>.
+              Stored at <code>~/.murmurent/decommissions/</code>.
             </div>
           ) : (
             <>
@@ -5470,7 +5470,7 @@ function DecommissionReportModal({ report, onClose }) {
           <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
         </div>
         <div className="mono muted" style={{fontSize:11, marginBottom:8}}>
-          ~/.wigamig/decommissions/{report.file}
+          ~/.murmurent/decommissions/{report.file}
         </div>
         <pre style={{
           background:"var(--paper-2)", border:"1px solid var(--rule)",
@@ -5508,8 +5508,8 @@ function ReceptionistPanel({ inbound, span="c-12" }) {
   if (persona !== "pi") return null;  // member doesn't see this box
   const list = inbound || [];
   const refresh = async () => {
-    if (typeof window.__wigamigFetchData === "function") {
-      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    if (typeof window.__murmurentFetchData === "function") {
+      try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
     }
   };
   const onAccept = async (req) => {
@@ -5645,8 +5645,8 @@ async function postOracleAction(slug, action, body) {
 
 function OracleDraftRow({ entry }) {
   const refresh = async () => {
-    if (typeof window.__wigamigFetchData === "function") {
-      try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+    if (typeof window.__murmurentFetchData === "function") {
+      try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
     }
   };
   const onApprove = async () => {
@@ -5721,7 +5721,7 @@ function PersonalOraclePanel({ data, span="c-4" }) {
              border:"1px solid rgba(160,50,50,0.30)", fontSize:12, lineHeight:1.5}}>
           <strong>Vault not readable — Full Disk Access needed.</strong> Entries
           below may be incomplete (blocked reads look like "no entries"). Grant FDA
-          to VS Code, quit + relaunch, then run <code className="mono">wigamig oracle doctor</code>.
+          to VS Code, quit + relaunch, then run <code className="mono">murmurent oracle doctor</code>.
         </div>
       )}
       <div className="body" style={{padding:"6px 0"}}>
@@ -5772,7 +5772,7 @@ function AgentsPanel({ activity, span="c-12" }) {
       </header>
       <div className="muted" style={{padding:"2px 14px 6px", fontSize:11,
            borderBottom:"1px solid var(--rule)"}}>
-        subagent activity from <code className="mono">~/.wigamig/agents.log</code>
+        subagent activity from <code className="mono">~/.murmurent/agents.log</code>
         {" "}· newest first
       </div>
       <div className="body" style={{padding:"6px 0", maxHeight:280, overflowY:"auto"}}>
@@ -5800,7 +5800,7 @@ function AgentsPanel({ activity, span="c-12" }) {
           <div className="muted" style={{padding:"14px", fontSize:13}}>
             No recent agent activity. When you dispatch an agent (or one finishes),
             its verdict shows up here. Requires the agent-log hook
-            (<code className="mono">wigamig install --hooks</code>).
+            (<code className="mono">murmurent install --hooks</code>).
           </div>
         )}
       </div>
@@ -5877,7 +5877,7 @@ function LabOraclePanel({ entries, drafts, labFolder, span="c-6" }) {
         {list.length === 0 && (
           <div className="muted" style={{padding:"14px", fontSize:13}}>
             No oracle entries yet. Promote a finding with{" "}
-            <code className="mono">wigamig publish &lt;path&gt; --to oracle</code>.
+            <code className="mono">murmurent publish &lt;path&gt; --to oracle</code>.
           </div>
         )}
       </div>
@@ -5982,13 +5982,13 @@ function NotebookEditButton({ date, label="edit", style }) {
       const r = await postNotebookEdit(date);
       setMsg(r.created ? "created · opened" : "opened");
       // Refresh dashboard — picks up word_count change for new files.
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
       setTimeout(() => setMsg(null), 2200);
     } catch (ex) {
       setMsg(String(ex.message || ex));
-      console.warn("[wigamig] notebook edit failed", ex);
+      console.warn("[murmurent] notebook edit failed", ex);
     } finally {
       setBusy(false);
     }
@@ -6020,8 +6020,8 @@ function NotebookPanel({ span="c-9" }) {
   const onDayClick = async (iso) => {
     try {
       await window.postNotebookEdit(iso);
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
     } catch (ex) {
       alert("Could not open " + iso + ".md: " + (ex.message || ex));
@@ -6130,8 +6130,8 @@ function MemberProfileModal({ onClose }) {
       const body = await res.json();
       setProbes(body.probes || []);
       setMsg("saved");
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
       // Auto-close only when every git step was green; keep modal up
       // if push warned so the user sees it.
@@ -6417,7 +6417,7 @@ function HostsModal({ onClose }) {
           Hosts you can install projects on. <code>local</code> is always this laptop;
           register an SSH host (e.g. <code>biodatsci</code>) to enable the
           <em> New Project → host=&lt;name&gt;</em> deploy flow.
-          Saved to <code>~/.wigamig/hosts.yaml</code>.
+          Saved to <code>~/.murmurent/hosts.yaml</code>.
         </p>
 
         {loadErr && (
@@ -6505,7 +6505,7 @@ function HostsModal({ onClose }) {
         <div className="muted" style={{fontSize:11, marginTop:10, lineHeight:1.55}}>
           <strong>Once a host is registered:</strong>
           <ol style={{margin:"4px 0 0 18px", padding:0}}>
-            <li>Run <code>bash scripts/install_remote.sh &lt;name&gt;</code> from the wigamig repo to install <code>uv</code> + <code>wigamig</code> on the host.</li>
+            <li>Run <code>bash scripts/install_remote.sh &lt;name&gt;</code> from the murmurent repo to install <code>uv</code> + <code>murmurent</code> on the host.</li>
             <li>Click <strong>test</strong> above — the four probes should all be ✓ or warn.</li>
             <li>Open <strong>New Project</strong> and pick the host from the dropdown.</li>
           </ol>
@@ -6621,9 +6621,9 @@ function HostAddForm({ onCancel, onAdded }) {
    Obsidian vault for the current machine, and offers an "Add machine"
    form (the same one HostsModal used to use under "Add SSH host").
 
-   Storage: the current machine's settings live in ~/.wigamig/machine.yaml
+   Storage: the current machine's settings live in ~/.murmurent/machine.yaml
    (loaded into window.DATA.machine_settings). Remote hosts live in
-   ~/.wigamig/hosts.yaml and are fetched from /api/hosts on mount. */
+   ~/.murmurent/hosts.yaml and are fetched from /api/hosts on mount. */
 
 function _joinUnder(base, sub) {
   if (!base) return "—";
@@ -6803,8 +6803,8 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
       setProbes(body.probes || []);
       setOverall(body.overall || "ok");
       setMsg("saved");
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
       // Only auto-close when everything was green; otherwise leave
       // the panel up so the user can see what went yellow/red.
@@ -6839,7 +6839,7 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
         Edit: this machine
       </h4>
       <p className="muted" style={{fontSize:11, margin:"2px 0 4px"}}>
-        Saved to <code>~/.wigamig/machine.yaml</code>.
+        Saved to <code>~/.murmurent/machine.yaml</code>.
       </p>
 
       <div style={labelStyle}>wigamig_base (root for raw/refined/lab_notebooks; working clones go to ~/repos/)</div>
@@ -7021,7 +7021,7 @@ function MachinesModal({ onClose }) {
           containing <code>raw/</code>, <code>refined/</code>,
           <code> lab_notebooks/</code>, and <code>repos/</code>. The Obsidian
           vault (which hosts your personal oracle) lives separately. Stored
-          in <code>~/.wigamig/machine.yaml</code> and <code>~/.wigamig/hosts.yaml</code>.
+          in <code>~/.murmurent/machine.yaml</code> and <code>~/.murmurent/hosts.yaml</code>.
         </p>
 
         {editingThis ? (
@@ -7299,8 +7299,8 @@ function MasterFoldersPanel({ labBase }) {
       if (_looksLikeAuthFailure(body.probes)) {
         setCooldownUntil(Date.now() + 90 * 1000);
       }
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
     } catch (ex) { setErr(String(ex.message || ex)); }
     finally { setBusy(false); }
@@ -7561,8 +7561,8 @@ function LabSettingsModal({ onClose }) {
         throw new Error(d.detail || ("HTTP " + res.status));
       }
       setMsg("saved");
-      if (typeof window.__wigamigFetchData === "function") {
-        try { await window.__wigamigFetchData(window.DATA.persona); } catch (_) {}
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
       setTimeout(onClose, 800);
     } catch (ex) { setMsg(String(ex.message || ex)); }

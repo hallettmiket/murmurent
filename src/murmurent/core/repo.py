@@ -2,8 +2,8 @@
 Purpose: Discover murmurent repos and the active project on disk.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-06
-Input: Filesystem (current working directory, ``$WIGAMIG_REPO_ROOT``,
-       ``$WIGAMIG_LAB_MGMT_REPO``).
+Input: Filesystem (current working directory, ``$MURMURENT_REPO_ROOT``,
+       ``$MURMURENT_LAB_MGMT_REPO``).
 Output: Helpers that locate the murmurent repo, the lab-management repo, and the
         active project repo (the nearest ancestor containing ``CHARTER.md``).
 """
@@ -48,9 +48,9 @@ class ProjectRepo:
 
 
 def wigamig_repo_root(env: dict[str, str] | None = None) -> Path:
-    """Resolve the murmurent repo root, honouring ``$WIGAMIG_REPO_ROOT`` if set."""
+    """Resolve the murmurent repo root, honouring ``$MURMURENT_REPO_ROOT`` if set."""
     env = os.environ if env is None else env
-    return Path(env.get("WIGAMIG_REPO_ROOT", DEFAULT_WIGAMIG_REPO)).expanduser()
+    return Path(env.get("MURMURENT_REPO_ROOT", DEFAULT_WIGAMIG_REPO)).expanduser()
 
 
 def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
@@ -60,7 +60,7 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
       1. Thread-local override set by ``use_lab_mgmt_root()`` — used by the
          FastAPI dashboard to point each request at the viewer's own lab
          (so @vdumeaux sees her lab_mgmt, @mhallet sees his).
-      2. ``$WIGAMIG_LAB_MGMT_REPO`` env var
+      2. ``$MURMURENT_LAB_MGMT_REPO`` env var
       3. ``~/repos/lab_mgmt`` if it exists
       4. ``~/repos/hallett-lab-mgmt`` (legacy fallback) if it exists
       5. ``~/repos/lab_mgmt`` (the canonical default, even if missing)
@@ -69,7 +69,7 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
     if override is not None:
         return Path(override).expanduser()
     env = os.environ if env is None else env
-    explicit = env.get("WIGAMIG_LAB_MGMT_REPO")
+    explicit = env.get("MURMURENT_LAB_MGMT_REPO")
     if explicit:
         return Path(explicit).expanduser()
     pinned = _pinned_lab_mgmt_path()          # persistent pointer (set by pi-init)
@@ -83,7 +83,7 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
 
 
 def _wig_home() -> Path:
-    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+    return Path(os.environ.get("MURMURENT_HOME", str(Path.home() / ".murmurent")))
 
 
 def _lab_mgmt_pointer_path() -> Path:
@@ -105,8 +105,8 @@ def _pinned_lab_mgmt_path() -> Path | None:
 
 def repos_root() -> Path:
     """The base directory for working clones — ``~/repos`` by default, overridable
-    with ``$WIGAMIG_REPOS_ROOT`` (tests isolate it)."""
-    return Path(os.environ.get("WIGAMIG_REPOS_ROOT", str(Path.home() / "repos"))).expanduser()
+    with ``$MURMURENT_REPOS_ROOT`` (tests isolate it)."""
+    return Path(os.environ.get("MURMURENT_REPOS_ROOT", str(Path.home() / "repos"))).expanduser()
 
 
 def lab_repo_path(group: str) -> Path:
@@ -118,8 +118,8 @@ def lab_repo_path(group: str) -> Path:
 
 def set_lab_mgmt_path(path: str | Path) -> None:
     """Persistently point ``lab_mgmt_repo_root()`` at a lab's own management repo
-    (e.g. ``~/repos/wigamig_lab_mh``). Honours ``WIGAMIG_HOME``. An explicit
-    ``$WIGAMIG_LAB_MGMT_REPO`` still overrides it."""
+    (e.g. ``~/repos/wigamig_lab_mh``). Honours ``MURMURENT_HOME``. An explicit
+    ``$MURMURENT_LAB_MGMT_REPO`` still overrides it."""
     p = _lab_mgmt_pointer_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(str(Path(path).expanduser()) + "\n", encoding="utf-8")

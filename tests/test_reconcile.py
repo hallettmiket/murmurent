@@ -39,16 +39,16 @@ def world(monkeypatch, tmp_path):
     """Isolated $HOME + lab_mgmt + installations + inventory cache."""
     home = tmp_path / "home"
     (home / "repos").mkdir(parents=True)
-    installations = home / ".wigamig" / "installations"
+    installations = home / ".murmurent" / "installations"
     installations.mkdir(parents=True)
-    inv_dir = home / ".wigamig" / "inventory"
+    inv_dir = home / ".murmurent" / "inventory"
     inv_dir.mkdir(parents=True)
     lab_mgmt = tmp_path / "lab_mgmt"
     (lab_mgmt / "projects").mkdir(parents=True)
     hosts_file = tmp_path / "hosts.yaml"
     monkeypatch.setenv("HOME", str(home))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_mgmt))
-    monkeypatch.setenv("WIGAMIG_HOSTS_FILE", str(hosts_file))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_mgmt))
+    monkeypatch.setenv("MURMURENT_HOSTS_FILE", str(hosts_file))
     # Redirect runtime constants the detectors read.
     monkeypatch.setattr(_snap, "INSTALLATIONS_DIR", installations)
     from murmurent.core import repo_inventory as _ri
@@ -286,14 +286,14 @@ def test_detect_unadopted_clones_from_cached_inventory(world):
             {
                 "key": "x", "name": "x",
                 "clones": [
-                    {"host": "local", "path": "/x", "is_wigamig_installed": False},
-                    {"host": "biodatsci", "path": "/x", "is_wigamig_installed": False},
+                    {"host": "local", "path": "/x", "is_murmurent_installed": False},
+                    {"host": "biodatsci", "path": "/x", "is_murmurent_installed": False},
                 ],
             },
             {
                 "key": "y", "name": "y",
                 "clones": [
-                    {"host": "local", "path": "/y", "is_wigamig_installed": True},
+                    {"host": "local", "path": "/y", "is_murmurent_installed": True},
                 ],
             },
         ],
