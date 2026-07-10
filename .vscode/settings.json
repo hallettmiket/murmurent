@@ -1,7 +1,7 @@
 {
-  "//": "Per-folder VSCode settings for wigamig. Pairs with scripts/open_wigamig.sh + .claude/settings.json hooks. See CLAUDE.md > 'VSCode workflow' for the full layout recipe.",
+  "//": "Per-folder VSCode settings for murmurent. Pairs with scripts/open_wigamig.sh + .claude/settings.json hooks. See CLAUDE.md > 'VSCode workflow' for the full layout recipe.",
 
-  "window.title": "Wigamig — ${rootName}${separator}${activeEditorMedium}${separator}${dirty}",
+  "window.title": "Murmurent — ${rootName}${separator}${activeEditorMedium}${separator}${dirty}",
   "window.titleSeparator": "  ·  ",
 
   "workbench.activityBar.location": "end",

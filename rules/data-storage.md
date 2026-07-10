@@ -14,7 +14,7 @@ All data except very small files in-repo lives under
 
 ## Rules enforced by hooks
 
-The wigamig CC hooks (registered by ``wigamig install --hooks``)
+The murmurent CC hooks (registered by ``murmurent install --hooks``)
 block these operations:
 
 - **Any write under ``raw/``** — via

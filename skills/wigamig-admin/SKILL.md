@@ -1,14 +1,14 @@
 ---
 name: wigamig-admin
-description: Prime context before admin-level (centre / mayor / registrar) work on wigamig. Reloads wigamig's purpose from the manuscript and code, pins the Obsidian maps/legends and Claude-Code guidance to the top of context, and enforces the manuscript pull-first rule. Use before designing or changing the administrative layer, the mayor/centre bootstrap, the join flow, or provisioning.
+description: Prime context before admin-level (centre / mayor / registrar) work on murmurent. Reloads murmurent's purpose from the manuscript and code, pins the Obsidian maps/legends and Claude-Code guidance to the top of context, and enforces the manuscript pull-first rule. Use before designing or changing the administrative layer, the mayor/centre bootstrap, the join flow, or provisioning.
 user_invocable: true
 ---
 
-Wigamig is a large, multi-repo system whose *purpose* and *administrative
+Murmurent is a large, multi-repo system whose *purpose* and *administrative
 architecture* live as much in the manuscript as in the code. Before doing
 admin-level work — the centre/mayor bootstrap, the registrar, the join
 flow, provisioning, or the install story for a new institution — reload
-that context so you act from wigamig's actual design, not a half-remembered
+that context so you act from murmurent's actual design, not a half-remembered
 version of it. Do this **first**, before proposing or writing changes.
 
 ## 0. Load orientation to the top of context
@@ -21,9 +21,9 @@ Read these first so they anchor the rest of the session:
 2. **How to use Claude Code here** — the top-level `CLAUDE.md` of this repo
    (agents, hard rules, skills) and `docs/vscode-workflow.md`.
 
-## 1. Reload wigamig's purpose from the manuscript
+## 1. Reload murmurent's purpose from the manuscript
 
-The manuscript is the authoritative description of what wigamig is and how
+The manuscript is the authoritative description of what murmurent is and how
 the administrative layer is meant to work (it uses **registrar /
 receptionist / accountant / centre-level security guard**; note there is
 **no "mayor" agent** — "mayor" is a *human bootstrap role* only).
@@ -51,7 +51,7 @@ re-implementing it:
 
 ## 3. The three repos + the public hub
 
-Wigamig spans three repos plus a global onboarding hub. Name them
+Murmurent spans three repos plus a global onboarding hub. Name them
 precisely when you reference them:
 
 | Repo | Purpose |

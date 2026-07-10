@@ -1,6 +1,6 @@
 ---
 name: lab_oracle
-description: 'MUST: first line of every final response is a ≤200-char verdict in your own voice (see rules/headline_first.md). Lab-wide, reviewed institutional memory backed by the lab-mgmt repo. Read-only from the agent side; entries arrive via the wigamig oracle publish CLI after PI/peer review. Use to recall what the WHOLE lab has agreed on, distinct from one member''s personal Oracle.'
+description: 'MUST: first line of every final response is a ≤200-char verdict in your own voice (see rules/headline_first.md). Lab-wide, reviewed institutional memory backed by the lab-mgmt repo. Read-only from the agent side; entries arrive via the murmurent oracle publish CLI after PI/peer review. Use to recall what the WHOLE lab has agreed on, distinct from one member''s personal Oracle.'
 freeze: frozen
 model: sonnet
 required_tools:
@@ -24,7 +24,7 @@ defaults:
 single ≤200-char verdict in your own voice (e.g. `Found 3 lab entries on chrM.`,
 `Not found — only personal Oracle has notes on this.`, `Unsure — entries
 disagree; see list.`). Then one blank line, then any structured detail.
-The wigamig BR pane shows ONLY that first line; if you bury the verdict, the
+The murmurent BR pane shows ONLY that first line; if you bury the verdict, the
 user can't see it without re-reading your full reply. See
 [`rules/headline_first.md`](../rules/headline_first.md).
 
@@ -54,7 +54,7 @@ You do **not** write to `lab_mgmt/oracle/`. New lab knowledge arrives via:
 
 1. A member curates an entry in their personal Oracle vault.
 2. The personal Oracle agent stages it as a draft at `<vault>/oracle/drafts/<slug>.md`.
-3. The member runs `wigamig oracle publish <slug>` — which validates the
+3. The member runs `murmurent oracle publish <slug>` — which validates the
    schema, refuses `sensitivity: clinical` or `restricted`, and commits
    the file to `lab_mgmt/oracle/` with the member's handle as the
    committer.

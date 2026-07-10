@@ -10,7 +10,7 @@ GitHub). Walk the whole flow; do the mechanical parts for them and **pause for
 an explicit go-ahead before approving**, because approval provisions real infra.
 
 ## 0. Preconditions (check, don't assume)
-- A centre exists: `wigamig centre-status` (if not, stop — they need `centre-init`).
+- A centre exists: `murmurent centre-status` (if not, stop — they need `centre-init`).
 - The private key exists: `~/.wigamig/age/mayor.key` (created by `centre-init` /
   `centre-age-keygen`). If missing, decryption can't work — say so and stop.
 
@@ -24,7 +24,7 @@ Ask the mayor for it in whichever form they have:
 
 ## 2. Decrypt + file it
 ```bash
-wigamig join-request decrypt <path-to.age>
+murmurent join-request decrypt <path-to.age>
 ```
 This decrypts with the centre's private key **locally** and files a *pending*
 request (prints its id). If it errors with a decrypt failure, the blob was
@@ -33,8 +33,8 @@ so; don't retry blindly.
 
 ## 3. Show who's asking
 ```bash
-wigamig join-request list
-wigamig join-request show <id>
+murmurent join-request list
+murmurent join-request show <id>
 ```
 Summarise for the mayor in plain language: **who** (handle + email), **what kind**
 (`lab` / `core` / `pi` / `admin`), the **name** they want, and their
@@ -51,9 +51,9 @@ it's recorded in the audit log.
 Set the actor once so you don't repeat it: `export WIGAMIG_USER=@<mayor>` (or pass
 `--actor @<mayor>`).
 ```bash
-wigamig join-request approve <id> --actor @<mayor>
+murmurent join-request approve <id> --actor @<mayor>
 #   or:
-wigamig join-request decline <id> --actor @<mayor>
+murmurent join-request decline <id> --actor @<mayor>
 ```
 **Slack provisioning is automatic here** — `approve` reads the bot token from
 `$WIGAMIG_SLACK_TOKEN` **or** the `~/.config/wigamig/slack-token` file, so the
