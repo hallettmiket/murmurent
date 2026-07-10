@@ -43,11 +43,11 @@ to include you in the lab or core.
    murmurent enroll --group <your-lab> --out enroll.json
    ```
    Send the output file `enroll.json` to your PI —
-   DM it to them directly on Slack or via email.
+   DM it to them directly on Slack.
 2. The PI then runs `murmurent issue-member-card` against
    your request. Murmurent will DM the signed bundle
    back to you.
-3. Save what you recevied as a file (e.g. `bundle.json`)
+3. Save what you received as a file (e.g. `bundle.json`)
    and run the `murmurent import-card` command
 
 ## I'm a PI of a lab or core
@@ -60,7 +60,7 @@ You are your lab's certificate authority.
    murmurent pi-init <your-lab>          # (or answer "PI" in `murmurent init`)
    ```
 2. Connect your lab's Slack. This lets member IDs travel by DM instead
-   of by hand (it is possible to do this by email if preferred):
+   of by hand:
    ```bash
    murmurent group-slack-setup <your-lab>
    ```
