@@ -260,7 +260,7 @@ Murmurent ships [`scripts/lab_sec_dump.sh`](../scripts/lab_sec_dump.sh)
 ```bash
 # 1. SSH to the lab server.
 ssh biodatsci
-cd ~/repos/wigamig
+cd ~/repos/murmurent
 git pull
 
 # 2. Verify the script's SHA256 matches what's recorded in the repo.

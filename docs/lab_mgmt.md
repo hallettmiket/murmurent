@@ -34,7 +34,7 @@ writes across labs.
 The clean conceptual boundary is:
 
 ```
-~/repos/wigamig/         ← Commons: agents, rules, skills, CLI source.
+~/repos/murmurent/       ← Commons: agents, rules, skills, CLI source.
                            Shared across the centre. Symlinked into
                            ~/.claude/. Anyone can clone.
 ~/repos/lab_mgmt/        ← One lab's filing cabinet. PI-owned.

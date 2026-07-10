@@ -43,7 +43,7 @@ from . import charter as _charter
 from . import preflight as _pf
 from . import project_cc_init as _cci
 from .projects import ProjectSummary
-from .repo import wigamig_repo_root
+from .repo import murmurent_repo_root
 
 
 INSTALLATIONS_DIR_DEFAULT = Path.home() / ".murmurent" / "installations"
@@ -287,7 +287,7 @@ def make_wigamig_project(
     # core.remote_install.install — caller handles that separately.
     if not ssh_remote:
         for p in _cci.bootstrap_local(
-            clone_path, wigamig_repo_root(),
+            clone_path, murmurent_repo_root(),
             agents=agents,
             project_name=project,
             raw_path=raw_path,

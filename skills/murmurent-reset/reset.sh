@@ -60,7 +60,7 @@ UNINSTALL=0
 WIG="$HOME/.murmurent"
 CFG="$HOME/.config/wigamig"
 BACKUPS="$HOME/.wigamig_backups"
-REPO="${MURMURENT_REPO:-$HOME/repos/wigamig}"
+REPO="${MURMURENT_REPO:-$HOME/repos/murmurent}"
 REPOS_ROOT="${MURMURENT_REPOS_ROOT:-$HOME/repos}"
 
 usage() { grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }

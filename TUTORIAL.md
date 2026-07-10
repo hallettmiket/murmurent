@@ -19,7 +19,7 @@ Switch personas with `MURMURENT_USER=<handle>` before any command.
 ## One-time setup
 
 ```bash
-cd ~/repos/wigamig
+cd ~/repos/murmurent
 uv sync --extra dev --extra mcp --extra dashboard
 uv pip install -e .              # install `murmurent` on your PATH
 python scripts/seed_tutorial.py  # idempotent; --skip-github for offline

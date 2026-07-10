@@ -18,7 +18,7 @@ from pathlib import Path
 
 CHARTER_FILENAME = "CHARTER.md"
 MEMBERS_FILENAME = "MEMBERS"
-DEFAULT_WIGAMIG_REPO = Path("~/repos/wigamig").expanduser()
+DEFAULT_MURMURENT_REPO = Path("~/repos/murmurent").expanduser()
 # 2026-05-14: repo is being renamed from "hallett-lab-mgmt" to the per-group
 # convention "lab_mgmt". During the transition we prefer the new path but
 # fall back to the legacy name so existing clones keep working.
@@ -47,10 +47,10 @@ class ProjectRepo:
     members_path: Path | None
 
 
-def wigamig_repo_root(env: dict[str, str] | None = None) -> Path:
+def murmurent_repo_root(env: dict[str, str] | None = None) -> Path:
     """Resolve the murmurent repo root, honouring ``$MURMURENT_REPO_ROOT`` if set."""
     env = os.environ if env is None else env
-    return Path(env.get("MURMURENT_REPO_ROOT", DEFAULT_WIGAMIG_REPO)).expanduser()
+    return Path(env.get("MURMURENT_REPO_ROOT", DEFAULT_MURMURENT_REPO)).expanduser()
 
 
 def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:

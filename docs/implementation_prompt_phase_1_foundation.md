@@ -17,7 +17,7 @@ Stand up the Python package, CLI skeleton, agent registry, frontmatter and repo-
 
 ## Preconditions
 
-- The `~/repos/wigamig/` repo exists with `docs/` populated.
+- The `~/repos/murmurent/` repo exists with `docs/` populated.
 - `gh auth status` is healthy against the `hallettmiket` org. If not, stop and ask the user to run `gh auth login`.
 
 ## Deliverables

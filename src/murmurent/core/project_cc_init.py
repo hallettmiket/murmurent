@@ -87,7 +87,7 @@ def bootstrap_local(
     """Symlink picked agents + write CLAUDE.md stub for a local project.
 
     ``project_dir`` is the working tree (``~/repos/<project>``).
-    ``wigamig_root`` is the murmurent clone (``~/repos/wigamig``) — its
+    ``wigamig_root`` is the murmurent clone (``~/repos/murmurent``) — its
     ``agents/`` subdir is what we symlink from.
 
     Returns one Probe per discrete step. The caller decides whether to
@@ -335,7 +335,7 @@ def _stub(
         "\n"
         "## Agents wired up for this project\n"
         "\n"
-        "See `.claude/agents/` — symlinks into `~/repos/wigamig/agents/`.\n"
+        "See `.claude/agents/` — symlinks into `~/repos/murmurent/agents/`.\n"
         f"Selected: {selected}.\n"
         "\n"
         "## Data locations\n"
@@ -344,7 +344,7 @@ def _stub(
         "\n"
         "## murmurent commons\n"
         "\n"
-        "Lab-wide agents + rules live in `~/repos/wigamig/`. This project\n"
+        "Lab-wide agents + rules live in `~/repos/murmurent/`. This project\n"
         "inherits from `~/.claude/` (Layer 1) AND overrides via `.claude/`\n"
         "here (Layer 2). See [[project-cc-commons-layered]] in lab oracle.\n"
     )

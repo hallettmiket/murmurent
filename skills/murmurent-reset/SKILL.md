@@ -18,7 +18,7 @@ then run for real**.
 | Level | Removes | Keeps |
 |---|---|---|
 | `centre` (default) | `~/.murmurent/lab_info/` only → centre-init is first-run again | everything else |
-| `install` | centre + reinstall the tool from `~/repos/wigamig` (`uv tool install --force --python 3.12 -e '.[dashboard,slack,mcp]'`) + `scripts/setup.sh` + `murmurent install --hooks` | credentials, installations, audit |
+| `install` | centre + reinstall the tool from `~/repos/murmurent` (`uv tool install --force --python 3.12 -e '.[dashboard,slack,mcp]'`) + `scripts/setup.sh` + `murmurent install --hooks` | credentials, installations, audit |
 | `full` | install + machine-local **caches** (`workspaces/`, `*.log`, `dashboard.pid`, `security/agent_cache`, stale `RESUME.md`) | credentials, `installations/`, `decommissions/`, audit logs, `hosts.yaml`/`machine.yaml` |
 | `data` | **all data you entered** into `~/.murmurent` — `lab_info/`, `profile.yaml`, `hosts`/`machine`/`master_folders` yaml, `inventory/`, `cores/`, `onboarding/`, `decommissions/`, `security/`, identity/cards/trust/revocation, logs — everything *except* key material (allowlist-based, so new files are caught) | `keys/`, `age/`, `installations/` (other projects), and `~/.config/wigamig`. **No reinstall.** |
 
@@ -61,7 +61,7 @@ When the user asks to "completely remove" / "uninstall" murmurent:
   up with no `murmurent` on PATH.
 - **Remove the old one and put back a clean one** (the usual "fresh copy from
   the repo" intent): `--level install --uninstall` — uninstalls first, then
-  reinstalls editable from `~/repos/wigamig`.
+  reinstalls editable from `~/repos/murmurent`.
 
 `--uninstall` is what handles the stray-duplicate-install problem (e.g. an old
 `pip install -e` copy in a conda env shadowing the uv-tool one). It scans conda

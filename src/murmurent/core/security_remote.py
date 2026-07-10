@@ -25,7 +25,7 @@ from pathlib import Path
 
 from . import hosts as _hosts
 from . import remote as _remote
-from .repo import wigamig_repo_root
+from .repo import murmurent_repo_root
 from .security_findings import Finding, rollup_by_directory
 
 
@@ -61,7 +61,7 @@ class ScanResult:
 
 def _read_scanner_script() -> str:
     """Locate ``scripts/murmurent_sec_scan.sh`` in the murmurent repo."""
-    repo = wigamig_repo_root()
+    repo = murmurent_repo_root()
     path = repo / SCANNER_SCRIPT
     if not path.is_file():
         raise FileNotFoundError(f"scanner script not found at {path}")

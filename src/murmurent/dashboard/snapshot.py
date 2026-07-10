@@ -32,7 +32,7 @@ from ..core.agents import load_registry as load_agent_registry
 from ..core import compliance as compliance_core
 from ..core import cross_group as xgroup
 from ..core import membership as membership_core
-from ..core.repo import lab_mgmt_repo_root, wigamig_repo_root
+from ..core.repo import lab_mgmt_repo_root, murmurent_repo_root
 from ..core import requests as req_core
 from ..core import lab_vm as _lab_vm
 from ..core import sea_catalog as catalog_core
@@ -1311,7 +1311,7 @@ def _peer_role(handle: str) -> str:
 def _agents() -> list[C.AgentRow]:
     """Load the murmurent agent registry as a list of dashboard rows."""
     try:
-        registry = load_agent_registry(wigamig_repo_root() / "agents")
+        registry = load_agent_registry(murmurent_repo_root() / "agents")
     except Exception:
         return []
     rows: list[C.AgentRow] = []

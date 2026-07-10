@@ -126,8 +126,8 @@ def _resolve_command(reg: dict[str, Any]) -> str:
     """
     env = reg.get("env") or {}
     if "command" in reg:
-        from ..core.repo import wigamig_repo_root
-        cmd = str(reg["command"]).replace("<MURMURENT_REPO>", str(wigamig_repo_root()))
+        from ..core.repo import murmurent_repo_root
+        cmd = str(reg["command"]).replace("<MURMURENT_REPO>", str(murmurent_repo_root()))
         parts = [f"{k}={v}" for k, v in env.items()] + [cmd]
         return " ".join(parts)
     parts = [f"{k}={v}" for k, v in env.items()]
@@ -150,8 +150,8 @@ def _matches_existing(entry: dict[str, Any], reg: dict[str, Any]) -> bool:
         return False
     body = reg.get("module") or reg.get("command") or ""
     if "<MURMURENT_REPO>" in body:
-        from ..core.repo import wigamig_repo_root
-        body = body.replace("<MURMURENT_REPO>", str(wigamig_repo_root()))
+        from ..core.repo import murmurent_repo_root
+        body = body.replace("<MURMURENT_REPO>", str(murmurent_repo_root()))
     hooks = entry.get("hooks") or []
     for h in hooks:
         cmd = h.get("command", "")

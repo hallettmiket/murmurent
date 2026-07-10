@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from .frontmatter import FrontmatterError, parse_file
-from .repo import wigamig_repo_root
+from .repo import murmurent_repo_root
 
 AGENTS_DIRNAME = "agents"
 VALID_FREEZE_VALUES = {"frozen", "personal"}
@@ -35,7 +35,7 @@ class AgentRecord:
 
 def agents_dir(repo_root: Path | None = None) -> Path:
     """Return the path to the agents directory inside the murmurent repo."""
-    base = repo_root if repo_root is not None else wigamig_repo_root()
+    base = repo_root if repo_root is not None else murmurent_repo_root()
     return base / AGENTS_DIRNAME
 
 

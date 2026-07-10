@@ -9,7 +9,7 @@ The console-script entry point isn't on your PATH. Either:
 ```bash
 uv run murmurent <args>
 # or, for the rest of the session:
-uv pip install -e ~/repos/wigamig
+uv pip install -e ~/repos/murmurent
 ```
 
 ## Hooks don't fire in Claude Code

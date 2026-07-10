@@ -33,7 +33,7 @@ murmurent install
 ```
 
 Effects:
-- Clones or updates the murmurent repo (default `~/repos/wigamig`).
+- Clones or updates the murmurent repo (default `~/repos/murmurent`).
 - Creates `~/.claude/agents/` if absent.
 - Symlinks `frozen` agents from the group registry; copies `personal` agents.
 - Configures `~/.claude/settings.json` with group-derived permissions and MCP servers.

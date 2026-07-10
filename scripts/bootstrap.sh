@@ -12,13 +12,13 @@
 #        curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts/bootstrap.sh | bash
 #
 #   B. Inspect-then-run (recommended): clone first, read this file, then:
-#        git clone https://github.com/hallettmiket/murmurent ~/repos/wigamig
-#        cd ~/repos/wigamig && ./scripts/bootstrap.sh
+#        git clone https://github.com/hallettmiket/murmurent ~/repos/murmurent
+#        cd ~/repos/murmurent && ./scripts/bootstrap.sh
 #
 # What it does (each step is idempotent — safe to re-run):
 #   1. Checks prerequisites (git, uv — installs uv if missing; warns about
 #      Claude Code + gh, which need interactive login and can't be automated).
-#   2. Clones or updates ~/repos/wigamig (skipped if run from inside a clone).
+#   2. Clones or updates ~/repos/murmurent (skipped if run from inside a clone).
 #   3. Installs the murmurent CLI (`uv tool install`).
 #   4. Wires the commons into ~/.claude/ (agents, rules, skills) via setup.sh.
 #   5. Registers the data-governance hooks + MCP servers (`murmurent install --hooks`).
@@ -30,7 +30,7 @@
 #   - Fill the centre-setup form (that's the mayor's actual input).
 #
 # Env overrides:
-#   MURMURENT_REPO_DIR   where to clone/expect the repo (default ~/repos/wigamig)
+#   MURMURENT_REPO_DIR   where to clone/expect the repo (default ~/repos/murmurent)
 #   MURMURENT_BRANCH     branch to clone/checkout (default main)
 #   NO_LAUNCH=1        skip the offer to launch the dashboard at the end
 # ─────────────────────────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@
 set -euo pipefail
 
 REPO_URL="https://github.com/hallettmiket/murmurent.git"
-REPO_DIR="${MURMURENT_REPO_DIR:-$HOME/repos/wigamig}"
+REPO_DIR="${MURMURENT_REPO_DIR:-$HOME/repos/murmurent}"
 BRANCH="${MURMURENT_BRANCH:-main}"
 
 step() { printf "\n→ %s\n" "$*"; }
