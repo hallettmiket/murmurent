@@ -54,7 +54,7 @@ to include you in the lab or core.
 
 You are your lab's certificate authority.
 
-1. Install murmurent (above), then self-issue your PI ID — this makes you your
+1. Install Murmurent (above), then self-issue your PI ID — this makes you your
    lab's root and prints a **trust root** to give your members:
    ```bash
    murmurent pi-init <your-lab>          # (or answer "PI" in `murmurent init`)
