@@ -48,7 +48,7 @@ digraph wigamig_system_map {
     style="rounded,dashed";
     bgcolor="#F1ECE3";
 
-    icon       [label="Wigamig\nDashboard.app",       fillcolor="#FFE9CC", color="#F0A757"];
+    icon       [label="Murmurent\nDashboard.app",       fillcolor="#FFE9CC", color="#F0A757"];
     launcher   [label="zsh launcher\n(create_mac_app.sh)"];
     uvicorn    [label="uvicorn :8770\nFastAPI app"];
     sentinel_user [label="~/.wigamig/user\n(saved netname)",     shape=note, fillcolor="#FFF8E6"];

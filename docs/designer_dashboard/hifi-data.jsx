@@ -194,7 +194,7 @@ const DATA = {
     stock:    { reagents: [42, 50], kits: [6, 12] },
   },
 
-  // Existing Wigamig installations per member × machine.
+  // Existing Murmurent installations per member × machine.
   installations: [
     {
       member: "@allie", project: "dcis_imaging_genomics",

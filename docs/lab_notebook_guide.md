@@ -3,7 +3,7 @@
 > A concrete, opinionated guide for keeping a wigamig-compatible lab notebook
 > as a Hallett Lab member. Read this once. Bookmark it. Don't reinvent.
 
-There are **two distinct things** in wigamig that the word "notebook" can
+There are **two distinct things** in murmurent that the word "notebook" can
 mean. Knowing which is which prevents 90 % of confusion:
 
 | Term | Where it lives | Who can read it | What goes there |
@@ -12,7 +12,7 @@ mean. Knowing which is which prevents 90 % of confusion:
 | **Experimental notebook** | `<project_repo>/exp/<n>_<slug>/notebook.md` | Every project member (via git) | The lab notebook *for that experiment*: protocol, run dates, instrument, data file paths, raw results, conclusion. |
 
 The dashboard's "Lab notebook · today" panel shows the **daily journal**.
-The PI sees your **experimental notebooks** the moment you `wigamig push`.
+The PI sees your **experimental notebooks** the moment you `murmurent push`.
 
 ## The daily journal — `~/lab-notebook/`
 
@@ -62,9 +62,9 @@ laptop unless you explicitly publish from it. When you have a finding,
 decision, or note that the lab should see, copy that section into:
 
 - A **finding** in the project repo: `<project>/findings/YYYY-MM-DD_topic.md`,
-  then `wigamig push <project>` — visible to project members on next pull.
+  then `murmurent push <project>` — visible to project members on next pull.
 - An **oracle entry** for lab-wide knowledge:
-  `wigamig publish <path> --to oracle` — surfaces in the dashboard's
+  `murmurent publish <path> --to oracle` — surfaces in the dashboard's
   "Group oracle · recent" panel for everyone.
 
 Don't push your raw daily journal. It has half-formed thoughts.
@@ -80,7 +80,7 @@ sense (paper notebook → digital). One experiment = one folder under
 ### Create a new experiment
 
 ```bash
-wigamig experiment new --project dcis_sc_tutorial --name titration_v3
+murmurent experiment new --project dcis_sc_tutorial --name titration_v3
 ```
 
 This scaffolds:
@@ -146,7 +146,7 @@ Export PNG/PDF to `sketches/`. Same embed syntax:
 
 **Screenshots (FACS plot, software output):**
 
-`sketches/` is fine. If it's instrument-derived, prefer `wigamig
+`sketches/` is fine. If it's instrument-derived, prefer `murmurent
 experiment ingest` — the file lands in `/data/lab_vm/wigamig/refined/<project>/<exp>/instrument_outputs/`
 with checksums and the notebook's `instrument_outputs:` list updates
 automatically.
@@ -172,7 +172,7 @@ canonical store). Reference them by absolute path:
 - QC report: `/data/lab_vm/wigamig/refined/dcis_sc_tutorial/3_titration_v3/qc_report.html`
 ```
 
-`wigamig push <project> --refined 3_titration_v3` walks the refined
+`murmurent push <project> --refined 3_titration_v3` walks the refined
 dir, recomputes SHA-256 for every file, and updates the notebook's
 `refined_data:` and `checksums:` frontmatter automatically. Run this
 when you've produced new outputs.
@@ -185,13 +185,13 @@ travels with normal git push:
 ```bash
 cd ~/repos/dcis_sc_tutorial
 git add exp/3_titration_v3/
-wigamig push dcis_sc_tutorial   # writes a personal branch + PR-friendly commit
+murmurent push dcis_sc_tutorial   # writes a personal branch + PR-friendly commit
 ```
 
 Or, if you've also produced refined data on the lab VM:
 
 ```bash
-wigamig push dcis_sc_tutorial --refined 3_titration_v3
+murmurent push dcis_sc_tutorial --refined 3_titration_v3
 ```
 
 The PI (and every project member) sees the new notebook on next pull.
@@ -201,8 +201,8 @@ their next refresh hits the API.
 ### When an experiment is finished
 
 ```bash
-wigamig experiment status dcis_sc_tutorial titration_v3 --set complete
-wigamig finalize experiment 3_titration_v3 --project dcis_sc_tutorial
+murmurent experiment status dcis_sc_tutorial titration_v3 --set complete
+murmurent finalize experiment 3_titration_v3 --project dcis_sc_tutorial
 ```
 
 `finalize` walks: examine → conclude. Examine creates a deliberation
@@ -220,12 +220,12 @@ sections are present and writes a final summary into the project's
 |---|---|
 | Capture a quick today-thought | Click **edit** in the dashboard's notebook panel |
 | Open yesterday's daily journal | Click yesterday's date in the 7-day strip |
-| Start a new experiment | `wigamig experiment new --project <p> --name <slug>` |
+| Start a new experiment | `murmurent experiment new --project <p> --name <slug>` |
 | Add a phone photo to an experiment | Drop into `<project>/exp/<n>/pages/`, embed with `![](pages/<file>)` |
-| Add a screenshot of an instrument | `wigamig experiment ingest <project> <slug> <source-dir>` |
-| Update refined-data checksums | `wigamig push <project> --refined <slug>` |
-| Make my notebook visible to the PI | `wigamig push <project>` (or `--finalize` for a PR) |
-| Promote a finding lab-wide | `wigamig publish <path> --to oracle` |
+| Add a screenshot of an instrument | `murmurent experiment ingest <project> <slug> <source-dir>` |
+| Update refined-data checksums | `murmurent push <project> --refined <slug>` |
+| Make my notebook visible to the PI | `murmurent push <project>` (or `--finalize` for a PR) |
+| Promote a finding lab-wide | `murmurent publish <path> --to oracle` |
 
 ---
 

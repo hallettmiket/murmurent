@@ -1,6 +1,6 @@
 # Identity & membership cards
 
-Wigamig membership is a **signed certificate**, not an honour-system registry
+Murmurent membership is a **signed certificate**, not an honour-system registry
 entry. Every member, PI, and mayor holds an ed25519 key; membership is a card
 signed along a chain of trust that mirrors the org:
 
@@ -14,7 +14,7 @@ claim a group you're not in, and each person has a unique cryptographic ID (thei
 public-key **fingerprint**).
 
 **A mayor is optional.** By default a PI is their **own root** — a lab runs
-standalone (`wigamig pi-init`), the PI signs member cards, and members pin the
+standalone (`murmurent pi-init`), the PI signs member cards, and members pin the
 PI's key. When a lab *joins* a centre, the mayor adds a higher root: the centre
 root signs the PI's card, so those same member cards also chain up to the centre
 (only the trust anchor changes — nothing is re-issued). Your **key** is the
@@ -31,12 +31,12 @@ constant across both.
 
 ## Your key (everyone)
 
-The first `wigamig` command you run after cloning mints your keypair under
+The first `murmurent` command you run after cloning mints your keypair under
 `~/.wigamig/keys/` (0600). Its fingerprint is your unique ID.
 
 ```bash
-wigamig identity-init          # explicit mint (idempotent; --rotate to replace)
-wigamig whoami                 # your handle, key ID (fingerprint), and card status
+murmurent identity-init          # explicit mint (idempotent; --rotate to replace)
+murmurent whoami                 # your handle, key ID (fingerprint), and card status
 ```
 
 Losing the key means re-enrolling; leaking it means someone can act as you until
@@ -45,11 +45,11 @@ the card is revoked — treat it like an SSH key.
 ## Joining a group (member)
 
 ```bash
-wigamig enroll --group <group> --out enroll.json    # proves you hold your key (PoP)
+murmurent enroll --group <group> --out enroll.json    # proves you hold your key (PoP)
 # → send enroll.json to your PI
 # ← they send back a signed card bundle (bundle.json) + the centre's fingerprint
-wigamig import-card bundle.json --trust-root <ed25519:…pubkey>
-wigamig whoami                                       # now shows your group role
+murmurent import-card bundle.json --trust-root <ed25519:…pubkey>
+murmurent whoami                                       # now shows your group role
 ```
 
 `--trust-root` is the centre's published signing key; confirm its fingerprint
@@ -59,7 +59,7 @@ from the public hub instead).
 ## Vouching for a member (PI / group registrar)
 
 ```bash
-wigamig issue-member-card enroll.json --group <group> --out bundle.json
+murmurent issue-member-card enroll.json --group <group> --out bundle.json
 ```
 
 Signs the member's card with **your** key and bundles your PI card so the member
@@ -70,11 +70,11 @@ can verify the whole chain. You can only issue for a group you lead.
 You self-issue your own PI ID and become your lab's root — no centre needed:
 
 ```bash
-wigamig pi-init <your-lab>      # prints a trust root; give it to your members
+murmurent pi-init <your-lab>      # prints a trust root; give it to your members
 ```
 
 Now issue member cards as above; members import with
-`wigamig import-card <bundle> --trust-root <your-trust-root>`. If you later join a
+`murmurent import-card <bundle> --trust-root <your-trust-root>`. If you later join a
 centre, the mayor issues you a **separate** centre PI card attesting the same key
 (see below) — your members keep working, they just gain a higher anchor.
 
@@ -82,10 +82,10 @@ centre, the mayor issues you a **separate** centre PI card attesting the same ke
 
 ```bash
 # one-time: create the centre's root signing key (the CA)
-wigamig centre-root-keygen           # BACK IT UP OFFLINE — see docs/centre_root_key.md
+murmurent centre-root-keygen           # BACK IT UP OFFLINE — see docs/centre_root_key.md
 
 # for each PI (after their lab/core exists + they send you enroll.json):
-wigamig issue-pi-card enroll.json --actor @<you> --out pi_card.json
+murmurent issue-pi-card enroll.json --actor @<you> --out pi_card.json
 # → send pi_card.json + your centre's signing recipient to the PI
 ```
 
@@ -96,11 +96,11 @@ to the public hub; members fetch and pin them.
 
 ```bash
 # mayor: publish signing key + CRL alongside the directory listing
-wigamig centre-hub-publish [--submit]
+murmurent centre-hub-publish [--submit]
 
 # member: fetch the centre's signing key + CRL from a local wigamig_public clone,
 # pin the anchor (confirm the fingerprint out-of-band), and enable revocation
-wigamig centre-pin <unique-name> --fingerprint <SHA256:…>
+murmurent centre-pin <unique-name> --fingerprint <SHA256:…>
 ```
 
 ## Revocation
@@ -109,11 +109,11 @@ Cards have a 90-day TTL, so revocation is explicit and **fail-closed** — a
 verifier with no fresh CRL refuses the card.
 
 ```bash
-wigamig revoke --handle <handle>          # or --card-id / --fingerprint (mayor)
-wigamig crl --out crl.json                # export the signed CRL to publish
+murmurent revoke --handle <handle>          # or --card-id / --fingerprint (mayor)
+murmurent crl --out crl.json                # export the signed CRL to publish
 ```
 
-`wigamig group-remove-member` also revokes the departing member's card as
+`murmurent group-remove-member` also revokes the departing member's card as
 defense-in-depth (after pulling their Slack/GitHub access). Revocation is
 mayor-centric (the CRL is root-signed); members see a revocation once they
 `centre-pin`/re-fetch the updated CRL.

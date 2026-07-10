@@ -1,8 +1,8 @@
-# Join a wigamig institution
+# Join a murmurent institution
 
-**wigamig** is shared AI research infrastructure used by universities and
+**murmurent** is shared AI research infrastructure used by universities and
 research centres. This page is a **directory**: if your institution runs
-wigamig and you'd like to join a lab or core, find it below and **email its
+murmurent and you'd like to join a lab or core, find it below and **email its
 registrar**.
 
 > This repository collects **nothing**. There is no form to submit and issues
@@ -30,7 +30,7 @@ plain form, and the directory below has each registrar's email + encryption key.
 
 ## After you send it
 
-You're now waiting on the **Mayor** — the person who runs wigamig at your
+You're now waiting on the **Mayor** — the person who runs murmurent at your
 institution. Expect **two things back**:
 
 1. **An email reply from the Mayor.** Watch your inbox (and your spam folder).
@@ -42,7 +42,7 @@ If a few days pass with no reply, reply to your own sent email to nudge them.
 
 ## Install the software (you can do this now, while you wait)
 
-You don't have to wait to be approved to install wigamig — **the code is
+You don't have to wait to be approved to install murmurent — **the code is
 public**, and installing it just gets your computer ready. Approval only
 decides which lab/core you join, not whether you can have the software. The
 one-script joiner above offers to do this for you at the end; or run it
@@ -53,32 +53,32 @@ curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/wigamig_public/main
 sh install-wigamig.sh
 ```
 
-It downloads wigamig to `~/repos/wigamig`, installs the `wigamig` command, and
+It downloads murmurent to `~/repos/wigamig`, installs the `murmurent` command, and
 wires up the shared agents, rules, and tools — installing the `uv` helper for
 you if you don't already have it (you just need `git`). When the Mayor's reply
 and Slack invite arrive, you'll already be set, and the rest of onboarding is
 walked through for you in Slack.
 
-## Institutions using wigamig
+## Institutions using murmurent
 
-One institution may run more than one wigamig installation (a centre, a
+One institution may run more than one murmurent installation (a centre, a
 department, a named group), so match on the institution *and* the description.
 
 | Institution | Installation | Email to join | age key (encrypt to this) |
 |---|---|---|---|
 | Western University | Bioconvergence Centre | _(added when the centre goes live)_ | _(added when the centre goes live)_ |
 
-**Don't see your institution?** It may not run wigamig yet — ask your PI or
+**Don't see your institution?** It may not run murmurent yet — ask your PI or
 lab manager. (Registrars add their row here when they go live.)
 
 ## Where's the software?
 
-The wigamig **code** lives in a different repo:
+The murmurent **code** lives in a different repo:
 [github.com/hallettmiket/wigamig](https://github.com/hallettmiket/wigamig).
-You'll install it on your own computer to run wigamig — the easiest way is the
+You'll install it on your own computer to run murmurent — the easiest way is the
 one-command installer above (it clones that repo for you), so you don't need to
-touch GitHub directly. Setting up wigamig for a whole institution (as a
-**mayor**) or building wigamig itself uses the same repo, just further in.
+touch GitHub directly. Setting up murmurent for a whole institution (as a
+**mayor**) or building murmurent itself uses the same repo, just further in.
 
 The **two steps are separate**: *joining* a lab/core is the encrypted email to
 your registrar; *installing the software* is the command above. You can do the

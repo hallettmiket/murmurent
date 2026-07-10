@@ -1,12 +1,12 @@
 # VSCode workflow
 
-The wigamig repo ships a launcher + workspace config so VSCode opens
+The murmurent repo ships a launcher + workspace config so VSCode opens
 in a consistent 4-quadrant layout with live agent reporting.
 
 ## Opening a project
 
 ```bash
-scripts/open_wigamig.sh                   # opens wigamig itself
+scripts/open_wigamig.sh                   # opens murmurent itself
 scripts/open_wigamig.sh ~/repos/<other>   # opens another repo
 ```
 
@@ -44,7 +44,7 @@ One-time setup per project:
 Each project's `.vscode/settings.json` (written by
 `bootstrap_local`) wires:
 
-- `window.title` → `Wigamig — <repo>  ·  <active editor>  ·  <dirty>`
+- `window.title` → `Murmurent — <repo>  ·  <active editor>  ·  <dirty>`
 - `workbench.activityBar.location` → `end` (right side)
 - `workbench.sideBar.location` → `right`
 - `terminal.integrated.defaultLocation` → `editor`

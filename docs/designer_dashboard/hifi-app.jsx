@@ -1539,7 +1539,7 @@ function InstallModal({ initialProject, initialMachine, initialRepoUrl, onClose 
                     </div>
                   </div>
                   <div>
-                    <label {...LBL}>Wigamig agents to deploy</label>
+                    <label {...LBL}>Murmurent agents to deploy</label>
                     <div style={{display:"flex", flexWrap:"wrap", gap:6}}>
                       {(window.DATA.agents || []).filter(a => !a.disabled).map(a => (
                         <button key={a.name} type="button" onClick={() => toggleAgent(a.name)}

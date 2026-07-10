@@ -1,6 +1,6 @@
 # Security dashboard — per-lab posture audit
 
-Wigamig's per-lab security dashboard runs the `security_guard` agent
+Murmurent's per-lab security dashboard runs the `security_guard` agent
 periodically against a registered host (typically a shared lab server
 such as lab-server) and surfaces permission, hygiene, and policy
 findings in one screen.
@@ -18,7 +18,7 @@ Two tiers, two trust levels:
   dashboard consumes the snapshot if present and reports "ACL details
   unavailable" rows if absent.
 
-**Hard rule (carried over from the global wigamig charter):**
+**Hard rule (carried over from the global murmurent charter):**
 the security agent **never modifies or deletes any file under
 `/data/lab_vm/raw/` or `/data/lab_vm/refined/`**, even when its own
 findings recommend a fix. All `chmod`/`chown`/ACL adjustments in the
@@ -197,7 +197,7 @@ anchors below to deep-link from the dashboard rows.
 | <a id="HOME-REPO-PRIVATE-01"></a>`HOME-REPO-PRIVATE-01` | warn | File in `~/repos/<project>/` is group/world-readable on a shared host. |
 | <a id="HOME-REPO-LARGE-01"></a>`HOME-REPO-LARGE-01` | warn | Tracked file > `--repo-large-mb` (default 50 MB) and not in `.gitignore`. |
 | <a id="HOME-REPO-GIT-SECRET-01"></a>`HOME-REPO-GIT-SECRET-01` | block | Tracked filename matches a secret pattern (`*.env`, `*.pem`, `*_rsa`, `*.key`, `id_*`, etc.). |
-| <a id="GITHUB-PUBLIC-01"></a>`GITHUB-PUBLIC-01` | info | A wigamig project's GitHub origin is `public` — verify intentional. *(Implemented dashboard-side, not in the bash scanner.)* |
+| <a id="GITHUB-PUBLIC-01"></a>`GITHUB-PUBLIC-01` | info | A murmurent project's GitHub origin is `public` — verify intentional. *(Implemented dashboard-side, not in the bash scanner.)* |
 | <a id="SSH-DIR-PERM-01"></a>`SSH-DIR-PERM-01` | warn | `~/.ssh` itself is not mode `0700`. |
 | <a id="SSH-AUTHKEYS-PERM-01"></a>`SSH-AUTHKEYS-PERM-01` | warn | `~/.ssh/authorized_keys` is not mode `0600`. |
 | <a id="SSH-PRIVKEY-PERM-01"></a>`SSH-PRIVKEY-PERM-01` | block | Private key file (`id_*`, `*_rsa`, `*_ed25519`) is not mode `0600` or `0400`. |
@@ -251,7 +251,7 @@ carries the core's short id in its `project` field. Categories:
 
 ## Tier 2 setup
 
-Wigamig ships [`scripts/lab_sec_dump.sh`](../scripts/lab_sec_dump.sh)
+Murmurent ships [`scripts/lab_sec_dump.sh`](../scripts/lab_sec_dump.sh)
 (the root-owned snapshot script) and
 [`scripts/sudoers.d/wigamig_sec_dump`](../scripts/sudoers.d/wigamig_sec_dump)
 (the NOPASSWD grant template, currently authorising `the_pi` and

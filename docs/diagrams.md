@@ -1,9 +1,9 @@
 ---
 date: 2026-05-06
-tags: [wigamig, design, diagrams]
+tags: [murmurent, design, diagrams]
 ---
 
-# Wigamig — Diagrams
+# Murmurent — Diagrams
 
 > Mermaid diagrams for the group-level design. Companion to [[group_level]] and [[cli_manual]].
 > Mermaid renders natively in Obsidian (with the official renderer) and on GitHub.
@@ -11,12 +11,12 @@ tags: [wigamig, design, diagrams]
 
 ## 1. Tier architecture
 
-The wigamig hierarchy: centre → group → project → squad → member.
+The murmurent hierarchy: centre → group → project → squad → member.
 
 ```mermaid
 graph TB
     subgraph CENTRE["Bioconvergence centre"]
-        WC[Wigamig commons]
+        WC[Murmurent commons]
         OR[Centre oracle]
     end
     subgraph G1["Group g1 (Hallett)"]
@@ -49,7 +49,7 @@ Three classes of repo plus the lab VM. Data never lives in the repos.
 ```mermaid
 graph LR
     subgraph GH["GitHub"]
-        WR["wigamig repo<br/>(agent registry,<br/>choreographies)"]
+        WR["murmurent repo<br/>(agent registry,<br/>choreographies)"]
         LMR["lab-management repo<br/>(roles, inventory,<br/>members, audit, dashboards)"]
         PR1["project repo: dcis_imaging<br/>(CHARTER, MEMBERS,<br/>exp/, src/, findings/)"]
         PR2["project repo: bbb_perm<br/>(CHARTER, MEMBERS,<br/>exp/, src/, findings/)"]
@@ -83,9 +83,9 @@ sequenceDiagram
     participant Bots as Bots (Actions)
     participant Reviewer as Lead / PI
     participant Oracle as Group oracle
-    M->>PB: wigamig push (direct)
-    M->>PB: wigamig push --refined (checksums)
-    M->>PB: wigamig push --finalize
+    M->>PB: murmurent push (direct)
+    M->>PB: murmurent push --refined (checksums)
+    M->>PB: murmurent push --finalize
     PB->>Main: open PR
     Main->>Bots: trigger by path
     Bots-->>Main: adversary, conscience,<br/>security_guard, bookworm
@@ -126,17 +126,17 @@ sequenceDiagram
     participant CC as ~/.claude
     participant LV as Lab VM
     PI->>LMR: file Onboard issue<br/>(profile, projects, roles)
-    New->>CC: wigamig onboard <group> --profile <p>
+    New->>CC: murmurent onboard <group> --profile <p>
     CC->>CC: install agents<br/>(freeze cascade)
     CC->>CC: configure MCP servers
     CC->>CC: generate age key pair
     CC->>LMR: PR with public key +<br/>members/<handle>.md
     PI->>LMR: review + approve PR
-    PI->>LMR: wigamig project admit<br/>(per project)
+    PI->>LMR: murmurent project admit<br/>(per project)
     LMR->>LV: ACL sync
     LMR->>LMR: re-encrypt age bundles
-    PI->>LMR: wigamig role assign<br/>(per starting role)
-    New->>CC: wigamig doctor
+    PI->>LMR: murmurent role assign<br/>(per starting role)
+    New->>CC: murmurent doctor
     CC-->>New: All checks passed
     PI->>LMR: close onboarding issue
 ```

@@ -1,6 +1,6 @@
 # The centre root key — handling & rotation runbook
 
-The **centre root key** is the certificate-authority root of a wigamig centre.
+The **centre root key** is the certificate-authority root of a murmurent centre.
 It is an ed25519 signing key, held **only by the mayor**, that signs PI identity
 cards (which in turn let PIs sign member cards) and the centre's revocation list
 (CRL). Its public half is the centre's `signing_recipient`, published in the
@@ -10,7 +10,7 @@ centre.
 > **This runbook exists on purpose before the key does.** Per the security
 > review, a key with this blast radius must not be generated until its recovery
 > and rotation story is written down. If you are reading this while about to run
-> `wigamig centre-root-keygen`, read to the end first.
+> `murmurent centre-root-keygen`, read to the end first.
 
 ## Blast radius — why this key is special
 
@@ -28,7 +28,7 @@ signing) and must be kept as close to offline as your workflow allows.
 ## Where it lives
 
 - Private key: `~/.wigamig/keys/centre_root_ed25519` — mode **0600**, generated
-  by `wigamig centre-root-keygen`.
+  by `murmurent centre-root-keygen`.
 - Public key: `~/.wigamig/keys/centre_root_ed25519.pub` and the centre's
   `signing_recipient:` field in `centre.md`.
 - Pinned anchor (this machine's copy of the trusted fingerprint):
@@ -60,7 +60,7 @@ Rotation replaces the root key. **Every card and CRL signed by the old key
 becomes stale** (they no longer chain to the new root), so this is a coordinated
 operation, not a quiet swap.
 
-1. `wigamig centre-root-keygen --rotate` — mints a new root key, re-pins the
+1. `murmurent centre-root-keygen --rotate` — mints a new root key, re-pins the
    anchor locally, and updates `signing_recipient` in `centre.md`.
 2. **Publish the new signing pubkey** in the installations table. Because a
    pubkey *change* on an existing centre is indistinguishable from an attack, the

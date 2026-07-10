@@ -1,6 +1,6 @@
 ---
 date: 2026-05-06
-tags: [wigamig, prompt]
+tags: [murmurent, prompt]
 ---
 
 # Phase 4 prompt: MCP + remaining hooks
@@ -54,7 +54,7 @@ Inventory MCP works in CC; PHI pattern detection fires inside clinical projects;
    - Append jsonl to `~/.claude/wigamig-audit/YYYY-MM-DD.log`: `ts`, `member`, `project`, `tool`, `args_summary`, `outcome`, `duration_ms`
 
 6. **Hook + MCP installer**
-   - `wigamig install --hooks` deploys all four hooks (raw_guard from phase 2 + the three new ones) to `~/.claude/hooks/` and registers in `~/.claude/settings.json` with the right `match` rules
+   - `murmurent install --hooks` deploys all four hooks (raw_guard from phase 2 + the three new ones) to `~/.claude/hooks/` and registers in `~/.claude/settings.json` with the right `match` rules
    - Same command registers the inventory MCP under `mcpServers`
    - Idempotent (rerun safely)
 
@@ -65,7 +65,7 @@ Inventory MCP works in CC; PHI pattern detection fires inside clinical projects;
 - [ ] Same paste in `bbb_drug_screen` (sensitivity: standard) — no refusal
 - [ ] Submitting any prompt inside `dcis_sc_tutorial` injects a system reminder showing project name + role + active SEAs
 - [ ] Tool calls written to `~/.claude/wigamig-audit/YYYY-MM-DD.log` as jsonl
-- [ ] `wigamig install --hooks` succeeds idempotently
+- [ ] `murmurent install --hooks` succeeds idempotently
 - [ ] PR opened on `hallettmiket/wigamig` from `feat/phase-4-mcp-hooks`
 
 ## Deferred to phase 5

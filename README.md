@@ -1,4 +1,4 @@
-# wigamig
+# murmurent
 
 Shared agentic-AI infrastructure for academic researchers, labs cores and research centers. 
 It lets research groups work independently, pool agents and data when collaboration helps, and
@@ -6,13 +6,13 @@ accumulate institutional knowledge across every project. See
 [`CLAUDE.md`](CLAUDE.md) for the architectural overview and [`docs/`](docs/) for
 the full design.
 
-Wigamig is **institution-agnostic** — not tied to any one university. A new
+Murmurent is **institution-agnostic** — not tied to any one university. A new
 institution stands it up by having one person (the **mayor**) bootstrap a
 *centre*; everyone else joins afterward.
 
-## Download Wigamig
+## Download Murmurent
 
-**Everyone — member, PI, or mayor — starts by installing wigamig.** The code is
+**Everyone — member, PI, or mayor — starts by installing murmurent.** The code is
 public; one command does it (you only need `git`):
 
 ```bash
@@ -24,24 +24,24 @@ then run it — it installs whatever clone you run it from:
 
 ```bash
 git clone https://github.com/hallettmiket/wigamig
-cd wigamig && ./scripts/bootstrap.sh
+cd murmurent && ./scripts/bootstrap.sh
 ```
 
 (`~/repos/wigamig` is a common spot but not required. The `curl` one-liner above
 clones there by default; override it with `WIGAMIG_REPO_DIR=/your/path`.)
 
 [`scripts/bootstrap.sh`](scripts/bootstrap.sh) is idempotent: it installs the
-`wigamig` command, wires the shared agents/rules/skills into `~/.claude/`, and
+`murmurent` command, wires the shared agents/rules/skills into `~/.claude/`, and
 registers the data-governance hooks. On your first run it mints your **identity
-key** (your unique ID). Then set your personal info — `wigamig whoami` shows your
-handle + key, and the dashboard (`wigamig dashboard --hifi`) has the rest.
+key** (your unique ID). Then set your personal info — `murmurent whoami` shows your
+handle + key, and the dashboard (`murmurent dashboard --hifi`) has the rest.
 
 Then find your situation below.
 
-## I'm a member of a lab that already uses wigamig
+## I'm a member of a lab that already uses murmurent
 
 Set your info, then ask your **PI** for a **membership ID** (a signed identity
-certificate). Run the one `wigamig import-card` command they give you, and your
+certificate). Run the one `murmurent import-card` command they give you, and your
 dashboard recognises your role. That's it — you never touch the mayor or the
 public directory.
 
@@ -50,18 +50,18 @@ public directory.
 **You don't need a mayor to run a lab.** You are your own lab's certificate
 authority.
 
-1. Install wigamig (above), then **self-issue your PI ID** — this makes you your
+1. Install murmurent (above), then **self-issue your PI ID** — this makes you your
    lab's root and prints a **trust root** to give your members:
    ```bash
-   wigamig pi-init <your-lab>          # (or answer "PI" in `wigamig init`)
+   murmurent pi-init <your-lab>          # (or answer "PI" in `murmurent init`)
    ```
-2. **Accept members by issuing them IDs.** When a member sends a `wigamig enroll`
+2. **Accept members by issuing them IDs.** When a member sends a `murmurent enroll`
    request, sign and return it:
    ```bash
-   wigamig issue-member-card <their-request> --group <your-lab>
+   murmurent issue-member-card <their-request> --group <your-lab>
    ```
-   They import it with `wigamig import-card <bundle> --trust-root <your-trust-root>`.
-3. **Optional — join a centre.** If your institution runs a wigamig centre,
+   They import it with `murmurent import-card <bundle> --trust-root <your-trust-root>`.
+3. **Optional — join a centre.** If your institution runs a murmurent centre,
    register with its mayor (the [implementations directory](https://github.com/hallettmiket/wigamig_public)
    → `wigamig-join.sh`). The mayor issues you a **separate** centre PI ID that
    attests your *same key* to the centre — your members' cards keep working
@@ -69,7 +69,7 @@ authority.
 
 Full identity flow (enroll → issue → import → revoke): [`docs/identity.md`](docs/identity.md).
 
-## I want to run wigamig at my institution (become the mayor)
+## I want to run murmurent at my institution (become the mayor)
 
 You bootstrap a new **centre** and become its founding registrar — see the
 detailed setup just below. You then register PIs and send each one their ID.
@@ -89,17 +89,17 @@ server. Beyond `git`, you'll want:
 After running `bootstrap.sh` (above), bootstrap the centre:
 
 ```bash
-wigamig dashboard --hifi --port 8771
+murmurent dashboard --hifi --port 8771
 # open http://localhost:8771/registrar and fill in the one-time setup form
 ```
 
 ...or headlessly:
 
 ```bash
-wigamig centre-init --mayor @<your-handle> \
+murmurent centre-init --mayor @<your-handle> \
   --name "<Centre name>" --institution "<Institution>" \
   --unique-name <short-id> --server-host <wigamig-server-host>
-wigamig centre-status      # confirms you are the founding registrar
+murmurent centre-status      # confirms you are the founding registrar
 ```
 
 ### Make your centre joinable
@@ -109,32 +109,32 @@ stay deliberate, opt-in steps:
 
 1. **Encryption key for join requests.** `centre-init` generates an `age` keypair
    automatically (PIs encrypt their join requests to it); recreate with
-   `wigamig centre-age-keygen`.
-2. **Root signing key (the identity CA).** `wigamig centre-root-keygen` — signs PI
+   `murmurent centre-age-keygen`.
+2. **Root signing key (the identity CA).** `murmurent centre-root-keygen` — signs PI
    IDs + the revocation list. **Back it up offline** (see
    [`docs/centre_root_key.md`](docs/centre_root_key.md)).
-3. **List your centre** in the implementations directory: `wigamig centre-hub-publish`
+3. **List your centre** in the implementations directory: `murmurent centre-hub-publish`
    clones [`wigamig_public`](https://github.com/hallettmiket/wigamig_public),
    writes your directory row, and publishes your **signing key + revocation list**
    so members can verify IDs. It prints a `git push` for you to run.
 4. **Set up Slack.** Create a `wigamig-<unique-name>` workspace + bot token and
-   smoke-test with `wigamig centre-slack-smoke`. Guide:
+   smoke-test with `murmurent centre-slack-smoke`. Guide:
    [`docs/slack_setup.md`](docs/slack_setup.md).
 
-Then move the centre to the always-online **wigamig server** —
+Then move the centre to the always-online **murmurent server** —
 [`docs/setup.md`](docs/setup.md) → *"Deploying a centre on a dedicated Ubuntu
 server"*. Labs, cores, and members onboard after that; you approve from
 `/registrar`.
 
 ## Install (developer)
 
-Working on wigamig itself (not deploying a centre):
+Working on murmurent itself (not deploying a centre):
 
 ```bash
 git clone https://github.com/hallettmiket/wigamig
-cd wigamig
+cd murmurent
 uv sync --extra dev
-uv run wigamig --help
+uv run murmurent --help
 ```
 
 ## Running tests

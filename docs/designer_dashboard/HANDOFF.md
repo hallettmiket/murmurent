@@ -1,6 +1,6 @@
-# wigamig — hi-fi dashboard handoff
+# murmurent — hi-fi dashboard handoff
 
-This package contains the design spec for the redesigned wigamig dashboard. It is intentionally framework-agnostic — your job is to wire it into the existing Streamlit (or successor) app. Tokens, components, and data shape are all explicit so a port to React/HTMX/Streamlit-with-custom-components is a 1-to-1 mapping.
+This package contains the design spec for the redesigned murmurent dashboard. It is intentionally framework-agnostic — your job is to wire it into the existing Streamlit (or successor) app. Tokens, components, and data shape are all explicit so a port to React/HTMX/Streamlit-with-custom-components is a 1-to-1 mapping.
 
 ## Files in this handoff
 | file | role |
@@ -40,7 +40,7 @@ Locked to Western University brand. Do not invent new colors.
 
 ## Layout regions (top → bottom)
 1. **Brand bar** — purple band, tiger underline, "Hallett Lab · Schulich · Western University". Right side: signed-in handle + lab.
-2. **Command bar** — `wigamig` wordmark, global search (`⌘K` / `/`), persona toggle (`V`).
+2. **Command bar** — `murmurent` wordmark, global search (`⌘K` / `/`), persona toggle (`V`).
 3. **Stat strip** — 5 KPI cards: attention, SEAs/week, compliance, inventory, notebook cadence.
 4. **Row 1**: Attention queue (5/12) + SEAs in/out tabs (7/12).
 5. **Row 2**: Compliance heatmap (7/12) + Projects table (5/12).

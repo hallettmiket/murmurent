@@ -1,13 +1,13 @@
 # The `lab_mgmt` repository
 
-The single most-confusing piece of wigamig's filesystem layout is what
+The single most-confusing piece of murmurent's filesystem layout is what
 `lab_mgmt` is, who needs it, and how it differs from
 `~/.wigamig/lab_info/`. This document is the short answer.
 
 ## TL;DR
 
 `lab_mgmt` is the **per-group governance repo** — one per PI. It is
-NOT a wigamig commons artifact; it belongs to the lab. It holds the
+NOT a murmurent commons artifact; it belongs to the lab. It holds the
 canonical roster, project registry, inventory, training records,
 audit log, and other day-to-day filing-cabinet contents for ONE
 research group.
@@ -27,7 +27,7 @@ Tempting — but no. The name `lab_mgmt` correctly signals "the lab's
 own management data," analogous to how a paper folder labelled "Lab
 Filing Cabinet" sits on the PI's bookshelf. Renaming to
 `wigamig-mgmt` would imply this is a wigamig-owned artifact you can
-update from the commons. It isn't: every wigamig install reads
+update from the commons. It isn't: every murmurent install reads
 multiple `lab_mgmt` repos (one per lab in the centre) and never
 writes across labs.
 
@@ -153,7 +153,7 @@ the final gate.
 | **Owner** | the PI | the registrar |
 | **Members** | one PI + lab members | one or more registrars (mayors become first registrar) |
 | **GitHub home** | the lab's own org | a private centre org (or none — can stay local + git-push to a private remote) |
-| **First clone** | each lab member runs `git clone` once during onboarding | the mayor's machine creates it on `wigamig centre-init` |
+| **First clone** | each lab member runs `git clone` once during onboarding | the mayor's machine creates it on `murmurent centre-init` |
 | **Cross-lab visibility** | no — one lab's repo, period | yes — the registry lists every lab and core in the centre |
 | **What writes here** | `cable_guy` (per-member onboarding), inventory MCP, oracle MCP, PI's hand-edits | `centre_cable_guy` (lab/core onboarding), `registrar.create_lab` / `create_core`, join-request approvals, common-SEA submissions |
 
@@ -164,10 +164,10 @@ lab specifics belong in `lab_mgmt`. Inter-lab relations belong in
 
 ## See also
 
-- [`docs/setup.md`](setup.md) — first-time wigamig install on a new
+- [`docs/setup.md`](setup.md) — first-time murmurent install on a new
   machine, including the recommended `~/repos/lab_mgmt` clone.
 - [`docs/group_level.md`](group_level.md) — the broader design
-  document for group-scope wigamig operations.
+  document for group-scope murmurent operations.
 - [`docs/cores_plan.md`](cores_plan.md) §4 — how a core's own
   `lab_mgmt` (yes, cores have one too, parallel to labs) mounts
   inside `~/.wigamig/lab_info/cores/<core>/lab-mgmt/`.

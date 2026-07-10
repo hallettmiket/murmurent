@@ -17,7 +17,7 @@ netname, institution, role, PI, justification, etc. never touch GitHub. This is
 deliberate: we don't want a permanent, publicly-archived pile of "who wants to
 join what, where" across institutions.
 
-> The hub is **not** where the wigamig code lives — that's
+> The hub is **not** where the murmurent code lives — that's
 > [`github.com/hallettmiket/wigamig`](https://github.com/hallettmiket/wigamig)
 > (public, cloned via `bootstrap.sh`). You don't need the hub to get the code;
 > you need it only to look up who to email.
@@ -41,7 +41,7 @@ gh repo edit hallettmiket/wigamig_public --enable-issues=false   # no data colle
 When an institution goes live, its mayor adds **one row** to the hub's
 [`README.md`](wigamig_public/README.md) table — institution, a short description
 (centre / department / group name), and the **join email** (`join_email` on the
-centre, set via `wigamig centre-init --join-email …` or the `/registrar` profile
+centre, set via `murmurent centre-init --join-email …` or the `/registrar` profile
 editor). Nothing else is published.
 
 ## Receiving + filing a join request (each mayor, ongoing)
@@ -50,12 +50,12 @@ editor). Nothing else is published.
 2. The registrar reads the email and files the request **locally**:
 
    ```bash
-   wigamig join-request submit --kind lab \
+   murmurent join-request submit --kind lab \
      --name <proposed_name> --pi @<netname> \
      --email <requester_email> --institution <institution> \
      --justification "…"
    ```
-3. Then approves/declines as usual (`wigamig join-request approve|decline`, or
+3. Then approves/declines as usual (`murmurent join-request approve|decline`, or
    the `/registrar` dashboard). Provisioning (Slack/GitHub/FS) fires on approval.
 
 Everything about the requester stays on the registrar's own machine + the
