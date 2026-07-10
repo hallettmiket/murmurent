@@ -392,7 +392,7 @@ def render_charter(name: str, spec: dict) -> str:
     """A minimal CHARTER.md the dashboard's iter_local_projects() will find.
 
     Clinical-sensitivity charters get the extra REB / data_residency fields
-    required by ``wigamig.core.charter.validate_charter``.
+    required by ``murmurent.core.charter.validate_charter``.
     """
     meta = {
         "project": name,

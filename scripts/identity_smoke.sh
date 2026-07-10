@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# End-to-end smoke test of the wigamig signed-identity lifecycle (phases 0-5),
+# End-to-end smoke test of the murmurent signed-identity lifecycle (phases 0-5),
 # simulating a MAYOR, a PI, and a MEMBER on ONE machine via separate
 # WIGAMIG_HOME roots. Non-destructive: everything lives under a fresh temp dir.
-# Requires `wigamig` on PATH.
+# Requires `murmurent` on PATH.
 set -euo pipefail
 
-# Use the exact interpreter `wigamig` was installed with for the few python bits.
-PY="$(head -1 "$(command -v wigamig)" | sed 's/^#!//')"
+# Use the exact interpreter `murmurent` was installed with for the few python bits.
+PY="$(head -1 "$(command -v murmurent)" | sed 's/^#!//')"
 
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/wig-smoke.XXXXXX")"
 echo "workdir: $WORK"
@@ -39,64 +39,64 @@ member_env(){ export WIGAMIG_HOME="$MEMBER" WIGAMIG_LAB_INFO_ROOT="$WORK/mem_lab
 # ---------------- MAYOR: bootstrap ----------------
 hr "MAYOR: bootstrap centre + root CA"
 mayor_env
-wigamig centre-init --no-prompt --name "Smoke Centre" --institution "Test U" \
+murmurent centre-init --no-prompt --name "Smoke Centre" --institution "Test U" \
         --unique-name smoke --mayor @tbrowne5
-OUT="$(wigamig centre-root-keygen)"; echo "$OUT" | sed -n '1,3p'
+OUT="$(murmurent centre-root-keygen)"; echo "$OUT" | sed -n '1,3p'
 TRUST="$(printf '%s\n' "$OUT" | grep -oE 'ed25519:[A-Za-z0-9+/=]+' | head -1)"
 echo "TRUST ROOT = $TRUST"
 
 hr "MAYOR: register a lab for PI @yxia266 (stands in for a lab join-request)"
-"$PY" -c "from wigamig.core import registrar as R; R.create_lab(name='xia_lab', display_name='Xia Lab', pi_handle='@yxia266', pi_email='y@test.edu')"
+"$PY" -c "from murmurent.core import registrar as R; R.create_lab(name='xia_lab', display_name='Xia Lab', pi_handle='@yxia266', pi_email='y@test.edu')"
 
 # ---------------- PI: enroll ----------------
 hr "PI: mint key + enroll (proof of possession)"
 pi_env
-wigamig identity-init | sed -n '1,2p'
-wigamig enroll --out "$WORK/pi_enroll.json"
+murmurent identity-init | sed -n '1,2p'
+murmurent enroll --out "$WORK/pi_enroll.json"
 
 # ---------------- MAYOR: issue PI card ----------------
 hr "MAYOR: issue root-signed PI card"
 mayor_env
-wigamig issue-pi-card "$WORK/pi_enroll.json" --actor @tbrowne5 --out "$WORK/pi_card.json"
+murmurent issue-pi-card "$WORK/pi_enroll.json" --actor @tbrowne5 --out "$WORK/pi_card.json"
 
 # ---------------- PI: import ----------------
 hr "PI: import PI card (pins the trust root) + whoami"
 pi_env
-wigamig import-card "$WORK/pi_card.json" --trust-root "$TRUST"
-wigamig whoami
+murmurent import-card "$WORK/pi_card.json" --trust-root "$TRUST"
+murmurent whoami
 
 # ---------------- MEMBER: enroll ----------------
 hr "MEMBER: mint key + enroll"
 member_env
-wigamig identity-init | sed -n '1,2p'
-wigamig enroll --group xia_lab --out "$WORK/mem_enroll.json"
-MEMFP="$("$PY" -c 'from wigamig.core import idkeys as K; print(K.local_fingerprint())')"
+murmurent identity-init | sed -n '1,2p'
+murmurent enroll --group xia_lab --out "$WORK/mem_enroll.json"
+MEMFP="$("$PY" -c 'from murmurent.core import idkeys as K; print(K.local_fingerprint())')"
 echo "member fingerprint = $MEMFP"
 
 # ---------------- PI: issue member card ----------------
 hr "PI: issue member card (PI-signed, chains to root)"
 pi_env
-wigamig issue-member-card "$WORK/mem_enroll.json" --group xia_lab --out "$WORK/mem_bundle.json"
+murmurent issue-member-card "$WORK/mem_enroll.json" --group xia_lab --out "$WORK/mem_bundle.json"
 
 # ---------------- MEMBER: import ----------------
 hr "MEMBER: import member card (verifies member->PI->root) + whoami"
 member_env
-wigamig import-card "$WORK/mem_bundle.json" --trust-root "$TRUST"
-wigamig whoami
+murmurent import-card "$WORK/mem_bundle.json" --trust-root "$TRUST"
+murmurent whoami
 echo "-> local identity check:"
-"$PY" -c "from wigamig.core import issuance as I; print(I.verify_local_identity())"
+"$PY" -c "from murmurent.core import issuance as I; print(I.verify_local_identity())"
 
 # ---------------- REVOCATION ----------------
 hr "MAYOR: revoke the member (by fingerprint) + publish CRL"
 mayor_env
-wigamig revoke --fingerprint "$MEMFP"
-wigamig crl --out "$WORK/crl.json"
+murmurent revoke --fingerprint "$MEMFP"
+murmurent crl --out "$WORK/crl.json"
 
 hr "MEMBER: fetch the CRL -> local identity is now REJECTED"
 member_env
-"$PY" -c "import json; from wigamig.core import revocation as R; R.import_distributed_crl('smoke', json.load(open('$WORK/crl.json')))"
+"$PY" -c "import json; from murmurent.core import revocation as R; R.import_distributed_crl('smoke', json.load(open('$WORK/crl.json')))"
 echo "-> local identity check after revocation:"
-"$PY" -c "from wigamig.core import issuance as I; print(I.verify_local_identity())"
+"$PY" -c "from murmurent.core import issuance as I; print(I.verify_local_identity())"
 
 hr "DONE"
 echo "clean up with: rm -rf $WORK"

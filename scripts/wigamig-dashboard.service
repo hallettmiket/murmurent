@@ -12,7 +12,7 @@
 
 [Unit]
 Description=wigamig hi-fi dashboard (centre)
-Documentation=https://github.com/hallettmiket/wigamig/blob/main/docs/setup.md
+Documentation=https://github.com/hallettmiket/murmurent/blob/main/docs/setup.md
 After=network-online.target
 Wants=network-online.target
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Purpose: Idempotent install of `uv` + wigamig on a remote SSH host so the
+# Purpose: Idempotent install of `uv` + murmurent on a remote SSH host so the
 #          centre's lab-server server (or any equivalent host) can run
-#          `wigamig project new` etc. directly. The laptop dashboard then
+#          `murmurent project new` etc. directly. The laptop dashboard then
 #          drives the remote host over SSH; this script just ensures the
 #          binaries are in place.
 # Author:  Mike Hallett (with Claude Code)
@@ -19,27 +19,27 @@
 #
 # Pre-reqs on the remote host (`lab-server`):
 #   - bash, curl, git available
-#   - /data/lab_vm/{raw,refined} mounted (warned-only if missing — wigamig
+#   - /data/lab_vm/{raw,refined} mounted (warned-only if missing — murmurent
 #     project new will create them inside whatever exists).
 #
 # What this script does (idempotent — re-run safely):
 #   1. ssh true                        → fails fast if auth/host is wrong.
 #   2. Ensure ~/.local/bin/uv on host  → installs via the official one-liner
 #                                        if missing; skips otherwise.
-#   3. Clone (or pull) the wigamig repo into ~/repos/wigamig on host.
-#   4. uv tool install --reinstall .   → registers `wigamig` on the host's
-#                                        PATH at ~/.local/bin/wigamig.
-#   5. Sanity probes: wigamig --version, ls /data/lab_vm/{raw,refined},
+#   3. Clone (or pull) the murmurent repo into ~/repos/wigamig on host.
+#   4. uv tool install --reinstall .   → registers `murmurent` on the host's
+#                                        PATH at ~/.local/bin/murmurent.
+#   5. Sanity probes: murmurent --version, ls /data/lab_vm/{raw,refined},
 #      gh auth status, mkdir -p ~/.wigamig.
 #
 # Stdout is human-readable; any failure prints a clear "FAILED:" line and
-# the script exits non-zero so callers (e.g. `wigamig host add`) can react.
+# the script exits non-zero so callers (e.g. `murmurent host add`) can react.
 
 set -euo pipefail
 
 SCRIPT_NAME="$(basename "$0")"
 LAPTOP_REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-WIGAMIG_REPO_URL="https://github.com/hallettmiket/wigamig.git"
+WIGAMIG_REPO_URL="https://github.com/hallettmiket/murmurent.git"
 BRANCH="main"
 HOST=""
 
@@ -107,8 +107,8 @@ else
   ok "uv installed: ${UV_VERSION}"
 fi
 
-# ── Step 3: clone or update the wigamig repo ─────────────────────────────────
-step "3/5 wigamig source at ~/repos/wigamig on ${HOST}"
+# ── Step 3: clone or update the murmurent repo ─────────────────────────────────
+step "3/5 murmurent source at ~/repos/wigamig on ${HOST}"
 ssh_run 'mkdir -p ~/repos'
 if ssh_run 'test -d ~/repos/wigamig/.git'; then
   ssh_run "cd ~/repos/wigamig && git fetch origin && git checkout ${BRANCH} && git pull --ff-only origin ${BRANCH}"
@@ -120,25 +120,25 @@ else
   ok "repo cloned to ~/repos/wigamig at ${REMOTE_COMMIT}"
 fi
 
-# ── Step 4: `uv tool install` the wigamig CLI ────────────────────────────────
-step "4/5 wigamig CLI installation on ${HOST}"
+# ── Step 4: `uv tool install` the murmurent CLI ────────────────────────────────
+step "4/5 murmurent CLI installation on ${HOST}"
 # --reinstall is idempotent and makes upgrades behave the same as fresh installs.
 # -e (editable) + --python 3.12: a non-editable install relocates the package
 # away from the clone, breaking the dashboard's static assets; py3.12 is required.
 ssh_run 'export PATH=$HOME/.local/bin:$PATH; cd ~/repos/wigamig && uv tool install --reinstall --python 3.12 -e .'
-WIGAMIG_VERSION="$(ssh_run 'export PATH=$HOME/.local/bin:$PATH; wigamig --version 2>/dev/null || true')"
+WIGAMIG_VERSION="$(ssh_run 'export PATH=$HOME/.local/bin:$PATH; murmurent --version 2>/dev/null || true')"
 if [[ -z "$WIGAMIG_VERSION" ]]; then
-  fail "wigamig --version returned no output on the remote host"
+  fail "murmurent --version returned no output on the remote host"
 fi
-ok "wigamig installed: ${WIGAMIG_VERSION}"
+ok "murmurent installed: ${WIGAMIG_VERSION}"
 
-# ── Step 4b: wire wigamig into the remote ~/.claude/ as the default ─────────
+# ── Step 4b: wire murmurent into the remote ~/.claude/ as the default ─────────
 # Same script that runs locally — re-points ~/.claude/agents at the
-# wigamig commons, links ~/.claude/CLAUDE.md, runs `wigamig install
+# murmurent commons, links ~/.claude/CLAUDE.md, runs `murmurent install
 # --hooks`. Idempotent. Preserves any user-authored agents (non-symlinks).
 step "4b/5 wiring ~/.claude/ on ${HOST}"
 ssh_run 'export PATH=$HOME/.local/bin:$PATH; bash ~/repos/wigamig/scripts/setup.sh' \
-  && ok "~/.claude/ wired into wigamig commons on ${HOST}" \
+  && ok "~/.claude/ wired into murmurent commons on ${HOST}" \
   || warn "setup.sh on ${HOST} reported issues — inspect manually if needed"
 
 # ── Step 5: sanity probes ────────────────────────────────────────────────────
@@ -150,9 +150,9 @@ ok "~/.wigamig present"
 if ssh_run 'test -d /data/lab_vm/wigamig/raw && test -d /data/lab_vm/wigamig/refined'; then
   ok "/data/lab_vm/{raw,refined} present"
 else
-  warn "/data/lab_vm/{raw,refined} not found on ${HOST}. wigamig will fall back"
+  warn "/data/lab_vm/{raw,refined} not found on ${HOST}. murmurent will fall back"
   warn "to \$WIGAMIG_LAB_VM_ROOT (default ~/lab_vm/data) — set it on the remote"
-  warn "user's shell or via the host's wigamig settings before creating projects."
+  warn "user's shell or via the host's murmurent settings before creating projects."
 fi
 
 # gh auth status — warn but don't fail.
@@ -172,11 +172,11 @@ echo
 echo "Install complete."
 echo "  host:         ${HOST}"
 echo "  remote user:  ${REMOTE_USER}@${REMOTE_HOSTNAME}"
-echo "  wigamig:      ${WIGAMIG_VERSION}"
+echo "  murmurent:      ${WIGAMIG_VERSION}"
 echo "  uv:           ${UV_VERSION}"
 echo "  repo commit:  ${REMOTE_COMMIT}"
 echo
-echo "Next: register this host with wigamig so the dashboard knows about it:"
-echo "    wigamig host add ${HOST} --remote-user ${REMOTE_USER}"
+echo "Next: register this host with murmurent so the dashboard knows about it:"
+echo "    murmurent host add ${HOST} --remote-user ${REMOTE_USER}"
 echo "Then test:"
-echo "    wigamig host test ${HOST}"
+echo "    murmurent host test ${HOST}"

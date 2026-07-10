@@ -42,10 +42,10 @@ _SRC_PATH = _REPO_ROOT / "src"
 if _SRC_PATH.is_dir() and str(_SRC_PATH) not in sys.path:
     sys.path.insert(0, str(_SRC_PATH))
 
-from wigamig.commands import experiment_cmd, project_cmd  # noqa: E402
-from wigamig.core import deliberation, inventory, lab_vm  # noqa: E402
-from wigamig.core import sea as sea_core  # noqa: E402
-from wigamig.core.projects import find_project  # noqa: E402
+from murmurent.commands import experiment_cmd, project_cmd  # noqa: E402
+from murmurent.core import deliberation, inventory, lab_vm  # noqa: E402
+from murmurent.core import sea as sea_core  # noqa: E402
+from murmurent.core.projects import find_project  # noqa: E402
 
 # Importing the fake-data generator lets us call it without spawning a
 # subprocess; the file lives next to this one.
@@ -1021,7 +1021,7 @@ def main() -> int:
                         check=False,
                     )
         log("regenerating per-member dashboards")
-        from wigamig.commands import dashboard_cmd  # noqa: PLC0415
+        from murmurent.commands import dashboard_cmd  # noqa: PLC0415
 
         for path in dashboard_cmd.cmd_generate_all():
             log(f"wrote dashboard: {path}")

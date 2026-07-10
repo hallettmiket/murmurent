@@ -57,7 +57,7 @@ usage() {
   cat <<EOF
 Usage: $0 --project <name> --members <comma-separated-netnames>
 
-  --project   Wigamig project slug (matches ${SLUG_RE}).
+  --project   Murmurent project slug (matches ${SLUG_RE}).
   --members   Comma-separated list of OS accounts to grant access.
 
 Example:
