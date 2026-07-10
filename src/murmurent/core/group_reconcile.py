@@ -8,7 +8,7 @@ group roster against (a) the group's Slack workspace and (b) the group's GitHub
 repo, and reports / applies the deltas.
 
 PI-side by design: it reads the **group's own** bot token from
-``~/.config/wigamig/groups/<group>/slack-token`` (never the mayor's) and the
+``~/.config/murmurent/groups/<group>/slack-token`` (never the mayor's) and the
 PI's own ``gh`` for collaborator adds. All network calls go through injectable
 seams so it is unit-testable without Slack/GitHub. Writes (GitHub collaborator
 adds) only happen with ``apply=True``.
@@ -33,7 +33,7 @@ class GroupReconcileResult:
 
 def resolve_group_slack_token(group: str, *, allow_file: bool = True) -> str:
     """The group's OWN Slack bot token: env ``MURMURENT_GROUP_SLACK_TOKEN`` first,
-    then ``~/.config/wigamig/groups/<group>/slack-token`` (the PI's machine)."""
+    then ``~/.config/murmurent/groups/<group>/slack-token`` (the PI's machine)."""
     tok = os.environ.get("MURMURENT_GROUP_SLACK_TOKEN", "").strip()
     if tok or not allow_file:
         return tok
@@ -146,7 +146,7 @@ def group_reconcile(
             pass  # no group workspace configured — nothing to reconcile
         elif not tok:
             res.slack.append(f"@{handle}: no group Slack token "
-                             "(~/.config/wigamig/groups/{}/slack-token) — skipped".format(group))
+                             "(~/.config/murmurent/groups/{}/slack-token) — skipped".format(group))
         elif not email:
             res.slack.append(f"@{handle}: no email on file — can't check workspace membership")
         else:

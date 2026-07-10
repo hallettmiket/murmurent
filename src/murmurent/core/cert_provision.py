@@ -11,7 +11,7 @@ already carries each member's email + github.
 
 Author: Mike Hallett (with Claude Code)
 Input: the cert-project registry + the lab roster + a Slack bot token (env or
-       ``~/.config/wigamig/slack-token``).
+       ``~/.config/murmurent/slack-token``).
 Output: a private channel per project; ``slack_channel_id`` stamped on the record.
 """
 

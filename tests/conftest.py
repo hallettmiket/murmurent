@@ -1,7 +1,7 @@
 """Global test guards.
 
 The most important one: **never let the test suite make a live Slack call**,
-even on a developer machine that has a real ``~/.config/wigamig/slack-token``.
+even on a developer machine that has a real ``~/.config/murmurent/slack-token``.
 Without this, tests that exercise notification paths (join requests, SEA
 lifecycle, broadcasts) would resolve the real token from that file and post
 fixture data (``@diego``, ``p_test``, …) into a real workspace channel.

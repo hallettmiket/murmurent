@@ -308,7 +308,7 @@ def resolve_slack_token(*, allow_file: bool = False) -> str:
 
     Env first (``MURMURENT_SLACK_TOKEN`` → ``SLACK_BOT_TOKEN``); when
     ``allow_file`` is set, fall back to the mode-0600
-    ``~/.config/wigamig/slack-token`` file — the same source the long-running
+    ``~/.config/murmurent/slack-token`` file — the same source the long-running
     dashboard uses — so a mayor doesn't have to re-export the token in every
     terminal. **Automatic** provisioning must NOT pass ``allow_file=True``:
     keeping that path env-only (see :func:`_has_env_slack_token`) is what stops
@@ -796,7 +796,7 @@ def slack_create_channel(
     # Unified token: prefer MURMURENT_SLACK_TOKEN, fall back to the legacy
     # SLACK_BOT_TOKEN (both are workspace-scoped bot tokens). The posting /
     # invite path (dashboard/slack_notify) additionally honours the
-    # ~/.config/wigamig/slack-token file.
+    # ~/.config/murmurent/slack-token file.
     tok = token if token is not None else (
         os.environ.get("MURMURENT_SLACK_TOKEN", "").strip()
         or os.environ.get("SLACK_BOT_TOKEN", "").strip()

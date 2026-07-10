@@ -5,7 +5,7 @@ Purpose: Mirror one day of one Slack channel into a markdown file at
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-08
 Input: Slack web API (via :mod:`slack_sdk`); ``$MURMURENT_SLACK_TOKEN``
-       or ``~/.config/wigamig/slack-token`` (mode 0600) for the token.
+       or ``~/.config/murmurent/slack-token`` (mode 0600) for the token.
 Output: One markdown file per (channel, date), with frontmatter and
         threaded message bodies. Forward-compatible with the
         distillation pipeline (:mod:`murmurent.core.slack_distill`).
@@ -17,7 +17,7 @@ private channels the bot wasn't invited to.
 
 Token resolution order (first match wins):
   1. ``$MURMURENT_SLACK_TOKEN``
-  2. ``~/.config/wigamig/slack-token`` (single line, mode 0600)
+  2. ``~/.config/murmurent/slack-token`` (single line, mode 0600)
   3. raise — refuse to silently no-op
 """
 
@@ -33,7 +33,7 @@ from .frontmatter import dump_document
 from .repo import lab_mgmt_repo_root
 
 SLACK_SUBDIR = "slack"
-TOKEN_FILE = Path("~/.config/wigamig/slack-token").expanduser()
+TOKEN_FILE = Path("~/.config/murmurent/slack-token").expanduser()
 ORACLE_MARKER = "[oracle:on]"
 
 
