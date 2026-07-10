@@ -1,6 +1,6 @@
 ---
 name: wigamig-push
-description: Wigamig-aware stage/commit/push for a wigamig-enabled repo. Excludes per-machine + secret-shaped files, refuses to commit large files that belong in refined/, never touches /data/lab_vm/raw|refined, and posts a release note to the project's own Slack channel after the push.
+description: Murmurent-aware stage/commit/push for a wigamig-enabled repo. Excludes per-machine + secret-shaped files, refuses to commit large files that belong in refined/, never touches /data/lab_vm/raw|refined, and posts a release note to the project's own Slack channel after the push.
 user_invocable: true
 ---
 
@@ -8,9 +8,9 @@ Stage changed files, create a descriptive commit, push to the remote tracking br
 
 ## Pre-flight (do this BEFORE staging)
 
-1. **Confirm it's a wigamig repo.** The current working tree must contain `CHARTER.md` at its root. If not, stop and tell the user "this isn't a wigamig project — use /commit-push instead."
+1. **Confirm it's a murmurent repo.** The current working tree must contain `CHARTER.md` at its root. If not, stop and tell the user "this isn't a murmurent project — use /commit-push instead."
 
-2. **Refuse if the diff touches `/data/lab_vm/raw/` or `/data/lab_vm/refined/`.** Those paths are immutable per wigamig's data-storage rule (`rules/data-storage.md`). The hook layer would block it anyway, but check `git status` for any path matching `^data/lab_vm/(raw|refined)/` and refuse the commit with a clear explanation. (Note: project repos under `~/repos/<name>/` should never contain such paths; this guard catches misconfigured `.gitignore` or symlinks.)
+2. **Refuse if the diff touches `/data/lab_vm/raw/` or `/data/lab_vm/refined/`.** Those paths are immutable per murmurent's data-storage rule (`rules/data-storage.md`). The hook layer would block it anyway, but check `git status` for any path matching `^data/lab_vm/(raw|refined)/` and refuse the commit with a clear explanation. (Note: project repos under `~/repos/<name>/` should never contain such paths; this guard catches misconfigured `.gitignore` or symlinks.)
 
 3. **Refuse secret-shaped filenames.** Before staging, run `git status --porcelain` and look for changes to filenames matching any of:
    - `*.env` (but `.env.example` is OK if values are placeholders)
@@ -32,7 +32,7 @@ Stage changed files, create a descriptive commit, push to the remote tracking br
 
 ## Stage + commit + push
 
-Once the pre-flight passes, follow the standard commit-push flow with these wigamig conventions:
+Once the pre-flight passes, follow the standard commit-push flow with these murmurent conventions:
 
 - **Stage selectively.** Use `git add <specific files>` rather than `git add -A` or `git add .` so the skips from steps 3-5 stick.
 - **Commit message style.** Lead with a short imperative title (≤70 chars). Body explains the *why*, not the *what*. If `CHARTER.md`, `MEMBERS`, or `.claude/agents/` symlinks changed, call that out explicitly in the body — those are governance-level changes a reader needs to notice.
@@ -43,7 +43,7 @@ Once the pre-flight passes, follow the standard commit-push flow with these wiga
   ```
 
 - **Never `--amend`** — create a new commit per CLAUDE.md.
-- **Never `--no-verify`** — wigamig hooks (raw_guard, protected_paths, phi_check, audit) are load-bearing.
+- **Never `--no-verify`** — murmurent hooks (raw_guard, protected_paths, phi_check, audit) are load-bearing.
 - **Never `push --force`** — the lab's commit history is the audit trail. If a rebase is truly needed, ask the user first.
 
 ## After the push: Slack release note
@@ -53,12 +53,12 @@ project (it has a `CHARTER.md`), so its activity belongs in its channel, not the
 centre-wide dev channel. Resolve the channel id first:
 
 ```bash
-wigamig project channel        # prints the cert-project's Slack channel id
+murmurent project channel        # prints the cert-project's Slack channel id
 ```
 
 - If it prints a channel id → post there with `mcp__claude_ai_Slack__slack_send_message` (`channel_id` = that id).
 - If it exits with **"no Slack channel yet"** → the project isn't provisioned.
-  Tell the user to run `wigamig project provision-slack <project>` (PI only), and
+  Tell the user to run `murmurent project provision-slack <project>` (PI only), and
   **skip the Slack post** (don't fall back to #claude-test — a project's notes go
   to its own channel only). The push still succeeded.
 - If it exits with **"not inside a project repo"** → this isn't a project after
@@ -75,7 +75,7 @@ Use `mcp__claude_ai_Slack__slack_send_message`, NOT `mcp__slack__slack_post_mess
 
 | Situation | Action | Reason |
 |---|---|---|
-| Repo lacks `CHARTER.md` at root | Refuse; suggest `/commit-push` | Not a wigamig project |
+| Repo lacks `CHARTER.md` at root | Refuse; suggest `/commit-push` | Not a murmurent project |
 | Diff touches `data/lab_vm/raw\|refined/` | Refuse | rules/data-storage.md (immutable) |
 | Secret-shaped filename in diff | Stop and ask | Prevent credential leak |
 | File > 1 MB in `data/`/`src/`/`exp/`/`obsolete/` | Refuse; suggest refined/ | rules/project-structure.md |

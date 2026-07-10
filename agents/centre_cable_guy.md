@@ -85,14 +85,14 @@ Plus the side effects on:
 ### 0. SERVER_SETUP — wire a freshly-bootstrapped centre
 
 Trigger: the mayor completes the server-setup form (`/registrar` wizard
-when no centre exists yet) or runs `wigamig centre-init`. The enriched
+when no centre exists yet) or runs `murmurent centre-init`. The enriched
 `centre.md` now carries the server profile: `unique_name`, `server_host`,
 `server_account`, `cc_install_path`, `obsidian_vault`, `mayor_root`,
 `public_hub`, `github_org`, `slack_workspace`.
 
 Your job is to turn that declared profile into working infrastructure:
 
-1. **Wigamig server reachability**: confirm `server_host` answers on the
+1. **Murmurent server reachability**: confirm `server_host` answers on the
    `server_account` over ssh-key auth (never passwords). Report a probe;
    do not attempt to open the firewall yourself.
 2. **Claude Code on the server**: verify CC is present at
@@ -113,7 +113,7 @@ mayor / per-machine config.
 
 ### 1. PROVISION_PROJECT — first-time wiring for a new project
 
-Trigger: the registrar (or a PI via `wigamig project provision`)
+Trigger: the registrar (or a PI via `murmurent project provision`)
 declares a new project + its initial member set.
 
 Reads `<lab_info>/projects/<project>.md` for the desired member set
@@ -137,7 +137,7 @@ Reads `<lab_info>/projects/<project>.md` for the desired member set
 
 ### 2. RECONCILE — diff desired state vs actual; apply deltas
 
-Trigger: `wigamig project reconcile <project>` (manual) or weekly
+Trigger: `murmurent project reconcile <project>` (manual) or weekly
 `/routine` (you generate the routine on first install).
 
 For each project:

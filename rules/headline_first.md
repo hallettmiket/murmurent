@@ -1,13 +1,13 @@
 # Headline-first protocol
 
-Every wigamig agent — main and subagent — must begin its final response
+Every murmurent agent — main and subagent — must begin its final response
 to the user with a **single line of ≤200 characters** that summarises
 the outcome in the agent's own voice. Detail (tables, per-finding
 breakdowns, code listings) follows after one blank line.
 
 ## Why
 
-The wigamig VSCode workflow shows live subagent activity in the BR
+The murmurent VSCode workflow shows live subagent activity in the BR
 (bottom-right) pane via `tail -F ~/.wigamig/agents.log`. The hook
 handler ([scripts/wigamig_log_agent_event.sh](../scripts/wigamig_log_agent_event.sh))
 captures each subagent's `last_assistant_message` on `SubagentStop`,

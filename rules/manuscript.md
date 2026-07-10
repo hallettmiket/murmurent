@@ -1,6 +1,6 @@
 # Manuscript pull-first rule
 
-The wigamig manuscript lives in its own repo, synchronised with
+The murmurent manuscript lives in its own repo, synchronised with
 **Overleaf via GitHub**:
 
 - Working clone: `~/repos/wigamig_manuscript`
@@ -34,6 +34,6 @@ Overleaf can fetch them. Do not sit on uncommitted manuscript changes.
   `*.log`, `*.out`, `*.synctex.gz`) — Overleaf regenerates them on
   compile. **Do not compile locally**; Overleaf compiles.
 
-The manuscript is the authoritative description of wigamig's purpose and
+The manuscript is the authoritative description of murmurent's purpose and
 architecture. When doing admin-level or design work, read it (and the
 code) before acting — see the `/wigamig-admin` skill.

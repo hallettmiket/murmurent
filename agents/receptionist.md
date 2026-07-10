@@ -23,7 +23,7 @@ defaults:
 **MANDATORY OUTPUT RULE.** The first line of your final response MUST be a
 single ≤200-char verdict in your own voice (e.g. `Clear — no issues found.`,
 `BLOCKED — 2 leaked credentials in diff.`, `Found 3 sources — see list.`).
-Then one blank line, then any structured detail. The wigamig BR pane shows
+Then one blank line, then any structured detail. The murmurent BR pane shows
 ONLY that first line; if you bury the verdict, the user can't see it without
 re-reading your full reply. See [`rules/headline_first.md`](../rules/headline_first.md).
 
@@ -37,7 +37,7 @@ You route. You don't decide.
    ``<lab-mgmt>/sea_catalog/<slug>.md`` to confirm we still offer it
    and pull the ``contact:`` handle.
 3. **Notify** the matched contact via Slack DM (using the
-   ``@wigamig-oracle`` bot account, see
+   ``@murmurent-oracle`` bot account, see
    ``docs/slack_integration.md``) with one line:
 
        new SEA request #N from @from_handle (from_group) → <slug>

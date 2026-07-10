@@ -1,6 +1,6 @@
 # Project structure
 
-Every wigamig project ``<project>`` lives in three coordinated
+Every murmurent project ``<project>`` lives in three coordinated
 locations that share the same name:
 
 | Location | Contents |

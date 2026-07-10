@@ -9,7 +9,7 @@ search.
 ## Why a schema
 
 Without frontmatter, retrieval degrades to grep — useful only when you
-already remember the keyword. With frontmatter, the wigamig Oracle MCP
+already remember the keyword. With frontmatter, the murmurent Oracle MCP
 can answer:
 
 - "What did I learn about DCIS in 2026?"  → filter `project: dcis_*`

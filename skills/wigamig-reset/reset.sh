@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# reset.sh — back up, then reset wigamig machine state to a fresh start.
+# reset.sh — back up, then reset murmurent machine state to a fresh start.
 #
 # Levels (default: centre):
-#   centre   remove ~/.wigamig/lab_info only  ->  `wigamig centre-init` is
+#   centre   remove ~/.wigamig/lab_info only  ->  `murmurent centre-init` is
 #            first-run again. Nothing else touched.
 #   install  centre + reinstall the tool from the repo (force, py3.12, extras)
-#            + re-run scripts/setup.sh + `wigamig install --hooks`.
+#            + re-run scripts/setup.sh + `murmurent install --hooks`.
 #   full     install + remove machine-local CACHES (workspaces/, *.log,
 #            dashboard.pid, security/ agent cache). Still KEEPS credentials,
 #            installations/, decommissions/, audit logs, hosts/machine yaml.
@@ -22,15 +22,15 @@
 #   --nuke-credentials     also remove ~/.config/wigamig (slack-token + keys)
 #   --nuke-keys            with --level data, ALSO remove ~/.wigamig/keys + age
 #                          (a fully fresh identity; default keeps them)
-#   --nuke-labs            ALSO remove this machine's wigamig lab-management repos
+#   --nuke-labs            ALSO remove this machine's murmurent lab-management repos
 #                          (~/repos/wigamig_*  — they hold the roster). Backed up
 #                          into the tarball first; REFUSES any repo with
 #                          uncommitted or unpushed commits (push it, or don't nuke
 #                          it). Default: labs are only LISTED and left untouched.
-#   --uninstall            first completely REMOVE the existing wigamig
+#   --uninstall            first completely REMOVE the existing murmurent
 #                          install(s) — the uv-tool one AND stray conda/pipx
 #                          copies — before any reinstall. With --level centre
-#                          (default) this leaves NO wigamig on the machine; with
+#                          (default) this leaves NO murmurent on the machine; with
 #                          --level install/full it removes-then-reinstalls clean.
 #
 # Completely remove the old install (leave nothing):
@@ -93,7 +93,7 @@ rmrf() { # rmrf <path> <label>
   else say "  (skip) $2 not present"; fi
 }
 
-say "=== wigamig reset — level: $LEVEL${DRY:+ }$([ "$DRY" = 1 ] && echo '(dry-run)')"
+say "=== murmurent reset — level: $LEVEL${DRY:+ }$([ "$DRY" = 1 ] && echo '(dry-run)')"
 say "    repo:        $REPO"
 say "    nuke creds:  $([ "$NUKE_CREDS" = 1 ] && echo yes || echo NO)"
 say "    nuke installs: $([ "$NUKE_INSTALL" = 1 ] && echo yes || echo NO)"
@@ -108,8 +108,8 @@ fi
 
 # 1. stop any running dashboards --------------------------------------------
 say "1. stopping any running dashboards"
-if [ "$DRY" = 1 ]; then say "  DRY: would pkill -f 'wigamig dashboard'";
-else pkill -f "wigamig dashboard" 2>/dev/null || true; sleep 1; fi
+if [ "$DRY" = 1 ]; then say "  DRY: would pkill -f 'murmurent dashboard'";
+else pkill -f "murmurent dashboard" 2>/dev/null || true; sleep 1; fi
 
 # 2. ALWAYS back up first ---------------------------------------------------
 say "2. backing up (~/.wigamig + ~/.config/wigamig)"
@@ -154,25 +154,25 @@ if [ "$LEVEL" = data ]; then
 fi
 
 # 3b. uninstall the tool entirely (only with --uninstall) -------------------
-# Completely removes every wigamig executable: the uv-tool install AND any
+# Completely removes every murmurent executable: the uv-tool install AND any
 # stray copies pip-installed into conda envs / pipx that would shadow it.
 if [ "$UNINSTALL" = 1 ]; then
-  say "3b. removing existing wigamig install(s)"
-  if [ "$DRY" = 1 ]; then say "  DRY: would uv tool uninstall wigamig"; else
-    uv tool uninstall wigamig 2>/dev/null && say "  uv-tool wigamig removed" || say "  (no uv-tool wigamig)"
+  say "3b. removing existing murmurent install(s)"
+  if [ "$DRY" = 1 ]; then say "  DRY: would uv tool uninstall murmurent"; else
+    uv tool uninstall murmurent 2>/dev/null && say "  uv-tool murmurent removed" || say "  (no uv-tool murmurent)"
   fi
   # stray installs in conda base + envs and pipx
   for py in "$HOME"/anaconda3/bin/python "$HOME"/anaconda3/envs/*/bin/python \
             "$HOME"/miniconda3/bin/python "$HOME"/miniconda3/envs/*/bin/python; do
     [ -x "$py" ] || continue
-    "$py" -c "import wigamig" >/dev/null 2>&1 || continue
-    if [ "$DRY" = 1 ]; then say "  DRY: would pip-uninstall wigamig from $py";
-    else "$py" -m pip uninstall -y wigamig >/dev/null 2>&1 && say "  removed stray install: $py"; fi
+    "$py" -c "import murmurent" >/dev/null 2>&1 || continue
+    if [ "$DRY" = 1 ]; then say "  DRY: would pip-uninstall murmurent from $py";
+    else "$py" -m pip uninstall -y murmurent >/dev/null 2>&1 && say "  removed stray install: $py"; fi
   done
-  command -v pipx >/dev/null 2>&1 && { [ "$DRY" = 1 ] && say "  DRY: would pipx uninstall wigamig" || pipx uninstall wigamig >/dev/null 2>&1 || true; }
+  command -v pipx >/dev/null 2>&1 && { [ "$DRY" = 1 ] && say "  DRY: would pipx uninstall murmurent" || pipx uninstall murmurent >/dev/null 2>&1 || true; }
   if [ "$DRY" != 1 ]; then
-    left="$(command -v wigamig 2>/dev/null || true)"
-    [ -z "$left" ] && say "  ✓ no wigamig left on PATH" || say "  ! still on PATH: $left (check it manually)"
+    left="$(command -v murmurent 2>/dev/null || true)"
+    [ -z "$left" ] && say "  ✓ no murmurent left on PATH" || say "  ! still on PATH: $left (check it manually)"
   fi
 fi
 
@@ -187,7 +187,7 @@ if [ "$LEVEL" = install ] || [ "$LEVEL" = full ]; then
     # -e keeps the package in the clone so the dashboard's static assets resolve.
     run "cd '$REPO' && uv tool install --force --python 3.12 -e ."
     run "cd '$REPO' && bash scripts/setup.sh"
-    run "wigamig install --hooks"
+    run "murmurent install --hooks"
   fi
 else
   say "4. (skip reinstall — level '$LEVEL')"
@@ -212,19 +212,19 @@ say "6. opt-in nukes"
 if [ "$NUKE_INSTALL" = 1 ]; then rmrf "$WIG/installations" "installations/ (OTHER PROJECTS)"; else say "  (keep) installations/"; fi
 if [ "$NUKE_CREDS" = 1 ];   then rmrf "$CFG" "credentials (~/.config/wigamig: slack-token + keys)"; else say "  (keep) credentials"; fi
 
-# 7. wigamig lab-management repos (~/repos/wigamig_*) ------------------------
+# 7. murmurent lab-management repos (~/repos/wigamig_*) ------------------------
 # These hold the lab ROSTER (members/*.md) — the source of truth for identity.
 # They live under ~/repos, which reset otherwise NEVER touches, so by default we
 # only LIST them (so you know they survive). --nuke-labs removes them, but only
 # after backing each into the tarball and refusing any with uncommitted/unpushed
 # work (losing the roster to a reset must be a deliberate, safe act).
-say "7. wigamig lab repos ($REPOS_ROOT/wigamig_*)"
+say "7. murmurent lab repos ($REPOS_ROOT/wigamig_*)"
 LAB_REPOS=()
 if [ -d "$REPOS_ROOT" ]; then
   for d in "$REPOS_ROOT"/wigamig_*; do
     [ -d "$d/.git" ] || continue
-    # the wigamig repo + its manuscript aren't lab-mgmt repos; skip by name
-    case "$(basename "$d")" in wigamig|wigamig_manuscript|wigamig_public) continue ;; esac
+    # the murmurent repo + its manuscript aren't lab-mgmt repos; skip by name
+    case "$(basename "$d")" in murmurent|wigamig_manuscript|wigamig_public) continue ;; esac
     LAB_REPOS+=("$d")
   done
 fi
@@ -267,4 +267,4 @@ fi
 say ""
 say "=== done (level: $LEVEL$([ "$DRY" = 1 ] && echo ', dry-run — nothing changed'))"
 [ "$DRY" != 1 ] && say "restore if needed:  tar -xzf $BK -C \$HOME"
-say "next:  wigamig centre-status   (should say 'no centre initialised')"
+say "next:  murmurent centre-status   (should say 'no centre initialised')"
