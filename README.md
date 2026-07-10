@@ -60,7 +60,7 @@ You are your lab's certificate authority.
    murmurent pi-init <your-lab>          # (or answer "PI" in `murmurent init`)
    ```
 2. Connect your lab's Slack. This lets member IDs travel by DM instead
-3. of by hand (it is possible to do this by email if preferred):
+   of by hand (it is possible to do this by email if preferred):
    ```bash
    murmurent group-slack-setup <your-lab>
    ```
@@ -72,12 +72,12 @@ You are your lab's certificate authority.
    ```bash
    murmurent issue-member-card <their-request> --group <your-lab>
    ```
-   This automatically DMs the signed bundle back to the member.
-   Pass `--dm <slack_user_id>`.
-   If Slack fails, the command will print the bundle for you to send
-   yourself. ???? (`murmurent import-card
-   <bundle> --trust-root <your-trust-root>`). Add `--no-dm` to always skip
-   Slack and just print/write the bundle.
+   This automatically DMs the signed bundle back to the member — pass
+   `--dm <slack_user_id>` if you already know their Slack id, or `--no-dm`
+   to skip Slack and just print the bundle. If Slack isn't connected, or
+   the member's Slack account can't be found, it falls back to printing
+   the bundle for you to send yourself. Either way, the member finishes
+   with `murmurent import-card <bundle> --trust-root <your-trust-root>`.
 
 Full identity flow (enroll → issue → import → revoke): [`docs/identity.md`](docs/identity.md).
 
