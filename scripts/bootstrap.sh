@@ -149,7 +149,7 @@ cat <<'EOF'
 EOF
 
 if [[ "${NO_LAUNCH:-0}" != "1" && -t 0 ]]; then
-  printf "\nRun `murmurent init` now? [Y/n] "
+  printf "\nRun 'murmurent init' now? [Y/n] "
   read -r reply
   if [[ -z "$reply" || "$reply" == "y" || "$reply" == "Y" ]]; then
     exec murmurent init
