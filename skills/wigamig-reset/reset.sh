@@ -224,7 +224,7 @@ if [ -d "$REPOS_ROOT" ]; then
   for d in "$REPOS_ROOT"/wigamig_*; do
     [ -d "$d/.git" ] || continue
     # the murmurent repo + its manuscript aren't lab-mgmt repos; skip by name
-    case "$(basename "$d")" in murmurent|wigamig_manuscript|wigamig_public) continue ;; esac
+    case "$(basename "$d")" in murmurent|murmurent_manuscript|murmurent_public) continue ;; esac
     LAB_REPOS+=("$d")
   done
 fi
