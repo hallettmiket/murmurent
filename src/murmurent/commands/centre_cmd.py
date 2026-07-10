@@ -300,7 +300,7 @@ def cmd_approve(req_id: int, actor: str, no_provision: bool) -> None:
     if not actor:
         raise click.ClickException("--actor required (or set $MURMURENT_USER)")
     # Approving is a deliberate mayor action → resolve the Slack token from env
-    # OR the mode-0600 ~/.config/wigamig/slack-token file, so lab/core
+    # OR the mode-0600 ~/.config/murmurent/slack-token file, so lab/core
     # provisioning actually creates the channel + invites members without
     # requiring the mayor to export a token first.
     tok = _cp.resolve_slack_token(allow_file=True)
@@ -453,7 +453,7 @@ def centre_slack_smoke(channel: str, public: bool, keep: bool) -> None:
     if not tok:
         raise click.ClickException(
             "no Slack token found. Set $MURMURENT_SLACK_TOKEN (legacy $SLACK_BOT_TOKEN "
-            "also works) or put it in ~/.config/wigamig/slack-token (mode 0600). "
+            "also works) or put it in ~/.config/murmurent/slack-token (mode 0600). "
             "The bot needs 'groups:write' (private) or 'channels:manage' (public):\n"
             "    export MURMURENT_SLACK_TOKEN=xoxb-..."
         )
@@ -555,7 +555,7 @@ def centre_status() -> None:
 def centre_slack_setup(mayor_email: str) -> None:
     from ..core import centre_provision as _cp
     # Explicit mayor command → resolve the token from env OR the mode-0600
-    # ~/.config/wigamig/slack-token file, so it works in any terminal.
+    # ~/.config/murmurent/slack-token file, so it works in any terminal.
     tok = _cp.resolve_slack_token(allow_file=True)
     probes = _cp.provision_centre_slack(token=tok or None, mayor_email=mayor_email)
     any_block = False
@@ -1352,7 +1352,7 @@ def group_setup(group: str, sets: tuple[str, ...], non_interactive: bool) -> Non
                      "repo. Reports Slack workspace membership (free/Pro can't "
                      "API-invite — it surfaces the invite link) and, with "
                      "--apply, adds members as GitHub collaborators. Uses the "
-                     "group's own token (~/.config/wigamig/groups/<group>/slack-token).")
+                     "group's own token (~/.config/murmurent/groups/<group>/slack-token).")
 @click.argument("group")
 @click.option("--apply", is_flag=True,
               help="Actually add GitHub collaborators (default: report only).")

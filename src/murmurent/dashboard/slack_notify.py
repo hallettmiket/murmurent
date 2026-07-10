@@ -1,7 +1,7 @@
 """
 Purpose: Post dashboard event notifications to Slack.
          Uses the Slack Web API (chat.postMessage) with a bot token
-         stored in $MURMURENT_SLACK_TOKEN or ~/.config/wigamig/slack-token.
+         stored in $MURMURENT_SLACK_TOKEN or ~/.config/murmurent/slack-token.
          All functions are no-ops when no token is configured, so the
          server starts cleanly without Slack auth.
 Author: Mike Hallett (with Claude Code)
@@ -27,7 +27,7 @@ _SLACK_API_LIST   = "https://slack.com/api/conversations.list"
 _SLACK_API_INVITE = "https://slack.com/api/conversations.invite"
 _SLACK_API_MEMBERS = "https://slack.com/api/conversations.members"
 _SLACK_API_LOOKUP_BY_EMAIL = "https://slack.com/api/users.lookupByEmail"
-_TOKEN_FILE = Path("~/.config/wigamig/slack-token").expanduser()
+_TOKEN_FILE = Path("~/.config/murmurent/slack-token").expanduser()
 
 # Fallback channel IDs. ``_CHAN_DEFAULT`` is the LAST-RESORT channel for
 # wigamig-generated notifications when no specific project/group channel
@@ -74,7 +74,7 @@ def _route(channel: str) -> str:
 def _token() -> str | None:
     """Return the bot token, or None if not configured.
 
-    Resolution: ``$MURMURENT_SLACK_TOKEN`` → ``~/.config/wigamig/slack-token``
+    Resolution: ``$MURMURENT_SLACK_TOKEN`` → ``~/.config/murmurent/slack-token``
     → the legacy ``$SLACK_BOT_TOKEN`` (unified with centre_provision so a
     single token drives both channel creation and posting/invites)."""
     env = os.environ.get("MURMURENT_SLACK_TOKEN", "").strip()
@@ -428,7 +428,7 @@ def _post_error_hint(error: str, channel: str) -> str:
     """Map a Slack error code to an actionable, mayor-readable explanation."""
     hints = {
         "no_token": "no Slack token — set $MURMURENT_SLACK_TOKEN or put it in "
-                    "~/.config/wigamig/slack-token.",
+                    "~/.config/murmurent/slack-token.",
         "channel_not_found": f"channel {channel} was not found. The bot token is "
                     "almost certainly for a DIFFERENT Slack workspace than this "
                     "channel — use the token for the channel's own workspace.",
