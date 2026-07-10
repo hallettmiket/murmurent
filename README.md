@@ -26,7 +26,7 @@ handle + key, and the dashboard (`murmurent dashboard --hifi`) has the rest.
 
 There are three ways a user interacts with Murmurent:
 (i) through the `murmurent` CLI
-(ii) through interactions (e.g. \skills) defined in Claude Code
+(ii) through interactions (e.g. skills) defined in Claude Code
 (iii) through a Dashboard (not discussed here).
 
 After installation, find your situation below.
