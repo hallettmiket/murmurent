@@ -1,4 +1,4 @@
-# murmurent
+# Murmurent
 
 Shared agentic-AI infrastructure for academic researchers, labs cores and research centers. 
 It lets research groups work independently, pool agents and data when collaboration helps, and
