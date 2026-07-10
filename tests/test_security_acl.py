@@ -27,9 +27,9 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.core import security_acl as A
-from wigamig.core import security_tier2 as T2
-from wigamig.core.security_findings import (
+from murmurent.core import security_acl as A
+from murmurent.core import security_tier2 as T2
+from murmurent.core.security_findings import (
     SEVERITY_BLOCK,
     SEVERITY_INFO,
     SEVERITY_WARN,

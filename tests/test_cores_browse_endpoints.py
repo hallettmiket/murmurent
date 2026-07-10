@@ -21,10 +21,10 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar as R
-from wigamig.core import services as S
-from wigamig.core import training as T
-from wigamig.dashboard.server import create_app
+from murmurent.core import registrar as R
+from murmurent.core import services as S
+from murmurent.core import training as T
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -114,7 +114,7 @@ def test_list_cores_services_member_with_training(world):
 
 # ---- /api/member/<h>/requests ------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_member_requests_only_for_that_member(mock_post, world):
     client = TestClient(create_app())
     # alice books cd; bob books cd; alice books seq.
@@ -145,7 +145,7 @@ def test_member_requests_only_for_that_member(mock_post, world):
     assert {r["core"] for r in rows} == {"biocore", "genomics"}
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_member_requests_excludes_terminal_by_default(mock_post, world):
     client = TestClient(create_app())
     res_book = client.post(

@@ -10,9 +10,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from wigamig.core import cert_projects as CP
-from wigamig.core import cert_provision as CPROV
-from wigamig.core import membership as MEM
+from murmurent.core import cert_projects as CP
+from murmurent.core import cert_provision as CPROV
+from murmurent.core import membership as MEM
 
 
 @pytest.fixture(autouse=True)

@@ -1,5 +1,5 @@
 """
-Purpose: Validate the ported agent registry and the loader in ``wigamig.core.agents``.
+Purpose: Validate the ported agent registry and the loader in ``murmurent.core.agents``.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-06
 Input: ``agents/`` directory at the repo root + synthetic agent files for negative tests.
@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.core.agents import VALID_FREEZE_VALUES, load_agent, load_registry
-from wigamig.core.frontmatter import FrontmatterError
+from murmurent.core.agents import VALID_FREEZE_VALUES, load_agent, load_registry
+from murmurent.core.frontmatter import FrontmatterError
 
 REPO_AGENTS_DIR = Path(__file__).resolve().parents[1] / "agents"
 EXPECTED_AGENTS = {

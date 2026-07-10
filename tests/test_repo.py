@@ -1,5 +1,5 @@
 """
-Purpose: Unit tests for ``wigamig.core.repo``.
+Purpose: Unit tests for ``murmurent.core.repo``.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-06
 Input: ``tmp_path`` fixtures simulating project repos.
@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.core.repo import (
+from murmurent.core.repo import (
     RepoDiscoveryError,
     find_project_repo,
     read_members,

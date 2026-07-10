@@ -14,8 +14,8 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from wigamig.core import idcert as C
-from wigamig.core import idkeys as K
+from murmurent.core import idcert as C
+from murmurent.core import idkeys as K
 
 
 T0 = datetime(2026, 7, 8, 12, 0, 0, tzinfo=timezone.utc)

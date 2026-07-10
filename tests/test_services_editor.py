@@ -21,9 +21,9 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar as R
-from wigamig.core import services as S
-from wigamig.dashboard.server import create_app
+from murmurent.core import registrar as R
+from murmurent.core import services as S
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -144,7 +144,7 @@ def test_archive_service_flips_status(world):
 
 # ---- HTTP endpoints ------------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_http_create_as_registrar(mock_post, world):
     client = TestClient(create_app())
     res = client.post(
@@ -157,7 +157,7 @@ def test_http_create_as_registrar(mock_post, world):
     mock_post.assert_called()
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_http_create_as_core_leader(mock_post, world):
     client = TestClient(create_app())
     res = client.post(
@@ -195,7 +195,7 @@ def test_http_create_unknown_core(world):
     assert res.status_code == 404
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_http_update_patches_field(mock_post, world):
     S.create_service(core="biocore", slug="abc", name="Original")
     client = TestClient(create_app())
@@ -210,7 +210,7 @@ def test_http_update_patches_field(mock_post, world):
     assert s.description == "edited"
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_http_archive_endpoint(mock_post, world):
     S.create_service(core="biocore", slug="abc", name="X")
     client = TestClient(create_app())

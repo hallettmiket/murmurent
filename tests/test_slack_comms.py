@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.core import centre_init as CI
-from wigamig.core import centre_provision as CP
-from wigamig.core import registrar as R
-from wigamig.core import slack_comms as SC
+from murmurent.core import centre_init as CI
+from murmurent.core import centre_provision as CP
+from murmurent.core import registrar as R
+from murmurent.core import slack_comms as SC
 
 
 @pytest.fixture
@@ -54,7 +54,7 @@ def test_ensure_group_channel_noop_without_token(world, monkeypatch):
 
 def test_ensure_group_channel_creates_and_invites(world, monkeypatch):
     monkeypatch.setattr(SC, "token_present", lambda: True)
-    from wigamig.core.centre_provision import SlackChannelResult
+    from murmurent.core.centre_provision import SlackChannelResult
     seen = {}
     def creator(name, *, private=True):
         seen["name"] = name
@@ -156,7 +156,7 @@ def test_provision_centre_slack_reuses_existing_mayor_channel(world, monkeypatch
     monkeypatch.setattr(CP, "slack_create_channel",
         lambda name, **k: CP.SlackChannelResult(ok=False, channel_name=name,
                                                 error="name_taken", detail="exists"))
-    monkeypatch.setattr("wigamig.dashboard.slack_notify._lookup_channel_id_by_name",
+    monkeypatch.setattr("murmurent.dashboard.slack_notify._lookup_channel_id_by_name",
                         lambda n: "C0EXISTING")
     probes = CP.provision_centre_slack(channel_resolver=lambda n: None)
     mayor = next(p for p in probes if p.name == "mayor-channel")
@@ -167,7 +167,7 @@ def test_provision_centre_slack_reuses_existing_mayor_channel(world, monkeypatch
 def test_resolve_slack_token_env_then_file(monkeypatch, tmp_path):
     monkeypatch.delenv("WIGAMIG_SLACK_TOKEN", raising=False)
     monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
-    cfg = tmp_path / ".config" / "wigamig"
+    cfg = tmp_path / ".config" / "murmurent"
     cfg.mkdir(parents=True)
     (cfg / "slack-token").write_text("xoxb-fromfile\n")
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
@@ -192,7 +192,7 @@ def test_provision_centre_slack_invites_the_mayor(world, monkeypatch):
     def fake_invite(cid, handles, *, member_email_map=None):
         seen.update(cid=cid, handles=handles, map=member_email_map)
         return {"invited": handles, "already_in": [], "unresolved": []}
-    monkeypatch.setattr("wigamig.dashboard.slack_notify.invite_members_to_channel", fake_invite)
+    monkeypatch.setattr("murmurent.dashboard.slack_notify.invite_members_to_channel", fake_invite)
 
     probes = CP.provision_centre_slack(channel_resolver=lambda n: "C0GEN")
     inv = next(p for p in probes if p.name == "mayor-invite")
@@ -211,7 +211,7 @@ def test_provision_centre_slack_mayor_email_override(world, monkeypatch):
     def fake_invite(cid, handles, *, member_email_map=None):
         seen["map"] = member_email_map
         return {"invited": handles, "already_in": [], "unresolved": []}
-    monkeypatch.setattr("wigamig.dashboard.slack_notify.invite_members_to_channel", fake_invite)
+    monkeypatch.setattr("murmurent.dashboard.slack_notify.invite_members_to_channel", fake_invite)
     CP.provision_centre_slack(channel_resolver=lambda n: "C0GEN", mayor_email="real@slack.edu")
     assert seen["map"] == {"tbrowne": "real@slack.edu"}     # override beats join_email
 
@@ -228,7 +228,7 @@ def test_provision_centre_slack_warns_when_no_mayor_email(world, monkeypatch):
 def test_provision_member_to_group_invites(world, monkeypatch):
     R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
     R.set_group_slack_channel("dcis", "C0DCIS")
-    monkeypatch.setattr("wigamig.dashboard.slack_notify.invite_members_to_channel",
+    monkeypatch.setattr("murmurent.dashboard.slack_notify.invite_members_to_channel",
         lambda cid, handles, *, member_email_map=None:
             {"invited": handles, "already_in": [], "unresolved": []})
     probes = CP.provision_member_to_group("dcis", handle="@bob", email="bob@x", token="xoxb-x")
@@ -239,7 +239,7 @@ def test_provision_member_defers_with_invite_link_when_not_in_workspace(world, m
     R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
     R.set_group_slack_channel("dcis", "C0DCIS")
     CI.update_centre({"slack_invite_url": "https://join.slack/xyz"})
-    monkeypatch.setattr("wigamig.dashboard.slack_notify.invite_members_to_channel",
+    monkeypatch.setattr("murmurent.dashboard.slack_notify.invite_members_to_channel",
         lambda cid, handles, *, member_email_map=None:
             {"invited": [], "already_in": [],
              "unresolved": [{"handle": handles[0], "reason": "no slack account"}]})

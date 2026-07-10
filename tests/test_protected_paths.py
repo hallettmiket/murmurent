@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.hooks.protected_paths` — the refined/notebook
+"""Tests for :mod:`murmurent.hooks.protected_paths` — the refined/notebook
 write-once guard.
 
 Contract this hook must enforce:
@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.hooks import protected_paths as pp
+from murmurent.hooks import protected_paths as pp
 
 
 def _run(payload: dict) -> dict:
@@ -390,13 +390,13 @@ def test_malformed_json_allows_silently():
 
 
 def test_hook_is_registered_in_install_cmd():
-    """The new hook must be in HOOK_REGISTRATIONS so `wigamig install --hooks`
+    """The new hook must be in HOOK_REGISTRATIONS so `murmurent install --hooks`
     wires it into ~/.claude/settings.json."""
-    from wigamig.commands.install_cmd import HOOK_REGISTRATIONS
+    from murmurent.commands.install_cmd import HOOK_REGISTRATIONS
     labels = {h["label"] for h in HOOK_REGISTRATIONS}
-    assert "wigamig-protected-paths" in labels
+    assert "murmurent-protected-paths" in labels
     # ``module`` is only present on Python-module registrations; the
     # bash-script registrations (e.g. the agent reporter) use
     # ``command`` instead.
     modules = {h["module"] for h in HOOK_REGISTRATIONS if "module" in h}
-    assert "wigamig.hooks.protected_paths" in modules
+    assert "murmurent.hooks.protected_paths" in modules

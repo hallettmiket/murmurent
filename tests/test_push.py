@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.commands.push_cmd`."""
+"""Tests for :mod:`murmurent.commands.push_cmd`."""
 
 from __future__ import annotations
 
@@ -6,10 +6,10 @@ import subprocess
 
 import pytest
 
-from wigamig.commands import experiment_cmd, project_cmd, push_cmd
-from wigamig.core import lab_vm
-from wigamig.core.frontmatter import parse_file
-from wigamig.core.projects import find_project
+from murmurent.commands import experiment_cmd, project_cmd, push_cmd
+from murmurent.core import lab_vm
+from murmurent.core.frontmatter import parse_file
+from murmurent.core.projects import find_project
 
 
 @pytest.fixture

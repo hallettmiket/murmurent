@@ -12,8 +12,8 @@ import json
 
 import pytest
 
-from wigamig.commands import project_cmd, sea_cmd
-from wigamig.dashboard import audit_log, sea_actions, snapshot
+from murmurent.commands import project_cmd, sea_cmd
+from murmurent.dashboard import audit_log, sea_actions, snapshot
 
 
 # ---------------------------------------------------------------------------

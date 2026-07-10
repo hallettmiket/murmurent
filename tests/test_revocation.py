@@ -10,12 +10,12 @@ from datetime import datetime, timezone
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from wigamig.core import centre_root as CR
-from wigamig.core import idcert as C
-from wigamig.core import idkeys as K
-from wigamig.core import identity_card as IC
-from wigamig.core import issuance as ISS
-from wigamig.core import revocation as REV
+from murmurent.core import centre_root as CR
+from murmurent.core import idcert as C
+from murmurent.core import idkeys as K
+from murmurent.core import identity_card as IC
+from murmurent.core import issuance as ISS
+from murmurent.core import revocation as REV
 
 
 @pytest.fixture(autouse=True)
@@ -125,7 +125,7 @@ def test_verify_local_identity_expired(monkeypatch, tmp_path):
 
 def test_dashboard_refuses_revoked_card(monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
     card = _card_machine(monkeypatch, tmp_path)
     REV.revoke("qa", card_id=card["payload"]["card_id"])
     client = TestClient(create_app())

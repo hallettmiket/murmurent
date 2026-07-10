@@ -14,9 +14,9 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.core import join_notify as JN
-from wigamig.core import join_requests as JR
-from wigamig.core import registrar as R
+from murmurent.core import join_notify as JN
+from murmurent.core import join_requests as JR
+from murmurent.core import registrar as R
 
 
 @pytest.fixture
@@ -182,7 +182,7 @@ def test_provisioned_posts_to_admin_with_action_reminder(world, monkeypatch):
 
 def test_provisioned_includes_invite_link_when_set(world, monkeypatch):
     monkeypatch.setattr(JN, "_has_token", lambda: True)
-    from wigamig.core import centre_init as CI
+    from murmurent.core import centre_init as CI
     monkeypatch.setattr(
         CI, "read_centre",
         lambda env=None: type("P", (), {"slack_invite_url": "https://join.example/xyz"})())

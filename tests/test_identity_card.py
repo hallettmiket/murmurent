@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.core import centre_init as CI
-from wigamig.core import identity_card as IC
-from wigamig.core import registrar as R
+from murmurent.core import centre_init as CI
+from murmurent.core import identity_card as IC
+from murmurent.core import registrar as R
 
 
 @pytest.fixture
@@ -84,7 +84,7 @@ def test_card_yaml_round_trips(mayor_world):
 
 def test_dashboard_refuses_wrong_netname_on_carded_machine(mayor_world, monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
     # Build the card while the MAYOR registry is active, THEN move to the
     # member machine (separate home + registry root) and import it.
     card = IC.build_card("emucaki")

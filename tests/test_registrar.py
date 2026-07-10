@@ -19,15 +19,15 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar
-from wigamig.core.registrar import (
+from murmurent.core import registrar
+from murmurent.core.registrar import (
     CollaborationEntry,
     CoreEntry,
     LabEntry,
     Registry,
 )
-from wigamig.dashboard import registrar_snapshot as rs
-from wigamig.dashboard.server import create_app
+from murmurent.dashboard import registrar_snapshot as rs
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -42,7 +42,7 @@ def isolated(monkeypatch, tmp_path):
     # access). These tests model a registrar's environment, so treat the centre as
     # bootstrapped. (Mock rather than write centre.md, since some tests mkdir the
     # lab_info dir themselves.)
-    from wigamig.core import centre_init as _ci
+    from murmurent.core import centre_init as _ci
     monkeypatch.setattr(_ci, "is_initialised", lambda env=None: True)
     # Also block other resolvers so the test doesn't leak the real user.
     monkeypatch.setenv("WIGAMIG_USER", "the_pi")
@@ -260,7 +260,7 @@ def test_snapshot_never_reads_notebooks_or_oracles(isolated, tmp_path, monkeypat
         blocked.append("called")
         raise AssertionError("registrar must not access lab-private data")
 
-    from wigamig.dashboard import snapshot as lab_snap
+    from murmurent.dashboard import snapshot as lab_snap
     for name in ("_notebook", "_personal_oracle", "_oracle_recent",
                  "_inventory", "_seas"):
         monkeypatch.setattr(lab_snap, name, _sentinel, raising=False)
@@ -346,7 +346,7 @@ def test_create_lab_renders_labmd_frontmatter_correctly(isolated):
         institution="Western University",
         department="Schulich",
     )
-    from wigamig.core.frontmatter import parse_file
+    from murmurent.core.frontmatter import parse_file
     meta = parse_file(registrar.lab_info_root() / "labs" / "ortega" / "lab-mgmt" / "lab.md").meta
     assert meta["lab"] == "ortega"
     assert meta["name"] == "Ortega Lab"
@@ -362,7 +362,7 @@ def test_create_lab_pi_member_file_has_pi_role(isolated):
         name="ortega", display_name="Ortega Lab",
         pi_handle="jortega", pi_full_name="Jane Ortega",
     )
-    from wigamig.core.frontmatter import parse_file
+    from murmurent.core.frontmatter import parse_file
     member_md = registrar.lab_info_root() / "labs" / "ortega" / "lab-mgmt" / "members" / "jortega.md"
     meta = parse_file(member_md).meta
     assert meta["handle"] == "@jortega"
@@ -584,7 +584,7 @@ def test_update_changes_display_name_and_persists_to_lab_md(isolated):
     registrar.create_lab(name="ortega", display_name="Ortega Lab", pi_handle="jortega")
     registrar.update_lab_metadata("ortega", display_name="Ortega Group")
 
-    from wigamig.core.frontmatter import parse_file
+    from murmurent.core.frontmatter import parse_file
     meta = parse_file(registrar.lab_info_root() / "labs" / "ortega" / "lab-mgmt" / "lab.md").meta
     assert meta["name"] == "Ortega Group"
     # Other fields untouched:
@@ -603,7 +603,7 @@ def test_update_clears_optional_field_with_empty_string(isolated):
     entry = next(l for l in registrar.read_registry().labs if l.name == "ortega")
     assert entry.slack_workspace is None
     # lab.md no longer has the key:
-    from wigamig.core.frontmatter import parse_file
+    from murmurent.core.frontmatter import parse_file
     meta = parse_file(registrar.lab_info_root() / "labs" / "ortega" / "lab-mgmt" / "lab.md").meta
     assert "slack_workspace" not in meta
 
@@ -620,7 +620,7 @@ def test_update_pi_handoff_writes_new_member_file(isolated):
     # New PI gets a member file.
     new_pi_md = members_dir / "kortega.md"
     assert new_pi_md.is_file()
-    from wigamig.core.frontmatter import parse_file
+    from murmurent.core.frontmatter import parse_file
     meta = parse_file(new_pi_md).meta
     assert meta["role"] == "pi"
     assert meta["handle"] == "@kortega"
@@ -910,7 +910,7 @@ def test_cert_panel_endpoint_returns_panel(isolated, tmp_path):
 
 def test_load_config_at_reads_arbitrary_path(tmp_path):
     """The new load_config_at must work without env vars set."""
-    from wigamig.core import compliance
+    from murmurent.core import compliance
     p = tmp_path / "compliance.md"
     p.write_text(
         "---\nrequired:\n"
@@ -925,7 +925,7 @@ def test_load_config_at_reads_arbitrary_path(tmp_path):
 
 
 def test_load_config_at_returns_default_when_missing(tmp_path):
-    from wigamig.core import compliance
+    from murmurent.core import compliance
     cfg = compliance.load_config_at(tmp_path / "no_such_file.md")
     # Falls back to the default set; should not raise.
     assert isinstance(cfg.required, list)
@@ -1045,7 +1045,7 @@ def test_lab_dashboard_is_registrar_false_for_non_registrar(isolated, tmp_path, 
     # This models a single-lab install with NO centre registry, so the scoping
     # gate must fall through and let the lab member in. Undo the fixture's
     # "centre initialised" mock for this case.
-    from wigamig.core import centre_init as _ci
+    from murmurent.core import centre_init as _ci
     monkeypatch.setattr(_ci, "is_initialised", lambda env=None: False)
     lab_dir = _make_lab_mgmt(
         tmp_path, lab_id="hallett", pi="the_pi",
@@ -1088,7 +1088,7 @@ def test_create_core_lab_md_declares_core_short_id(isolated):
     registrar.create_core(
         name="imaging", display_name="Imaging Core", leader_handle="dlee",
     )
-    from wigamig.core.frontmatter import parse_file
+    from murmurent.core.frontmatter import parse_file
     meta = parse_file(
         registrar.lab_info_root() / "cores" / "imaging" / "lab-mgmt" / "lab.md"
     ).meta
@@ -1103,7 +1103,7 @@ def test_create_core_member_file_uses_core_leader_role(isolated):
         name="imaging", display_name="Imaging Core",
         leader_handle="dlee", leader_full_name="Diane Lee",
     )
-    from wigamig.core.frontmatter import parse_file
+    from murmurent.core.frontmatter import parse_file
     member_md = registrar.lab_info_root() / "cores" / "imaging" / "lab-mgmt" / "members" / "dlee.md"
     meta = parse_file(member_md).meta
     assert meta["handle"] == "@dlee"
@@ -1164,7 +1164,7 @@ def test_update_core_metadata(isolated):
     registrar.update_core_metadata("imaging", display_name="Imaging Facility", slack_workspace="")
     entry = next(c for c in registrar.read_registry().cores if c.name == "imaging")
     assert entry.slack_workspace is None
-    from wigamig.core.frontmatter import parse_file
+    from murmurent.core.frontmatter import parse_file
     meta = parse_file(
         registrar.lab_info_root() / "cores" / "imaging" / "lab-mgmt" / "lab.md"
     ).meta
@@ -1179,7 +1179,7 @@ def test_update_core_leader_handoff_creates_new_member_file(isolated):
     members_dir = registrar.lab_info_root() / "cores" / "imaging" / "lab-mgmt" / "members"
     assert (members_dir / "dlee.md").is_file()  # untouched
     assert (members_dir / "kpark.md").is_file()  # new
-    from wigamig.core.frontmatter import parse_file
+    from murmurent.core.frontmatter import parse_file
     meta = parse_file(members_dir / "kpark.md").meta
     assert meta["role"] == "core_leader"
     assert meta["full_name"] == "Kim Park"

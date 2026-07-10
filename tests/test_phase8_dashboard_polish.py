@@ -21,13 +21,13 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import audit_slice as AUDIT
-from wigamig.core import deliverables as DLV
-from wigamig.core import jobs as J
-from wigamig.core import registrar as R
-from wigamig.core import service_requests as SR
-from wigamig.core import services as S
-from wigamig.dashboard.server import create_app
+from murmurent.core import audit_slice as AUDIT
+from murmurent.core import deliverables as DLV
+from murmurent.core import jobs as J
+from murmurent.core import registrar as R
+from murmurent.core import service_requests as SR
+from murmurent.core import services as S
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture

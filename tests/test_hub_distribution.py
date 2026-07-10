@@ -12,13 +12,13 @@ import pytest
 from click.testing import CliRunner
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from wigamig.core import centre_root as CR
-from wigamig.core import hub_fetch as HF
-from wigamig.core import hub_publish as HP
-from wigamig.core import idcert as C
-from wigamig.core import identity_card as IC
-from wigamig.core import issuance as ISS
-from wigamig.core import revocation as REV
+from murmurent.core import centre_root as CR
+from murmurent.core import hub_fetch as HF
+from murmurent.core import hub_publish as HP
+from murmurent.core import idcert as C
+from murmurent.core import identity_card as IC
+from murmurent.core import issuance as ISS
+from murmurent.core import revocation as REV
 
 
 @pytest.fixture(autouse=True)
@@ -129,7 +129,7 @@ def test_distribution_enforces_revocation_end_to_end(tmp_path, monkeypatch):
 # ---- CLI --------------------------------------------------------------------
 
 def test_cli_centre_pin(tmp_path, monkeypatch):
-    from wigamig.cli import cli
+    from murmurent.cli import cli
     hub = tmp_path / "hub"
     monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "mayor"))
     root_pub, fpr = _publish(hub)

@@ -20,10 +20,10 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar as R
-from wigamig.core import service_requests as SR
-from wigamig.core import services as S
-from wigamig.dashboard.server import create_app
+from murmurent.core import registrar as R
+from murmurent.core import service_requests as SR
+from murmurent.core import services as S
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -63,7 +63,7 @@ def _book(client, user="alice"):
 
 # ---- helper -------------------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_set_actual_charge_persists_and_audits(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)
@@ -92,7 +92,7 @@ def test_set_actual_charge_unknown_request(world):
 
 # ---- endpoint -----------------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_endpoint_leader_passes(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)
@@ -108,7 +108,7 @@ def test_endpoint_leader_passes(mock_post, world):
     mock_post.assert_called()
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_endpoint_registrar_passes(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)
@@ -169,7 +169,7 @@ def test_endpoint_rejects_bad_total(world, bad):
     assert res.status_code == 422
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_endpoint_allowed_after_completed(mock_post, world):
     """Charges often confirmed AFTER a run completes; verify state is
     not a barrier."""
@@ -185,7 +185,7 @@ def test_endpoint_allowed_after_completed(mock_post, world):
     assert res.status_code == 200
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_endpoint_slack_delta_overtime(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)

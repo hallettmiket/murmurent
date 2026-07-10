@@ -1,5 +1,5 @@
-"""Tests for :mod:`wigamig.core.reconcile` and the
-``wigamig reconcile`` CLI wrapper.
+"""Tests for :mod:`murmurent.core.reconcile` and the
+``murmurent reconcile`` CLI wrapper.
 
 What we pin:
   * Each detector finds the drift it's supposed to (orphan
@@ -23,10 +23,10 @@ import yaml
 import pytest
 from pathlib import Path
 
-from wigamig.core import hosts as _hosts
-from wigamig.core import reconcile as _rec
-from wigamig.core import remote as _remote
-from wigamig.dashboard import snapshot as _snap
+from murmurent.core import hosts as _hosts
+from murmurent.core import reconcile as _rec
+from murmurent.core import remote as _remote
+from murmurent.dashboard import snapshot as _snap
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +51,7 @@ def world(monkeypatch, tmp_path):
     monkeypatch.setenv("WIGAMIG_HOSTS_FILE", str(hosts_file))
     # Redirect runtime constants the detectors read.
     monkeypatch.setattr(_snap, "INSTALLATIONS_DIR", installations)
-    from wigamig.core import repo_inventory as _ri
+    from murmurent.core import repo_inventory as _ri
     monkeypatch.setattr(_ri, "INVENTORY_DIR", inv_dir)
     return {
         "home": home, "repos": home / "repos",
@@ -80,7 +80,7 @@ def _write_registry(lab_mgmt: Path, project: str, *,
     """Create a cert-project entry (the authoritative project registry that
     reconcile now reads). ``path`` is the local code_repo; ``host``/``remote_path``
     mark a remote-tree project. Returns the cert-project file path."""
-    from wigamig.core import cert_projects as _cp
+    from murmurent.core import cert_projects as _cp
     rp = (remote_path or "/home/u/repos/" + project) if host != "local" else ""
     _cp.upsert(project, lab="hallett", member="@the_pi",
                code_repo=(path or "/repos/" + project), host=host,
@@ -130,7 +130,7 @@ def test_alive_local_install_no_finding(world):
 def test_detect_orphan_installation_unknown_ssh_host(world):
     """If a manifest references an SSH host that's been removed from
     the registry, we treat the install as orphaned (the user can't
-    reach the clone any more, so wigamig shouldn't list it)."""
+    reach the clone any more, so murmurent shouldn't list it)."""
     _write_manifest(world["installations"], "stranded", ssh_remote="ghost_host")
     findings = _rec.detect_orphan_installations()
     assert len(findings) == 1
@@ -202,7 +202,7 @@ def test_archived_registry_skipped(world):
 def test_multi_repo_one_gone_is_warn_not_orphan(world):
     """A project whose code repo is present but manuscript repo is gone is a
     WARN (project still lives), NOT an actionable project-orphan."""
-    from wigamig.core import cert_projects as CP
+    from murmurent.core import cert_projects as CP
     _make_clone(world["repos"], "proj_x")            # live code clone
     CP.upsert("proj_x", lab="hallett", code_repo=str(world["repos"] / "proj_x"))
     CP.add_repo("proj_x", role="manuscript", repo_name="proj_x_manuscript",
@@ -215,7 +215,7 @@ def test_multi_repo_one_gone_is_warn_not_orphan(world):
 
 def test_multi_repo_all_gone_is_actionable_orphan(world):
     """When EVERY repo of a project is gone, it's an actionable orphan (archive)."""
-    from wigamig.core import cert_projects as CP
+    from murmurent.core import cert_projects as CP
     CP.upsert("dead_x", lab="hallett", code_repo=str(world["repos"] / "dead_x"))
     CP.add_repo("dead_x", role="manuscript", repo_name="dead_x_manuscript",
                 path=str(world["repos"] / "dead_x_manuscript"))
@@ -225,7 +225,7 @@ def test_multi_repo_all_gone_is_actionable_orphan(world):
 
 
 def test_multi_repo_all_present_no_findings(world):
-    from wigamig.core import cert_projects as CP
+    from murmurent.core import cert_projects as CP
     _make_clone(world["repos"], "live_x")
     _make_clone(world["repos"], "live_x_manuscript")
     CP.upsert("live_x", lab="hallett", code_repo=str(world["repos"] / "live_x"))
@@ -365,14 +365,14 @@ def test_cli_exits_1_on_actionable_dry_run(world):
     """When there's actionable drift and ``--apply`` wasn't passed,
     the CLI returns exit code 1 so cron / CI can branch."""
     _write_manifest(world["installations"], "dirty")
-    from wigamig.commands.reconcile_cmd import cmd_reconcile
+    from murmurent.commands.reconcile_cmd import cmd_reconcile
     rc = cmd_reconcile(apply=False, slack_body=False)
     assert rc == 1
 
 
 def test_cli_exits_0_when_clean(world):
     """Clean state → exit 0."""
-    from wigamig.commands.reconcile_cmd import cmd_reconcile
+    from murmurent.commands.reconcile_cmd import cmd_reconcile
     rc = cmd_reconcile(apply=False, slack_body=False)
     assert rc == 0
 
@@ -380,6 +380,6 @@ def test_cli_exits_0_when_clean(world):
 def test_cli_exits_0_after_apply(world):
     """After ``--apply`` repairs the actionable findings, exit 0."""
     _write_manifest(world["installations"], "dirty")
-    from wigamig.commands.reconcile_cmd import cmd_reconcile
+    from murmurent.commands.reconcile_cmd import cmd_reconcile
     rc = cmd_reconcile(apply=True, slack_body=False)
     assert rc == 0

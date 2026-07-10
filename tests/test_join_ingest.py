@@ -17,10 +17,10 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.core import join_ingest as JI
-from wigamig.core import join_requests as JR
-from wigamig.core import centre_init as CI
-from wigamig.core import registrar as R
+from murmurent.core import join_ingest as JI
+from murmurent.core import join_requests as JR
+from murmurent.core import centre_init as CI
+from murmurent.core import registrar as R
 
 
 @pytest.fixture

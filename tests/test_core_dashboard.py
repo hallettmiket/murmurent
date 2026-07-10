@@ -15,9 +15,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar as R
-from wigamig.core import role_audit
-from wigamig.dashboard.server import create_app
+from murmurent.core import registrar as R
+from murmurent.core import role_audit
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -198,7 +198,7 @@ def test_core_services_list_returns_catalog(world):
     """A core with services in lab-mgmt/services/ surfaces them in the
     Phase 2b list endpoint. Schema mirrors the ServiceSummary dataclass."""
     _seed_core()
-    from wigamig.core import services as _svc
+    from murmurent.core import services as _svc
     sdir = _svc.services_dir("biocore")
     sdir.mkdir(parents=True, exist_ok=True)
     (sdir / "demo.md").write_text(

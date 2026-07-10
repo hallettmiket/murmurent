@@ -1,10 +1,10 @@
-"""Tests for :mod:`wigamig.core.lab_vm`."""
+"""Tests for :mod:`murmurent.core.lab_vm`."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from wigamig.core import lab_vm
+from murmurent.core import lab_vm
 
 
 def test_lab_vm_root_default(monkeypatch):

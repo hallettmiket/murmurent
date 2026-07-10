@@ -1,18 +1,18 @@
 """
-Purpose: Smoke-test that ``wigamig --help`` exposes the full command tree
+Purpose: Smoke-test that ``murmurent --help`` exposes the full command tree
          expected by ``docs/cli_manual.md``.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-06
 Input: ``click.testing.CliRunner``.
 Output: pytest cases asserting the top-level command tree and that
-        ``wigamig agent list`` runs against the repo's agents directory.
+        ``murmurent agent list`` runs against the repo's agents directory.
 """
 
 from __future__ import annotations
 
 from click.testing import CliRunner
 
-from wigamig.cli import cli
+from murmurent.cli import cli
 
 EXPECTED_TOP_LEVEL = [
     "agent",
@@ -72,7 +72,7 @@ def test_stub_commands_emit_v1_message() -> None:
 
 
 def test_oracle_doctor_reports_ok_when_readable(tmp_path, monkeypatch) -> None:
-    """`wigamig oracle doctor` actually reads an entry and reports OK
+    """`murmurent oracle doctor` actually reads an entry and reports OK
     (exit 0) when the vault is accessible."""
     oracle_dir = tmp_path / "vault" / "oracle"
     oracle_dir.mkdir(parents=True)
@@ -88,7 +88,7 @@ def test_oracle_doctor_reports_ok_when_readable(tmp_path, monkeypatch) -> None:
 def test_oracle_doctor_blocked_exits_nonzero(tmp_path, monkeypatch) -> None:
     """A Full-Disk-Access denial must exit non-zero with the actionable
     hint — the whole point of the probe is to be loud, not silent."""
-    from wigamig.core import oracle_publish as _op
+    from murmurent.core import oracle_publish as _op
 
     monkeypatch.setattr(
         _op, "probe_personal_oracle",

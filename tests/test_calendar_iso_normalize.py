@@ -10,7 +10,7 @@ inside create_event so EVERY caller is safe.
 
 from __future__ import annotations
 
-from wigamig.core.calendar_google import _normalize_iso_for_google as N
+from murmurent.core.calendar_google import _normalize_iso_for_google as N
 
 
 def test_adds_seconds_when_missing():

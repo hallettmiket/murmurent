@@ -20,10 +20,10 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from wigamig.core import hosts as _hosts
-from wigamig.core import projects as _projects
-from wigamig.core import requests as req_core
-from wigamig.dashboard.server import create_app
+from murmurent.core import hosts as _hosts
+from murmurent.core import projects as _projects
+from murmurent.core import requests as req_core
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -282,7 +282,7 @@ def test_create_project_request_default_host_is_local(world):
 def test_approve_routes_remote_to_cmd_new_remote(world, monkeypatch):
     """An approved project-create with host=lab-server must call
     cmd_new_remote, not cmd_new."""
-    from wigamig.commands import project_cmd as _project_cmd
+    from murmurent.commands import project_cmd as _project_cmd
     seen: dict = {}
 
     def fake_cmd_new(*a, **kw):

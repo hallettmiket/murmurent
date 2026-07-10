@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from wigamig.core import registrar as R
+from murmurent.core import registrar as R
 
 
 def test_wig_home_honours_env(monkeypatch, tmp_path):

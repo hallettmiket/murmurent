@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.core import centre_init as CI
-from wigamig.core import registrar as R
+from murmurent.core import centre_init as CI
+from murmurent.core import registrar as R
 
 
 @pytest.fixture
@@ -41,7 +41,7 @@ EXTENDED = dict(
     slack_workspace="T0DEMO",
     github_org="wigamig-demo",
     server_host="lab-server.demo.edu",
-    server_account="wigamig",
+    server_account="murmurent",
     cc_install_path="/opt/claude",
     obsidian_vault="/mayor/obsidian",
     mayor_root="/mayor/wigamig",

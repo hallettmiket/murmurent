@@ -8,11 +8,11 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import centre_init as CI
-from wigamig.core import centre_provision as CP
-from wigamig.core import join_requests as JR
-from wigamig.core import registrar as R
-from wigamig.dashboard.server import create_app
+from murmurent.core import centre_init as CI
+from murmurent.core import centre_provision as CP
+from murmurent.core import join_requests as JR
+from murmurent.core import registrar as R
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture

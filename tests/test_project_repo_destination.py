@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.commands import project_cmd
-from wigamig.core import requests as req_core
-from wigamig.core.frontmatter import parse_file
+from murmurent.commands import project_cmd
+from murmurent.core import requests as req_core
+from murmurent.core.frontmatter import parse_file
 
 
 @pytest.fixture
@@ -175,7 +175,7 @@ def test_lab_settings_reads_github_org_from_labmd(world):
         "git_repos_subpath: bare\n---\n",
         encoding="utf-8",
     )
-    from wigamig.dashboard import snapshot
+    from murmurent.dashboard import snapshot
     s = snapshot._lab_settings("hallett")
     assert s.github_org == "someoneelse"
     assert s.git_repos_subpath == "bare"
@@ -186,7 +186,7 @@ def test_lab_settings_github_org_falls_back(world):
     never substitute another lab's org. Missing ``git_repos_subpath``
     falls back to the 2026-05-14 default ``repos`` (was ``git_repos``
     before the lab_base umbrella refactor)."""
-    from wigamig.dashboard import snapshot
+    from murmurent.dashboard import snapshot
     s = snapshot._lab_settings("hallett")
     assert s.github_org == ""
     assert s.git_repos_subpath == "repos"
@@ -196,7 +196,7 @@ def test_no_github_org_fails_safe_not_hallettmiket(world, monkeypatch):
     """With no ``github_org`` configured, the inventory path surfaces a
     clear error and never queries a stranger's org (the reported bug:
     a fresh lab must not run ``gh repo list hallettmiket``)."""
-    from wigamig.core import repo_inventory as inv
+    from murmurent.core import repo_inventory as inv
 
     # Empty org short-circuits before any gh/subprocess call.
     repos, err = inv.list_github_repos("")

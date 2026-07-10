@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.core.dashboard`."""
+"""Tests for :mod:`murmurent.core.dashboard`."""
 
 from __future__ import annotations
 
@@ -6,9 +6,9 @@ import datetime as _dt
 
 import pytest
 
-from wigamig.commands import experiment_cmd, project_cmd, sea_cmd
-from wigamig.core import dashboard, inventory, sea
-from wigamig.core.projects import find_project
+from murmurent.commands import experiment_cmd, project_cmd, sea_cmd
+from murmurent.core import dashboard, inventory, sea
+from murmurent.core.projects import find_project
 
 
 @pytest.fixture

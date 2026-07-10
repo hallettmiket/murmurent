@@ -21,9 +21,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar, role_audit
-from wigamig.core.registrar import LabEntry, Registry
-from wigamig.dashboard.server import create_app
+from murmurent.core import registrar, role_audit
+from murmurent.core.registrar import LabEntry, Registry
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -108,7 +108,7 @@ def test_is_registrar_prefers_registry_list_over_sentinel(isolated):
 def test_is_registrar_falls_back_to_sentinel_when_list_empty(isolated, monkeypatch):
     # Legacy single-registrar install: a centre exists, no registry list, so the
     # sentinel is honoured. (The sentinel is only valid within a centre.)
-    from wigamig.core import centre_init as _ci
+    from murmurent.core import centre_init as _ci
     monkeypatch.setattr(_ci, "is_initialised", lambda env=None: True)
     registrar.REGISTRAR_SENTINEL.write_text("the_pi\n", encoding="utf-8")
     # Write an empty-registrars registry on disk.
@@ -233,7 +233,7 @@ def test_login_resolve_core_leader_is_not_a_lab_pi(isolated, tmp_path, monkeypat
     """A core LEADER must resolve as core_leader, NOT as a lab PI. Cores reuse
     the ``pi:`` field internally for their leader, which used to make the
     resolver read it as a lab PI (emucaki showing PI view but no core view)."""
-    from wigamig.core.registrar import CoreEntry
+    from murmurent.core.registrar import CoreEntry
     core_dir = _seed_lab_mgmt(tmp_path, lab_id="biocore", pi="emucaki",
                               members=[("emucaki", "lead")])
     registrar.write_registry(Registry(
@@ -251,7 +251,7 @@ def test_dashboard_gate_rejects_unknown_on_initialised_centre(isolated, tmp_path
     """An unknown netname on ANY initialised centre gets 403 — NOT a fabricated
     dashboard under a default/demo ('hallett'/'allie') lab. The scoping-leak fix
     keys on the centre existing, so there is no default-lab-mgmt fallback."""
-    from wigamig.core import centre_init as CI
+    from murmurent.core import centre_init as CI
     CI.init_centre(name="Western QA", institution="U", founding_mayor="@tbrowne5",
                    write_sentinel=False)
     lab_dir = _seed_lab_mgmt(tmp_path, lab_id="yxia_lab", pi="yxia266",

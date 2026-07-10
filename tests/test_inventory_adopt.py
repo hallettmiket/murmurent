@@ -1,9 +1,9 @@
 """Tests for ``POST /api/inventory/adopt`` — the "promote a plain git
-clone to a wigamig project" wizard exposed on the Repo Inventory panel.
+clone to a murmurent project" wizard exposed on the Repo Inventory panel.
 
 What this endpoint must guarantee:
   - Writes a valid CHARTER.md at the clone root (uses
-    :func:`wigamig.core.charter.render_charter`)
+    :func:`murmurent.core.charter.render_charter`)
   - Runs the layer-2 CC bootstrap so ``.claude/agents/`` exists
   - Refuses paths outside ``~/repos/`` (escape guard — the dashboard
     sends absolute paths from the inventory scanner)
@@ -18,12 +18,12 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from wigamig.dashboard.server import create_app
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    """Stand up an isolated ~/repos and a fake wigamig commons.
+    """Stand up an isolated ~/repos and a fake murmurent commons.
 
     The adopt endpoint resolves clone paths against ``Path.home()``, so
     we point ``$HOME`` at tmp_path. ``$WIGAMIG_REPO_ROOT`` aims the
@@ -32,7 +32,7 @@ def world(monkeypatch, tmp_path):
     """
     home = tmp_path / "home"
     (home / "repos").mkdir(parents=True)
-    commons = tmp_path / "wigamig"
+    commons = tmp_path / "murmurent"
     (commons / "agents").mkdir(parents=True)
     (commons / "agents" / "blacksmith.md").write_text("# blacksmith\n")
     monkeypatch.setenv("HOME", str(home))
@@ -108,7 +108,7 @@ def test_adopt_refuses_non_git_dir(world):
 
 
 def test_adopt_refuses_when_charter_already_exists(world):
-    """A clone that's already a wigamig project must not get its
+    """A clone that's already a murmurent project must not get its
     CHARTER.md silently overwritten — the user should edit by hand
     or remove the file and re-adopt explicitly."""
     clone = _make_git_clone(world["repos"], "already_a_project")

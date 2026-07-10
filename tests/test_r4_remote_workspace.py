@@ -18,9 +18,9 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from wigamig.core import hosts as _hosts
-from wigamig.core import remote as _remote
-from wigamig.dashboard.server import create_app
+from murmurent.core import hosts as _hosts
+from murmurent.core import remote as _remote
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -149,10 +149,10 @@ def test_host_test_all_ok(world, monkeypatch):
         "name": "lab-server", "ssh_host": "lab-server", "lab_vm_root": "/data/lab_vm",
     })
 
-    # Probe sequence: ssh (true), wigamig --version, test -d lab_vm dirs, gh auth status
+    # Probe sequence: ssh (true), murmurent --version, test -d lab_vm dirs, gh auth status
     sequence = iter([
         _ok(),                            # ssh probe (true)
-        _ok("wigamig 1.0.0"),             # wigamig --version
+        _ok("murmurent 1.0.0"),           # murmurent --version
         _ok(),                            # lab_vm test -d
         _ok("Logged in to github.com"),   # gh auth status
     ])
@@ -163,15 +163,15 @@ def test_host_test_all_ok(world, monkeypatch):
     body = res.json()
     assert body["overall"] == "ok"
     statuses = {p["name"]: p["status"] for p in body["probes"]}
-    assert statuses == {"ssh": "ok", "wigamig": "ok", "lab_vm": "ok", "gh_auth": "ok"}
+    assert statuses == {"ssh": "ok", "murmurent": "ok", "lab_vm": "ok", "gh_auth": "ok"}
 
 
-def test_host_test_wigamig_missing_fails(world, monkeypatch):
+def test_host_test_murmurent_missing_fails(world, monkeypatch):
     client = TestClient(create_app())
     client.post("/api/hosts", json={"name": "lab-server", "ssh_host": "lab-server"})
     sequence = iter([
         _ok(),                              # ssh probe
-        _fail(127, "wigamig: command not found"),  # wigamig --version
+        _fail(127, "murmurent: command not found"),  # murmurent --version
         _ok(),                              # lab_vm
         _fail(1, "not authenticated"),      # gh auth
     ])
@@ -180,9 +180,9 @@ def test_host_test_wigamig_missing_fails(world, monkeypatch):
     body = client.post("/api/hosts/lab-server/test").json()
     assert body["overall"] == "fail"
     by_name = {p["name"]: p for p in body["probes"]}
-    assert by_name["wigamig"]["status"] == "fail"
-    assert by_name["wigamig"]["required"] is True
-    assert "install_remote.sh" in by_name["wigamig"]["detail"]
+    assert by_name["murmurent"]["status"] == "fail"
+    assert by_name["murmurent"]["required"] is True
+    assert "install_remote.sh" in by_name["murmurent"]["detail"]
     # lab_vm and gh_auth are warn-only — their failures don't change overall=fail
     # but their statuses are reported correctly.
     assert by_name["gh_auth"]["status"] == "warn"
@@ -209,10 +209,10 @@ def test_host_test_ssh_fails_short_circuits(world, monkeypatch):
 
 def test_host_test_local_returns_ok_without_ssh_call(world, monkeypatch):
     """The local host has nothing to ssh into, but the test endpoint
-    still runs wigamig --version + the lab_vm/gh probes via bash -lc."""
+    still runs murmurent --version + the lab_vm/gh probes via bash -lc."""
     client = TestClient(create_app())
     sequence = iter([
-        _ok("wigamig 1.0.0"),
+        _ok("murmurent 1.0.0"),
         _fail(),  # lab_vm missing locally — warn
         _ok("Logged in"),
     ])
@@ -223,7 +223,7 @@ def test_host_test_local_returns_ok_without_ssh_call(world, monkeypatch):
     assert body["overall"] == "ok"
     statuses = {p["name"]: p["status"] for p in body["probes"]}
     assert statuses["ssh"] == "ok"          # synthetic "local host"
-    assert statuses["wigamig"] == "ok"
+    assert statuses["murmurent"] == "ok"
     assert statuses["lab_vm"] == "warn"
 
 
@@ -287,7 +287,7 @@ def test_workspace_launch_local_uses_open_wigamig_sh(world, monkeypatch):
     scripts/open_wigamig.sh — the 80%-window launcher with monitor
     detection — instead of the older scripts/start_workspace.sh that
     spawned a VSCode + iTerm 65/35 split. The agent-log role moved
-    into VSCode's BR pane via the wigamig hook, so iTerm windows are
+    into VSCode's BR pane via the murmurent hook, so iTerm windows are
     no longer needed for the local flow.
     """
     _seed_local_for_launch(world["repos"], world["lab_mgmt"])

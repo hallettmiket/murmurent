@@ -14,11 +14,11 @@ import datetime as _dt
 
 import pytest
 
-from wigamig.commands import project_cmd
-from wigamig.core import cross_group as xg
-from wigamig.core import sea_catalog as catalog
-from wigamig.dashboard import snapshot
-from wigamig.mcp import sea_catalog_server as mcp_srv
+from murmurent.commands import project_cmd
+from murmurent.core import cross_group as xg
+from murmurent.core import sea_catalog as catalog
+from murmurent.dashboard import snapshot
+from murmurent.mcp import sea_catalog_server as mcp_srv
 
 
 @pytest.fixture
@@ -177,7 +177,7 @@ def test_snapshot_inbound_only_visible_to_pi(world):
 
 def _client():
     from fastapi.testclient import TestClient
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
     return TestClient(create_app())
 
 

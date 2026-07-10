@@ -1,10 +1,10 @@
-"""Tests for :mod:`wigamig.commands.install_cmd`."""
+"""Tests for :mod:`murmurent.commands.install_cmd`."""
 
 from __future__ import annotations
 
 import json
 
-from wigamig.commands import install_cmd
+from murmurent.commands import install_cmd
 
 
 def test_install_writes_settings(tmp_path):
@@ -15,7 +15,7 @@ def test_install_writes_settings(tmp_path):
     pre_entries = settings["hooks"]["PreToolUse"]
     matchers = [e["matcher"] for e in pre_entries]
     assert any("Write|Edit|Bash|NotebookEdit" in m for m in matchers)
-    assert "wigamig-inventory" in settings["mcpServers"]
+    assert "murmurent-inventory" in settings["mcpServers"]
 
 
 def test_install_idempotent(tmp_path):

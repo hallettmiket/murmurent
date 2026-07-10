@@ -9,7 +9,7 @@ import json
 
 import pytest
 
-from wigamig.core.security_findings import (
+from murmurent.core.security_findings import (
     Finding,
     SEVERITY_BLOCK,
     SEVERITY_INFO,
@@ -167,7 +167,7 @@ def test_rollup_max_severity_wins():
 # ---- remote-side parser --------------------------------------------------
 
 def test_security_remote_parses_progress_and_findings():
-    from wigamig.core.security_remote import _parse_stream
+    from murmurent.core.security_remote import _parse_stream
     stdout = (
         '{"_kind":"progress","message":"starting","ts":"12:00:00"}\n'
         + _make(rule="R1").to_json_line() + "\n"
@@ -188,7 +188,7 @@ def test_security_remote_parses_progress_and_findings():
 
 
 def test_security_remote_records_malformed_json_object_as_error():
-    from wigamig.core.security_remote import _parse_stream
+    from murmurent.core.security_remote import _parse_stream
     stdout = (
         _make(rule="R1").to_json_line() + "\n"
         + '{"severity": "warn", "unclosed-brace\n'  # starts with { but invalid

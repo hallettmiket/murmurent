@@ -1,7 +1,7 @@
-"""Tests for the ``wigamig-oracle`` MCP server's tool implementations.
+"""Tests for the ``murmurent-oracle`` MCP server's tool implementations.
 
 We exercise the python-level ``tool_*`` functions directly — same
-pattern as ``tests/test_inventory.py`` for ``wigamig-inventory``. The
+pattern as ``tests/test_inventory.py`` for ``murmurent-inventory``. The
 FastMCP wiring is exercised only when the SDK is actually installed
 and the server runs, which is out of scope for unit tests.
 
@@ -16,7 +16,7 @@ Coverage:
   - Missing personal vault degrades gracefully (returns [] for that tier)
 
 Also a separate test for the install_cmd registration so the MCP
-server appears in ~/.claude/settings.json after `wigamig install`.
+server appears in ~/.claude/settings.json after `murmurent install`.
 """
 
 from __future__ import annotations
@@ -27,8 +27,8 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.mcp import oracle_server as srv
-from wigamig.core import oracle_publish as _op
+from murmurent.mcp import oracle_server as srv
+from murmurent.core import oracle_publish as _op
 
 
 # ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ def world(monkeypatch, tmp_path):
                  tags=["gene", "dcis"],
                  sources=["@the_pi"])
     _write_entry(vault_oracle, "2026-04-25_obsidian_validated",
-                 title="Obsidian validated as the wigamig knowledge vault",
+                 title="Obsidian validated as the murmurent knowledge vault",
                  date="2026-04-25",
                  project="general",
                  tags=["tool", "infrastructure"],
@@ -99,7 +99,7 @@ def world(monkeypatch, tmp_path):
     # An index file — must be excluded.
     (vault_oracle / "MEMORY.md").write_text("# Index\n")
 
-    # Lab entries (mirror the real wigamig lab_mgmt/oracle samples)
+    # Lab entries (mirror the real murmurent lab_mgmt/oracle samples)
     _write_entry(lab_oracle, "2026-05-07_drift_correction",
                  title="Drift correction belongs in run_all, not in QC",
                  date="2026-05-07",
@@ -156,7 +156,7 @@ def test_list_both_returns_personal_and_lab(world):
     rows = srv.tool_list("both")
     titles = sorted(r["title"] for r in rows)
     assert "MMP11 flagged for DCIS" in titles
-    assert "Obsidian validated as the wigamig knowledge vault" in titles
+    assert "Obsidian validated as the murmurent knowledge vault" in titles
     assert "Drift correction belongs in run_all, not in QC" in titles
     assert "GRCh38.p14 fixes the chrM contig issue for run 17" in titles
     assert "Should not appear in search" not in titles
@@ -456,17 +456,17 @@ def test_notebook_dir_unreadable_does_not_crash(monkeypatch, world):
 
 
 def test_install_registers_oracle_mcp(tmp_path, monkeypatch):
-    """`wigamig install --hooks` must add wigamig-oracle to mcpServers
-    alongside wigamig-inventory — otherwise the agents have no way to
+    """`murmurent install --hooks` must add murmurent-oracle to mcpServers
+    alongside murmurent-inventory — otherwise the agents have no way to
     reach the MCP."""
-    from wigamig.commands import install_cmd
+    from murmurent.commands import install_cmd
     settings = tmp_path / "settings.json"
     settings.write_text("{}")
     install_cmd.cmd_install(hooks=True, settings_path=settings, backup=False)
     data = json.loads(settings.read_text())
-    assert "wigamig-oracle" in data["mcpServers"]
-    spec = data["mcpServers"]["wigamig-oracle"]
-    assert spec["args"] == ["-m", "wigamig.mcp.oracle_server"]
+    assert "murmurent-oracle" in data["mcpServers"]
+    spec = data["mcpServers"]["murmurent-oracle"]
+    assert spec["args"] == ["-m", "murmurent.mcp.oracle_server"]
 
 
 def test_install_does_not_emit_null_matcher(tmp_path):
@@ -480,7 +480,7 @@ def test_install_does_not_emit_null_matcher(tmp_path):
     matcher key, not set it to null. This test fails if any
     serialised hook entry carries a null matcher.
     """
-    from wigamig.commands import install_cmd
+    from murmurent.commands import install_cmd
     settings = tmp_path / "settings.json"
     settings.write_text("{}")
     install_cmd.cmd_install(hooks=True, settings_path=settings, backup=False)
@@ -527,8 +527,8 @@ def test_notebook_dir_falls_back_to_obsidian_registry(monkeypatch, tmp_path):
     monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
     vault_root = tmp_path / "vault"
     (vault_root / "lab-notebook").mkdir(parents=True)
-    from wigamig.dashboard import machine_settings as _ms
-    from wigamig.core.obsidian import Vault
+    from murmurent.dashboard import machine_settings as _ms
+    from murmurent.core.obsidian import Vault
     monkeypatch.setattr(_ms, "load", lambda **k: _Settings(vault=None))
     monkeypatch.setattr(srv._obsidian, "preferred_vault",
                         lambda: Vault(name="vault", path=vault_root, ts=1))
@@ -541,7 +541,7 @@ def test_notebook_dir_uses_machine_yaml_when_present(monkeypatch, tmp_path):
     monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
     vault_root = tmp_path / "myvault"
     (vault_root / "daily").mkdir(parents=True)
-    from wigamig.dashboard import machine_settings as _ms
+    from murmurent.dashboard import machine_settings as _ms
     monkeypatch.setattr(_ms, "load",
                         lambda **k: _Settings(vault=str(vault_root), sub="daily"))
     monkeypatch.setattr(
@@ -555,7 +555,7 @@ def test_notebook_dir_none_when_nothing_resolves(monkeypatch):
     """No env, no machine.yaml vault, no Obsidian registry → None, and no
     crash."""
     monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
-    from wigamig.dashboard import machine_settings as _ms
+    from murmurent.dashboard import machine_settings as _ms
     monkeypatch.setattr(_ms, "load", lambda **k: _Settings(vault=None))
     monkeypatch.setattr(srv._obsidian, "preferred_vault", lambda: None)
     assert srv._safe_notebook_dir() is None

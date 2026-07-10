@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.core.projectize`.
+"""Tests for :mod:`murmurent.core.projectize`.
 
 projectize is the single chokepoint that ``POST /api/inventory/adopt``
 and ``POST /api/workspace/initialize`` both call so a freshly-adopted
@@ -24,7 +24,7 @@ import yaml
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    """Stand up an isolated home + lab_mgmt + wigamig commons."""
+    """Stand up an isolated home + lab_mgmt + murmurent commons."""
     home = tmp_path / "home"
     (home / "repos").mkdir(parents=True)
     commons = tmp_path / "wigamig_commons"
@@ -58,7 +58,7 @@ def test_make_wigamig_project_writes_all_four_artefacts(world):
     """A fresh clone (no CHARTER) gets CHARTER, registry, manifest, and
     .claude/agents/ symlinks in one call. This is the contract the
     adopt endpoint depends on."""
-    from wigamig.core import projectize as p
+    from murmurent.core import projectize as p
     clone = _make_clone(world["repos"], "hockey_stats")
     res = p.make_wigamig_project(
         clone_path=clone,
@@ -85,7 +85,7 @@ def test_manifest_carries_member_machine_paths(world):
     """The installation manifest schema must match what snapshot.py +
     workspace/launch reads. Schema drift would silently break the
     Installations panel."""
-    from wigamig.core import projectize as p
+    from murmurent.core import projectize as p
     clone = _make_clone(world["repos"], "demo")
     p.make_wigamig_project(
         clone_path=clone, project="demo",
@@ -118,7 +118,7 @@ def test_existing_charter_preserved(world):
     """projectize must NEVER overwrite a hand-edited CHARTER. (The
     adopt endpoint guards this with a 409 too, but projectize itself
     must not clobber.)"""
-    from wigamig.core import projectize as p
+    from murmurent.core import projectize as p
     clone = _make_clone(world["repos"], "hand_edited")
     (clone / "CHARTER.md").write_text("---\nproject: hand_edited\n---\n# hand-written\n")
     p.make_wigamig_project(
@@ -132,7 +132,7 @@ def test_existing_charter_preserved(world):
 def test_existing_registry_preserved(world):
     """Same for the lab_mgmt registry entry — never clobber. The lab
     may have edited the entry by hand to add notes."""
-    from wigamig.core import projectize as p
+    from murmurent.core import projectize as p
     clone = _make_clone(world["repos"], "registered")
     reg = world["lab_mgmt"] / "projects" / "registered.md"
     reg.write_text("---\nproject: registered\n---\n# kept by hand\n")
@@ -149,7 +149,7 @@ def test_manifest_rewritten_every_call(world):
     own per-machine record. Re-installing should refresh it (so
     last_checked moves forward and the agent set reflects the latest
     pick), not preserve a stale entry."""
-    from wigamig.core import projectize as p
+    from murmurent.core import projectize as p
     clone = _make_clone(world["repos"], "demo")
     p.make_wigamig_project(
         clone_path=clone, project="demo",
@@ -176,7 +176,7 @@ def test_ssh_install_skips_local_bootstrap_but_writes_manifest(world):
     writes the local manifest + registry so the dashboard sees the
     installation, but it must NOT try to .claude/agents-symlink locally
     (there's no clone there)."""
-    from wigamig.core import projectize as p
+    from murmurent.core import projectize as p
     # Note: no _make_clone — no local working tree for SSH installs.
     fake_clone = world["repos"] / "remote_only"
     fake_clone.mkdir()
@@ -211,7 +211,7 @@ def test_ssh_install_skips_local_bootstrap_but_writes_manifest(world):
 def test_invalid_charter_metadata_returns_fail_probe(world):
     """A bad sensitivity tier (e.g. empty members) surfaces as a
     required=True fail probe so the endpoint can translate it to 422."""
-    from wigamig.core import projectize as p
+    from murmurent.core import projectize as p
     clone = _make_clone(world["repos"], "badmeta")
     res = p.make_wigamig_project(
         clone_path=clone, project="badmeta",
@@ -230,7 +230,7 @@ def test_missing_lab_mgmt_is_warn_not_fail(monkeypatch, tmp_path):
     must still succeed at the local steps (CHARTER, manifest,
     bootstrap) — just skip the registry write with a warn. We can't
     block a personal adopt on shared-repo availability."""
-    from wigamig.core import projectize as p
+    from murmurent.core import projectize as p
     home = tmp_path / "home"
     (home / "repos").mkdir(parents=True)
     commons = tmp_path / "wigamig_commons"

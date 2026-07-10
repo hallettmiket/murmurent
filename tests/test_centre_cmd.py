@@ -1,5 +1,5 @@
 """
-Tests for ``wigamig centre-init`` + ``wigamig centre-status`` (2b).
+Tests for ``murmurent centre-init`` + ``murmurent centre-status`` (2b).
 """
 
 from __future__ import annotations
@@ -7,10 +7,10 @@ from __future__ import annotations
 import pytest
 from click.testing import CliRunner
 
-from wigamig.commands.centre_cmd import centre_init as cli_centre_init
-from wigamig.commands.centre_cmd import centre_status as cli_centre_status
-from wigamig.core import centre_init as CI
-from wigamig.core import registrar as R
+from murmurent.commands.centre_cmd import centre_init as cli_centre_init
+from murmurent.commands.centre_cmd import centre_status as cli_centre_status
+from murmurent.core import centre_init as CI
+from murmurent.core import registrar as R
 
 
 @pytest.fixture
@@ -135,7 +135,7 @@ def test_status_after_init(world):
 
 # ---- join-request CLI -------------------------------------------------
 
-from wigamig.commands.centre_cmd import join_request_group as cli_jr
+from murmurent.commands.centre_cmd import join_request_group as cli_jr
 
 
 def _init(world):

@@ -20,8 +20,8 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.core import security_agent_review as r
-from wigamig.core.security_findings import (
+from murmurent.core import security_agent_review as r
+from murmurent.core.security_findings import (
     SEVERITY_BLOCK,
     SEVERITY_WARN,
     SOURCE_AGENT,
@@ -283,7 +283,7 @@ def test_per_category_prompt_routing(fixture_repo, tmp_path):
     sys_prompts, user_prompts = zip(*stub.calls)
     # All three calls share the same system prompt.
     assert len(set(sys_prompts)) == 1
-    assert "wigamig `security_guard` agent" in sys_prompts[0]
+    assert "murmurent `security_guard` agent" in sys_prompts[0]
     # Each user prompt carries its category label.
     assert any("Category: code" in p for p in user_prompts)
     assert any("Category: secrets" in p for p in user_prompts)

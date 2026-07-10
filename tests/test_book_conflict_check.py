@@ -15,11 +15,11 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar as R
-from wigamig.core import service_requests as SR
-from wigamig.core import services as S
-from wigamig.core import training as T
-from wigamig.dashboard.server import create_app
+from murmurent.core import registrar as R
+from murmurent.core import service_requests as SR
+from murmurent.core import services as S
+from murmurent.core import training as T
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -60,7 +60,7 @@ def _book(client, *, user, service="itc", start="2026-05-23T10:00-04:00",
 
 # ---- happy path: no conflict, both succeed ------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_non_overlapping_slots_both_book(mock_post, world):
     client = TestClient(create_app())
     r1 = _book(client, user="alice",
@@ -73,7 +73,7 @@ def test_non_overlapping_slots_both_book(mock_post, world):
 
 # ---- conflict variants --------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_exact_overlap_refused(mock_post, world):
     client = TestClient(create_app())
     r1 = _book(client, user="alice")
@@ -84,7 +84,7 @@ def test_exact_overlap_refused(mock_post, world):
     assert "@alice" in r2.json()["detail"]
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_partial_overlap_refused(mock_post, world):
     client = TestClient(create_app())
     _book(client, user="alice",
@@ -94,7 +94,7 @@ def test_partial_overlap_refused(mock_post, world):
     assert r.status_code == 409
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_back_to_back_slots_ok(mock_post, world):
     """end == start of the next is NOT an overlap."""
     client = TestClient(create_app())
@@ -105,7 +105,7 @@ def test_back_to_back_slots_ok(mock_post, world):
     assert r.status_code == 200
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_different_service_no_conflict(mock_post, world):
     """ITC slot doesn't block CD slot at the same time."""
     client = TestClient(create_app())
@@ -114,7 +114,7 @@ def test_different_service_no_conflict(mock_post, world):
     assert r.status_code == 200
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_cancelled_booking_frees_slot(mock_post, world):
     client = TestClient(create_app())
     r1 = _book(client, user="alice")
@@ -127,7 +127,7 @@ def test_cancelled_booking_frees_slot(mock_post, world):
 
 # ---- override (leader / registrar only) --------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_override_conflict_works_for_leader(mock_post, world):
     """Leader proxy-books on behalf of alice over an existing slot."""
     client = TestClient(create_app())
@@ -138,7 +138,7 @@ def test_override_conflict_works_for_leader(mock_post, world):
     assert r.status_code == 200, r.text
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_override_conflict_works_for_registrar(mock_post, world):
     client = TestClient(create_app())
     _book(client, user="alice")
@@ -147,7 +147,7 @@ def test_override_conflict_works_for_registrar(mock_post, world):
     assert r.status_code == 200
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_override_conflict_ignored_for_member(mock_post, world):
     """A regular member can't bypass the check by sending the flag."""
     client = TestClient(create_app())
@@ -158,7 +158,7 @@ def test_override_conflict_ignored_for_member(mock_post, world):
 
 # ---- bad slot inputs surface early -------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_end_before_start_refused(mock_post, world):
     client = TestClient(create_app())
     r = _book(client, user="alice",

@@ -24,7 +24,7 @@ def _no_live_slack(monkeypatch):
     token still opts in with ``monkeypatch.setenv(...)`` (and mocks ``httpx``);
     env is checked before the file, so those keep working.
     """
-    from wigamig.dashboard import slack_notify as _sn
+    from murmurent.dashboard import slack_notify as _sn
 
     monkeypatch.delenv("WIGAMIG_SLACK_TOKEN", raising=False)
     monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)

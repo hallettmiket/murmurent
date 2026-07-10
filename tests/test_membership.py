@@ -13,8 +13,8 @@ import datetime as _dt
 
 import pytest
 
-from wigamig.commands import project_cmd
-from wigamig.core import membership as M
+from murmurent.commands import project_cmd
+from murmurent.core import membership as M
 
 
 @pytest.fixture
@@ -113,7 +113,7 @@ def test_iter_members_filters(world):
 
 def _client():
     from fastapi.testclient import TestClient
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
     return TestClient(create_app())
 
 
@@ -176,7 +176,7 @@ def test_inactive_member_cannot_run_sea_action(world, monkeypatch):
         skip_github=True,
     )
     # File a SEA so bob has something to act on.
-    from wigamig.commands import sea_cmd
+    from murmurent.commands import sea_cmd
     sea_cmd.cmd_request(
         project_name="p_act", to_target="@bob", kind="analysis",
         description="x", from_handle="@allie",
@@ -193,7 +193,7 @@ def test_inactive_member_visible_in_pi_group_panel(world):
     """PI sees inactive members in the group panel (with status=inactive)."""
     M.add(handle="bob", full_name="B", role="postdoc")
     M.set_status("bob", M.INACTIVE)
-    from wigamig.dashboard import snapshot
+    from murmurent.dashboard import snapshot
     resp = snapshot.build_response("the_pi", today=_dt.date(2026, 5, 8))
     bob = next((p for p in resp.peers if p.handle == "bob"), None)
     assert bob is not None

@@ -14,9 +14,9 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.dashboard import snapshot as snap_mod
-from wigamig.dashboard.contract import InstallationRow
-from wigamig.dashboard.server import create_app
+from murmurent.dashboard import snapshot as snap_mod
+from murmurent.dashboard.contract import InstallationRow
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -25,7 +25,7 @@ def isolated(monkeypatch, tmp_path):
     repos = tmp_path / "repos"
     lab_vm = tmp_path / "lab_vm"
     lab_mgmt = tmp_path / "lab-mgmt"
-    installs = tmp_path / "wigamig" / "installations"
+    installs = tmp_path / "murmurent" / "installations"
 
     monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(repos))
     monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(lab_vm))
@@ -108,12 +108,12 @@ def test_initialize_creates_dirs_and_manifest(isolated, tmp_path):
 
 
 def test_initialize_writes_charter_for_bare_clone(isolated, tmp_path, monkeypatch):
-    """A clone with no CHARTER.md must become a wigamig project end-to-end
+    """A clone with no CHARTER.md must become a murmurent project end-to-end
     when installed: CHARTER appears, the lab_mgmt registry gets an entry,
     and the installation manifest is written. Before the projectize
     refactor this would 404 on bare clones — only project-new'd repos
     could be installed."""
-    # Point wigamig commons at a fake so bootstrap_local has agents to symlink.
+    # Point murmurent commons at a fake so bootstrap_local has agents to symlink.
     commons = tmp_path / "wigamig_commons"
     (commons / "agents").mkdir(parents=True)
     (commons / "agents" / "oracle.md").write_text("# oracle\n")
@@ -151,8 +151,8 @@ def test_initialize_ssh_install_on_bare_repo_no_local_dir(isolated, tmp_path, mo
     whole point of an SSH install is that the working tree lives on
     the remote.
     """
-    import wigamig.core.remote as _remote_mod
-    from wigamig.core import hosts as _hosts
+    import murmurent.core.remote as _remote_mod
+    from murmurent.core import hosts as _hosts
 
     # Register an SSH host so workspace_initialize can resolve it.
     monkeypatch.setenv("WIGAMIG_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
@@ -163,14 +163,14 @@ def test_initialize_ssh_install_on_bare_repo_no_local_dir(isolated, tmp_path, mo
     ))
 
     # Mock every Remote.run so we don't actually SSH anywhere. Two
-    # round trips happen: the install probe (wigamig binary / clone)
+    # round trips happen: the install probe (murmurent binary / clone)
     # and the projectize-driven remote_adopt CHARTER write.
     def fake_run(self, command, *, check=True, timeout=60):
-        if "wigamig --version" in command:
-            stdout = "wigamig 1.0.0\n"
+        if "murmurent --version" in command:
+            stdout = "murmurent 1.0.0\n"
         elif "raw:" in command or "refined:" in command or "notebook:" in command:
             stdout = "\n".join([
-                "wigamig:ok:1.0.0",
+                "murmurent:ok:1.0.0",
                 "homedir:ok:/home/UWO/the_pi",
                 "raw:ok:created /data/lab_vm/wigamig/raw",
                 "refined:ok:created /data/lab_vm/wigamig/refined",

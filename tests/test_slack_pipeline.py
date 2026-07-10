@@ -13,10 +13,10 @@ import datetime as _dt
 
 import pytest
 
-from wigamig.commands import project_cmd
-from wigamig.core import slack_distill as distill
-from wigamig.core import slack_mirror as mirror
-from wigamig.dashboard import snapshot
+from murmurent.commands import project_cmd
+from murmurent.core import slack_distill as distill
+from murmurent.core import slack_mirror as mirror
+from murmurent.dashboard import snapshot
 
 
 @pytest.fixture
@@ -206,7 +206,7 @@ def test_distill_writes_drafts_with_status_draft(world):
     response = (
         "---\n"
         "title: 'GRCh38.p14 fixes chrM'\n"
-        "author: '@wigamig-oracle'\n"
+        "author: '@murmurent-oracle'\n"
         "date: 2026-05-08\n"
         "tags: [reference-genome]\n"
         "status: draft\n"
@@ -273,7 +273,7 @@ def test_stub_llm_used_without_anthropic_key(world, monkeypatch):
 def _seed_oracle_file(world, *, slug: str, status: str, **extras):
     odir = world / "lab-mgmt" / "oracle"
     odir.mkdir(parents=True, exist_ok=True)
-    fm = ["---", f"title: '{slug}'", f"status: {status}", "author: '@wigamig-oracle'",
+    fm = ["---", f"title: '{slug}'", f"status: {status}", "author: '@murmurent-oracle'",
           "date: 2026-05-08"]
     for k, v in extras.items():
         fm.append(f"{k}: {v}")
@@ -335,7 +335,7 @@ def test_iter_drafts_returns_only_drafts(world):
 
 def _client():
     from fastapi.testclient import TestClient
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
     return TestClient(create_app())
 
 

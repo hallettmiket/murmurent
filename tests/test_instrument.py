@@ -1,10 +1,10 @@
-"""Tests for :mod:`wigamig.core.instrument`."""
+"""Tests for :mod:`murmurent.core.instrument`."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from wigamig.core.instrument import (
+from murmurent.core.instrument import (
     GENERIC_DERIVED_PATTERNS,
     detect_profile,
     generic_classify,

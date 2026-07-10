@@ -1,14 +1,14 @@
-"""Tests for :mod:`wigamig.core.sea` and :mod:`wigamig.commands.sea_cmd`."""
+"""Tests for :mod:`murmurent.core.sea` and :mod:`murmurent.commands.sea_cmd`."""
 
 from __future__ import annotations
 
 import pytest
 from click.testing import CliRunner
 
-from wigamig.cli import cli
-from wigamig.commands import project_cmd, sea_cmd
-from wigamig.core import sea
-from wigamig.core.projects import find_project
+from murmurent.cli import cli
+from murmurent.commands import project_cmd, sea_cmd
+from murmurent.core import sea
+from murmurent.core.projects import find_project
 
 
 @pytest.fixture

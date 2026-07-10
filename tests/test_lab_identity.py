@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.core import lab_identity as LI
+from murmurent.core import lab_identity as LI
 
 
 @pytest.fixture

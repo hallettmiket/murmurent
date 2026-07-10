@@ -8,8 +8,8 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.core import membership as M
-from wigamig.core import repo as R
+from murmurent.core import membership as M
+from murmurent.core import repo as R
 
 
 @pytest.fixture

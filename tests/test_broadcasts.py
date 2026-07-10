@@ -25,9 +25,9 @@ import yaml
 from click.testing import CliRunner
 from fastapi.testclient import TestClient
 
-from wigamig.commands.broadcast_cmd import broadcast as cli_broadcast
-from wigamig.core import broadcasts as BC
-from wigamig.dashboard.server import create_app
+from murmurent.commands.broadcast_cmd import broadcast as cli_broadcast
+from murmurent.core import broadcasts as BC
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -120,7 +120,7 @@ def test_send_broadcast_posts_and_logs(world):
 def test_send_broadcast_surfaces_failed_post_and_skips_ledger(world, monkeypatch):
     # Live path (no injected poster): a rejected Slack post must raise with the
     # real error AND must not be recorded in the audit ledger.
-    from wigamig.dashboard import slack_notify as SN
+    from murmurent.dashboard import slack_notify as SN
     monkeypatch.setattr(SN, "post_message_result",
         lambda cid, text: SN.SlackPostResult(ok=False, error="not_in_channel",
                                              detail="invite the bot into the channel"))
@@ -194,7 +194,7 @@ def _post_json(client, url, body, **kw):
 
 
 def test_http_post_pi_passes(world):
-    with patch("wigamig.core.broadcasts.send_broadcast") as m:
+    with patch("murmurent.core.broadcasts.send_broadcast") as m:
         m.return_value = BC.Broadcast(
             iso_ts="2026-05-26T12:00:00Z", audience="leaders",
             channel_id="C0LEADERS", sender="the_pi",
@@ -258,7 +258,7 @@ def test_cli_send_dry_run_no_post(world):
 
 
 def test_cli_send_apply_writes_ledger(world):
-    with patch("wigamig.core.broadcasts.send_broadcast") as m:
+    with patch("murmurent.core.broadcasts.send_broadcast") as m:
         m.return_value = BC.Broadcast(
             iso_ts="2026-05-26T12:00:00Z", audience="leaders",
             channel_id="C0LEADERS", sender="the_pi",

@@ -1,4 +1,4 @@
-"""Tests for ``wigamig oracle publish`` (personal vault → Lab Oracle).
+"""Tests for ``murmurent oracle publish`` (personal vault → Lab Oracle).
 
 Covers the contract spelled out in [agents/oracle.md][1] and
 [rules/oracle_schema.md][2]:
@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.core import oracle_publish as _op
+from murmurent.core import oracle_publish as _op
 
 
 # ---------------------------------------------------------------------------

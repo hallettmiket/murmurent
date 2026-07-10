@@ -25,9 +25,9 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar as R
-from wigamig.core import training as T
-from wigamig.dashboard.server import create_app
+from murmurent.core import registrar as R
+from murmurent.core import training as T
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
