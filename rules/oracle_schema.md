@@ -3,7 +3,7 @@
 Every Oracle entry — personal (`<vault>/oracle/*.md`) or lab
 (`lab_mgmt/oracle/*.md`) — must start with YAML frontmatter conforming
 to this schema. The schema is enforced by the Oracle and Lab Oracle
-agents and parsed by `src/wigamig/mcp/oracle_server.py` for structured
+agents and parsed by `src/murmurent/mcp/oracle_server.py` for structured
 search.
 
 ## Why a schema

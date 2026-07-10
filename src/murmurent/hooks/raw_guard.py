@@ -1,6 +1,6 @@
 """
 Purpose: Claude Code ``PreToolUse`` hook that refuses any tool call that would
-         mutate files under ``$WIGAMIG_LAB_VM_ROOT/raw/``. Read / Glob / Grep
+         mutate files under ``$MURMURENT_LAB_VM_ROOT/raw/``. Read / Glob / Grep
          are explicitly allowed; the lab's data-storage rule is "raw is
          read-only, ever."
 Author: Mike Hallett (with Claude Code)
@@ -41,12 +41,12 @@ WRITE_TOOLS: frozenset[str] = frozenset({"Write", "Edit", "NotebookEdit"})
 def _raw_prefixes() -> tuple[str, ...]:
     """Return the set of path prefixes that count as 'raw'.
 
-    Always honours ``$WIGAMIG_LAB_VM_ROOT`` (so the smoke-test setup is covered)
+    Always honours ``$MURMURENT_LAB_VM_ROOT`` (so the smoke-test setup is covered)
     and always also blocks the production ``/data/lab_vm/wigamig/raw/`` path even when
     the env var points elsewhere — defense in depth.
     """
     prefixes: list[str] = [str(PRODUCTION_RAW_ROOT)]
-    env = os.environ.get("WIGAMIG_LAB_VM_ROOT")
+    env = os.environ.get("MURMURENT_LAB_VM_ROOT")
     if env:
         prefixes.append(str(Path(env).expanduser() / "raw"))
     else:

@@ -30,9 +30,9 @@ from murmurent.dashboard.server import create_app
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_USER", "the_pi")
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_USER", "the_pi")
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "lab.md").write_text(
         "---\nlab: hallett\npi: '@the_pi'\n---\n", encoding="utf-8",

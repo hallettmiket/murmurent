@@ -18,16 +18,16 @@ from murmurent.core import registrar as R
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "wigamig_home"))
-    monkeypatch.setenv("WIGAMIG_USER", "tbrowne")
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "wigamig_home"))
+    monkeypatch.setenv("MURMURENT_USER", "tbrowne")
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "lab.md").write_text(
         "---\nlab: hallett\npi: '@the_pi'\n---\n", encoding="utf-8")
     fake_home = tmp_path / "home"
     fake_home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(R, "REGISTRAR_SENTINEL", fake_home / ".wigamig" / "registrar")
+    monkeypatch.setattr(R, "REGISTRAR_SENTINEL", fake_home / ".murmurent" / "registrar")
     CI.init_centre(name="Serenity", institution="U", founding_mayor="@tbrowne",
                    slack_workspace="T0X", github_org="centre-x",
                    data_server="lab-server", write_sentinel=False)

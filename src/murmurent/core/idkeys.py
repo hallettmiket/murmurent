@@ -17,7 +17,7 @@ Design constraints baked in (from the adversary + security_guard design reviews)
     unsigned-field wiggle room — the caller decides exactly which fields are in
     the signed payload and only those bytes are signed.
   - **Perms at generation time.** The private key is written under
-    ``~/.wigamig/keys/`` with ``0700`` dir / ``0600`` file perms enforced *as it
+    ``~/.murmurent/keys/`` with ``0700`` dir / ``0600`` file perms enforced *as it
     is created* (``os.open`` with mode, then an explicit ``chmod``), never by
     downstream convention, and never into a repo working tree.
   - **No private material leaves this module** in a card, log, or wire message —
@@ -44,11 +44,11 @@ _PUB_PREFIX = "ed25519:"
 
 
 # ---------------------------------------------------------------------------
-# Paths (honour WIGAMIG_HOME so tests + non-default installs are isolated)
+# Paths (honour MURMURENT_HOME so tests + non-default installs are isolated)
 # ---------------------------------------------------------------------------
 
 def _home() -> Path:
-    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+    return Path(os.environ.get("MURMURENT_HOME", str(Path.home() / ".murmurent")))
 
 
 def keys_dir() -> Path:
@@ -142,7 +142,7 @@ def have_keys(path: Path | None = None) -> bool:
 
 def generate_keypair(*, overwrite: bool = False, path: Path | None = None) -> str:
     """Create an ed25519 keypair (default: this machine's key under
-    ``~/.wigamig/keys/``; ``path`` selects a different key, e.g. the centre root).
+    ``~/.murmurent/keys/``; ``path`` selects a different key, e.g. the centre root).
 
     Idempotent: if a private key already exists at ``path`` and ``overwrite`` is
     false, the existing key is kept and its fingerprint returned (so a "first run

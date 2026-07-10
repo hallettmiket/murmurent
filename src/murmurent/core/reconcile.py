@@ -3,10 +3,10 @@ Purpose: Detect + (optionally) repair drift between murmurent's recorded
          state and on-disk reality across every registered host.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-17
-Input: ``~/.wigamig/installations/*.yaml`` (this-machine install
+Input: ``~/.murmurent/installations/*.yaml`` (this-machine install
        records), the cert-project registry (``<lab-mgmt>/cert_projects/*.md`` —
        the authoritative project store that replaced the CHARTER-mirror
-       registry), registered hosts (``~/.wigamig/hosts.yaml``), and the live
+       registry), registered hosts (``~/.murmurent/hosts.yaml``), and the live
        state of working trees on those hosts (filesystem locally,
        SSH probe remotely).
 Output: ``ReconcileReport`` — list of :class:`DriftFinding` rows.
@@ -16,7 +16,7 @@ Output: ``ReconcileReport`` — list of :class:`DriftFinding` rows.
 What we detect (all four enabled by default):
 
   1. **orphan_installation** — manifest at
-     ``~/.wigamig/installations/<name>.yaml`` whose target working
+     ``~/.murmurent/installations/<name>.yaml`` whose target working
      tree no longer exists on the host it points to. Common cause:
      user ``rm -rf``'d the clone locally, or lab-server wiped a repo.
   2. **orphan_registry** — a cert-project at
@@ -58,7 +58,7 @@ from .frontmatter import parse_file, dump_document
 # Where install manifests live. snapshot.INSTALLATIONS_DIR is the
 # runtime path; we re-import inside functions so monkeypatched tests
 # pick up the override.
-DEFAULT_INSTALLATIONS_DIR = Path.home() / ".wigamig" / "installations"
+DEFAULT_INSTALLATIONS_DIR = Path.home() / ".murmurent" / "installations"
 ARCHIVE_SUBDIR = ".archive"
 
 
@@ -512,7 +512,7 @@ def detect_unadopted_clones() -> list[DriftFinding]:
     counts: dict[str, int] = {}
     for row in data.get("rows", []):
         for c in row.get("clones", []) or []:
-            if not c.get("is_wigamig_installed"):
+            if not c.get("is_murmurent_installed"):
                 host = c.get("host") or "unknown"
                 counts[host] = counts.get(host, 0) + 1
     findings: list[DriftFinding] = []

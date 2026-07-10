@@ -24,9 +24,9 @@ Stand up the Python package, CLI skeleton, agent registry, frontmatter and repo-
 
 1. **Python package skeleton**
    - `pyproject.toml` (Python 3.12, uv)
-   - `src/wigamig/` package
+   - `src/murmurent/` package
    - Dev deps: pytest, black, isort
-   - `src/wigamig/cli.py` with `click`
+   - `src/murmurent/cli.py` with `click`
    - `murmurent --help` prints the full command tree from `cli_manual.md` (most commands stub: `click.echo("not yet implemented in v1")`)
    - `tests/test_cli_help.py` smokes the help output
 
@@ -36,10 +36,10 @@ Stand up the Python package, CLI skeleton, agent registry, frontmatter and repo-
    - Each agent's frontmatter must include the new fields: `freeze` (`frozen` | `personal`), `required_tools` (list), `denied_tools` (list), `defaults` (block per design)
    - The `defaults` block uses the controlled vocabulary in `docs/group_level.md` "Tool preferences"
 
-3. **Core utilities** at `src/wigamig/core/`
+3. **Core utilities** at `src/murmurent/core/`
    - `repo.py` — walk cwd to find active project (marker: `CHARTER.md`); read `MEMBERS`; locate lab-management repo at `~/repos/lab_mgmt`
    - `frontmatter.py` — parse YAML frontmatter; validate required fields per the design
-   - `identity.py` — resolve current user (env var `WIGAMIG_USER` preferred for testing; fall back to `gh api user`)
+   - `identity.py` — resolve current user (env var `MURMURENT_USER` preferred for testing; fall back to `gh api user`)
    - Tests for each
 
 4. **`murmurent agent list`** working — reads `agents/*.md`, prints name + freeze flag in a table

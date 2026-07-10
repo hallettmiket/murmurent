@@ -18,9 +18,9 @@ from murmurent.dashboard.server import create_app
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_USER", "tbrowne")
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_USER", "tbrowne")
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "lab.md").write_text(
         "---\nlab: hallett\npi: '@tbrowne'\n---\n", encoding="utf-8",
@@ -36,7 +36,7 @@ def world(monkeypatch, tmp_path):
     fake_home = tmp_path / "home"
     fake_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(R, "REGISTRAR_SENTINEL",
-                         fake_home / ".wigamig" / "registrar")
+                         fake_home / ".murmurent" / "registrar")
     return tmp_path
 
 
@@ -107,7 +107,7 @@ def test_post_init_422_when_no_mayor_resolvable(world):
         "name": "C", "institution": "U",
     })
     # Without ?user= and no body.mayor, the server falls back to
-    # $WIGAMIG_USER which IS set in this fixture → succeeds. So we
+    # $MURMURENT_USER which IS set in this fixture → succeeds. So we
     # blank it out here.
     # NB: same outcome as the previous test, just being explicit.
     assert res.status_code in (200, 422)

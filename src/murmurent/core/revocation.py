@@ -12,7 +12,7 @@ the mayor. Distributing the signed CRL to members' machines is Phase 6; until
 then, a member's dashboard enforces card **expiry + tamper** but not remote
 revocation.
 
-State on disk (under ``~/.wigamig/revocation/``):
+State on disk (under ``~/.murmurent/revocation/``):
   - ``<centre>.state.json``   — ``{serial, revoked: [...]}`` (the unsigned set)
   - ``<centre>.crl.json``     — the last root-signed CRL (published / importable)
   - ``<centre>.issued.json``  — issuance ledger ``{handle: {card_id, fingerprint,
@@ -34,7 +34,7 @@ class RevocationError(RuntimeError):
 
 
 def _home() -> Path:
-    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+    return Path(os.environ.get("MURMURENT_HOME", str(Path.home() / ".murmurent")))
 
 
 def _dir() -> Path:

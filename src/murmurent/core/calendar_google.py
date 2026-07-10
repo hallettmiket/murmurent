@@ -3,7 +3,7 @@ Purpose: Google Calendar v3 client for per-core booking events.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-22
 Input: Per-core OAuth credentials at
-       ``~/.wigamig/cores/<core>/google_calendar.json`` (created by
+       ``~/.murmurent/cores/<core>/google_calendar.json`` (created by
        ``murmurent core-calendar-auth`` via the InstalledAppFlow).
 Output: Calendar event ID + html link that the booking endpoint
         stitches into the RequestSummary's BookingSlot.
@@ -12,7 +12,7 @@ Design (Phase 3c of the cores rollout — docs/cores_plan.md §5c):
 
   - Identity: the core *leader*'s calendar holds the events. Gary
     runs the one-time OAuth flow on his machine; the refresh token
-    lands at ``~/.wigamig/cores/biocore/google_calendar.json`` and
+    lands at ``~/.murmurent/cores/biocore/google_calendar.json`` and
     is loaded by the dashboard process.
   - Sync: the booking endpoint calls ``create_event`` inline before
     persisting the request. Failure is non-blocking — the request is
@@ -25,7 +25,7 @@ Design (Phase 3c of the cores rollout — docs/cores_plan.md §5c):
 
 Storage layout:
 
-  ~/.wigamig/cores/<core>/
+  ~/.murmurent/cores/<core>/
     google_oauth_client.json     # OAuth client_id/secret from Google Cloud
                                   # (provided by the core leader once)
     google_calendar.json          # refresh token after the auth flow
@@ -67,7 +67,7 @@ class CalendarEvent:
 def _cores_dir() -> Path:
     """Per-core credential root (machine-local)."""
     return Path(
-        os.environ.get("WIGAMIG_HOME") or (Path.home() / ".wigamig")
+        os.environ.get("MURMURENT_HOME") or (Path.home() / ".murmurent")
     ) / "cores"
 
 

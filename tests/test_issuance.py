@@ -25,9 +25,9 @@ from murmurent.core import registrar as R
 @pytest.fixture
 def mayor_world(monkeypatch, tmp_path):
     """Mayor's machine: a centre with a lab + a core, and the centre root key."""
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "mayor_lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "mayor_lab_mgmt"))
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "mayor_home"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "mayor_lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "mayor_lab_mgmt"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "mayor_home"))
     monkeypatch.setattr(R, "REGISTRAR_SENTINEL", tmp_path / "sentinel")
     CI.init_centre(name="Western QA", institution="U", founding_mayor="@tbrowne5",
                    unique_name="western-qa", write_sentinel=False)
@@ -81,9 +81,9 @@ def test_issue_rejects_non_pi(mayor_world):
 
 
 def test_issue_requires_root_key(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "li"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lm"))
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "h"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "li"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lm"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "h"))
     monkeypatch.setattr(R, "REGISTRAR_SENTINEL", tmp_path / "sentinel")
     CI.init_centre(name="QA", institution="U", founding_mayor="@tbrowne5",
                    unique_name="qa", write_sentinel=False)
@@ -100,8 +100,8 @@ def test_verify_and_import_materializes_role(mayor_world, monkeypatch, tmp_path)
     card = ISS.issue_pi_card("@yxia266", enrollment=req, actor="@tbrowne5")
     root_pub = mayor_world["root_pub"]
     # move to a FRESH PI machine
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi_home"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_lab_info"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi_home"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi_lab_info"))
     verdict, actions = ISS.verify_and_import_pi_card(card, trust_root=root_pub)
     assert verdict.ok and verdict.handle == "@yxia266"
     # the PI's own machine now resolves them as the lab PI
@@ -116,8 +116,8 @@ def test_verify_and_import_materializes_role(mayor_world, monkeypatch, tmp_path)
 def test_import_needs_trust_anchor(mayor_world, monkeypatch, tmp_path):
     _priv, req = _enrollment()
     card = ISS.issue_pi_card("@yxia266", enrollment=req, actor="@tbrowne5")
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi2"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi2_li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi2"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi2_li"))
     with pytest.raises(ISS.IssuanceError, match="trust anchor"):
         ISS.verify_and_import_pi_card(card)  # nothing pinned, no --trust-root
 
@@ -125,8 +125,8 @@ def test_import_needs_trust_anchor(mayor_world, monkeypatch, tmp_path):
 def test_import_rejects_anchor_mismatch(mayor_world, monkeypatch, tmp_path):
     _priv, req = _enrollment()
     card = ISS.issue_pi_card("@yxia266", enrollment=req, actor="@tbrowne5")
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi3"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi3_li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi3"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi3_li"))
     # a DIFFERENT root is already pinned → offering the real one fails closed
     other = K.encode_public(Ed25519PrivateKey.generate().public_key())
     C.pin_root("western-qa", other)
@@ -139,8 +139,8 @@ def test_import_rejects_card_from_wrong_root(mayor_world, monkeypatch, tmp_path)
     evil_root = Ed25519PrivateKey.generate()
     forged = C.issue_pi_card(handle="@yxia266", pi_pubkey=req["payload"]["pubkey"],
                              centre="western-qa", root_priv=evil_root)
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi4"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi4_li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi4"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi4_li"))
     with pytest.raises(ISS.IssuanceError, match="rejected"):
         ISS.verify_and_import_pi_card(forged, trust_root=mayor_world["root_pub"])
 
@@ -148,9 +148,9 @@ def test_import_rejects_card_from_wrong_root(mayor_world, monkeypatch, tmp_path)
 # ---- CLI --------------------------------------------------------------------
 
 def test_cli_enroll_produces_valid_request(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "h"))
-    monkeypatch.setenv("WIGAMIG_USER", "yxia266")
-    monkeypatch.delenv("WIGAMIG_NO_AUTOKEY", raising=False)  # allow first-run keygen
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "h"))
+    monkeypatch.setenv("MURMURENT_USER", "yxia266")
+    monkeypatch.delenv("MURMURENT_NO_AUTOKEY", raising=False)  # allow first-run keygen
     from murmurent.cli import cli
     res = CliRunner().invoke(cli, ["enroll", "--nonce", "abc"])
     assert res.exit_code == 0, res.output
@@ -163,8 +163,8 @@ def test_cli_enroll_produces_valid_request(monkeypatch, tmp_path):
 
 def test_standalone_pi_self_issues_and_runs_a_lab(monkeypatch, tmp_path):
     # PI machine — no centre, no mayor, just their own identity key.
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi_home"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi_home"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
     K.generate_keypair()
     out = ISS.self_issue_pi_card("@yxia266", "xia_lab")
     trust = out["trust_root"]
@@ -180,8 +180,8 @@ def test_standalone_pi_self_issues_and_runs_a_lab(monkeypatch, tmp_path):
 
     # the member imports it, pinning the PI's key (the trust root) — chains
     # member -> PI(self-root), no centre.
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "allie_home"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "allie_li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "allie_home"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "allie_li"))
     verdict, _actions = ISS.verify_and_import_member_card(bundle, trust_root=trust)
     assert verdict.ok and verdict.handle == "@allie" and verdict.group == "xia_lab"
     assert R.lab_mgmt_path_for_handle("allie")[0] == "xia_lab"
@@ -189,9 +189,9 @@ def test_standalone_pi_self_issues_and_runs_a_lab(monkeypatch, tmp_path):
 
 def test_cli_whoami_shows_trust_root_for_pi(monkeypatch, tmp_path):
     from murmurent.cli import cli
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
-    monkeypatch.setenv("WIGAMIG_USER", "the_pi")
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.setenv("MURMURENT_USER", "the_pi")
     K.generate_keypair()
     ISS.self_issue_pi_card("@the_pi", "lab_mh")
     res = CliRunner().invoke(cli, ["whoami"])
@@ -202,9 +202,9 @@ def test_cli_whoami_shows_trust_root_for_pi(monkeypatch, tmp_path):
 
 def test_cli_issue_member_card_prints_trust_root_when_standalone(monkeypatch, tmp_path):
     from murmurent.cli import cli
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
-    monkeypatch.setenv("WIGAMIG_USER", "the_pi")
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.setenv("MURMURENT_USER", "the_pi")
     K.generate_keypair()
     out = ISS.self_issue_pi_card("@the_pi", "lab_mh")
     allie = Ed25519PrivateKey.generate()
@@ -229,9 +229,9 @@ def test_issuance_writes_the_roster(monkeypatch, tmp_path):
     from murmurent.core import repo as R
     from murmurent.core import revocation as REV
 
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
-    monkeypatch.delenv("WIGAMIG_LAB_MGMT_REPO", raising=False)   # use the pinned pointer
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.delenv("MURMURENT_LAB_MGMT_REPO", raising=False)   # use the pinned pointer
     K.generate_keypair()
     (tmp_path / "pi").mkdir(parents=True, exist_ok=True)
     (tmp_path / "pi" / "profile.yaml").write_text(
@@ -270,9 +270,9 @@ def test_project_scoped_card_issue_and_revoke(monkeypatch, tmp_path):
     from murmurent.core import cert_projects as CP
     from murmurent.core import revocation as REV
 
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
-    monkeypatch.delenv("WIGAMIG_LAB_MGMT_REPO", raising=False)
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.delenv("MURMURENT_LAB_MGMT_REPO", raising=False)
     K.generate_keypair()
     (tmp_path / "pi").mkdir(parents=True, exist_ok=True)
     (tmp_path / "pi" / "profile.yaml").write_text(
@@ -321,8 +321,8 @@ def test_project_scoped_card_issue_and_revoke(monkeypatch, tmp_path):
 
 
 def test_standalone_pi_requires_a_group_name(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "h"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "h"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "li"))
     K.generate_keypair()
     with pytest.raises(ISS.IssuanceError, match="name is required"):
         ISS.self_issue_pi_card("@yxia266", "")
@@ -350,8 +350,8 @@ def _carded_pi(mayor_world, monkeypatch, tmp_path, home="pi_home"):
                                     centre="western-qa")
     pi_card = ISS.issue_pi_card("@yxia266", enrollment=req, actor="@tbrowne5")
     root_pub = mayor_world["root_pub"]
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / home))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / (home + "_li")))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / home))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / (home + "_li")))
     _install_machine_key(pi_priv)
     ISS.verify_and_import_pi_card(pi_card, trust_root=root_pub)
     return {"pi_priv": pi_priv, "root_pub": root_pub}
@@ -371,8 +371,8 @@ def test_member_card_full_chain(mayor_world, monkeypatch, tmp_path):
     assert bundle["member_card"]["payload"]["kind"] == "member"
     assert bundle["pi_card"]["payload"]["subject"]["handle"] == "@yxia266"
     # member machine imports the bundle and now resolves as a member of the lab
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "allie_home"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "allie_li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "allie_home"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "allie_li"))
     verdict, actions = ISS.verify_and_import_member_card(bundle, trust_root=ctx["root_pub"])
     assert verdict.ok and verdict.handle == "@allie" and verdict.group == "yxia_lab"
     match = R.lab_mgmt_path_for_handle("allie")
@@ -405,8 +405,8 @@ def test_member_card_from_forged_pi_rejected(mayor_world, monkeypatch, tmp_path)
                                  group="yxia_lab", centre="western-qa",
                                  pi_priv=attacker, pi_handle="@yxia266")
     bad_bundle = {"member_card": forged, "pi_card": good["pi_card"]}
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "allie2"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "allie2_li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "allie2"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "allie2_li"))
     with pytest.raises(ISS.IssuanceError, match="rejected"):
         ISS.verify_and_import_member_card(bad_bundle, trust_root=ctx["root_pub"])
 
@@ -423,8 +423,8 @@ def test_cli_member_card_round_trip(mayor_world, monkeypatch, tmp_path):
                             "--out", str(bundle_f)])
     assert r.exit_code == 0, r.output
     # member machine imports it
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "allie_cli"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "allie_cli_li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "allie_cli"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "allie_cli_li"))
     r2 = runner.invoke(cli, ["import-card", str(bundle_f), "--trust-root", ctx["root_pub"]])
     assert r2.exit_code == 0, r2.output
     assert "verified" in r2.output and "member" in r2.output
@@ -444,8 +444,8 @@ def test_cli_issue_and_import_round_trip(mayor_world, monkeypatch, tmp_path):
     assert res.exit_code == 0, res.output
     assert card_f.is_file()
     # PI machine imports it
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi_home"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi_home"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
     res2 = runner.invoke(cli, ["import-card", str(card_f), "--trust-root",
                                mayor_world["root_pub"]])
     assert res2.exit_code == 0, res2.output

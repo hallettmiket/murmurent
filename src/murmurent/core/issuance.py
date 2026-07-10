@@ -42,7 +42,7 @@ class IssuanceError(RuntimeError):
 
 
 def _home() -> Path:
-    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+    return Path(os.environ.get("MURMURENT_HOME", str(Path.home() / ".murmurent")))
 
 
 def cards_dir() -> Path:
@@ -189,7 +189,7 @@ def self_issue_pi_card(handle: str, group: str, *, group_kind: str = "lab",
 # ---------------------------------------------------------------------------
 
 def _read_profile(env: dict | None = None) -> dict:
-    """The member's ``~/.wigamig/profile.yaml`` (from ``murmurent init``), or {}."""
+    """The member's ``~/.murmurent/profile.yaml`` (from ``murmurent init``), or {}."""
     import yaml
     p = _home() / "profile.yaml"
     if not p.is_file():

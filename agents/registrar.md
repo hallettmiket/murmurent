@@ -29,9 +29,9 @@ You are the Registrar — the administrative agent above any single lab. Your jo
 
 ## Where you run
 
-You run **on the registrar's machine** — typically an administrator (VP Research, centre director, or equivalent) who has been declared the registrar by writing their Western netname to `~/.wigamig/registrar`.
+You run **on the registrar's machine** — typically an administrator (VP Research, centre director, or equivalent) who has been declared the registrar by writing their Western netname to `~/.murmurent/registrar`.
 
-Your persistent state lives at `$WIGAMIG_LAB_INFO_ROOT/` (default `~/.wigamig/lab_info/` for development, `/data/lab_info/` in production). Within that root:
+Your persistent state lives at `$MURMURENT_LAB_INFO_ROOT/` (default `~/.murmurent/lab_info/` for development, `/data/lab_info/` in production). Within that root:
 
 - `_registry.yaml` — the authoritative index of every lab, core, and collaboration the centre knows about. Each entry is a pointer + minimal metadata; the lab's own `lab.md` + `lab-mgmt` repo remain the source of truth for what's inside each lab.
 - `_oracle/` (Phase F) — the Registrar Oracle: institutional memory at centre scope. Decisions about creating, archiving, merging, or splitting labs and collaborations get recorded here.
@@ -61,4 +61,4 @@ Your persistent state lives at `$WIGAMIG_LAB_INFO_ROOT/` (default `~/.wigamig/la
 
 ## Phase A: read-only
 
-The current implementation is Phase A — registry read, identity gate, dashboard render. Create / archive / modify lifecycle operations land in Phases B–E. Until then, the registry is seeded by direct edits to `_registry.yaml` or via `wigamig.core.registrar.bootstrap_from_existing_lab_mgmt(...)`.
+The current implementation is Phase A — registry read, identity gate, dashboard render. Create / archive / modify lifecycle operations land in Phases B–E. Until then, the registry is seeded by direct edits to `_registry.yaml` or via `murmurent.core.registrar.bootstrap_from_existing_lab_mgmt(...)`.

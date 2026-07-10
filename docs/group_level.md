@@ -112,7 +112,7 @@ Some preferences are cross-cutting (multiple agents care): plotting library, fig
 A member can set the cross-cutting fields once, applied across all their installed `personal` agents:
 
 ```yaml
-# ~/.claude/wigamig-preferences.yaml
+# ~/.claude/murmurent-preferences.yaml
 language: en
 prose_style: academic
 plotting: seaborn
@@ -130,7 +130,7 @@ When an agent asks "what plotting library should I use?", the answer cascades:
 
 1. **Conversation override** ("use altair this time") — always wins.
 2. **Agent's local `defaults`** — set on the agent file directly.
-3. **Personal preferences profile** (`~/.claude/wigamig-preferences.yaml`) — fills in any standardised field not set in (2).
+3. **Personal preferences profile** (`~/.claude/murmurent-preferences.yaml`) — fills in any standardised field not set in (2).
 4. **Registry default** (centre, optionally extended by guild) — `frozen` agents stop here; `personal` agents only fall through to here for fields not set in (2) or (3).
 
 A member who sets `plotting: seaborn` once in their profile gets seaborn from every personal agent unprompted. To override for a single agent (e.g. `bookworm` uses pandoc-style citations regardless), they edit that agent's local copy.
@@ -1258,8 +1258,8 @@ Seven hooks compose the murmurent protection layer. Each is a small script regis
 
 Several hooks need to know which murmurent project the member is currently working in. Resolution order:
 
-1. `WIGAMIG_PROJECT` environment variable, if set.
-2. Walk up from `cwd` until a `.wigamig-project` marker file (or `CHARTER.md`) is found; the project name is read from that file.
+1. `MURMURENT_PROJECT` environment variable, if set.
+2. Walk up from `cwd` until a `.murmurent-project` marker file (or `CHARTER.md`) is found; the project name is read from that file.
 3. Fall back to "no active project" — non-protected operations only.
 
 This is computed once per CC session and cached. Most hooks short-circuit when no active project is resolved.
@@ -1321,7 +1321,7 @@ print(json.dumps({"decision": "allow"}))
 **Trigger:** every tool call (after execution).
 
 **Logic:**
-- Append a single jsonl line to `~/.claude/wigamig-audit/YYYY-MM-DD.log`:
+- Append a single jsonl line to `~/.claude/murmurent-audit/YYYY-MM-DD.log`:
 
 ```json
 {"ts": "2026-05-06T10:14:22Z", "member": "@the_pi", "project": "dcis_imaging",
@@ -1377,7 +1377,7 @@ Active SEAs:
 
 **Logic:**
 - Compose a short summary: project worked on, files touched, tool calls counted, any errors or denied calls.
-- Append to `~/.claude/wigamig-audit/sessions.log`.
+- Append to `~/.claude/murmurent-audit/sessions.log`.
 - If the session touched files in an active SEA's delivery path, prompt the user (in CC's stop output) to consider marking the SEA `complete`.
 - Never auto-pushes to git — surfacing the suggestion to the user is enough.
 
@@ -1426,7 +1426,7 @@ The murmurent install script writes the seven hooks into `~/.claude/settings.jso
 
 ### Failure modes and degradation
 
-- If a hook script crashes, CC sees no decision and proceeds with the default permission. To prevent silent degradation, hooks log to `~/.claude/wigamig-audit/hook-errors.log`; `murmurent doctor` checks the log size and warns if hooks are failing.
+- If a hook script crashes, CC sees no decision and proceeds with the default permission. To prevent silent degradation, hooks log to `~/.claude/murmurent-audit/hook-errors.log`; `murmurent doctor` checks the log size and warns if hooks are failing.
 - Lab-management repo unreachable: hooks fall back to local cached MEMBERS / config files. Stale by up to 5 minutes. The active project's MEMBERS is always available because the project is cloned locally.
 
 ## Tool allowlists per agent (gap #2, design)
@@ -1703,7 +1703,7 @@ The required-vs-elected distinction is enforced: a member cannot opt out of a co
 - **Freeze** — immutable snapshot of a project at a point in time: git tag + manifest + age-encrypted bundle. Used for paper / thesis / grant submission moments.
 - **oracle_curator** — group-level role responsible for facilitating finalisation choreographies and handling periodic legacy maintenance (cross-reference health, citation rot, tag drift). Quotaed to 2; annual rotation.
 - **Standardised vocabulary** — controlled list of cross-cutting `defaults` field names documented at `wigamig/preferences.md`; guilds extend via `wigamig/guilds/<group>/preferences.md`. Used for fields multiple agents share (plotting, citation_style, prose_style, etc.).
-- **Personal preferences profile** — `~/.claude/wigamig-preferences.yaml`, local to each member's machine, sets standardised fields once for all `personal` agents. Never committed to group repos.
+- **Personal preferences profile** — `~/.claude/murmurent-preferences.yaml`, local to each member's machine, sets standardised fields once for all `personal` agents. Never committed to group repos.
 - **Onboarding profile** — YAML+markdown spec at `wigamig/onboarding/<profile>.md` (centre default) or `lab-mgmt-repo/onboarding/<profile>.md` (lab override) bundling agents-to-install, default permissions, lead eligibility, and expiry for a class of new member. Four centre defaults: `student`, `postdoc`, `pi-collab`, `visitor`. Cores are themselves groups, not profiles within a group.
 - **Sensitivity tier** — project-level property declared in `CHARTER.md` frontmatter: `standard` / `restricted` / `clinical`. Controls per tier defined in `wigamig/sensitivity-policy.yaml`. Projects in the same group can be at different tiers.
 - **PHIPA / TCPS 2 / REB** — Personal Health Information Protection Act (Ontario), Tri-Council Policy Statement on research ethics, Research Ethics Board. Together they govern `clinical` projects.

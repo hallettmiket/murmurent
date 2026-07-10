@@ -16,10 +16,10 @@ from murmurent.core.frontmatter import parse_file
 @pytest.fixture
 def isolated_env(monkeypatch, tmp_path):
     """Point all murmurent env vars to ``tmp_path`` so tests don't touch real dirs."""
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     (tmp_path / "lab-mgmt" / "projects").mkdir(parents=True)
     yield tmp_path
 

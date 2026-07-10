@@ -10,19 +10,19 @@ Output: ``OpenResult`` dict with the resolved path + the launched command.
 
 Editor resolution (first match wins):
 
-  1. ``$WIGAMIG_NOTEBOOK_EDITOR``  — explicit override. Use ``{path}`` as a
+  1. ``$MURMURENT_NOTEBOOK_EDITOR``  — explicit override. Use ``{path}`` as a
      placeholder for the file path. Examples::
 
-          export WIGAMIG_NOTEBOOK_EDITOR="obsidian"
-          export WIGAMIG_NOTEBOOK_EDITOR="code -g {path}"
-          export WIGAMIG_NOTEBOOK_EDITOR="vim {path}"
+          export MURMURENT_NOTEBOOK_EDITOR="obsidian"
+          export MURMURENT_NOTEBOOK_EDITOR="code -g {path}"
+          export MURMURENT_NOTEBOOK_EDITOR="vim {path}"
 
   2. ``obsidian://`` URL  — when the file is *inside a registered
      Obsidian vault*. We win over ``$EDITOR`` here because the file
      literally lives in the user's Obsidian world; opening it elsewhere
      surprises them and breaks the ``[[wikilink]]`` graph.
   3. ``$EDITOR`` / ``$VISUAL``  — for files that aren't in a vault
-     (e.g. when ``$WIGAMIG_NOTEBOOK_DIR`` points outside Obsidian).
+     (e.g. when ``$MURMURENT_NOTEBOOK_DIR`` points outside Obsidian).
   4. ``code`` (VS Code) if on PATH.
   5. Platform default — ``open`` (macOS) / ``xdg-open`` (Linux).
 
@@ -73,7 +73,7 @@ def notebook_folder() -> Path:
     """Resolve the daily-notes folder.
 
     Priority:
-      1. ``$WIGAMIG_NOTEBOOK_DIR`` — explicit override (used by tests
+      1. ``$MURMURENT_NOTEBOOK_DIR`` — explicit override (used by tests
          + power users with non-Obsidian setups).
       2. ``<obsidian-vault>/lab-notebook/`` — the user's registered
          Obsidian vault, so the ``obsidian://`` URL works and notes
@@ -83,7 +83,7 @@ def notebook_folder() -> Path:
     On the first call after switching to the vault path, any pre-existing
     files under ``~/lab-notebook/`` are migrated in (one-time, logged).
     """
-    override = os.environ.get("WIGAMIG_NOTEBOOK_DIR")
+    override = os.environ.get("MURMURENT_NOTEBOOK_DIR")
     if override:
         return Path(override).expanduser()
 
@@ -162,7 +162,7 @@ def default_entry_text(date_iso: str) -> str:
 
 def resolve_editor_cmd(path: Path) -> list[str]:
     """Pick a launch command for ``path``. See module docstring for rules."""
-    override = os.environ.get("WIGAMIG_NOTEBOOK_EDITOR", "").strip()
+    override = os.environ.get("MURMURENT_NOTEBOOK_EDITOR", "").strip()
     if override:
         if override.lower() == "obsidian":
             # Explicit override - trust the user even if the vault isn't
@@ -196,7 +196,7 @@ def resolve_editor_cmd(path: Path) -> list[str]:
         return ["xdg-open", str(path)]
 
     raise NotebookEditorNotAvailable(
-        "No editor available. Set $WIGAMIG_NOTEBOOK_EDITOR or $EDITOR."
+        "No editor available. Set $MURMURENT_NOTEBOOK_EDITOR or $EDITOR."
     )
 
 
@@ -211,7 +211,7 @@ def _obsidian_cmd(path: Path, *, force: bool = False) -> list[str] | None:
         without .md>``, both URL-encoded.
       - Return ``["open", url]`` (macOS) / ``["xdg-open", url]`` (Linux).
 
-    ``force=True`` (e.g. user set ``WIGAMIG_NOTEBOOK_EDITOR=obsidian``
+    ``force=True`` (e.g. user set ``MURMURENT_NOTEBOOK_EDITOR=obsidian``
     explicitly) builds a best-effort URL using the parent folder name
     even when no vault match is found. The URL may still fail in
     Obsidian, but at least we try.

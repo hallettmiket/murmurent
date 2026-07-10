@@ -25,13 +25,13 @@ from murmurent.core import registrar as R
 
 @pytest.fixture
 def centre(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
     monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
     fake_home = tmp_path / "home"
     fake_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(R, "REGISTRAR_SENTINEL",
-                        fake_home / ".wigamig" / "registrar")
+                        fake_home / ".murmurent" / "registrar")
     CI.init_centre(
         name="Demo", institution="Demo U", founding_mayor="@tbrowne",
         unique_name="demo",

@@ -32,9 +32,9 @@ class GroupReconcileResult:
 
 
 def resolve_group_slack_token(group: str, *, allow_file: bool = True) -> str:
-    """The group's OWN Slack bot token: env ``WIGAMIG_GROUP_SLACK_TOKEN`` first,
+    """The group's OWN Slack bot token: env ``MURMURENT_GROUP_SLACK_TOKEN`` first,
     then ``~/.config/wigamig/groups/<group>/slack-token`` (the PI's machine)."""
-    tok = os.environ.get("WIGAMIG_GROUP_SLACK_TOKEN", "").strip()
+    tok = os.environ.get("MURMURENT_GROUP_SLACK_TOKEN", "").strip()
     if tok or not allow_file:
         return tok
     f = Path.home() / ".config" / "murmurent" / "groups" / group / "slack-token"

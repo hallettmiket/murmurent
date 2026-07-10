@@ -5,7 +5,7 @@ resolver fallbacks), and ``POST /api/notebook/edit`` (creates file +
 returns the resolved command).
 
 We never actually spawn an editor — every test goes through ``spawn=False``
-or sets ``WIGAMIG_NOTEBOOK_EDITOR=true`` (the unix ``true`` binary is a
+or sets ``MURMURENT_NOTEBOOK_EDITOR=true`` (the unix ``true`` binary is a
 silent no-op).
 """
 
@@ -22,8 +22,8 @@ from murmurent.dashboard import notebook_actions
 @pytest.fixture
 def lab_notebook(monkeypatch, tmp_path):
     """Redirect ``~/lab-notebook`` to a tmp dir for the test."""
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_DIR", str(tmp_path / "lab-notebook"))
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_EDITOR", raising=False)
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_DIR", str(tmp_path / "lab-notebook"))
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_EDITOR", raising=False)
     monkeypatch.delenv("EDITOR", raising=False)
     monkeypatch.delenv("VISUAL", raising=False)
     return tmp_path / "lab-notebook"
@@ -35,7 +35,7 @@ def lab_notebook(monkeypatch, tmp_path):
 
 
 def test_explicit_override_with_path_placeholder(lab_notebook, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_EDITOR", "myedit --line 1 {path}")
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_EDITOR", "myedit --line 1 {path}")
     cmd = notebook_actions.resolve_editor_cmd(lab_notebook / "x.md")
     assert cmd[0] == "myedit"
     assert "--line" in cmd
@@ -43,15 +43,15 @@ def test_explicit_override_with_path_placeholder(lab_notebook, monkeypatch):
 
 
 def test_explicit_override_plain_command(lab_notebook, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_EDITOR", "vim")
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_EDITOR", "vim")
     cmd = notebook_actions.resolve_editor_cmd(lab_notebook / "x.md")
     assert cmd[0] == "vim"
     assert cmd[-1] == str(lab_notebook / "x.md")
 
 
 def test_explicit_override_obsidian_keyword(lab_notebook, monkeypatch):
-    """``WIGAMIG_NOTEBOOK_EDITOR=obsidian`` builds an obsidian:// URL command."""
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_EDITOR", "obsidian")
+    """``MURMURENT_NOTEBOOK_EDITOR=obsidian`` builds an obsidian:// URL command."""
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_EDITOR", "obsidian")
     path = lab_notebook / "2026-05-08.md"
     cmd = notebook_actions.resolve_editor_cmd(path)
     # On macOS / linux this becomes ``["open"|"xdg-open", "obsidian://..."]``.
@@ -73,7 +73,7 @@ def test_obsidian_wins_when_file_inside_registered_vault(monkeypatch, tmp_path):
     vault = _obs.Vault(name="lab-vault", path=tmp_path / "lab-vault", ts=1234)
     monkeypatch.setattr(_obs, "discover_vaults", lambda: [vault])
     monkeypatch.setenv("EDITOR", "nano")  # would win in the old order
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_EDITOR", raising=False)
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_EDITOR", raising=False)
     nb = vault.path / "lab-notebook"
     nb.mkdir(parents=True)
     target = nb / "2026-05-08.md"
@@ -92,7 +92,7 @@ def test_obsidian_url_skipped_when_file_outside_any_vault(monkeypatch, tmp_path)
 
     monkeypatch.setattr(_obs, "discover_vaults", lambda: [])
     monkeypatch.setenv("EDITOR", "nano")
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_EDITOR", raising=False)
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_EDITOR", raising=False)
     cmd = notebook_actions.resolve_editor_cmd(tmp_path / "elsewhere" / "x.md")
     assert cmd[0] == "nano"
 
@@ -109,7 +109,7 @@ def test_resolver_raises_when_nothing_available(lab_notebook, monkeypatch):
     monkeypatch.setenv("PATH", "")
     monkeypatch.delenv("EDITOR", raising=False)
     monkeypatch.delenv("VISUAL", raising=False)
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_EDITOR", raising=False)
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_EDITOR", raising=False)
     with pytest.raises(notebook_actions.NotebookEditorNotAvailable):
         notebook_actions.resolve_editor_cmd(lab_notebook / "x.md")
 
@@ -125,13 +125,13 @@ def test_entry_path_uses_overridden_folder(lab_notebook):
 
 
 def test_notebook_folder_prefers_obsidian_vault(monkeypatch, tmp_path):
-    """When a vault is registered and no $WIGAMIG_NOTEBOOK_DIR override,
+    """When a vault is registered and no $MURMURENT_NOTEBOOK_DIR override,
     the notebook lives inside the vault."""
     from murmurent.core import obsidian as _obs
 
     vault = _obs.Vault(name="my-vault", path=tmp_path / "my-vault", ts=1)
     vault.path.mkdir()
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_DIR", raising=False)
     monkeypatch.setattr(_obs, "preferred_vault", lambda: vault)
 
     folder = notebook_actions.notebook_folder()
@@ -149,7 +149,7 @@ def test_notebook_folder_migrates_legacy_into_vault(monkeypatch, tmp_path):
     (legacy / "2026-05-01.md").write_text("hello", encoding="utf-8")
     (legacy / "2026-05-02.md").write_text("world", encoding="utf-8")
 
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_DIR", raising=False)
     monkeypatch.setattr(_obs, "preferred_vault", lambda: vault)
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path / "home"))
 
@@ -164,7 +164,7 @@ def test_notebook_folder_migrates_legacy_into_vault(monkeypatch, tmp_path):
 def test_notebook_folder_falls_back_to_home_when_no_vault(monkeypatch, tmp_path):
     from murmurent.core import obsidian as _obs
 
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_DIR", raising=False)
     monkeypatch.setattr(_obs, "preferred_vault", lambda: None)
     monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
     folder = notebook_actions.notebook_folder()
@@ -185,7 +185,7 @@ def test_default_entry_text_has_required_frontmatter(lab_notebook):
 
 
 def test_open_entry_creates_missing_file(lab_notebook, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_EDITOR", "true")
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_EDITOR", "true")
     result = notebook_actions.open_entry(date_iso="2026-05-08", spawn=False)
     assert result.created is True
     assert result.path == lab_notebook / "2026-05-08.md"
@@ -195,7 +195,7 @@ def test_open_entry_creates_missing_file(lab_notebook, monkeypatch):
 
 
 def test_open_entry_does_not_overwrite_existing(lab_notebook, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_EDITOR", "true")
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_EDITOR", "true")
     lab_notebook.mkdir(parents=True, exist_ok=True)
     p = lab_notebook / "2026-05-08.md"
     p.write_text("MY OWN CONTENT", encoding="utf-8")
@@ -205,7 +205,7 @@ def test_open_entry_does_not_overwrite_existing(lab_notebook, monkeypatch):
 
 
 def test_open_entry_defaults_to_today(lab_notebook, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_EDITOR", "true")
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_EDITOR", "true")
     today = _dt.date(2026, 5, 8)
     result = notebook_actions.open_entry(today=today, spawn=False)
     assert result.path.name == "2026-05-08.md"
@@ -223,7 +223,7 @@ def _client():
 
 
 def test_endpoint_creates_today_entry(lab_notebook, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_EDITOR", "true")
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_EDITOR", "true")
     client = _client()
     res = client.post("/api/notebook/edit", json={})
     assert res.status_code == 200, res.text
@@ -235,7 +235,7 @@ def test_endpoint_creates_today_entry(lab_notebook, monkeypatch):
 
 
 def test_endpoint_opens_specific_date(lab_notebook, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_EDITOR", "true")
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_EDITOR", "true")
     client = _client()
     res = client.post("/api/notebook/edit", json={"date": "2025-12-25"})
     assert res.status_code == 200
@@ -246,7 +246,7 @@ def test_endpoint_500_when_no_editor(lab_notebook, monkeypatch):
     monkeypatch.setenv("PATH", "")
     monkeypatch.delenv("EDITOR", raising=False)
     monkeypatch.delenv("VISUAL", raising=False)
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_EDITOR", raising=False)
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_EDITOR", raising=False)
     client = _client()
     res = client.post("/api/notebook/edit", json={})
     assert res.status_code == 500

@@ -13,14 +13,14 @@ Output:
   ~/repos/lab_mgmt/                  (hallett lab — primary)
     members/{the_pi,mu1,mu2,mu3}.md
     projects/{mp1,mp2}.md
-  ~/.wigamig/lab_info/
+  ~/.murmurent/lab_info/
     _registry.yaml                   (lists hallett + core_lead + collab)
     labs/core_lead/lab-mgmt/          (full lab-mgmt scaffold)
     collaborations/the_pi_core_lead/
 
 The script is idempotent: re-running wipes targeted directories and
 rewrites every file. Preserved: lab.md (your lab_base/slack edits) and
-compliance.md (the institution-wide cert spec). Untouched: ~/.wigamig/
+compliance.md (the institution-wide cert spec). Untouched: ~/.murmurent/
 {user,registrar,machine.yaml,dashboard.log} so the in-flight dashboard
 session keeps working.
 """
@@ -41,7 +41,7 @@ import yaml
 HOME = Path.home()
 REPOS = HOME / "repos"
 HALLETT_REPO = REPOS / "lab_mgmt"
-LAB_INFO     = HOME / ".wigamig" / "lab_info"
+LAB_INFO     = HOME / ".murmurent" / "lab_info"
 CORE_LEAD_REPO = LAB_INFO / "labs" / "core_lead" / "lab-mgmt"
 COLLAB_DIR    = LAB_INFO / "collaborations" / "the_pi_core_lead"
 
@@ -428,7 +428,7 @@ def render_charter(name: str, spec: dict) -> str:
 
 
 def render_members_file(spec: dict) -> str:
-    lines = ["# wigamig project MEMBERS — one handle per line."]
+    lines = ["# murmurent project MEMBERS — one handle per line."]
     lines.extend(spec["members"])
     return "\n".join(lines) + "\n"
 
@@ -596,10 +596,10 @@ def main() -> None:
     print()
 
     # ── Clear stale per-machine state that references gone projects ─────
-    workspaces = HOME / ".wigamig" / "workspaces"
-    installs   = HOME / ".wigamig" / "installations"
+    workspaces = HOME / ".murmurent" / "workspaces"
+    installs   = HOME / ".murmurent" / "installations"
     if workspaces.is_dir() or installs.is_dir():
-        print("(also wiping ~/.wigamig/workspaces and installations of old projects)")
+        print("(also wiping ~/.murmurent/workspaces and installations of old projects)")
         for d in (workspaces, installs):
             if d.is_dir():
                 for child in d.iterdir():

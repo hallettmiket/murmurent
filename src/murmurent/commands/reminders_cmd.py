@@ -13,7 +13,7 @@ Designed to be invoked every ~15 minutes from a CC ``/routine``:
       schedule: every 15 minutes
 
 Idempotent: each (request_id, window) pair is recorded in
-``~/.wigamig/cores/<core>/reminders_sent.json`` after a successful
+``~/.murmurent/cores/<core>/reminders_sent.json`` after a successful
 send, so re-running the same scanner cycle won't double-ping.
 """
 

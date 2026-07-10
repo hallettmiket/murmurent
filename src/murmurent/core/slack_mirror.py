@@ -4,7 +4,7 @@ Purpose: Mirror one day of one Slack channel into a markdown file at
          the slack-integration design.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-08
-Input: Slack web API (via :mod:`slack_sdk`); ``$WIGAMIG_SLACK_TOKEN``
+Input: Slack web API (via :mod:`slack_sdk`); ``$MURMURENT_SLACK_TOKEN``
        or ``~/.config/wigamig/slack-token`` (mode 0600) for the token.
 Output: One markdown file per (channel, date), with frontmatter and
         threaded message bodies. Forward-compatible with the
@@ -16,7 +16,7 @@ flip it off by editing the channel topic; nothing here parses
 private channels the bot wasn't invited to.
 
 Token resolution order (first match wins):
-  1. ``$WIGAMIG_SLACK_TOKEN``
+  1. ``$MURMURENT_SLACK_TOKEN``
   2. ``~/.config/wigamig/slack-token`` (single line, mode 0600)
   3. raise — refuse to silently no-op
 """
@@ -48,7 +48,7 @@ class SlackMirrorError(Exception):
 
 def resolve_token() -> str:
     """Resolve the bot OAuth token. Raises if not found."""
-    env = os.environ.get("WIGAMIG_SLACK_TOKEN", "").strip()
+    env = os.environ.get("MURMURENT_SLACK_TOKEN", "").strip()
     if env:
         return env
     if TOKEN_FILE.is_file():
@@ -57,7 +57,7 @@ def resolve_token() -> str:
         except OSError as exc:
             raise SlackMirrorError(f"could not read {TOKEN_FILE}: {exc}") from exc
     raise SlackMirrorError(
-        f"No Slack token. Set $WIGAMIG_SLACK_TOKEN or write to {TOKEN_FILE}."
+        f"No Slack token. Set $MURMURENT_SLACK_TOKEN or write to {TOKEN_FILE}."
     )
 
 

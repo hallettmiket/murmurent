@@ -15,7 +15,7 @@ from murmurent.core import repo as R
 @pytest.fixture
 def lab(monkeypatch, tmp_path):
     root = tmp_path / "lab-mgmt"
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(root))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(root))
     (root / "members").mkdir(parents=True)
     return root
 
@@ -51,11 +51,11 @@ def test_upsert_rejects_bad_role(lab):
 
 
 def test_lab_mgmt_pointer_resolves_and_env_wins(monkeypatch, tmp_path):
-    monkeypatch.delenv("WIGAMIG_LAB_MGMT_REPO", raising=False)
-    # WIGAMIG_HOME is isolated by the conftest autouse; the pointer lives under it
+    monkeypatch.delenv("MURMURENT_LAB_MGMT_REPO", raising=False)
+    # MURMURENT_HOME is isolated by the conftest autouse; the pointer lives under it
     target = tmp_path / "repos" / "wigamig_lab_mh"
     R.set_lab_mgmt_path(target)
     assert R.lab_mgmt_repo_root() == target
     # an explicit env var still overrides the pointer
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "other"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "other"))
     assert R.lab_mgmt_repo_root() == tmp_path / "other"

@@ -6,7 +6,7 @@ Author: Mike Hallett (with Claude Code)
 Date: 2026-05-22
 
 Every mutation in ``core.registrar``, ``core.services``,
-``core.service_requests`` etc. commits to the ``$WIGAMIG_LAB_INFO_ROOT``
+``core.service_requests`` etc. commits to the ``$MURMURENT_LAB_INFO_ROOT``
 git repo with a message starting ``core <core>:``. We rely on that
 prefix to filter the log per-core without a separate database.
 

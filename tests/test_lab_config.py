@@ -23,10 +23,10 @@ from murmurent.dashboard import snapshot
 
 @pytest.fixture
 def lab_world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "projects").mkdir(parents=True)
     return tmp_path
@@ -138,13 +138,13 @@ def test_inventory_mcp_uses_lab_md_for_lab_manager(lab_world, monkeypatch):
     inventory.write_item(inventory.InventoryItem(name="thing", status="in_stock"))
 
     # bob (not the PI) should get a permission error.
-    monkeypatch.setenv("WIGAMIG_USER", "bob")
+    monkeypatch.setenv("MURMURENT_USER", "bob")
     with pytest.raises(PermissionError) as excinfo:
         inventory_server.tool_set("thing", {"status": "low"})
     assert "alice" in str(excinfo.value).lower()
 
     # alice (is the PI) succeeds.
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     inventory_server.tool_set("thing", {"status": "low"})
     item = inventory.parse_item(inventory.item_path("thing"))
     assert item.status == "low"

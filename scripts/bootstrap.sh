@@ -30,16 +30,16 @@
 #   - Fill the centre-setup form (that's the mayor's actual input).
 #
 # Env overrides:
-#   WIGAMIG_REPO_DIR   where to clone/expect the repo (default ~/repos/wigamig)
-#   WIGAMIG_BRANCH     branch to clone/checkout (default main)
+#   MURMURENT_REPO_DIR   where to clone/expect the repo (default ~/repos/wigamig)
+#   MURMURENT_BRANCH     branch to clone/checkout (default main)
 #   NO_LAUNCH=1        skip the offer to launch the dashboard at the end
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
 
 REPO_URL="https://github.com/hallettmiket/murmurent.git"
-REPO_DIR="${WIGAMIG_REPO_DIR:-$HOME/repos/wigamig}"
-BRANCH="${WIGAMIG_BRANCH:-main}"
+REPO_DIR="${MURMURENT_REPO_DIR:-$HOME/repos/wigamig}"
+BRANCH="${MURMURENT_BRANCH:-main}"
 
 step() { printf "\n→ %s\n" "$*"; }
 ok()   { printf "  ✓ %s\n" "$*"; }

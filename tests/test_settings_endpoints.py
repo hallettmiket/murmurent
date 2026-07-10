@@ -1,7 +1,7 @@
 """Tests for the three settings endpoints + machine.yaml round-trip.
 
 Covers:
-  - POST /api/machine/settings: writes ~/.wigamig/machine.yaml, round-trips
+  - POST /api/machine/settings: writes ~/.murmurent/machine.yaml, round-trips
   - POST /api/member/settings: rewrites contact/location, preserves body,
     preserves unknown fields (certifications, obsidian, custom keys)
   - POST /api/lab/settings: PI-only, rewrites lab.md frontmatter,
@@ -72,8 +72,8 @@ def world(monkeypatch, tmp_path):
         encoding="utf-8",
     )
 
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_mgmt))
-    monkeypatch.setenv("WIGAMIG_USER", "the_pi")
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_mgmt))
+    monkeypatch.setenv("MURMURENT_USER", "the_pi")
     # Redirect machine.yaml so we don't touch the developer's real home.
     machine_yaml = tmp_path / "murmurent" / "machine.yaml"
     monkeypatch.setattr(ms_mod, "MACHINE_FILE", machine_yaml)
@@ -256,7 +256,7 @@ def test_member_settings_drops_blank_fields(world):
 
 def test_member_settings_silently_drops_obsidian_fields(world):
     """Old clients may still post obsidian_vault_path; we ignore it because
-    those fields moved to ~/.wigamig/machine.yaml."""
+    those fields moved to ~/.murmurent/machine.yaml."""
     client = TestClient(create_app())
     client.post("/api/member/settings", json={
         "obsidian_vault_path": "/should/not/land/here",
@@ -271,7 +271,7 @@ def test_member_settings_silently_drops_obsidian_fields(world):
 
 
 def test_member_settings_404_when_member_file_missing(world, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_USER", "ghost")
+    monkeypatch.setenv("MURMURENT_USER", "ghost")
     client = TestClient(create_app())
     res = client.post("/api/member/settings", json={"email": "x@y.z"})
     assert res.status_code == 404
@@ -283,7 +283,7 @@ def test_member_settings_404_when_member_file_missing(world, monkeypatch):
 
 
 def test_lab_settings_pi_only(world, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_USER", "bob")  # not the PI
+    monkeypatch.setenv("MURMURENT_USER", "bob")  # not the PI
     client = TestClient(create_app())
     res = client.post("/api/lab/settings", json={"display_name": "Hacked Lab"})
     assert res.status_code == 403

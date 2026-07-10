@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>wigamig · Sign in</title>
+    <title>murmurent · Sign in</title>
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -174,7 +174,7 @@
   </head>
   <body>
     <div class="banner">
-      <h1>wigamig <small>v1.0.0</small> &middot; Sign in</h1>
+      <h1>murmurent <small>v1.0.0</small> &middot; Sign in</h1>
       <div class="meta">Hallett Lab &middot; Western University</div>
     </div>
 
@@ -395,8 +395,8 @@
     });
 
     // Initial state — fetch the inferred handle from the server's
-    // resolve endpoint (no ?user= → server returns whatever WIGAMIG_USER
-    // or ~/.wigamig/user resolves to).
+    // resolve endpoint (no ?user= → server returns whatever MURMURENT_USER
+    // or ~/.murmurent/user resolves to).
     fetch("/api/login/resolve", { credentials: "same-origin", headers: { Accept: "application/json" } })
       .then(r => r.json())
       .then(data => {

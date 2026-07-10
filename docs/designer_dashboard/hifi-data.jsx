@@ -1,5 +1,5 @@
 /* Mock data for the hi-fi Command Bridge. Mirrors the shape returned by
-   wigamig.core.dashboard.DashboardSnapshot so swapping in the real backend
+   murmurent.core.dashboard.DashboardSnapshot so swapping in the real backend
    is a 1-to-1 substitution. */
 
 const DATA = {
@@ -291,7 +291,7 @@ const DATA = {
  * 1. Set window.DATA to the inline mock synchronously so first paint never
  *    blocks on the network.
  * 2. Fire the initial fetch.
- * 3. Expose window.__wigamigFetchData(persona) so the persona toggle can
+ * 3. Expose window.__murmurentFetchData(persona) so the persona toggle can
  *    refetch with ?persona=pi or ?persona=member without a page reload.
  *
  * Both paths Object.assign the response onto the *same* window.DATA object so
@@ -302,7 +302,7 @@ const DATA = {
  */
 window.DATA = DATA;
 
-window.__wigamigFetchData = function (persona) {
+window.__murmurentFetchData = function (persona) {
   const params = new URLSearchParams(window.location.search);
   const userParam = params.get("user");
   const qs = new URLSearchParams();
@@ -327,11 +327,11 @@ window.__wigamigFetchData = function (persona) {
       return real;
     })
     .catch((err) => {
-      console.warn("[wigamig] /api/dashboard failed; rendering mock data", err);
+      console.warn("[murmurent] /api/dashboard failed; rendering mock data", err);
       window.__wigamigDataLive = false;
       throw err;
     });
 };
 
 // Initial load — let the server pick the default persona ("member").
-window.__wigamigFetchData();
+window.__murmurentFetchData();

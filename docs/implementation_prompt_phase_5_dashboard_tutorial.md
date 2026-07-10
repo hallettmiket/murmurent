@@ -28,11 +28,11 @@ Dashboard renders the textured fake state; tutorial document walks two students 
    - Idempotent
    - GitHub Action `.github/workflows/dashboard.yml` triggers on PR merge to `main` of any project repo
 
-2. **Streamlit viewer** at `src/wigamig/dashboard/app.py`
+2. **Streamlit viewer** at `src/murmurent/dashboard/app.py`
    - Reads the snapshot for static state; queries inventory MCP live for current inventory
    - Outstanding analysis: subtle yellow at >2 weeks since `complete` and not `examined`; red and "escalated" at >2 months
    - Security and compliance: red for missing required (e.g. Cassie's TCPS 2)
-   - Member view by default; PI view auto-enabled if `WIGAMIG_USER=mike`
+   - Member view by default; PI view auto-enabled if `MURMURENT_USER=mike`
    - `murmurent dashboard` opens streamlit on localhost
    - `murmurent dashboard --snapshot` prints the markdown
    - `murmurent dashboard --outstanding` prints the Outstanding analysis as a terminal summary
@@ -69,7 +69,7 @@ All eight from `docs/implementation_prompt.md`:
 2. As @bob, claim SEA #1, work in `exp/2_alignment_count_matrix/`, run a fake analysis script, push to a personal branch
 3. As @allie, run `murmurent sea examine 3`; the deliberation document is scaffolded; manually invoke bookworm and adversary in CC to fill in their sections; commit; run `murmurent sea conclude 3` and gather approvals
 4. As any persona inside `dcis_sc_tutorial`, paste `1234-567-890-AB` into a prompt — PHI hook refuses with a clear message
-5. As any persona, attempt to write to a file under `$WIGAMIG_LAB_VM_ROOT/raw/dcis_sc_tutorial/` — raw-data guard refuses
+5. As any persona, attempt to write to a file under `$MURMURENT_LAB_VM_ROOT/raw/dcis_sc_tutorial/` — raw-data guard refuses
 6. Inside CC in any persona's session, ask about reagents — CC calls `inventory_list` via the MCP and reports correctly
 7. As @mike, run `murmurent dashboard` and see the PI compliance grid surface @cassie's missing TCPS 2 in red
 8. All four repos visible at `https://github.com/hallettmiket/{murmurent, lab_mgmt, dcis_sc_tutorial, bbb_drug_screen}` with seed content committed

@@ -14,10 +14,10 @@ from murmurent.core.projects import find_project
 @pytest.fixture
 def world(monkeypatch, tmp_path):
     """A complete fake universe — lab-mgmt, two projects, member files, inventory."""
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    monkeypatch.setenv("MURMURENT_USER", "allie")
     lab_mgmt = tmp_path / "lab-mgmt"
     (lab_mgmt / "members").mkdir(parents=True)
     (lab_mgmt / "projects").mkdir(parents=True)

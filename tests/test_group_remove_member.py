@@ -19,12 +19,12 @@ from murmurent.core import registrar as R
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_USER", "tbrowne")
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_USER", "tbrowne")
     fake_home = tmp_path / "home"
     fake_home.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(R, "REGISTRAR_SENTINEL", fake_home / ".wigamig" / "registrar")
+    monkeypatch.setattr(R, "REGISTRAR_SENTINEL", fake_home / ".murmurent" / "registrar")
     CI.init_centre(name="C", institution="U", founding_mayor="@tbrowne",
                    slack_workspace="T0X", github_org="centre-x", write_sentinel=False)
     R.create_lab(name="mh", display_name="MH", pi_handle="@the_pi",

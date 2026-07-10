@@ -3,19 +3,19 @@ Purpose: Cross-machine + cross-GitHub git-repo inventory for the dashboard.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-15
 Input: Lab's GitHub org (``lab.md:github_org``), registered hosts
-       (``~/.wigamig/hosts.yaml``), each host's scan dirs (defaults to
+       (``~/.murmurent/hosts.yaml``), each host's scan dirs (defaults to
        ``~/repo`` + ``~/repos``; overridable per-host via the host's
        ``scan_dirs:`` field, which accepts both ``$HOME``-relative and
        absolute paths), and any existing murmurent install manifests at
-       ``~/.wigamig/installations/<project>.yaml``.
+       ``~/.murmurent/installations/<project>.yaml``.
 Output: ``InventoryReport`` — list of rows keyed by canonical origin URL,
-        each row carrying per-host presence + wigamig-init signals.
+        each row carrying per-host presence + murmurent-init signals.
 
 Why this module exists: a lab member's repos sprawl across a laptop
 (``~/repos``), one or more shared lab servers (lab-server), and the
 GitHub org. The dashboard's "Repos" panel surfaces that whole picture
 so the user can see at a glance: which repos exist where, which are
-wigamig-initialized on which machine, which are GitHub-only (i.e.
+murmurent-initialized on which machine, which are GitHub-only (i.e.
 could be cloned to a new machine), which are local-only (i.e. at risk
 of loss because they have no GitHub remote).
 
@@ -40,7 +40,7 @@ import yaml
 from . import hosts as _hosts
 from . import remote as _remote
 
-INVENTORY_DIR = Path.home() / ".wigamig" / "inventory"
+INVENTORY_DIR = Path.home() / ".murmurent" / "inventory"
 SCAN_INTERVAL_DAYS = 7  # weekly refresh
 DEFAULT_SCAN_DIRS = ("repo", "repos")  # under each host's $HOME
 
@@ -54,7 +54,7 @@ class RepoOnHost:
     origin_url: str                 # "" when the repo has no ``origin`` remote
     has_charter: bool               # ``CHARTER.md`` at the working-tree root
     has_claude_dir: bool            # ``.claude/agents/`` exists
-    is_wigamig_installed: bool      # both of the above + manifest in ~/.wigamig
+    is_murmurent_installed: bool      # both of the above + manifest in ~/.murmurent
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -261,12 +261,12 @@ def list_machine_repos(host_name: str) -> tuple[list[RepoOnHost], str | None]:
             origin_url=origin,
             has_charter=charter == "1",
             has_claude_dir=claude == "1",
-            # The full wigamig-installed signal is "has charter + has
+            # The full murmurent-installed signal is "has charter + has
             # claude/agents". Installation manifests live in
-            # ~/.wigamig/installations/<name>.yaml which we'd need a
+            # ~/.murmurent/installations/<name>.yaml which we'd need a
             # second SSH call to check — skipped for v1 since the
             # in-repo state is the leading indicator anyway.
-            is_wigamig_installed=(charter == "1" and claude == "1"),
+            is_murmurent_installed=(charter == "1" and claude == "1"),
         ))
     return out, None
 

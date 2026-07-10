@@ -48,11 +48,11 @@ def test_install_registers_core_data_mcp(tmp_path):
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "wigamig_home"))
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "wigamig_home"))
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "lab.md").write_text(
         "---\nlab: hallett\npi: '@the_pi'\n---\n", encoding="utf-8",
@@ -125,7 +125,7 @@ def test_bundle_helper_unknown_job(world):
 
 def test_mcp_bundle_returns_base64_tarball(world, monkeypatch):
     req = _make_job_with_files(world)
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_bundle_job("biocore", req.request_id)
     assert out["ok"] is True
     assert out["format"] == "tar.gz"
@@ -140,7 +140,7 @@ def test_mcp_bundle_denied_for_other_lab(world, monkeypatch):
     m = json.loads(p.read_text())
     m["requester_lab"] = "castellani"
     p.write_text(json.dumps(m))
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_bundle_job("biocore", req.request_id)
     assert out["ok"] is False
     assert "not in the job" in out["error"]
@@ -148,14 +148,14 @@ def test_mcp_bundle_denied_for_other_lab(world, monkeypatch):
 
 def test_mcp_bundle_size_cap(world, monkeypatch):
     req = _make_job_with_files(world)
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_bundle_job("biocore", req.request_id, max_bytes=10)
     assert out["ok"] is False
     assert "max" in out["error"]
 
 
 def test_mcp_bundle_unknown_job(world, monkeypatch):
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     out = MCP.tool_bundle_job("biocore", "ghost")
     assert out["ok"] is False
     assert "not found" in out["error"]

@@ -24,7 +24,7 @@ Push to personal branches, open PRs for finalisation, run the SEA lifecycle, and
 1. **Push mechanics**
    - `murmurent push <project>` — commit current changes, push to `member/<handle>/<topic>` branch (direct, no review)
    - `murmurent push <project> --finalize` — open PR via `gh pr create` from personal branch to `main`
-   - `murmurent push <project> --refined <exp>` — recompute SHA-256 for files in `$WIGAMIG_LAB_VM_ROOT/refined/<project>/<exp>/`, update notebook frontmatter (`refined_data`, `checksums`), push to personal branch
+   - `murmurent push <project> --refined <exp>` — recompute SHA-256 for files in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/`, update notebook frontmatter (`refined_data`, `checksums`), push to personal branch
    - `murmurent pull <project>`
 
 2. **SEA registry and operational verbs**
@@ -51,8 +51,8 @@ Push to personal branches, open PRs for finalisation, run the SEA lifecycle, and
 
 ## Acceptance criteria
 
-- [ ] `WIGAMIG_USER=bob murmurent sea list --incoming` shows SEAs assigned to bob
-- [ ] `WIGAMIG_USER=allie murmurent sea list --outgoing` shows SEAs filed by allie
+- [ ] `MURMURENT_USER=bob murmurent sea list --incoming` shows SEAs assigned to bob
+- [ ] `MURMURENT_USER=allie murmurent sea list --outgoing` shows SEAs filed by allie
 - [ ] `murmurent sea examine 3` (as @mike) scaffolds the deliberation doc with empty agent sections
 - [ ] `murmurent sea conclude 3 --statement <path>` opens PR for approvals
 - [ ] `murmurent push dcis_sc_tutorial --finalize` opens a real PR on GitHub

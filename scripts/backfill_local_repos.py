@@ -3,7 +3,7 @@ Purpose: One-shot Layer-2 CC bootstrap for repos that pre-date the install-wizar
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-15
 Input: ``~/repos/<project>/CHARTER.md`` (any project repo); optional
-       installation manifest at ``~/.wigamig/installations/<project>.yaml``.
+       installation manifest at ``~/.murmurent/installations/<project>.yaml``.
 Output: ``<project>/.claude/agents/`` populated with symlinks + a
         ``<project>/CLAUDE.md`` stub. Prints traffic-light status per project.
 
@@ -45,7 +45,7 @@ def _load_manifest_agents(project: str) -> list[str] | None:
     both cases tell bootstrap_local to skip symlink creation entirely
     (Layer 1 covers it).
     """
-    path = Path.home() / ".wigamig" / "installations" / f"{project}.yaml"
+    path = Path.home() / ".murmurent" / "installations" / f"{project}.yaml"
     if not path.is_file():
         return None
     try:
@@ -76,12 +76,12 @@ def main(argv: list[str] | None = None) -> int:
 
     wig_root = wigamig_repo_root()
     if not (wig_root / "agents").is_dir():
-        print(f"{RED}error:{RESET} wigamig commons not found at {wig_root / 'agents'}", file=sys.stderr)
+        print(f"{RED}error:{RESET} murmurent commons not found at {wig_root / 'agents'}", file=sys.stderr)
         return 2
 
     candidates: list[Path] = []
     for child in sorted(args.repos_dir.iterdir()):
-        # Skip non-dirs, hidden, and the wigamig clone itself (no
+        # Skip non-dirs, hidden, and the murmurent clone itself (no
         # point bootstrapping the commons into itself).
         if not child.is_dir() or child.name.startswith("."):
             continue

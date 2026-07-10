@@ -11,8 +11,8 @@ from murmurent.core import compliance, membership
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_USER", "the_pi")
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_USER", "the_pi")
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "lab.md").write_text(
         "---\nlab: hallett\nname: 'Hallett Lab'\npi: '@the_pi'\n---\n",
@@ -180,8 +180,8 @@ def test_status_explicit_n_a(world):
 
 
 def test_snapshot_training_compliance_block(world, monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
     (tmp_path / "lab-mgmt" / "projects").mkdir(parents=True)
     membership.add(handle="the_pi", full_name="Mike Hallett", role="pi",
                    certifications=["WHM103:2030-12-31"])

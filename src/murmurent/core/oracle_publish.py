@@ -16,9 +16,9 @@ slug doesn't clobber an existing entry) and copies + commits.
 Path resolution:
   - Personal Oracle dir: ``machine.yaml.obsidian_vault_path / oracle_subfolder``,
     falling back to the most-recently-opened Obsidian vault. Overridable
-    via ``$WIGAMIG_PERSONAL_ORACLE_DIR`` for tests.
+    via ``$MURMURENT_PERSONAL_ORACLE_DIR`` for tests.
   - Lab Oracle dir: ``core.repo.lab_mgmt_repo_root() / 'oracle'``,
-    overridable via ``$WIGAMIG_LAB_MGMT_REPO``.
+    overridable via ``$MURMURENT_LAB_MGMT_REPO``.
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ REQUIRED_FIELDS: tuple[str, ...] = (
 BLOCKED_SENSITIVITIES: frozenset[str] = frozenset({"clinical", "restricted"})
 SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_")
-ENV_PERSONAL = "WIGAMIG_PERSONAL_ORACLE_DIR"
+ENV_PERSONAL = "MURMURENT_PERSONAL_ORACLE_DIR"
 
 
 class OracleError(ValueError):
@@ -83,7 +83,7 @@ class PublishResult:
 def personal_oracle_dir() -> Path:
     """Resolve the personal oracle dir on this machine.
 
-    Order: ``$WIGAMIG_PERSONAL_ORACLE_DIR`` → ``machine.yaml`` vault +
+    Order: ``$MURMURENT_PERSONAL_ORACLE_DIR`` → ``machine.yaml`` vault +
     subfolder → most-recently-opened vault + ``oracle/``. Raises
     :class:`OracleError` if none of these resolve.
 
@@ -107,7 +107,7 @@ def personal_oracle_dir() -> Path:
     if v is None:
         raise OracleError(
             "no Obsidian vault registered; set "
-            "WIGAMIG_PERSONAL_ORACLE_DIR or save vault path via the dashboard"
+            "MURMURENT_PERSONAL_ORACLE_DIR or save vault path via the dashboard"
         )
     return v.path / "oracle"
 

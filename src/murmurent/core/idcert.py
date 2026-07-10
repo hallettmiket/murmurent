@@ -52,7 +52,7 @@ DEFAULT_SKEW_SECONDS = 300     # tolerated clock skew on temporal checks
 # ---------------------------------------------------------------------------
 
 def _home() -> Path:
-    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+    return Path(os.environ.get("MURMURENT_HOME", str(Path.home() / ".murmurent")))
 
 
 def _norm(handle: str) -> str:

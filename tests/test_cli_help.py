@@ -79,7 +79,7 @@ def test_oracle_doctor_reports_ok_when_readable(tmp_path, monkeypatch) -> None:
     (oracle_dir / "2026-05-16_x.md").write_text(
         "---\ntitle: x\n---\n\nbody\n", encoding="utf-8"
     )
-    monkeypatch.setenv("WIGAMIG_PERSONAL_ORACLE_DIR", str(oracle_dir))
+    monkeypatch.setenv("MURMURENT_PERSONAL_ORACLE_DIR", str(oracle_dir))
     result = CliRunner().invoke(cli, ["oracle", "doctor"])
     assert result.exit_code == 0, result.output
     assert "OK" in result.output

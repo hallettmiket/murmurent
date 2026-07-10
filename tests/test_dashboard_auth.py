@@ -21,7 +21,7 @@ from murmurent.dashboard.server import create_app
 
 @pytest.fixture(autouse=True)
 def isolate_secret(monkeypatch, tmp_path):
-    """Never read a real ~/.wigamig/dashboard_secret; start with auth OFF."""
+    """Never read a real ~/.murmurent/dashboard_secret; start with auth OFF."""
     monkeypatch.setattr(A, "SECRET_FILE", tmp_path / "dashboard_secret")
     monkeypatch.delenv(A.ENV_VAR, raising=False)
 
@@ -77,7 +77,7 @@ def test_gate_predicate(method, path, gated):
 
 @pytest.fixture
 def client(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
     return TestClient(create_app())
 
 

@@ -26,7 +26,7 @@ def _no_live_slack(monkeypatch):
     """
     from murmurent.dashboard import slack_notify as _sn
 
-    monkeypatch.delenv("WIGAMIG_SLACK_TOKEN", raising=False)
+    monkeypatch.delenv("MURMURENT_SLACK_TOKEN", raising=False)
     monkeypatch.delenv("SLACK_BOT_TOKEN", raising=False)
     monkeypatch.setattr(_sn, "_TOKEN_FILE", Path("/nonexistent/wigamig-test-slack-token"))
     # Drop any token cached by a prior test. A test may itself monkeypatch
@@ -38,27 +38,27 @@ def _no_live_slack(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _no_autokey(monkeypatch):
-    """Never mint an ed25519 keypair in the developer's real ``~/.wigamig`` just
+    """Never mint an ed25519 keypair in the developer's real ``~/.murmurent`` just
     because a test invoked the CLI (the ``cli`` group callback auto-generates one
     on first run). Bootstrap tests opt back in with ``monkeypatch.delenv`` + an
-    isolated ``WIGAMIG_HOME``."""
-    monkeypatch.setenv("WIGAMIG_NO_AUTOKEY", "1")
+    isolated ``MURMURENT_HOME``."""
+    monkeypatch.setenv("MURMURENT_NO_AUTOKEY", "1")
 
 
 @pytest.fixture(autouse=True)
 def _isolate_wigamig_home(monkeypatch, tmp_path):
-    """Point ``WIGAMIG_HOME`` at a per-test temp dir. Everything that reads
-    ``~/.wigamig`` at runtime — the dashboard's netname enforcement + card
+    """Point ``MURMURENT_HOME`` at a per-test temp dir. Everything that reads
+    ``~/.murmurent`` at runtime — the dashboard's netname enforcement + card
     verification, key generation, the issuance/revocation stores — is then
     isolated, so a test can neither read nor pollute the developer's real home
     (a leaked ``identity.yaml`` there used to 403 unrelated dashboard tests).
-    Tests that need a specific home simply set ``WIGAMIG_HOME`` again."""
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "_wig_home"))
+    Tests that need a specific home simply set ``MURMURENT_HOME`` again."""
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "_wig_home"))
 
 
 @pytest.fixture(autouse=True)
 def _isolate_repos_root(monkeypatch, tmp_path):
-    """Point ``WIGAMIG_REPOS_ROOT`` at a per-test temp dir so anything that creates
+    """Point ``MURMURENT_REPOS_ROOT`` at a per-test temp dir so anything that creates
     a lab-mgmt repo (``pi-init`` → ``~/repos/wigamig_<lab>``) never writes into the
     developer's real ``~/repos``."""
-    monkeypatch.setenv("WIGAMIG_REPOS_ROOT", str(tmp_path / "_repos"))
+    monkeypatch.setenv("MURMURENT_REPOS_ROOT", str(tmp_path / "_repos"))

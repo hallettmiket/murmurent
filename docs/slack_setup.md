@@ -1,7 +1,7 @@
 # Slack setup for a murmurent centre (mayor guide)
 
 Murmurent uses Slack as its primary communication fabric: a private **mayor↔CC
-channel** (`#wigamig-ops`) where the code posts events, a private **channel per
+channel** (`#murmurent-ops`) where the code posts events, a private **channel per
 lab/core** (named after the group, members-only), and **`#general`** for
 broadcasts. This guide is the one-time setup a **mayor** does so those channels
 get created and populated automatically.
@@ -30,9 +30,9 @@ murmurent talks to Slack through a **bot user** on a Slack **app** you own. Crea
 it once — click by click:
 
 1. Go to <https://api.slack.com/apps> and sign in as the account that owns your
-   `wigamig-<name>` workspace.
+   `murmurent-<name>` workspace.
 2. **Create New App → From scratch.** Name it **`mayor`**, pick your
-   `wigamig-<name>` workspace, **Create App**. Then open **App Home** (left
+   `murmurent-<name>` workspace, **Create App**. Then open **App Home** (left
    sidebar) and set the bot's **Display Name** and **Default username** to
    `mayor`. This name is what PIs + members see as the *sender* of every DM
    murmurent sends (onboarding steps, approvals) — so messages read as coming
@@ -43,7 +43,7 @@ it once — click by click:
 
    | Scope | Why |
    |---|---|
-   | `groups:write` | create private channels (lab/core + `#wigamig-ops`) |
+   | `groups:write` | create private channels (lab/core + `#murmurent-ops`) |
    | `channels:manage` | create public channels (if you use any) |
    | `chat:write` | post events + broadcasts |
    | `im:write` | open a real DM to a member (onboarding + decision DMs); without it, DMs land in the bot's *App messages* tab, not the member's Direct Messages |
@@ -63,12 +63,12 @@ it once — click by click:
 Either export it, or store it in the token file (mode 0600):
 
 ```bash
-export WIGAMIG_SLACK_TOKEN=xoxb-...
+export MURMURENT_SLACK_TOKEN=xoxb-...
 #   ...or, to persist it for the dashboard/server:
 umask 077; printf '%s\n' 'xoxb-...' > ~/.config/wigamig/slack-token
 ```
 
-`WIGAMIG_SLACK_TOKEN` and the legacy `SLACK_BOT_TOKEN` both work.
+`MURMURENT_SLACK_TOKEN` and the legacy `SLACK_BOT_TOKEN` both work.
 
 ## 4. Point the centre at the workspace
 
@@ -81,10 +81,10 @@ in `centre.md`).
 
 ```bash
 murmurent centre-slack-smoke     # confirms the bot token can create a channel
-murmurent centre-slack-setup     # creates #wigamig-ops, wires #general + admin broadcasts
+murmurent centre-slack-setup     # creates #murmurent-ops, wires #general + admin broadcasts
 ```
 
-`centre-slack-setup` creates the private **mayor↔CC channel** (`#wigamig-ops`,
+`centre-slack-setup` creates the private **mayor↔CC channel** (`#murmurent-ops`,
 stored as `mayor_channel_id`) and seeds the broadcast map (`admin` → the mayor
 channel, `everyone` → `#general`). Re-running is safe (idempotent).
 

@@ -1,6 +1,6 @@
 """
 Purpose: Consume the root-owned snapshot produced by
-         ``/opt/wigamig/lab_sec_dump.sh`` (Tier 2) and emit
+         ``/opt/murmurent/lab_sec_dump.sh`` (Tier 2) and emit
          :class:`Finding` rows the dashboard surfaces alongside
          Tier 1 results.
 Author: Mike Hallett (with Claude Code)

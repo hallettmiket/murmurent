@@ -4,7 +4,7 @@ Purpose: Build the ``RegistrarResponse`` payload for the
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-12
 Input: A registrar's handle (``@the_pi`` in dev) and the registry at
-       ``$WIGAMIG_LAB_INFO_ROOT/_registry.yaml`` plus each lab's own
+       ``$MURMURENT_LAB_INFO_ROOT/_registry.yaml`` plus each lab's own
        ``lab.md`` + ``members/*.md`` files.
 Output: A :class:`~murmurent.dashboard.contract.RegistrarResponse`.
 

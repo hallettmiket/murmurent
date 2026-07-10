@@ -1,4 +1,4 @@
-# wigamig smoke-test tutorial
+# murmurent smoke-test tutorial
 
 > 5-day walkthrough for two students using the four fake personas
 > (`@the_pi`, `@allie`, `@bob`, `@cassie`). Everything is fake — no real PHI,
@@ -14,20 +14,20 @@
 | `@bob` | senior PhD | expires in ~30 days (yellow) |
 | `@cassie` | junior PhD | missing (red) |
 
-Switch personas with `WIGAMIG_USER=<handle>` before any command.
+Switch personas with `MURMURENT_USER=<handle>` before any command.
 
 ## One-time setup
 
 ```bash
 cd ~/repos/wigamig
 uv sync --extra dev --extra mcp --extra dashboard
-uv pip install -e .              # install `wigamig` on your PATH
+uv pip install -e .              # install `murmurent` on your PATH
 python scripts/seed_tutorial.py  # idempotent; --skip-github for offline
-wigamig install --hooks          # registers hooks + MCP in ~/.claude/settings.json
+murmurent install --hooks          # registers hooks + MCP in ~/.claude/settings.json
 # restart Claude Code
 ```
 
-After this, `wigamig --help` shows the full command tree, the four hooks
+After this, `murmurent --help` shows the full command tree, the four hooks
 fire on every CC session, and the inventory MCP is reachable from CC.
 
 ## Day 1 — solo orientation
@@ -35,11 +35,11 @@ fire on every CC session, and the inventory MCP is reachable from CC.
 Each student picks a persona (Bob, Cassie). Pretend Allie / the_pi (PI) are offline.
 
 ```bash
-WIGAMIG_USER=bob wigamig dashboard --snapshot
-WIGAMIG_USER=bob wigamig project list
-WIGAMIG_USER=bob wigamig project describe dcis_sc_tutorial
-WIGAMIG_USER=bob wigamig project members dcis_sc_tutorial
-WIGAMIG_USER=bob wigamig sea list --incoming
+MURMURENT_USER=bob murmurent dashboard --snapshot
+MURMURENT_USER=bob murmurent project list
+MURMURENT_USER=bob murmurent project describe dcis_sc_tutorial
+MURMURENT_USER=bob murmurent project members dcis_sc_tutorial
+MURMURENT_USER=bob murmurent sea list --incoming
 ```
 
 What to check:
@@ -51,20 +51,20 @@ What to check:
 
 Open the live Streamlit view. Easiest path: in Finder, double-click
 **`Open Dashboard.command`** at the top of the repo. It picks your username
-from (in order) `$WIGAMIG_USER` or `~/.wigamig/user`. If neither is set,
+from (in order) `$MURMURENT_USER` or `~/.murmurent/user`. If neither is set,
 the dashboard prompts you to type a handle in the sidebar (e.g. `the_pi`)
 and saves it for next time. There is no fallback to your Mac login name —
 that almost always disagrees with your Western username.
 To run it as Bob for the tutorial, set the env var first:
 
 ```bash
-WIGAMIG_USER=bob open "Open Dashboard.command"
+MURMURENT_USER=bob open "Open Dashboard.command"
 ```
 
 Or stay on the command line:
 
 ```bash
-WIGAMIG_USER=bob uv run wigamig dashboard
+MURMURENT_USER=bob uv run murmurent dashboard
 ```
 
 ## Day 2 — claim, work, push
@@ -72,7 +72,7 @@ WIGAMIG_USER=bob uv run wigamig dashboard
 Pick a SEA you haven't claimed yet. As Bob:
 
 ```bash
-WIGAMIG_USER=bob wigamig sea list --incoming
+MURMURENT_USER=bob murmurent sea list --incoming
 # SEA #1 is already claimed; let's pretend it just got assigned.
 cd ~/repos/dcis_sc_tutorial
 git checkout -b member/bob/sample-qc-rerun
@@ -81,11 +81,11 @@ git checkout -b member/bob/sample-qc-rerun
 echo "rerun started 2026-05-07" >> exp/2_alignment_count_matrix/notebook.md
 
 # Push to your personal branch.
-WIGAMIG_USER=bob wigamig push dcis_sc_tutorial \
+MURMURENT_USER=bob murmurent push dcis_sc_tutorial \
     --message "kick off GRCh38.p14 rerun" --topic sample-qc-rerun
 
 # When ready to merge to main, finalize:
-WIGAMIG_USER=bob wigamig push dcis_sc_tutorial --finalize
+MURMURENT_USER=bob murmurent push dcis_sc_tutorial --finalize
 # -> opens a PR via gh; the adversary-stub workflow comments on the PR.
 ```
 
@@ -102,7 +102,7 @@ All three students together. Goal: walk SEA #3 (Allie's methodology review with 
 As the_pi (squad lead for #3):
 
 ```bash
-WIGAMIG_USER=the_pi wigamig sea examine 3
+MURMURENT_USER=the_pi murmurent sea examine 3
 # -> scaffolds ~/repos/dcis_sc_tutorial/deliberations/sea/3.md
 #    with empty agent + member sections.
 ```
@@ -113,29 +113,29 @@ section of `deliberations/sea/3.md`:
 
 ```bash
 # In separate CC sessions:
-# WIGAMIG_USER=allie  -> ask the bookworm agent for citations.
-# WIGAMIG_USER=the_pi   -> ask the adversary agent to challenge the methodology.
-# WIGAMIG_USER=bob    -> ask the artist agent for any figure suggestions.
+# MURMURENT_USER=allie  -> ask the bookworm agent for citations.
+# MURMURENT_USER=the_pi   -> ask the adversary agent to challenge the methodology.
+# MURMURENT_USER=bob    -> ask the artist agent for any figure suggestions.
 ```
 
 When the agent + member sections look complete:
 
 ```bash
 echo "Pipeline assumptions hold; recommend continuing." > /tmp/sea3.md
-WIGAMIG_USER=the_pi wigamig sea conclude 3 --statement /tmp/sea3.md
+MURMURENT_USER=the_pi murmurent sea conclude 3 --statement /tmp/sea3.md
 ```
 
 What to check:
 
 - `deliberations/sea/3.md` ends with `analysis_status: concluded` and the statement is inlined.
-- `wigamig sea list` (in dcis_sc_tutorial) shows SEA #3 as `concluded`.
+- `murmurent sea list` (in dcis_sc_tutorial) shows SEA #3 as `concluded`.
 
 Optional next step: promote the statement to a finding.
 
 ```bash
 mkdir -p ~/repos/dcis_sc_tutorial/findings/sea
 cp /tmp/sea3.md ~/repos/dcis_sc_tutorial/findings/sea/3.md
-WIGAMIG_USER=the_pi wigamig push dcis_sc_tutorial --finalize \
+MURMURENT_USER=the_pi murmurent push dcis_sc_tutorial --finalize \
     --message "promote SEA 3 statement to finding"
 ```
 
@@ -156,7 +156,7 @@ cd ~/repos/bbb_drug_screen
 
 # 3. Try to write to raw
 echo '{"tool_name":"Write","tool_input":{"file_path":"~/lab_vm/data/raw/dcis_sc_tutorial/1_sample_qc/x.fastq.gz"}}' \
-    | python -m wigamig.hooks.raw_guard
+    | python -m murmurent.hooks.raw_guard
 # -> {"decision":"deny","reason":"raw data is read-only by lab policy; ..."}
 
 # 4. Read another project as a non-member
@@ -186,14 +186,14 @@ Use the issue template at [.github/ISSUE_TEMPLATE/smoke_test.md](.github/ISSUE_T
 
 | Verb | Phase | Notes |
 |---|---|---|
-| `wigamig install --hooks` | 4 | Registers hooks + MCP in `~/.claude/settings.json`. |
-| `wigamig project list / describe / sensitivity / admit` | 2 | Local + lab-mgmt registry. |
-| `wigamig experiment new / list / status / ingest` | 2 | Ingest does the classification + chmod-readonly dance. |
-| `wigamig sea request / list / claim / complete / decline` | 3 | Per-project IDs. |
-| `wigamig sea examine / conclude / reopen` | 3 | Drives the finalisation choreography on a SEA. |
-| `wigamig finalize sea <id>` | 3 | Umbrella — examine then conclude. |
-| `wigamig push <p> [--finalize / --refined]` | 3 | Personal branches; PR via `gh`. |
-| `wigamig dashboard [--snapshot / --outstanding]` | 5 | Streamlit + markdown + terminal-friendly summary. |
+| `murmurent install --hooks` | 4 | Registers hooks + MCP in `~/.claude/settings.json`. |
+| `murmurent project list / describe / sensitivity / admit` | 2 | Local + lab-mgmt registry. |
+| `murmurent experiment new / list / status / ingest` | 2 | Ingest does the classification + chmod-readonly dance. |
+| `murmurent sea request / list / claim / complete / decline` | 3 | Per-project IDs. |
+| `murmurent sea examine / conclude / reopen` | 3 | Drives the finalisation choreography on a SEA. |
+| `murmurent finalize sea <id>` | 3 | Umbrella — examine then conclude. |
+| `murmurent push <p> [--finalize / --refined]` | 3 | Personal branches; PR via `gh`. |
+| `murmurent dashboard [--snapshot / --outstanding]` | 5 | Streamlit + markdown + terminal-friendly summary. |
 
 ## Defer to v2
 

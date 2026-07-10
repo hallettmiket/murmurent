@@ -3,7 +3,7 @@ create-project request roundtrip with --host).
 
 Covers:
   - ``GET /api/hosts`` returns at minimum ``{name: "local"}`` and surfaces any
-    custom hosts the user registered in ~/.wigamig/hosts.yaml
+    custom hosts the user registered in ~/.murmurent/hosts.yaml
   - ``ProjectRow.host`` / ``remote_path`` / ``remote_ssh_host`` are populated
     for remote-pointer dirs and stay empty for plain local projects
   - ``POST /api/request/create-project`` accepts ``host: lab-server`` and the
@@ -31,13 +31,13 @@ def world(monkeypatch, tmp_path):
     repos = tmp_path / "repos"
     lab_mgmt = tmp_path / "lab-mgmt"
     lab_vm = tmp_path / "lab_vm"
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(repos))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_mgmt))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(lab_vm))
-    monkeypatch.setenv("WIGAMIG_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
-    monkeypatch.setenv("WIGAMIG_REMOTE_AUDIT_LOG", str(tmp_path / "remote_audit.log"))
-    monkeypatch.setenv("WIGAMIG_ROLE_AUDIT_LOG", str(tmp_path / "role_audit.log"))
-    monkeypatch.setenv("WIGAMIG_USER", "the_pi")
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(repos))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_mgmt))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(lab_vm))
+    monkeypatch.setenv("MURMURENT_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
+    monkeypatch.setenv("MURMURENT_REMOTE_AUDIT_LOG", str(tmp_path / "remote_audit.log"))
+    monkeypatch.setenv("MURMURENT_ROLE_AUDIT_LOG", str(tmp_path / "role_audit.log"))
+    monkeypatch.setenv("MURMURENT_USER", "the_pi")
     (lab_mgmt / "projects").mkdir(parents=True)
     (lab_mgmt / "members").mkdir(parents=True)
     (lab_mgmt / "requests").mkdir(parents=True)
@@ -175,7 +175,7 @@ def _seed_remote_pointer(repos: Path, lab_mgmt: Path, name: str = "rem") -> None
     """Make a remote-pointer project pointing at lab-server."""
     p = repos / name
     p.mkdir(parents=True)
-    p.joinpath(".wigamig-remote-pointer").write_text("", encoding="utf-8")
+    p.joinpath(".murmurent-remote-pointer").write_text("", encoding="utf-8")
     p.joinpath("CHARTER.md").write_text(
         "---\n"
         f"project: {name}\n"

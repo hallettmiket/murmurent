@@ -15,7 +15,7 @@ Design notes:
   (already a project dependency). Tests inject a stub via ``client=``.
 - **Cache**: keyed by (project, category, hash-of-inputs). Re-running
   on unchanged inputs returns 0 LLM calls. Cache lives at
-  ``~/.wigamig/security/agent_cache/`` and is per-machine — safe to
+  ``~/.murmurent/security/agent_cache/`` and is per-machine — safe to
   delete to force a fresh review.
 - **Hard rule (carried from the global murmurent charter)**: every
   category-specific user prompt explicitly forbids the agent from
@@ -372,7 +372,7 @@ def _collect_cc_settings(project_root: Path) -> tuple[dict | None, dict | None]:
 # Cache — keyed by (category, sha256(inputs)). Stored as JSON.
 # ---------------------------------------------------------------------------
 
-CACHE_DIR_DEFAULT = Path.home() / ".wigamig" / "security" / "agent_cache"
+CACHE_DIR_DEFAULT = Path.home() / ".murmurent" / "security" / "agent_cache"
 
 
 def _input_hash(category: str, payload: Any) -> str:

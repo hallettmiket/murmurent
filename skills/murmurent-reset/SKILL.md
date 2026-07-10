@@ -17,19 +17,19 @@ then run for real**.
 
 | Level | Removes | Keeps |
 |---|---|---|
-| `centre` (default) | `~/.wigamig/lab_info/` only → centre-init is first-run again | everything else |
+| `centre` (default) | `~/.murmurent/lab_info/` only → centre-init is first-run again | everything else |
 | `install` | centre + reinstall the tool from `~/repos/wigamig` (`uv tool install --force --python 3.12 -e '.[dashboard,slack,mcp]'`) + `scripts/setup.sh` + `murmurent install --hooks` | credentials, installations, audit |
 | `full` | install + machine-local **caches** (`workspaces/`, `*.log`, `dashboard.pid`, `security/agent_cache`, stale `RESUME.md`) | credentials, `installations/`, `decommissions/`, audit logs, `hosts.yaml`/`machine.yaml` |
-| `data` | **all data you entered** into `~/.wigamig` — `lab_info/`, `profile.yaml`, `hosts`/`machine`/`master_folders` yaml, `inventory/`, `cores/`, `onboarding/`, `decommissions/`, `security/`, identity/cards/trust/revocation, logs — everything *except* key material (allowlist-based, so new files are caught) | `keys/`, `age/`, `installations/` (other projects), and `~/.config/wigamig`. **No reinstall.** |
+| `data` | **all data you entered** into `~/.murmurent` — `lab_info/`, `profile.yaml`, `hosts`/`machine`/`master_folders` yaml, `inventory/`, `cores/`, `onboarding/`, `decommissions/`, `security/`, identity/cards/trust/revocation, logs — everything *except* key material (allowlist-based, so new files are caught) | `keys/`, `age/`, `installations/` (other projects), and `~/.config/wigamig`. **No reinstall.** |
 
 Use `data` for "wipe everything I've entered and start over, but keep my keys and
 credentials." It's the level to reach for when `full` leaves too much behind
 (`full` keeps `profile.yaml`, `hosts.yaml`, `inventory/`, etc.).
 
 Opt-in extras (only with the flag): `--nuke-installations` (also wipes
-`~/.wigamig/installations/` — **other projects' manifests**),
+`~/.murmurent/installations/` — **other projects' manifests**),
 `--nuke-credentials` (also wipes `~/.config/wigamig/` — the **slack-token +
-keys**), `--nuke-keys` (with `--level data`, **also** removes `~/.wigamig/keys/`
+keys**), `--nuke-keys` (with `--level data`, **also** removes `~/.murmurent/keys/`
 + `age/` for a fully fresh identity; default keeps them), `--nuke-labs` (also
 removes this machine's **lab-management repos** `~/repos/wigamig_*` — they hold
 the roster; see below), `--uninstall` (first **completely removes** the existing
@@ -92,7 +92,7 @@ base/envs + pipx and removes any murmurent it finds. Working clones under
 
 ## Guardrails (the script enforces these — don't work around them)
 
-- **Backup is mandatory and lands OUTSIDE `~/.wigamig`** (`~/.wigamig_backups/`)
+- **Backup is mandatory and lands OUTSIDE `~/.murmurent`** (`~/.wigamig_backups/`)
   so even a full wipe can't delete it. Never pass a flag to skip it; there
   isn't one.
 - **Never** touches `~/repos/*` working clones, `~/.claude/CLAUDE.md`,
@@ -102,7 +102,7 @@ base/envs + pipx and removes any murmurent it finds. Working clones under
   `~/repos` is ever touched.
 - **Credentials and other-project installs are preserved by default.** On this
   machine `~/.config/wigamig/slack-token` + `keys/` are real, and
-  `~/.wigamig/installations/` holds manifests for the user's *other* projects
+  `~/.murmurent/installations/` holds manifests for the user's *other* projects
   (manuscript, mp3/mp4, …). Removing either needs the explicit `--nuke-*` flag
   AND a clear go-ahead from the user.
 - If the user says "wipe everything / pristine machine", read that back as

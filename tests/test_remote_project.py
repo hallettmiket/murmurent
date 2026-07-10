@@ -5,7 +5,7 @@ Covers:
   - ``cmd_new_remote`` shells out via the SSH chokepoint (mocked) and
     constructs the expected remote ``murmurent project new ...`` command
   - On success, a local remote-pointer dir is created at ``~/repos/<name>/``
-    with ``.wigamig-remote-pointer`` + a CHARTER.md carrying ``host:`` +
+    with ``.murmurent-remote-pointer`` + a CHARTER.md carrying ``host:`` +
     ``remote_path:`` in its frontmatter
   - The lab-mgmt registry entry includes ``host:`` and ``remote_path:``
   - ``render_registry_entry`` round-trip with host fields
@@ -33,11 +33,11 @@ def world(monkeypatch, tmp_path):
     """Isolated lab-mgmt + projects root + hosts.yaml + audit logs."""
     repos = tmp_path / "repos"
     lab_mgmt = tmp_path / "lab-mgmt"
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(repos))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_mgmt))
-    monkeypatch.setenv("WIGAMIG_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
-    monkeypatch.setenv("WIGAMIG_REMOTE_AUDIT_LOG", str(tmp_path / "remote_audit.log"))
-    monkeypatch.setenv("WIGAMIG_USER", "the_pi")
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(repos))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_mgmt))
+    monkeypatch.setenv("MURMURENT_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
+    monkeypatch.setenv("MURMURENT_REMOTE_AUDIT_LOG", str(tmp_path / "remote_audit.log"))
+    monkeypatch.setenv("MURMURENT_USER", "the_pi")
     (lab_mgmt / "projects").mkdir(parents=True)
     (lab_mgmt / "members").mkdir(parents=True)
     (lab_mgmt / "lab.md").write_text(
@@ -141,7 +141,7 @@ def test_is_remote_pointer_false_for_regular_dir(tmp_path):
 def test_is_remote_pointer_true_when_marker_present(tmp_path):
     d = tmp_path / "proj"
     d.mkdir()
-    (d / ".wigamig-remote-pointer").write_text("", encoding="utf-8")
+    (d / ".murmurent-remote-pointer").write_text("", encoding="utf-8")
     (d / "CHARTER.md").write_text(
         "---\nproject: proj\nhost: lab-server\nremote_path: /home/the_pi/repos/proj\n---\n",
         encoding="utf-8",
@@ -155,7 +155,7 @@ def test_is_remote_pointer_true_when_marker_present(tmp_path):
 def test_read_remote_pointer_none_when_local_host(tmp_path):
     d = tmp_path / "proj"
     d.mkdir()
-    (d / ".wigamig-remote-pointer").write_text("", encoding="utf-8")
+    (d / ".murmurent-remote-pointer").write_text("", encoding="utf-8")
     (d / "CHARTER.md").write_text(
         "---\nproject: proj\nhost: local\n---\n", encoding="utf-8",
     )
@@ -178,7 +178,7 @@ def test_cmd_new_remote_writes_pointer_and_registry(world, lab-server, fake_ssh)
     assert remote_path == "/home/the_pi/repos/myproj"
     pointer = world["repos"] / "myproj"
     assert pointer.is_dir()
-    assert (pointer / ".wigamig-remote-pointer").is_file()
+    assert (pointer / ".murmurent-remote-pointer").is_file()
     charter = pointer / "CHARTER.md"
     assert charter.is_file()
     meta = parse_file(charter).meta

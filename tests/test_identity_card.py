@@ -16,9 +16,9 @@ from murmurent.core import registrar as R
 @pytest.fixture
 def mayor_world(monkeypatch, tmp_path):
     """The MAYOR's machine: a full centre registry with a lab + a core."""
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "mayor_lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "mayor_lab_mgmt"))
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "mayor_home"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "mayor_lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "mayor_lab_mgmt"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "mayor_home"))
     monkeypatch.setattr(R, "REGISTRAR_SENTINEL", tmp_path / "sentinel")
     CI.init_centre(name="Western QA", institution="U", founding_mayor="@tbrowne5",
                    unique_name="western-qa", write_sentinel=False)
@@ -56,8 +56,8 @@ def test_import_card_materializes_role_on_member_machine(mayor_world, monkeypatc
     # Mayor builds emucaki's card...
     card = IC.build_card("emucaki", issued_by="@tbrowne5")
     # ...then we move to a FRESH member machine (separate home + registry root).
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "member_home"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "member_lab_info"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "member_home"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "member_lab_info"))
     IC.import_card(card)
 
     # The member's machine now independently resolves emucaki as the core leader.
@@ -88,8 +88,8 @@ def test_dashboard_refuses_wrong_netname_on_carded_machine(mayor_world, monkeypa
     # Build the card while the MAYOR registry is active, THEN move to the
     # member machine (separate home + registry root) and import it.
     card = IC.build_card("emucaki")
-    monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "member_home"))
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "member_lab_info"))
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "member_home"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "member_lab_info"))
     IC.import_card(card)
     client = TestClient(create_app())
     # Signing in as anyone but the machine owner → refused.

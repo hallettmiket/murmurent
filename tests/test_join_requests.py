@@ -16,9 +16,9 @@ from murmurent.core import registrar as R
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_USER", "tbrowne")
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_USER", "tbrowne")
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "lab.md").write_text(
         "---\nlab: hallett\npi: '@the_pi'\n---\n", encoding="utf-8",
@@ -26,7 +26,7 @@ def world(monkeypatch, tmp_path):
     fake_home = tmp_path / "home"
     fake_home.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr(R, "REGISTRAR_SENTINEL",
-                         fake_home / ".wigamig" / "registrar")
+                         fake_home / ".murmurent" / "registrar")
     # Centre is initialised; provisioning hooks need it.
     CI.init_centre(
         name="C", institution="U", founding_mayor="@tbrowne",
@@ -279,12 +279,12 @@ def test_group_reconcile_reports_and_applies(world):
 
 def test_resolve_group_slack_token_env_then_file(monkeypatch, tmp_path):
     from murmurent.core import group_reconcile as GR
-    monkeypatch.delenv("WIGAMIG_GROUP_SLACK_TOKEN", raising=False)
+    monkeypatch.delenv("MURMURENT_GROUP_SLACK_TOKEN", raising=False)
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
     d = tmp_path / ".config" / "murmurent" / "groups" / "dcis"; d.mkdir(parents=True)
     (d / "slack-token").write_text("xoxb-group\n")
     assert GR.resolve_group_slack_token("dcis") == "xoxb-group"
-    monkeypatch.setenv("WIGAMIG_GROUP_SLACK_TOKEN", "xoxb-env")
+    monkeypatch.setenv("MURMURENT_GROUP_SLACK_TOKEN", "xoxb-env")
     assert GR.resolve_group_slack_token("dcis") == "xoxb-env"   # env wins
 
 
@@ -353,7 +353,7 @@ def test_decline_refuses_empty_reason(world):
 
 def test_provision_lab_onboarding_no_centre(monkeypatch, tmp_path):
     """If centre.md is missing → returns a single block probe."""
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT",
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT",
                          str(tmp_path / "fresh_lab_info"))
     probes = CP.provision_lab_onboarding("any_lab")
     assert len(probes) == 1

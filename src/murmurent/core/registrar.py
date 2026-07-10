@@ -2,9 +2,9 @@
 Purpose: Registrar — the administrative layer above any single lab.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-12
-Input: ``~/.wigamig/registrar`` (sentinel containing the registrar's
-       Western netname), ``$WIGAMIG_LAB_INFO_ROOT`` (default
-       ``~/.wigamig/lab_info/``), and per-lab ``lab.md`` files at
+Input: ``~/.murmurent/registrar`` (sentinel containing the registrar's
+       Western netname), ``$MURMURENT_LAB_INFO_ROOT`` (default
+       ``~/.murmurent/lab_info/``), and per-lab ``lab.md`` files at
        the paths declared in ``_registry.yaml``.
 Output: Helpers for identity (``is_registrar``) and registry I/O
         (``read_registry``, ``write_registry``) plus dataclasses for
@@ -69,16 +69,16 @@ class InvalidCollaboration(RegistrarError):
 # -----------------------------------------------------------------
 
 def _wig_home() -> Path:
-    """This machine's ``~/.wigamig`` root, honouring ``WIGAMIG_HOME`` so tools,
+    """This machine's ``~/.murmurent`` root, honouring ``MURMURENT_HOME`` so tools,
     scripts, and tests that isolate it never write into the real home."""
-    return Path(os.environ.get("WIGAMIG_HOME", str(Path.home() / ".wigamig")))
+    return Path(os.environ.get("MURMURENT_HOME", str(Path.home() / ".murmurent")))
 
 
-# Per-machine sentinel. Honours WIGAMIG_HOME (evaluated per process), so e.g. the
-# identity smoke test — which sets WIGAMIG_HOME — cannot clobber the real one.
+# Per-machine sentinel. Honours MURMURENT_HOME (evaluated per process), so e.g. the
+# identity smoke test — which sets MURMURENT_HOME — cannot clobber the real one.
 REGISTRAR_SENTINEL = _wig_home() / "registrar"
-LAB_INFO_ENV_VAR = "WIGAMIG_LAB_INFO_ROOT"
-DEFAULT_LAB_INFO_ROOT = Path.home() / ".wigamig" / "lab_info"
+LAB_INFO_ENV_VAR = "MURMURENT_LAB_INFO_ROOT"
+DEFAULT_LAB_INFO_ROOT = Path.home() / ".murmurent" / "lab_info"
 REGISTRY_FILENAME = "_registry.yaml"
 
 
@@ -86,7 +86,7 @@ def lab_info_root(env: dict[str, str] | None = None) -> Path:
     """Return the registrar's data root.
 
     Production setting: ``/data/lab_info/``. Development default:
-    ``~/.wigamig/lab_info/``. Override via ``$WIGAMIG_LAB_INFO_ROOT``.
+    ``~/.murmurent/lab_info/``. Override via ``$MURMURENT_LAB_INFO_ROOT``.
     """
     source = os.environ if env is None else env
     return Path(source.get(LAB_INFO_ENV_VAR, DEFAULT_LAB_INFO_ROOT)).expanduser()
@@ -102,7 +102,7 @@ def _normalize(handle: str) -> str:
 
 
 def registrar_handle() -> str | None:
-    """Return the registrar's handle from ``~/.wigamig/registrar``, or ``None``.
+    """Return the registrar's handle from ``~/.murmurent/registrar``, or ``None``.
 
     The file contains the Western netname on the first non-blank line.
     This is the **per-machine sentinel** — the human at this laptop says
@@ -162,7 +162,7 @@ def is_registrar(handle: str, env: dict[str, str] | None = None) -> bool:
     If that list is empty (fresh install, pre-Phase-A), fall back — in order — to
     a ``<lab_info>/registrar`` file (git-tracked, scoped to this centre's data
     root, so it isolates cleanly) and then the per-machine
-    ``~/.wigamig/registrar`` sentinel, for backward compat with single-registrar
+    ``~/.murmurent/registrar`` sentinel, for backward compat with single-registrar
     installs.
     """
     norm = _normalize(handle)
@@ -172,11 +172,11 @@ def is_registrar(handle: str, env: dict[str, str] | None = None) -> bool:
     if declared:
         return norm in declared
     # Fallback 1: a registrar declared in the centre's own lab_info root (scoped
-    # to WIGAMIG_LAB_INFO_ROOT, so it only exists for a configured centre).
+    # to MURMURENT_LAB_INFO_ROOT, so it only exists for a configured centre).
     scoped = _lab_info_registrar(env)
     if scoped is not None:
         return norm == scoped
-    # Fallback 2: the legacy per-MACHINE sentinel (~/.wigamig/registrar) is only
+    # Fallback 2: the legacy per-MACHINE sentinel (~/.murmurent/registrar) is only
     # meaningful once a centre actually exists on this machine. A fresh or
     # centre-less install must grant NOBODY registrar access — otherwise a stale
     # sentinel left behind by a removed centre silently confers registrar powers.
@@ -201,7 +201,7 @@ def _centre_initialised(env: dict[str, str] | None = None) -> bool:
 def _lab_info_registrar(env: dict[str, str] | None = None) -> str | None:
     """The single registrar handle declared in ``<lab_info>/registrar``, or None.
 
-    Scoped to ``WIGAMIG_LAB_INFO_ROOT`` (unlike the machine sentinel), so it is
+    Scoped to ``MURMURENT_LAB_INFO_ROOT`` (unlike the machine sentinel), so it is
     naturally isolated per install/test."""
     p = lab_info_root(env) / "registrar"
     if not p.is_file():

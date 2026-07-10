@@ -43,7 +43,7 @@ which murmurent    # should print the rdkit-env path, not the .venv
 
 ```bash
 # 1. Confirm bioCORE is in the centre registry.
-ls ~/.wigamig/lab_info/cores/biocore/lab-mgmt/
+ls ~/.murmurent/lab_info/cores/biocore/lab-mgmt/
 # Expect: lab.md, members/, services/, training/, training_roster/, requests/
 
 # 2. Tests pass on this checkout.
@@ -71,13 +71,13 @@ murmurent dashboard --hifi --port 8771
 ### Recurring gotcha — dashboard restart after code changes
 
 Python modules are imported once at startup. Any change to
-`src/wigamig/**` requires a Ctrl-C + relaunch of the dashboard.
+`src/murmurent/**` requires a Ctrl-C + relaunch of the dashboard.
 JSX changes are picked up on browser reload (Babel runs in-browser),
 but you may need Cmd-Shift-R to bust the Babel cache.
 
 ### If it fails
 - Missing tests file or path: `git pull && pip install -e '.[dev,dashboard,slack,gcal]'`
-- Dashboard 500 on `/`: check `~/.wigamig/lab_info/registrar` exists and
+- Dashboard 500 on `/`: check `~/.murmurent/lab_info/registrar` exists and
   contains your handle.
 - `Error: hi-fi dashboard deps missing`: you're missing the
   `dashboard` extra — re-run the install above.
@@ -88,7 +88,7 @@ but you may need Cmd-Shift-R to bust the Babel cache.
 
 ### Goal
 Gary's calendar holds every booking event going forward. Refresh token
-lands at `~/.wigamig/cores/biocore/google_calendar.json`.
+lands at `~/.murmurent/cores/biocore/google_calendar.json`.
 
 ### Prereq
 - Gary has a Google account that will own the bioCORE calendar.
@@ -122,10 +122,10 @@ lands at `~/.wigamig/cores/biocore/google_calendar.json`.
 
 2. **Drop it on Gary's machine**
    ```bash
-   mkdir -p ~/.wigamig/cores/biocore
+   mkdir -p ~/.murmurent/cores/biocore
    mv ~/Downloads/client_secret_*.json \
-      ~/.wigamig/cores/biocore/google_oauth_client.json
-   chmod 600 ~/.wigamig/cores/biocore/google_oauth_client.json
+      ~/.murmurent/cores/biocore/google_oauth_client.json
+   chmod 600 ~/.murmurent/cores/biocore/google_oauth_client.json
    ```
 
 3. **Run the auth flow** (gcal extra already installed per §0)
@@ -139,7 +139,7 @@ lands at `~/.wigamig/cores/biocore/google_calendar.json`.
 
 4. **Verify the token landed**
    ```bash
-   ls -l ~/.wigamig/cores/biocore/google_calendar.json
+   ls -l ~/.murmurent/cores/biocore/google_calendar.json
    # Expect: -rw------- (mode 0600), recent mtime.
    ```
 
@@ -174,7 +174,7 @@ event land on Gary's calendar.
 ### Background — where training records live
 
 bioCORE owns its training roster at
-`~/.wigamig/lab_info/cores/biocore/lab-mgmt/training_roster/<handle>.md`.
+`~/.murmurent/lab_info/cores/biocore/lab-mgmt/training_roster/<handle>.md`.
 The core leader (Gary) writes here; the member's lab repo
 (`~/repos/lab_mgmt/members/<handle>.md`) is NOT consulted for booking
 prereqs. This mirrors real Western BioCORE policy.
@@ -302,7 +302,7 @@ grep -A2 murmurent-core-data ~/.claude/settings.json
 # Expect: the MCP entry with args ["-m", "murmurent.mcp.core_data_server"].
 
 # 2. Open a fresh CC session (new tab) in any project where you're
-#    signed in as @the_pi (set $WIGAMIG_USER if missing).
+#    signed in as @the_pi (set $MURMURENT_USER if missing).
 #    In CC, ask:
 ```
 
@@ -325,15 +325,15 @@ Then:
 
 Audit log check:
 ```bash
-tail -5 ~/.wigamig/cores/biocore/access.log
+tail -5 ~/.murmurent/cores/biocore/access.log
 # Expect: one JSON line per MCP call, with caller="the_pi".
 ```
 
 ### If it fails
 - MCP not listed in CC: `~/.claude/settings.json` may have been edited
   by hand; re-run `murmurent install --hooks` and confirm the diff.
-- "no WIGAMIG_USER / USER set": the MCP runs without your shell env.
-  Add `WIGAMIG_USER=the_pi` to the env block of the MCP entry in
+- "no MURMURENT_USER / USER set": the MCP runs without your shell env.
+  Add `MURMURENT_USER=the_pi` to the env block of the MCP entry in
   `~/.claude/settings.json` (mirror how the oracle MCP is wired on
   machines that need it).
 
@@ -403,19 +403,19 @@ curl -s "http://localhost:8771/api/lab_roster/resolve?lab=acme-bio" | jq .
 
 ```bash
 # 7. Verify the artifact.
-ls ~/.wigamig/lab_info/cores/biocore/lab-mgmt/invoices/2026-05/
+ls ~/.murmurent/lab_info/cores/biocore/lab-mgmt/invoices/2026-05/
 # Expect: acme-bio.csv, acme-bio.md, hallett.csv, hallett.md, summary.md
 
-cat ~/.wigamig/lab_info/cores/biocore/lab-mgmt/invoices/2026-05/acme-bio.md
+cat ~/.murmurent/lab_info/cores/biocore/lab-mgmt/invoices/2026-05/acme-bio.md
 # Expect: ## Bill to block with PO-2026-001, ap@acme.example.
 
-cat ~/.wigamig/lab_info/cores/biocore/lab-mgmt/invoices/2026-05/summary.md
+cat ~/.murmurent/lab_info/cores/biocore/lab-mgmt/invoices/2026-05/summary.md
 # Expect: "Breakdown by recipient kind: external: $200.00 (1), lab: $120.00 (1)"
 ```
 
 ### If it fails
 - Proxy booking 403: confirm Gary is the registered leader of bioCORE
-  (`grep leader ~/.wigamig/lab_info/cores/biocore/lab-mgmt/lab.md`).
+  (`grep leader ~/.murmurent/lab_info/cores/biocore/lab-mgmt/lab.md`).
   Non-leader/registrar can't book on behalf of someone else.
 - Invoice generate writes nothing: check the slot is in the right month
   (a 2026-05-22 slot won't appear in 2026-06 invoices).

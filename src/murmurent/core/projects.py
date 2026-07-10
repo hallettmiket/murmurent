@@ -2,7 +2,7 @@
 Purpose: Discover murmurent project repos and the lab-mgmt project registry.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-07
-Input: Local filesystem (``~/repos`` by default), ``$WIGAMIG_PROJECTS_ROOT``,
+Input: Local filesystem (``~/repos`` by default), ``$MURMURENT_PROJECTS_ROOT``,
        and the lab-mgmt repo's ``projects/`` index.
 Output: Helpers that list projects a member belongs to and resolve a project's
         local repo path.
@@ -19,7 +19,7 @@ from .frontmatter import parse_file
 from .repo import CHARTER_FILENAME, MEMBERS_FILENAME, ProjectRepo, lab_mgmt_repo_root, read_members
 
 DEFAULT_PROJECTS_ROOT = Path("~/repos").expanduser()
-PROJECTS_ROOT_ENV = "WIGAMIG_PROJECTS_ROOT"
+PROJECTS_ROOT_ENV = "MURMURENT_PROJECTS_ROOT"
 PROJECT_REGISTRY_DIR = "projects"
 
 
@@ -47,7 +47,7 @@ class ProjectSummary:
 
 
 def projects_root(env: dict[str, str] | None = None) -> Path:
-    """Return ``~/repos`` (or ``$WIGAMIG_PROJECTS_ROOT``) — where local project repos live."""
+    """Return ``~/repos`` (or ``$MURMURENT_PROJECTS_ROOT``) — where local project repos live."""
     source = os.environ if env is None else env
     return Path(source.get(PROJECTS_ROOT_ENV, DEFAULT_PROJECTS_ROOT)).expanduser()
 
@@ -154,7 +154,7 @@ def lab_mgmt_project_registry_path(name: str, env: dict[str, str] | None = None)
     return lab_mgmt_repo_root(env) / PROJECT_REGISTRY_DIR / f"{name}.md"
 
 
-REMOTE_POINTER_FILE = ".wigamig-remote-pointer"
+REMOTE_POINTER_FILE = ".murmurent-remote-pointer"
 
 
 def render_registry_entry(
@@ -199,7 +199,7 @@ def render_registry_entry(
 def is_remote_pointer(project_dir: Path) -> bool:
     """True if ``project_dir`` is a remote-project pointer (no working tree).
 
-    Remote-pointer dirs contain a single ``.wigamig-remote-pointer`` marker
+    Remote-pointer dirs contain a single ``.murmurent-remote-pointer`` marker
     file alongside a CHARTER.md whose frontmatter carries ``host:`` and
     ``remote_path:``. Calls into git here would all fail; the dashboard
     surfaces them with a 🌐 chip and the "Open in VSCode" button generates

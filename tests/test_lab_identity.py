@@ -13,7 +13,7 @@ from murmurent.core import lab_identity as LI
 @pytest.fixture
 def lab(monkeypatch, tmp_path):
     root = tmp_path / "lab-mgmt"
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(root))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(root))
     (root / "members").mkdir(parents=True)
     (root / "lab.md").write_text("---\nlab: lab_mh\npi: '@the_pi'\n---\n", encoding="utf-8")
 

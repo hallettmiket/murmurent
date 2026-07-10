@@ -46,9 +46,9 @@ def _run(payload: dict) -> dict:
 
 @pytest.fixture
 def refined(monkeypatch, tmp_path):
-    """Point WIGAMIG_LAB_VM_ROOT at tmp; create refined/ + a file inside."""
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path))
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_ROOT", raising=False)
+    """Point MURMURENT_LAB_VM_ROOT at tmp; create refined/ + a file inside."""
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_ROOT", raising=False)
     refined_dir = tmp_path / "refined" / "proj" / "exp"
     refined_dir.mkdir(parents=True)
     existing = refined_dir / "results.csv"
@@ -58,13 +58,13 @@ def refined(monkeypatch, tmp_path):
 
 @pytest.fixture
 def notebook(monkeypatch, tmp_path):
-    """Pin WIGAMIG_NOTEBOOK_ROOT so the hook protects a known vault."""
+    """Pin MURMURENT_NOTEBOOK_ROOT so the hook protects a known vault."""
     vault = tmp_path / "Obsidian" / "lab-notebook"
     vault.mkdir(parents=True)
     existing = vault / "2026-05-13.md"
     existing.write_text("# notes\n", encoding="utf-8")
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_ROOT", str(vault))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "novm"))
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_ROOT", str(vault))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "novm"))
     return {"vault": vault, "existing": existing}
 
 
@@ -359,8 +359,8 @@ def test_production_refined_blocked_even_with_env(monkeypatch, tmp_path):
     instead verify that the lexical protection is in place (Write to a
     well-known production subpath that has no special status today still
     routes through this hook; only the existence check stops the deny)."""
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "alt"))
-    monkeypatch.delenv("WIGAMIG_NOTEBOOK_ROOT", raising=False)
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "alt"))
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_ROOT", raising=False)
     prefixes = pp._refined_prefixes()
     assert "/data/lab_vm/wigamig/refined" in prefixes  # always present
 

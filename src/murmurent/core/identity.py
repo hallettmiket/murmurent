@@ -2,7 +2,7 @@
 Purpose: Resolve the murmurent identity of the current user.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-06
-Input: Environment (``WIGAMIG_USER``), ``~/.wigamig/user`` (the saved
+Input: Environment (``MURMURENT_USER``), ``~/.murmurent/user`` (the saved
        Western netname), or ``gh api user`` as final fallback.
 Output: ``Identity`` dataclass with the resolved handle and source.
 """
@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-ENV_VAR = "WIGAMIG_USER"
-USER_FILE = Path.home() / ".wigamig" / "user"
+ENV_VAR = "MURMURENT_USER"
+USER_FILE = Path.home() / ".murmurent" / "user"
 IdentitySource = Literal["env", "user_file", "gh", "unknown"]
 
 
@@ -45,7 +45,7 @@ def _normalize(handle: str) -> str:
 
 
 def from_env() -> Identity | None:
-    """Return an :class:`Identity` from ``WIGAMIG_USER`` if set, else ``None``."""
+    """Return an :class:`Identity` from ``MURMURENT_USER`` if set, else ``None``."""
     value = os.environ.get(ENV_VAR)
     if not value:
         return None
@@ -56,7 +56,7 @@ def from_env() -> Identity | None:
 
 
 def from_user_file() -> Identity | None:
-    """Return an :class:`Identity` from ``~/.wigamig/user`` if present, else ``None``.
+    """Return an :class:`Identity` from ``~/.murmurent/user`` if present, else ``None``.
 
     This file is written by the dashboard's "Remember me on this machine"
     flow and stores the user's **Western netname**. It must be consulted
@@ -105,7 +105,7 @@ def from_gh() -> Identity | None:
 def resolve(*, allow_unknown: bool = False) -> Identity:
     """Resolve the current user.
 
-    Resolution order: ``WIGAMIG_USER`` env var, then ``~/.wigamig/user``
+    Resolution order: ``MURMURENT_USER`` env var, then ``~/.murmurent/user``
     (the saved Western netname), then ``gh api user``.
 
     Parameters

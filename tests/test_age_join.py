@@ -41,9 +41,9 @@ def test_parse_join_form_skips_blank_and_unfilled():
 # ---- age_recipient on the centre profile ------------------------------
 
 def test_age_recipient_round_trips(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
     monkeypatch.setattr(R, "REGISTRAR_SENTINEL",
-                        tmp_path / "home" / ".wigamig" / "registrar")
+                        tmp_path / "home" / ".murmurent" / "registrar")
     CI.init_centre(name="C", institution="U", founding_mayor="@tbrowne",
                    age_recipient="age1demo...", write_sentinel=False)
     assert CI.read_centre().age_recipient == "age1demo..."
@@ -53,9 +53,9 @@ def test_age_recipient_round_trips(monkeypatch, tmp_path):
 
 @pytest.mark.skipif(not A.age_available(), reason="age not installed")
 def test_live_encrypt_decrypt_and_file(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
     monkeypatch.setattr(R, "REGISTRAR_SENTINEL",
-                        tmp_path / "home" / ".wigamig" / "registrar")
+                        tmp_path / "home" / ".murmurent" / "registrar")
     CI.init_centre(name="C", institution="U", founding_mayor="@tbrowne",
                    write_sentinel=False)
 

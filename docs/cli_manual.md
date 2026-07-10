@@ -11,7 +11,7 @@ tags: [murmurent, manual]
 
 ## Overview
 
-The murmurent CLI manages the configuration that lets your local Claude Code instance act as a member of a wigamig-enabled group. It does **not** run agents — it manages agent installation, group membership, role assignments, projects, and the day-to-day verbs that touch group artefacts.
+The murmurent CLI manages the configuration that lets your local Claude Code instance act as a member of a murmurent-enabled group. It does **not** run agents — it manages agent installation, group membership, role assignments, projects, and the day-to-day verbs that touch group artefacts.
 
 Design choice: a thin CLI is preferred over a GUI until a concrete onboarding pain demands one.
 
@@ -54,7 +54,7 @@ Effects:
 
 ### Preferences
 
-Personal preferences profile lives at `~/.claude/wigamig-preferences.yaml` (local; never committed to group repos). Sets standardised cross-cutting fields once across all installed `personal` agents. See [Tool preferences](group_level.md#tool-preferences-defaults--overrides) for the controlled vocabulary.
+Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (local; never committed to group repos). Sets standardised cross-cutting fields once across all installed `personal` agents. See [Tool preferences](group_level.md#tool-preferences-defaults--overrides) for the controlled vocabulary.
 
 | Command | Effect |
 |---|---|

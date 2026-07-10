@@ -1,12 +1,12 @@
 """
-Purpose: Seed the wigamig smoke-test tutorial. Phase 1 scope: lab-mgmt repo +
+Purpose: Seed the murmurent smoke-test tutorial. Phase 1 scope: lab-mgmt repo +
          members + age keys. Phase 2 scope: also seed the two project repos
          (``dcis_sc_tutorial`` and ``bbb_drug_screen``) with charters,
          experiments, lab-VM dirs, and clearly-fake instrument data.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-07
-Input: ``WIGAMIG_LAB_MGMT_REPO`` env var (default ``~/repos/lab_mgmt``);
-       ``WIGAMIG_LAB_VM_ROOT`` env var (default ``~/lab_vm/data``);
+Input: ``MURMURENT_LAB_MGMT_REPO`` env var (default ``~/repos/lab_mgmt``);
+       ``MURMURENT_LAB_VM_ROOT`` env var (default ``~/lab_vm/data``);
        ``gh`` CLI authenticated against the ``hallettmiket`` org;
        ``age-keygen`` available on PATH.
 Output: ``~/repos/lab_mgmt/`` populated with members/, keys/, inventory/,
@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-# Make the wigamig package importable when running this script from a checkout
+# Make the murmurent package importable when running this script from a checkout
 # without `pip install -e .` (e.g. inside the seed flow on a fresh machine).
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _SRC_PATH = _REPO_ROOT / "src"
@@ -101,7 +101,7 @@ PROJECT_SEEDS: tuple[ProjectSeed, ...] = (
         lead="@allie",
         members=("@the_pi", "@allie", "@bob", "@cassie"),
         description=(
-            "Single-cell DCIS tutorial project for the wigamig smoke-test. All data "
+            "Single-cell DCIS tutorial project for the murmurent smoke-test. All data "
             "is clearly fake: clinicopathology rows use OHIPs of the form "
             "0000-000-NNN, FASTQ files are random-base sequences, count matrices are "
             "uniform integers. Used to exercise the clinical-sensitivity controls "
@@ -124,7 +124,7 @@ PROJECT_SEEDS: tuple[ProjectSeed, ...] = (
         lead="@bob",
         members=("@the_pi", "@bob", "@allie"),
         description=(
-            "Blood-brain-barrier drug-screen tutorial project for the wigamig "
+            "Blood-brain-barrier drug-screen tutorial project for the murmurent "
             "smoke-test. All compound data is clearly fake (FAKE_CMP_NNNN). "
             "Used to exercise the drug-discovery LitL choreography."
         ),
@@ -301,13 +301,13 @@ def fail(message: str) -> None:
 
 
 def lab_mgmt_root() -> Path:
-    """Resolve the lab-management repo root, honouring ``WIGAMIG_LAB_MGMT_REPO``."""
-    return Path(os.environ.get("WIGAMIG_LAB_MGMT_REPO", DEFAULT_LAB_MGMT_PATH)).expanduser()
+    """Resolve the lab-management repo root, honouring ``MURMURENT_LAB_MGMT_REPO``."""
+    return Path(os.environ.get("MURMURENT_LAB_MGMT_REPO", DEFAULT_LAB_MGMT_PATH)).expanduser()
 
 
 def keys_dir() -> Path:
     """Resolve the directory holding private age keys."""
-    return Path(os.environ.get("WIGAMIG_KEYS_DIR", DEFAULT_KEYS_DIR)).expanduser()
+    return Path(os.environ.get("MURMURENT_KEYS_DIR", DEFAULT_KEYS_DIR)).expanduser()
 
 
 def run(
@@ -374,7 +374,7 @@ def scaffold_lab_mgmt(repo_root: Path) -> None:
         readme,
         (
             f"# {LAB_MGMT_NAME}\n\n"
-            "Lab-management repo for the Hallett group, seeded by the wigamig "
+            "Lab-management repo for the Hallett group, seeded by the murmurent "
             "tutorial smoke-test (phase 1).\n\n"
             "Holds member profiles, public age keys, inventory, project registry, "
             "dashboards, audit logs, role registry, and onboarding profiles.\n\n"
@@ -427,7 +427,7 @@ def generate_age_key_pair(handle: str, repo_root: Path) -> None:
 
     Public key committed to ``<lab-mgmt>/keys/<handle>.age``;
     private key written outside the repo at
-    ``$WIGAMIG_KEYS_DIR/<handle>.age-private`` (mode 0600).
+    ``$MURMURENT_KEYS_DIR/<handle>.age-private`` (mode 0600).
     """
     public_path = repo_root / "keys" / f"{handle}.age"
     private_path = keys_dir() / f"{handle}.age-private"
@@ -472,7 +472,7 @@ def generate_age_key_pair(handle: str, repo_root: Path) -> None:
     public_path.parent.mkdir(parents=True, exist_ok=True)
     public_path.write_text(
         (
-            f"# wigamig age public key for @{handle} (fake tutorial persona)\n"
+            f"# murmurent age public key for @{handle} (fake tutorial persona)\n"
             f"# generated {TODAY}\n"
             f"{public_key}\n"
         ),
@@ -549,7 +549,7 @@ def ensure_github_repo(slug: str) -> None:
             f"{GITHUB_ORG}/{slug}",
             "--private",
             "--description",
-            "Hallett group lab-management repo (wigamig tutorial smoke-test)",
+            "Hallett group lab-management repo (murmurent tutorial smoke-test)",
             "--confirm",
         ],
         check=False,
@@ -674,7 +674,7 @@ def seed_fake_data(staging_root: Path) -> dict[str, Path]:
 def stage_data_into_lab_vm(bundles: dict[str, Path]) -> None:
     """Copy generated files directly into the lab-VM raw / refined trees.
 
-    For the seed we don't go through ``wigamig experiment ingest`` because the
+    For the seed we don't go through ``murmurent experiment ingest`` because the
     interactive prompt would block the non-interactive script. We populate the
     lab-VM tree by hand so the smoke-test acceptance step can exercise ingest
     against a *fresh* source directory (`scripts/fake_data.py` regenerates it).
@@ -962,7 +962,7 @@ def main() -> int:
             "# keys/\n\n"
             "Public age keys for group members. Private keys are stored outside the repo at\n"
             "`~/.config/wigamig/keys/<handle>.age-private` (mode 0600).\n\n"
-            "All keys here are placeholders for the wigamig tutorial smoke-test.\n"
+            "All keys here are placeholders for the murmurent tutorial smoke-test.\n"
         ),
     )
 

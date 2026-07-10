@@ -9,7 +9,7 @@
 <g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(4 773.2)">
 <title>install_modes</title>
 <polygon fill="#faf8f5" stroke="none" points="-4,4 -4,-773.2 1212.65,-773.2 1212.65,4 -4,4"/>
-<text xml:space="preserve" text-anchor="start" x="469.7" y="-749.1" font-family="EB Garamond" font-weight="bold" font-size="18.00" fill="#201436">wigamig · project install modes</text>
+<text xml:space="preserve" text-anchor="start" x="458.82" y="-749.1" font-family="EB Garamond" font-weight="bold" font-size="18.00" fill="#201436">murmurent · project install modes</text>
 <text xml:space="preserve" text-anchor="start" x="470.45" y="-737.75" font-family="EB Garamond" font-size="11.00" fill="#201436">where does each artefact live? · local laptop vs lab-server</text>
 <g id="clust1" class="cluster">
 <title>cluster_local</title>
@@ -40,8 +40,8 @@
 <!-- L_dashboard -->
 <g id="node3" class="node">
 <title>L_dashboard</title>
-<path fill="#ffe9cc" stroke="#f0a757" d="M538.07,-588.4C538.07,-588.4 442.4,-588.4 442.4,-588.4 436.4,-588.4 430.4,-582.4 430.4,-576.4 430.4,-576.4 430.4,-562 430.4,-562 430.4,-556 436.4,-550 442.4,-550 442.4,-550 538.07,-550 538.07,-550 544.07,-550 550.07,-556 550.07,-562 550.07,-562 550.07,-576.4 550.07,-576.4 550.07,-582.4 544.07,-588.4 538.07,-588.4"/>
-<text xml:space="preserve" text-anchor="middle" x="490.24" y="-570.75" font-family="EB Garamond" font-size="11.00" fill="#1a1a1a">wigamig dashboard</text>
+<path fill="#ffe9cc" stroke="#f0a757" d="M544.45,-588.4C544.45,-588.4 436.03,-588.4 436.03,-588.4 430.03,-588.4 424.03,-582.4 424.03,-576.4 424.03,-576.4 424.03,-562 424.03,-562 424.03,-556 430.03,-550 436.03,-550 436.03,-550 544.45,-550 544.45,-550 550.45,-550 556.45,-556 556.45,-562 556.45,-562 556.45,-576.4 556.45,-576.4 556.45,-582.4 550.45,-588.4 544.45,-588.4"/>
+<text xml:space="preserve" text-anchor="middle" x="490.24" y="-570.75" font-family="EB Garamond" font-size="11.00" fill="#1a1a1a">murmurent dashboard</text>
 <text xml:space="preserve" text-anchor="middle" x="490.24" y="-558.75" font-family="EB Garamond" font-size="11.00" fill="#1a1a1a">(uvicorn :8770)</text>
 </g>
 <!-- L_repo -->
@@ -54,8 +54,8 @@
 <!-- L_dashboard&#45;&gt;L_repo -->
 <g id="edge1" class="edge">
 <title>L_dashboard&#45;&gt;L_repo</title>
-<path fill="none" stroke="#5b5b5b" d="M550.52,-573.01C604.46,-576.47 683.87,-581.58 739.07,-585.12"/>
-<polygon fill="#5b5b5b" stroke="#5b5b5b" points="738.72,-587.56 745.87,-585.56 739.04,-582.67 738.72,-587.56"/>
+<path fill="none" stroke="#5b5b5b" d="M556.87,-573.42C610.55,-576.87 685.98,-581.71 739.05,-585.12"/>
+<polygon fill="#5b5b5b" stroke="#5b5b5b" points="738.72,-587.56 745.86,-585.56 739.03,-582.67 738.72,-587.56"/>
 </g>
 <!-- L_vault -->
 <g id="node5" class="node">
@@ -67,8 +67,8 @@
 <!-- L_dashboard&#45;&gt;L_vault -->
 <g id="edge4" class="edge">
 <title>L_dashboard&#45;&gt;L_vault</title>
-<path fill="none" stroke="#5b5b5b" d="M550.52,-558.92C594.98,-551.2 656.72,-540.49 707.97,-531.6"/>
-<polygon fill="#5b5b5b" stroke="#5b5b5b" points="708.13,-534.06 714.61,-530.45 707.29,-529.23 708.13,-534.06"/>
+<path fill="none" stroke="#5b5b5b" d="M556.87,-557.81C600.63,-550.22 658.85,-540.12 707.62,-531.66"/>
+<polygon fill="#5b5b5b" stroke="#5b5b5b" points="708.02,-534.08 714.5,-530.47 707.18,-529.25 708.02,-534.08"/>
 <text xml:space="preserve" text-anchor="middle" x="658.56" y="-546.63" font-family="Courier Prime" font-size="9.00" fill="#5b5b5b">notebook</text>
 </g>
 <!-- L_repo&#45;&gt;github -->
@@ -114,22 +114,22 @@
 <!-- R_dashboard -->
 <g id="node9" class="node">
 <title>R_dashboard</title>
-<path fill="#ffe9cc" stroke="#f0a757" d="M184.8,-293.4C184.8,-293.4 89.13,-293.4 89.13,-293.4 83.13,-293.4 77.13,-287.4 77.13,-281.4 77.13,-281.4 77.13,-267 77.13,-267 77.13,-261 83.13,-255 89.13,-255 89.13,-255 184.8,-255 184.8,-255 190.8,-255 196.8,-261 196.8,-267 196.8,-267 196.8,-281.4 196.8,-281.4 196.8,-287.4 190.8,-293.4 184.8,-293.4"/>
-<text xml:space="preserve" text-anchor="middle" x="136.96" y="-275.75" font-family="EB Garamond" font-size="11.00" fill="#1a1a1a">wigamig dashboard</text>
+<path fill="#ffe9cc" stroke="#f0a757" d="M191.17,-293.4C191.17,-293.4 82.75,-293.4 82.75,-293.4 76.75,-293.4 70.75,-287.4 70.75,-281.4 70.75,-281.4 70.75,-267 70.75,-267 70.75,-261 76.75,-255 82.75,-255 82.75,-255 191.17,-255 191.17,-255 197.17,-255 203.17,-261 203.17,-267 203.17,-267 203.17,-281.4 203.17,-281.4 203.17,-287.4 197.17,-293.4 191.17,-293.4"/>
+<text xml:space="preserve" text-anchor="middle" x="136.96" y="-275.75" font-family="EB Garamond" font-size="11.00" fill="#1a1a1a">murmurent dashboard</text>
 <text xml:space="preserve" text-anchor="middle" x="136.96" y="-263.75" font-family="EB Garamond" font-size="11.00" fill="#1a1a1a">(uvicorn :8770)</text>
 </g>
-<!-- R_wigamig -->
+<!-- R_murmurent -->
 <g id="node16" class="node">
-<title>R_wigamig</title>
-<path fill="#ffffff" stroke="#c7bfb1" d="M551.2,-351.4C551.2,-351.4 429.28,-351.4 429.28,-351.4 423.28,-351.4 417.28,-345.4 417.28,-339.4 417.28,-339.4 417.28,-325 417.28,-325 417.28,-319 423.28,-313 429.28,-313 429.28,-313 551.2,-313 551.2,-313 557.2,-313 563.2,-319 563.2,-325 563.2,-325 563.2,-339.4 563.2,-339.4 563.2,-345.4 557.2,-351.4 551.2,-351.4"/>
-<text xml:space="preserve" text-anchor="middle" x="490.24" y="-333.75" font-family="EB Garamond" font-size="11.00" fill="#1a1a1a">wigamig CLI on lab-server</text>
+<title>R_murmurent</title>
+<path fill="#ffffff" stroke="#c7bfb1" d="M557.57,-351.4C557.57,-351.4 422.9,-351.4 422.9,-351.4 416.9,-351.4 410.9,-345.4 410.9,-339.4 410.9,-339.4 410.9,-325 410.9,-325 410.9,-319 416.9,-313 422.9,-313 422.9,-313 557.57,-313 557.57,-313 563.57,-313 569.57,-319 569.57,-325 569.57,-325 569.57,-339.4 569.57,-339.4 569.57,-345.4 563.57,-351.4 557.57,-351.4"/>
+<text xml:space="preserve" text-anchor="middle" x="490.24" y="-333.75" font-family="EB Garamond" font-size="11.00" fill="#1a1a1a">murmurent CLI on lab-server</text>
 <text xml:space="preserve" text-anchor="middle" x="490.24" y="-321.75" font-family="EB Garamond" font-size="11.00" fill="#1a1a1a">(uv tool install)</text>
 </g>
-<!-- R_dashboard&#45;&gt;R_wigamig -->
+<!-- R_dashboard&#45;&gt;R_murmurent -->
 <g id="edge5" class="edge">
-<title>R_dashboard&#45;&gt;R_wigamig</title>
-<path fill="none" stroke="#4f2683" stroke-width="2" d="M197.15,-283.97C255.28,-293.57 344.38,-308.28 408.89,-318.93"/>
-<polygon fill="#4f2683" stroke="#4f2683" stroke-width="2" points="406.73,-321.06 414.04,-319.78 407.53,-316.23 406.73,-321.06"/>
+<title>R_dashboard&#45;&gt;R_murmurent</title>
+<path fill="none" stroke="#4f2683" stroke-width="2" d="M203.62,-285.04C259.78,-294.31 341.04,-307.73 402.54,-317.88"/>
+<polygon fill="#4f2683" stroke="#4f2683" stroke-width="2" points="400.41,-320.02 407.71,-318.74 401.2,-315.18 400.41,-320.02"/>
 <text xml:space="preserve" text-anchor="middle" x="326.8" y="-311.3" font-family="Courier Prime" font-size="9.00" fill="#5b5b5b">ssh lab-server &#160;</text>
 </g>
 <!-- R_vscode_remote -->
@@ -202,11 +202,11 @@
 <polygon fill="#5b5b5b" stroke="#5b5b5b" points="983.72,-334.65 990.72,-332.2 983.72,-329.75 983.72,-334.65"/>
 <text xml:space="preserve" text-anchor="middle" x="941.73" y="-333.4" font-family="Courier Prime" font-size="9.00" fill="#5b5b5b">reads / writes</text>
 </g>
-<!-- R_wigamig&#45;&gt;R_repo -->
+<!-- R_murmurent&#45;&gt;R_repo -->
 <g id="edge8" class="edge">
-<title>R_wigamig&#45;&gt;R_repo</title>
-<path fill="none" stroke="#5b5b5b" d="M563.44,-332.2C606.72,-332.2 662.24,-332.2 708.88,-332.2"/>
-<polygon fill="#5b5b5b" stroke="#5b5b5b" points="708.66,-334.65 715.66,-332.2 708.66,-329.75 708.66,-334.65"/>
+<title>R_murmurent&#45;&gt;R_repo</title>
+<path fill="none" stroke="#5b5b5b" d="M569.79,-332.2C612,-332.2 664.34,-332.2 708.69,-332.2"/>
+<polygon fill="#5b5b5b" stroke="#5b5b5b" points="708.65,-334.65 715.65,-332.2 708.65,-329.75 708.65,-334.65"/>
 <text xml:space="preserve" text-anchor="middle" x="658.56" y="-333.4" font-family="Courier Prime" font-size="9.00" fill="#5b5b5b">project new</text>
 </g>
 <!-- legend -->
@@ -221,7 +221,7 @@
 <text xml:space="preserve" text-anchor="start" x="97.21" y="-31.75" font-family="EB Garamond" font-style="italic" font-size="11.00" fill="#1a1a1a">or</text>
 <text xml:space="preserve" text-anchor="start" x="106.96" y="-31.75" font-family="EB Garamond" font-size="11.00" fill="#1a1a1a"> Mode B — never both at once.</text>
 <text xml:space="preserve" text-anchor="start" x="16.96" y="-13.75" font-family="EB Garamond" font-size="11.00" fill="#1a1a1a">Migration: </text>
-<text xml:space="preserve" text-anchor="start" x="67.21" y="-13.75" font-family="Courier Prime" font-size="11.00" fill="#1a1a1a">wigamig notebook move&#45;to &lt;host&gt;</text>
+<text xml:space="preserve" text-anchor="start" x="67.21" y="-13.75" font-family="Courier Prime" font-size="11.00" fill="#1a1a1a">murmurent notebook move&#45;to &lt;host&gt;</text>
 </g>
 <!-- legend&#45;&gt;R_vault -->
 </g>

@@ -1,6 +1,6 @@
 ---
 name: murmurent-push
-description: Murmurent-aware stage/commit/push for a wigamig-enabled repo. Excludes per-machine + secret-shaped files, refuses to commit large files that belong in refined/, never touches /data/lab_vm/raw|refined, and posts a release note to the project's own Slack channel after the push.
+description: Murmurent-aware stage/commit/push for a murmurent-enabled repo. Excludes per-machine + secret-shaped files, refuses to commit large files that belong in refined/, never touches /data/lab_vm/raw|refined, and posts a release note to the project's own Slack channel after the push.
 user_invocable: true
 ---
 

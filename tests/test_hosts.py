@@ -25,8 +25,8 @@ from murmurent.core import hosts, remote
 @pytest.fixture
 def isolated(monkeypatch, tmp_path):
     """Redirect hosts.yaml + remote audit log into tmp_path."""
-    monkeypatch.setenv("WIGAMIG_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
-    monkeypatch.setenv("WIGAMIG_REMOTE_AUDIT_LOG", str(tmp_path / "remote_audit.log"))
+    monkeypatch.setenv("MURMURENT_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
+    monkeypatch.setenv("MURMURENT_REMOTE_AUDIT_LOG", str(tmp_path / "remote_audit.log"))
     return tmp_path
 
 

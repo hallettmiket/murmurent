@@ -22,7 +22,7 @@ Examples:
     # After bootstrap.
     murmurent centre-status
 
-``centre-init`` resolves the founding mayor from ``$WIGAMIG_USER``
+``centre-init`` resolves the founding mayor from ``$MURMURENT_USER``
 falling back to the OS user (``getpass.getuser()``) if unset. Pass
 ``--mayor @handle`` to override.
 """
@@ -39,7 +39,7 @@ from ..core import centre_init as _ci
 
 def _default_mayor() -> str:
     """Best-effort handle resolution for the bootstrap user."""
-    raw = os.environ.get("WIGAMIG_USER") or ""
+    raw = os.environ.get("MURMURENT_USER") or ""
     raw = raw.strip()
     if not raw:
         try:
@@ -59,7 +59,7 @@ def _default_mayor() -> str:
               help="Hosting institution (e.g. 'Western University').")
 @click.option("--mayor", default="",
               help="@handle of the bootstrapping user. "
-                   "Defaults to $WIGAMIG_USER then the OS user.")
+                   "Defaults to $MURMURENT_USER then the OS user.")
 @click.option("--unique-name", default="",
               help="Non-institution-specific install id (drives repo/Slack/"
                    "group names, e.g. 'western'). Optional.")
@@ -126,7 +126,7 @@ def centre_init(
                               default=getpass.getuser())
     if not mayor:
         raise click.ClickException(
-            "could not resolve founding mayor (set $WIGAMIG_USER or pass --mayor)"
+            "could not resolve founding mayor (set $MURMURENT_USER or pass --mayor)"
         )
 
     name = _prompt("Centre name", name, required=True)
@@ -289,16 +289,16 @@ def cmd_show(req_id: int) -> None:
 @join_request_group.command("approve")
 @click.argument("req_id", type=int)
 @click.option("--actor", default="",
-              help="Registrar handle. Defaults to $WIGAMIG_USER.")
+              help="Registrar handle. Defaults to $MURMURENT_USER.")
 @click.option("--no-provision", is_flag=True, default=False,
               help="Approve the record only; skip the Slack/GitHub/FS provisioning step.")
 def cmd_approve(req_id: int, actor: str, no_provision: bool) -> None:
     from ..core import join_requests as _jr
     from ..core import centre_provision as _cp
     if not actor:
-        actor = os.environ.get("WIGAMIG_USER", "")
+        actor = os.environ.get("MURMURENT_USER", "")
     if not actor:
-        raise click.ClickException("--actor required (or set $WIGAMIG_USER)")
+        raise click.ClickException("--actor required (or set $MURMURENT_USER)")
     # Approving is a deliberate mayor action → resolve the Slack token from env
     # OR the mode-0600 ~/.config/wigamig/slack-token file, so lab/core
     # provisioning actually creates the channel + invites members without
@@ -371,9 +371,9 @@ def cmd_approve(req_id: int, actor: str, no_provision: bool) -> None:
 def cmd_decline(req_id: int, actor: str, reason: str) -> None:
     from ..core import join_requests as _jr
     if not actor:
-        actor = os.environ.get("WIGAMIG_USER", "")
+        actor = os.environ.get("MURMURENT_USER", "")
     if not actor:
-        raise click.ClickException("--actor required (or set $WIGAMIG_USER)")
+        raise click.ClickException("--actor required (or set $MURMURENT_USER)")
     try:
         r = _jr.decline(req_id=req_id, actor=actor, reason=reason)
     except _jr.JoinRequestError as exc:
@@ -452,16 +452,16 @@ def centre_slack_smoke(channel: str, public: bool, keep: bool) -> None:
     tok = _cp.resolve_slack_token(allow_file=True)
     if not tok:
         raise click.ClickException(
-            "no Slack token found. Set $WIGAMIG_SLACK_TOKEN (legacy $SLACK_BOT_TOKEN "
+            "no Slack token found. Set $MURMURENT_SLACK_TOKEN (legacy $SLACK_BOT_TOKEN "
             "also works) or put it in ~/.config/wigamig/slack-token (mode 0600). "
             "The bot needs 'groups:write' (private) or 'channels:manage' (public):\n"
-            "    export WIGAMIG_SLACK_TOKEN=xoxb-..."
+            "    export MURMURENT_SLACK_TOKEN=xoxb-..."
         )
 
     if not channel:
         # Use UTC + seconds so re-runs don't collide.
         stamp = _dt.datetime.now(_dt.timezone.utc).strftime("%Y%m%d-%H%M%S")
-        channel = f"wigamig-smoke-{stamp}"
+        channel = f"murmurent-smoke-{stamp}"
 
     click.echo(f"channel name:  {channel}")
     click.echo(f"private:       {not public}")
@@ -544,12 +544,12 @@ def centre_status() -> None:
 
 @click.command("centre-slack-setup",
                 help="Provision the centre's Slack fabric: the private mayor↔CC "
-                     "channel (#wigamig-ops) + the #general broadcast wiring. "
-                     "Needs a bot token ($WIGAMIG_SLACK_TOKEN) + slack_workspace "
+                     "channel (#murmurent-ops) + the #general broadcast wiring. "
+                     "Needs a bot token ($MURMURENT_SLACK_TOKEN) + slack_workspace "
                      "set on the centre.")
 @click.option("--mayor-email", default="",
               help="The email on YOUR Slack account (used to add you to "
-                   "#wigamig-ops). Defaults to your registrar profile email, then "
+                   "#murmurent-ops). Defaults to your registrar profile email, then "
                    "the centre join_email — override here if those don't match "
                    "your Slack login.")
 def centre_slack_setup(mayor_email: str) -> None:
@@ -573,7 +573,7 @@ def centre_slack_setup(mayor_email: str) -> None:
 
 @click.command("centre-age-keygen",
                 help="Generate the centre's age key pair for the encrypted-email "
-                     "join flow. Writes the private key to ~/.wigamig/age/mayor.key "
+                     "join flow. Writes the private key to ~/.murmurent/age/mayor.key "
                      "and stores the public recipient on the centre (publish it in "
                      "the murmurent_public directory).")
 def centre_age_keygen() -> None:
@@ -596,7 +596,7 @@ def centre_age_keygen() -> None:
 @click.command("centre-root-keygen",
                 help="Generate the centre's ROOT signing key — the certificate "
                      "authority that signs PI identity cards. Writes the private "
-                     "key to ~/.wigamig/keys/, pins its fingerprint as this "
+                     "key to ~/.murmurent/keys/, pins its fingerprint as this "
                      "machine's trust anchor, and stores the public signing "
                      "recipient on the centre. --rotate replaces an existing root "
                      "(all cards must then be re-issued).")
@@ -645,7 +645,7 @@ def identity_card(handle: str, out_file: str | None, actor: str) -> None:
     if _ci.read_centre() is None:
         raise click.ClickException("no centre initialised; run `murmurent centre-init` first.")
     if not actor:
-        actor = os.environ.get("WIGAMIG_USER", "")
+        actor = os.environ.get("MURMURENT_USER", "")
     try:
         card = _ic.build_card(handle, issued_by=actor)
     except ValueError as exc:
@@ -733,7 +733,7 @@ def issue_pi_card_cmd(enrollment_file: str, handle: str, actor: str,
     import json as _json
     from pathlib import Path as _P
     if not actor:
-        actor = os.environ.get("WIGAMIG_USER", "")
+        actor = os.environ.get("MURMURENT_USER", "")
     try:
         enrollment = _json.loads(_P(enrollment_file).expanduser().read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
@@ -1329,7 +1329,7 @@ def group_setup(group: str, sets: tuple[str, ...], non_interactive: bool) -> Non
         h = (fields.get(hk, current.get(hk, "")) or "").strip()
         if h and known_hosts and h not in known_hosts:
             click.secho(f"  ! host {h!r} isn't in your machine registry "
-                        f"(~/.wigamig/hosts.yaml) — add it with `murmurent host add {h} …` "
+                        f"(~/.murmurent/hosts.yaml) — add it with `murmurent host add {h} …` "
                         "so notebooks/data can be reached.", fg="yellow", err=True)
 
     if not _R.update_group_profile(group, fields):

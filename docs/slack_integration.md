@@ -219,7 +219,7 @@ These are the questions I'd want answered as a PR comment on this doc:
 2. Where does the bot's OAuth token live? Slack app config has it; we
    need to store it locally for the cron to read. Default proposal:
    `~/.config/wigamig/slack-token` (mode 0600), with a fallback to
-   `$WIGAMIG_SLACK_TOKEN` env var for ephemeral use.
+   `$MURMURENT_SLACK_TOKEN` env var for ephemeral use.
 3. Distillation timing: 02:00 local seems right for North America.
    If the lab has trans-Atlantic collaborators (Barbados meetings?),
    should it be 06:00 UTC instead?

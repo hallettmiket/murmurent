@@ -14,14 +14,14 @@ cd ~/repos/wigamig && git pull && uv tool install --reinstall .
 ## 2. Set your centre's join email
 
 The address prospective members write to. Set it on the centre (hand-edit
-`~/.wigamig/lab_info/centre.md` frontmatter, or the `/registrar` profile editor):
+`~/.murmurent/lab_info/centre.md` frontmatter, or the `/registrar` profile editor):
 
 ```yaml
 join_email: wigamig-western@example.edu      # a shared/role address is ideal
 ```
 
 ```bash
-git -C ~/.wigamig/lab_info commit -am "set centre join_email"
+git -C ~/.murmurent/lab_info commit -am "set centre join_email"
 murmurent centre-status
 ```
 
@@ -32,7 +32,7 @@ about them is ever readable in transit or on GitHub. Generate the key once:
 
 ```bash
 murmurent centre-age-keygen
-#  → private key: ~/.wigamig/age/mayor.key   (0600, keep secret)
+#  → private key: ~/.murmurent/age/mayor.key   (0600, keep secret)
 #  → public recipient: age1...               (safe to publish)
 ```
 

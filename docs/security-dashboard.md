@@ -9,7 +9,7 @@ Two tiers, two trust levels:
 
 - **Tier 1** — unprivileged. Runs as the invoking user over SSH. Walks
   POSIX bits on filesystems where they're authoritative (`/home`,
-  ext4), reads the user's own `~/.ssh/`, `~/.wigamig/`, `~/.claude*`,
+  ext4), reads the user's own `~/.ssh/`, `~/.murmurent/`, `~/.claude*`,
   dotfiles, crontab, systemd user units, etc. Ships immediately.
 - **Tier 2** — root-owned ACL snapshot. Requires a sysadmin to install
   a narrowly-scoped sudoers entry on the target host (see
@@ -204,7 +204,7 @@ anchors below to deep-link from the dashboard rows.
 | <a id="SSH-WEAK-KEY-01"></a>`SSH-WEAK-KEY-01` | warn | Key type is `ssh-rsa` or `ssh-dss` — replace with `ssh-ed25519`. |
 | <a id="SSH-LOGIN-IPS-01"></a>`SSH-LOGIN-IPS-01` | info | Distinct IPs seen in `last` history (for the PI to vet). |
 | <a id="DOT-CRED-MODE-01"></a>`DOT-CRED-MODE-01` | warn / block | `~/.gitconfig`, `~/.netrc`, `~/.pgpass`, `~/.aws/credentials` more permissive than `0600`. |
-| <a id="WIGAMIG-MANIFEST-PERM-01"></a>`WIGAMIG-MANIFEST-PERM-01` | warn | `~/.wigamig/installations/*.yaml` is world-readable. |
+| <a id="WIGAMIG-MANIFEST-PERM-01"></a>`WIGAMIG-MANIFEST-PERM-01` | warn | `~/.murmurent/installations/*.yaml` is world-readable. |
 | <a id="CLAUDE-CRED-MODE-01"></a>`CLAUDE-CRED-MODE-01` | warn | `~/.claude.json` or `~/.claude/settings.json` is world-readable (these contain MCP tokens). |
 | <a id="TMP-LAB-LEAK-01"></a>`TMP-LAB-LEAK-01` | warn | World-readable file under `/tmp` or `~/tmp` whose path includes a lab data marker. |
 | <a id="CRON-UNATTENDED-01"></a>`CRON-UNATTENDED-01` | info | User has an active crontab — review what runs unattended. |
@@ -274,7 +274,7 @@ git pull
 
 # 3. Install the root-owned snapshot script.
 sudo install -m 0755 -o root -g root \
-    scripts/lab_sec_dump.sh /opt/wigamig/lab_sec_dump.sh
+    scripts/lab_sec_dump.sh /opt/murmurent/lab_sec_dump.sh
 
 # 4. Install the sudoers grant. Edit scripts/sudoers.d/murmurent_sec_dump
 #    first if the authorised handles need to change.
@@ -288,30 +288,30 @@ sudo visudo -c -f /etc/sudoers.d/murmurent_sec_dump
 #   /etc/sudoers.d/murmurent_sec_dump: parsed OK
 
 # 6. Smoke test — no password should be prompted.
-sudo -n /opt/wigamig/lab_sec_dump.sh
-# Expected: "lab_sec_dump: snapshot written to /var/lib/wigamig/.snapshot/<UTC-date>"
-ls -la /var/lib/wigamig/.snapshot/latest/
+sudo -n /opt/murmurent/lab_sec_dump.sh
+# Expected: "lab_sec_dump: snapshot written to /var/lib/murmurent/.snapshot/<UTC-date>"
+ls -la /var/lib/murmurent/.snapshot/latest/
 # Expected files: manifest.json, acls_raw.txt, acls_refined.txt,
 #                  sshd_runtime.txt, ssh_keys.jsonl, auth_summary.json
 
 # 7. (Optional but recommended) Confirm the installed binary's hash
 #    matches the source. Anyone with root could later modify
-#    /opt/wigamig/lab_sec_dump.sh; running this periodically detects it.
-sudo shasum -a 256 /opt/wigamig/lab_sec_dump.sh
-diff <(sudo shasum -a 256 /opt/wigamig/lab_sec_dump.sh | awk '{print $1}') \
+#    /opt/murmurent/lab_sec_dump.sh; running this periodically detects it.
+sudo shasum -a 256 /opt/murmurent/lab_sec_dump.sh
+diff <(sudo shasum -a 256 /opt/murmurent/lab_sec_dump.sh | awk '{print $1}') \
      <(awk '{print $1}' scripts/lab_sec_dump.sh.sha256) \
   && echo "installed binary matches source" \
   || echo "MISMATCH — investigate"
 ```
 
 After step 5, the `/security` dashboard's **Run sudo dump** button works:
-it SSHes to the host, runs `sudo -n /opt/wigamig/lab_sec_dump.sh`, and
+it SSHes to the host, runs `sudo -n /opt/murmurent/lab_sec_dump.sh`, and
 the next live scan automatically ingests the snapshot (tarred + shipped
 back, parsed locally) and merges Tier 2 findings into the table.
 
 ### What the script writes
 
-Per-run directory at `/var/lib/wigamig/.snapshot/<UTC-date>/` on the
+Per-run directory at `/var/lib/murmurent/.snapshot/<UTC-date>/` on the
 **local disk** of the host (NOT on the the NAS share — the NAS's NFSv4 ACLs
 deny `root@<host>` write access since root isn't an AD principal there).
 Owned by `root:labgroup`, mode 0750 (lab group reads; no one else).
@@ -346,7 +346,7 @@ Edit `/etc/sudoers.d/murmurent_sec_dump` (via `sudo visudo -f`) and add a
 line in the same form:
 
 ```
-new_handle  ALL=(root) NOPASSWD: /opt/wigamig/lab_sec_dump.sh
+new_handle  ALL=(root) NOPASSWD: /opt/murmurent/lab_sec_dump.sh
 ```
 
 Then run `sudo visudo -c -f /etc/sudoers.d/murmurent_sec_dump` to validate.

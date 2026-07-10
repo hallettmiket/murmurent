@@ -134,12 +134,12 @@ def ensure_mayor_channel(
     creator: Callable | None = None,
 ) -> str | None:
     """Ensure the private mayor↔CC events channel exists; return its id (or
-    ``None`` when no token). Channel name: ``wigamig-ops`` (per-centre, but a
+    ``None`` when no token). Channel name: ``murmurent-ops`` (per-centre, but a
     workspace hosts one centre, so a fixed name is fine and easy to find).
     Idempotent. Never raises."""
     if not token_present():
         return None
-    name = channel_name_for("wigamig-ops")
+    name = channel_name_for("murmurent-ops")
     try:
         res = _create_channel(name, private=True, creator=creator)
         if res.ok:

@@ -18,7 +18,7 @@ need the same four side effects, in this order:
      (the authoritative project store that replaced the CHARTER-mirror
      registry) — carries name/lab/sensitivity/lead/members + the clone
      location (code_repo/host/remote_path) so reconcile can find it.
-  3. **Installation manifest** at ``~/.wigamig/installations/<name>.yaml``
+  3. **Installation manifest** at ``~/.murmurent/installations/<name>.yaml``
      — written every time, carries member + paths + agents picked.
   4. **Layer-2 CC bootstrap** — ``.claude/agents/`` symlinks into the
      murmurent commons + ``CLAUDE.md`` stub.
@@ -46,7 +46,7 @@ from .projects import ProjectSummary
 from .repo import wigamig_repo_root
 
 
-INSTALLATIONS_DIR_DEFAULT = Path.home() / ".wigamig" / "installations"
+INSTALLATIONS_DIR_DEFAULT = Path.home() / ".murmurent" / "installations"
 
 
 @dataclass

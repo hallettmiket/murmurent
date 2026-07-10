@@ -2,8 +2,8 @@
 
 A plain answer to "what can and can't murmurent do with my vault?" Everything
 below is checked against the code that ships today
-(`src/wigamig/core/obsidian.py`, `src/wigamig/core/oracle_publish.py`,
-`src/wigamig/mcp/oracle_server.py`, `rules/oracle_schema.md`,
+(`src/murmurent/core/obsidian.py`, `src/murmurent/core/oracle_publish.py`,
+`src/murmurent/mcp/oracle_server.py`, `rules/oracle_schema.md`,
 `agents/oracle.md`). If a capability isn't demonstrable in that code, it's
 called out explicitly as *not shipped* rather than implied.
 
@@ -11,7 +11,7 @@ called out explicitly as *not shipped* rather than implied.
 
 Murmurent (Murmurent's reference implementation) does **not** read your whole
 vault. It only ever touches two subfolders, both configurable per machine
-(`~/.wigamig/machine.yaml`, see §6):
+(`~/.murmurent/machine.yaml`, see §6):
 
 | Subfolder (default name) | What it's for | Read by | Written by |
 |---|---|---|---|
@@ -27,7 +27,7 @@ looks at them (see §4).
 
 ## 2. The three Oracle tiers
 
-The `murmurent-oracle` MCP server (`src/wigamig/mcp/oracle_server.py`) exposes
+The `murmurent-oracle` MCP server (`src/murmurent/mcp/oracle_server.py`) exposes
 three tiers, queryable separately or together:
 
 - **`personal`** — your vault's `oracle/` folder. Yours alone; nothing here
@@ -207,10 +207,10 @@ The same vault path is **never** hardcoded — it's resolved fresh on every
 call, in this order (personal Oracle dir; the notebook dir uses the same
 chain):
 
-1. **Env override** — `$WIGAMIG_PERSONAL_ORACLE_DIR` (personal tier) /
-   `$WIGAMIG_NOTEBOOK_DIR` (notebook tier). Points straight at the
+1. **Env override** — `$MURMURENT_PERSONAL_ORACLE_DIR` (personal tier) /
+   `$MURMURENT_NOTEBOOK_DIR` (notebook tier). Points straight at the
    directory; mainly for tests and power users.
-2. **`~/.wigamig/machine.yaml`** — `obsidian_vault_path` (+ `oracle_subfolder`,
+2. **`~/.murmurent/machine.yaml`** — `obsidian_vault_path` (+ `oracle_subfolder`,
    default `oracle`; `notebook_subfolder`, default `lab-notebook`). This is
    the normal per-machine configuration, written by the dashboard's Machine
    Settings modal. It deliberately stays out of the git-synced lab-mgmt
@@ -221,7 +221,7 @@ chain):
    (`~/Library/Application Support/obsidian/obsidian.json` on macOS,
    `~/.config/obsidian/obsidian.json` on Linux) and picks the
    most-recently-opened vault. You can pin a specific vault by name with
-   `$WIGAMIG_OBSIDIAN_VAULT` if you have more than one registered and the
+   `$MURMURENT_OBSIDIAN_VAULT` if you have more than one registered and the
    most-recent isn't the right one.
 
 If none of these resolve, tools that need the personal tier raise a clear
@@ -231,7 +231,7 @@ and returns no entries if nothing resolves.
 **To point murmurent at your vault:** either open the vault at least once in
 the Obsidian app (so it lands in `obsidian.json`) and let discovery pick it
 up, or set `obsidian_vault_path` explicitly via the dashboard's Machine
-Settings (or hand-edit `~/.wigamig/machine.yaml`).
+Settings (or hand-edit `~/.murmurent/machine.yaml`).
 
 ## 7. What you can't do yet
 

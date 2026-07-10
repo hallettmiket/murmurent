@@ -17,7 +17,7 @@ from murmurent.core import membership as MEM
 
 @pytest.fixture(autouse=True)
 def _lab_mgmt(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab_mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab_mgmt"))
 
 
 def _seed_project_with_members():

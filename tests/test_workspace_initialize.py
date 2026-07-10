@@ -27,10 +27,10 @@ def isolated(monkeypatch, tmp_path):
     lab_mgmt = tmp_path / "lab-mgmt"
     installs = tmp_path / "murmurent" / "installations"
 
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(repos))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(lab_vm))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_mgmt))
-    monkeypatch.setenv("WIGAMIG_USER", "the_pi")
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(repos))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(lab_vm))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_mgmt))
+    monkeypatch.setenv("MURMURENT_USER", "the_pi")
     monkeypatch.setattr(snap_mod, "INSTALLATIONS_DIR", installs)
 
     # A bare project dir is enough for the endpoint's existence check.
@@ -118,7 +118,7 @@ def test_initialize_writes_charter_for_bare_clone(isolated, tmp_path, monkeypatc
     (commons / "agents").mkdir(parents=True)
     (commons / "agents" / "oracle.md").write_text("# oracle\n")
     (commons / "agents" / "blacksmith.md").write_text("# blacksmith\n")
-    monkeypatch.setenv("WIGAMIG_REPO_ROOT", str(commons))
+    monkeypatch.setenv("MURMURENT_REPO_ROOT", str(commons))
     # Make the demo dir a git working tree so projectize sees a real clone.
     (isolated["repos"] / "demo" / ".git").mkdir()
 
@@ -155,7 +155,7 @@ def test_initialize_ssh_install_on_bare_repo_no_local_dir(isolated, tmp_path, mo
     from murmurent.core import hosts as _hosts
 
     # Register an SSH host so workspace_initialize can resolve it.
-    monkeypatch.setenv("WIGAMIG_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
+    monkeypatch.setenv("MURMURENT_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
     _hosts.add(_hosts.Host(
         name="lab-server", kind="ssh", ssh_host="lab-server",
         remote_user="the_pi", project_root="/home/UWO/the_pi/repos",
@@ -242,7 +242,7 @@ def test_initialize_clone_if_missing_runs_git_clone(isolated, tmp_path, monkeypa
     commons = tmp_path / "wigamig_commons"
     (commons / "agents").mkdir(parents=True)
     (commons / "agents" / "oracle.md").write_text("# oracle\n")
-    monkeypatch.setenv("WIGAMIG_REPO_ROOT", str(commons))
+    monkeypatch.setenv("MURMURENT_REPO_ROOT", str(commons))
 
     import subprocess
     origin = tmp_path / "origin" / "newcoin.git"
@@ -273,7 +273,7 @@ def test_initialize_clone_if_missing_runs_git_clone(isolated, tmp_path, monkeypa
     assert r.status_code == 200, r.text
     assert r.json()["ok"] is True
 
-    # The clone landed under WIGAMIG_PROJECTS_ROOT/newcoin.
+    # The clone landed under MURMURENT_PROJECTS_ROOT/newcoin.
     cloned = isolated["repos"] / "newcoin"
     assert (cloned / ".git").is_dir()
     # CHARTER.md was written by projectize after the clone.

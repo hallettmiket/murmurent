@@ -18,7 +18,7 @@ restore VSCode's persisted layout — **arrange the quadrants once
 and they stick**.
 
 The dashboard's *open workspace* button calls the same launcher
-(see [`src/wigamig/dashboard/server.py`](../src/wigamig/dashboard/server.py)
+(see [`src/murmurent/dashboard/server.py`](../src/murmurent/dashboard/server.py)
 `workspace_launch` local branch).
 
 ## Quadrant layout
@@ -28,7 +28,7 @@ The dashboard's *open workspace* button calls the same launcher
 | TL | Claude Code (VSCode extension) |
 | TR | Editor area |
 | BL | tmux shell |
-| BR | `tail -F ~/.wigamig/agents.log` — live subagent reporter |
+| BR | `tail -F ~/.murmurent/agents.log` — live subagent reporter |
 
 One-time setup per project:
 
@@ -36,7 +36,7 @@ One-time setup per project:
    thanks to `terminal.integrated.defaultLocation: editor`.
 2. Drag them into a 2×2 split.
 3. In BL: any tmux shell.
-4. In BR: `tail -F ~/.wigamig/agents.log`.
+4. In BR: `tail -F ~/.murmurent/agents.log`.
 5. VSCode persists this editor-group state per folder.
 
 ## Title bar + chrome
@@ -63,7 +63,7 @@ on:
 - `SubagentStop` → writes `<agent>: <verdict>` (first line of the
   agent's reply, ≤200 chars).
 
-BR pane runs `tail -F ~/.wigamig/agents.log`. Same log across every
+BR pane runs `tail -F ~/.murmurent/agents.log`. Same log across every
 project on this machine, so you see all subagent activity in one
 place.
 

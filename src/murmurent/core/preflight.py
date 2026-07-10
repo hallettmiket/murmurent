@@ -39,7 +39,7 @@ _LAB_VM_BLOCKED_PREFIXES: tuple[str, ...] = (
 # ``~/repos/`` (per generic_cc convention) — *not* under wigamig_base —
 # so there is no ``repos/`` subfolder here. wigamig_base is strictly
 # for data + lab-shared notebooks.
-WIGAMIG_SUBDIRS: tuple[str, ...] = ("raw", "refined", "lab_notebooks")
+MURMURENT_SUBDIRS: tuple[str, ...] = ("raw", "refined", "lab_notebooks")
 
 
 @dataclass
@@ -91,7 +91,7 @@ def probe_wigamig_base(wigamig_base: str | None) -> list[Probe]:
       1. ``wigamig_base set`` — was a value provided at all?
       2. ``not protected`` — guard against ``/data/lab_vm/raw|refined``.
       3. ``wigamig_base exists`` — create with mkdir -p if missing.
-      4. For each of :data:`WIGAMIG_SUBDIRS`: create if missing.
+      4. For each of :data:`MURMURENT_SUBDIRS`: create if missing.
 
     Returns one ``Probe`` per step. The caller decides whether to
     abort after a failure; this helper always runs as much as it can.
@@ -140,7 +140,7 @@ def probe_wigamig_base(wigamig_base: str | None) -> list[Probe]:
     if probes[-1].status == "fail":
         return probes
 
-    for sub in WIGAMIG_SUBDIRS:
+    for sub in MURMURENT_SUBDIRS:
         probes.append(_ensure_dir(base / sub, label=sub, required=False))
     return probes
 

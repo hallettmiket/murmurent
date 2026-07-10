@@ -32,16 +32,16 @@ def isolated(monkeypatch, tmp_path):
 
     Mirrors the fixture in ``test_registrar.py`` but also redirects the
     role-audit log + the user-pref file so the test never writes into
-    the real ``~/.wigamig/``.
+    the real ``~/.murmurent/``.
     """
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
     monkeypatch.setattr(
         registrar, "REGISTRAR_SENTINEL", tmp_path / "registrar_sentinel"
     )
-    monkeypatch.setenv("WIGAMIG_ROLE_AUDIT_LOG", str(tmp_path / "role_audit.log"))
+    monkeypatch.setenv("MURMURENT_ROLE_AUDIT_LOG", str(tmp_path / "role_audit.log"))
     # Redirect Path.home() so the remember-me write also lands in tmp.
     monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
-    monkeypatch.setenv("WIGAMIG_USER", "")  # don't leak the real user
+    monkeypatch.setenv("MURMURENT_USER", "")  # don't leak the real user
     return tmp_path
 
 
@@ -186,7 +186,7 @@ def test_login_resolve_member_only(isolated, tmp_path, monkeypatch):
     lab_dir = _seed_lab_mgmt(tmp_path, lab_id="hallett", pi="the_pi",
                              members=[("the_pi", "pi"), ("bob", "postdoc")])
     registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_dir))
     client = TestClient(create_app())
     res = client.get("/api/login/resolve?user=bob")
     body = res.json()
@@ -200,7 +200,7 @@ def test_login_resolve_pi(isolated, tmp_path, monkeypatch):
     lab_dir = _seed_lab_mgmt(tmp_path, lab_id="hallett", pi="the_pi",
                              members=[("the_pi", "pi")])
     registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_dir))
     client = TestClient(create_app())
     res = client.get("/api/login/resolve?user=the_pi")
     body = res.json()
@@ -212,7 +212,7 @@ def test_login_resolve_registrar_from_registry(isolated, tmp_path, monkeypatch):
     lab_dir = _seed_lab_mgmt(tmp_path, lab_id="hallett", pi="the_pi",
                              members=[("the_pi", "pi")])
     registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_dir))
     # Add a second registrar via the registry.
     reg = registrar.read_registry()
     registrar.write_registry(Registry(
@@ -239,7 +239,7 @@ def test_login_resolve_core_leader_is_not_a_lab_pi(isolated, tmp_path, monkeypat
     registrar.write_registry(Registry(
         cores=[CoreEntry(name="biocore", pi="@emucaki", lab_mgmt_path=str(core_dir))],
     ))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(core_dir))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(core_dir))
     body = TestClient(create_app()).get("/api/login/resolve?user=emucaki").json()
     assert body["is_core_leader"] is True
     assert "biocore" in body["core_leader_of"]
@@ -257,7 +257,7 @@ def test_dashboard_gate_rejects_unknown_on_initialised_centre(isolated, tmp_path
     lab_dir = _seed_lab_mgmt(tmp_path, lab_id="yxia_lab", pi="yxia266",
                              members=[("yxia266", "pi")])
     registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_dir))
     client = TestClient(create_app())
     # Arbitrary netname → refused, even though a demo lab-mgmt is the default.
     res = client.get("/api/dashboard?user=totally_made_up_netname")
@@ -290,7 +290,7 @@ def test_login_select_pi_rejected_for_non_pi(isolated, tmp_path, monkeypatch):
     lab_dir = _seed_lab_mgmt(tmp_path, lab_id="hallett", pi="the_pi",
                              members=[("bob", "postdoc")])
     registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_dir))
     client = TestClient(create_app())
     res = client.post("/api/login/select", json={
         "handle": "bob", "role": "pi", "remember_user": False,
@@ -304,7 +304,7 @@ def test_login_select_registrar_allowed(isolated, tmp_path, monkeypatch):
     lab_dir = _seed_lab_mgmt(tmp_path, lab_id="hallett", pi="the_pi",
                              members=[("the_pi", "pi")])
     registrar.bootstrap_from_existing_lab_mgmt(lab_mgmt_path=lab_dir)
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_dir))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab_dir))
     reg = registrar.read_registry()
     registrar.write_registry(Registry(
         labs=reg.labs, registrars=["the_pi"],
@@ -323,7 +323,7 @@ def test_login_select_remember_user_writes_pref(isolated):
     client.post("/api/login/select", json={
         "handle": "ghost", "role": "member", "remember_user": True,
     })
-    pref = isolated / ".wigamig" / "user"
+    pref = isolated / ".murmurent" / "user"
     assert pref.is_file()
     assert pref.read_text(encoding="utf-8").strip() == "ghost"
 

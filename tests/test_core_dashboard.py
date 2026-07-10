@@ -23,10 +23,10 @@ from murmurent.dashboard.server import create_app
 @pytest.fixture
 def world(monkeypatch, tmp_path):
     # Centre registrar + audit log live here so the tests don't touch
-    # the real ~/.wigamig/.
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_USER", "the_pi")
+    # the real ~/.murmurent/.
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_USER", "the_pi")
     monkeypatch.setenv(role_audit.ENV_VAR, str(tmp_path / "role_audit.log"))
 
     # Minimal lab.md so the resolver's PI check doesn't blow up.

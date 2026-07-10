@@ -2,7 +2,7 @@
 Purpose: Per-machine settings storage for murmurent.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-12
-Input: ``~/.wigamig/machine.yaml`` (written by the dashboard's Machine
+Input: ``~/.murmurent/machine.yaml`` (written by the dashboard's Machine
        Settings modal); falls back to the legacy ``obsidian:`` block in
        ``<lab-mgmt>/members/<handle>.md`` so existing installs keep
        working until users save once and migrate forward.
@@ -24,7 +24,7 @@ import yaml
 
 from . import contract as C
 
-MACHINE_FILE = Path.home() / ".wigamig" / "machine.yaml"
+MACHINE_FILE = Path.home() / ".murmurent" / "machine.yaml"
 
 
 def _read_yaml(path: Path) -> dict[str, Any]:
@@ -41,7 +41,7 @@ def _read_yaml(path: Path) -> dict[str, Any]:
 def load(*, legacy_obsidian: dict | None = None) -> C.MachineSettings:
     """Return the current machine settings.
 
-    Resolution order: ``~/.wigamig/machine.yaml`` → legacy ``obsidian:``
+    Resolution order: ``~/.murmurent/machine.yaml`` → legacy ``obsidian:``
     block on the member profile (one-time migration on first save). The
     key names differ between the two sources because the legacy block
     lived under an ``obsidian:`` parent and used short keys; this helper
@@ -85,7 +85,7 @@ def _derive_vault_name(vault_path: str | None) -> str | None:
 
 
 def write(settings: C.MachineSettings) -> Path:
-    """Persist ``settings`` to ``~/.wigamig/machine.yaml`` (creating dirs).
+    """Persist ``settings`` to ``~/.murmurent/machine.yaml`` (creating dirs).
 
     Returns the path written. The on-disk format is plain YAML so a user
     can hand-edit it without going through the dashboard. The

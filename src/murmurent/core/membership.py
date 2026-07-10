@@ -275,7 +275,7 @@ def set_status(
     """Flip a member's ``status:``. Refuses to deactivate the PI.
 
     When ``status == INACTIVE`` a decommission report is written to
-    ``~/.wigamig/decommissions/`` listing the things tied to this
+    ``~/.murmurent/decommissions/`` listing the things tied to this
     member that the user may want to clean up by hand (personal vault,
     project memberships, slack DMs, signing key, etc.). The member file
     on disk is preserved — only the status flag flips. Reactivation

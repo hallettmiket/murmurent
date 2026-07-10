@@ -31,15 +31,15 @@ Members can create projects and experiments, ingest fake instrument data with th
    - CHARTER frontmatter validator: `sensitivity` required; `clinical` requires `reb_number`, `reb_expires`, `data_residency`
 
 2. **Experiment commands**
-   - `murmurent experiment new --project <p> --name <slug>` — scaffold `exp/<n>_<slug>/` with `README.md`, `run_all.py`, `notebook.md` template, `pages/`, `sketches/`, `data/`; create lab VM dirs at `$WIGAMIG_LAB_VM_ROOT/raw/<p>/<exp>/` and `refined/<p>/<exp>/`
+   - `murmurent experiment new --project <p> --name <slug>` — scaffold `exp/<n>_<slug>/` with `README.md`, `run_all.py`, `notebook.md` template, `pages/`, `sketches/`, `data/`; create lab VM dirs at `$MURMURENT_LAB_VM_ROOT/raw/<p>/<exp>/` and `refined/<p>/<exp>/`
    - `murmurent experiment list [--project <p>]`
    - `murmurent experiment ingest <project> <slug> <source>` — full classification + review + copy + chmod per design
    - `murmurent experiment status <project> <slug> --set <state>`
 
 3. **Instrument profile** at `instruments/illumina-novaseq.yaml` per design (raw extensions: `fastq`, `fastq.gz`; derived patterns: `*thumbnail*`, `*qc.html*`, `*summary.pdf*`)
 
-4. **Raw-data guard hook** at `src/wigamig/hooks/raw_guard.py`
-   - Refuses Write/Edit/Bash/NotebookEdit mutating `$WIGAMIG_LAB_VM_ROOT/raw/`
+4. **Raw-data guard hook** at `src/murmurent/hooks/raw_guard.py`
+   - Refuses Write/Edit/Bash/NotebookEdit mutating `$MURMURENT_LAB_VM_ROOT/raw/`
    - Independent test harness piping fake JSON through stdin
    - Manual `~/.claude/settings.json` registration documented in a draft `TUTORIAL.md` snippet (full hook installer is phase 4)
 
@@ -53,11 +53,11 @@ Members can create projects and experiments, ingest fake instrument data with th
    - Creates `~/repos/dcis_sc_tutorial/` and `~/repos/bbb_drug_screen/` locally + on GitHub (private)
    - Charters with the right sensitivity tiers per umbrella prompt
    - All five experiments scaffolded with `notebook.md` in correct `status` / `analysis_status` states (per umbrella prompt's experiment table)
-   - Fake data generated and placed in `$WIGAMIG_LAB_VM_ROOT/`
+   - Fake data generated and placed in `$MURMURENT_LAB_VM_ROOT/`
 
 ## Acceptance criteria
 
-- [ ] `WIGAMIG_USER=allie murmurent project list` shows both projects
+- [ ] `MURMURENT_USER=allie murmurent project list` shows both projects
 - [ ] `murmurent project describe dcis_sc_tutorial` shows clinical sensitivity, REB number, four members
 - [ ] `murmurent experiment list --project dcis_sc_tutorial` shows the four experiments with their status
 - [ ] `murmurent experiment ingest dcis_sc_tutorial 1_sample_qc <fresh-source-dir>` runs the classification + mandatory review prompt

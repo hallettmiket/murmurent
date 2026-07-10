@@ -123,7 +123,7 @@ def execute_ingest(
 ) -> IngestResult:
     """Copy classified files into the lab-VM, chmod raw read-only, hash everything.
 
-    Raw files go to ``$WIGAMIG_LAB_VM_ROOT/raw/<project>/<experiment>/``;
+    Raw files go to ``$MURMURENT_LAB_VM_ROOT/raw/<project>/<experiment>/``;
     derived files to ``.../refined/<project>/<experiment>/instrument_outputs/``.
     After copy, the raw directory tree is set ``a-w`` (owner can still ``rm`` since
     parent perms are unchanged, but files inside are read-only — matches the

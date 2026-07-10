@@ -3,7 +3,7 @@ Phase 5a tests: per-job dir + manifest + auto-create on booking.
 
 Covers:
   - Paths: cores_root, core_jobs_dir, job_dir, manifest_path honor
-    WIGAMIG_LAB_VM_ROOT and are NOT under top-level raw/refined
+    MURMURENT_LAB_VM_ROOT and are NOT under top-level raw/refined
   - init_job creates raw/ + refined/ subdirs + manifest.json
   - init_job is idempotent
   - Manifest carries request_id, requester, requester_lab, fee
@@ -31,10 +31,10 @@ from murmurent.core import services as S
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
-    monkeypatch.setenv("WIGAMIG_USER", "alice")
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    monkeypatch.setenv("MURMURENT_USER", "alice")
     (tmp_path / "lab-mgmt" / "members").mkdir(parents=True)
     (tmp_path / "lab-mgmt" / "lab.md").write_text(
         "---\nlab: hallett\npi: '@the_pi'\n---\n", encoding="utf-8",
@@ -221,7 +221,7 @@ def test_create_request_auto_inits_job_dir(world):
 def test_create_request_survives_job_init_failure(monkeypatch, world):
     """When lab_vm_root is unwritable (e.g. on a member laptop without
     the lab mount), booking still succeeds — job dir is best-effort."""
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", "/this/path/cannot/exist/anywhere")
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", "/this/path/cannot/exist/anywhere")
     req = SR.create_request(
         core="biocore", service="itc",
         requester="@alice", requester_lab="hallett",

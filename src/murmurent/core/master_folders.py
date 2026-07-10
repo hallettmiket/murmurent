@@ -13,7 +13,7 @@ this module probes for them over SSH and creates the missing ones on
 explicit request (never on a passive read — the user must press a
 button so directory-creation isn't a hidden side effect).
 
-Cached status (``~/.wigamig/master_folders.yaml``):
+Cached status (``~/.murmurent/master_folders.yaml``):
     {hallett: {host: ..., path: ..., overall: ok|warn|fail,
                checked: 2026-05-15T11:50:00, subdirs: {...}}}
 
@@ -44,7 +44,7 @@ from .preflight import Probe
 # Working clones live in each user's ``~/repos/``.
 MASTER_SUBDIRS: tuple[str, ...] = ("raw", "refined", "notebooks", "lab_oracle")
 
-CACHE_FILE = Path.home() / ".wigamig" / "master_folders.yaml"
+CACHE_FILE = Path.home() / ".murmurent" / "master_folders.yaml"
 
 
 @dataclass

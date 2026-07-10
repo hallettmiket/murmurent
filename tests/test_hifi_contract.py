@@ -24,14 +24,14 @@ from murmurent.dashboard import contract, snapshot
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
-    monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
-    monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "lab_vm"))
     # Isolate the CENTRE registry too, so the scoping gate reads a hermetic
-    # (empty) registry instead of this machine's real ~/.wigamig/lab_info.
-    monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
-    monkeypatch.setenv("WIGAMIG_USER", "allie")
-    monkeypatch.setenv("WIGAMIG_NOTEBOOK_DIR", str(tmp_path / "lab-notebook"))
+    # (empty) registry instead of this machine's real ~/.murmurent/lab_info.
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "lab_info"))
+    monkeypatch.setenv("MURMURENT_USER", "allie")
+    monkeypatch.setenv("MURMURENT_NOTEBOOK_DIR", str(tmp_path / "lab-notebook"))
     lab_mgmt = tmp_path / "lab-mgmt"
     (lab_mgmt / "members").mkdir(parents=True)
     (lab_mgmt / "projects").mkdir(parents=True)
@@ -203,7 +203,7 @@ def test_agents_activity_parses_the_log(monkeypatch, tmp_path):
         "\x1b[91m[15:22] blacksmith: Done — shipped it, 12 tests green\x1b[0m\n\n"
         "garbage line that doesn't match\n",
         encoding="utf-8")
-    monkeypatch.setenv("WIGAMIG_AGENT_LOG", str(log))
+    monkeypatch.setenv("MURMURENT_AGENT_LOG", str(log))
     feed = _snap._agents_activity(limit=10)
     assert [a.agent for a in feed] == ["blacksmith", "blacksmith"]   # newest first
     assert feed[0].time == "15:22" and feed[0].started is False
@@ -213,7 +213,7 @@ def test_agents_activity_parses_the_log(monkeypatch, tmp_path):
 
 def test_agents_activity_missing_log_is_empty(monkeypatch, tmp_path):
     from murmurent.dashboard import snapshot as _snap
-    monkeypatch.setenv("WIGAMIG_AGENT_LOG", str(tmp_path / "nope.log"))
+    monkeypatch.setenv("MURMURENT_AGENT_LOG", str(tmp_path / "nope.log"))
     assert _snap._agents_activity() == []
 
 
@@ -599,9 +599,9 @@ def test_api_endpoint_400_when_no_user(monkeypatch, tmp_path):
     from murmurent.core import identity as _identity
     from murmurent.dashboard.server import create_app
 
-    monkeypatch.delenv("WIGAMIG_USER", raising=False)
+    monkeypatch.delenv("MURMURENT_USER", raising=False)
     monkeypatch.setenv("PATH", "")  # blocks gh fallback
-    # Also block the ~/.wigamig/user fallback; otherwise the developer's
+    # Also block the ~/.murmurent/user fallback; otherwise the developer's
     # real saved Western netname leaks into the test and the 400 never fires.
     monkeypatch.setattr(_identity, "USER_FILE", tmp_path / "no_user_here")
     app = create_app()

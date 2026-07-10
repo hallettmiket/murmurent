@@ -1,6 +1,6 @@
 ---
 name: Smoke-test feedback
-about: One issue per finding from the wigamig smoke test
+about: One issue per finding from the murmurent smoke test
 title: "Smoke test: <one-line summary>"
 labels: smoke-test
 assignees: hallettmiket
@@ -28,7 +28,7 @@ Which fake persona were you running as?
 (Exact command + exact output. Use code fences.)
 
 ```bash
-$ wigamig ...
+$ murmurent ...
 <paste output>
 ```
 
@@ -49,4 +49,4 @@ $ wigamig ...
 - OS:
 - Python:
 - gh auth: (`gh auth status` first line)
-- wigamig commit: (`git -C ~/repos/wigamig rev-parse --short HEAD`)
+- murmurent commit: (`git -C ~/repos/wigamig rev-parse --short HEAD`)

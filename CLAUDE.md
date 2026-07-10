@@ -49,8 +49,8 @@ own repo and compose against this reference set.
 Auto-loaded into every CC session via `~/.claude/rules/`:
 
 - [`rules/data-storage.md`](rules/data-storage.md) — raw is immutable,
-  refined is append-only. Enforced by [`raw_guard`](src/wigamig/hooks/raw_guard.py)
-  + [`protected_paths`](src/wigamig/hooks/protected_paths.py) hooks (delete +
+  refined is append-only. Enforced by [`raw_guard`](src/murmurent/hooks/raw_guard.py)
+  + [`protected_paths`](src/murmurent/hooks/protected_paths.py) hooks (delete +
   overwrite under raw or refined are blocked at the hook layer, not just
   by convention).
 - [`rules/project-structure.md`](rules/project-structure.md) —
@@ -75,7 +75,7 @@ command available in any wigamig-bootstrapped CC session.
 |---|---|
 | [`/murmurent-push`](skills/murmurent-push/SKILL.md) | Murmurent-aware stage/commit/push: skips per-machine + secret-shaped files, refuses large files that belong in `refined/`, never touches `/data/lab_vm/raw\|refined/`, posts a Slack release note. Use instead of generic `/commit-push` for any repo with a `CHARTER.md`. |
 | [`/murmurent-admin`](skills/murmurent-admin/SKILL.md) | Prime context before admin-level (centre / mayor / registrar / join / provisioning) work: reloads murmurent's purpose from the manuscript + code, pins Obsidian maps-legends and CC guidance to the top, enforces the manuscript pull-first rule. |
-| [`/murmurent-reset`](skills/murmurent-reset/SKILL.md) | Back up, then reset this machine's murmurent state to a fresh start (so `centre-init` is first-run again). Tiered `centre`/`install`/`full`; always tarballs `~/.wigamig` first; credentials + other-project installs are protected behind explicit `--nuke` flags; `--dry-run` previews. Use for a clean slate / fresh copy from the repo. |
+| [`/murmurent-reset`](skills/murmurent-reset/SKILL.md) | Back up, then reset this machine's murmurent state to a fresh start (so `centre-init` is first-run again). Tiered `centre`/`install`/`full`; always tarballs `~/.murmurent` first; credentials + other-project installs are protected behind explicit `--nuke` flags; `--dry-run` previews. Use for a clean slate / fresh copy from the repo. |
 | [`/murmurent-onboard`](skills/murmurent-onboard/SKILL.md) | Mayor/registrar helper: process an incoming **encrypted** join-request email end to end — decrypt + file it, show who's asking, then (on explicit OK) approve + provision (lab/core Slack channel, GitHub repo, FS ACLs) or decline. Approval reads the Slack token from env **or** the `~/.config` file so the channel is created without exporting anything. |
 
 ## Linked references (loaded on-demand)
