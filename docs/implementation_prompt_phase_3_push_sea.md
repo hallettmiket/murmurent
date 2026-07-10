@@ -57,7 +57,7 @@ Push to personal branches, open PRs for finalisation, run the SEA lifecycle, and
 - [ ] `murmurent sea conclude 3 --statement <path>` opens PR for approvals
 - [ ] `murmurent push dcis_sc_tutorial --finalize` opens a real PR on GitHub
 - [ ] PR triggers the simulated bot review comment
-- [ ] PR opened on `hallettmiket/wigamig` from `feat/phase-3-push-sea`
+- [ ] PR opened on `hallettmiket/murmurent` from `feat/phase-3-push-sea`
 
 ## Deferred to phase 4
 

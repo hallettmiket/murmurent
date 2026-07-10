@@ -63,7 +63,7 @@ Members can create projects and experiments, ingest fake instrument data with th
 - [ ] `murmurent experiment ingest dcis_sc_tutorial 1_sample_qc <fresh-source-dir>` runs the classification + mandatory review prompt
 - [ ] After ingest: raw chmod a-w; `notebook.md` `raw_data` and `checksums` populated
 - [ ] Raw-data guard refuses an attempted modification of a raw file (test via the hook harness)
-- [ ] PR opened on `hallettmiket/wigamig` from `feat/phase-2-projects`
+- [ ] PR opened on `hallettmiket/murmurent` from `feat/phase-2-projects`
 - [ ] Both project repos exist on GitHub with seed content
 
 ## Deferred to phase 3

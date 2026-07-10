@@ -174,7 +174,7 @@ What to check:
 
 ```bash
 gh issue create \
-    --repo hallettmiket/wigamig \
+    --repo hallettmiket/murmurent \
     --label smoke-test \
     --title "Smoke test feedback: <one-line summary>" \
     --body-file <(cat .github/ISSUE_TEMPLATE/smoke_test.md)

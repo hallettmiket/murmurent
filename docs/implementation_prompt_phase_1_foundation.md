@@ -59,7 +59,7 @@ Stand up the Python package, CLI skeleton, agent registry, frontmatter and repo-
 - [ ] `murmurent agent list` lists eight agents with freeze flags
 - [ ] `python scripts/seed_tutorial.py` completes without error and creates `lab_mgmt` locally and on GitHub
 - [ ] `black` and `isort` clean
-- [ ] PR opened on `hallettmiket/wigamig` from a `feat/phase-1-foundation` branch
+- [ ] PR opened on `hallettmiket/murmurent` from a `feat/phase-1-foundation` branch
 
 ## Deferred to phase 2
 

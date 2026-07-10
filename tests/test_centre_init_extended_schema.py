@@ -45,7 +45,7 @@ EXTENDED = dict(
     cc_install_path="/opt/claude",
     obsidian_vault="/mayor/obsidian",
     mayor_root="/mayor/wigamig",
-    public_hub="github.com/x/wigamig_public#demo",
+    public_hub="github.com/x/murmurent_public#demo",
     raw_root="/data/lab_vm/raw",
     refined_root="/data/lab_vm/refined",
 )

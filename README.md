@@ -16,14 +16,14 @@ institution stands it up by having one person (the **mayor**) bootstrap a
 public; one command does it (you only need `git`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hallettmiket/wigamig/main/scripts/bootstrap.sh | bash
+curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts/bootstrap.sh | bash
 ```
 
 Prefer to read the script first (recommended)? Clone it **wherever you like**,
 then run it — it installs whatever clone you run it from:
 
 ```bash
-git clone https://github.com/hallettmiket/wigamig
+git clone https://github.com/hallettmiket/murmurent
 cd murmurent && ./scripts/bootstrap.sh
 ```
 
@@ -62,7 +62,7 @@ authority.
    ```
    They import it with `murmurent import-card <bundle> --trust-root <your-trust-root>`.
 3. **Optional — join a centre.** If your institution runs a murmurent centre,
-   register with its mayor (the [implementations directory](https://github.com/hallettmiket/wigamig_public)
+   register with its mayor (the [implementations directory](https://github.com/hallettmiket/murmurent_public)
    → `murmurent-join.sh`). The mayor issues you a **separate** centre PI ID that
    attests your *same key* to the centre — your members' cards keep working
    unchanged; only the trust anchor gains a higher root.
@@ -114,7 +114,7 @@ stay deliberate, opt-in steps:
    IDs + the revocation list. **Back it up offline** (see
    [`docs/centre_root_key.md`](docs/centre_root_key.md)).
 3. **List your centre** in the implementations directory: `murmurent centre-hub-publish`
-   clones [`wigamig_public`](https://github.com/hallettmiket/wigamig_public),
+   clones [`murmurent_public`](https://github.com/hallettmiket/murmurent_public),
    writes your directory row, and publishes your **signing key + revocation list**
    so members can verify IDs. It prints a `git push` for you to run.
 4. **Set up Slack.** Create a `wigamig-<unique-name>` workspace + bot token and
@@ -131,7 +131,7 @@ server"*. Labs, cores, and members onboard after that; you approve from
 Working on murmurent itself (not deploying a centre):
 
 ```bash
-git clone https://github.com/hallettmiket/wigamig
+git clone https://github.com/hallettmiket/murmurent
 cd murmurent
 uv sync --extra dev
 uv run murmurent --help
