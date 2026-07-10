@@ -6,7 +6,7 @@ CLAUDE.md embedding the pull-first rules.
 
 from __future__ import annotations
 
-from wigamig.core import project_cc_init as CCI
+from murmurent.core import project_cc_init as CCI
 
 
 def test_writes_note_when_dir_exists_and_no_claude_md(tmp_path):

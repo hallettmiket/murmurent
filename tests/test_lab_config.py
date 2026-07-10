@@ -6,7 +6,7 @@ read fresh from lab.md per call. These tests confirm:
   1. Reading lab.md returns the declared PI handle.
   2. Missing lab.md falls back to a sensible default.
   3. Overriding the PI in lab.md flips ``can_pi`` on the dashboard
-     response (so a different lab can use the same wigamig install).
+     response (so a different lab can use the same murmurent install).
   4. The inventory MCP's ``lab_manager`` check honours the same source.
 """
 
@@ -16,9 +16,9 @@ import datetime as _dt
 
 import pytest
 
-from wigamig.commands import project_cmd
-from wigamig.core.lab import load_lab_config, pi_handle
-from wigamig.dashboard import snapshot
+from murmurent.commands import project_cmd
+from murmurent.core.lab import load_lab_config, pi_handle
+from murmurent.dashboard import snapshot
 
 
 @pytest.fixture
@@ -66,7 +66,7 @@ def test_pi_handle_helper_strips_at_sign(lab_world):
 
 
 def test_load_lab_config_falls_back_when_file_missing(lab_world):
-    """No lab.md → a NEUTRAL config so wigamig still boots, but it must NOT
+    """No lab.md → a NEUTRAL config so murmurent still boots, but it must NOT
     fabricate a specific lab's identity (no hardcoded pi/lab/institution)."""
     cfg = load_lab_config()
     assert cfg.pi == ""     # institution-agnostic: never invent a PI
@@ -78,7 +78,7 @@ def test_load_lab_config_falls_back_when_file_missing(lab_world):
 
 def test_lab_settings_defaults_kind_to_lab(lab_world):
     """A lab.md without an explicit ``kind:`` field is treated as a
-    research lab (back-compat with every existing wigamig install)."""
+    research lab (back-compat with every existing murmurent install)."""
     _write_lab(lab_world, lab="hallett", pi="mhallet")
     settings = snapshot._lab_settings("hallett")
     assert settings.kind == "lab"
@@ -131,8 +131,8 @@ def test_alternate_pi_flips_can_pi_on_dashboard(lab_world):
 
 def test_inventory_mcp_uses_lab_md_for_lab_manager(lab_world, monkeypatch):
     """Permission check follows the lab.md PI."""
-    from wigamig.core import inventory
-    from wigamig.mcp import inventory_server
+    from murmurent.core import inventory
+    from murmurent.mcp import inventory_server
 
     _write_lab(lab_world, pi="alice")
     inventory.write_item(inventory.InventoryItem(name="thing", status="in_stock"))

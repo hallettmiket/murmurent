@@ -1,4 +1,4 @@
-"""Tests for SSH-side adopt — :mod:`wigamig.core.remote_adopt` and the
+"""Tests for SSH-side adopt — :mod:`murmurent.core.remote_adopt` and the
 ``POST /api/inventory/adopt`` branch that fires it.
 
 We can't hit a real SSH host in tests, so :class:`Remote` is monkey-
@@ -13,11 +13,11 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import hosts as _hosts
-from wigamig.core import remote as _remote
-from wigamig.core import remote_adopt as _radopt
-from wigamig.dashboard import snapshot as snap_mod
-from wigamig.dashboard.server import create_app
+from murmurent.core import hosts as _hosts
+from murmurent.core import remote as _remote
+from murmurent.core import remote_adopt as _radopt
+from murmurent.dashboard import snapshot as snap_mod
+from murmurent.dashboard.server import create_app
 
 
 # ---------------------------------------------------------------------------
@@ -95,7 +95,7 @@ def test_script_uses_quoted_heredoc():
 
 def test_parse_records_status_and_required():
     """Mirror of remote_install.parse_output behaviour — ``charter`` is
-    the only required step (vs install where ``wigamig`` + ``repo`` are
+    the only required step (vs install where ``murmurent`` + ``repo`` are
     required because install may need to clone). Agent rows all share
     the ``cc_agent`` name (the agent name is in the detail); same as
     the install script, so the parser stays uniform across both flows.
@@ -103,7 +103,7 @@ def test_parse_records_status_and_required():
     out = "\n".join([
         "charter:ok:wrote /tmp/x/CHARTER.md",
         "cc_agent:ok:blacksmith -> wigamig/agents/blacksmith.md",
-        "cc_agent:warn:bogus (no bogus.md in wigamig commons)",
+        "cc_agent:warn:bogus (no bogus.md in murmurent commons)",
         "cc_claude_md:ok:created /tmp/x/CLAUDE.md",
     ])
     probes = _radopt.parse_remote_adopt_output(out)

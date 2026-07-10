@@ -21,11 +21,11 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import jobs as J
-from wigamig.core import registrar as R
-from wigamig.core import service_requests as SR
-from wigamig.core import services as S
-from wigamig.dashboard.server import create_app
+from murmurent.core import jobs as J
+from murmurent.core import registrar as R
+from murmurent.core import service_requests as SR
+from murmurent.core import services as S
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -51,7 +51,7 @@ def world(monkeypatch, tmp_path):
     return tmp_path
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def _book(mock_post, client, user="alice"):
     res = client.post(
         f"/api/core/biocore/services/itc/book?user={user}",

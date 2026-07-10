@@ -17,9 +17,9 @@ import datetime as _dt
 
 import pytest
 
-from wigamig.core import registrar as R
-from wigamig.core import services as S
-from wigamig.core import training as T
+from murmurent.core import registrar as R
+from murmurent.core import services as S
+from murmurent.core import training as T
 
 
 @pytest.fixture

@@ -13,10 +13,10 @@ from __future__ import annotations
 import pytest
 from click.testing import CliRunner
 
-from wigamig.core import centre_init as CI
-from wigamig.core import centre_root as CR
-from wigamig.core import idcert as C
-from wigamig.core import idkeys as K
+from murmurent.core import centre_init as CI
+from murmurent.core import centre_root as CR
+from murmurent.core import idcert as C
+from murmurent.core import idkeys as K
 
 
 @pytest.fixture(autouse=True)
@@ -114,7 +114,7 @@ def _init_centre():
 
 
 def test_cli_centre_root_keygen_stamps_signing_recipient():
-    from wigamig.cli import cli
+    from murmurent.cli import cli
     _init_centre()
     res = CliRunner().invoke(cli, ["centre-root-keygen"])
     assert res.exit_code == 0, res.output
@@ -126,7 +126,7 @@ def test_cli_centre_root_keygen_stamps_signing_recipient():
 
 
 def test_cli_centre_root_keygen_idempotent():
-    from wigamig.cli import cli
+    from murmurent.cli import cli
     _init_centre()
     runner = CliRunner()
     runner.invoke(cli, ["centre-root-keygen"])
@@ -137,7 +137,7 @@ def test_cli_centre_root_keygen_idempotent():
 
 
 def test_cli_centre_root_keygen_requires_centre():
-    from wigamig.cli import cli
+    from murmurent.cli import cli
     res = CliRunner().invoke(cli, ["centre-root-keygen"])
     assert res.exit_code != 0
     assert "no centre initialised" in res.output

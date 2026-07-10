@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.core.repo_inventory` scan-dir resolution.
+"""Tests for :mod:`murmurent.core.repo_inventory` scan-dir resolution.
 
 Covers the wiring from the per-host ``scan_dirs`` field (added to the
 ``Host`` dataclass for absolute + ``$HOME``-relative repo locations)
@@ -19,7 +19,7 @@ likely to regress.
 
 from __future__ import annotations
 
-from wigamig.core import hosts, repo_inventory
+from murmurent.core import hosts, repo_inventory
 
 
 def test_effective_scan_dirs_falls_back_to_default():

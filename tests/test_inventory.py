@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.core.inventory` and the inventory MCP tool layer."""
+"""Tests for :mod:`murmurent.core.inventory` and the inventory MCP tool layer."""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import datetime as _dt
 
 import pytest
 
-from wigamig.core import inventory
-from wigamig.mcp import inventory_server
+from murmurent.core import inventory
+from murmurent.mcp import inventory_server
 
 
 @pytest.fixture

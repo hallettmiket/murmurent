@@ -14,7 +14,7 @@ import stat
 
 import pytest
 
-from wigamig.core import idkeys as K
+from murmurent.core import idkeys as K
 
 
 @pytest.fixture(autouse=True)

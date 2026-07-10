@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.core import centre_init as CI
-from wigamig.core import centre_provision as CP
-from wigamig.core import registrar as R
+from murmurent.core import centre_init as CI
+from murmurent.core import centre_provision as CP
+from murmurent.core import registrar as R
 
 
 @pytest.fixture

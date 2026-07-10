@@ -12,9 +12,9 @@ import datetime as _dt
 
 import pytest
 
-from wigamig.commands import project_cmd
-from wigamig.core import requests as req_core
-from wigamig.dashboard import audit_log, request_actions, snapshot
+from murmurent.commands import project_cmd
+from murmurent.core import requests as req_core
+from murmurent.dashboard import audit_log, request_actions, snapshot
 
 
 @pytest.fixture
@@ -211,7 +211,7 @@ def test_requests_mine_shows_resolved_too(world):
 
 def _client():
     from fastapi.testclient import TestClient
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
     return TestClient(create_app())
 
 

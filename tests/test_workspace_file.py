@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.dashboard.workspace_file`.
+"""Tests for :mod:`murmurent.dashboard.workspace_file`.
 
 The workspace generator deliberately drops folders that don't exist on
 disk — a non-IT-savvy user opening VSCode and seeing a red "missing
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.dashboard import workspace_file as wf
+from murmurent.dashboard import workspace_file as wf
 
 
 @pytest.fixture

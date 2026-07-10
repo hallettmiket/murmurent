@@ -1,12 +1,12 @@
-"""Tests for wigamig VSCode + CC chrome propagation into adopted /
+"""Tests for murmurent VSCode + CC chrome propagation into adopted /
 installed projects.
 
 These pin the contract that ``bootstrap_local`` (and by extension
 ``projectize.make_wigamig_project``) lays down a consistent VSCode
-personality for every wigamig project:
+personality for every murmurent project:
   * ``.vscode/settings.json`` — title template, activity bar right,
     sidebar right, terminals default to editor area
-  * ``.claude/settings.json`` — hooks block pointing at the wigamig
+  * ``.claude/settings.json`` — hooks block pointing at the murmurent
     commons agent-reporter so subagent events from this project
     land in ``~/.wigamig/agents.log`` (which the BR pane tails)
 
@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.core.project_cc_init import (
+from murmurent.core.project_cc_init import (
     _vscode_settings_json,
     bootstrap_local,
 )
@@ -31,10 +31,10 @@ from wigamig.core.project_cc_init import (
 
 @pytest.fixture
 def world(monkeypatch, tmp_path):
-    """Isolated project dir + fake wigamig commons."""
+    """Isolated project dir + fake murmurent commons."""
     home = tmp_path / "home"
     (home / "repos").mkdir(parents=True)
-    commons = tmp_path / "wigamig"
+    commons = tmp_path / "murmurent"
     (commons / "agents").mkdir(parents=True)
     (commons / "agents" / "blacksmith.md").write_text("# blacksmith\n")
     (commons / "scripts").mkdir(parents=True)
@@ -47,13 +47,13 @@ def world(monkeypatch, tmp_path):
 
 
 def test_bootstrap_writes_vscode_settings(world):
-    """A fresh project gets `.vscode/settings.json` with the wigamig
+    """A fresh project gets `.vscode/settings.json` with the murmurent
     title template + chrome settings."""
     bootstrap_local(world["project"], world["commons"], agents=[], project_name="demo")
     f = world["project"] / ".vscode" / "settings.json"
     assert f.is_file()
     data = json.loads(f.read_text())
-    assert "Wigamig" in data["window.title"]
+    assert "Murmurent" in data["window.title"]
     assert "${rootName}" in data["window.title"]
     assert data["workbench.activityBar.location"] == "end"
     assert data["workbench.sideBar.location"] == "right"
@@ -61,7 +61,7 @@ def test_bootstrap_writes_vscode_settings(world):
 
 
 def test_bootstrap_does_not_write_cc_settings(world):
-    """The wigamig subagent-reporter hooks moved out of per-project
+    """The murmurent subagent-reporter hooks moved out of per-project
     .claude/settings.json into the user-global ~/.claude/settings.json
     on 2026-05-17 (single source of truth, no machine-absolute paths
     leaking into project repos). bootstrap_local must NOT write a
@@ -156,7 +156,7 @@ def test_ssh_chrome_writes_appear_in_remote_adopt_script():
     biodatsci adopt produces the same set of artefacts a local one
     does. Pin via the script text — we exercise the bash itself in
     the real round-trip test (test_remote_adopt.py)."""
-    from wigamig.core import remote_adopt as r
+    from murmurent.core import remote_adopt as r
     s = r.build_remote_adopt_script(
         clone_path="/tmp/x", project="x",
         charter_text="---\nproject: x\nlead: '@x'\nsensitivity: standard\nmembers:\n  - '@x'\n---\n# x\n",

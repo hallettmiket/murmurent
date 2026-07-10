@@ -22,10 +22,10 @@ import yaml
 from click.testing import CliRunner
 from fastapi.testclient import TestClient
 
-from wigamig.commands.project_centre_cmd import centre_project as cli_centre_project
-from wigamig.core import centre_provision as CP
-from wigamig.core import registrar as R
-from wigamig.dashboard.server import create_app
+from murmurent.commands.project_centre_cmd import centre_project as cli_centre_project
+from murmurent.core import centre_provision as CP
+from murmurent.core import registrar as R
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture

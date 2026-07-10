@@ -1,10 +1,10 @@
 """
-Test that `wigamig install --hooks` also writes MCP entries to
+Test that `murmurent install --hooks` also writes MCP entries to
 ``~/.claude.json`` (where Claude Code actually reads them) — not just
-``~/.claude/settings.json`` (a legacy wigamig location CC ignores).
+``~/.claude/settings.json`` (a legacy murmurent location CC ignores).
 
 Smoke-discovered bug: agents in fresh CC sessions couldn't see any
-wigamig MCP because we were writing to the wrong file.
+murmurent MCP because we were writing to the wrong file.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from wigamig.commands import install_cmd
+from murmurent.commands import install_cmd
 
 
 @pytest.fixture
@@ -34,9 +34,9 @@ def test_install_writes_to_claude_json(fake_home):
     assert claude_json.is_file()
     data = json.loads(claude_json.read_text(encoding="utf-8"))
     servers = data.get("mcpServers", {})
-    assert "wigamig-inventory" in servers
-    assert "wigamig-oracle" in servers
-    assert "wigamig-core-data" in servers
+    assert "murmurent-inventory" in servers
+    assert "murmurent-oracle" in servers
+    assert "murmurent-core-data" in servers
 
 
 def test_install_preserves_user_added_mcps(fake_home):
@@ -45,7 +45,7 @@ def test_install_preserves_user_added_mcps(fake_home):
     claude_json.write_text(json.dumps({
         "mcpServers": {
             "slack": {"command": "npx", "args": ["-y", "@anything/slack"]},
-            "wigamig-inventory": {"command": "python", "args": ["-m", "stale"]},
+            "murmurent-inventory": {"command": "python", "args": ["-m", "stale"]},
         },
         "otherKey": {"preserved": True},
     }), encoding="utf-8")
@@ -55,9 +55,9 @@ def test_install_preserves_user_added_mcps(fake_home):
     data = json.loads(claude_json.read_text(encoding="utf-8"))
     # User's slack entry stays.
     assert data["mcpServers"]["slack"]["command"] == "npx"
-    # Wigamig entries are refreshed to current spec (stale stub replaced).
-    assert data["mcpServers"]["wigamig-inventory"]["args"] == [
-        "-m", "wigamig.mcp.inventory_server",
+    # Murmurent entries are refreshed to current spec (stale stub replaced).
+    assert data["mcpServers"]["murmurent-inventory"]["args"] == [
+        "-m", "murmurent.mcp.inventory_server",
     ]
     # Non-MCP keys preserved.
     assert data["otherKey"] == {"preserved": True}

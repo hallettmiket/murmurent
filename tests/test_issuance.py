@@ -13,13 +13,13 @@ import pytest
 from click.testing import CliRunner
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from wigamig.core import centre_init as CI
-from wigamig.core import centre_root as CR
-from wigamig.core import idcert as C
-from wigamig.core import identity_card as IC
-from wigamig.core import idkeys as K
-from wigamig.core import issuance as ISS
-from wigamig.core import registrar as R
+from murmurent.core import centre_init as CI
+from murmurent.core import centre_root as CR
+from murmurent.core import idcert as C
+from murmurent.core import identity_card as IC
+from murmurent.core import idkeys as K
+from murmurent.core import issuance as ISS
+from murmurent.core import registrar as R
 
 
 @pytest.fixture
@@ -151,7 +151,7 @@ def test_cli_enroll_produces_valid_request(monkeypatch, tmp_path):
     monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "h"))
     monkeypatch.setenv("WIGAMIG_USER", "yxia266")
     monkeypatch.delenv("WIGAMIG_NO_AUTOKEY", raising=False)  # allow first-run keygen
-    from wigamig.cli import cli
+    from murmurent.cli import cli
     res = CliRunner().invoke(cli, ["enroll", "--nonce", "abc"])
     assert res.exit_code == 0, res.output
     req = json.loads(res.output)
@@ -188,7 +188,7 @@ def test_standalone_pi_self_issues_and_runs_a_lab(monkeypatch, tmp_path):
 
 
 def test_cli_whoami_shows_trust_root_for_pi(monkeypatch, tmp_path):
-    from wigamig.cli import cli
+    from murmurent.cli import cli
     monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
     monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
     monkeypatch.setenv("WIGAMIG_USER", "mhallet")
@@ -201,7 +201,7 @@ def test_cli_whoami_shows_trust_root_for_pi(monkeypatch, tmp_path):
 
 
 def test_cli_issue_member_card_prints_trust_root_when_standalone(monkeypatch, tmp_path):
-    from wigamig.cli import cli
+    from murmurent.cli import cli
     monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
     monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
     monkeypatch.setenv("WIGAMIG_USER", "mhallet")
@@ -224,10 +224,10 @@ def test_issuance_writes_the_roster(monkeypatch, tmp_path):
     of truth: PI + member land there with email, github, and card fingerprint/id;
     revoke_member reads the fingerprint back from the roster."""
     import yaml as _yaml
-    from wigamig.core import centre_root as CR
-    from wigamig.core import membership as M
-    from wigamig.core import repo as R
-    from wigamig.core import revocation as REV
+    from murmurent.core import centre_root as CR
+    from murmurent.core import membership as M
+    from murmurent.core import repo as R
+    from murmurent.core import revocation as REV
 
     monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
     monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
@@ -267,8 +267,8 @@ def test_project_scoped_card_issue_and_revoke(monkeypatch, tmp_path):
     that chains member → PI → the PI's own root, and can revoke the whole project
     with their own key (no centre root needed)."""
     import yaml as _yaml
-    from wigamig.core import cert_projects as CP
-    from wigamig.core import revocation as REV
+    from murmurent.core import cert_projects as CP
+    from murmurent.core import revocation as REV
 
     monkeypatch.setenv("WIGAMIG_HOME", str(tmp_path / "pi"))
     monkeypatch.setenv("WIGAMIG_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
@@ -412,7 +412,7 @@ def test_member_card_from_forged_pi_rejected(mayor_world, monkeypatch, tmp_path)
 
 
 def test_cli_member_card_round_trip(mayor_world, monkeypatch, tmp_path):
-    from wigamig.cli import cli
+    from murmurent.cli import cli
     ctx = _carded_pi(mayor_world, monkeypatch, tmp_path)  # env at the PI machine
     runner = CliRunner()
     _priv, m_req = _member_enrollment()
@@ -432,7 +432,7 @@ def test_cli_member_card_round_trip(mayor_world, monkeypatch, tmp_path):
 
 
 def test_cli_issue_and_import_round_trip(mayor_world, monkeypatch, tmp_path):
-    from wigamig.cli import cli
+    from murmurent.cli import cli
     runner = CliRunner()
     # PI builds an enrollment (fresh key), writes it to a file
     priv, req = _enrollment()

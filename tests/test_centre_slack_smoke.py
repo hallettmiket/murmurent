@@ -6,7 +6,7 @@ Tests for the Slack channel-create surface (backlog #2):
   - the _live_slack_create_channel compat shim still returns the
     raw channel_id (or None) so provision_lab_onboarding's hook
     signature stays unchanged.
-  - the wigamig centre-slack-smoke CLI prints actionable hints +
+  - the murmurent centre-slack-smoke CLI prints actionable hints +
     exit code 0/1 correctly.
 
 All tests mock httpx — none hit a real Slack workspace. The live
@@ -22,10 +22,10 @@ from unittest.mock import patch, MagicMock
 import pytest
 from click.testing import CliRunner
 
-from wigamig.commands.centre_cmd import (
+from murmurent.commands.centre_cmd import (
     centre_slack_smoke as cli_smoke,
 )
-from wigamig.core import centre_provision as CP
+from murmurent.core import centre_provision as CP
 
 
 def _httpx_response(ok: bool, *, channel_id: str = "C0FAKE",

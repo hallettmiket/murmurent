@@ -7,15 +7,15 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from wigamig.cli import cli
-from wigamig.commands import experiment_cmd, project_cmd
-from wigamig.core import lab_vm
-from wigamig.core.frontmatter import parse_file
+from murmurent.cli import cli
+from murmurent.commands import experiment_cmd, project_cmd
+from murmurent.core import lab_vm
+from murmurent.core.frontmatter import parse_file
 
 
 @pytest.fixture
 def isolated_env(monkeypatch, tmp_path):
-    """Point all wigamig env vars to ``tmp_path`` so tests don't touch real dirs."""
+    """Point all murmurent env vars to ``tmp_path`` so tests don't touch real dirs."""
     monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
     monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(tmp_path / "lab-mgmt"))
     monkeypatch.setenv("WIGAMIG_LAB_VM_ROOT", str(tmp_path / "lab_vm"))

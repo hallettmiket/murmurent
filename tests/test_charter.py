@@ -1,10 +1,10 @@
-"""Tests for :mod:`wigamig.core.charter`."""
+"""Tests for :mod:`murmurent.core.charter`."""
 
 from __future__ import annotations
 
 import pytest
 
-from wigamig.core.charter import CharterError, render_charter, validate_charter
+from murmurent.core.charter import CharterError, render_charter, validate_charter
 
 
 def test_validate_minimal_standard():

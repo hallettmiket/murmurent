@@ -20,9 +20,9 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 
-from wigamig.core import membership as M
-from wigamig.core.frontmatter import parse_file
-from wigamig.dashboard.server import create_app
+from murmurent.core import membership as M
+from murmurent.core.frontmatter import parse_file
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture

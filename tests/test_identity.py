@@ -1,5 +1,5 @@
 """
-Purpose: Unit tests for ``wigamig.core.identity``.
+Purpose: Unit tests for ``murmurent.core.identity``.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-06
 Input: Patched environment + monkeypatched ``gh`` resolver.
@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.core import identity
-from wigamig.core.identity import ENV_VAR, Identity, IdentityError, resolve
+from murmurent.core import identity
+from murmurent.core.identity import ENV_VAR, Identity, IdentityError, resolve
 
 
 def test_env_takes_precedence(monkeypatch: pytest.MonkeyPatch) -> None:

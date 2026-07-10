@@ -17,9 +17,9 @@ from unittest.mock import patch
 import pytest
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar as R
-from wigamig.core.frontmatter import parse_file
-from wigamig.dashboard.server import create_app
+from murmurent.core import registrar as R
+from murmurent.core.frontmatter import parse_file
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -79,7 +79,7 @@ def test_add_core_member_unknown_core(world):
 
 
 def test_add_core_member_empty_handle(world):
-    from wigamig.core.membership import MembershipError
+    from murmurent.core.membership import MembershipError
     with pytest.raises(MembershipError):
         R.add_core_member(core_name="biocore", handle="@")
 
@@ -172,7 +172,7 @@ def test_rotate_core_leader_refuses_when_new_leads_another_active_core(world):
 
 # ---- HTTP endpoints ------------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_http_add_member(mock_post, world):
     client = TestClient(create_app())
     res = client.post(
@@ -184,7 +184,7 @@ def test_http_add_member(mock_post, world):
     mock_post.assert_called()  # slack notification fired
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_http_remove_member(mock_post, world):
     R.add_core_member(core_name="biocore", handle="alice")
     client = TestClient(create_app())
@@ -196,7 +196,7 @@ def test_http_remove_member(mock_post, world):
     mock_post.assert_called()
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_http_rotate_leader(mock_post, world):
     R.add_core_member(core_name="biocore", handle="bob")
     client = TestClient(create_app())

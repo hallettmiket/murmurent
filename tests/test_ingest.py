@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.core.ingest`."""
+"""Tests for :mod:`murmurent.core.ingest`."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.core import ingest, lab_vm
+from murmurent.core import ingest, lab_vm
 
 
 def _make_source(root: Path) -> Path:

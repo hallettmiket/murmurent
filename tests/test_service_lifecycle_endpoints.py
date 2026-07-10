@@ -25,11 +25,11 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import calendar_google as CAL
-from wigamig.core import registrar as R
-from wigamig.core import service_requests as SR
-from wigamig.core import services as S
-from wigamig.dashboard.server import create_app
+from murmurent.core import calendar_google as CAL
+from murmurent.core import registrar as R
+from murmurent.core import service_requests as SR
+from murmurent.core import services as S
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -76,7 +76,7 @@ def _book(client, *, user="alice", with_event_id=""):
 
 # ---- advance -----------------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_advance_auto_picks_forward_state(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)
@@ -93,7 +93,7 @@ def test_advance_auto_picks_forward_state(mock_post, world):
     assert res.json()["state"] == SR.STATE_COMPLETED
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_advance_explicit_to_state(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)
@@ -117,7 +117,7 @@ def test_advance_requester_forbidden(world):
     assert res.status_code == 403
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_advance_registrar_passes(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)
@@ -127,7 +127,7 @@ def test_advance_registrar_passes(mock_post, world):
     assert res.status_code == 200
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_advance_terminal_state_refuses(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)
@@ -150,7 +150,7 @@ def test_advance_unknown_request(world):
 
 # ---- cancel ------------------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_cancel_by_requester(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)
@@ -161,7 +161,7 @@ def test_cancel_by_requester(mock_post, world):
     assert res.json()["state"] == SR.STATE_CANCELLED
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_cancel_by_leader(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)
@@ -184,8 +184,8 @@ def test_cancel_by_outsider_forbidden(world):
     assert res.status_code == 403
 
 
-@patch("wigamig.dashboard.slack_notify._post")
-@patch("wigamig.core.calendar_google.delete_event")
+@patch("murmurent.dashboard.slack_notify._post")
+@patch("murmurent.core.calendar_google.delete_event")
 def test_cancel_deletes_calendar_event_when_connected(
     mock_delete, mock_post, world,
 ):
@@ -202,7 +202,7 @@ def test_cancel_deletes_calendar_event_when_connected(
     assert res.json()["calendar"]["deleted_event_id"] == "evt-xyz"
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_cancel_skips_calendar_when_not_connected(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client, with_event_id="evt-xyz")
@@ -214,8 +214,8 @@ def test_cancel_skips_calendar_when_not_connected(mock_post, world):
     assert res.json()["calendar"]["warning"] == ""
 
 
-@patch("wigamig.dashboard.slack_notify._post")
-@patch("wigamig.core.calendar_google.delete_event",
+@patch("murmurent.dashboard.slack_notify._post")
+@patch("murmurent.core.calendar_google.delete_event",
        side_effect=CAL.CalendarError("API 500"))
 def test_cancel_swallows_calendar_error(mock_delete, mock_post, world):
     CAL.creds_path("biocore").parent.mkdir(parents=True, exist_ok=True)
@@ -232,7 +232,7 @@ def test_cancel_swallows_calendar_error(mock_delete, mock_post, world):
 
 # ---- reschedule --------------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_reschedule_replaces_slot_state_unchanged(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)
@@ -257,7 +257,7 @@ def test_reschedule_missing_slot_fields(world):
     assert res.status_code == 422
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_reschedule_refuses_terminal_state(mock_post, world):
     client = TestClient(create_app())
     rid = _book(client)
@@ -270,9 +270,9 @@ def test_reschedule_refuses_terminal_state(mock_post, world):
     assert res.status_code == 422
 
 
-@patch("wigamig.dashboard.slack_notify._post")
-@patch("wigamig.core.calendar_google.create_event")
-@patch("wigamig.core.calendar_google.delete_event")
+@patch("murmurent.dashboard.slack_notify._post")
+@patch("murmurent.core.calendar_google.create_event")
+@patch("murmurent.core.calendar_google.delete_event")
 def test_reschedule_rotates_calendar_event(
     mock_delete, mock_create, mock_post, world,
 ):

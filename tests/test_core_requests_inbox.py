@@ -20,10 +20,10 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar as R
-from wigamig.core import services as S
-from wigamig.core import service_requests as SR
-from wigamig.dashboard.server import create_app
+from murmurent.core import registrar as R
+from murmurent.core import services as S
+from murmurent.core import service_requests as SR
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ def world(monkeypatch, tmp_path):
     return tmp_path
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def _seed_bookings(mock_post, client):
     """Three back-to-back hour slots: alice@10-11 (live), bob@11-12
     (cancelled), alice@12-13 (completed)."""
@@ -91,7 +91,7 @@ def test_inbox_ok_for_leader(world):
     assert res.json()["counts"] == {"live": 0, "terminal": 0}
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_inbox_ok_for_registrar(mock_post, world):
     client = TestClient(create_app())
     res = client.get("/api/core/biocore/requests?user=mhallet")
@@ -100,7 +100,7 @@ def test_inbox_ok_for_registrar(mock_post, world):
 
 # ---- listing / filtering ------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_inbox_orders_live_first_then_terminal(mock_post, world):
     client = TestClient(create_app())
     _seed_bookings.__wrapped__(mock_post, client)
@@ -114,7 +114,7 @@ def test_inbox_orders_live_first_then_terminal(mock_post, world):
     assert counts == {"live": 1, "terminal": 2}
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_inbox_include_terminal_false_hides_them(mock_post, world):
     client = TestClient(create_app())
     _seed_bookings.__wrapped__(mock_post, client)
@@ -125,7 +125,7 @@ def test_inbox_include_terminal_false_hides_them(mock_post, world):
     assert [r["state"] for r in rows] == ["scheduled"]
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_inbox_state_filter(mock_post, world):
     client = TestClient(create_app())
     _seed_bookings.__wrapped__(mock_post, client)

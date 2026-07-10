@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.hooks.raw_guard` (the raw-data guard CC hook)."""
+"""Tests for :mod:`murmurent.hooks.raw_guard` (the raw-data guard CC hook)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.hooks import raw_guard
+from murmurent.hooks import raw_guard
 
 
 def _run(payload: dict, env: dict[str, str] | None = None) -> dict:

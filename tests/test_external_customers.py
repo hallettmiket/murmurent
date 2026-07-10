@@ -24,13 +24,13 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import external_customers as EC
-from wigamig.core import invoices as INV
-from wigamig.core import lab_roster as ROSTER
-from wigamig.core import registrar as R
-from wigamig.core import service_requests as SR
-from wigamig.core import services as S
-from wigamig.dashboard.server import create_app
+from murmurent.core import external_customers as EC
+from murmurent.core import invoices as INV
+from murmurent.core import lab_roster as ROSTER
+from murmurent.core import registrar as R
+from murmurent.core import service_requests as SR
+from murmurent.core import services as S
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -140,7 +140,7 @@ def test_resolve_empty_returns_unknown(world):
 
 # ---- 6c: booking validates requester_lab --------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_book_unknown_lab_returns_warning(mock_post, world):
     client = TestClient(create_app())
     res = client.post(
@@ -166,7 +166,7 @@ def test_book_strict_lab_refuses_unknown(world):
     assert res.status_code == 422
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_book_external_lab_resolves_clean(mock_post, world):
     EC.create_customer(id="acme", name="ACME")
     client = TestClient(create_app())

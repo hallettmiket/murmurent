@@ -8,10 +8,10 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from wigamig.core import centre_init as CI
-from wigamig.core import centre_provision as CP
-from wigamig.core import join_requests as JR
-from wigamig.core import registrar as R
+from murmurent.core import centre_init as CI
+from murmurent.core import centre_provision as CP
+from murmurent.core import join_requests as JR
+from murmurent.core import registrar as R
 
 
 @pytest.fixture
@@ -237,7 +237,7 @@ def test_update_group_profile_no_such_group(world):
 
 def test_group_setup_cli(world):
     from click.testing import CliRunner
-    from wigamig.commands.centre_cmd import group_setup
+    from murmurent.commands.centre_cmd import group_setup
     R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
     res = CliRunner().invoke(group_setup, [
         "dcis", "--non-interactive",
@@ -248,8 +248,8 @@ def test_group_setup_cli(world):
 
 
 def test_group_reconcile_reports_and_applies(world):
-    from wigamig.core import group_reconcile as GR
-    from wigamig.core.frontmatter import parse_file, dump_document
+    from murmurent.core import group_reconcile as GR
+    from murmurent.core.frontmatter import parse_file, dump_document
     import pathlib
     R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
     R.update_group_profile("dcis", {"slack_workspace": "T0DCIS",
@@ -278,10 +278,10 @@ def test_group_reconcile_reports_and_applies(world):
 
 
 def test_resolve_group_slack_token_env_then_file(monkeypatch, tmp_path):
-    from wigamig.core import group_reconcile as GR
+    from murmurent.core import group_reconcile as GR
     monkeypatch.delenv("WIGAMIG_GROUP_SLACK_TOKEN", raising=False)
     monkeypatch.setattr("pathlib.Path.home", lambda: tmp_path)
-    d = tmp_path / ".config" / "wigamig" / "groups" / "dcis"; d.mkdir(parents=True)
+    d = tmp_path / ".config" / "murmurent" / "groups" / "dcis"; d.mkdir(parents=True)
     (d / "slack-token").write_text("xoxb-group\n")
     assert GR.resolve_group_slack_token("dcis") == "xoxb-group"
     monkeypatch.setenv("WIGAMIG_GROUP_SLACK_TOKEN", "xoxb-env")
@@ -290,7 +290,7 @@ def test_resolve_group_slack_token_env_then_file(monkeypatch, tmp_path):
 
 def test_group_init_toolkit_scaffolds(world, tmp_path):
     from click.testing import CliRunner
-    from wigamig.commands.centre_cmd import group_init_toolkit
+    from murmurent.commands.centre_cmd import group_init_toolkit
     R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
     target = tmp_path / "dcis_toolkit"
     res = CliRunner().invoke(group_init_toolkit, ["dcis", "--dir", str(target)])
@@ -302,7 +302,7 @@ def test_group_init_toolkit_scaffolds(world, tmp_path):
 
 def test_group_init_toolkit_refuses_nonempty(world, tmp_path):
     from click.testing import CliRunner
-    from wigamig.commands.centre_cmd import group_init_toolkit
+    from murmurent.commands.centre_cmd import group_init_toolkit
     R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
     target = tmp_path / "dcis_toolkit"; target.mkdir()
     (target / "x").write_text("y")

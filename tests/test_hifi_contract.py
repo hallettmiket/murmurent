@@ -2,7 +2,7 @@
 
 Asserts ``GET /api/dashboard`` returns the exact field set declared in
 ``docs/designer_dashboard/hifi-data.jsx``. Uses the same fixture universe
-as :mod:`tests.test_dashboard` so we hit real wigamig data, not mocks.
+as :mod:`tests.test_dashboard` so we hit real murmurent data, not mocks.
 """
 
 from __future__ import annotations
@@ -11,10 +11,10 @@ import datetime as _dt
 
 import pytest
 
-from wigamig.commands import experiment_cmd, project_cmd, sea_cmd
-from wigamig.core import inventory, sea
-from wigamig.core.projects import find_project
-from wigamig.dashboard import contract, snapshot
+from murmurent.commands import experiment_cmd, project_cmd, sea_cmd
+from murmurent.core import inventory, sea
+from murmurent.core.projects import find_project
+from murmurent.dashboard import contract, snapshot
 
 
 # ---------------------------------------------------------------------------
@@ -195,7 +195,7 @@ def test_response_validates_against_pydantic(world):
 
 
 def test_agents_activity_parses_the_log(monkeypatch, tmp_path):
-    from wigamig.dashboard import snapshot as _snap
+    from murmurent.dashboard import snapshot as _snap
     log = tmp_path / "agents.log"
     # exactly the format scripts/wigamig_log_agent_event.sh writes (ANSI + blanks)
     log.write_text(
@@ -212,7 +212,7 @@ def test_agents_activity_parses_the_log(monkeypatch, tmp_path):
 
 
 def test_agents_activity_missing_log_is_empty(monkeypatch, tmp_path):
-    from wigamig.dashboard import snapshot as _snap
+    from murmurent.dashboard import snapshot as _snap
     monkeypatch.setenv("WIGAMIG_AGENT_LOG", str(tmp_path / "nope.log"))
     assert _snap._agents_activity() == []
 
@@ -222,7 +222,7 @@ def test_cert_project_surfaces_in_the_one_project_list(world):
     alongside CHARTER-backed projects, and every project created via `project new`
     is registered as a cert-project too (is_cert), since cert-projects are now the
     authoritative model."""
-    from wigamig.core import cert_projects as CP
+    from murmurent.core import cert_projects as CP
     CP.upsert("rna_atlas", lab="hallett", member="@allie",
               cert={"fingerprint": "fa", "card_id": "cA"},
               lead="@mhallet", sensitivity="standard")
@@ -239,8 +239,8 @@ def test_add_project_repo_endpoint(world):
     """PI assigns a manuscript repo to a cert-project; non-PI is refused. The repo
     also shows up in the project's dashboard row."""
     from fastapi.testclient import TestClient
-    from wigamig.dashboard.server import create_app
-    from wigamig.core import cert_projects as CP
+    from murmurent.dashboard.server import create_app
+    from murmurent.core import cert_projects as CP
     client = TestClient(create_app())
     r = client.post("/api/project/dcis_test/repos?user=mhallet",
                     json={"repo_name": "dcis_test_manuscript", "role": "manuscript",
@@ -262,7 +262,7 @@ def test_add_project_repo_endpoint(world):
 
 def test_cert_project_visibility_scoped_to_lab(world):
     """A cert-project in another lab, with the viewer not a member, is hidden."""
-    from wigamig.core import cert_projects as CP
+    from murmurent.core import cert_projects as CP
     CP.upsert("other_lab_proj", lab="vdumeaux", member="@vdumeaux",
               cert={"fingerprint": "fx", "card_id": "cx"})
     resp = snapshot.build_response("allie", today=_dt.date(2026, 5, 8))
@@ -391,7 +391,7 @@ def test_pi_persona_heatmap_shows_all_projects(world):
 def test_api_endpoint_accepts_persona_param(world):
     from fastapi.testclient import TestClient
 
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
 
     client = TestClient(create_app())
     resp = client.get("/api/dashboard?user=mhallet&persona=pi")
@@ -438,7 +438,7 @@ def test_agents_panel_populated_from_registry(world):
     resp = snapshot.build_response("allie", today=_dt.date(2026, 5, 8))
     assert len(resp.agents) >= 1
     names = {a.name for a in resp.agents}
-    # The wigamig repo ships at least these.
+    # The murmurent repo ships at least these.
     assert {"oracle", "bookworm"} <= names
     for a in resp.agents:
         assert a.freeze in {"frozen", "personal"}
@@ -475,7 +475,7 @@ def test_oracle_recent_picks_up_published_files(world):
 def test_api_endpoint_rejects_invalid_persona(world):
     from fastapi.testclient import TestClient
 
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
 
     client = TestClient(create_app())
     resp = client.get("/api/dashboard?user=mhallet&persona=admin")
@@ -582,7 +582,7 @@ def test_notebook_renders_real_entry(world, tmp_path, monkeypatch):
 def test_api_endpoint_returns_full_payload(world):
     from fastapi.testclient import TestClient
 
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
 
     app = create_app()
     client = TestClient(app)
@@ -596,8 +596,8 @@ def test_api_endpoint_returns_full_payload(world):
 def test_api_endpoint_400_when_no_user(monkeypatch, tmp_path):
     from fastapi.testclient import TestClient
 
-    from wigamig.core import identity as _identity
-    from wigamig.dashboard.server import create_app
+    from murmurent.core import identity as _identity
+    from murmurent.dashboard.server import create_app
 
     monkeypatch.delenv("WIGAMIG_USER", raising=False)
     monkeypatch.setenv("PATH", "")  # blocks gh fallback
@@ -613,7 +613,7 @@ def test_api_endpoint_400_when_no_user(monkeypatch, tmp_path):
 def test_healthz(world):
     from fastapi.testclient import TestClient
 
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
 
     app = create_app()
     client = TestClient(app)

@@ -12,9 +12,9 @@ from __future__ import annotations
 import pytest
 from click.testing import CliRunner
 
-from wigamig.cli import cli
-from wigamig.core import identity_bootstrap as IB
-from wigamig.core import idkeys as K
+from murmurent.cli import cli
+from murmurent.core import identity_bootstrap as IB
+from murmurent.core import idkeys as K
 
 
 @pytest.fixture(autouse=True)

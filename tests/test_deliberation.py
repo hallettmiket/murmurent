@@ -1,10 +1,10 @@
-"""Tests for :mod:`wigamig.core.deliberation`."""
+"""Tests for :mod:`murmurent.core.deliberation`."""
 
 from __future__ import annotations
 
 import pytest
 
-from wigamig.core import deliberation
+from murmurent.core import deliberation
 
 
 def test_render_includes_required_sections():
@@ -49,7 +49,7 @@ def test_update_status_writes_dates(tmp_path):
 
 
 def test_path_resolution(tmp_path):
-    from wigamig.core.repo import ProjectRepo
+    from murmurent.core.repo import ProjectRepo
 
     repo = ProjectRepo(path=tmp_path, charter_path=tmp_path / "CHARTER.md", members_path=None)
     assert (

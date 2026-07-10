@@ -15,8 +15,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from wigamig.dashboard import auth as A
-from wigamig.dashboard.server import create_app
+from murmurent.dashboard import auth as A
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture(autouse=True)

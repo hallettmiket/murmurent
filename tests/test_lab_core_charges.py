@@ -17,10 +17,10 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar as R
-from wigamig.core import service_requests as SR
-from wigamig.core import services as S
-from wigamig.dashboard.server import create_app
+from murmurent.core import registrar as R
+from murmurent.core import service_requests as SR
+from murmurent.core import services as S
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture

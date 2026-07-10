@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.commands import project_cmd, sea_cmd
-from wigamig.core import sea as sea_core
-from wigamig.dashboard import sea_actions
+from murmurent.commands import project_cmd, sea_cmd
+from murmurent.core import sea as sea_core
+from murmurent.dashboard import sea_actions
 
 
 @pytest.fixture
@@ -172,7 +172,7 @@ def test_missing_sea_is_not_found(world):
 
 def _client():
     from fastapi.testclient import TestClient
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
     return TestClient(create_app())
 
 
@@ -229,7 +229,7 @@ def test_endpoint_missing_sea_is_404(world):
 
 
 def test_endpoint_no_user_is_400(world, monkeypatch, tmp_path):
-    from wigamig.core import identity as _identity
+    from murmurent.core import identity as _identity
 
     monkeypatch.delenv("WIGAMIG_USER", raising=False)
     monkeypatch.setenv("PATH", "")  # block gh fallback

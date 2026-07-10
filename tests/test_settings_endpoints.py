@@ -18,11 +18,11 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core.frontmatter import parse_file
-from wigamig.dashboard import machine_settings as ms_mod
-from wigamig.dashboard import snapshot as snap_mod
-from wigamig.dashboard.contract import MachineSettings
-from wigamig.dashboard.server import create_app
+from murmurent.core.frontmatter import parse_file
+from murmurent.dashboard import machine_settings as ms_mod
+from murmurent.dashboard import snapshot as snap_mod
+from murmurent.dashboard.contract import MachineSettings
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -75,7 +75,7 @@ def world(monkeypatch, tmp_path):
     monkeypatch.setenv("WIGAMIG_LAB_MGMT_REPO", str(lab_mgmt))
     monkeypatch.setenv("WIGAMIG_USER", "mhallet")
     # Redirect machine.yaml so we don't touch the developer's real home.
-    machine_yaml = tmp_path / "wigamig" / "machine.yaml"
+    machine_yaml = tmp_path / "murmurent" / "machine.yaml"
     monkeypatch.setattr(ms_mod, "MACHINE_FILE", machine_yaml)
 
     return {"tmp": tmp_path, "lab_mgmt": lab_mgmt, "machine_yaml": machine_yaml}
@@ -132,7 +132,7 @@ def test_machine_settings_preflight_creates_subdirs(world, tmp_path):
 
 
 def test_machine_settings_rejects_protected_lab_vm_paths(world):
-    """``/data/lab_vm/raw`` is a hard refuse — re-routing wigamig writes
+    """``/data/lab_vm/raw`` is a hard refuse — re-routing murmurent writes
     through it would defeat the raw_guard hook."""
     res = TestClient(create_app()).post("/api/machine/settings", json={
         "wigamig_base": "/data/lab_vm/raw",

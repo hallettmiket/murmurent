@@ -16,7 +16,7 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.dashboard import notebook_actions
+from murmurent.dashboard import notebook_actions
 
 
 @pytest.fixture
@@ -68,7 +68,7 @@ def test_editor_env_fallback(lab_notebook, monkeypatch):
 def test_obsidian_wins_when_file_inside_registered_vault(monkeypatch, tmp_path):
     """When the file is in a registered Obsidian vault, Obsidian opens
     even if $EDITOR is set — the file lives in the user's Obsidian world."""
-    from wigamig.core import obsidian as _obs
+    from murmurent.core import obsidian as _obs
 
     vault = _obs.Vault(name="lab-vault", path=tmp_path / "lab-vault", ts=1234)
     monkeypatch.setattr(_obs, "discover_vaults", lambda: [vault])
@@ -88,7 +88,7 @@ def test_obsidian_wins_when_file_inside_registered_vault(monkeypatch, tmp_path):
 
 def test_obsidian_url_skipped_when_file_outside_any_vault(monkeypatch, tmp_path):
     """File outside vaults -> Obsidian doesn't fire; $EDITOR wins."""
-    from wigamig.core import obsidian as _obs
+    from murmurent.core import obsidian as _obs
 
     monkeypatch.setattr(_obs, "discover_vaults", lambda: [])
     monkeypatch.setenv("EDITOR", "nano")
@@ -127,7 +127,7 @@ def test_entry_path_uses_overridden_folder(lab_notebook):
 def test_notebook_folder_prefers_obsidian_vault(monkeypatch, tmp_path):
     """When a vault is registered and no $WIGAMIG_NOTEBOOK_DIR override,
     the notebook lives inside the vault."""
-    from wigamig.core import obsidian as _obs
+    from murmurent.core import obsidian as _obs
 
     vault = _obs.Vault(name="my-vault", path=tmp_path / "my-vault", ts=1)
     vault.path.mkdir()
@@ -140,7 +140,7 @@ def test_notebook_folder_prefers_obsidian_vault(monkeypatch, tmp_path):
 
 def test_notebook_folder_migrates_legacy_into_vault(monkeypatch, tmp_path):
     """First call with a vault registered moves stale ~/lab-notebook entries in."""
-    from wigamig.core import obsidian as _obs
+    from murmurent.core import obsidian as _obs
 
     vault = _obs.Vault(name="v", path=tmp_path / "v", ts=1)
     vault.path.mkdir()
@@ -162,7 +162,7 @@ def test_notebook_folder_migrates_legacy_into_vault(monkeypatch, tmp_path):
 
 
 def test_notebook_folder_falls_back_to_home_when_no_vault(monkeypatch, tmp_path):
-    from wigamig.core import obsidian as _obs
+    from murmurent.core import obsidian as _obs
 
     monkeypatch.delenv("WIGAMIG_NOTEBOOK_DIR", raising=False)
     monkeypatch.setattr(_obs, "preferred_vault", lambda: None)
@@ -218,7 +218,7 @@ def test_open_entry_defaults_to_today(lab_notebook, monkeypatch):
 
 def _client():
     from fastapi.testclient import TestClient
-    from wigamig.dashboard.server import create_app
+    from murmurent.dashboard.server import create_app
     return TestClient(create_app())
 
 

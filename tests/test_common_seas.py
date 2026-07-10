@@ -21,10 +21,10 @@ import yaml
 from click.testing import CliRunner
 from fastapi.testclient import TestClient
 
-from wigamig.commands.common_seas_cmd import common_sea as cli_common_sea
-from wigamig.core import common_seas as CS
-from wigamig.core import registrar as R
-from wigamig.dashboard.server import create_app
+from murmurent.commands.common_seas_cmd import common_sea as cli_common_sea
+from murmurent.core import common_seas as CS
+from murmurent.core import registrar as R
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -58,7 +58,7 @@ def test_create_sea_writes_file(world):
         slug="qc_drift_routine", name="QC drift watcher",
         kind="routine", owner_lab="hallett",
         description="Posts Slack on MoM QC drift >2σ",
-        install="wigamig routine install qc_drift_routine",
+        install="murmurent routine install qc_drift_routine",
         url="https://github.com/hallettmiket/qc_drift_routine",
         tags=["qc", "monitoring"],
     )
@@ -265,7 +265,7 @@ def test_cli_submit_then_list_then_show(world):
         "submit", "--slug", "qc_drift", "--name", "QC drift",
         "--kind", "routine",
         "--description", "demo",
-        "--install", "wigamig routine install qc_drift",
+        "--install", "murmurent routine install qc_drift",
         "--tag", "qc", "--tag", "monitoring",
     ])
     assert res.exit_code == 0, res.output
@@ -277,7 +277,7 @@ def test_cli_submit_then_list_then_show(world):
 
     res = runner.invoke(cli_common_sea, ["show", "qc_drift"])
     assert "QC drift" in res.output
-    assert "wigamig routine install qc_drift" in res.output
+    assert "murmurent routine install qc_drift" in res.output
 
 
 def test_cli_archive(world):

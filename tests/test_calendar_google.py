@@ -30,11 +30,11 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import calendar_google as CAL
-from wigamig.core import registrar as R
-from wigamig.core import services as S
-from wigamig.core import service_requests as SR
-from wigamig.dashboard.server import create_app
+from murmurent.core import calendar_google as CAL
+from murmurent.core import registrar as R
+from murmurent.core import services as S
+from murmurent.core import service_requests as SR
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -95,7 +95,7 @@ def test_is_connected_true_when_token_present(world):
 
 # ---- booking endpoint integration --------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_book_no_calendar_returns_warning_not_blocked(mock_post, world):
     """No token file → request still lands scheduled; warning surfaced."""
     client = TestClient(create_app())
@@ -112,8 +112,8 @@ def test_book_no_calendar_returns_warning_not_blocked(mock_post, world):
     assert "core-calendar-auth" in j["calendar"]["warning"]
 
 
-@patch("wigamig.dashboard.slack_notify._post")
-@patch("wigamig.core.calendar_google.create_event")
+@patch("murmurent.dashboard.slack_notify._post")
+@patch("murmurent.core.calendar_google.create_event")
 def test_book_creates_event_when_connected(mock_create, mock_post, world):
     """Token file present → endpoint calls calendar_google.create_event
     and stitches the returned id + html_link into both the response
@@ -152,8 +152,8 @@ def test_book_creates_event_when_connected(mock_create, mock_post, world):
     assert rt.booked_slot.calendar_event_id == "evt-abc123"
 
 
-@patch("wigamig.dashboard.slack_notify._post")
-@patch("wigamig.core.calendar_google.create_event")
+@patch("murmurent.dashboard.slack_notify._post")
+@patch("murmurent.core.calendar_google.create_event")
 def test_book_swallows_calendar_error_and_warns(mock_create, mock_post, world):
     """API failure → request still created, event_id="", warning carries
     the error message so the leader can see what went wrong."""
@@ -174,8 +174,8 @@ def test_book_swallows_calendar_error_and_warns(mock_create, mock_post, world):
     assert "quota exceeded" in j["calendar"]["warning"]
 
 
-@patch("wigamig.dashboard.slack_notify._post")
-@patch("wigamig.core.calendar_google.create_event")
+@patch("murmurent.dashboard.slack_notify._post")
+@patch("murmurent.core.calendar_google.create_event")
 def test_book_caller_supplied_event_id_skips_create(mock_create, mock_post, world):
     """If the caller already has a calendar_event_id (re-book / proxy
     flows), the server uses it verbatim and does NOT call create_event."""

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.core import cert_projects as CP
+from murmurent.core import cert_projects as CP
 
 
 @pytest.fixture(autouse=True)
@@ -93,7 +93,7 @@ def test_slack_channel_for():
 
 
 def test_project_name_for_cwd(monkeypatch, tmp_path):
-    from wigamig.core import repo as R
+    from murmurent.core import repo as R
     # not in a project repo → None
     monkeypatch.chdir(tmp_path)
     assert CP.project_name_for_cwd() is None
@@ -198,7 +198,7 @@ def test_clone_location_round_trips():
 def test_backfill_from_charter(monkeypatch, tmp_path):
     """Existing CHARTER code-projects are mirrored into the cert-project registry
     with their name/lab/sensitivity/lead/members and a code_repo link."""
-    from wigamig.core import charter as _charter
+    from murmurent.core import charter as _charter
     monkeypatch.setenv("WIGAMIG_PROJECTS_ROOT", str(tmp_path / "repos"))
     repo = tmp_path / "repos" / "dcis_sc"
     repo.mkdir(parents=True)

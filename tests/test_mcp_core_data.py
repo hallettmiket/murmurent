@@ -1,5 +1,5 @@
 """
-Phase 5d tests: wigamig-core-data MCP server tool shims.
+Phase 5d tests: murmurent-core-data MCP server tool shims.
 
 We test the ``tool_*`` Python entry points directly (no MCP SDK
 needed) — the FastMCP wrapper is a thin JSON shim around these.
@@ -23,11 +23,11 @@ from pathlib import Path
 import pytest
 import yaml
 
-from wigamig.core import jobs as J
-from wigamig.core import registrar as R
-from wigamig.core import service_requests as SR
-from wigamig.core import services as S
-from wigamig.mcp import core_data_server as MCP
+from murmurent.core import jobs as J
+from murmurent.core import registrar as R
+from murmurent.core import service_requests as SR
+from murmurent.core import services as S
+from murmurent.mcp import core_data_server as MCP
 
 
 @pytest.fixture

@@ -23,10 +23,10 @@ import os
 
 import pytest
 
-from wigamig.core import jobs as J
-from wigamig.core import registrar as R
-from wigamig.core import service_requests as SR
-from wigamig.core import services as S
+from murmurent.core import jobs as J
+from murmurent.core import registrar as R
+from murmurent.core import service_requests as SR
+from murmurent.core import services as S
 
 
 @pytest.fixture

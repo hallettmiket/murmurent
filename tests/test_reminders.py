@@ -24,12 +24,12 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from wigamig.commands.reminders_cmd import core_remind
-from wigamig.core import calendar_google as CAL  # noqa: F401 (env isolation)
-from wigamig.core import registrar as R
-from wigamig.core import reminders as REM
-from wigamig.core import services as S
-from wigamig.core import service_requests as SR
+from murmurent.commands.reminders_cmd import core_remind
+from murmurent.core import calendar_google as CAL  # noqa: F401 (env isolation)
+from murmurent.core import registrar as R
+from murmurent.core import reminders as REM
+from murmurent.core import services as S
+from murmurent.core import service_requests as SR
 
 
 @pytest.fixture
@@ -131,8 +131,8 @@ def test_record_sent_persists_per_window(world):
 
 # ---- CLI ---------------------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
-@patch("wigamig.core.reminders.scan_due_reminders")
+@patch("murmurent.dashboard.slack_notify._post")
+@patch("murmurent.core.reminders.scan_due_reminders")
 def test_cli_dry_run_does_not_post_or_record(mock_scan, mock_post, world):
     req = _book("2026-05-22T13:00:00+00:00")
     mock_scan.return_value = [REM.DueReminder(
@@ -146,8 +146,8 @@ def test_cli_dry_run_does_not_post_or_record(mock_scan, mock_post, world):
     assert not REM.already_sent("biocore", req.request_id, REM.WINDOW_1H)
 
 
-@patch("wigamig.dashboard.slack_notify._post")
-@patch("wigamig.core.reminders.scan_due_reminders")
+@patch("murmurent.dashboard.slack_notify._post")
+@patch("murmurent.core.reminders.scan_due_reminders")
 def test_cli_apply_posts_and_records(mock_scan, mock_post, world):
     req = _book("2026-05-22T13:00:00+00:00")
     mock_scan.return_value = [REM.DueReminder(
@@ -161,7 +161,7 @@ def test_cli_apply_posts_and_records(mock_scan, mock_post, world):
     assert REM.already_sent("biocore", req.request_id, REM.WINDOW_1H)
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_cli_no_reminders_clean_exit(mock_post, world):
     result = CliRunner().invoke(core_remind, ["--apply"])
     assert result.exit_code == 0

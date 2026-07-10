@@ -15,8 +15,8 @@ from __future__ import annotations
 import pytest
 import yaml
 
-from wigamig.core import centre_init as CI
-from wigamig.core import registrar as R
+from murmurent.core import centre_init as CI
+from murmurent.core import registrar as R
 
 
 @pytest.fixture
@@ -85,7 +85,7 @@ def test_init_adds_mayor_to_registrars(world):
 
 def test_init_writes_sentinel_when_requested(world, tmp_path):
     fake_sentinel = tmp_path / "home" / ".wigamig" / "registrar"
-    import wigamig.core.registrar as R
+    import murmurent.core.registrar as R
     R.REGISTRAR_SENTINEL = fake_sentinel  # already monkeypatched
     CI.init_centre(name="C", institution="U",
                     founding_mayor="@tbrowne", write_sentinel=True)

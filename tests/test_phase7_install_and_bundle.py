@@ -1,8 +1,8 @@
 """
 Phase 7 tests: MCP install wiring + bundle_job tool/endpoint.
 
-7a: ``wigamig install --hooks`` must register ``wigamig-core-data``
-    alongside ``wigamig-inventory`` and ``wigamig-oracle``.
+7a: ``murmurent install --hooks`` must register ``murmurent-core-data``
+    alongside ``murmurent-inventory`` and ``murmurent-oracle``.
 
 7b: bundle_job — pure helper, MCP tool, HTTP endpoint.
     Verifies tar.gz roundtrip, permission gating, size cap, and the
@@ -21,27 +21,27 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import jobs as J
-from wigamig.core import registrar as R
-from wigamig.core import service_requests as SR
-from wigamig.core import services as S
-from wigamig.dashboard.server import create_app
-from wigamig.mcp import core_data_server as MCP
+from murmurent.core import jobs as J
+from murmurent.core import registrar as R
+from murmurent.core import service_requests as SR
+from murmurent.core import services as S
+from murmurent.dashboard.server import create_app
+from murmurent.mcp import core_data_server as MCP
 
 
 # ---- Phase 7a: install registration ------------------------------------
 
 def test_install_registers_core_data_mcp(tmp_path):
-    """A fresh `wigamig install --hooks` populates mcpServers with
-    wigamig-core-data so members get the MCP without manual config."""
-    from wigamig.commands import install_cmd
+    """A fresh `murmurent install --hooks` populates mcpServers with
+    murmurent-core-data so members get the MCP without manual config."""
+    from murmurent.commands import install_cmd
     settings = tmp_path / "settings.json"
     settings.write_text("{}")
     install_cmd.cmd_install(hooks=True, settings_path=settings, backup=False)
     data = json.loads(settings.read_text())
-    assert "wigamig-core-data" in data["mcpServers"]
-    spec = data["mcpServers"]["wigamig-core-data"]
-    assert spec["args"] == ["-m", "wigamig.mcp.core_data_server"]
+    assert "murmurent-core-data" in data["mcpServers"]
+    spec = data["mcpServers"]["murmurent-core-data"]
+    assert spec["args"] == ["-m", "murmurent.mcp.core_data_server"]
 
 
 # ---- Phase 7b: bundle_job ---------------------------------------------

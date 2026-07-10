@@ -3,7 +3,7 @@
 Covers:
   - ``cmd_new_remote`` refuses unknown hosts and local-kind hosts
   - ``cmd_new_remote`` shells out via the SSH chokepoint (mocked) and
-    constructs the expected remote ``wigamig project new ...`` command
+    constructs the expected remote ``murmurent project new ...`` command
   - On success, a local remote-pointer dir is created at ``~/repos/<name>/``
     with ``.wigamig-remote-pointer`` + a CHARTER.md carrying ``host:`` +
     ``remote_path:`` in its frontmatter
@@ -21,11 +21,11 @@ from pathlib import Path
 import pytest
 import click
 
-from wigamig.commands import project_cmd
-from wigamig.core import hosts as _hosts
-from wigamig.core import remote as _remote
-from wigamig.core import projects as _projects
-from wigamig.core.frontmatter import parse_file
+from murmurent.commands import project_cmd
+from murmurent.core import hosts as _hosts
+from murmurent.core import remote as _remote
+from murmurent.core import projects as _projects
+from murmurent.core.frontmatter import parse_file
 
 
 @pytest.fixture
@@ -201,10 +201,10 @@ def test_cmd_new_remote_sends_expected_command_over_ssh(world, biodatsci, fake_s
     )
     # 1st call is the probe (`true`); subsequent ones are the actual create.
     assert any("true" in (call[-1] if call else "") for call in fake_ssh)
-    create_calls = [c for c in fake_ssh if "wigamig project new" in (c[-1] if c else "")]
+    create_calls = [c for c in fake_ssh if "murmurent project new" in (c[-1] if c else "")]
     assert create_calls, f"no project new call seen; calls={fake_ssh}"
     cmd = create_calls[0][-1]
-    assert "wigamig project new myproj" in cmd
+    assert "murmurent project new myproj" in cmd
     assert "--members" in cmd
     assert "--sensitivity standard" in cmd
     assert "--lead" in cmd
@@ -253,7 +253,7 @@ def test_cmd_new_remote_ssh_unreachable_raises(world, biodatsci, monkeypatch):
 
 
 def test_cmd_new_remote_remote_failure_propagates(world, biodatsci, monkeypatch):
-    """When the remote wigamig project new fails, surface stderr to the user."""
+    """When the remote murmurent project new fails, surface stderr to the user."""
     state = {"call": 0}
 
     def fake_run(argv, **kwargs):

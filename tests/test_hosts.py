@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from wigamig.core import hosts, remote
+from murmurent.core import hosts, remote
 
 
 @pytest.fixture
@@ -347,10 +347,10 @@ def test_remote_probe_uses_true(isolated, monkeypatch):
     assert "true" in seen["argv"][-1]
 
 
-def test_remote_wigamig_version_parses_stdout(isolated, monkeypatch):
+def test_remote_murmurent_version_parses_stdout(isolated, monkeypatch):
     def fake_run(argv, **kwargs):
-        return subprocess.CompletedProcess(argv, 0, stdout="wigamig, version 1.0.0\n", stderr="")
+        return subprocess.CompletedProcess(argv, 0, stdout="murmurent, version 1.0.0\n", stderr="")
 
     monkeypatch.setattr(remote.subprocess, "run", fake_run)
     r = remote.Remote(_ssh_host())
-    assert r.wigamig_version() == "wigamig, version 1.0.0"
+    assert r.murmurent_version() == "murmurent, version 1.0.0"

@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.hooks.audit`."""
+"""Tests for :mod:`murmurent.hooks.audit`."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from wigamig.hooks import audit
+from murmurent.hooks import audit
 
 
 def test_writes_jsonl(tmp_path, monkeypatch):

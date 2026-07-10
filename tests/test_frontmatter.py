@@ -1,5 +1,5 @@
 """
-Purpose: Unit tests for ``wigamig.core.frontmatter``.
+Purpose: Unit tests for ``murmurent.core.frontmatter``.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-06
 Input: Synthetic markdown strings.
@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.core.frontmatter import (
+from murmurent.core.frontmatter import (
     FrontmatterError,
     dump_document,
     parse_text,

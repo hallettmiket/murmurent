@@ -6,18 +6,18 @@ from __future__ import annotations
 
 import pytest
 
-from wigamig.core import hub_publish as H
+from murmurent.core import hub_publish as H
 
 
 DIRECTORY = (
-    "# wigamig institution directory — machine-readable, read by wigamig-join.sh.\n"
+    "# murmurent institution directory — machine-readable, read by wigamig-join.sh.\n"
     "# institution\temail\tage_recipient\n"
     "Western University (Bioconvergence Centre)\n"
 )
 
 README = (
-    "# Join a wigamig institution\n\n"
-    "## Institutions using wigamig\n\n"
+    "# Join a murmurent institution\n\n"
+    "## Institutions using murmurent\n\n"
     "| Institution | Installation | Email to join | age key (encrypt to this) |\n"
     "|---|---|---|---|\n"
     "| Western University | Bioconvergence Centre | _(added when live)_ | _(added when live)_ |\n\n"
@@ -44,7 +44,7 @@ def test_directory_replaces_placeholder_for_same_institution(hub):
     assert "Western University (Nirvana)\tmhallet@uwo.ca\tage1abc" in body
     assert "Bioconvergence Centre" not in body       # placeholder gone
     # comments preserved
-    assert body.startswith("# wigamig institution directory")
+    assert body.startswith("# murmurent institution directory")
 
 
 def test_directory_idempotent(hub):
@@ -210,7 +210,7 @@ def test_command_submit_publishes_even_when_files_unchanged(monkeypatch, tmp_pat
     ("unchanged") — a prior run writes the files without pushing, and the old
     code wrongly bailed with "nothing to publish"."""
     from click.testing import CliRunner
-    from wigamig.commands import centre_cmd as CC
+    from murmurent.commands import centre_cmd as CC
 
     class _Prof:
         institution = "Western University"; name = "Western Samadhi"
@@ -237,7 +237,7 @@ def test_command_submit_publishes_even_when_files_unchanged(monkeypatch, tmp_pat
 
 def test_command_no_submit_when_unchanged_tells_you_to_submit(monkeypatch, tmp_path):
     from click.testing import CliRunner
-    from wigamig.commands import centre_cmd as CC
+    from murmurent.commands import centre_cmd as CC
 
     class _Prof:
         institution = "U"; name = "C"; join_email = "m@u"; unique_name = "c"

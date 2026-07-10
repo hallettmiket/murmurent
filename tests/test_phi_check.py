@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.hooks.phi_check`."""
+"""Tests for :mod:`murmurent.hooks.phi_check`."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ import json
 
 import pytest
 
-from wigamig.commands import project_cmd
-from wigamig.core.projects import find_project
-from wigamig.hooks import phi_check
+from murmurent.commands import project_cmd
+from murmurent.core.projects import find_project
+from murmurent.hooks import phi_check
 
 
 def _run(payload, *, mode="pre"):

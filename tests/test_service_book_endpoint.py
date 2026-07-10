@@ -23,11 +23,11 @@ import pytest
 import yaml
 from fastapi.testclient import TestClient
 
-from wigamig.core import registrar as R
-from wigamig.core import services as S
-from wigamig.core import service_requests as SR
-from wigamig.core import training as T
-from wigamig.dashboard.server import create_app
+from murmurent.core import registrar as R
+from murmurent.core import services as S
+from murmurent.core import service_requests as SR
+from murmurent.core import training as T
+from murmurent.dashboard.server import create_app
 
 
 @pytest.fixture
@@ -110,7 +110,7 @@ def _seed_itc(world, *, training_required="itc_basic", status="active",
 
 # ---- happy path --------------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_book_happy_path_lands_scheduled(mock_post, world):
     _seed_itc(world)
     client = TestClient(create_app())
@@ -134,7 +134,7 @@ def test_book_happy_path_lands_scheduled(mock_post, world):
     mock_post.assert_called()
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_book_modifiers_multiply_through(mock_post, world):
     _seed_itc(world)
     client = TestClient(create_app())
@@ -226,7 +226,7 @@ def test_book_self_no_proxy_required(world):
     assert res.status_code == 200, res.text
 
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_book_leader_can_proxy_for_member(mock_post, world):
     _seed_itc(world)
     client = TestClient(create_app())
@@ -256,7 +256,7 @@ def test_book_non_leader_cannot_proxy(world):
 
 # ---- tier defaulting ---------------------------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_book_defaults_to_first_tier(mock_post, world):
     _seed_itc(world)
     client = TestClient(create_app())
@@ -284,7 +284,7 @@ def test_book_rejects_unknown_tier(world):
 
 # ---- no-fee service (free training slot) -------------------------------
 
-@patch("wigamig.dashboard.slack_notify._post")
+@patch("murmurent.dashboard.slack_notify._post")
 def test_book_no_fee_service_empty_snapshot(mock_post, world):
     """Free services (no fee.tiers) snapshot an empty fee — still
     bookable when the member has the prereq."""

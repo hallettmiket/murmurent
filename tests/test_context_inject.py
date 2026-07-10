@@ -1,4 +1,4 @@
-"""Tests for :mod:`wigamig.hooks.context_inject`."""
+"""Tests for :mod:`murmurent.hooks.context_inject`."""
 
 from __future__ import annotations
 
@@ -7,9 +7,9 @@ import json
 
 import pytest
 
-from wigamig.commands import project_cmd, sea_cmd
-from wigamig.core.projects import find_project
-from wigamig.hooks import context_inject
+from murmurent.commands import project_cmd, sea_cmd
+from murmurent.core.projects import find_project
+from murmurent.hooks import context_inject
 
 
 @pytest.fixture

@@ -6,7 +6,7 @@ import datetime as _dt
 
 import pytest
 
-from wigamig.core import compliance, membership
+from murmurent.core import compliance, membership
 
 
 @pytest.fixture
@@ -188,7 +188,7 @@ def test_snapshot_training_compliance_block(world, monkeypatch, tmp_path):
     membership.add(handle="bob", full_name="Bob", role="postdoc",
                    certifications=["WHM103:2025-01-01"])  # expired
 
-    from wigamig.dashboard import snapshot
+    from murmurent.dashboard import snapshot
     resp = snapshot.build_response("mhallet", today=_dt.date(2026, 5, 8))
     tc = resp.training_compliance
     assert any(s.code == "WHM103" for s in tc.required)
