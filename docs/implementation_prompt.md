@@ -1,11 +1,11 @@
 ---
 date: 2026-05-06
-tags: [wigamig, prompt]
+tags: [murmurent, prompt]
 ---
 
 # Implementation prompt for Claude Code
 
-> Hand this to Claude Code in a session opened at `~/repos/wigamig/`. It is the v1 scope for a smoke-test tutorial of wigamig at the group level.
+> Hand this to Claude Code in a session opened at `~/repos/wigamig/`. It is the v1 scope for a smoke-test tutorial of murmurent at the group level.
 
 ## Read first
 
@@ -19,7 +19,7 @@ The lab's global rules at `~/.claude/rules/` (code style, data storage, project 
 
 ## What we are building
 
-A working smoke-test of the wigamig group-level design. Two real students will use it to walk through fake projects, find issues, and validate the design. Everything is fake — no real PHI, no real cross-group communication, no real security infrastructure. The smoke test is a faithful exercise of the design's *shape*; it is not a regulated production system.
+A working smoke-test of the murmurent group-level design. Two real students will use it to walk through fake projects, find issues, and validate the design. Everything is fake — no real PHI, no real cross-group communication, no real security infrastructure. The smoke test is a faithful exercise of the design's *shape*; it is not a regulated production system.
 
 ## Cast (fake)
 
@@ -118,7 +118,7 @@ All four repos live at `~/repos/<name>/` locally **and** are pushed to GitHub un
 
 Use `gh` CLI for repo creation, branch pushes, and PR opens. Verify `gh auth status` is healthy before starting Phase 1; document any setup the user has to do (e.g. `gh auth login`).
 
-For the existing `wigamig` repo: do not force-push or rewrite history. Add new code on a feature branch (`feat/cli-v1` or similar), push, and open a PR for review. The user merges manually.
+For the existing `murmurent` repo: do not force-push or rewrite history. Add new code on a feature branch (`feat/cli-v1` or similar), push, and open a PR for review. The user merges manually.
 
 For the three new repos: seed script creates them, pushes initial commit, sets default branch to `main`, applies branch protection (no direct push to `main`; PR required) where the user's permissions allow.
 
@@ -126,18 +126,18 @@ For the three new repos: seed script creates them, pushes initial commit, sets d
 
 ### CLI subcommands (functional)
 
-- `wigamig install`, `wigamig onboard`, `wigamig doctor`
-- `wigamig project list / describe / new / admit`
-- `wigamig project sensitivity <p> [--set <tier>]`
-- `wigamig experiment new / list / ingest`
-- `wigamig sea request / list / claim / complete / decline`
-- `wigamig sea examine / conclude`
-- `wigamig finalize <scope> <id>`
-- `wigamig push` (with `--finalize`)
-- `wigamig dashboard` (and `--snapshot`, `--outstanding`)
-- `wigamig compliance status`
-- `wigamig preference show / set`
-- `wigamig agent list`
+- `murmurent install`, `murmurent onboard`, `murmurent doctor`
+- `murmurent project list / describe / new / admit`
+- `murmurent project sensitivity <p> [--set <tier>]`
+- `murmurent experiment new / list / ingest`
+- `murmurent sea request / list / claim / complete / decline`
+- `murmurent sea examine / conclude`
+- `murmurent finalize <scope> <id>`
+- `murmurent push` (with `--finalize`)
+- `murmurent dashboard` (and `--snapshot`, `--outstanding`)
+- `murmurent compliance status`
+- `murmurent preference show / set`
+- `murmurent agent list`
 
 Other subcommands referenced in the design may stub out with a clear "not implemented in v1" message.
 
@@ -167,9 +167,9 @@ Register in `~/.claude/settings.json` under `mcpServers`. Wraps the markdown fil
 - **Snapshot generator** (Python script): walks lab-mgmt repo, both project repos, and the simulated lab VM; produces `lab_mgmt/dashboards/<handle>.md` for each member with all panels populated. Idempotent.
 - **Streamlit viewer**: reads the snapshot, calls inventory MCP live for the inventory panel; renders Outstanding analysis (yellow at >2 weeks since `complete` and not `examined`; red at >2 months); renders Security and compliance with red for missing required.
 - Member view by default; PI view auto-enabled when run as `@mike` (env var `WIGAMIG_USER`).
-- `wigamig dashboard` opens Streamlit on localhost.
-- `wigamig dashboard --snapshot` prints the markdown.
-- `wigamig dashboard --outstanding` prints the Outstanding analysis section as a terminal summary.
+- `murmurent dashboard` opens Streamlit on localhost.
+- `murmurent dashboard --snapshot` prints the markdown.
+- `murmurent dashboard --outstanding` prints the Outstanding analysis section as a terminal summary.
 
 ### Seed script
 
@@ -190,13 +190,13 @@ Register in `~/.claude/settings.json` under `mcpServers`. Wraps the markdown fil
   - Fake count matrix CSV.
   - Fake clinicopathology table with clearly-fake OHIP strings (`0000-000-001`, `0000-000-002`, ...) and fake clinical fields (grade, ER, PR).
   - Fake compound table for `bbb_drug_screen`.
-- After local creation, the seed script `git init`/`git add`/`git commit`/`git push -u origin main` for each new repo. The `wigamig` repo (already on GitHub) gets new code on a feature branch with a PR opened, not direct-to-main.
+- After local creation, the seed script `git init`/`git add`/`git commit`/`git push -u origin main` for each new repo. The `murmurent` repo (already on GitHub) gets new code on a feature branch with a PR opened, not direct-to-main.
 
 ### Tutorial document
 
 `~/repos/wigamig/TUTORIAL.md`. Day-by-day walkthrough:
 
-- **Day 1 (each student solo)**: `wigamig install`; explore the dashboard; locate both project repos; understand `MEMBERS`.
+- **Day 1 (each student solo)**: `murmurent install`; explore the dashboard; locate both project repos; understand `MEMBERS`.
 - **Day 2 (each student solo)**: claim a pre-seeded SEA; do (synthetic) work; push to personal branch; open PR.
 - **Day 3 (collaborative, all three online)**: finalise SEA #3 (Allie's methodology review with Mike). Each squad member invokes the relevant CC agents to fill the deliberation document. Squad approves. Statement promoted to a finding.
 - **Day 4 (deliberate breakage)**: try to paste fake OHIP into a `dcis_sc_tutorial` prompt; try to write to a raw-data path; try to read another project's repo as a non-member.
@@ -219,20 +219,20 @@ Register in `~/.claude/settings.json` under `mcpServers`. Wraps the markdown fil
 
 The smoke test passes when each of these stories runs end-to-end:
 
-1. Each persona's CC instance can run `wigamig install`, then `wigamig dashboard` and see their populated dashboard.
+1. Each persona's CC instance can run `murmurent install`, then `murmurent dashboard` and see their populated dashboard.
 2. As @bob, claim SEA #1 (already claimed in seed; verify behaviour for already-claimed), work in `exp/2_alignment_count_matrix/`, run a fake analysis script, push to a personal branch.
-3. As @allie, run `wigamig sea examine 3`; the deliberation document is scaffolded with empty agent-contribution sections; manually invoke bookworm and adversary in CC to fill in their sections; commit; run `wigamig sea conclude 3` and gather approvals.
+3. As @allie, run `murmurent sea examine 3`; the deliberation document is scaffolded with empty agent-contribution sections; manually invoke bookworm and adversary in CC to fill in their sections; commit; run `murmurent sea conclude 3` and gather approvals.
 4. As any persona inside `dcis_sc_tutorial`, paste the string `1234-567-890-AB` into a CC prompt — the PHI hook refuses with a clear message naming the pattern type.
 5. As any persona, attempt to write to a file under `$WIGAMIG_LAB_VM_ROOT/raw/dcis_sc_tutorial/` — the raw-data guard refuses with a clear message.
 6. Inside CC in any persona's session, ask "what reagents do we have low or expiring?" — CC calls `inventory_list` via the MCP and reports correctly: `4_oht` expired, `nebnext_kit` low, `livedead_stain` expiring soon.
-7. As @mike, run `wigamig dashboard` and see the PI compliance grid surface @cassie's missing TCPS 2 certification in red.
-8. All four repos are visible at `https://github.com/hallettmiket/{wigamig, lab_mgmt, dcis_sc_tutorial, bbb_drug_screen}` (the latter three private), with the seed content committed.
+7. As @mike, run `murmurent dashboard` and see the PI compliance grid surface @cassie's missing TCPS 2 certification in red.
+8. All four repos are visible at `https://github.com/hallettmiket/{murmurent, lab_mgmt, dcis_sc_tutorial, bbb_drug_screen}` (the latter three private), with the seed content committed.
 
 ## Build order
 
 Use your judgement, but suggested order:
 
-1. Python package skeleton; `wigamig --help` works; CI-friendly project layout.
+1. Python package skeleton; `murmurent --help` works; CI-friendly project layout.
 2. Agent registry: port the seven `~/repos/generic_cc/agents/*.md` agents and add `security_guard.md`. Add the new frontmatter fields (`freeze`, `required_tools`, `denied_tools`, `defaults`).
 3. Seed script: writes the lab-mgmt repo and the two project repos with all frontmatter, members, charters, inventory, SEAs, fake data.
 4. Repo-discovery and frontmatter-parsing utilities.

@@ -1,6 +1,6 @@
 # Oracle workflow
 
-Two tiers, one schema. The Oracle is wigamig's institutional memory.
+Two tiers, one schema. The Oracle is murmurent's institutional memory.
 
 ## Why two tiers
 
@@ -30,7 +30,7 @@ Lives in your Obsidian vault under `oracle/`. Resolve the path on
 this machine with:
 
 ```bash
-wigamig oracle path
+murmurent oracle path
 ```
 
 The [`oracle` agent](../agents/oracle.md) maintains it. It refuses
@@ -53,19 +53,19 @@ publish flow.
 #    → writes <vault>/oracle/drafts/2026-05-16_chrm_p14.md
 
 # 2. From a terminal:
-wigamig oracle vault-drafts                       # list staged drafts
-wigamig oracle publish 2026-05-16_chrm_p14        # validate + copy + commit
-wigamig oracle publish 2026-05-16_chrm_p14 --push # commit + push in one shot
+murmurent oracle vault-drafts                       # list staged drafts
+murmurent oracle publish 2026-05-16_chrm_p14        # validate + copy + commit
+murmurent oracle publish 2026-05-16_chrm_p14 --push # commit + push in one shot
 ```
 
-`wigamig oracle publish` **refuses entries with `sensitivity:
+`murmurent oracle publish` **refuses entries with `sensitivity:
 clinical` or `restricted`** — those must stay personal. It also
 refuses if the lab already has an entry at the same path (no
 silent overwrite of peer-reviewed content).
 
 ## Search (MCP)
 
-The `wigamig-oracle` MCP server (registered by `wigamig install
+The `murmurent-oracle` MCP server (registered by `murmurent install
 --hooks`) exposes:
 
 - `oracle_search(query, kind, tags, project, sensitivity, source, limit)`

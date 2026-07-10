@@ -1,6 +1,6 @@
 ---
 date: 2026-05-06
-tags: [wigamig, prompt]
+tags: [murmurent, prompt]
 ---
 
 # Phase 2 prompt: Project, experiment, ingest
@@ -15,7 +15,7 @@ Members can create projects and experiments, ingest fake instrument data with th
 
 ## Preconditions
 
-- Phase 1 PR merged to `main` of `wigamig`
+- Phase 1 PR merged to `main` of `murmurent`
 - `lab_mgmt` exists locally and on GitHub
 - Member files for the four personas exist
 - `gh` authenticated
@@ -23,18 +23,18 @@ Members can create projects and experiments, ingest fake instrument data with th
 ## Deliverables
 
 1. **Project commands** (functional in v1)
-   - `wigamig project new <name> --charter <file> --members <list>` — scaffold local project repo (per the lab project structure: `exp/`, `src/`, `findings/`, `obsolete/`, `data/`, `seas/`, `deliberations/`); create GitHub repo `hallettmiket/<name>` private; register in `lab-mgmt/projects/<name>.md`
-   - `wigamig project list` — projects user is a member of
-   - `wigamig project describe <name>` — charter, MEMBERS, status, sensitivity badge
-   - `wigamig project admit <name> <member>` — update MEMBERS, open PR
-   - `wigamig project sensitivity <name> [--set <tier>]` — read or change sensitivity tier
+   - `murmurent project new <name> --charter <file> --members <list>` — scaffold local project repo (per the lab project structure: `exp/`, `src/`, `findings/`, `obsolete/`, `data/`, `seas/`, `deliberations/`); create GitHub repo `hallettmiket/<name>` private; register in `lab-mgmt/projects/<name>.md`
+   - `murmurent project list` — projects user is a member of
+   - `murmurent project describe <name>` — charter, MEMBERS, status, sensitivity badge
+   - `murmurent project admit <name> <member>` — update MEMBERS, open PR
+   - `murmurent project sensitivity <name> [--set <tier>]` — read or change sensitivity tier
    - CHARTER frontmatter validator: `sensitivity` required; `clinical` requires `reb_number`, `reb_expires`, `data_residency`
 
 2. **Experiment commands**
-   - `wigamig experiment new --project <p> --name <slug>` — scaffold `exp/<n>_<slug>/` with `README.md`, `run_all.py`, `notebook.md` template, `pages/`, `sketches/`, `data/`; create lab VM dirs at `$WIGAMIG_LAB_VM_ROOT/raw/<p>/<exp>/` and `refined/<p>/<exp>/`
-   - `wigamig experiment list [--project <p>]`
-   - `wigamig experiment ingest <project> <slug> <source>` — full classification + review + copy + chmod per design
-   - `wigamig experiment status <project> <slug> --set <state>`
+   - `murmurent experiment new --project <p> --name <slug>` — scaffold `exp/<n>_<slug>/` with `README.md`, `run_all.py`, `notebook.md` template, `pages/`, `sketches/`, `data/`; create lab VM dirs at `$WIGAMIG_LAB_VM_ROOT/raw/<p>/<exp>/` and `refined/<p>/<exp>/`
+   - `murmurent experiment list [--project <p>]`
+   - `murmurent experiment ingest <project> <slug> <source>` — full classification + review + copy + chmod per design
+   - `murmurent experiment status <project> <slug> --set <state>`
 
 3. **Instrument profile** at `instruments/illumina-novaseq.yaml` per design (raw extensions: `fastq`, `fastq.gz`; derived patterns: `*thumbnail*`, `*qc.html*`, `*summary.pdf*`)
 
@@ -57,10 +57,10 @@ Members can create projects and experiments, ingest fake instrument data with th
 
 ## Acceptance criteria
 
-- [ ] `WIGAMIG_USER=allie wigamig project list` shows both projects
-- [ ] `wigamig project describe dcis_sc_tutorial` shows clinical sensitivity, REB number, four members
-- [ ] `wigamig experiment list --project dcis_sc_tutorial` shows the four experiments with their status
-- [ ] `wigamig experiment ingest dcis_sc_tutorial 1_sample_qc <fresh-source-dir>` runs the classification + mandatory review prompt
+- [ ] `WIGAMIG_USER=allie murmurent project list` shows both projects
+- [ ] `murmurent project describe dcis_sc_tutorial` shows clinical sensitivity, REB number, four members
+- [ ] `murmurent experiment list --project dcis_sc_tutorial` shows the four experiments with their status
+- [ ] `murmurent experiment ingest dcis_sc_tutorial 1_sample_qc <fresh-source-dir>` runs the classification + mandatory review prompt
 - [ ] After ingest: raw chmod a-w; `notebook.md` `raw_data` and `checksums` populated
 - [ ] Raw-data guard refuses an attempted modification of a raw file (test via the hook harness)
 - [ ] PR opened on `hallettmiket/wigamig` from `feat/phase-2-projects`

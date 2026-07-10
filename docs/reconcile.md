@@ -1,6 +1,6 @@
 # Reconciliation routine
 
-`wigamig reconcile` compares wigamig's recorded state to on-disk
+`murmurent reconcile` compares murmurent's recorded state to on-disk
 reality across every registered host and reports drift. Default is
 dry-run; `--apply` repairs the actionable subset.
 
@@ -10,7 +10,7 @@ dry-run; `--apply` repairs the actionable subset.
 |---|---|---|---|
 | `orphan_installation` | actionable | ✓ | Move `~/.wigamig/installations/<name>.yaml` into `installations/.archive/<name>_<date>.yaml` |
 | `orphan_registry` | actionable | ✓ | Set `status: archived` + `archived_at: <date>` in the lab_mgmt registry frontmatter (file preserved — lab history is shared) |
-| `missing_charter` | warn | ✗ | User decides: re-adopt the clone, or remove from wigamig |
+| `missing_charter` | warn | ✗ | User decides: re-adopt the clone, or remove from murmurent |
 | `unadopted_clone` | info | ✗ | Click ↑ adopt in the Repos panel |
 
 Remote (SSH) hosts are probed in a single batched bash call per
@@ -21,9 +21,9 @@ biodatsci being down for a reboot won't auto-deactivate everything.
 ## Manual run
 
 ```bash
-wigamig reconcile                  # dry-run; exit 1 if actionable drift
-wigamig reconcile --apply          # repair actionable findings
-wigamig reconcile --slack-body     # also print a Slack-formatted summary
+murmurent reconcile                  # dry-run; exit 1 if actionable drift
+murmurent reconcile --apply          # repair actionable findings
+murmurent reconcile --slack-body     # also print a Slack-formatted summary
 ```
 
 Exit codes:
@@ -38,7 +38,7 @@ Set up once:
 ```
 /routine create wigamig-reconcile
   prompt: |
-    Run `wigamig reconcile --slack-body` in the shell and capture the
+    Run `murmurent reconcile --slack-body` in the shell and capture the
     output. If exit code is 1 (actionable drift was found in dry-run
     mode), post the slack-body block to #claude-test via
     mcp__claude_ai_Slack__slack_send_message and STOP — do not
@@ -51,7 +51,7 @@ Set up once:
 Why dry-run on the cron and `--apply` is manual: a false positive
 auto-archiving an installation manifest is a bad surprise. The
 routine surfaces drift in Slack; you decide whether to run
-`wigamig reconcile --apply` from a terminal.
+`murmurent reconcile --apply` from a terminal.
 
 ## Recovery from auto-archive
 

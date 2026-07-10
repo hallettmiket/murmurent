@@ -1,4 +1,4 @@
-# Plan: Slack ↔ Claude Code integration for a wigamig lab
+# Plan: Slack ↔ Claude Code integration for a murmurent lab
 
 ## Intent
 
@@ -11,7 +11,7 @@ built. The PI is the lab's certificate authority (self-issued via `pi-init`).
 ## Locked decisions (from the design Q&A)
 
 - **Model C (relay).** A single **lab relay** holds the bot token (the only copy).
-  Each member's CC session authenticates to the relay with **its wigamig card**;
+  Each member's CC session authenticates to the relay with **its murmurent card**;
   the relay posts to Slack *as that member* (`chat:write.customize` name + avatar)
   and can attach a card-anchored provenance tag so "m1 said X" is verifiable, not
   a spoofable display name.
@@ -81,10 +81,10 @@ grants these, and pastes the token into the one-time setup form (stored in
 ## Phases (each independently shippable + green)
 
 ### Phase A — Foundations: setup form + identity mapping
-- Extend the PI's one-time setup (`group-setup` / `wigamig init` PI path) to capture
+- Extend the PI's one-time setup (`group-setup` / `murmurent init` PI path) to capture
   the **lab Slack workspace id + bot token** and the **lab GitHub org/account**;
   store the token in `~/.config/wigamig/`.
-- Establish the per-member **identity map**: wigamig handle ↔ email ↔ Slack user id
+- Establish the per-member **identity map**: murmurent handle ↔ email ↔ Slack user id
   (`users.lookupByEmail`) ↔ GitHub login. Email is the join key (captured on the
   member's enrollment/card).
 - `security_guard`: token is never committed/logged; add it to the key-hygiene set.
@@ -92,7 +92,7 @@ grants these, and pastes the token into the one-time setup form (stored in
 ### Phase B — Project lifecycle (certs + registry + dashboard)
 - **[NEW] Project-scoped cert:** extend the member card so a project card binds a
   member's key to a project (`group = lab_mh/<project>`). The PI issues it; a
-  member requests via `wigamig enroll --project <p>`.
+  member requests via `murmurent enroll --project <p>`.
 - **Project registry record** (in the lab-mgmt repo): id, members, created, status.
 - **PI-only delete = revoke** the project certs (CRL) — no Slack/GitHub yet.
 - **Dashboard:** members see only their projects; PI/registrar sees all. PI has a
@@ -137,7 +137,7 @@ Mode `connections:write`).
 ## Open infra decision (needs a call before Phase D)
 
 **Where does the relay run?** It holds the only copy of the bot token and must be
-reachable by every member's CC session. Options: the lab's always-online wigamig
+reachable by every member's CC session. Options: the lab's always-online murmurent
 server (natural for a distributed lab) vs. the PI's machine (fine for a co-located
 lab, but off when the laptop sleeps). This shapes Phase D deployment.
 

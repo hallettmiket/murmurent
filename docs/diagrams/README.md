@@ -1,6 +1,6 @@
 # Architecture diagrams
 
-Hand-tuned Graphviz sources for the wigamig system. Two diagrams live here:
+Hand-tuned Graphviz sources for the murmurent system. Two diagrams live here:
 
 | File | What it shows |
 |---|---|

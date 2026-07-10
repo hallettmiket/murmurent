@@ -1,11 +1,11 @@
 ---
 date: 2026-05-06
-tags: [wigamig, prompt]
+tags: [murmurent, prompt]
 ---
 
 # Phase 1 prompt: Foundation
 
-> Phase 1 of 5 in the wigamig smoke-test tutorial v1 build.
+> Phase 1 of 5 in the murmurent smoke-test tutorial v1 build.
 >
 > Read first: `docs/implementation_prompt.md` (umbrella brief), `docs/group_level.md` (full design), `docs/cli_manual.md` (CLI surface).
 >
@@ -27,7 +27,7 @@ Stand up the Python package, CLI skeleton, agent registry, frontmatter and repo-
    - `src/wigamig/` package
    - Dev deps: pytest, black, isort
    - `src/wigamig/cli.py` with `click`
-   - `wigamig --help` prints the full command tree from `cli_manual.md` (most commands stub: `click.echo("not yet implemented in v1")`)
+   - `murmurent --help` prints the full command tree from `cli_manual.md` (most commands stub: `click.echo("not yet implemented in v1")`)
    - `tests/test_cli_help.py` smokes the help output
 
 2. **Agent registry** at `agents/`
@@ -42,7 +42,7 @@ Stand up the Python package, CLI skeleton, agent registry, frontmatter and repo-
    - `identity.py` — resolve current user (env var `WIGAMIG_USER` preferred for testing; fall back to `gh api user`)
    - Tests for each
 
-4. **`wigamig agent list`** working — reads `agents/*.md`, prints name + freeze flag in a table
+4. **`murmurent agent list`** working — reads `agents/*.md`, prints name + freeze flag in a table
 
 5. **Seed script v1** at `scripts/seed_tutorial.py` (idempotent)
    - Creates `~/repos/lab_mgmt/` locally
@@ -54,9 +54,9 @@ Stand up the Python package, CLI skeleton, agent registry, frontmatter and repo-
 
 ## Acceptance criteria
 
-- [ ] `wigamig --help` prints the full command tree
+- [ ] `murmurent --help` prints the full command tree
 - [ ] `pytest` passes
-- [ ] `wigamig agent list` lists eight agents with freeze flags
+- [ ] `murmurent agent list` lists eight agents with freeze flags
 - [ ] `python scripts/seed_tutorial.py` completes without error and creates `lab_mgmt` locally and on GitHub
 - [ ] `black` and `isort` clean
 - [ ] PR opened on `hallettmiket/wigamig` from a `feat/phase-1-foundation` branch

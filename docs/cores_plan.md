@@ -1,6 +1,6 @@
-# Cores in wigamig — comprehensive design plan
+# Cores in murmurent — comprehensive design plan
 
-**Status:** draft for discussion. **Nothing implemented yet.** This document is the proposed strategy for adding cores (e.g. bioCore) to wigamig as first-class entities alongside labs. It answers items 0–8 from the user request, proposes architectural decisions, and ends with the open questions we need to resolve before any code lands.
+**Status:** draft for discussion. **Nothing implemented yet.** This document is the proposed strategy for adding cores (e.g. bioCore) to murmurent as first-class entities alongside labs. It answers items 0–8 from the user request, proposes architectural decisions, and ends with the open questions we need to resolve before any code lands.
 
 Worked example throughout: **bioCore** (Western, Schulich, Department of Biochemistry — https://www.schulich.uwo.ca/biocore/). Three service modes (consultation / independent data collection / fee-for-service) — we focus on **independent data collection**. Three capability families (protein production & synthetic biology / structure-function-interaction / high-throughput molecular analysis) — we focus on **structure, function, and interaction**.
 
@@ -8,9 +8,9 @@ Worked example throughout: **bioCore** (Western, Schulich, Department of Biochem
 
 ## 1. Executive summary
 
-A **core** in wigamig is a peer of a lab. It has a leader (PI-equivalent), members (staff who run services), and lives under the centre's registrar. Where a lab does *open-ended research*, a core does *discrete repeatable services* with defined SLAs, fee schedules, training prerequisites, and equipment scheduling.
+A **core** in murmurent is a peer of a lab. It has a leader (PI-equivalent), members (staff who run services), and lives under the centre's registrar. Where a lab does *open-ended research*, a core does *discrete repeatable services* with defined SLAs, fee schedules, training prerequisites, and equipment scheduling.
 
-Architecturally, **a core is a lab whose "projects" are durable service offerings rather than time-bounded research investigations.** Most wigamig plumbing — agents, security guard, lab_mgmt registry, MEMBERS files, certification tracking, Slack notifications, Tier 2 sudo dump, reconcile — applies to cores with minor schema additions.
+Architecturally, **a core is a lab whose "projects" are durable service offerings rather than time-bounded research investigations.** Most murmurent plumbing — agents, security guard, lab_mgmt registry, MEMBERS files, certification tracking, Slack notifications, Tier 2 sudo dump, reconcile — applies to cores with minor schema additions.
 
 The genuinely new concepts are:
 
@@ -57,7 +57,7 @@ This shapes the implementation: we extend the existing entities rather than crea
                                                   └─────────────────┘
 ```
 
-A lab member of lab `hallett` who needs to use a bioCore centrifuge becomes a **service requester** at bioCore — wigamig should know they're affiliated with lab `hallett` (for billing + data delivery) without making them a *member* of bioCore.
+A lab member of lab `hallett` who needs to use a bioCore centrifuge becomes a **service requester** at bioCore — murmurent should know they're affiliated with lab `hallett` (for billing + data delivery) without making them a *member* of bioCore.
 
 ---
 
@@ -91,9 +91,9 @@ Expected hits: many. Most fall into three categories:
 ### "HQP" vs "member"
 
 - **HQP** (Highly Qualified Personnel) is the term Canadian funding agencies (CIHR, NSERC, CFI) use in grant reporting and is what your TCPS_2 / chair-renewal materials use.
-- **Member** is the broader, friendlier term that works across academic / industry / government contexts and is what wigamig already uses internally.
+- **Member** is the broader, friendlier term that works across academic / industry / government contexts and is what murmurent already uses internally.
 
-**Recommendation:** use **"member"** as wigamig's canonical word, and surface **"HQP"** only where it aligns with grant-reporting context (e.g., the training-compliance panel, certification reports). The two are not synonyms but the overlap is ~90%; collapsing them simplifies UX.
+**Recommendation:** use **"member"** as murmurent's canonical word, and surface **"HQP"** only where it aligns with grant-reporting context (e.g., the training-compliance panel, certification reports). The two are not synonyms but the overlap is ~90%; collapsing them simplifies UX.
 
 ### PI vs Leader
 
@@ -113,7 +113,7 @@ Half a day of focused rename + grep verification + one back-compat shim per quer
 
 **Correction from the original v1 of this plan.** I initially proposed extending `~/repos/lab_mgmt/` (the Hallett lab's per-lab repo) with a `cores/` subdir. **That was wrong**: `lab_mgmt` is one *lab's* repo. Cores aren't part of any lab — they're centre-wide. Putting them under `lab_mgmt/cores/` is a category error (a core isn't a member of the Hallett lab).
 
-The right place was already wired up in wigamig:
+The right place was already wired up in murmurent:
 
 - The **centre registrar** ([src/wigamig/core/registrar.py](../src/wigamig/core/registrar.py)) maintains `~/.wigamig/lab_info/` as the centre-wide registry. Index file `_registry.yaml` + per-entity directories under `labs/`, `cores/`, `collaborations/`.
 - Each core gets a **self-contained per-core mini-repo** at `~/.wigamig/lab_info/cores/<name>/lab-mgmt/` — a directory tree that mirrors the per-lab `lab_mgmt/` layout (members/, projects/, requests/, audit/) but owned by the centre's registrar, not by any one lab's PI.
@@ -126,7 +126,7 @@ The right place was already wired up in wigamig:
 - Cross-membership (a core staff member also in a lab) works via shared handles: both registries reference the same member handle string; the member's identity record lives in whichever lab they primarily belong to.
 - All Phase 1+ work — registrar CRUD, security audit, slack-notify, training-compliance — already runs over `~/.wigamig/lab_info/` because the registrar dashboard's snapshot pulls from there. Zero migration needed.
 
-**Practical consequence**: Phase 0c (originally "extend lab_mgmt") was reverted (wigamig `3da0aa8`, lab_mgmt `b0b3a5e`) and redone by calling the existing `core.registrar.create_core("biocore", ...)` API, which scaffolds at `~/.wigamig/lab_info/cores/biocore/`. The existing registrar dashboard renders bioCORE without code changes — Phase 0d collapses from "build a Cores panel" to "verify the existing Cores panel + add coverage tests."
+**Practical consequence**: Phase 0c (originally "extend lab_mgmt") was reverted (murmurent `3da0aa8`, lab_mgmt `b0b3a5e`) and redone by calling the existing `core.registrar.create_core("biocore", ...)` API, which scaffolds at `~/.wigamig/lab_info/cores/biocore/`. The existing registrar dashboard renders bioCORE without code changes — Phase 0d collapses from "build a Cores panel" to "verify the existing Cores panel + add coverage tests."
 
 The §4b schema below describes the **per-core lab-mgmt** that the registrar scaffolds; the storage path is `~/.wigamig/lab_info/cores/<core>/lab-mgmt/` not `~/repos/lab_mgmt/cores/<core>/`. The rest of the plan stands.
 
@@ -176,7 +176,7 @@ capabilities:                       # broad capability families (matches website
   - protein_production_synthetic_biology
   - structure_function_interaction
   - high_throughput_molecular_analysis
-service_modes:                      # which modes wigamig wires up (for now: independent_data_collection only)
+service_modes:                      # which modes murmurent wires up (for now: independent_data_collection only)
   - consultation                    # advisory; not bookable
   - independent_data_collection     # bookable; user runs the equipment
   - fee_for_service_data_collection # bookable; core staff runs the equipment
@@ -279,7 +279,7 @@ fee:
     overtime: 1.5                     # > duration_default
 data_deliverable:
   format: "MicroCal .itc files + auto-generated PNG fit"
-  delivery: per_job_acl              # wigamig grants requesting-lab read on job dir
+  delivery: per_job_acl              # murmurent grants requesting-lab read on job dir
 contact:
   email: BioCORE@uwo.ca
 status: active                        # active | maintenance | retired
@@ -321,7 +321,7 @@ notes: |
 
 The state machine matches existing SEAs so the dashboard UX is reusable: a panel listing pending/scheduled/completed requests, per-row actions to advance state.
 
-### 5c. Integration with the existing wigamig dashboard
+### 5c. Integration with the existing murmurent dashboard
 
 - **Member dashboard**: new **Service requests (mine)** panel showing requests the logged-in user has filed across all cores, with state + links.
 - **Lab PI dashboard**: new **Lab service spend** panel showing requests filed by anyone in the PI's lab + monthly $ total.
@@ -342,11 +342,11 @@ This is the biggest decision. We don't want to build a calendar app from scratch
 - Native iCal subscription means a user can see their bookings in their phone calendar without us doing anything.
 - Conflict detection is free (Google checks).
 - Cancellation, reschedule, reminder emails — all built in.
-- Wigamig MCP already wired in this environment.
+- Murmurent MCP already wired in this environment.
 
 **Cons:**
-- No native pricing/tier logic — we layer it in wigamig.
-- No native training-prerequisite enforcement — wigamig must check before creating the calendar event.
+- No native pricing/tier logic — we layer it in murmurent.
+- No native training-prerequisite enforcement — murmurent must check before creating the calendar event.
 - Cross-org calendar sharing (a Hallett-lab member booking a bioCore calendar) needs the core to grant guest-write — once per calendar, manageable.
 - Privacy concern: booking metadata sits on Google.
 
@@ -365,7 +365,7 @@ Two open-source candidates:
 
 **Cons:**
 - One more thing to run, secure, back up, update.
-- Webhook integration with wigamig is bespoke.
+- Webhook integration with murmurent is bespoke.
 - Authentication — needs to talk to Western SSO somehow, otherwise users juggle yet another login.
 
 ### Option C — Roll our own minimal booking layer
@@ -373,7 +373,7 @@ Two open-source candidates:
 A `core/scheduling.py` module + a sqlite-backed table (or files in `lab_mgmt/cores/<core>/calendar/`). Just enough to record `(service, slot, requester)` with conflict detection and a per-service availability config (weekdays X to Y, max one booking per slot, etc.).
 
 **Pros:**
-- Total integration with wigamig identity, training, billing.
+- Total integration with murmurent identity, training, billing.
 - No third party.
 
 **Cons:**
@@ -381,7 +381,7 @@ A `core/scheduling.py` module + a sqlite-backed table (or files in `lab_mgmt/cor
 
 ### Recommendation
 
-**Phase A: Option A (Google Calendar MCP).** Fast to ship, leverages infra already in this CC environment, lets users see bookings in their existing tools. Wigamig owns the *policy* layer (training enforcement, fee snapshotting, lab-affiliation tracking) and Google owns the *calendar* layer.
+**Phase A: Option A (Google Calendar MCP).** Fast to ship, leverages infra already in this CC environment, lets users see bookings in their existing tools. Murmurent owns the *policy* layer (training enforcement, fee snapshotting, lab-affiliation tracking) and Google owns the *calendar* layer.
 
 **Phase B (if Phase A reveals friction):** evaluate Booked Scheduler as a self-hosted alternative. Migration is straightforward because all the wigamig-side state (request_id, fee_at_booking, training_verified, job_id) is independent of the calendar backend.
 
@@ -428,9 +428,9 @@ This piggybacks on the existing certification UI; no new schema work in the dash
 
 ## 7. Item 7: Billing
 
-### Wigamig's role
+### Murmurent's role
 
-**Wigamig is not a billing system.** Wigamig is a *billing-data producer*. It captures every billable event (a completed service request, the tier, the time-of-day modifiers, the requester's lab + Western ID) and emits structured invoice artifacts. A human then routes those artifacts through Western's actual finance system.
+**Murmurent is not a billing system.** Murmurent is a *billing-data producer*. It captures every billable event (a completed service request, the tier, the time-of-day modifiers, the requester's lab + Western ID) and emits structured invoice artifacts. A human then routes those artifacts through Western's actual finance system.
 
 ### Data model
 
@@ -441,7 +441,7 @@ Each completed service request has `fee_at_booking` snapshotted (so retroactive 
 End-of-month CLI command (and scheduled via CC `/routine`):
 
 ```bash
-wigamig core invoice --core biocore --month 2026-05
+murmurent core invoice --core biocore --month 2026-05
 ```
 
 Produces, per requesting-lab, a CSV + PDF at:
@@ -463,7 +463,7 @@ The PDF format mirrors what Western accounting expects (line items, tax breakdow
 |---|---|---|
 | **1. Manual** (lab admin emails PDF to Western finance, mirrors current bioCore process) | None | 100% |
 | **2. Semi-automated** (lab admin uploads CSVs into Western's expense-report tool) | Low | Likely Western has a CSV upload format; can match it |
-| **3. API integration** (wigamig POSTs invoices to Western finance) | High; needs Western IT engagement, contracts | Low — Western IT is risk-averse with research-side automation |
+| **3. API integration** (murmurent POSTs invoices to Western finance) | High; needs Western IT engagement, contracts | Low — Western IT is risk-averse with research-side automation |
 
 **Recommendation for v1:** ship Path 1, design the CSV/PDF to make Path 2 easy when the lab admin is ready. Defer Path 3 until there's a clear business case (e.g., bioCore wants real-time charge-back to lab fund balances).
 
@@ -471,14 +471,14 @@ The PDF format mirrors what Western accounting expects (line items, tax breakdow
 
 The "industry" tier in the fee schedule covers customers who aren't on a Western lab fund. Two sub-paths:
 
-- **Western invoice → external customer** (existing bioCore flow) — wigamig generates the invoice, Western's existing Accounts Receivable system bills the customer. No new integration.
-- **Direct Stripe/Square payment at booking** — wigamig generates a payment link, user pays before the slot is confirmed. Useful for one-off industry users who don't want to deal with Western AR. Stripe has a Python SDK; integration is ~half a day. Requires the core to have a merchant account.
+- **Western invoice → external customer** (existing bioCore flow) — murmurent generates the invoice, Western's existing Accounts Receivable system bills the customer. No new integration.
+- **Direct Stripe/Square payment at booking** — murmurent generates a payment link, user pays before the slot is confirmed. Useful for one-off industry users who don't want to deal with Western AR. Stripe has a Python SDK; integration is ~half a day. Requires the core to have a merchant account.
 
 **Recommendation:** ship the Western-invoice path for v1; flag Stripe as a Phase 5 add-on if bioCore actually has external customers who want it.
 
 ### Per-lab budget alerts (nice-to-have)
 
-A lab PI can set a monthly budget cap. When their lab's accumulated charges in a month hit 75% of cap, wigamig posts to the lab's Slack channel. At 100%, optionally block further bookings (configurable per lab — some PIs prefer the alert without the block).
+A lab PI can set a monthly budget cap. When their lab's accumulated charges in a month hit 75% of cap, murmurent posts to the lab's Slack channel. At 100%, optionally block further bookings (configurable per lab — some PIs prefer the alert without the block).
 
 ---
 
@@ -511,20 +511,20 @@ The per-job dir has its own ACL: read-only for the requesting lab's group + read
 | Option | Mechanism | Pros | Cons |
 |---|---|---|---|
 | **1. Per-job NFSv4 ACL grants** | At job completion, `lab_sec_dump`-like script (running as root) sets an inheriting ACE granting `ssmd-u-<labgroup>:rxtTcy` on the job dir | Native, no daemon, files visible in the lab's normal mount | Requires root ACL changes on every job — that's a lot of `nfs4_setfacl` calls. Auditing later is harder. |
-| **2. Wigamig MCP (`wigamig-core-data`)** | New MCP server that exposes `list_jobs(lab=)`, `get_job_status(job_id)`, `read_file(job_id, path)`, `bundle_job(job_id)`. The MCP runs as a service account, walks the job dir, returns content. Wigamig identity check at the request layer. | Clean access-control story (one place to enforce policy); easy auditing (MCP logs each access); works the same on every machine | Users get data via tooling (`claude` / dashboard download button), not as files in their lab's normal mount. They have to copy/move if they want files on disk. |
-| **3. Per-job signed URLs** | Wigamig HTTP server signs a short-lived (e.g. 72h) URL per file; user downloads via browser/curl | Familiar UX (one-click download); easy to email the link to a non-CC user | Files leave the lab_vm tree onto the wigamig host's disk during download; needs HTTPS + cert; sharing the link is a security hole if it leaks |
+| **2. Murmurent MCP (`murmurent-core-data`)** | New MCP server that exposes `list_jobs(lab=)`, `get_job_status(job_id)`, `read_file(job_id, path)`, `bundle_job(job_id)`. The MCP runs as a service account, walks the job dir, returns content. Murmurent identity check at the request layer. | Clean access-control story (one place to enforce policy); easy auditing (MCP logs each access); works the same on every machine | Users get data via tooling (`claude` / dashboard download button), not as files in their lab's normal mount. They have to copy/move if they want files on disk. |
+| **3. Per-job signed URLs** | Murmurent HTTP server signs a short-lived (e.g. 72h) URL per file; user downloads via browser/curl | Familiar UX (one-click download); easy to email the link to a non-CC user | Files leave the lab_vm tree onto the murmurent host's disk during download; needs HTTPS + cert; sharing the link is a security hole if it leaks |
 
 **Recommendation: Option 2 (MCP)** as the primary mechanism, with Option 1 as a *fallback* for users who absolutely need the files on the lab's NFS mount.
 
 Why Option 2:
-- It mirrors how `wigamig-oracle` already works (server-side filter + identity check, client gets only what's allowed). Wigamig has the pattern.
+- It mirrors how `murmurent-oracle` already works (server-side filter + identity check, client gets only what's allowed). Murmurent has the pattern.
 - The audit trail is built-in: every read is one MCP-call log line, telling us who pulled what when. Compare to the NFS-ACL path where reads are not logged at the filesystem layer.
 - It's the right ergonomics for a research lab: the requester opens Claude Code, asks "show me my most recent ITC fits," the MCP returns them, the agent analyses them. The data never has to land on the lab's working tree.
 
 Sketch of the MCP server:
 
 ```
-wigamig-core-data  (new MCP server in src/wigamig/mcp/core_data_server.py)
+murmurent-core-data  (new MCP server in src/wigamig/mcp/core_data_server.py)
 
 Tools:
   list_my_jobs(state="completed", limit=20)
@@ -539,7 +539,7 @@ Tools:
       → returns a single archive blob (for offline analysis)
 
 Identity:
-  Honours WIGAMIG_USER env (set by the wigamig shell wrapper); falls back
+  Honours WIGAMIG_USER env (set by the murmurent shell wrapper); falls back
   to the user's claim in the MCP call. Refuses if the caller's lab
   doesn't match the job's requester_lab field UNLESS the caller is a
   member of the core itself (core staff see all jobs in their core).
@@ -551,7 +551,7 @@ Audit:
 
 ### Where the MCP runs
 
-On the lab server (biodatsci) close to the data. The user's local CC session connects via stdio over SSH (same pattern as the existing wigamig-oracle MCP).
+On the lab server (biodatsci) close to the data. The user's local CC session connects via stdio over SSH (same pattern as the existing murmurent-oracle MCP).
 
 ### What's MCP-applicable beyond data delivery?
 
@@ -565,10 +565,10 @@ The agent-side wins are clear: a member of the Hallett lab can now have a conver
 
 ### Cores with existing data infrastructure
 
-Many established cores (genomics core with sequencers writing to BaseSpace, proteomics core with mass-spec data on a vendor server) will not migrate their data to `/data/lab_vm/wigamig/core/<core>/`. Wigamig needs to handle the "core stores its data elsewhere; wigamig is just the access layer" case:
+Many established cores (genomics core with sequencers writing to BaseSpace, proteomics core with mass-spec data on a vendor server) will not migrate their data to `/data/lab_vm/wigamig/core/<core>/`. Murmurent needs to handle the "core stores its data elsewhere; murmurent is just the access layer" case:
 
 - The core's `data_root` field can be a URL (s3://, https://, sftp://) or a mount path on the lab server.
-- The `wigamig-core-data` MCP's `read_job_file` implementation per-core handles the backend (filesystem, s3, http GET, vendor API).
+- The `murmurent-core-data` MCP's `read_job_file` implementation per-core handles the backend (filesystem, s3, http GET, vendor API).
 - For BaseSpace (Illumina): there's an existing API + Python SDK. The MCP wraps it.
 - For mass-spec instruments writing to an Exchange-share-style NAS: the MCP mounts read-only and proxies.
 
@@ -578,7 +578,7 @@ This keeps the abstraction stable while letting each core wire in whatever its e
 
 ## 9. Cross-lab user identity (a thing item 6 implies but isn't called out)
 
-bioCore's customers are Hallett-lab members, Castellani-lab members, industry collaborators — anyone with a Schulich identity. Wigamig today scopes users to one lab via `lab_mgmt/members/<handle>.md` + a `lab:` field. We need to handle "this user is *primarily* in lab X but is *currently requesting a service from* core Y."
+bioCore's customers are Hallett-lab members, Castellani-lab members, industry collaborators — anyone with a Schulich identity. Murmurent today scopes users to one lab via `lab_mgmt/members/<handle>.md` + a `lab:` field. We need to handle "this user is *primarily* in lab X but is *currently requesting a service from* core Y."
 
 Proposed model:
 
@@ -620,7 +620,7 @@ The Core Dashboard reuses ~70% of the lab PI dashboard's panels. New panels for 
 | **Training catalogue + roster** (who has done which training, expiring soon) | extends TrainingCompliancePanel | Reused + extended | 2-3 |
 | **Fee schedule editor** (per-service rate tiers + modifiers) | new | New | 2 |
 | **Pending invoices** (current month's accumulated charges per requesting-lab) | new | New | 5 |
-| **Data deliverables overview** (recent jobs + their delivery status: pending / delivered / archived) | new | New (consumes wigamig-core-data MCP) | 4 |
+| **Data deliverables overview** (recent jobs + their delivery status: pending / delivered / archived) | new | New (consumes murmurent-core-data MCP) | 4 |
 | **Repos panel** (this core's tooling repos, e.g. analysis scripts) | RepoInventoryPanel | Reused as-is | 1 |
 | **Security access (lab_sudo for core)** (which core staff can see /security) | SecurityAccessPanel | Reused, gates on core_leader instead of lab PI | 1 |
 | **Lab Oracle / personal Oracle** | OraclePanel | Reused | 1 |
@@ -695,7 +695,7 @@ Estimate: roughly +1 week distributed across Phases 1-5 (each phase's UI is +1-2
 
 ### Phase 4 — Data delivery MCP (≈ 1 week)
 
-- `wigamig-core-data` MCP server.
+- `murmurent-core-data` MCP server.
 - Job manifest schema; `bundle_job` for archive download.
 - Per-job ACL grant fallback (Option 1 above) for users who need files on the NFS mount.
 - Audit log of every data-access call.
@@ -704,7 +704,7 @@ Estimate: roughly +1 week distributed across Phases 1-5 (each phase's UI is +1-2
 
 ### Phase 5 — Billing (≈ 1-2 weeks)
 
-- `wigamig core invoice --core <core> --month YYYY-MM` CLI.
+- `murmurent core invoice --core <core> --month YYYY-MM` CLI.
 - Per-lab CSV + PDF invoices.
 - Monthly Slack summary to each PI.
 - Budget cap + alerts (optional).
@@ -763,10 +763,10 @@ These need a decision from you before the plan goes further:
 
 To set expectations on what's out of scope and would be future work:
 
-- **Multi-centre federation** — wigamig assumes one centre. If Schulich grows into a multi-centre group (e.g., adding Robarts), we'd need a layer above the registrar.
+- **Multi-centre federation** — murmurent assumes one centre. If Schulich grows into a multi-centre group (e.g., adding Robarts), we'd need a layer above the registrar.
 - **Public marketplace**. The plan assumes services are offered to centre-affiliated users only. A public-facing "bioCore is open to anyone with a credit card" mode is a separate effort.
 - **Time-and-motion analytics**. Tracking actual-vs-quoted duration over time is doable from the booking data, but I haven't sketched the dashboards for it.
-- **Equipment health / maintenance scheduling**. A core has a centrifuge that needs calibration every 6 months. Wigamig could track maintenance windows, but that's a separate scope (equipment registry, not service catalog).
+- **Equipment health / maintenance scheduling**. A core has a centrifuge that needs calibration every 6 months. Murmurent could track maintenance windows, but that's a separate scope (equipment registry, not service catalog).
 - **Sample tracking**. A user dropping off a tube for bioCore staff to run later (the fee_for_service mode) implies sample-tracking that we're explicitly out-of-scope for the focus on independent_data_collection.
 
 ---
@@ -776,10 +776,10 @@ To set expectations on what's out of scope and would be future work:
 bioCore is the right pilot because:
 
 - It's already established (real customers, real fee schedule, real workflows we can learn from).
-- The leader is in the existing wigamig ecosystem (Vanessa is already in `lab_mgmt/members/`).
+- The leader is in the existing murmurent ecosystem (Vanessa is already in `lab_mgmt/members/`).
 - The capability range (centrifuge, ITC, CD, mass spec) spans the simple-to-complex spectrum, so we'll surface design issues early.
 - It's small enough to onboard end-to-end before we generalise to other cores.
-- The data is already on biodatsci, where wigamig already runs.
+- The data is already on biodatsci, where murmurent already runs.
 
 Once Phase 0-4 are live for bioCore, **the second core** (genomics, proteomics, microscopy — your call) is mostly schema + service catalog + per-backend MCP adapter. The platform is built once.
 
@@ -797,7 +797,7 @@ Once Phase 0-4 are live for bioCore, **the second core** (genomics, proteomics, 
 | 5. Billing | 1-2 weeks | 7 weeks |
 | 6. Optional add-ons | as-needed | — |
 
-Total to a workable bioCore in wigamig: **~7 weeks** of focused work, with usable deliverables at each phase boundary. Phase 0+1 alone gives the registrar what they need to track cores; Phase 2 gives bioCore's leader the catalog editor; Phase 3 is where end-users see real value.
+Total to a workable bioCore in murmurent: **~7 weeks** of focused work, with usable deliverables at each phase boundary. Phase 0+1 alone gives the registrar what they need to track cores; Phase 2 gives bioCore's leader the catalog editor; Phase 3 is where end-users see real value.
 
 ---
 

@@ -31,12 +31,12 @@ catalog are seeded, and the dashboard boots.
 
 The repo's `.venv` is on Python 3.11, but `pyproject.toml` now requires
 3.12+. Don't fight it — use a 3.12+ conda env (this dev box uses
-`my-rdkit-env`, which is on 3.13) and install the wigamig extras there:
+`my-rdkit-env`, which is on 3.13) and install the murmurent extras there:
 
 ```bash
 conda activate my-rdkit-env
 pip install -e '/Users/mth/repos/wigamig[dev,dashboard,slack,gcal]'
-which wigamig    # should print the rdkit-env path, not the .venv
+which murmurent    # should print the rdkit-env path, not the .venv
 ```
 
 ### Steps
@@ -52,14 +52,14 @@ python -m pytest -q
 # Expect: 1089 passed, 1 skipped (gcal extra).
 
 # 3. CLI is current.
-wigamig core-calendar-auth --help
-wigamig core-invoice --help
-wigamig core-remind --help
+murmurent core-calendar-auth --help
+murmurent core-invoice --help
+murmurent core-remind --help
 # Expect: each prints help without traceback.
 
 # 4. Dashboard boots — pick a fresh port so the browser doesn't
 #    hand you a cached JSX from a previous run.
-wigamig dashboard --hifi --port 8771
+murmurent dashboard --hifi --port 8771
 # Open http://localhost:8771 in an INCOGNITO/private window
 # (guarantees no Babel cache from prior sessions).
 # Log in as @mhallet (PI).
@@ -130,7 +130,7 @@ lands at `~/.wigamig/cores/biocore/google_calendar.json`.
 
 3. **Run the auth flow** (gcal extra already installed per §0)
    ```bash
-   wigamig core-calendar-auth --core biocore
+   murmurent core-calendar-auth --core biocore
    ```
    A browser opens → Gary picks the bioCORE Google account → consent
    screen warns "Google hasn't verified this app" (expected in
@@ -286,7 +286,7 @@ In the **Core services** panel → **My bookings** → that row:
 
 ---
 
-## §4 · MCP `wigamig-core-data` from a separate CC session (10 min)
+## §4 · MCP `murmurent-core-data` from a separate CC session (10 min)
 
 ### Goal
 A member's CC session, started **after** the install in this checkout,
@@ -295,18 +295,18 @@ can list and read their job files via the MCP — no dashboard involved.
 ### Steps
 
 ```bash
-# 1. Re-run install so wigamig-core-data is in ~/.claude/settings.json.
+# 1. Re-run install so murmurent-core-data is in ~/.claude/settings.json.
 cd ~/repos/wigamig
-wigamig install --hooks
-grep -A2 wigamig-core-data ~/.claude/settings.json
-# Expect: the MCP entry with args ["-m", "wigamig.mcp.core_data_server"].
+murmurent install --hooks
+grep -A2 murmurent-core-data ~/.claude/settings.json
+# Expect: the MCP entry with args ["-m", "murmurent.mcp.core_data_server"].
 
 # 2. Open a fresh CC session (new tab) in any project where you're
 #    signed in as @mhallet (set $WIGAMIG_USER if missing).
 #    In CC, ask:
 ```
 
-> "Use the wigamig-core-data MCP to list my jobs on biocore."
+> "Use the murmurent-core-data MCP to list my jobs on biocore."
 
 Then:
 
@@ -331,7 +331,7 @@ tail -5 ~/.wigamig/cores/biocore/access.log
 
 ### If it fails
 - MCP not listed in CC: `~/.claude/settings.json` may have been edited
-  by hand; re-run `wigamig install --hooks` and confirm the diff.
+  by hand; re-run `murmurent install --hooks` and confirm the diff.
 - "no WIGAMIG_USER / USER set": the MCP runs without your shell env.
   Add `WIGAMIG_USER=mhallet` to the env block of the MCP entry in
   `~/.claude/settings.json` (mirror how the oracle MCP is wired on
@@ -431,7 +431,7 @@ The `/routine`-able reminder scanner sees upcoming bookings.
 
 ```bash
 # Book a slot ~1h from now, then:
-wigamig core-remind --core biocore
+murmurent core-remind --core biocore
 # Expect: at least one line like:
 #   [1h] biocore/<rid> @mhallet → itc_microcal_peaq in ~60 min
 # (no --apply: dry-run, doesn't post to Slack)
@@ -463,5 +463,5 @@ Issues hit: …
 Follow-ups: …
 ```
 
-Any ✗ row → file a wigamig issue with the failing curl/click + the
+Any ✗ row → file a murmurent issue with the failing curl/click + the
 error text, then loop back here when the fix lands.

@@ -1,6 +1,6 @@
 ---
 date: 2026-05-06
-tags: [wigamig, prompt]
+tags: [murmurent, prompt]
 ---
 
 # Phase 5 prompt: Dashboard + tutorial
@@ -33,9 +33,9 @@ Dashboard renders the textured fake state; tutorial document walks two students 
    - Outstanding analysis: subtle yellow at >2 weeks since `complete` and not `examined`; red and "escalated" at >2 months
    - Security and compliance: red for missing required (e.g. Cassie's TCPS 2)
    - Member view by default; PI view auto-enabled if `WIGAMIG_USER=mike`
-   - `wigamig dashboard` opens streamlit on localhost
-   - `wigamig dashboard --snapshot` prints the markdown
-   - `wigamig dashboard --outstanding` prints the Outstanding analysis as a terminal summary
+   - `murmurent dashboard` opens streamlit on localhost
+   - `murmurent dashboard --snapshot` prints the markdown
+   - `murmurent dashboard --outstanding` prints the Outstanding analysis as a terminal summary
 
 3. **Compliance state seeded** in member files (extend seed script to v5):
    - `@allie`: TCPS 2 ✓, TOTP ✓, signing key ✓ — green
@@ -44,8 +44,8 @@ Dashboard renders the textured fake state; tutorial document walks two students 
    - `@mike`: all green; PI dashboard surfaces Cassie's red status
 
 4. **Tutorial document** at `TUTORIAL.md`
-   - **Day 1 (each student solo)**: `wigamig install`; explore the dashboard; locate both project repos; understand `MEMBERS` files
-   - **Day 2 (each student solo)**: claim a pre-seeded SEA; do (synthetic) work; `wigamig push` to personal branch; `wigamig push --finalize` opens a PR
+   - **Day 1 (each student solo)**: `murmurent install`; explore the dashboard; locate both project repos; understand `MEMBERS` files
+   - **Day 2 (each student solo)**: claim a pre-seeded SEA; do (synthetic) work; `murmurent push` to personal branch; `murmurent push --finalize` opens a PR
    - **Day 3 (collaborative, all three online)**: finalise SEA #3 (Allie's methodology review with Mike). Each squad member invokes the relevant CC agents to fill the deliberation document. Squad approves. Statement promoted to a finding.
    - **Day 4 (deliberate breakage)**: try to paste fake OHIP `1234-567-890-AB` into a `dcis_sc_tutorial` prompt; try to write to a raw-data path; try to read another project's repo as a non-member
    - **Day 5 (debrief)**: file smoke-test issues using the issue template
@@ -65,14 +65,14 @@ Dashboard renders the textured fake state; tutorial document walks two students 
 
 All eight from `docs/implementation_prompt.md`:
 
-1. Each persona's CC instance can run `wigamig install`, then `wigamig dashboard` and see their populated dashboard
+1. Each persona's CC instance can run `murmurent install`, then `murmurent dashboard` and see their populated dashboard
 2. As @bob, claim SEA #1, work in `exp/2_alignment_count_matrix/`, run a fake analysis script, push to a personal branch
-3. As @allie, run `wigamig sea examine 3`; the deliberation document is scaffolded; manually invoke bookworm and adversary in CC to fill in their sections; commit; run `wigamig sea conclude 3` and gather approvals
+3. As @allie, run `murmurent sea examine 3`; the deliberation document is scaffolded; manually invoke bookworm and adversary in CC to fill in their sections; commit; run `murmurent sea conclude 3` and gather approvals
 4. As any persona inside `dcis_sc_tutorial`, paste `1234-567-890-AB` into a prompt — PHI hook refuses with a clear message
 5. As any persona, attempt to write to a file under `$WIGAMIG_LAB_VM_ROOT/raw/dcis_sc_tutorial/` — raw-data guard refuses
 6. Inside CC in any persona's session, ask about reagents — CC calls `inventory_list` via the MCP and reports correctly
-7. As @mike, run `wigamig dashboard` and see the PI compliance grid surface @cassie's missing TCPS 2 in red
-8. All four repos visible at `https://github.com/hallettmiket/{wigamig, lab_mgmt, dcis_sc_tutorial, bbb_drug_screen}` with seed content committed
+7. As @mike, run `murmurent dashboard` and see the PI compliance grid surface @cassie's missing TCPS 2 in red
+8. All four repos visible at `https://github.com/hallettmiket/{murmurent, lab_mgmt, dcis_sc_tutorial, bbb_drug_screen}` with seed content committed
 
 Plus:
 - [ ] `TUTORIAL.md` walkthrough runs end-to-end without manual workarounds

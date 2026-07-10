@@ -17,7 +17,7 @@ Surface lab Slack conversations in two complementary ways:
    panel.
 
 Today the dashboard shows oracle entries that came from manual
-`wigamig publish`. After this phase, oracle entries also come from
+`murmurent publish`. After this phase, oracle entries also come from
 nightly Slack distillation, with the raw mirror as their citation
 trail.
 
@@ -38,8 +38,8 @@ trail.
 
 A new Slack user account in the existing Hallett Lab workspace:
 
-- Display name: **Wigamig Oracle Bot**
-- Handle: `@wigamig-oracle`
+- Display name: **Murmurent Oracle Bot**
+- Handle: `@murmurent-oracle`
 - Profile bio: "Auto-summarises monitored channels into the lab oracle.
   Read-only. See `docs/slack_integration.md`."
 - Member of every monitored channel (the channel's topic flag is what
@@ -99,7 +99,7 @@ Each distilled oracle entry is markdown with frontmatter:
 ```yaml
 ---
 title: 'GRCh38.p14 fixes the chrM contig issue for run 17'
-author: '@wigamig-oracle'
+author: '@murmurent-oracle'
 date: 2026-05-09
 project: dcis_sc_tutorial
 source_channel: proj_dcis_sc_tutorial
@@ -125,7 +125,7 @@ surface citations and the Obsidian vault can navigate to them.
 ## Cadence (nightly cron)
 
 A scheduled job runs at **02:00 local time** on the lab VM (or
-wherever the wigamig server runs):
+wherever the murmurent server runs):
 
 1. For each `[oracle:on]` channel:
    1. Pull yesterday's messages via the Slack web API.
@@ -181,10 +181,10 @@ oracle file schema described in slack_integration.md.
   remains; PR review is the audit trail.
 - **Right to be forgotten:** if a member leaves the lab and asks for
   their messages to be redacted from mirrors, the lab admin runs
-  `wigamig slack redact --member @<handle>` (not yet built; tracked).
+  `murmurent slack redact --member @<handle>` (not yet built; tracked).
 - **Distillation review window:** for the first month, all oracle
   entries from the bot land with `status: draft` and only show in
-  the dashboard once the PI confirms via `wigamig oracle approve`.
+  the dashboard once the PI confirms via `murmurent oracle approve`.
   After we trust the distillation, we drop the gate.
 
 ## Implementation order
@@ -192,18 +192,18 @@ oracle file schema described in slack_integration.md.
 The cron + raw mirror is the simpler half; the distillation is the
 agentic half. Build in this order:
 
-1. **`wigamig slack mirror --channel <name> --date <yyyy-mm-dd>`** —
+1. **`murmurent slack mirror --channel <name> --date <yyyy-mm-dd>`** —
    manual one-shot fetch of one channel/day. Validates the Slack
    adapter, the Markdown serialisation, and the lab-mgmt write path.
-2. **`wigamig slack mirror --all --since <date>`** — bulk fetch.
+2. **`murmurent slack mirror --all --since <date>`** — bulk fetch.
    Hardens pagination and error handling.
 3. **Cron entry** — nightly + weekly. Uses `cron` or `launchd` agent;
    `crontab -e` line plus a `launchd` plist for macOS.
-4. **`wigamig slack distil --channel <name> --date <yyyy-mm-dd>`** —
+4. **`murmurent slack distil --channel <name> --date <yyyy-mm-dd>`** —
    manual distillation of one mirror file. PI validates output by
    eye against the prompt.
 5. **Distillation in the cron**, with the `status: draft` gate.
-6. **Approval flow** + `wigamig oracle approve` command.
+6. **Approval flow** + `murmurent oracle approve` command.
 7. **Drop the gate** once the PI is happy with the distillations.
 8. **Weekly digest** + the single outbound `chat:write` post.
 
@@ -224,5 +224,5 @@ These are the questions I'd want answered as a PR comment on this doc:
    If the lab has trans-Atlantic collaborators (Barbados meetings?),
    should it be 06:00 UTC instead?
 4. Approval flow UI: dashboard panel, CLI, or both? My instinct is
-   both — `wigamig oracle approve` for terminals, plus an "Approve /
+   both — `murmurent oracle approve` for terminals, plus an "Approve /
    Decline" pair on draft entries in the Group Oracle panel.

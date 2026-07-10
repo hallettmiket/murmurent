@@ -5,7 +5,7 @@ prospective members to be able to find and contact them. Joining is by **email**
 — the public directory just points people at your address. Western is the worked
 example; swap in your own values.
 
-## 1. Update the wigamig CLI
+## 1. Update the murmurent CLI
 
 ```bash
 cd ~/repos/wigamig && git pull && uv tool install --reinstall .
@@ -22,7 +22,7 @@ join_email: wigamig-western@uwo.ca      # a shared/role address is ideal
 
 ```bash
 git -C ~/.wigamig/lab_info commit -am "set centre join_email"
-wigamig centre-status
+murmurent centre-status
 ```
 
 ## 3. Generate your age key (for encrypted join requests)
@@ -31,7 +31,7 @@ Prospective members encrypt their join form to your **public** key so nothing
 about them is ever readable in transit or on GitHub. Generate the key once:
 
 ```bash
-wigamig centre-age-keygen
+murmurent centre-age-keygen
 #  → private key: ~/.wigamig/age/mayor.key   (0600, keep secret)
 #  → public recipient: age1...               (safe to publish)
 ```
@@ -41,8 +41,8 @@ wigamig centre-age-keygen
 Run:
 
 ```bash
-wigamig centre-hub-publish            # writes your row + prints next steps
-wigamig centre-hub-publish --submit   # …and publishes it for you
+murmurent centre-hub-publish            # writes your row + prints next steps
+murmurent centre-hub-publish --submit   # …and publishes it for you
 ```
 
 It clones the [`wigamig_public`](https://github.com/hallettmiket/wigamig_public)
@@ -65,12 +65,12 @@ A prospective member emails you an encrypted `join-request.age`. Decrypt + file
 it in one step, then approve:
 
 ```bash
-wigamig join-request decrypt join-request.age   # decrypts + files a pending request
-wigamig join-request list
-wigamig join-request approve 1                   # provisions Slack + GitHub + FS
+murmurent join-request decrypt join-request.age   # decrypts + files a pending request
+murmurent join-request list
+murmurent join-request approve 1                   # provisions Slack + GitHub + FS
 ```
 
-(You can also file a plaintext request by hand with `wigamig join-request submit
+(You can also file a plaintext request by hand with `murmurent join-request submit
 …` if someone emails you unencrypted.)
 
 Everything about the requester stays on your machine and the centre's private

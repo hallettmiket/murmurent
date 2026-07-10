@@ -1,15 +1,15 @@
 ---
 date: 2026-05-05
-tags: [wigamig, design]
+tags: [murmurent, design]
 ---
 
-# Wigamig — Group-Level Design
+# Murmurent — Group-Level Design
 
 > Working draft. Conversation between Mike Hallett and Claude Code, started 2026-05-05.
 > Destined to become a Claude Code system prompt for group-level operations.
 > Re-read in full before every edit; keep the document internally consistent.
 > See companions: [[cli_manual]], [[diagrams]].
-> Origin notes: [[wigamig notes]].
+> Origin notes: [[murmurent notes]].
 
 ## Taxonomy
 
@@ -43,13 +43,13 @@ A **group** g consists of people p1...pn, usually with one PI. Members participa
 
 A group operates across three classes of repo. Each plays a distinct role; mixing scope across them is a smell.
 
-- **Wigamig repo** — center-wide; holds the agent registry under `guilds/<group>/agents/` and the install tooling.
+- **Murmurent repo** — center-wide; holds the agent registry under `guilds/<group>/agents/` and the install tooling.
 - **Lab-management repo** — group-scoped; holds the role registry (`roles/`), inventory (`inventory/`), audit logs, the project registry, and group-wide protocols. One per group.
 - **Project repos** — project-scoped; one per active project. Holds `CHARTER.md`, `MEMBERS`, `exp/`, `src/`, `findings/`, etc. (the lab's standard project layout). Private to MEMBERS.
 
 ## Three layers within the group
 
-1. **Agent registry** — definitions for every agent the group recognises, version-controlled in the wigamig repo at `guilds/<group>/agents/`.
+1. **Agent registry** — definitions for every agent the group recognises, version-controlled in the murmurent repo at `guilds/<group>/agents/`.
 2. **Role registry** — group-level roles, each with cardinality (singleton / quota / open) and current operator(s). Lives in the lab-management repo. Only the PI mutates assignments.
 3. **Workspaces** — each member's local Claude Code environment, with the agents they have chosen to install, free to evolve on their own machine (subject to the freeze cascade below).
 
@@ -137,7 +137,7 @@ A member who sets `plotting: seaborn` once in their profile gets seaborn from ev
 
 #### Validation
 
-`wigamig install` checks each installed agent's `defaults` against the centre + guild vocabulary:
+`murmurent install` checks each installed agent's `defaults` against the centre + guild vocabulary:
 
 - **Standard fields**: validate type / enum. Unknown enum values are flagged.
 - **Possible misspellings**: free-form fields with Levenshtein distance < 3 to a standardised field name produce a warning ("did you mean `figure_size`?").
@@ -195,13 +195,13 @@ For verbs not in this day-to-day table, see:
 - [Role transitions](#role-transitions) for `assign` / `revoke` / `transfer_role`.
 - [Project lifecycle](#project-lifecycle) for `birth` / `admit` / `release` / `pause` / `resume` / `end` / `archive_project`.
 - [Knowledge and continuity verbs](#knowledge-and-continuity-verbs) for `discuss` / `teach` / `freeze`.
-- `schedule` is intentionally not a wigamig verb — calendars and a `calendar` MCP cover it.
+- `schedule` is intentionally not a murmurent verb — calendars and a `calendar` MCP cover it.
 
 ## Privacy and access
 
 - **Personal**: lives in the person's vault and `~/.claude/agent-memory/`. Never leaves their machine.
 - **Project-scoped**: lives in a private GitHub repo (one per project) with a checked-in `MEMBERS` file as the source of truth. Filesystem ACL on `/data/lab_vm/wigamig/refined/<project>/` is synced from MEMBERS.
-- **Group-shared**: agent definitions in the wigamig repo; curated findings in a group oracle; readable to all group members.
+- **Group-shared**: agent definitions in the murmurent repo; curated findings in a group oracle; readable to all group members.
 - **Sensitive artefacts that must travel** (cloud, email, off-VM): wrap in `age` with MEMBERS as the recipient list. Re-encrypt on membership change.
 
 ## Inventory and shared resources
@@ -275,7 +275,7 @@ If the lab outgrows markdown (≥1000 items, multiple writers per day, complex q
 ### Why not SQL today
 
 - Schema rigidity: catalog photos, vendor links, prep notes don't fit cleanly.
-- Tooling separate from the rest of wigamig.
+- Tooling separate from the rest of murmurent.
 - Adds a server to operate.
 - For lab-scale (hundreds of items, infrequent updates), the marginal benefit is small.
 
@@ -414,7 +414,7 @@ Use what you already have:
 - Spreadsheets → CSV in `data/`.
 - Obsidian opens the project repo as a vault.
 
-For raw instrument data: `wigamig experiment ingest <project> <exp> <source>` copies the instrument files, computes checksums, sets the raw directory `chmod a-w`, and updates the notebook's `raw_data` and `checksums` fields. Classification of raw vs derived files is described below.
+For raw instrument data: `murmurent experiment ingest <project> <exp> <source>` copies the instrument files, computes checksums, sets the raw directory `chmod a-w`, and updates the notebook's `raw_data` and `checksums` fields. Classification of raw vs derived files is described below.
 
 ### Ingest classification (raw vs derived)
 
@@ -444,7 +444,7 @@ derived:
 ---
 ```
 
-`detect_marker` lets the CLI auto-detect the instrument when `--instrument` is not given. The wigamig repo ships starter profiles for common instruments (Zeiss confocal, Illumina sequencers, common mass-spec); labs add their own.
+`detect_marker` lets the CLI auto-detect the instrument when `--instrument` is not given. The murmurent repo ships starter profiles for common instruments (Zeiss confocal, Illumina sequencers, common mass-spec); labs add their own.
 
 #### 2. Generic fallback patterns
 
@@ -460,7 +460,7 @@ The fallback fires with a loud warning so the user knows the classification is h
 Before any copy or `chmod`, the CLI shows the proposed classification and waits for explicit acceptance:
 
 ```
-$ wigamig experiment ingest dcis_imaging 3_titration ~/Downloads/scope_export
+$ murmurent experiment ingest dcis_imaging 3_titration ~/Downloads/scope_export
 Detected instrument: zeiss-confocal (from .czi files)
 Proposed classification:
   → /data/lab_vm/wigamig/raw/dcis_imaging/3_titration/
@@ -494,7 +494,7 @@ Review is non-negotiable. The cost of a misclassification — a derived file per
 
 ### Verb support
 
-`wigamig experiment new --project dcis_imaging --name titration` scaffolds:
+`murmurent experiment new --project dcis_imaging --name titration` scaffolds:
 - `exp/<next-int>_titration/` in the project repo with `README.md`, `run_all.py` skeleton, `notebook.md` template (auto-filled `experiment`, `date`, `performer`), `pages/`, `sketches/`, `data/` subfolders.
 - `/data/lab_vm/wigamig/raw/dcis_imaging/<next-int>_titration/` (writeable until raw is loaded; then `chmod a-w`).
 - `/data/lab_vm/wigamig/refined/dcis_imaging/<next-int>_titration/`.
@@ -511,8 +511,8 @@ The `push` verb covers a wide range of artefacts (notebook entries, code, photos
 
 Each member works on branches named `member/<github-handle>/<topic>` in the project repo.
 
-- `wigamig push <project>` → push the current branch as a personal branch. Direct push, no review.
-- `wigamig push <project> --finalize` → open a PR from the personal branch to `main`. Bot and human reviews per the path rules.
+- `murmurent push <project>` → push the current branch as a personal branch. Direct push, no review.
+- `murmurent push <project> --finalize` → open a PR from the personal branch to `main`. Bot and human reviews per the path rules.
 
 The CLI inspects the diff and, if any changed path requires PR, refuses direct push and offers to open one instead.
 
@@ -555,7 +555,7 @@ When a PR merges to `main`, a merge Action runs:
 
 When an analysis produces new files in `/data/lab_vm/wigamig/refined/<project>/<exp>/`, the notebook's `refined_data:` and `checksums:` fields need updating. This is a frequent operation; it should not require PR review.
 
-- `wigamig push <project> --refined <exp>` recomputes checksums for files in `/data/lab_vm/wigamig/refined/<project>/<exp>/`, updates the notebook's `refined_data:` and `checksums:` fields, and pushes to the member's personal branch.
+- `murmurent push <project> --refined <exp>` recomputes checksums for files in `/data/lab_vm/wigamig/refined/<project>/<exp>/`, updates the notebook's `refined_data:` and `checksums:` fields, and pushes to the member's personal branch.
 - The eventual `--finalize` PR rolls all those personal-branch updates into `main` along with the status flip to `complete`.
 
 ### Why path-based, not all-PR or all-direct
@@ -655,11 +655,11 @@ Reusable profiles live at `lab-mgmt-repo/onboarding/<profile>.md`. Each profile 
 The new user runs:
 
 ```
-wigamig onboard <group> --profile student
+murmurent onboard <group> --profile student
 ```
 
 This:
-- Clones the wigamig repo (default `~/repos/wigamig`).
+- Clones the murmurent repo (default `~/repos/wigamig`).
 - Installs agents per the profile, applying the freeze cascade (symlinks for `frozen`, copies for `personal`).
 - Configures MCP servers (inventory, oracle, request board) in `~/.claude/settings.json`.
 - Generates a personal `age` key pair; pushes the public key to `lab-mgmt-repo/keys/<github-handle>.age`.
@@ -669,13 +669,13 @@ This:
 ### Stage 3 — Approval
 
 - PI reviews the PR and approves the public key + profile.
-- For each project listed in the onboarding issue, PI runs `wigamig project admit <project> @<handle>`. Each admit is a normal admit event in the project lifecycle (audit entry, ACL re-sync, re-encryption of `age` bundles to include the new recipient).
-- PI assigns starting roles via `wigamig role assign`. Each is a normal role transition.
+- For each project listed in the onboarding issue, PI runs `murmurent project admit <project> @<handle>`. Each admit is a normal admit event in the project lifecycle (audit entry, ACL re-sync, re-encryption of `age` bundles to include the new recipient).
+- PI assigns starting roles via `murmurent role assign`. Each is a normal role transition.
 
 ### Stage 4 — Confirmation
 
 - New user verifies they can pull each project they were admitted to.
-- New user runs `wigamig doctor` to confirm install integrity.
+- New user runs `murmurent doctor` to confirm install integrity.
 - Onboarding issue is closed.
 
 ### Required artefacts
@@ -716,7 +716,7 @@ lead_eligible: false
 expiry: null
 ```
 
-`saul_goodman` excluded by default — IP concerns rarely matter for students; can be added later via `wigamig agent add`.
+`saul_goodman` excluded by default — IP concerns rarely matter for students; can be added later via `murmurent agent add`.
 
 #### `postdoc`
 
@@ -793,11 +793,11 @@ Core facilities (sequencing centres, mass-spec, imaging cores) are **not** model
 
 ### Layering
 
-Profiles describe the **baseline** install. Roles, project memberships, and permission elevations are layered separately via the normal flow (PI runs `wigamig role assign`, `wigamig project admit`). A student who will act as `bookworm_curator` gets the `student` profile and then has the role assigned. This keeps the profile count from exploding combinatorially.
+Profiles describe the **baseline** install. Roles, project memberships, and permission elevations are layered separately via the normal flow (PI runs `murmurent role assign`, `murmurent project admit`). A student who will act as `bookworm_curator` gets the `student` profile and then has the role assigned. This keeps the profile count from exploding combinatorially.
 
 ### Validation
 
-`wigamig install` and `wigamig onboard` check the resolved profile:
+`murmurent install` and `murmurent onboard` check the resolved profile:
 - Warns if a referenced agent doesn't exist in the registry.
 - Warns if a referenced role doesn't exist.
 - Warns if `expiry` is missing for `pi-collab` or `visitor` (these are time-bounded by default).
@@ -928,7 +928,7 @@ A project adopts a choreography by setting `choreography: <name>` in its `CHARTE
 
 Choreography is invoked as a CC skill:
 
-- `choreography:list` — show available choreographies in the wigamig repo and any guild-level additions.
+- `choreography:list` — show available choreographies in the murmurent repo and any guild-level additions.
 - `choreography:apply <name> --to <project>` — scaffold a project against the recipe.
 - `choreography:status <project>` — report how far the project has progressed against the recipe's expected steps; flag missing artefacts.
 
@@ -962,9 +962,9 @@ The day-to-day verbs handle moment-to-moment work. The verbs in this section pro
 | `links` | list[wikilink] | Related findings, charters, SEAs, experiments |
 
 **CLI:**
-- `wigamig discuss new --project <p> --topic <t> [--participants <list>]` — scaffold a file, open in editor.
-- `wigamig discuss list [--project <p>] [--open]` — browse.
-- `wigamig discuss close <id> --outcome <decided|open|blocked|tabled> [--decision <text>]` — set outcome.
+- `murmurent discuss new --project <p> --topic <t> [--participants <list>]` — scaffold a file, open in editor.
+- `murmurent discuss list [--project <p>] [--open]` — browse.
+- `murmurent discuss close <id> --outcome <decided|open|blocked|tabled> [--decision <text>]` — set outcome.
 
 **Authority:** any project member may file a discussion; only the project lead may close one with `outcome: decided`.
 
@@ -997,9 +997,9 @@ Both share a templated body:
 ```
 
 **CLI:**
-- `wigamig teach protocol --name <n> [--scope project|group|center] [--from-experiment <project> <experiment>]` — scaffold a protocol; with `--from-experiment`, extracts a draft from the experiment's notebook entry as a starting point.
-- `wigamig teach skill --name <n> [--scope group|center]` — scaffold a skill file.
-- `wigamig teach promote <name> --to <wider-scope>` — move an existing protocol or skill to a wider scope (project → group → centre).
+- `murmurent teach protocol --name <n> [--scope project|group|center] [--from-experiment <project> <experiment>]` — scaffold a protocol; with `--from-experiment`, extracts a draft from the experiment's notebook entry as a starting point.
+- `murmurent teach skill --name <n> [--scope group|center]` — scaffold a skill file.
+- `murmurent teach promote <name> --to <wider-scope>` — move an existing protocol or skill to a wider scope (project → group → centre).
 
 **Authority:** any member may author at project scope; group lead promotes to group; PI promotes to centre.
 
@@ -1015,19 +1015,19 @@ Both share a templated body:
 Freezes are immutable. Re-freezing under the same purpose produces a new dated tag, never overwrites.
 
 **CLI:**
-- `wigamig freeze <project> --purpose <text> [--include-raw]` — compute manifest, create tag, encrypt bundle.
-- `wigamig freeze list <project>` — list past freezes with their purposes and dates.
-- `wigamig freeze restore <project> <tag> [--to <path>]` — extract a freeze into a temp location for inspection. Never modifies the live project.
+- `murmurent freeze <project> --purpose <text> [--include-raw]` — compute manifest, create tag, encrypt bundle.
+- `murmurent freeze list <project>` — list past freezes with their purposes and dates.
+- `murmurent freeze restore <project> <tag> [--to <path>]` — extract a freeze into a temp location for inspection. Never modifies the live project.
 
 **Authority:** project lead initiates; PI approves via PR review on the manifest commit. The git tag is created only after PI approval (an `on: push` Action listens for `freeze/...` manifest merges and creates the tag).
 
 **Performance note:** computing checksums on a project with many gigabytes of refined data takes time. The freeze command runs in the background by default and notifies on completion.
 
-### Verbs not added to wigamig
+### Verbs not added to murmurent
 
-- **schedule** — not a wigamig verb. Calendars (Google Calendar, iCal) handle scheduling; a `calendar` MCP lets agents read events. The dashboard's "upcoming" panel pulls from notebook `status: planned` frontmatter, SEA deadlines, and the calendar MCP.
-- **transfer_role** — already designed in [Role transitions](#role-transitions). CLI: `wigamig role transfer`.
-- **archive_project** — already in [Project lifecycle](#project-lifecycle). CLI: `wigamig project archive`.
+- **schedule** — not a murmurent verb. Calendars (Google Calendar, iCal) handle scheduling; a `calendar` MCP lets agents read events. The dashboard's "upcoming" panel pulls from notebook `status: planned` frontmatter, SEA deadlines, and the calendar MCP.
+- **transfer_role** — already designed in [Role transitions](#role-transitions). CLI: `murmurent role transfer`.
+- **archive_project** — already in [Project lifecycle](#project-lifecycle). CLI: `murmurent project archive`.
 
 ## The finalisation choreography
 
@@ -1046,7 +1046,7 @@ A failed experiment can be analytically concluded — we examined the failure, d
 
 ### Stages
 
-**1. Complete (operational).** The work is done; the delivery exists. Reached by `wigamig sea complete <id>` (or by the experiment / project completing its operational lifecycle).
+**1. Complete (operational).** The work is done; the delivery exists. Reached by `murmurent sea complete <id>` (or by the experiment / project completing its operational lifecycle).
 
 **2. Examine.** The squad's common agents weigh in on the result. Each produces a section in the deliberation document:
 
@@ -1180,7 +1180,7 @@ Each member has a dashboard. The PI gets an enhanced version of it. Two implemen
 
 ### Live local view
 
-`wigamig dashboard` opens a local Streamlit app that reads the snapshot plus live MCP queries (inventory, oracle, request board) plus local git state. Member-level by default; PI sees additional sections automatically (based on identity).
+`murmurent dashboard` opens a local Streamlit app that reads the snapshot plus live MCP queries (inventory, oracle, request board) plus local git state. Member-level by default; PI sees additional sections automatically (based on identity).
 
 ### Member dashboard contents
 
@@ -1252,11 +1252,11 @@ Plus a project-level sensitivity-tier framework that layers extra controls (`sta
 
 ## Claude Code hooks (gap #1, design)
 
-Seven hooks compose the wigamig protection layer. Each is a small script registered in `~/.claude/settings.json`. Hook scripts live in the wigamig repo at `wigamig/hooks/` and are symlinked into `~/.claude/hooks/` by `wigamig install`. The CC harness invokes them with the tool call (or prompt) on stdin as JSON; the hook responds with JSON declaring allow / deny / modify.
+Seven hooks compose the murmurent protection layer. Each is a small script registered in `~/.claude/settings.json`. Hook scripts live in the murmurent repo at `wigamig/hooks/` and are symlinked into `~/.claude/hooks/` by `murmurent install`. The CC harness invokes them with the tool call (or prompt) on stdin as JSON; the hook responds with JSON declaring allow / deny / modify.
 
 ### Active project context
 
-Several hooks need to know which wigamig project the member is currently working in. Resolution order:
+Several hooks need to know which murmurent project the member is currently working in. Resolution order:
 
 1. `WIGAMIG_PROJECT` environment variable, if set.
 2. Walk up from `cwd` until a `.wigamig-project` marker file (or `CHARTER.md`) is found; the project name is read from that file.
@@ -1304,7 +1304,7 @@ print(json.dumps({"decision": "allow"}))
 
 **Logic:**
 - Identify each path argument in the tool call.
-- For each path, check if it's inside another wigamig project's repo (`~/repos/<other>/`) or data dir (`/data/lab_vm/{raw,refined}/<other>/`).
+- For each path, check if it's inside another murmurent project's repo (`~/repos/<other>/`) or data dir (`/data/lab_vm/{raw,refined}/<other>/`).
 - For each such "foreign" path, fetch the MEMBERS file of that project (cached locally for 5 min).
 - If the current member's GitHub handle isn't in MEMBERS, deny.
 - The active project itself is always allowed (no MEMBERS lookup needed; CC was started inside it).
@@ -1347,7 +1347,7 @@ print(json.dumps({"decision": "allow"}))
 
 ### Hook 5: Project context injection (`UserPromptSubmit`)
 
-**Purpose:** when a user prompt is submitted inside a wigamig project, inject relevant context as system reminders so the model has fresh awareness without the user having to re-explain.
+**Purpose:** when a user prompt is submitted inside a murmurent project, inject relevant context as system reminders so the model has fresh awareness without the user having to re-explain.
 
 **Trigger:** every user prompt submission.
 
@@ -1389,12 +1389,12 @@ Active SEAs:
 
 **Logic:**
 - For each agent in `~/.claude/agents/` whose registry version is `frozen`, verify the local file is a symlink and resolves to the registry path.
-- If not, deny the prompt with a clear message: "Frozen agent `conscience` has been modified locally. Run `wigamig agent update` to restore." Refuse to continue.
+- If not, deny the prompt with a clear message: "Frozen agent `conscience` has been modified locally. Run `murmurent agent update` to restore." Refuse to continue.
 - This catches the case where someone copied a frozen agent and modified it (intentional bypass attempt or accident).
 
 ### Settings.json registration
 
-The wigamig install script writes the seven hooks into `~/.claude/settings.json`:
+The murmurent install script writes the seven hooks into `~/.claude/settings.json`:
 
 ```json
 {
@@ -1426,7 +1426,7 @@ The wigamig install script writes the seven hooks into `~/.claude/settings.json`
 
 ### Failure modes and degradation
 
-- If a hook script crashes, CC sees no decision and proceeds with the default permission. To prevent silent degradation, hooks log to `~/.claude/wigamig-audit/hook-errors.log`; `wigamig doctor` checks the log size and warns if hooks are failing.
+- If a hook script crashes, CC sees no decision and proceeds with the default permission. To prevent silent degradation, hooks log to `~/.claude/wigamig-audit/hook-errors.log`; `murmurent doctor` checks the log size and warns if hooks are failing.
 - Lab-management repo unreachable: hooks fall back to local cached MEMBERS / config files. Stale by up to 5 minutes. The active project's MEMBERS is always available because the project is cloned locally.
 
 ## Tool allowlists per agent (gap #2, design)
@@ -1470,11 +1470,11 @@ A bookworm should never need Bash; if a session is running bookworm and somehow 
 
 ### Generation of settings.json
 
-`wigamig install` reads `required_tools` and `denied_tools` for every installed agent and produces:
+`murmurent install` reads `required_tools` and `denied_tools` for every installed agent and produces:
 
 - **Agent definitions** — when copying or symlinking an agent into `~/.claude/agents/<name>.md`, ensures the file's `tools:` field is exactly `required_tools - denied_tools`. (For symlinks to frozen agents, the registry definition already has the right `tools:`; install verifies.)
 - **`~/.claude/settings.json` `permissions.allow`** — the union of all installed agents' `required_tools`. These tools are auto-allowed (no user prompt) globally, because some installed agent legitimately needs them.
-- **`~/.claude/settings.json` `permissions.deny`** — a baseline list of inherently risky patterns that no wigamig agent should ever invoke:
+- **`~/.claude/settings.json` `permissions.deny`** — a baseline list of inherently risky patterns that no murmurent agent should ever invoke:
 
 ```json
 "deny": [
@@ -1493,7 +1493,7 @@ These deny rules trip *before* hooks fire, providing belt-and-braces against the
 
 ### Audit during install
 
-`wigamig install` performs a sanity pass over each agent's declared tools:
+`murmurent install` performs a sanity pass over each agent's declared tools:
 
 - Warn if an agent declares `Bash` without also declaring at least one specific Bash pattern in `denied_tools` to scope risk.
 - Warn if an agent declares broad `mcp__*` wildcards rather than specific MCP server prefixes.
@@ -1501,7 +1501,7 @@ These deny rules trip *before* hooks fire, providing belt-and-braces against the
 
 ### Drift detection
 
-`wigamig doctor` compares the installed agents' actual `tools:` with the declared `required_tools - denied_tools`. Drift on a personal agent is reported (members may have intentionally edited). Drift on a frozen agent is a hard error — frozen agents must match the registry exactly.
+`murmurent doctor` compares the installed agents' actual `tools:` with the declared `required_tools - denied_tools`. Drift on a personal agent is reported (members may have intentionally edited). Drift on a frozen agent is a hard error — frozen agents must match the registry exactly.
 
 ### Why this layout
 
@@ -1522,7 +1522,7 @@ The audit trail is only as good as our ability to prove it wasn't rewritten.
 
 - **Signed commits** required on the lab-management repo and every project repo (gpg or sigstore). Branch protection rejects unsigned commits to `main`.
 - **Branch protection**: no force-push, no history rewrite, no merge without review on `main` of any wigamig-managed repo.
-- **Tamper-evident chain** for sensitive projects: each audit-log entry includes the SHA-256 of the previous entry. `wigamig audit verify <repo>` walks the chain and validates both signatures and hashes; breaks are loud.
+- **Tamper-evident chain** for sensitive projects: each audit-log entry includes the SHA-256 of the previous entry. `murmurent audit verify <repo>` walks the chain and validates both signatures and hashes; breaks are loud.
 - **Retention** controlled by REB approval. Default 10 years post-publication (Tri-Council guidance), longer if the REB requires. Archive-encrypted bundles outlive the project repo.
 
 For non-sensitive projects: signed commits + branch protection are enough. The chain is overkill.
@@ -1531,7 +1531,7 @@ For non-sensitive projects: signed commits + branch protection are enough. The c
 
 The inventory MCP "knows" the caller is `lab_manager` only because we said so. That needs teeth.
 
-- **Wigamig session token** at session start: a JWT-equivalent signed by the member's age private key. Issued by `wigamig install` / `wigamig onboard`; refreshed on session start.
+- **Murmurent session token** at session start: a JWT-equivalent signed by the member's age private key. Issued by `murmurent install` / `murmurent onboard`; refreshed on session start.
 - **TTL by sensitivity**: 8 hours for `standard` projects; 4 hours for `restricted`; 15 minutes with explicit refresh for `clinical`.
 - **MCP-side verification**: each MCP server caches the public-key registry from `lab-mgmt-repo/keys/` and verifies the token's signature on every call. Role checks happen inside the MCP — `inventory_set` reads the caller's identity from the token, looks up the role registry, refuses if not `lab_manager`.
 - **Server-side log** on every MCP host plus the existing per-member audit log.
@@ -1548,8 +1548,8 @@ Three tiers, three storage strategies:
 - **Project-scoped** (project API keys, third-party tokens): in the project repo as `secrets/<name>.age`, encrypted to project MEMBERS. Rotated on member release.
 
 Enforcement:
-- A **git pre-commit hook** in every wigamig repo blocks plaintext secret patterns (extending the secret-leak hook in gap #1).
-- `wigamig secret rotate <scope> <name>` rotates and re-encrypts.
+- A **git pre-commit hook** in every murmurent repo blocks plaintext secret patterns (extending the secret-leak hook in gap #1).
+- `murmurent secret rotate <scope> <name>` rotates and re-encrypts.
 - For `clinical` projects, any secret touching PHI requires PI sign-off (PR review on the encrypted blob) at creation and at every rotation.
 
 ### Gap #6 — Lab VM authentication
@@ -1621,7 +1621,7 @@ data_residency: ca
 ---
 ```
 
-`wigamig project new` validates these; CI re-validates on every charter change.
+`murmurent project new` validates these; CI re-validates on every charter change.
 
 ### Sensitive-project-mode controls in detail
 
@@ -1632,7 +1632,7 @@ For `sensitivity: clinical`:
 - **PHI pattern detection** extends the secret-leak hook with patterns: OHIP (10-digit + 2-letter version code), MRN-style identifiers, SIN, DOB-near-name proximity. Outbound calls (WebFetch, mcp__slack, Anthropic API) refuse to send any prompt or argument matching these patterns.
 - **Member certifications**: each clinical-project member holds current TCPS 2 (CORE-2022) certification, recorded in `lab-mgmt-repo/members/<handle>.md` with expiry date. Auto-revocation on expiry.
 - **REB-bounded access**: when the REB approval expires or amends, member access auto-pauses pending re-approval.
-- **`wigamig breach <project> --description <text>`**: opens an incident in the lab-management repo, notifies PI immediately, starts the PHIPA 24-hour clock, drafts the IPC notification.
+- **`murmurent breach <project> --description <text>`**: opens an incident in the lab-management repo, notifies PI immediately, starts the PHIPA 24-hour clock, drafts the IPC notification.
 
 ### Honest flag: LLM API and PHI
 
@@ -1642,7 +1642,7 @@ Sending any PHI-containing prompt to the Claude API itself violates PHIPA unless
 - **Anthropic Enterprise tier with BAA / equivalent**, with verified residency.
 - **Keep data-touching analyses outside CC**: CC handles methods, code, deliberations, and writing; the actual PHI-touching analysis runs locally on the lab VM without LLM mediation.
 
-This is a constraint of using *any* LLM tool on regulated data, not a wigamig limitation.
+This is a constraint of using *any* LLM tool on regulated data, not a murmurent limitation.
 
 ### Dashboard reflection: required vs elected
 
@@ -1659,12 +1659,12 @@ The required-vs-elected distinction is enforced: a member cannot opt out of a co
 
 | Command | Effect | Authority |
 |---|---|---|
-| `wigamig project sensitivity <project> [--set <tier>]` | Read or change a project's sensitivity tier | PI (raising tier always allowed; lowering requires PR + audit) |
-| `wigamig compliance status [--project <p>]` | Show your compliance state | Member |
-| `wigamig compliance certify <cert-name> --expires <date>` | Record a certification (e.g. TCPS 2) | Member; verified by PI |
-| `wigamig audit verify <repo>` | Walk the audit chain, verify signatures and hash chain | Anyone with repo access |
-| `wigamig secret rotate <scope> <name>` | Rotate and re-encrypt a secret | Scope-appropriate authority |
-| `wigamig breach <project> --description <text>` | Open a breach incident; start PHIPA clock | Any project member |
+| `murmurent project sensitivity <project> [--set <tier>]` | Read or change a project's sensitivity tier | PI (raising tier always allowed; lowering requires PR + audit) |
+| `murmurent compliance status [--project <p>]` | Show your compliance state | Member |
+| `murmurent compliance certify <cert-name> --expires <date>` | Record a certification (e.g. TCPS 2) | Member; verified by PI |
+| `murmurent audit verify <repo>` | Walk the audit chain, verify signatures and hash chain | Anyone with repo access |
+| `murmurent secret rotate <scope> <name>` | Rotate and re-encrypt a secret | Scope-appropriate authority |
+| `murmurent breach <project> --description <text>` | Open a breach incident; start PHIPA clock | Any project member |
 
 ## Open questions
 

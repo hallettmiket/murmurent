@@ -1,19 +1,19 @@
 # Setup
 
-First-time wigamig installation on a new machine.
+First-time murmurent installation on a new machine.
 
 ## Per-machine wiring
 
 ```bash
 # 1. Clone the commons.
-git clone git@github.com:hallettmiket/wigamig.git ~/repos/wigamig
+git clone git@github.com:hallettmiket/murmurent.git ~/repos/wigamig
 cd ~/repos/wigamig
 
 # 2. Install the CLI (editable, pinned to Python 3.12).
 #    -e (editable): keeps the package in this clone so the dashboard's static
 #    assets (docs/designer_dashboard/) resolve — a non-editable install
 #    relocates it into site-packages and the hi-fi dashboard 500s.
-#    --python 3.12: wigamig needs >=3.12; avoids inheriting an older
+#    --python 3.12: murmurent needs >=3.12; avoids inheriting an older
 #    system/conda default (uv fetches a managed 3.12 if needed).
 #    The dashboard (fastapi/uvicorn), Slack, and MCP deps are HARD deps in
 #    pyproject, so they come along automatically — no extras to drop. (Only the
@@ -24,7 +24,7 @@ uv tool install --python 3.12 -e .
 bash scripts/setup.sh
 
 # 4. Register hooks + MCP servers in ~/.claude/settings.json.
-wigamig install --hooks
+murmurent install --hooks
 ```
 
 What each step does:
@@ -32,9 +32,9 @@ What each step does:
 - `setup.sh` symlinks every `agents/*.md` and `rules/*.md` into
   `~/.claude/agents/` and `~/.claude/rules/`. Preserves any
   user-authored files at the same paths.
-- `wigamig install --hooks` merges the wigamig hooks (raw_guard,
+- `murmurent install --hooks` merges the murmurent hooks (raw_guard,
   protected_paths, phi_check, audit, agent reporter) and the MCP
-  servers (`wigamig-inventory`, `wigamig-oracle`) into
+  servers (`murmurent-inventory`, `murmurent-oracle`) into
   `~/.claude/settings.json`. Idempotent; preserves existing
   hooks/servers.
 
@@ -51,7 +51,7 @@ hood, which writes:
    it, and how it differs from `~/.wigamig/lab_info/`.
 3. `~/.wigamig/installations/<name>.yaml` (this-machine manifest).
 4. `.claude/agents/` symlinks for the agents you picked.
-5. `.vscode/settings.json` (wigamig chrome — title, activity bar
+5. `.vscode/settings.json` (murmurent chrome — title, activity bar
    right, terminals in editor area).
 6. `.gitignore` line for `.claude/settings.json` (machine-local
    permissions/grants don't escape to git).
@@ -60,14 +60,14 @@ Existing files are preserved on re-run.
 
 ## Remote host setup
 
-If you also run wigamig on a remote (e.g. biodatsci):
+If you also run murmurent on a remote (e.g. biodatsci):
 
 ```bash
 # Add the host to the local registry (dashboard Machines panel,
 # or ~/.wigamig/hosts.yaml directly).
-wigamig host add biodatsci --ssh-host biodatsci ...
+murmurent host add biodatsci --ssh-host biodatsci ...
 
-# Clone wigamig on the remote so the commons agents resolve there.
+# Clone murmurent on the remote so the commons agents resolve there.
 scripts/install_remote.sh biodatsci
 ```
 
@@ -80,13 +80,13 @@ over a single batched SSH session).
 ```bash
 ls -la ~/.claude/agents/   # should be symlinks into ~/repos/wigamig/agents/
 ls -la ~/.claude/rules/    # should be symlinks into ~/repos/wigamig/rules/
-grep wigamig-oracle ~/.claude/settings.json  # MCP registered
-wigamig --version
+grep murmurent-oracle ~/.claude/settings.json  # MCP registered
+murmurent --version
 ```
 
 ## Deploying a centre on a dedicated Ubuntu server
 
-For a brand-new centre, the **mayor** typically runs `wigamig
+For a brand-new centre, the **mayor** typically runs `murmurent
 centre-init` on their laptop (the GUI wizard at `/registrar` collects
 the centre profile). Once bootstrap succeeds, the centre data lives
 under `~/.wigamig/lab_info/`. To move that centre to a permanent
@@ -106,19 +106,19 @@ Run as root (or via sudo). Replace placeholders to match your install.
 
 ```bash
 # System user + install location.
-sudo adduser --system --group --home /var/lib/wigamig wigamig
+sudo adduser --system --group --home /var/lib/wigamig murmurent
 sudo mkdir -p /var/lib/wigamig
-sudo -u wigamig git clone git@<your-git-host>:<your-org>/lab_info.git \
+sudo -u murmurent git clone git@<your-git-host>:<your-org>/lab_info.git \
   /var/lib/wigamig/lab_info
 
-# wigamig itself — via pipx / uv tool (whichever you use in production).
-sudo -u wigamig pipx install wigamig
+# murmurent itself — via pipx / uv tool (whichever you use in production).
+sudo -u murmurent pipx install murmurent
 
 # Project ACL script (item 0c) + sudoers fragment.
 sudo install -m 0755 \
   ~wigamig/.../scripts/wigamig_project_acl.sh \
   /opt/wigamig/wigamig_project_acl.sh
-echo 'wigamig ALL=(root) NOPASSWD: /opt/wigamig/wigamig_project_acl.sh' \
+echo 'murmurent ALL=(root) NOPASSWD: /opt/wigamig/wigamig_project_acl.sh' \
   | sudo tee /etc/sudoers.d/wigamig_project_acl
 sudo chmod 0440 /etc/sudoers.d/wigamig_project_acl
 
@@ -136,7 +136,7 @@ the internet** — front it with TLS via Caddy or nginx. Minimal
 Caddyfile:
 
 ```
-wigamig.<your-domain>.edu {
+murmurent.<your-domain>.edu {
   reverse_proxy 127.0.0.1:8771
 }
 ```
@@ -151,13 +151,13 @@ unchanged.
 
 ```bash
 # one secret, known to the registrar(s):
-sudo -u wigamig sh -c 'umask 077; openssl rand -hex 32 > ~wigamig/.wigamig/dashboard_secret'
+sudo -u murmurent sh -c 'umask 077; openssl rand -hex 32 > ~wigamig/.wigamig/dashboard_secret'
 #   ...or set WIGAMIG_DASHBOARD_SECRET in the systemd unit's Environment=.
 ```
 
 Operators then log in once per session: `POST /api/login/authenticate`
 with `{handle, secret}` sets the cookie (the dashboard shows a prompt).
-`wigamig dashboard` warns loudly if it's bound to a non-loopback address
+`murmurent dashboard` warns loudly if it's bound to a non-loopback address
 with no secret configured. Shared-secret model: the secret proves you're a
 trusted operator; per-user accountability is via the audit log. (Per-user
 credentials / GitHub OAuth are future upgrades.)
@@ -172,7 +172,7 @@ laptop (e.g. profile updates the registrar makes from `/registrar`):
 cd ~/.wigamig/lab_info && git push
 
 # On the server:
-sudo -u wigamig git -C /var/lib/wigamig/lab_info pull
+sudo -u murmurent git -C /var/lib/wigamig/lab_info pull
 sudo systemctl reload wigamig-dashboard
 ```
 
@@ -192,7 +192,7 @@ Run this once before the first real approval:
 
 ```bash
 export SLACK_BOT_TOKEN=xoxb-...           # the centre workspace bot
-wigamig centre-slack-smoke
+murmurent centre-slack-smoke
 ```
 
 Expected output:
@@ -217,7 +217,7 @@ the workspace). Re-run until it passes.
 ### 5. Member onboarding
 
 Once the centre is live, anyone at the institution visits
-`https://wigamig.<your-domain>.edu/join` and submits a request. The
+`https://murmurent.<your-domain>.edu/join` and submits a request. The
 registrar reviews from `/registrar`'s "Pending join requests" panel
 and approves; `centre_cable_guy` auto-provisions Slack + GitHub +
 filesystem ACLs. Per-member onboarding inside an approved lab
