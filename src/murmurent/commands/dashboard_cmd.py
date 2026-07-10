@@ -77,7 +77,7 @@ def _launch_hifi(*, host: str, port: int) -> int:
             "hi-fi dashboard deps missing (fastapi/uvicorn). Reinstall murmurent "
             "editable from the clone (the deps are hard deps, so this is all it "
             "takes):\n"
-            "    cd ~/repos/wigamig && uv tool install --force --python 3.12 -e .\n"
+            "    cd ~/repos/murmurent && uv tool install --force --python 3.12 -e .\n"
             "Or run the /murmurent-reset skill at --level install."
         ) from exc
 

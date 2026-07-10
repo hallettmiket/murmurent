@@ -659,7 +659,7 @@ murmurent onboard <group> --profile student
 ```
 
 This:
-- Clones the murmurent repo (default `~/repos/wigamig`).
+- Clones the murmurent repo (default `~/repos/murmurent`).
 - Installs agents per the profile, applying the freeze cascade (symlinks for `frozen`, copies for `personal`).
 - Configures MCP servers (inventory, oracle, request board) in `~/.claude/settings.json`.
 - Generates a personal `age` key pair; pushes the public key to `lab-mgmt-repo/keys/<github-handle>.age`.

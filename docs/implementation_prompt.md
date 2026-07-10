@@ -5,7 +5,7 @@ tags: [murmurent, prompt]
 
 # Implementation prompt for Claude Code
 
-> Hand this to Claude Code in a session opened at `~/repos/wigamig/`. It is the v1 scope for a smoke-test tutorial of murmurent at the group level.
+> Hand this to Claude Code in a session opened at `~/repos/murmurent/`. It is the v1 scope for a smoke-test tutorial of murmurent at the group level.
 
 ## Read first
 
@@ -111,7 +111,7 @@ All four repos live at `~/repos/<name>/` locally **and** are pushed to GitHub un
 
 | Local | GitHub | State |
 |---|---|---|
-| `~/repos/wigamig/` | `hallettmiket/murmurent` | Already exists (currently has design docs + assets); add the CLI, agents, choreographies, scripts on a feature branch, PR to main when ready |
+| `~/repos/murmurent/` | `hallettmiket/murmurent` | Already exists (currently has design docs + assets); add the CLI, agents, choreographies, scripts on a feature branch, PR to main when ready |
 | `~/repos/lab_mgmt/` | `hallettmiket/lab_mgmt` | New; created by seed script via `gh repo create --private` |
 | `~/repos/dcis_sc_tutorial/` | `hallettmiket/dcis_sc_tutorial` | New; created by seed script; private |
 | `~/repos/bbb_drug_screen/` | `hallettmiket/bbb_drug_screen` | New; created by seed script; private |
@@ -194,7 +194,7 @@ Register in `~/.claude/settings.json` under `mcpServers`. Wraps the markdown fil
 
 ### Tutorial document
 
-`~/repos/wigamig/TUTORIAL.md`. Day-by-day walkthrough:
+`~/repos/murmurent/TUTORIAL.md`. Day-by-day walkthrough:
 
 - **Day 1 (each student solo)**: `murmurent install`; explore the dashboard; locate both project repos; understand `MEMBERS`.
 - **Day 2 (each student solo)**: claim a pre-seeded SEA; do (synthetic) work; push to personal branch; open PR.

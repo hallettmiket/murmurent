@@ -131,7 +131,7 @@ Steps:
    - [ ] Install VS Code (link to download)
    - [ ] Install Claude Code: `npm install -g @anthropic-ai/claude-code`
    - [ ] Set Claude API key in shell profile
-   - [ ] Run Murmurent CC setup: `bash ~/repos/wigamig/scripts/setup.sh`
+   - [ ] Run Murmurent CC setup: `bash ~/repos/murmurent/scripts/setup.sh`
    - [ ] Install Obsidian (link to download)
    - [ ] Create Obsidian vault at `<notebook_path>` and register it in Obsidian
    - [ ] Verify lab-base access: `ls <raw_path>` and `ls <refined_path>`

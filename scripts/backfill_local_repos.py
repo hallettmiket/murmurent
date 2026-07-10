@@ -32,7 +32,7 @@ from pathlib import Path
 import yaml
 
 from murmurent.core.project_cc_init import bootstrap_local
-from murmurent.core.repo import wigamig_repo_root
+from murmurent.core.repo import murmurent_repo_root
 
 GREEN, YELLOW, RED, RESET = "\033[32m", "\033[33m", "\033[31m", "\033[0m"
 PILL = {"ok": GREEN + "✓" + RESET, "warn": YELLOW + "!" + RESET, "fail": RED + "✗" + RESET}
@@ -74,7 +74,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{RED}error:{RESET} {args.repos_dir} is not a directory", file=sys.stderr)
         return 2
 
-    wig_root = wigamig_repo_root()
+    wig_root = murmurent_repo_root()
     if not (wig_root / "agents").is_dir():
         print(f"{RED}error:{RESET} murmurent commons not found at {wig_root / 'agents'}", file=sys.stderr)
         return 2

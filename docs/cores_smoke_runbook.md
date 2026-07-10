@@ -35,7 +35,7 @@ The repo's `.venv` is on Python 3.11, but `pyproject.toml` now requires
 
 ```bash
 conda activate my-rdkit-env
-pip install -e '/Users/mth/repos/wigamig[dev,dashboard,slack,gcal]'
+pip install -e '/Users/mth/repos/murmurent[dev,dashboard,slack,gcal]'
 which murmurent    # should print the rdkit-env path, not the .venv
 ```
 
@@ -47,7 +47,7 @@ ls ~/.murmurent/lab_info/cores/biocore/lab-mgmt/
 # Expect: lab.md, members/, services/, training/, training_roster/, requests/
 
 # 2. Tests pass on this checkout.
-cd ~/repos/wigamig
+cd ~/repos/murmurent
 python -m pytest -q
 # Expect: 1089 passed, 1 skipped (gcal extra).
 
@@ -296,7 +296,7 @@ can list and read their job files via the MCP — no dashboard involved.
 
 ```bash
 # 1. Re-run install so murmurent-core-data is in ~/.claude/settings.json.
-cd ~/repos/wigamig
+cd ~/repos/murmurent
 murmurent install --hooks
 grep -A2 murmurent-core-data ~/.claude/settings.json
 # Expect: the MCP entry with args ["-m", "murmurent.mcp.core_data_server"].

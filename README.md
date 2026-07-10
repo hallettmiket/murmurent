@@ -27,7 +27,7 @@ git clone https://github.com/hallettmiket/murmurent
 cd murmurent && ./scripts/bootstrap.sh
 ```
 
-(`~/repos/wigamig` is a common spot but not required. The `curl` one-liner above
+(`~/repos/murmurent` is a common spot but not required. The `curl` one-liner above
 clones there by default; override it with `MURMURENT_REPO_DIR=/your/path`.)
 
 [`scripts/bootstrap.sh`](scripts/bootstrap.sh) is idempotent: it installs the

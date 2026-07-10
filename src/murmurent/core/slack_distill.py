@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import Iterable, Protocol
 
 from .frontmatter import dump_document, parse_file
-from .repo import lab_mgmt_repo_root, wigamig_repo_root
+from .repo import lab_mgmt_repo_root, murmurent_repo_root
 
 ORACLE_SUBDIR = "oracle"
 ORACLE_AGENT_FILE = "agents/oracle.md"
@@ -162,7 +162,7 @@ def make_llm() -> LLMLike:
 
 def oracle_system_prompt() -> str:
     """Read agents/oracle.md as the LLM's system prompt."""
-    path = wigamig_repo_root() / ORACLE_AGENT_FILE
+    path = murmurent_repo_root() / ORACLE_AGENT_FILE
     if not path.is_file():
         return "You are the Oracle agent. Distill carefully."
     return parse_file(path).body

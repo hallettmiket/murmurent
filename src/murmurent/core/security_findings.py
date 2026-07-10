@@ -214,8 +214,8 @@ def _rollup_key(f: Finding) -> str:
     if f.category in ("repos", "raw", "refined") and f.project:
         # Find the **highest** ancestor whose basename matches the
         # project name. Walk top-down so that a path like
-        # ``/home/u/repos/wigamig/src/murmurent/foo.py`` rolls up at
-        # ``/home/u/repos/wigamig``, not the nested ``src/murmurent``.
+        # ``/home/u/repos/murmurent/src/murmurent/foo.py`` rolls up at
+        # ``/home/u/repos/murmurent``, not the nested ``src/murmurent``.
         # Falls back to immediate parent if no match (defensive).
         parts = p.parts
         for i in range(len(parts)):

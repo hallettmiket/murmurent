@@ -1096,7 +1096,7 @@ def create_app() -> FastAPI:
         """
         import os
         import subprocess
-        from ..core.repo import wigamig_repo_root
+        from ..core.repo import murmurent_repo_root
         from ..core.projects import (
             find_project as _find_project,
             project_path,
@@ -1242,7 +1242,7 @@ def create_app() -> FastAPI:
         # start_workspace.sh remains in the tree for the iTerm-windows
         # workflow but is no longer the dashboard's default.
         project_dir = project_path(body.project)
-        script = wigamig_repo_root() / "scripts" / "open_murmurent.sh"
+        script = murmurent_repo_root() / "scripts" / "open_murmurent.sh"
         if not script.is_file():
             raise HTTPException(status_code=500, detail=f"launcher missing: {script}")
 
@@ -5668,7 +5668,7 @@ def create_app() -> FastAPI:
         require a PR against the agents/ registry.
         """
         from ..core import agents as agents_core
-        from ..core.repo import wigamig_repo_root
+        from ..core.repo import murmurent_repo_root
 
         VALID_MODELS = {"opus", "sonnet", "haiku"}
         if action not in {"enable", "disable", "set_model"}:
@@ -5679,7 +5679,7 @@ def create_app() -> FastAPI:
                 detail=f"set_model needs ?model={'|'.join(sorted(VALID_MODELS))}",
             )
 
-        registry_dir = wigamig_repo_root() / "agents"
+        registry_dir = murmurent_repo_root() / "agents"
         try:
             registry = agents_core.load_registry(registry_dir)
         except Exception as exc:

@@ -6,8 +6,8 @@ First-time murmurent installation on a new machine.
 
 ```bash
 # 1. Clone the commons.
-git clone git@github.com:hallettmiket/murmurent.git ~/repos/wigamig
-cd ~/repos/wigamig
+git clone git@github.com:hallettmiket/murmurent.git ~/repos/murmurent
+cd ~/repos/murmurent
 
 # 2. Install the CLI (editable, pinned to Python 3.12).
 #    -e (editable): keeps the package in this clone so the dashboard's static
@@ -78,8 +78,8 @@ over a single batched SSH session).
 ## Verify
 
 ```bash
-ls -la ~/.claude/agents/   # should be symlinks into ~/repos/wigamig/agents/
-ls -la ~/.claude/rules/    # should be symlinks into ~/repos/wigamig/rules/
+ls -la ~/.claude/agents/   # should be symlinks into ~/repos/murmurent/agents/
+ls -la ~/.claude/rules/    # should be symlinks into ~/repos/murmurent/rules/
 grep murmurent-oracle ~/.claude/settings.json  # MCP registered
 murmurent --version
 ```

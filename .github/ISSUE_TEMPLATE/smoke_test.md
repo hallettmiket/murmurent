@@ -49,4 +49,4 @@ $ murmurent ...
 - OS:
 - Python:
 - gh auth: (`gh auth status` first line)
-- murmurent commit: (`git -C ~/repos/wigamig rev-parse --short HEAD`)
+- murmurent commit: (`git -C ~/repos/murmurent rev-parse --short HEAD`)

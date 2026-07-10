@@ -24,7 +24,7 @@ from .commands import reconcile_cmd as reconcile_impl
 from .commands import sea_cmd
 from .commands import security_cmd as security_impl
 from .core.agents import load_registry
-from .core.repo import wigamig_repo_root
+from .core.repo import murmurent_repo_root
 
 NOT_IMPLEMENTED_MSG = "not yet implemented in v1"
 
@@ -103,7 +103,7 @@ def agent_group() -> None:
 @click.option("--group", "group_name", default=None, help="Filter to a specific guild.")
 def agent_list(group_name: str | None) -> None:
     """Print agent name + freeze flag + short description."""
-    registry_dir = wigamig_repo_root() / "agents"
+    registry_dir = murmurent_repo_root() / "agents"
     agents = load_registry(registry_dir)
     if not agents:
         click.echo(f"No agents found in {registry_dir}.")

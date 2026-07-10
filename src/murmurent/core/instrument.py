@@ -17,7 +17,7 @@ from typing import Iterable
 
 import yaml
 
-from .repo import lab_mgmt_repo_root, wigamig_repo_root
+from .repo import lab_mgmt_repo_root, murmurent_repo_root
 
 INSTRUMENTS_SUBDIR = "instruments"
 
@@ -131,7 +131,7 @@ def load_profiles(
     Returns a dict keyed by instrument name.
     """
     profiles: dict[str, InstrumentProfile] = {}
-    centre = centre_dir if centre_dir is not None else wigamig_repo_root() / INSTRUMENTS_SUBDIR
+    centre = centre_dir if centre_dir is not None else murmurent_repo_root() / INSTRUMENTS_SUBDIR
     lab = lab_dir if lab_dir is not None else lab_mgmt_repo_root() / INSTRUMENTS_SUBDIR
 
     for directory in (centre, lab):

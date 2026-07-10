@@ -45,7 +45,7 @@ Then a blank line. Then the detail. Example:
 ```
 Clear — no world-writable or sensitive-readable files in scope.
 
-**Security Guard Audit — /Users/mth/repos/wigamig**
+**Security Guard Audit — /Users/mth/repos/murmurent**
 1. World-writable files: none found.
 2. World-readable sensitive matches: none found.
 3. World-executable shell scripts in scripts/: 7 (all intentional).

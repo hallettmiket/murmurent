@@ -8,7 +8,7 @@ example; swap in your own values.
 ## 1. Update the murmurent CLI
 
 ```bash
-cd ~/repos/wigamig && git pull && uv tool install --reinstall .
+cd ~/repos/murmurent && git pull && uv tool install --reinstall .
 ```
 
 ## 2. Set your centre's join email

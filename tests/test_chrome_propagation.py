@@ -167,6 +167,6 @@ def test_ssh_chrome_writes_appear_in_remote_adopt_script():
     assert "vscode_settings:ok" in s
     assert "cc_settings:ok" in s
     # Hook path is resolved at remote-runtime via $WIG (script sets
-    # it to $HOME/repos/wigamig); the literal $WIG/scripts/... must
+    # it to $HOME/repos/murmurent); the literal $WIG/scripts/... must
     # appear so the unquoted heredoc expands it correctly.
     assert "$WIG/scripts/murmurent_log_agent_event.sh" in s
