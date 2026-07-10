@@ -45,7 +45,7 @@ murmurent centre-hub-publish            # writes your row + prints next steps
 murmurent centre-hub-publish --submit   # …and publishes it for you
 ```
 
-It clones the [`wigamig_public`](https://github.com/hallettmiket/wigamig_public)
+It clones the [`murmurent_public`](https://github.com/hallettmiket/murmurent_public)
 hub if you don't have it, writes your row (institution, centre name, join email,
 and your `age1...` public key) into both `join/directory.tsv` and the README
 table, and — with `--submit` — publishes it the right way for **you specifically**:

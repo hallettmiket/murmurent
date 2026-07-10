@@ -56,7 +56,7 @@ precisely when you reference them:
 
 | Repo | Purpose |
 |---|---|
-| `github.com/hallettmiket/wigamig` | reference implementation (**public**): agents, rules, hooks, MCP servers, CLI, dashboard. This is what a new mayor clones to bootstrap a centre. |
+| `github.com/hallettmiket/murmurent` | reference implementation (**public**): agents, rules, hooks, MCP servers, CLI, dashboard. This is what a new mayor clones to bootstrap a centre. |
 | `github.com/hallettmiket/murmurent_manuscript` | the paper (private; Overleaf-synced) |
 | `github.com/hallettmiket/lab_mgmt` | per-group governance repo (private; registry + lab Oracle publish gateway) |
 | `github.com/hallettmiket/murmurent_public` *(planned — Phase 2)* | global onboarding hub for self-service join. **Not yet created**; onboarding is the phase after the admin level. |

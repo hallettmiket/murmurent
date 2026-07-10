@@ -103,10 +103,10 @@ centre's `unique_name`, never a hardcoded university).
 
 | Repo | Purpose |
 |---|---|
-| [`hallettmiket/wigamig`](https://github.com/hallettmiket/wigamig) | this repo (**public**) — agents, rules, hooks, MCP servers, CLI, dashboard. Clone this to install murmurent / bootstrap a centre. |
+| [`hallettmiket/murmurent`](https://github.com/hallettmiket/murmurent) | this repo (**public**) — agents, rules, hooks, MCP servers, CLI, dashboard. Clone this to install murmurent / bootstrap a centre. |
 | `hallettmiket/murmurent_manuscript` | the paper (private; Overleaf-synced — see [`rules/manuscript.md`](rules/manuscript.md)) |
 | `hallettmiket/lab_mgmt` | per-group governance repo (private) — see [`docs/lab_mgmt.md`](docs/lab_mgmt.md) |
-| [`hallettmiket/wigamig_public`](https://github.com/hallettmiket/wigamig_public) | global onboarding hub: institution directory + GitHub-issue join intake (no netnames / server paths). Novice-facing README kept trivial; maintainer/mayor setup lives in [`docs/hub_setup.md`](docs/hub_setup.md). |
+| [`hallettmiket/murmurent_public`](https://github.com/hallettmiket/murmurent_public) | global onboarding hub: institution directory + GitHub-issue join intake (no netnames / server paths). Novice-facing README kept trivial; maintainer/mayor setup lives in [`docs/hub_setup.md`](docs/hub_setup.md). |
 
 ## Quick setup
 

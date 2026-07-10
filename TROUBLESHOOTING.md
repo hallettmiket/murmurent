@@ -120,7 +120,7 @@ audit dir won't surface as an error message.
 ## Onboarding a fresh machine
 
 ```bash
-git clone git@github.com:hallettmiket/wigamig
+git clone git@github.com:hallettmiket/murmurent
 cd wigamig
 uv sync --extra dev --extra mcp --extra dashboard
 uv pip install -e .

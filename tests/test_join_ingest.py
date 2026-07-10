@@ -1,5 +1,5 @@
 """
-Tests for the wigamig_public → join_requests ingest (Phase 2, increment 2).
+Tests for the murmurent_public → join_requests ingest (Phase 2, increment 2).
 
 All GitHub I/O is injected — no test shells out to `gh`. Covers:
   - issue-form parsing (headings → fields; kind token extraction)
@@ -35,7 +35,7 @@ def centre(monkeypatch, tmp_path):
     CI.init_centre(
         name="Demo", institution="Demo U", founding_mayor="@tbrowne",
         unique_name="demo",
-        public_hub="github.com/acme/wigamig_public#demo",
+        public_hub="github.com/acme/murmurent_public#demo",
         write_sentinel=False,
     )
     return tmp_path
@@ -51,7 +51,7 @@ def _issue(number, kind="lab — start a new lab (you are the PI)",
         f"### Justification\n\n{just}\n"
     )
     return {"number": number, "title": "[join]", "body": body,
-            "url": f"https://github.com/acme/wigamig_public/issues/{number}",
+            "url": f"https://github.com/acme/murmurent_public/issues/{number}",
             "labels": [{"name": "join-request"}]}
 
 
@@ -75,7 +75,7 @@ class _GH:
 # ---- hub resolution ----------------------------------------------------
 
 def test_hub_repo_parsed_from_public_hub(centre):
-    assert JI._hub_repo() == "acme/wigamig_public"
+    assert JI._hub_repo() == "acme/murmurent_public"
 
 
 def test_no_hub_raises(centre, monkeypatch):
@@ -94,12 +94,12 @@ def test_ingest_creates_request_with_provenance(centre):
     assert r.kind == "lab" and r.proposed_name == "my_lab"
     assert r.proposed_pi == "@api"
     assert r.requester_email == ""                      # public form: no email
-    assert r.source_issue == "acme/wigamig_public#7"
+    assert r.source_issue == "acme/murmurent_public#7"
     # commented + labelled the issue
     assert any("#0001" in c[1] for c in gh.comments)
     assert (7, JI.INGEST_LABEL) in gh.labels
     # persisted + reloadable with provenance intact
-    assert JR.get_request(r.id).source_issue == "acme/wigamig_public#7"
+    assert JR.get_request(r.id).source_issue == "acme/murmurent_public#7"
 
 
 def test_ingest_is_idempotent(centre):
@@ -143,7 +143,7 @@ def test_missing_required_field_not_created(centre):
 def test_comment_decision_declines_and_closes(centre):
     gh = _GH([])
     req = JR.file_request(kind="lab", requester_email="", proposed_name="x",
-                          proposed_pi="@p", source_issue="acme/wigamig_public#5")
+                          proposed_pi="@p", source_issue="acme/murmurent_public#5")
     req.state = "declined"; req.decline_reason = "out of scope"
     ok = JI.comment_decision_on_issue(req, commenter=gh.comment, closer=gh.close)
     assert ok is True
@@ -154,7 +154,7 @@ def test_comment_decision_declines_and_closes(centre):
 def test_comment_decision_approve_no_close(centre):
     gh = _GH([])
     req = JR.file_request(kind="lab", requester_email="", proposed_name="x",
-                          proposed_pi="@p", source_issue="acme/wigamig_public#6")
+                          proposed_pi="@p", source_issue="acme/murmurent_public#6")
     req.state = "approved"
     JI.comment_decision_on_issue(req, commenter=gh.comment, closer=gh.close)
     assert any("Approved" in c[1] for c in gh.comments)

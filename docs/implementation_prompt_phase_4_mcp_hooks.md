@@ -66,7 +66,7 @@ Inventory MCP works in CC; PHI pattern detection fires inside clinical projects;
 - [ ] Submitting any prompt inside `dcis_sc_tutorial` injects a system reminder showing project name + role + active SEAs
 - [ ] Tool calls written to `~/.claude/wigamig-audit/YYYY-MM-DD.log` as jsonl
 - [ ] `murmurent install --hooks` succeeds idempotently
-- [ ] PR opened on `hallettmiket/wigamig` from `feat/phase-4-mcp-hooks`
+- [ ] PR opened on `hallettmiket/murmurent` from `feat/phase-4-mcp-hooks`
 
 ## Deferred to phase 5
 

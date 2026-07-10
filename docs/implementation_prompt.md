@@ -111,7 +111,7 @@ All four repos live at `~/repos/<name>/` locally **and** are pushed to GitHub un
 
 | Local | GitHub | State |
 |---|---|---|
-| `~/repos/wigamig/` | `hallettmiket/wigamig` | Already exists (currently has design docs + assets); add the CLI, agents, choreographies, scripts on a feature branch, PR to main when ready |
+| `~/repos/wigamig/` | `hallettmiket/murmurent` | Already exists (currently has design docs + assets); add the CLI, agents, choreographies, scripts on a feature branch, PR to main when ready |
 | `~/repos/lab_mgmt/` | `hallettmiket/lab_mgmt` | New; created by seed script via `gh repo create --private` |
 | `~/repos/dcis_sc_tutorial/` | `hallettmiket/dcis_sc_tutorial` | New; created by seed script; private |
 | `~/repos/bbb_drug_screen/` | `hallettmiket/bbb_drug_screen` | New; created by seed script; private |

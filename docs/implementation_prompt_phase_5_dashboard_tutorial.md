@@ -76,8 +76,8 @@ All eight from `docs/implementation_prompt.md`:
 
 Plus:
 - [ ] `TUTORIAL.md` walkthrough runs end-to-end without manual workarounds
-- [ ] PR opened on `hallettmiket/wigamig` from `feat/phase-5-dashboard-tutorial`
-- [ ] All five phase PRs merged to `main` of `hallettmiket/wigamig`
+- [ ] PR opened on `hallettmiket/murmurent` from `feat/phase-5-dashboard-tutorial`
+- [ ] All five phase PRs merged to `main` of `hallettmiket/murmurent`
 
 ## After phase 5
 

@@ -98,7 +98,7 @@ to the public hub; members fetch and pin them.
 # mayor: publish signing key + CRL alongside the directory listing
 murmurent centre-hub-publish [--submit]
 
-# member: fetch the centre's signing key + CRL from a local wigamig_public clone,
+# member: fetch the centre's signing key + CRL from a local murmurent_public clone,
 # pin the anchor (confirm the fingerprint out-of-band), and enable revocation
 murmurent centre-pin <unique-name> --fingerprint <SHA256:…>
 ```

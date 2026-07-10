@@ -65,13 +65,13 @@ def _default_mayor() -> str:
                    "group names, e.g. 'western'). Optional.")
 @click.option("--join-email", default="",
               help="Public contact address for join requests (listed in the "
-                   "wigamig_public directory). Optional.")
+                   "murmurent_public directory). Optional.")
 @click.option("--slack-workspace", default="",
               help="Slack team/workspace id (e.g. T0WESTERN). Optional.")
 @click.option("--github-org", default="",
               help="Canonical centre github org / dedicated account. Optional.")
 @click.option("--public-hub", default="",
-              help="Global wigamig_public onboarding hub + this centre's label. "
+              help="Global murmurent_public onboarding hub + this centre's label. "
                    "Optional.")
 @click.option("--server-host", default="",
               help="The 'murmurent server' hostname/IP (always-online, ssh-gated). "
@@ -403,7 +403,7 @@ def cmd_decline(req_id: int, actor: str, reason: str) -> None:
 
 @join_request_group.command("ingest")
 def cmd_ingest() -> None:
-    """Poll the wigamig_public hub once and file new join requests.
+    """Poll the murmurent_public hub once and file new join requests.
 
     Reads the hub repo from `public_hub` in centre.md, ingests open
     `join-request` issues addressed to this centre, comments on each with
@@ -575,7 +575,7 @@ def centre_slack_setup(mayor_email: str) -> None:
                 help="Generate the centre's age key pair for the encrypted-email "
                      "join flow. Writes the private key to ~/.wigamig/age/mayor.key "
                      "and stores the public recipient on the centre (publish it in "
-                     "the wigamig_public directory).")
+                     "the murmurent_public directory).")
 def centre_age_keygen() -> None:
     from ..core import age_crypto as _age
     if not _age.age_available():
@@ -936,13 +936,13 @@ def pi_init(group: str, core: bool) -> None:
 
 @click.command("centre-pin",
                 help="MEMBER: fetch a centre's published signing key + CRL from a "
-                     "local wigamig_public checkout and pin it as your trust "
+                     "local murmurent_public checkout and pin it as your trust "
                      "anchor. Confirm the fingerprint out-of-band with "
                      "--fingerprint. After this your dashboard enforces card "
                      "revocation fully (not just expiry).")
 @click.argument("unique_name")
 @click.option("--hub-dir", type=click.Path(file_okay=False), default=None,
-              help="Your wigamig_public checkout (default: ~/repos/wigamig_public).")
+              help="Your murmurent_public checkout (default: ~/repos/murmurent_public).")
 @click.option("--fingerprint", default="",
               help="Expected root fingerprint (confirm out-of-band before pinning).")
 def centre_pin(unique_name: str, hub_dir: str | None, fingerprint: str) -> None:
@@ -1145,14 +1145,14 @@ def centre_set(pairs: tuple[str, ...]) -> None:
 
 
 @click.command("centre-hub-publish",
-                help="List this centre in the public wigamig_public hub. Clones "
+                help="List this centre in the public murmurent_public hub. Clones "
                      "the hub if needed and writes your row into "
                      "join/directory.tsv + the README table. With --submit it "
                      "also publishes: a direct push if you have write access, "
                      "otherwise it forks the hub and opens a pull request for you.")
 @click.option("--hub-dir", type=click.Path(file_okay=False), default=None,
-              help="Where to clone/find your wigamig_public checkout "
-                   "(default: ~/repos/wigamig_public).")
+              help="Where to clone/find your murmurent_public checkout "
+                   "(default: ~/repos/murmurent_public).")
 @click.option("--remote", default=None,
               help="Hub git remote to clone from (default: the public hub).")
 @click.option("--submit/--no-submit", default=False,
@@ -1258,7 +1258,7 @@ def centre_hub_publish(hub_dir: str | None, remote: str | None, submit: bool) ->
         else:
             branch = f"list-{(prof.unique_name or 'centre')}"
             title = f"directory: list {prof.name} ({prof.institution})"
-            body = ("Adds a wigamig_public directory row for this centre "
+            body = ("Adds a murmurent_public directory row for this centre "
                     "(registrar contact + age public key" +
                     (", signing key + CRL" if extra_files else "") +
                     "). Opened by `murmurent centre-hub-publish`. No member data "
@@ -1530,7 +1530,7 @@ def cmd_decrypt(path: str) -> None:
     """Decrypt an emailed .age join form and file it as a join request.
 
     The prospective member encrypted their form to the centre's public key
-    (see the wigamig_public directory) and emailed you the ciphertext. This
+    (see the murmurent_public directory) and emailed you the ciphertext. This
     decrypts it with the centre's private key and files a pending request."""
     from ..core import age_crypto as _age
     from ..core import join_requests as _jr
