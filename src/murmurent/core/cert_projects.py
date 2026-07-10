@@ -47,7 +47,7 @@ VALID_REPO_ROLES = ("code", "manuscript", "data", "infra")
 class RepoRef:
     """One repo belonging to a project. A project may have several — e.g. a code
     repo plus a manuscript repo (Overleaf-synced), the way ``murmurent`` and
-    ``wigamig_manuscript`` pair up. ``host="local"`` means this machine at
+    ``murmurent_manuscript`` pair up. ``host="local"`` means this machine at
     ``path``; a remote host name means the tree is at ``remote_path`` on that host
     and ``path`` is a local pointer."""
 

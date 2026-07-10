@@ -3,8 +3,8 @@
 The murmurent manuscript lives in its own repo, synchronised with
 **Overleaf via GitHub**:
 
-- Working clone: `~/repos/wigamig_manuscript`
-- Remote: `git@github.com:hallettmiket/wigamig_manuscript.git`
+- Working clone: `~/repos/murmurent_manuscript`
+- Remote: `git@github.com:hallettmiket/murmurent_manuscript.git`
 - Single source file: `main-article.tex` (Springer Nature class);
   bibliography in `wigamig_bib.bib`.
 
@@ -14,7 +14,7 @@ can be ahead of your local clone at any moment.
 
 ## The rule
 
-**Before modifying the manuscript, `git -C ~/repos/wigamig_manuscript
+**Before modifying the manuscript, `git -C ~/repos/murmurent_manuscript
 pull` first.** Skipping this risks clobbering edits Mike made in
 Overleaf, and produces merge conflicts that are painful to resolve
 (Overleaf has no branches — everything is on `main`).

@@ -28,12 +28,12 @@ the administrative layer is meant to work (it uses **registrar /
 receptionist / accountant / centre-level security guard**; note there is
 **no "mayor" agent** — "mayor" is a *human bootstrap role* only).
 
-- Repo: `~/repos/wigamig_manuscript`, remote
-  `git@github.com:hallettmiket/wigamig_manuscript.git`, single source
+- Repo: `~/repos/murmurent_manuscript`, remote
+  `git@github.com:hallettmiket/murmurent_manuscript.git`, single source
   `main-article.tex`. Read the "Beyond the individual" / Results section on
   the centre, cores, labs, commons, and the twelve reference agents.
 - **If your task will modify the manuscript, `git -C
-  ~/repos/wigamig_manuscript pull` FIRST** (it's synced with Overleaf via
+  ~/repos/murmurent_manuscript pull` FIRST** (it's synced with Overleaf via
   GitHub — see `rules/manuscript.md`). Overleaf edits are authoritative on
   conflict; no feature branches; do not compile locally.
 
@@ -57,7 +57,7 @@ precisely when you reference them:
 | Repo | Purpose |
 |---|---|
 | `github.com/hallettmiket/wigamig` | reference implementation (**public**): agents, rules, hooks, MCP servers, CLI, dashboard. This is what a new mayor clones to bootstrap a centre. |
-| `github.com/hallettmiket/wigamig_manuscript` | the paper (private; Overleaf-synced) |
+| `github.com/hallettmiket/murmurent_manuscript` | the paper (private; Overleaf-synced) |
 | `github.com/hallettmiket/lab_mgmt` | per-group governance repo (private; registry + lab Oracle publish gateway) |
 | `github.com/hallettmiket/wigamig_public` *(planned — Phase 2)* | global onboarding hub for self-service join. **Not yet created**; onboarding is the phase after the admin level. |
 
