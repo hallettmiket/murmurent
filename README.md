@@ -36,8 +36,6 @@ After installation, find your situation below.
 You need a **membership ID** (a signed identity certificate) from your **PI**
 to include you in the lab or core. 
 
-**Via Slack**
-
 1. Request your ID:
    ```bash
    murmurent enroll --group <your-lab> --out enroll.json
