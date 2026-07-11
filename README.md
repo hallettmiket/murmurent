@@ -45,18 +45,32 @@ to include you in the lab or core.
 2. The PI then runs `murmurent issue-member-card` against
    your request. Murmurent will DM the signed bundle
    back to you.
-3. Save what you received as a file (e.g. `bundle.json`). This is the signed
-   bundle — **not** the trust root; they are two separate things. The trust
-   root is your PI's public signing key (a short string, not a file), and
-   murmurent asks for it as its own argument on purpose: it won't take your
-   word for who to trust just because a bundle claims it. The DM from step 2
-   includes the exact command with that trust root already filled in — copy
-   it as-is:
-   ```bash
-   murmurent import-card bundle.json --trust-root <the-trust-root-from-your-PI's-DM>
+3. Save what you received as a file (e.g. `bundle.json`). It looks like this
+   (trimmed):
+   ```json
+   {
+     "member_card": {
+       "payload": {"subject": {"handle": "@allie", "fingerprint": "SHA256:jo8Aqfe6In..."}, "group": "xia_lab"},
+       "signature": "..."
+     },
+     "pi_card": {
+       "payload": {"subject": {"handle": "@yxia266", "pubkey": "ed25519:Rgmuqeen5X3lW4pFV8GHVFafw0ozSxGk+uUeLC279Fw="}},
+       "signature": "..."
+     }
+   }
    ```
-   The first time, confirm that trust-root value with your PI out-of-band
-   (in person or by phone, not the same Slack message) before you rely on it.
+   The **trust root** is that `pubkey` value inside `pi_card` —
+   `ed25519:Rgmuqeen5X3lW4pFV8GHVFafw0ozSxGk+uUeLC279Fw=`. It's a short
+   string, not a file, and murmurent deliberately won't just read it out of
+   the bundle for you — a forged bundle could claim any key it likes, so you
+   must be told the real one independently and pass it explicitly:
+   ```bash
+   murmurent import-card bundle.json --trust-root ed25519:Rgmuqeen5X3lW4pFV8GHVFafw0ozSxGk+uUeLC279Fw=
+   ```
+   In practice, your PI's step-2 DM already contains this exact command with
+   the real value filled in — copy it as-is. The first time, confirm that
+   value with your PI out-of-band (in person or by phone, not the same Slack
+   message) before you rely on it.
 
 ## I'm a PI of a lab or core
 
