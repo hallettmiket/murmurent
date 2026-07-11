@@ -67,10 +67,15 @@ to include you in the lab or core.
    ```bash
    murmurent import-card bundle.json --trust-root ed25519:Rgmuqeen5X3lW4pFV8GHVFafw0ozSxGk+uUeLC279Fw=
    ```
-   In practice, your PI's step-2 DM already contains this exact command with
-   the real value filled in — copy it as-is. The first time, confirm that
-   value with your PI out-of-band (in person or by phone, not the same Slack
-   message) before you rely on it.
+   The first time, confirm that trust-root value with your PI out-of-band
+   (in person or by phone, not the same Slack message) before you rely on it.
+4. Confirm it worked — you don't need to keep the output:
+   ```bash
+   murmurent whoami        # now lists your group and role
+   ```
+   `import-card` stores the verified card locally, so from now on murmurent
+   knows you're a member of the lab. If your dashboard is open, restart it to
+   pick up the new role.
 
 ## I'm a PI of a lab or core
 
