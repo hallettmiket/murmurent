@@ -54,16 +54,24 @@ below.
 You need a **membership ID** (a signed identity certificate) from your **PI**
 to include you in the lab or core. 
 
-1. Request your ID:
+1. **Run the one-time setup first:**
+   ```bash
+   murmurent init          # choose "member"; sets your handle, name, email, GitHub
+   ```
+   Do this before anything else. `init` mints your identity key and records your
+   handle/name/email/GitHub — and the next step (`enroll`) packages exactly those
+   details into your request (your email + GitHub are how your PI adds you to the
+   lab's Slack channel and GitHub repo). Skip `init` and `enroll` has nothing to send.
+2. Request your ID:
    ```bash
    murmurent enroll --group <your-lab> --out enroll.json
    ```
    Send the output file `enroll.json` to your PI —
    DM it to them directly on Slack.
-2. The PI then runs `murmurent issue-member-card` against
+3. The PI then runs `murmurent issue-member-card` against
    your request. Murmurent will DM the signed bundle
    back to you.
-3. Save what you received as a file (e.g. `bundle.json`). It looks like this
+4. Save what you received as a file (e.g. `bundle.json`). It looks like this
    (trimmed):
    ```json
    {
@@ -87,7 +95,7 @@ to include you in the lab or core.
    ```
    The first time, confirm that trust-root value with your PI out-of-band
    (in person or by phone, not the same Slack message) before you rely on it.
-4. Confirm it worked — you don't need to keep the output:
+5. Confirm it worked — you don't need to keep the output:
    ```bash
    murmurent whoami        # now lists your group and role
    ```
