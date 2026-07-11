@@ -10,6 +10,11 @@ Murmurent can be used as a standalone agentic AI OS environment, as a means to i
 members of the same lab, or as a means of intergrating labs and core facilities across
 a centre or University.
 
+> **Stuck on any step below?** Once you've installed [Claude Code](https://claude.com/claude-code),
+> you can just *ask it*. Murmurent wires its own docs and CLI into Claude Code, so
+> "walk me through installing Murmurent", "did my install work?", or "how do I
+> issue a member card?" all work — Claude Code can run many of these steps for you.
+
 ## Download Murmurent
 
 **Everyone — member, PI, or mayor — starts by installing murmurent.** The code is
@@ -29,7 +34,20 @@ There are three ways a user interacts with Murmurent:
 (ii) through interactions (e.g. skills) defined in Claude Code
 (iii) through a Dashboard (not discussed here).
 
-After installation, find your situation below.
+## You're ready to run Murmurent locally
+
+That's it — Murmurent now runs on your machine, no PI or centre required. The
+agents, the Oracle memory, and the data-governance guardrails all work standalone.
+
+**New here? Start with the walkthrough:
+[`docs/getting_started.md`](docs/getting_started.md).** It's a short set of worked
+examples showing what Murmurent adds on top of Claude Code alone — delegating to
+the specialist agents, giving the Oracle a memory that survives across sessions and
+projects, and letting the guardrails catch mistakes before they happen. Read that
+before the full architecture in [`CLAUDE.md`](CLAUDE.md).
+
+To go further — joining or running a lab, a core, or a centre — find your situation
+below.
 
 ## I'm a member of a lab whose PI already uses murmurent
 
