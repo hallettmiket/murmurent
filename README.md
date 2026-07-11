@@ -45,18 +45,25 @@ to include you in the lab or core.
 2. The PI then runs `murmurent issue-member-card` against
    your request. Murmurent will DM the signed bundle
    back to you.
-3. Save what you received as a file (e.g. `bundle.json`), then import it,
-   pinning the trust root your PI gave you out-of-band:
+3. Save what you received as a file (e.g. `bundle.json`), then import it. The
+   DM from step 2 includes the exact command already filled in with your
+   PI's **trust root** — their public signing key, the anchor you pin so you
+   can verify any card they sign:
    ```bash
    murmurent import-card bundle.json --trust-root <your-trust-root>
    ```
+   Confirm the trust root's fingerprint with your PI out-of-band the first
+   time (e.g. in person or by phone, not the same Slack channel that carried
+   the bundle) before pinning it.
 
 ## I'm a PI of a lab or core
 
 You are your lab's certificate authority.
 
 1. Install Murmurent (above), then self-issue your PI ID — this makes you your
-   lab's root and prints a **trust root** to give your members:
+   lab's root and prints a **trust root** (your public signing key — the
+   anchor members pin so they can verify any card you sign) to give your
+   members:
    ```bash
    murmurent pi-init <your-lab>          # (or answer "PI" in `murmurent init`)
    ```
