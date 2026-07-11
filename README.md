@@ -47,8 +47,11 @@ to include you in the lab or core.
 2. The PI then runs `murmurent issue-member-card` against
    your request. Murmurent will DM the signed bundle
    back to you.
-3. Save what you received as a file (e.g. `bundle.json`)
-   and run the `murmurent import-card` command
+3. Save what you received as a file (e.g. `bundle.json`), then import it,
+   pinning the trust root your PI gave you out-of-band:
+   ```bash
+   murmurent import-card bundle.json --trust-root <your-trust-root>
+   ```
 
 ## I'm a PI of a lab or core
 
