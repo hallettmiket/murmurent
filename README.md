@@ -10,7 +10,7 @@ Murmurent can be used as a standalone agentic AI OS environment, as a means to i
 members of the same lab, or as a means of intergrating labs and core facilities across
 a centre or University.
 
-## Step1. Download Murmurent
+## Download Murmurent
 
 **Everyone — member, PI, or mayor — starts by installing murmurent.** The code is
 public; one command does it (you only need `git`):
