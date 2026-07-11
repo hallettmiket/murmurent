@@ -45,16 +45,18 @@ to include you in the lab or core.
 2. The PI then runs `murmurent issue-member-card` against
    your request. Murmurent will DM the signed bundle
    back to you.
-3. Save what you received as a file (e.g. `bundle.json`), then import it. The
-   DM from step 2 includes the exact command already filled in with your
-   PI's **trust root** — their public signing key, the anchor you pin so you
-   can verify any card they sign:
+3. Save what you received as a file (e.g. `bundle.json`). This is the signed
+   bundle — **not** the trust root; they are two separate things. The trust
+   root is your PI's public signing key (a short string, not a file), and
+   murmurent asks for it as its own argument on purpose: it won't take your
+   word for who to trust just because a bundle claims it. The DM from step 2
+   includes the exact command with that trust root already filled in — copy
+   it as-is:
    ```bash
-   murmurent import-card bundle.json --trust-root <your-trust-root>
+   murmurent import-card bundle.json --trust-root <the-trust-root-from-your-PI's-DM>
    ```
-   Confirm the trust root's fingerprint with your PI out-of-band the first
-   time (e.g. in person or by phone, not the same Slack channel that carried
-   the bundle) before pinning it.
+   The first time, confirm that trust-root value with your PI out-of-band
+   (in person or by phone, not the same Slack message) before you rely on it.
 
 ## I'm a PI of a lab or core
 
