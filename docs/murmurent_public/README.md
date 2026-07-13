@@ -43,7 +43,7 @@ is the public key the join script encrypts to.
 
 | Institution | Installation | Email to join | age key (encrypt to this) |
 |---|---|---|---|
-| Western University | Western QA Centre | tbrowne5@uwo.ca | age1pa3tqu0xlcm0tqmgr5j63nh50k2xhvxd2yfcxd760dxyhuzat9nqqmexah |
+| Western University | Western Test Centre | tbrowne5@uwo.ca | age1y43uxhv7dp50mw8qnrqwh4wvamp7adz4alxezpxang4wn9usuumqmneuat |
 
 **Don't see your institution?** It may not run murmurent yet — ask your PI or lab
 manager. (Registrars add their row here when they go live.)
