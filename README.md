@@ -29,7 +29,7 @@ key** (your unique ID). Then set your personal info — `murmurent whoami` shows
 handle + key.
 
 
-## [Everyone] Set up your identity:**
+## [Everyone] Set up your identity:
 
 ```bash
 murmurent init          # sets your handle, name, email, GitHub (choose member / PI / mayor)
