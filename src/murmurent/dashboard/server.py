@@ -92,6 +92,19 @@ class AddMemberBody(BaseModel):
     role: str = "staff"
 
 
+class IssueMemberCardBody(BaseModel):
+    """JSON body for ``POST /api/members/issue-card`` — the cert-gated add flow.
+
+    The PI pastes the member's enrollment request (their proof-of-possession:
+    a public key + a signature proving they hold the matching private key). The
+    server verifies it and issues a signed member card, which is what actually
+    puts the member on the roster with a certificate."""
+
+    enrollment: dict                                  # the member's PoP request
+    group: str | None = None                          # lab to add them to (default: current lab)
+    dm: bool = True                                   # try to DM the bundle on Slack
+
+
 class ProjectRepoBody(BaseModel):
     """JSON body for ``POST /api/project/{project}/repos`` — assign a repo to a
     project (code / manuscript / data / infra)."""
@@ -213,6 +226,11 @@ class LabSettingsBody(BaseModel):
     git_providers: list[GitProviderBody] | None = None
     github_org: str | None = None                    # legacy: single GitHub org
     git_repos_subpath: str | None = None             # default "repos"
+    # Slack wiring — the lab's workspace + shareable invite link. The PI's
+    # Slack workspace IS the lab's, so these live in Lab settings. ``None`` =
+    # don't touch, empty string = clear.
+    slack_workspace: str | None = None               # workspace id, e.g. TDUD7D20Y
+    slack_invite_url: str | None = None              # shareable join link
     # Storage locations (2026-07-06): notebooks + Obsidian each get a machine +
     # path; ``lab_base`` remains the files umbrella. ``None`` = don't touch,
     # empty string = clear.
@@ -1766,6 +1784,10 @@ def create_app() -> FastAPI:
             updates["github_org"] = body.github_org or None
         if body.git_repos_subpath is not None:
             updates["git_repos_subpath"] = body.git_repos_subpath or None
+        if body.slack_workspace is not None:
+            updates["slack_workspace"] = body.slack_workspace or None
+        if body.slack_invite_url is not None:
+            updates["slack_invite_url"] = body.slack_invite_url or None
         if body.git_providers is not None:
             # Validate kinds + ids before persisting. An empty list
             # explicitly clears the providers block (so the resolver
@@ -2202,6 +2224,154 @@ def create_app() -> FastAPI:
             "handle": rec.handle, "full_name": rec.full_name,
             "role": rec.role, "status": rec.status, "created": rec.created,
         }}
+
+    @app.post("/api/members/issue-card")
+    def issue_member_card_endpoint(
+        body: IssueMemberCardBody,
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Cert-gated add: verify the member's enrollment (proof-of-possession),
+        sign a member card with the PI's key, record it in the issuance ledger,
+        stamp the roster, and return the bundle to send back to the member.
+
+        This is the ONLY way the dashboard should add a member — it guarantees a
+        member on the roster actually holds a certificate (unlike the legacy
+        free-form ``POST /api/members``)."""
+        from ..core import issuance as _iss
+        from ..core import group_reconcile as _gr
+        from . import audit_log as _audit
+        import json as _json
+
+        actor = _require_pi(user)
+
+        group = (body.group or "").strip() or (snap_mod._current_lab_settings().name or "")
+        if not group:
+            raise HTTPException(status_code=422, detail="no group/lab to add the member to")
+
+        enrollment = body.enrollment or {}
+        payload = enrollment.get("payload") if isinstance(enrollment, dict) else None
+        if not isinstance(payload, dict) or not payload.get("pubkey"):
+            raise HTTPException(
+                status_code=422,
+                detail="enrollment is not a valid request (missing payload.pubkey) — "
+                       "paste the exact JSON the member sent from `murmurent enroll`")
+        handle = str(payload.get("handle") or "").lstrip("@")
+        if not handle:
+            raise HTTPException(status_code=422, detail="enrollment has no handle")
+
+        try:
+            bundle = _iss.issue_member_card(handle, enrollment=enrollment, group=group)
+        except _iss.IssuanceError as exc:
+            # PoP failure / not-your-group / missing PI card → 422 with the reason.
+            raise HTTPException(status_code=422, detail=str(exc))
+
+        subj = bundle["member_card"]["payload"]["subject"]
+        # Tell the PI exactly what trust root the member must pin (self-rooted
+        # standalone lab → the PI's own key; centre lab → centre-pin flow).
+        pi_p = bundle["pi_card"]["payload"]
+        self_rooted = (pi_p.get("issuer") or {}).get("fingerprint") == pi_p["subject"]["fingerprint"]
+        if self_rooted:
+            import_hint = ("save the bundle as bundle.json, then run: "
+                           f"murmurent import-card bundle.json --trust-root {pi_p['subject']['pubkey']}")
+        else:
+            import_hint = ("save the bundle as bundle.json, then run: "
+                           "murmurent centre-pin <centre> && murmurent import-card bundle.json")
+
+        try:
+            _audit.write_event(
+                actor=actor, kind="member.issue_card", project="",
+                target=f"member/{handle}",
+                summary=f"@{actor} issued a member card to @{handle} ({group})",
+            )
+        except OSError:
+            pass
+
+        dm_ok, dm_detail = False, "not attempted"
+        if body.dm:
+            member_email = str(payload.get("email") or "")
+            dm_text = (
+                f"Your murmurent member ID for '{group}' is ready. Save the JSON "
+                f"below as bundle.json, then run:\n\n    {import_hint}\n\n"
+                f"```\n{_json.dumps(bundle, indent=2)}\n```")
+            dm_ok, dm_detail = _gr.send_group_dm(group, text=dm_text, email=member_email)
+
+        return {
+            "ok": True,
+            "handle": handle,
+            "group": group,
+            "fingerprint": subj.get("fingerprint", ""),
+            "bundle": bundle,
+            "import_hint": import_hint,
+            "dm": {"sent": dm_ok, "detail": dm_detail},
+        }
+
+    @app.get("/api/members/audit")
+    def members_audit_endpoint(
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Run the member-certificate audit (read-only). Returns every member's
+        standing plus the flagged (non-valid) subset. PI only."""
+        from ..core import member_audit as _ma
+
+        _require_pi(user)
+        statuses = _ma.audit()
+        flagged = [s for s in statuses if not s.valid]
+        return {
+            "ok": True,
+            "centre": _ma.resolve_centre(),
+            "members": [
+                {"handle": s.handle, "full_name": s.full_name, "role": s.role,
+                 "status": s.status, "cert": s.cert, "detail": s.detail,
+                 "is_pi": s.is_pi}
+                for s in statuses
+            ],
+            "flagged": [
+                {"handle": s.handle, "full_name": s.full_name, "role": s.role,
+                 "status": s.status, "cert": s.cert, "detail": s.detail}
+                for s in flagged
+            ],
+            "counts": {
+                "total": len(statuses),
+                "flagged": len(flagged),
+                "valid": sum(1 for s in statuses if s.valid),
+            },
+        }
+
+    @app.post("/api/members/audit/notify")
+    def members_audit_notify_endpoint(
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Run the audit and DM the PI the list of members lacking a valid
+        certificate. Never removes anyone — removal stays a PI-confirmed action.
+        PI only."""
+        from ..core import member_audit as _ma
+        from ..core import group_reconcile as _gr
+        from ..core import membership as _m
+
+        pi = _require_pi(user)
+        group = snap_mod._current_lab_settings().name or ""
+        flagged = _ma.findings()
+        if not flagged:
+            return {"ok": True, "flagged": 0, "notified": False,
+                    "detail": "all members hold a valid certificate"}
+
+        lines = "\n".join(
+            f"  • @{s.handle} ({s.role}) — {s.detail}" for s in flagged)
+        text = (
+            f":rotating_light: *Member certificate audit — {group or 'your lab'}*\n"
+            f"{len(flagged)} member(s) do not hold a valid identity certificate:\n\n"
+            f"{lines}\n\n"
+            "Review them on the dashboard (Lab members → Audit). Nobody has been "
+            "removed automatically — deactivate any that shouldn't have access.\n\n"
+            "All worship me and I will let you serve me.")
+        pi_email = ""
+        try:
+            pi_email = _m.get(pi).email
+        except Exception:  # noqa: BLE001
+            pass
+        ok, detail = _gr.send_group_dm(group, text=text, email=pi_email) if group \
+            else (False, "no group configured")
+        return {"ok": True, "flagged": len(flagged), "notified": ok, "detail": detail}
 
     def _fetch_and_consume_tier2(host_obj, *, lab_vm_root: str | None) -> list:
         """SSH to the host, tar the latest snapshot dir, untar locally,
@@ -5289,6 +5459,21 @@ def create_app() -> FastAPI:
             handle = identity.handle if identity.source != "unknown" else ""
         return _resolve_roles(handle)
 
+    @app.get("/api/lab/public")
+    def get_lab_public() -> dict:
+        """This install's lab identity — no auth, no PII. Used by the login
+        page + top bar so they show the REAL lab (never a hardcoded one)."""
+        try:
+            ls = snap_mod._current_lab_settings()
+            name = ls.name or ""
+            return {
+                "name": name,
+                "display_name": ls.display_name or name,
+                "kind": ls.kind or "lab",
+            }
+        except Exception:
+            return {"name": "", "display_name": "", "kind": "lab"}
+
     @app.post("/api/login/select")
     def post_login_select(body: LoginSelectBody, request: Request) -> dict:
         """Validate (handle, role), audit-log, and return the next URL.
@@ -5327,12 +5512,25 @@ def create_app() -> FastAPI:
             handle=handle, role=role, source=client_host, allowed=True,
         )
         if body.remember_user:
-            try:
-                pref = Path.home() / ".murmurent" / "user"
-                pref.parent.mkdir(parents=True, exist_ok=True)
-                pref.write_text(handle + "\n", encoding="utf-8")
-            except OSError:
-                pass  # not fatal — they can still proceed this session
+            # NEVER persist a netname this machine's identity card doesn't own.
+            # Members are not role-gated above (any handle gets the member lens),
+            # so without this guard a typo'd/other netname would overwrite the
+            # real ~/.murmurent/user and every no-?user= load would then resolve
+            # to the wrong (or an unknown → refused → fake-data) identity.
+            from ..core import identity_card as _idcard
+            _owner = _idcard.machine_netname()
+            if _owner and handle.lstrip("@").lower() != _owner:
+                role_audit.record(
+                    handle=handle, role=role, source=client_host,
+                    allowed=False, reason="remember_user_not_owner",
+                )
+            else:
+                try:
+                    pref = Path.home() / ".murmurent" / "user"
+                    pref.parent.mkdir(parents=True, exist_ok=True)
+                    pref.write_text(handle + "\n", encoding="utf-8")
+                except OSError:
+                    pass  # not fatal — they can still proceed this session
 
         if role == "registrar":
             next_url = f"/registrar?user={handle}"

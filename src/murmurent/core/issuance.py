@@ -539,7 +539,9 @@ def _record_issued(centre_name: str, card: dict, kind: str) -> None:
         p = card["payload"]
         _rev.record_issued(centre_name, handle=p["subject"]["handle"],
                            card_id=p["card_id"],
-                           fingerprint=p["subject"]["fingerprint"], kind=kind)
+                           fingerprint=p["subject"]["fingerprint"], kind=kind,
+                           issued_at=str(p.get("issued_at") or ""),
+                           valid_until=str(p.get("valid_until") or ""))
     except Exception:  # noqa: BLE001
         pass
 

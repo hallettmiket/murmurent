@@ -306,6 +306,11 @@ class PeerRow(BaseModel):
     # the grant-candidates list. False by default; True when the
     # member's frontmatter has ``lab_sudo: true``.
     lab_sudo: bool = False
+    # Identity-certificate standing, from core.member_audit (PI lens only).
+    # "valid" = holds a good card; "uncertified" = never issued one;
+    # "revoked" / "expired" / "mismatch" = flagged. Empty string = not
+    # computed (member lens). Drives the cert badge + audit flagging.
+    cert: str = ""
 
 
 class AgentRow(BaseModel):
@@ -356,6 +361,7 @@ class AgentActivity(BaseModel):
     by the SubagentStop / PreToolUse(Agent) hook). Lets the dashboard show what
     subagents are doing — the browser equivalent of the tmux BR pane."""
 
+    date: str = ""          # "YYYY-MM-DD" when the hook recorded it; "" for legacy time-only lines
     time: str = ""          # "HH:MM"
     agent: str = ""         # subagent type (e.g. "blacksmith")
     text: str = ""          # the ≤200-char verdict, or the starting description
@@ -401,8 +407,15 @@ class LabSettings(BaseModel):
     """
 
     name: str = ""                             # short identifier, used in paths
-    display_name: str = "Hallett Lab"          # human label shown in the UI
+    display_name: str = ""                     # human label shown in the UI (blank → derive from name)
     pi_handle: str = ""
+    # The PI's own GitHub username (from their init profile / member record),
+    # distinct from ``github_org`` (the lab's org). Shown in Lab settings so the
+    # PI sees the identity details they supplied at ``murmurent init``.
+    pi_github: str = ""
+    # Slack wiring the registrar/`group-slack-setup` recorded in lab.md.
+    slack_workspace: str = ""                  # workspace id, e.g. TDUD7D20Y
+    slack_invite_url: str = ""                 # shareable join link
     # Phase 0 of the cores rollout (docs/cores_plan.md §3): distinguishes
     # a research lab from a service core. The Pydantic field stays
     # ``pi_handle`` but the dashboard renders the label as "Leader" when

@@ -226,14 +226,16 @@ function Sparkline({ data, w=180, h=36 }) {
 
 /* ───────── header ───────── */
 function TopBar() {
-  const m = window.DATA.member;
+  const m = window.DATA.member || {};
+  const ls = window.DATA.lab_settings || {};
+  // Institution-agnostic: show THIS install's lab, never a hardcoded one.
+  const labLabel = ls.display_name || ls.name || m.lab || "";
+  const kindLabel = (ls.kind === "core") ? "core" : "lab";
   return (
     <div className="topbar">
-      <img className="lab-logo" src="assets/lab-logo-hi-res.jpg" alt="Hallett Lab" />
-      <span className="sep">·</span>
-      <span className="uwo">Schulich School of Dentristy and Medicine · Western University</span>
+      <span className="uwo" style={{fontWeight:600}}>{labLabel}</span>
       <span className="who">
-        signed in as <code>@{m.handle}</code> · lab: <code>{m.lab}</code>
+        signed in as <code>@{m.handle}</code> · {kindLabel}: <code>{m.lab || ls.name}</code>
       </span>
     </div>
   );
@@ -2737,71 +2739,173 @@ async function postMemberStatus(handle, action) {
   return res.json();
 }
 
+async function getMembersAudit() {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/members/audit" + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+async function postAuditNotify() {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/members/audit/notify" + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, { method: "POST", headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+// Colour + label for a member's certificate standing (from PeerRow.cert).
+const CERT_TONE = { valid:"green", uncertified:"red", revoked:"red", expired:"amber", mismatch:"amber" };
+const CERT_LABEL = { valid:"✓ id", uncertified:"no cert", revoked:"revoked", expired:"expired", mismatch:"mismatch" };
+
+async function postIssueCard(body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/members/issue-card" + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+// Adding a member = ISSUING them a certificate. The PI pastes the enrollment
+// request the person sent (from `murmurent enroll`) — their public key + a
+// signature proving they hold the private key. The server verifies that proof,
+// signs a member card, records it, and returns a bundle to send back. There is
+// deliberately no "just type a name" path: a member on the roster always holds
+// a certificate.
 function AddMemberModal({ onClose }) {
-  const [handle, setHandle] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState("postdoc");
+  const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!handle.trim() || !fullName.trim()) {
-      setErr("handle and full name are required"); return;
-    }
+  const [result, setResult] = useState(null);
+
+  // Parse the pasted enrollment so the PI can confirm WHO they're certifying
+  // before issuing. Never throws — bad/partial JSON just yields no preview.
+  let parsed = null, parseErr = null;
+  const trimmed = text.trim();
+  if (trimmed) {
+    try {
+      const obj = JSON.parse(trimmed);
+      const p = obj && obj.payload;
+      if (p && p.pubkey && p.handle) parsed = p;
+      else parseErr = "This JSON isn't an enrollment request (no payload.pubkey/handle).";
+    } catch (_) { parseErr = "Not valid JSON yet — paste the whole enrollment request."; }
+  }
+
+  const issue = async () => {
+    if (!parsed) { setErr("Paste a valid enrollment request first."); return; }
     setBusy(true); setErr(null);
     try {
-      await postMemberAdd({
-        handle: handle.trim().replace(/^@/, ""),
-        full_name: fullName.trim(),
-        role,
-      });
+      const r = await postIssueCard({ enrollment: JSON.parse(trimmed), dm: true });
+      setResult(r);
       if (typeof window.__murmurentFetchData === "function") {
-        await window.__murmurentFetchData(window.DATA.persona);
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
-      onClose();
     } catch (ex) { setErr(String(ex.message || ex)); }
     finally { setBusy(false); }
   };
+
+  const lbl = {fontFamily:"var(--mono)", fontSize:11, letterSpacing:1,
+               textTransform:"uppercase", color:"var(--muted)", marginTop:8};
+  const bundleText = result ? JSON.stringify(result.bundle, null, 2) : "";
+
   return (
     <div onClick={onClose} style={{
       position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
-      display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
+      display:"flex", alignItems:"flex-start", justifyContent:"center", zIndex:100,
+      padding:"40px 20px", overflowY:"auto",
     }}>
-      <form onSubmit={submit} onClick={e => e.stopPropagation()} style={{
+      <div onClick={e => e.stopPropagation()} style={{
         background:"var(--card)", border:"1px solid var(--rule-strong)",
-        borderRadius:2, padding:18, width:"min(480px, 92vw)",
+        borderRadius:2, padding:18, width:"min(560px, 94vw)",
         display:"flex", flexDirection:"column", gap:8,
       }}>
         <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
-          Add member to lab
+          Add member — issue certificate
         </h2>
-        <p className="muted" style={{fontSize:12, margin:0}}>
-          Creates <code>&lt;lab-mgmt&gt;/members/&lt;handle&gt;.md</code>. The new member will need to
-          push their own ORCID / contact info via the dashboard.
-        </p>
-        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>handle (Western username, no @)</label>
-        <input value={handle} onChange={e => setHandle(e.target.value)} placeholder="e.g. jdoe123"
-               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
-        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>full name</label>
-        <input value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Jane Doe"
-               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2}}/>
-        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>role</label>
-        <select value={role} onChange={e => setRole(e.target.value)}
-                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}>
-          <option value="postdoc">postdoc</option>
-          <option value="student">student</option>
-          <option value="research_assistant">research_assistant</option>
-          <option value="staff">staff</option>
-          <option value="collaborator">collaborator</option>
-        </select>
-        {err && <div style={{color:"var(--red)", fontSize:12}}>{err}</div>}
-        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:6}}>
-          <button type="button" className="btn sm ghost" onClick={onClose}>cancel</button>
-          <button type="submit" className="btn sm primary" disabled={busy}>
-            {busy ? "…" : "add member"}
-          </button>
-        </div>
-      </form>
+
+        {!result && <>
+          <p className="muted" style={{fontSize:12, margin:0, lineHeight:1.5}}>
+            Paste the enrollment request the person sent you (they generate it with
+            <code> murmurent enroll --group &lt;lab&gt;</code>). It carries their public
+            key and a proof they hold the matching private key. Issuing verifies
+            that proof and puts them on the roster <em>with a certificate</em>.
+          </p>
+          <label style={lbl}>enrollment request (JSON)</label>
+          <textarea value={text} onChange={e => setText(e.target.value)}
+            placeholder='{ "payload": { "handle": "jdoe", "pubkey": "…", … }, "signature": "…" }'
+            spellCheck={false}
+            style={{minHeight:120, padding:"8px 9px", border:"1px solid var(--rule-strong)",
+                    borderRadius:2, fontFamily:"var(--mono)", fontSize:11.5, resize:"vertical"}}/>
+          {parseErr && trimmed &&
+            <div className="muted" style={{fontSize:11.5, color:"var(--tiger-deep)"}}>{parseErr}</div>}
+          {parsed && (
+            <div style={{border:"1px solid var(--rule)", borderRadius:2, background:"var(--paper-2)",
+                         padding:"8px 10px", fontSize:12.5, lineHeight:1.6}}>
+              <div style={{fontWeight:600, marginBottom:2}}>You are certifying:</div>
+              <div><span className="muted">handle</span> <code className="mono">@{parsed.handle}</code></div>
+              {parsed.email  && <div><span className="muted">email</span> <code className="mono">{parsed.email}</code></div>}
+              {parsed.github && <div><span className="muted">github</span> <code className="mono">@{String(parsed.github).replace(/^@/,"")}</code></div>}
+              {parsed.group  && <div><span className="muted">group</span> <code className="mono">{parsed.group}</code></div>}
+              <div><span className="muted">key</span> <code className="mono" style={{fontSize:10}}>{String(parsed.pubkey).slice(0,44)}…</code></div>
+            </div>
+          )}
+          {err && <div style={{color:"var(--red)", fontSize:12}}>{err}</div>}
+          <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:6}}>
+            <button type="button" className="btn sm ghost" onClick={onClose}>cancel</button>
+            <button type="button" className="btn sm primary" disabled={busy || !parsed} onClick={issue}>
+              {busy ? "issuing…" : "verify & issue card"}
+            </button>
+          </div>
+        </>}
+
+        {result && <>
+          <div style={{border:"1px solid var(--green)", borderRadius:2, background:"rgba(46,125,50,0.07)",
+                       padding:"8px 10px", fontSize:13}}>
+            ✓ Issued a certificate to <code className="mono">@{result.handle}</code> in
+            <code className="mono"> {result.group}</code>. They're now on the roster, carded.
+            <div className="mono muted" style={{fontSize:10, marginTop:3}}>fingerprint {String(result.fingerprint).slice(0,24)}…</div>
+          </div>
+          <div className="muted" style={{fontSize:12, lineHeight:1.5}}>
+            {result.dm && result.dm.sent
+              ? <>The card bundle was <strong>DM'd to them on Slack</strong>. They import it with the command below.</>
+              : <>Send them this bundle (Slack DM couldn't be sent{result.dm && result.dm.detail ? `: ${result.dm.detail}` : ""}). They save it as <code>bundle.json</code> and run:</>}
+          </div>
+          <code className="mono" style={{display:"block", fontSize:11, background:"var(--paper-2)",
+                border:"1px solid var(--rule)", borderRadius:2, padding:"6px 8px", overflowX:"auto"}}>
+            {result.import_hint}
+          </code>
+          <label style={lbl}>card bundle (send to the member)</label>
+          <textarea readOnly value={bundleText} spellCheck={false}
+            onFocus={e => e.target.select()}
+            style={{minHeight:110, padding:"8px 9px", border:"1px solid var(--rule-strong)",
+                    borderRadius:2, fontFamily:"var(--mono)", fontSize:10.5, resize:"vertical"}}/>
+          <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:6}}>
+            <button type="button" className="btn sm ghost"
+              onClick={() => { try { navigator.clipboard.writeText(bundleText); } catch (_) {} }}>
+              copy bundle
+            </button>
+            <button type="button" className="btn sm primary" onClick={onClose}>done</button>
+          </div>
+        </>}
+      </div>
     </div>
   );
 }
@@ -2810,8 +2914,27 @@ function LabMembersPanel({ peers, span="c-6" }) {
   const tcpsTone = { ok:"green", expiring:"amber", missing:"red" };
   const persona = window.DATA.persona || "member";
   const isPI = persona === "pi";
+  const myHandle = ((window.DATA.member || {}).handle || "").toLowerCase();
   const [showAdd, setShowAdd] = useState(false);
   const [busyHandle, setBusyHandle] = useState(null);
+  const [audit, setAudit] = useState(null);     // {flagged:[...], counts, ...}
+  const [auditBusy, setAuditBusy] = useState(false);
+
+  const runAudit = async () => {
+    setAuditBusy(true);
+    try { setAudit(await getMembersAudit()); }
+    catch (ex) { alert("Audit failed: " + (ex.message || ex)); }
+    finally { setAuditBusy(false); }
+  };
+  const notifyAudit = async () => {
+    setAuditBusy(true);
+    try {
+      const r = await postAuditNotify();
+      alert(r.notified ? "DM'd you the flagged list on Slack."
+                       : "Couldn't DM (" + (r.detail || "no Slack") + ").");
+    } catch (ex) { alert(ex.message || ex); }
+    finally { setAuditBusy(false); }
+  };
 
   const refresh = async () => {
     if (typeof window.__murmurentFetchData === "function") {
@@ -2854,11 +2977,43 @@ function LabMembersPanel({ peers, span="c-6" }) {
               : `${peers.length} shared-project peers`}
           </span>
           {isPI && (
+            <button className="btn sm" disabled={auditBusy} onClick={runAudit}
+                    title="Check every member holds a valid identity certificate">
+              {auditBusy ? "…" : "audit"}
+            </button>
+          )}
+          {isPI && (
             <button className="btn sm primary" onClick={() => setShowAdd(true)}>＋ add</button>
           )}
         </div>
       </header>
       {showAdd && <AddMemberModal onClose={() => setShowAdd(false)} />}
+      {isPI && audit && (
+        <div style={{margin:"0 14px 8px", padding:"8px 10px", borderRadius:2, fontSize:12.5, lineHeight:1.5,
+             border:"1px solid " + (audit.counts.flagged ? "var(--red)" : "var(--green)"),
+             background: audit.counts.flagged ? "rgba(194,57,43,0.06)" : "rgba(46,125,50,0.07)"}}>
+          {audit.counts.flagged === 0
+            ? <><strong>✓ All {audit.counts.total} members hold a valid certificate.</strong></>
+            : <>
+                <strong style={{color:"var(--red)"}}>{audit.counts.flagged} member(s) without a valid certificate:</strong>
+                <ul style={{margin:"4px 0 6px 18px", padding:0}}>
+                  {audit.flagged.map(f => (
+                    <li key={f.handle}><code className="mono">@{f.handle}</code> — {f.detail}</li>
+                  ))}
+                </ul>
+                <div className="muted" style={{fontSize:11.5}}>
+                  Nobody was removed. Deactivate any that shouldn't have access using the
+                  button on their row below.
+                </div>
+                <div className="row" style={{gap:6, marginTop:6}}>
+                  <button className="btn sm ghost" disabled={auditBusy} onClick={notifyAudit}>DM me this list</button>
+                  <button className="btn sm ghost" onClick={() => setAudit(null)}>dismiss</button>
+                </div>
+              </>}
+          {audit.counts.flagged === 0 &&
+            <button className="btn sm ghost" style={{marginLeft:8}} onClick={() => setAudit(null)}>dismiss</button>}
+        </div>
+      )}
       <div className="body" style={{padding:"6px 0"}}>
         {peers.map(p => (
           <div key={p.handle} style={{
@@ -2873,6 +3028,13 @@ function LabMembersPanel({ peers, span="c-6" }) {
               </div>
               <div className="row" style={{gap:6}}>
                 {p.status === "inactive" && <Pill tone="red">inactive</Pill>}
+                {isPI && p.cert && (
+                  <Pill tone={CERT_TONE[p.cert] || "amber"}
+                        title={p.cert === "valid" ? "holds a valid identity certificate"
+                               : "certificate issue — run audit for detail"}>
+                    {CERT_LABEL[p.cert] || p.cert}
+                  </Pill>
+                )}
                 <Pill tone={tcpsTone[p.tcps]}>tcps {p.tcps}</Pill>
               </div>
             </div>
@@ -2893,7 +3055,10 @@ function LabMembersPanel({ peers, span="c-6" }) {
                 <span><strong style={{color:"var(--ink-2)"}}>{p.open_seas}</strong> open SEAs</span>
                 <span><strong style={{color:"var(--ink-2)"}}>{p.experiments}</strong> experiments</span>
               </div>
-              {isPI && (
+              {isPI && p.handle.toLowerCase() === myHandle && (
+                <span className="mono muted" style={{fontSize:11}}>you (PI)</span>
+              )}
+              {isPI && p.handle.toLowerCase() !== myHandle && (
                 <button
                   className="btn sm"
                   disabled={busyHandle === p.handle}
@@ -5762,7 +5927,25 @@ function agentColour(name) {
   return AGENT_PALETTE[h % AGENT_PALETTE.length];
 }
 
-function AgentsPanel({ activity, span="c-12" }) {
+// Short day label for an agent-activity entry: "today" / "yesterday" /
+// "Jul 10" from the entry's date, so days-old activity doesn't read as if it
+// just happened. Legacy time-only lines (no date) fall back to "earlier".
+function _agentDayLabel(dateStr) {
+  if (!dateStr) return "earlier";
+  const todayIso = (window.DATA.today && window.DATA.today.iso) || "";
+  if (dateStr === todayIso) return "today";
+  try {
+    const d = new Date(dateStr + "T00:00:00");
+    const t = todayIso ? new Date(todayIso + "T00:00:00") : new Date();
+    const diffDays = Math.round((t - d) / 86400000);
+    if (diffDays === 1) return "yesterday";
+    const mon = d.toLocaleString("en-US", { month: "short" });
+    const yr = d.getFullYear() !== t.getFullYear() ? " " + d.getFullYear() : "";
+    return mon + " " + d.getDate() + yr;
+  } catch (_) { return dateStr; }
+}
+
+function AgentsActivityPanel({ activity, span="c-12" }) {
   const feed = activity || [];
   return (
     <div className={"panel "+span}>
@@ -5782,7 +5965,11 @@ function AgentsPanel({ activity, span="c-12" }) {
             <div key={i} style={{display:"flex", gap:10, alignItems:"baseline",
                  padding:"7px 14px", borderBottom:"1px solid var(--rule)",
                  borderLeft:"3px solid "+col, opacity: a.started ? 0.72 : 1}}>
-              <span className="mono muted" style={{fontSize:10, whiteSpace:"nowrap"}}>{a.time}</span>
+              <span className="mono muted" style={{fontSize:10, whiteSpace:"nowrap",
+                    display:"flex", flexDirection:"column", alignItems:"flex-start", lineHeight:1.3}}>
+                <span style={{fontWeight:600, opacity:0.9}}>{_agentDayLabel(a.date)}</span>
+                <span>{a.time}</span>
+              </span>
               <span style={{fontFamily:"var(--mono)", fontSize:11, fontWeight:700,
                     letterSpacing:0.3, color:"#fff", background:col,
                     padding:"1px 7px", borderRadius:3, whiteSpace:"nowrap"}}>
@@ -7404,7 +7591,7 @@ function GitProvidersEditor({ value, onChange }) {
   const HINTS = {
     "github":     "target = org name (e.g. hallettmiket)",
     "gitea":      "target = base URL (e.g. https://lab-server/gitea)",
-    "local-bare": "target = absolute server-side dir (e.g. /data/lab_vm/wigamig/repos)",
+    "local-bare": "target = absolute server-side dir (e.g. /data/<lab id>/repos)",
   };
 
   const update = (i, k, v) => {
@@ -7503,6 +7690,32 @@ function _joinHostPath(host, path) {
   if (!h && !p) return "";
   return h + ":" + p;
 }
+// Resolve the repos location to a FULL path so the Storage row reads
+// /data/<id>/repos, consistent with the files row — not a bare "repos"
+// subpath. A stored absolute path is used verbatim; a bare subpath is joined
+// under the files path.
+function _reposFullPath(filesPath, stored) {
+  const s = (stored || "").trim();
+  if (s.startsWith("/")) return s;                 // already an absolute path
+  const base = (filesPath || "").replace(/\/+$/, "");
+  // No files path configured yet → leave blank so the row shows its
+  // placeholder (/data/<id>/repos), consistent with the empty files row
+  // (which also shows a placeholder rather than a bare value).
+  if (!base) return "";
+  return base + "/" + (s || "repos").replace(/^\/+/, "");
+}
+// Inverse of _reposFullPath: the repos value is STORED as a subpath under
+// lab_base (that's what the clone-remote + local-root resolvers expect), so on
+// save we strip the files path back off the full path the user sees/edits.
+function _reposSubpath(reposPath, filesPath) {
+  const rp = (reposPath || "").trim().replace(/\/+$/, "");
+  const fp = (filesPath || "").trim().replace(/\/+$/, "");
+  if (!rp) return "repos";
+  if (fp && (rp === fp || rp.startsWith(fp + "/"))) {
+    return rp.slice(fp.length).replace(/^\/+/, "") || "repos";
+  }
+  return rp.replace(/^\/+/, "") || "repos";
+}
 
 function LabSettingsModal({ onClose }) {
   const ls = window.DATA.lab_settings || {};
@@ -7513,11 +7726,19 @@ function LabSettingsModal({ onClose }) {
     website:           ls.website           || "",
     // Lab parameters
     admins:            (ls.admins || []).join(", "),
-    // Git provider — no hardcoded org default; a fresh lab shows blank, not
-    // some other lab's org.
-    github_org:        ls.github_org        || "",
-    git_repos_subpath: ls.git_repos_subpath || "repos",
+    // GitHub — the PI's own GitHub IS the lab's GitHub org, so seed the org
+    // from pi_github when the lab hasn't set an explicit org. Never fall back
+    // to another lab's org.
+    github_org:        ls.github_org        || ls.pi_github || "",
+    // Repos are a full Machine + Path location like notebooks/Obsidian (not a
+    // bare "repos" subpath), so the Path field reads /data/<id>/repos to match
+    // the files row. Own host so editing it never moves the files machine.
+    repos_host:        _fb.host,
+    repos_path:        _reposFullPath(_fb.path, ls.git_repos_subpath),
     git_providers:     ls.git_providers     || [],
+    // Slack — the PI's workspace is the lab's workspace.
+    slack_workspace:   ls.slack_workspace   || "",
+    slack_invite_url:  ls.slack_invite_url  || "",
     // Storage servers — three machine + path pairs. Files = the umbrella
     // (lab_base); notebooks + Obsidian get their own if the lab wants.
     files_host:        _fb.host,
@@ -7541,8 +7762,10 @@ function LabSettingsModal({ onClose }) {
         website:           form.website,
         admins:            form.admins.split(",").map(s => s.trim()).filter(Boolean),
         github_org:        form.github_org,
-        git_repos_subpath: form.git_repos_subpath,
+        git_repos_subpath: _reposSubpath(form.repos_path, form.files_path),
         git_providers:     form.git_providers,
+        slack_workspace:   form.slack_workspace,
+        slack_invite_url:  form.slack_invite_url,
         // Files → the umbrella lab_base (host:/path).
         lab_base:          _joinHostPath(form.files_host, form.files_path),
         notebook_host:     form.notebook_host,
@@ -7609,10 +7832,14 @@ function LabSettingsModal({ onClose }) {
     </div>
   );
 
-  const subpath   = (form.git_repos_subpath || "repos").replace(/^\/+|\/+$/g, "");
   const githubOrg = (form.github_org || "").trim();
   const filesBase = _joinHostPath(form.files_host, form.files_path);
   const labMgmtPath = ls.lab_mgmt_path || "lab_mgmt";
+  // Storage convention: everything for lab <id> lives under /data/<id>/.
+  // We derive the example paths off the real lab id so the placeholders show
+  // /data/mh/… for lab "mh", not a stale /data/lab_vm/wigamig.
+  const labId       = (ls.name || "").trim();
+  const dataRoot    = labId ? `/data/${labId}` : "/data/<lab id>";
 
   return (
     <div onClick={onClose} style={{
@@ -7641,8 +7868,13 @@ function LabSettingsModal({ onClose }) {
         <div style={sectionStyle}>
           <h4 style={sectionHeader}>Identity</h4>
           <div className="row" style={{flexWrap:"wrap", gap:14, marginTop:6, fontSize:13}}>
-            <div><span className="muted">lab id</span> <code className="mono">{ls.name}</code></div>
-            <div><span className="muted">PI</span> <code className="mono">{ls.pi_handle}</code></div>
+            <div><span className="muted">lab id</span> <code className="mono">{ls.name || "—"}</code></div>
+            <div><span className="muted">netname of PI</span> <code className="mono">{ls.pi_handle || "—"}</code></div>
+          </div>
+          <div className="muted" style={{fontSize:11, marginTop:4, lineHeight:1.5}}>
+            The lab id and PI netname you supplied at <code className="mono">murmurent init</code>.
+            The lab's GitHub and Slack — which are the PI's — are set in the GitHub
+            and Slack sections below.
           </div>
           <div style={labelStyle}>display name</div>
           <input style={inputStyle} value={form.display_name} onChange={update("display_name")}
@@ -7664,20 +7896,10 @@ function LabSettingsModal({ onClose }) {
           </div>
         </div>
 
-        {/* 3 · Git provider */}
+        {/* 3 · Lab GitHub account */}
         <div style={sectionStyle}>
-          <h4 style={sectionHeader}>Git provider</h4>
-          <div style={{fontSize:11, color:"var(--muted)", marginTop:3, marginBottom:6, lineHeight:1.5}}>
-            The git origin servers this lab uses. Each project picks one; each
-            member registers a username per provider in Member Profile. The
-            <em> display name</em> is just a friendly label shown in that
-            picker — leave it blank to fall back to the id.
-          </div>
-          <GitProvidersEditor
-            value={form.git_providers}
-            onChange={(next) => setForm((p) => ({ ...p, git_providers: next }))}
-          />
-          <div style={labelStyle}>GitHub org (fallback when no provider above)</div>
+          <h4 style={sectionHeader}>Lab GitHub account</h4>
+          <div style={labelStyle}>GitHub org</div>
           <input style={inputStyle} value={form.github_org} onChange={update("github_org")}
                  placeholder="your-github-org" />
           {githubOrg
@@ -7685,35 +7907,70 @@ function LabSettingsModal({ onClose }) {
                 Lab GitHub: <a href={`https://github.com/${githubOrg}`} target="_blank" rel="noopener">https://github.com/{githubOrg}</a>
               </div>
             : null}
-          <div style={labelStyle}>location for the group's repos on the lab server</div>
-          <input style={inputStyle} value={form.git_repos_subpath} onChange={update("git_repos_subpath")}
-                 placeholder="repos" />
-          <div style={{fontSize:11, color:"var(--muted)", marginTop:4, lineHeight:1.5}}>
-            Only used if you host git on your own lab server instead of GitHub.
-            {filesBase
-              ? <> Resolves to <code className="mono">{_underLabBase(filesBase, subpath)}</code>.</>
-              : null}
+          <div style={{...labelStyle, marginTop:12}}>additional git providers</div>
+          <div style={{fontSize:11, color:"var(--muted)", marginTop:3, marginBottom:6, lineHeight:1.5}}>
+            Declare extra git origin servers (a self-hosted Gitea, a lab-server
+            bare repo) if some projects don't use the GitHub org above. Each
+            project picks one; each member registers a username per provider in
+            Member Profile. The <em>display name</em> is just a friendly label
+            in that picker — leave it blank to fall back to the id.
           </div>
+          <GitProvidersEditor
+            value={form.git_providers}
+            onChange={(next) => setForm((p) => ({ ...p, git_providers: next }))}
+          />
         </div>
 
-        {/* 4 · Storage servers */}
+        {/* 4 · Slack */}
+        <div style={sectionStyle}>
+          <h4 style={sectionHeader}>Slack</h4>
+          <div style={{fontSize:11, color:"var(--muted)", marginTop:3, marginBottom:6, lineHeight:1.5}}>
+            The lab's Slack workspace — the PI's workspace, recorded at Slack
+            setup. Lab and project channels live here; the invite link is what
+            you send new members so they can join.
+          </div>
+          <div style={labelStyle}>Slack workspace id</div>
+          <input style={inputStyle} value={form.slack_workspace} onChange={update("slack_workspace")}
+                 placeholder="e.g. TDUD7D20Y" />
+          <div style={labelStyle}>Slack invite link</div>
+          <input style={inputStyle} value={form.slack_invite_url} onChange={update("slack_invite_url")}
+                 placeholder="https://join.slack.com/t/…/shared_invite/…" />
+          {form.slack_invite_url
+            ? <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
+                <a href={form.slack_invite_url} target="_blank" rel="noopener" style={{color:"var(--purple)"}}>join link ↗</a>
+              </div>
+            : null}
+        </div>
+
+        {/* 5 · Storage servers */}
         <div style={sectionStyle}>
           <h4 style={sectionHeader}>Storage servers</h4>
+          <div style={{fontSize:11, color:"var(--muted)", marginTop:3, marginBottom:2, lineHeight:1.5}}>
+            Lab files are located here — just a suggestion; each lab picks its
+            own (e.g. <code className="mono">{dataRoot}</code>).
+          </div>
           {storageRow({
             label: "files",
             host: form.files_host, path: form.files_path,
             onHost: update("files_host"), onPath: update("files_path"),
-            hostPh: "lab-server.example.edu", pathPh: "/data/lab_vm/wigamig",
-            hint: filesBase
-              ? <>Projects live under <code className="mono">{_underLabBase(filesBase, "raw")}</code> and <code className="mono">{_underLabBase(filesBase, "refined")}</code>.</>
-              : "The lab's data root. raw/ and refined/ live under this path.",
+            hostPh: "lab-server.example.edu", pathPh: dataRoot,
+          })}
+          {/* Repos — moved here from the GitHub section. Same Machine/Path shape
+              as the other storage rows for consistency. */}
+          {storageRow({
+            label: "repos on the lab server",
+            host: form.repos_host, path: form.repos_path,
+            onHost: update("repos_host"), onPath: update("repos_path"),
+            hostPh: form.files_host || "lab-server.example.edu",
+            pathPh: `${dataRoot}/repos`,
+            hint: "Local copies of lab repos",
           })}
           {storageRow({
             label: "lab notebooks",
             host: form.notebook_host, path: form.notebook_path,
             onHost: update("notebook_host"), onPath: update("notebook_path"),
             hostPh: form.files_host || "lab-server.example.edu",
-            pathPh: filesBase ? _underLabBase(filesBase, "notebooks") : "/data/lab_vm/wigamig/notebooks",
+            pathPh: filesBase ? _underLabBase(filesBase, "notebooks") : `${dataRoot}/notebooks`,
             hint: "Where per-member lab notebooks live. Leave blank to keep them under the files path.",
           })}
           {storageRow({
@@ -7946,7 +8203,14 @@ function App() {
       <div className="app">
         <CmdBar query={query} setQuery={setQuery} />
 
-        {/* Installations: always-visible — open workspace or install from here. */}
+        {/* Group members — the whole group (for the PI, the PI included; for a
+            member, their shared-project peers). Uppermost so the first thing
+            you see is who is in the lab/core. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <LabMembersPanel peers={D.peers} span="c-12" />
+        </div>
+
+        {/* Installations: open workspace or install from here. */}
         <div className="grid" style={{marginBottom:14}}>
           <InstallationsBox span="c-12" />
         </div>
@@ -7995,13 +8259,13 @@ function App() {
 
         {/* Live subagent feed — the browser equivalent of the tmux BR pane. */}
         <div className="grid" style={{marginBottom:14}}>
-          <AgentsPanel activity={D.agents_activity} span="c-12" />
+          <AgentsActivityPanel activity={D.agents_activity} span="c-12" />
         </div>
 
-        {/* Lab members + inventory: things you check, but not every day. */}
+        {/* Inventory: things you check, but not every day. (Lab members moved
+            to the top of the page.) */}
         <div className="grid" style={{marginBottom:14}}>
-          <LabMembersPanel peers={D.peers} span="c-6" />
-          <InventoryPanel inv={D.inventory} span="c-6" />
+          <InventoryPanel inv={D.inventory} span="c-12" />
         </div>
 
         {/* Repo inventory: cross-machine + GitHub audit. Cached weekly,

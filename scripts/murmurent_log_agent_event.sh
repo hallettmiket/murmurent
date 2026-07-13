@@ -66,9 +66,16 @@ TOOL="$(get tool_name)"
 #   SubagentStop      → agent_type
 # Plus the agent's final message (only on SubagentStop) so the "done"
 # line can echo the agent in its own voice instead of a bare "done".
+#
+# There is deliberately NO generic "agent" fallback. If neither field
+# resolves, the event did not come from a genuinely-dispatched subagent
+# (e.g. a main-context message, or a payload without an agent type). Writing
+# a nameless "agent: <whatever the main loop last said>" line is the exact
+# "fake out" the dashboard must never show — a real subagent always carries
+# its type. When we cannot name the agent, we skip the line entirely (below),
+# rather than inventing one.
 AGENT="$(get tool_input.subagent_type)"
 [[ -z "$AGENT" ]] && AGENT="$(get agent_type)"
-[[ -z "$AGENT" ]] && AGENT="agent"
 
 DESC="$(get tool_input.description)"
 LAST_MSG="$(get last_assistant_message)"
@@ -80,7 +87,10 @@ PALETTE=(32 33 34 35 36 91 92 93 94 95 96)
 HASH=$(printf '%s' "$AGENT" | cksum | awk '{print $1}')
 COLOR=${PALETTE[$(( HASH % ${#PALETTE[@]} ))]}
 
-ts="$(date '+%H:%M')"
+# Include the date, not just HH:MM — the dashboard shows a "today / yesterday /
+# Jul 10" day label so days-old activity doesn't read as if it just happened.
+# The parser (snapshot._AGENT_LINE_RE) still accepts old time-only lines.
+ts="$(date '+%Y-%m-%d %H:%M')"
 
 # Compose one line per event. Truncate description to 100 chars so a
 # verbose orchestrator prompt doesn't wrap and break the column.
@@ -89,6 +99,9 @@ case "$EVENT" in
         # Only fire for the Agent tool — other tools share PreToolUse
         # but aren't agent events.
         [[ "$TOOL" != "Agent" ]] && exit 0
+        # No subagent_type → not a real dispatch. Skip rather than log a
+        # nameless line (see the AGENT-resolution note above).
+        [[ -z "$AGENT" ]] && exit 0
         short="${DESC:0:100}"
         # Trailing blank line keeps the BR pane visually airy — easier
         # to scan one event at a time than a dense wall of text.
@@ -96,6 +109,10 @@ case "$EVENT" in
             "$COLOR" "$ts" "$AGENT" "$short" >> "$LOG"
         ;;
     SubagentStop)
+        # No agent_type → this stop did not come from a dispatched subagent,
+        # so its last message is main-context text, not an agent verdict.
+        # Skip it — logging it as "agent: …" is the fake-out we forbid.
+        [[ -z "$AGENT" ]] && exit 0
         # Echo back the agent's own final message (truncated, newlines
         # collapsed) so the BR pane shows "<agent>: <summary in their
         # own voice>" instead of a bare "<agent>: done". Empty message

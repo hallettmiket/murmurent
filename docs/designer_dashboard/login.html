@@ -175,7 +175,7 @@
   <body>
     <div class="banner">
       <h1>murmurent <small>v1.0.0</small> &middot; Sign in</h1>
-      <div class="meta">Hallett Lab &middot; Western University</div>
+      <div class="meta" id="lab-meta"></div>
     </div>
 
     <div class="wrap">
@@ -296,7 +296,20 @@
       const defaultRole = (resolved && resolved.default_role) || "member";
       selectedRole = allowed[defaultRole] ? defaultRole : "member";
 
-      const rows = ["member", "pi", "core_leader", "registrar"].map(role => {
+      // A PI (or core leader / registrar) does NOT get a "member" lens —
+      // they sign in as their group role. Only offer "member" to people whose
+      // highest role IS member (or an unrecognised netname, which still gets
+      // the empty member view rather than a hard 403 on a typo).
+      const holdsHigherRole = flags.pi || flags.core_leader || flags.registrar;
+      const roleOrder = ["member", "pi", "core_leader", "registrar"]
+        .filter(role => !(role === "member" && holdsHigherRole));
+      if (holdsHigherRole && selectedRole === "member") {
+        selectedRole = allowed.pi ? "pi"
+          : allowed.core_leader ? "core_leader"
+          : allowed.registrar ? "registrar" : "member";
+      }
+
+      const rows = roleOrder.map(role => {
         const isAllowed = allowed[role];
         const why = role === "member"
           ? (handle ? "available" : "claim a netname first")
@@ -393,6 +406,17 @@
           submitBtn.disabled = false;
         });
     });
+
+    // Banner: show THIS install's real lab (never a hardcoded one). Blank
+    // until it resolves, so a fresh install shows no stale lab name.
+    fetch("/api/lab/public", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(r => r.json())
+      .then(lab => {
+        const label = (lab && (lab.display_name || lab.name)) || "";
+        const el = document.getElementById("lab-meta");
+        if (el) el.textContent = label;
+      })
+      .catch(() => {});
 
     // Initial state — fetch the inferred handle from the server's
     // resolve endpoint (no ?user= → server returns whatever MURMURENT_USER

@@ -80,16 +80,33 @@ def _save(p: Path, obj) -> None:
 # ---------------------------------------------------------------------------
 
 def record_issued(centre: str, *, handle: str, card_id: str,
-                  fingerprint: str, kind: str) -> None:
-    """Record an issued card so it can later be revoked by handle. Best-effort;
-    called from the issuer's machine at issuance time."""
+                  fingerprint: str, kind: str,
+                  issued_at: str = "", valid_until: str = "") -> None:
+    """Record an issued card so it can later be revoked by handle, and so a
+    member-validity audit can tell "issued? / expired?" from the PI's own
+    machine. Best-effort; called from the issuer's machine at issuance time.
+    ``issued_at`` / ``valid_until`` are the card's own ISO timestamps (added
+    2026-07; older ledger entries omit them → the audit treats expiry as
+    unknown for those rather than flagging them)."""
     led = _load(_ledger_path(centre), {})
-    led[_norm(handle)] = {"card_id": card_id, "fingerprint": fingerprint, "kind": kind}
+    entry = {"card_id": card_id, "fingerprint": fingerprint, "kind": kind}
+    if issued_at:
+        entry["issued_at"] = issued_at
+    if valid_until:
+        entry["valid_until"] = valid_until
+    led[_norm(handle)] = entry
     _save(_ledger_path(centre), led)
 
 
 def lookup_issued(centre: str, handle: str) -> dict | None:
     return _load(_ledger_path(centre), {}).get(_norm(handle))
+
+
+def issued_ledger(centre: str) -> dict:
+    """The whole ``{handle: {card_id, fingerprint, kind, issued_at?, valid_until?}}``
+    index. Used by the member-validity audit to classify every roster member in
+    one read."""
+    return _load(_ledger_path(centre), {})
 
 
 # ---------------------------------------------------------------------------

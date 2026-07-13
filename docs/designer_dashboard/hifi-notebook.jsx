@@ -62,6 +62,12 @@ function NbHintPopup({ text }) {
 function NbToday() {
   const NB = window.DATA.notebook;
   const t = NB.today;
+  // Cap the rendered day to its most recent ~50 blocks so a long entry doesn't
+  // grow the panel without bound — the file itself always has the full text.
+  const CAP = 50;
+  const all = t.content || [];
+  const shown = all.length > CAP ? all.slice(-CAP) : all;
+  const hidden = all.length - shown.length;
   return (
     <div className="nb-entry">
       <h3>{t.title}</h3>
@@ -71,7 +77,12 @@ function NbToday() {
         <span><span className="muted">links ›</span> {t.links_seas.map(n => <span key={n} className="wikilink" style={{marginRight:6}}>SEA #{n}</span>)} {t.links_exp.map(e => <span key={e} className="wikilink" style={{marginRight:6}}>{e}</span>)}</span>
       </div>
 
-      {t.content.map((b, i) => {
+      {hidden > 0 && (
+        <p className="muted" style={{fontSize:12, fontStyle:"italic", margin:"0 0 8px"}}>
+          … showing the last {CAP} of {all.length} blocks — open the file for the full day.
+        </p>
+      )}
+      {shown.map((b, i) => {
         if (b.kind === "h4")        return <h4 key={i}>{b.text}</h4>;
         if (b.kind === "hint")      return <NbHintPopup key={i} text={b.text} />;
         if (b.kind === "p")         return <p key={i}>{b.text.split(/(\[\[[^\]]+\]\])/).map((s,j) => /^\[\[/.test(s) ? <span key={j} className="wikilink">{s.replace(/[\[\]]/g,'')}</span> : <span key={j}>{s}</span>)}</p>;

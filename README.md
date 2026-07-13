@@ -34,6 +34,18 @@ There are three ways a user interacts with Murmurent:
 (ii) through interactions (e.g. skills) defined in Claude Code
 (iii) through a Dashboard (not discussed here).
 
+**Everyone runs this next — set up your identity:**
+
+```bash
+murmurent init          # sets your handle, name, email, GitHub (choose member / PI / mayor)
+```
+
+`init` mints your identity key and records your handle/name/email/GitHub; everything
+else builds on it, whether or not you ever join a lab. (For a lab member, the next
+step further down — `enroll` — packages exactly those details into your request: your
+email + GitHub are how your PI adds you to the lab's Slack channel and GitHub repo.
+Skip `init` and `enroll` has nothing to send.)
+
 ## You're ready to run Murmurent locally
 
 That's it — Murmurent now runs on your machine, no PI or centre required. The
@@ -52,26 +64,19 @@ below.
 ## I'm a member of a lab whose PI already uses murmurent
 
 You need a **membership ID** (a signed identity certificate) from your **PI**
-to include you in the lab or core. 
+to include you in the lab or core. You've already run `murmurent init` (see
+[Download Murmurent](#download-murmurent) above) — that's the prerequisite; now:
 
-1. **Run the one-time setup first:**
-   ```bash
-   murmurent init          # choose "member"; sets your handle, name, email, GitHub
-   ```
-   Do this before anything else. `init` mints your identity key and records your
-   handle/name/email/GitHub — and the next step (`enroll`) packages exactly those
-   details into your request (your email + GitHub are how your PI adds you to the
-   lab's Slack channel and GitHub repo). Skip `init` and `enroll` has nothing to send.
-2. Request your ID:
+1. Request your ID:
    ```bash
    murmurent enroll --group <your-lab> --out enroll.json
    ```
    Send the output file `enroll.json` to your PI —
    DM it to them directly on Slack.
-3. The PI then runs `murmurent issue-member-card` against
+2. The PI then runs `murmurent issue-member-card` against
    your request. Murmurent will DM the signed bundle
    back to you.
-4. Save what you received as a file (e.g. `bundle.json`). It looks like this
+3. Save what you received as a file (e.g. `bundle.json`). It looks like this
    (trimmed):
    ```json
    {
@@ -95,7 +100,7 @@ to include you in the lab or core.
    ```
    The first time, confirm that trust-root value with your PI out-of-band
    (in person or by phone, not the same Slack message) before you rely on it.
-5. Confirm it worked — you don't need to keep the output:
+4. Confirm it worked — you don't need to keep the output:
    ```bash
    murmurent whoami        # now lists your group and role
    ```
