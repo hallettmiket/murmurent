@@ -2289,11 +2289,13 @@ def create_app() -> FastAPI:
         dm_ok, dm_detail = False, "not attempted"
         if body.dm:
             member_email = str(payload.get("email") or "")
+            member_slack = str(payload.get("slack") or "")
             dm_text = (
                 f"Your murmurent member ID for '{group}' is ready. Save the JSON "
                 f"below as bundle.json, then run:\n\n    {import_hint}\n\n"
                 f"```\n{_json.dumps(bundle, indent=2)}\n```")
-            dm_ok, dm_detail = _gr.send_group_dm(group, text=dm_text, email=member_email)
+            dm_ok, dm_detail = _gr.send_group_dm(group, text=dm_text,
+                                                 slack=member_slack, email=member_email)
 
         return {
             "ok": True,

@@ -110,15 +110,16 @@ def repos_root() -> Path:
 
 
 def lab_repo_path(group: str) -> Path:
-    """The lab-management repo for ``group`` — ``<repos>/wigamig_<group>`` — named so
-    it is unmistakably a murmurent repo."""
+    """The lab-management repo for ``group`` — ``<repos>/lab_mgmt_<group>`` — named so
+    it is unmistakably a murmurent lab-management repo (the legacy ``wigamig_``
+    prefix predates the wigamig→murmurent rename)."""
     safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in str(group or ""))
-    return repos_root() / f"wigamig_{safe}"
+    return repos_root() / f"murmurent_lab_mgmt_{safe}"
 
 
 def set_lab_mgmt_path(path: str | Path) -> None:
     """Persistently point ``lab_mgmt_repo_root()`` at a lab's own management repo
-    (e.g. ``~/repos/wigamig_lab_mh``). Honours ``MURMURENT_HOME``. An explicit
+    (e.g. ``~/repos/lab_mgmt_mh``). Honours ``MURMURENT_HOME``. An explicit
     ``$MURMURENT_LAB_MGMT_REPO`` still overrides it."""
     p = _lab_mgmt_pointer_path()
     p.parent.mkdir(parents=True, exist_ok=True)

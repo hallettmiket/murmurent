@@ -68,8 +68,11 @@ def run_init() -> None:
     name = click.prompt("Your full name", default="")
     email = click.prompt("Your email", default="")
     github = click.prompt("Your GitHub username (optional)", default="").strip().lstrip("@")
+    slack = click.prompt("Your Slack username or member ID (optional — lets your PI "
+                         "DM your ID card straight back to you)",
+                         default="").strip().lstrip("@")
     profile = {"handle": f"@{handle}", "role": role, "name": name, "email": email,
-               "github": github}
+               "github": github, "slack": slack}
 
     # 5. Role-specific info.
     if role == "pi":

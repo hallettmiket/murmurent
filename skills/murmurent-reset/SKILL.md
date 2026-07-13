@@ -31,14 +31,14 @@ Opt-in extras (only with the flag): `--nuke-installations` (also wipes
 `--nuke-credentials` (also wipes `~/.config/wigamig/` — the **slack-token +
 keys**), `--nuke-keys` (with `--level data`, **also** removes `~/.murmurent/keys/`
 + `age/` for a fully fresh identity; default keeps them), `--nuke-labs` (also
-removes this machine's **lab-management repos** `~/repos/wigamig_*` — they hold
+removes this machine's **lab-management repos** `~/repos/murmurent_lab_mgmt_* (legacy: ~/repos/wigamig_*)` — they hold
 the roster; see below), `--uninstall` (first **completely removes** the existing
 murmurent install — the uv-tool one *and* stray conda/pipx copies that shadow it —
 before any reinstall).
 
-### Lab repos (`~/repos/wigamig_*`) — the roster
+### Lab repos (`~/repos/murmurent_lab_mgmt_* (legacy: ~/repos/wigamig_*)`) — the roster
 
-A PI's lab-management repo (`~/repos/wigamig_<group>`, created by `pi-init` /
+A PI's lab-management repo (`~/repos/murmurent_lab_mgmt_<group>` (legacy `~/repos/wigamig_<group>`), created by `pi-init` /
 `murmurent init`) holds `members/*.md` — the **roster**, which is the source of
 truth for member identity (card fingerprints included). It lives under
 `~/repos`, which reset **never** touches by default, so **every** reset just
@@ -97,7 +97,7 @@ base/envs + pipx and removes any murmurent it finds. Working clones under
   isn't one.
 - **Never** touches `~/repos/*` working clones, `~/.claude/CLAUDE.md`,
   `~/.claude/memory/`, or `~/.claude/projects/` — with **one** opt-in exception:
-  `--nuke-labs` removes `~/repos/wigamig_*` lab-management repos (backed up first,
+  `--nuke-labs` removes `~/repos/murmurent_lab_mgmt_* (legacy: ~/repos/wigamig_*)` lab-management repos (backed up first,
   and only when they have no uncommitted/unpushed work). Nothing else under
   `~/repos` is ever touched.
 - **Credentials and other-project installs are preserved by default.** On this

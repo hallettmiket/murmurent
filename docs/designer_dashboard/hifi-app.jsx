@@ -2863,6 +2863,7 @@ function AddMemberModal({ onClose }) {
               <div><span className="muted">handle</span> <code className="mono">@{parsed.handle}</code></div>
               {parsed.email  && <div><span className="muted">email</span> <code className="mono">{parsed.email}</code></div>}
               {parsed.github && <div><span className="muted">github</span> <code className="mono">@{String(parsed.github).replace(/^@/,"")}</code></div>}
+              {parsed.slack  && <div><span className="muted">slack</span> <code className="mono">@{String(parsed.slack).replace(/^@/,"")}</code> <span className="muted" style={{fontSize:11}}>(card DM'd here)</span></div>}
               {parsed.group  && <div><span className="muted">group</span> <code className="mono">{parsed.group}</code></div>}
               <div><span className="muted">key</span> <code className="mono" style={{fontSize:10}}>{String(parsed.pubkey).slice(0,44)}…</code></div>
             </div>

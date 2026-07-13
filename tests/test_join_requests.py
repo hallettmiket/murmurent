@@ -348,7 +348,8 @@ def test_send_group_dm_no_email_or_uid_is_actionable():
     from murmurent.core import group_reconcile as GR
     ok, detail = GR.send_group_dm("dcis", text="hi", token="xoxb-x")
     assert ok is False
-    assert "no email on file" in detail
+    # No slack handle, no email, no uid → actionable "can't resolve" message.
+    assert "no Slack handle or email on file" in detail
 
 
 def test_send_group_dm_email_not_found_in_workspace(monkeypatch):

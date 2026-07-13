@@ -145,6 +145,36 @@ You are your lab's certificate authority.
 
 Full identity flow (enroll → issue → import → revoke): [`docs/identity.md`](docs/identity.md).
 
+## I have a lab or core and want to join a centre
+
+Your lab or core **already exists** — you created it when you ran `murmurent init`
+(and self-issued your PI ID) above. Joining a centre simply *affiliates that
+existing group* with an institution's murmurent centre. It does **not** create a
+new group and it does **not** disturb your standalone setup: your roster, your
+members' cards, and your day-to-day all keep working. You gain a **centre-signed
+PI/leader ID** on top of your own key, and the centre's mayor gains cross-lab
+coordination.
+
+1. Send a join request to the centre's mayor. One script gathers the details,
+   encrypts them to the mayor's key, and opens your email — nothing leaves your
+   machine until you press Send:
+   ```bash
+   curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/murmurent_public/main/join/murmurent-join.sh
+   sh murmurent-join.sh
+   ```
+   Pick your institution, then answer **lab** or **core**, your group's short name
+   (the one you used at `init`, e.g. `mh`), and your handle. (This script is for
+   PIs/leaders only — members get their card from their PI via `import-card`, above.)
+2. The mayor approves, registers your group with the centre, and sends you a
+   **centre-signed PI card**. Import it, pinning the centre's trust root the first
+   time (confirm that value with the mayor out-of-band):
+   ```bash
+   murmurent import-card <pi-bundle.json> --trust-root <centre-signing-key>
+   ```
+3. Done — your group is now part of the centre. Nothing about your existing lab
+   changed except that your key now also chains to the centre's root; your
+   members' cards keep verifying exactly as before.
+
 ## I want to run murmurent at my institution (become the mayor)
 
 You already ran `murmurent init` and chose **mayor** (see

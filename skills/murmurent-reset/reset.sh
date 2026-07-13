@@ -23,7 +23,7 @@
 #   --nuke-keys            with --level data, ALSO remove ~/.murmurent/keys + age
 #                          (a fully fresh identity; default keeps them)
 #   --nuke-labs            ALSO remove this machine's murmurent lab-management repos
-#                          (~/repos/wigamig_*  — they hold the roster). Backed up
+#                          (~/repos/murmurent_lab_mgmt_*, legacy wigamig_* — they hold the roster). Backed up
 #                          into the tarball first; REFUSES any repo with
 #                          uncommitted or unpushed commits (push it, or don't nuke
 #                          it). Default: labs are only LISTED and left untouched.
@@ -212,16 +212,20 @@ say "6. opt-in nukes"
 if [ "$NUKE_INSTALL" = 1 ]; then rmrf "$WIG/installations" "installations/ (OTHER PROJECTS)"; else say "  (keep) installations/"; fi
 if [ "$NUKE_CREDS" = 1 ];   then rmrf "$CFG" "credentials (~/.config/wigamig: slack-token + keys)"; else say "  (keep) credentials"; fi
 
-# 7. murmurent lab-management repos (~/repos/wigamig_*) ------------------------
+# 7. murmurent lab-management repos (~/repos/murmurent_lab_mgmt_*, legacy wigamig_*) ---
 # These hold the lab ROSTER (members/*.md) — the source of truth for identity.
 # They live under ~/repos, which reset otherwise NEVER touches, so by default we
 # only LIST them (so you know they survive). --nuke-labs removes them, but only
 # after backing each into the tarball and refusing any with uncommitted/unpushed
 # work (losing the roster to a reset must be a deliberate, safe act).
-say "7. murmurent lab repos ($REPOS_ROOT/wigamig_*)"
+say "7. murmurent lab repos ($REPOS_ROOT/murmurent_lab_mgmt_* + legacy wigamig_*)"
 LAB_REPOS=()
 if [ -d "$REPOS_ROOT" ]; then
-  for d in "$REPOS_ROOT"/wigamig_*; do
+  # Current convention is murmurent_lab_mgmt_<group>; wigamig_<group> is the
+  # pre-rename legacy name still on older machines. Match both so a reset never
+  # silently leaves a stale roster behind (a non-matching glob stays literal and
+  # is filtered by the .git check below).
+  for d in "$REPOS_ROOT"/murmurent_lab_mgmt_* "$REPOS_ROOT"/wigamig_*; do
     [ -d "$d/.git" ] || continue
     # the murmurent repo + its manuscript aren't lab-mgmt repos; skip by name
     case "$(basename "$d")" in murmurent|murmurent_manuscript|murmurent_public) continue ;; esac

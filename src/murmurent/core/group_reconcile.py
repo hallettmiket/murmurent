@@ -140,13 +140,55 @@ def resolve_group_slack_user_id(email: str, token: str) -> str | None:
     return None
 
 
+def resolve_slack_id_or_name(slack: str, token: str) -> str:
+    """Resolve a member's Slack handle to a user id. Accepts a raw member id
+    (``U…``/``W…``, used directly) or a username / display name / real name,
+    which is matched against ``users.list``. Returns "" on no match. Never
+    raises."""
+    import re as _re
+    s = (slack or "").strip().lstrip("@")
+    if not s:
+        return ""
+    if _re.fullmatch(r"[UW][A-Z0-9]{6,}", s):     # already a Slack member id
+        return s
+    target = s.lower()
+    try:
+        import httpx
+        cursor = ""
+        for _ in range(10):
+            params = {"limit": 200}
+            if cursor:
+                params["cursor"] = cursor
+            r = httpx.get("https://slack.com/api/users.list",
+                          headers={"Authorization": f"Bearer {token}"},
+                          params=params, timeout=8)
+            d = r.json()
+            if not d.get("ok"):
+                return ""
+            for u in d.get("members", []):
+                prof = u.get("profile", {}) or {}
+                names = {str(u.get("name") or "").lower(),
+                         str(prof.get("display_name") or "").lower(),
+                         str(prof.get("real_name") or "").lower()}
+                if target in names and not u.get("deleted"):
+                    return str(u.get("id") or "")
+            cursor = (d.get("response_metadata") or {}).get("next_cursor") or ""
+            if not cursor:
+                break
+    except Exception:  # noqa: BLE001
+        return ""
+    return ""
+
+
 def send_group_dm(group: str, *, text: str, slack_user_id: str = "",
-                   email: str = "", token: str | None = None) -> tuple[bool, str]:
+                   email: str = "", slack: str = "",
+                   token: str | None = None) -> tuple[bool, str]:
     """DM ``text`` to a member via the group's OWN Slack workspace (the token
     from :func:`resolve_group_slack_token`, or ``token`` to override).
 
-    Resolves ``slack_user_id`` from ``email`` via ``users.lookupByEmail`` when
-    not given directly. Never raises — a Slack outage or missing token can't
+    Resolution order for the recipient: an explicit ``slack_user_id``; then the
+    member's ``slack`` handle/id (from their enrollment); then ``email`` via
+    ``users.lookupByEmail``. Never raises — a Slack outage or missing token can't
     break card issuance; the caller falls back to manual delivery. Returns
     ``(ok, detail)``."""
     from ..dashboard import slack_notify as _sn
@@ -157,12 +199,16 @@ def send_group_dm(group: str, *, text: str, slack_user_id: str = "",
                         f"`murmurent group-slack-setup {group}` first")
 
     uid = slack_user_id
+    if not uid and slack:
+        uid = resolve_slack_id_or_name(slack, tok)
     if not uid:
-        if not email:
-            return False, "member has no email on file — can't resolve their Slack account"
-        uid = resolve_group_slack_user_id(email, tok)
+        if not email and not slack:
+            return False, "no Slack handle or email on file — can't resolve their Slack account"
+        if email:
+            uid = resolve_group_slack_user_id(email, tok)
         if not uid:
-            return False, f"couldn't find {email} in the group's Slack workspace"
+            who = slack or email
+            return False, f"couldn't find {who} in the group's Slack workspace"
 
     channel = _sn._open_dm(uid, tok)
     if not channel:

@@ -839,6 +839,7 @@ def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
         return
 
     member_email = str((enrollment.get("payload") or {}).get("email") or "")
+    member_slack = str((enrollment.get("payload") or {}).get("slack") or "")
     dm_text = (
         f"Your murmurent member ID for '{group}' is ready. Save the JSON below "
         f"as a file (e.g. bundle.json), then run:\n\n"
@@ -846,7 +847,7 @@ def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
         f"```\n{text}\n```"
     )
     ok, detail = _gr.send_group_dm(group, text=dm_text, slack_user_id=dm_user_id,
-                                    email=member_email)
+                                    slack=member_slack, email=member_email)
     if ok:
         click.echo(f"\n✓ DM'd {subj} their card on Slack")
     else:
