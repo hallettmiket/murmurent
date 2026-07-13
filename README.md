@@ -112,12 +112,16 @@ to include you in the lab or core. You've already run `murmurent init` (see
 
 You are your lab's certificate authority.
 
-1. Install Murmurent (above), then self-issue your PI ID — this makes you your
-   lab's root and prints a **trust root** (your public signing key — the
-   anchor members pin so they can verify any card you sign) to give your
-   members:
+1. You already ran `murmurent init` and chose **PI** (see
+   [Download Murmurent](#download-murmurent) above). `init` asked for your lab's
+   short name and then **offered to self-issue your PI ID on the spot** (the
+   default) — that is what makes you your lab's root and prints a **trust root**
+   (your public signing key, the anchor members pin so they can verify any card
+   you sign). **If you accepted that prompt, this step is already done.** Only if
+   you declined it (or want to redo it) do you run the standalone command — it does
+   exactly the same self-issue:
    ```bash
-   murmurent pi-init <your-lab>          # (or answer "PI" in `murmurent init`)
+   murmurent pi-init <your-lab>
    ```
 2. Connect your lab's Slack. This lets member IDs travel by DM instead
    of by hand:
@@ -126,7 +130,7 @@ You are your lab's certificate authority.
    ```
    Full details regarding creating the Slack app with security scopes, etc.:
    [`docs/group_slack_setup.md`](docs/group_slack_setup.md).
-4. Accept members by issuing them IDs. A member runs `murmurent enroll
+3. Accept members by issuing them IDs. A member runs `murmurent enroll
    --group <your-lab>` and gets instructions to send you the resulting
    request (e.g. a Slack DM). Once you have it:
    ```bash
@@ -143,8 +147,12 @@ Full identity flow (enroll → issue → import → revoke): [`docs/identity.md`
 
 ## I want to run murmurent at my institution (become the mayor)
 
-You bootstrap a new **centre** and become its founding registrar — see the
-details below. You then register PIs and send each one their ID.
+You already ran `murmurent init` and chose **mayor** (see
+[Download Murmurent](#download-murmurent) above). That sets your identity but does
+**not** create the centre — `init` deliberately just points you to the next step.
+You then bootstrap a new **centre** with `murmurent centre-init` (or the dashboard's
+registrar form) and become its founding registrar — see the details below — after
+which you register PIs and send each one their ID.
 
 ---
 
@@ -164,14 +172,52 @@ murmurent dashboard --hifi --port 8771
 # open http://localhost:8771/registrar and fill in the one-time setup form
 ```
 
-...or headlessly:
+...or headlessly. Only `--name` and `--institution` are required; everything else
+is optional and can be filled in later from the dashboard or with
+`murmurent centre-set`. A fully-worked example:
 
 ```bash
-murmurent centre-init --mayor @<your-handle> \
-  --name "<Centre name>" --institution "<Institution>" \
-  --unique-name <short-id> --server-host <wigamig-server-host>
+murmurent centre-init \
+  --name "Western Bioconvergence Centre" \
+  --institution "Western University" \
+  --mayor @tbrowne \
+  --unique-name western \
+  --join-email murmurent-western@example.edu \
+  --slack-workspace T0WESTERN \
+  --github-org centre-westernu \
+  --public-hub github.com/hallettmiket/murmurent_public#western \
+  --server-host lab-server.example.edu \
+  --server-account murmurent \
+  --cc-install-path /opt/claude \
+  --mayor-root /mayor/western \
+  --obsidian-vault /mayor/obsidian \
+  --raw-root /data/western/raw \
+  --refined-root /data/western/refined
 murmurent centre-status      # confirms you are the founding registrar
 ```
+
+Each parameter, with an example:
+
+| Flag | What it is | Example |
+|---|---|---|
+| `--name` *(required)* | Display name of the centre | `"Western Bioconvergence Centre"` |
+| `--institution` *(required)* | Hosting institution | `"Western University"` |
+| `--mayor` | Your `@handle` (defaults to `$MURMURENT_USER`, then the OS user) | `@tbrowne` |
+| `--unique-name` | Short, institution-agnostic id — drives repo / Slack / group names | `western` |
+| `--join-email` | Public address PIs send join requests to (listed in the directory) | `murmurent-western@example.edu` |
+| `--slack-workspace` | Your Slack workspace / team id (the `T…` id) | `T0WESTERN` |
+| `--github-org` | The centre's GitHub org / dedicated account | `centre-westernu` |
+| `--public-hub` | Global onboarding hub + this centre's label | `github.com/hallettmiket/murmurent_public#western` |
+| `--server-host` | The always-online, ssh-gated murmurent server | `lab-server.example.edu` |
+| `--server-account` | SSH login account on that server | `murmurent` |
+| `--cc-install-path` | Where Claude Code lives on the server | `/opt/claude` |
+| `--mayor-root` | High-level mayor dir (mirrorable to GitHub) | `/mayor/western` |
+| `--obsidian-vault` | Centre-level Obsidian / markdown pool | `/mayor/obsidian` |
+| `--raw-root` | Centre `raw/` root on the data server | `/data/western/raw` |
+| `--refined-root` | Centre `refined/` root on the data server | `/data/western/refined` |
+
+`--data-server` is a legacy alias of `--server-host`. Add `--no-prompt` for
+scripted / server runs, and `--no-sentinel` when running under `sudo` or in CI.
 
 ### Make your centre joinable
 
