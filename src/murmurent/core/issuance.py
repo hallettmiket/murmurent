@@ -167,15 +167,20 @@ def self_issue_pi_card(handle: str, group: str, *, group_kind: str = "lab",
     # write the PI's own record — the roster is the single source of truth.
     from . import membership as _mem
     from . import repo as _repo
+    prof = _read_profile(env)
     lab_repo = _repo.lab_repo_path(group)
     (lab_repo / "members").mkdir(parents=True, exist_ok=True)
     lab_md = lab_repo / "lab.md"
     if not lab_md.is_file():
-        lab_md.write_text(f"---\nlab: {group}\npi: '{at}'\nkind: {group_kind}\n---\n\n"
+        # Record what the PI already gave at `murmurent init`: their GitHub is the
+        # lab's org, so stamp github_org now rather than leaving lab.md minimal —
+        # the dashboard's Lab settings then shows it with no manual re-entry.
+        gh = str(prof.get("github") or "").strip().lstrip("@")
+        gh_line = f"github_org: {gh}\n" if gh else ""
+        lab_md.write_text(f"---\nlab: {group}\npi: '{at}'\nkind: {group_kind}\n{gh_line}---\n\n"
                           f"# {group}\n", encoding="utf-8")
     _git_init_lab_repo(lab_repo)          # version-control the roster (best-effort)
     _repo.set_lab_mgmt_path(lab_repo)
-    prof = _read_profile(env)
     _mem.upsert_member(at, role="pi", email=str(prof.get("email") or ""),
                        github=str(prof.get("github") or ""),
                        card_fingerprint=card["payload"]["subject"]["fingerprint"],

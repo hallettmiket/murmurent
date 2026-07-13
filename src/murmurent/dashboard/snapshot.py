@@ -592,11 +592,18 @@ def _lab_settings(lab_name: str) -> C.LabSettings:
             if kind not in ("lab", "core"):
                 kind = "lab"
             _pi = str(meta.get("pi") or _pi_handle())
+            # lab.md convention: ``lab:`` is the short id, ``name:`` is the human
+            # display label (this is what POST /api/lab/settings + group-setup
+            # write). So LabSettings.name (the short id, used in paths) comes from
+            # ``lab:``, and display_name comes from ``name:`` (or an explicit
+            # ``display_name:``). A bare ``name: <short-id>`` is NOT a real label.
+            _short = str(meta.get("lab") or lab_name)
+            _display = str(meta.get("display_name") or meta.get("name") or "")
+            if _display == _short:
+                _display = ""
             return C.LabSettings(
-                name=str(meta.get("name") or lab_name),
-                # Blank display_name → show the bare lab id (do NOT invent a
-                # "<Capitalized> Lab" label the PI never chose).
-                display_name=str(meta.get("display_name") or ""),
+                name=_short,
+                display_name=_display,
                 pi_handle=_pi,
                 pi_github=_pi_github(_pi),
                 slack_workspace=str(meta.get("slack_workspace") or ""),
