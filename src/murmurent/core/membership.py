@@ -86,6 +86,7 @@ class MemberRecord:
     status: str
     email: str = ""  # used to resolve the member's Slack account (users.lookupByEmail)
     github: str = ""  # GitHub login, for repo collaborator management
+    slack: str = ""  # the member's Slack username / member id (shown in the Lab members list)
     card_fingerprint: str = ""  # the member's identity-card key fingerprint (revocation index)
     card_id: str = ""           # the issued card's id (revocation index)
     certifications: list[str] = field(default_factory=list)
@@ -119,6 +120,7 @@ def parse_member(path: Path) -> MemberRecord:
         status=str(meta.get("status") or ACTIVE),
         email=str(meta.get("email") or "").strip(),
         github=str(meta.get("github") or "").strip().lstrip("@"),
+        slack=str(meta.get("slack") or "").strip().lstrip("@"),
         card_fingerprint=str(meta.get("card_fingerprint") or "").strip(),
         card_id=str(meta.get("card_id") or "").strip(),
         certifications=[str(c) for c in (meta.get("certifications") or [])],
@@ -177,6 +179,7 @@ def add(
     role: str = "staff",
     email: str = "",
     github: str = "",
+    slack: str = "",
     card_fingerprint: str = "",
     card_id: str = "",
     certifications: list[str] | None = None,
@@ -202,6 +205,7 @@ def add(
         status=ACTIVE,
         email=(email or "").strip(),
         github=(github or "").strip().lstrip("@"),
+        slack=(slack or "").strip().lstrip("@"),
         card_fingerprint=(card_fingerprint or "").strip(),
         card_id=(card_id or "").strip(),
         certifications=list(certifications or []),
@@ -218,6 +222,7 @@ def upsert_member(
     role: str | None = None,
     email: str | None = None,
     github: str | None = None,
+    slack: str | None = None,
     card_fingerprint: str | None = None,
     card_id: str | None = None,
     today: _dt.date | None = None,
@@ -232,6 +237,7 @@ def upsert_member(
     if not p.is_file():
         return add(handle=norm, full_name=full_name or norm,
                    role=role or "staff", email=email or "", github=github or "",
+                   slack=slack or "",
                    card_fingerprint=card_fingerprint or "", card_id=card_id or "",
                    today=today)
     rec = parse_member(p)
@@ -245,6 +251,8 @@ def upsert_member(
         rec.email = email.strip()
     if github is not None:
         rec.github = github.strip().lstrip("@")
+    if slack is not None:
+        rec.slack = slack.strip().lstrip("@")
     if card_fingerprint is not None:
         rec.card_fingerprint = card_fingerprint.strip()
     if card_id is not None:
@@ -416,6 +424,8 @@ def _write(rec: MemberRecord) -> Path:
         meta["email"] = rec.email
     if rec.github:
         meta["github"] = rec.github
+    if rec.slack:
+        meta["slack"] = rec.slack
     if rec.card_fingerprint:
         meta["card_fingerprint"] = rec.card_fingerprint
     if rec.card_id:

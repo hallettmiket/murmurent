@@ -221,7 +221,7 @@ def make_enrollment(handle: str, *, nonce: str | None = None,
         handle, priv=priv, nonce=nonce or os.urandom(8).hex(),
         centre=centre_name, group=group,
         email=str(prof.get("email") or ""), github=str(prof.get("github") or ""),
-        slack=str(prof.get("slack") or ""))
+        slack=str(prof.get("slack") or ""), name=str(prof.get("name") or ""))
 
 
 def _scoped_from_signed(payload: dict) -> dict:
@@ -332,8 +332,11 @@ def issue_member_card(handle: str, *, enrollment: dict, group: str,
     # they carried in their enrollment and the card's fingerprint/id.
     from . import membership as _mem
     ep = enrollment.get("payload") or {}
-    _mem.upsert_member(handle, role="staff", email=str(ep.get("email") or ""),
+    _mem.upsert_member(handle, role="staff",
+                       full_name=(str(ep.get("name") or "") or None),
+                       email=str(ep.get("email") or ""),
                        github=str(ep.get("github") or ""),
+                       slack=str(ep.get("slack") or ""),
                        card_fingerprint=member_card["payload"]["subject"]["fingerprint"],
                        card_id=member_card["payload"]["card_id"])
     return {"member_card": member_card, "pi_card": pi_card}

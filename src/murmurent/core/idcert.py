@@ -341,7 +341,8 @@ def verify_member_card(member_card, pi_card, *, root_pub, now=None,
 # ---------------------------------------------------------------------------
 
 def make_enrollment_request(handle, *, priv: Ed25519PrivateKey, nonce,
-                            centre="", group="", email="", github="", slack="") -> dict:
+                            centre="", group="", email="", github="", slack="",
+                            name="") -> dict:
     """Subject-side: sign a fresh ``nonce`` challenge proving control of the key.
 
     The issuer verifies this BEFORE binding ``fingerprint(pubkey)`` into a card,
@@ -354,6 +355,7 @@ def make_enrollment_request(handle, *, priv: Ed25519PrivateKey, nonce,
     payload = {
         "purpose": "enrollment",
         "handle": _norm(handle),
+        "name": name or "",
         "centre": centre or "",
         "group": group or "",
         "email": email or "",

@@ -3025,7 +3025,10 @@ function LabMembersPanel({ peers, span="c-6" }) {
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
               <div>
                 <span style={{fontWeight:500}}>{p.name}</span>
-                <span className="mono muted" style={{fontSize:11, marginLeft:6}}>@{p.handle} · {p.role}</span>
+                <span className="mono muted" style={{fontSize:11, marginLeft:6}}>
+                  @{p.handle} · {p.role}
+                  {p.slack && <> · slack <span style={{color:"var(--purple)"}}>@{p.slack}</span></>}
+                </span>
               </div>
               <div className="row" style={{gap:6}}>
                 {p.status === "inactive" && <Pill tone="red">inactive</Pill>}
