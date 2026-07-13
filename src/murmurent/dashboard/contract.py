@@ -311,6 +311,9 @@ class PeerRow(BaseModel):
     # "revoked" / "expired" / "mismatch" = flagged. Empty string = not
     # computed (member lens). Drives the cert badge + audit flagging.
     cert: str = ""
+    # The member's Slack username/id (from their enrollment → members/<h>.md),
+    # shown in the Lab members list. Empty when not on file.
+    slack: str = ""
 
 
 class AgentRow(BaseModel):

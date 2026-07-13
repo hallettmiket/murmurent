@@ -1347,6 +1347,7 @@ def _peers(
                 status="inactive" if member_status == "inactive" else "active",  # type: ignore[arg-type]
                 lab_sudo=bool(peer_profile.get("lab_sudo", False)),
                 cert=cert_map.get(peer.lower(), ""),
+                slack=str(peer_profile.get("slack") or "").lstrip("@"),
             )
         )
     return rows
