@@ -15,10 +15,9 @@ a centre or University.
 > "walk me through installing Murmurent", "did my install work?", or "how do I
 > issue a member card?" all work — Claude Code can run many of these steps for you.
 
-## Download Murmurent
+## [Everyone] Download Murmurent
 
-**Everyone — member, PI, or mayor — starts by installing murmurent.** The code is
-public; one command does it (you only need `git`):
+Start by installing murmurent. The code is public; one command does it (you only need `git`):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts/bootstrap.sh | bash
@@ -27,29 +26,23 @@ curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts
 This installs the `murmurent` command, wires the shared agents/rules/skills into `~/.claude/`, and
 registers the data-governance hooks. On your first run it mints your **identity
 key** (your unique ID). Then set your personal info — `murmurent whoami` shows your
-handle + key, and the dashboard (`murmurent dashboard --hifi`) has the rest.
+handle + key.
 
-There are three ways a user interacts with Murmurent:
-(i) through the `murmurent` CLI
-(ii) through interactions (e.g. skills) defined in Claude Code
-(iii) through a Dashboard (not discussed here).
 
-**Everyone runs this next — set up your identity:**
+## [Everyone] Set up your identity:**
 
 ```bash
 murmurent init          # sets your handle, name, email, GitHub (choose member / PI / mayor)
 ```
 
 `init` mints your identity key and records your handle/name/email/GitHub; everything
-else builds on it, whether or not you ever join a lab. (For a lab member, the next
-step further down — `enroll` — packages exactly those details into your request: your
-email + GitHub are how your PI adds you to the lab's Slack channel and GitHub repo.
-Skip `init` and `enroll` has nothing to send.)
+else builds on it, whether or not you ever join a lab. 
+You have a choice to be either (i) a user (termed a 'member'), (ii) a PI who leads 
+a lab or core facility, or (iii) a mayor how runs a centre (which consists of multiple labs
+and cores). You have to specify one of these three options during the `init` procedure.
 
-## You're ready to run Murmurent locally
+You're ready to run Murmurent locally.
 
-That's it — Murmurent now runs on your machine, no PI or centre required. The
-agents, the Oracle memory, and the data-governance guardrails all work standalone.
 
 **New here? Start with the walkthrough:
 [`docs/getting_started.md`](docs/getting_started.md).** It's a short set of worked
@@ -58,8 +51,7 @@ the specialist agents, giving the Oracle a memory that survives across sessions 
 projects, and letting the guardrails catch mistakes before they happen. Read that
 before the full architecture in [`CLAUDE.md`](CLAUDE.md).
 
-To go further — joining or running a lab, a core, or a centre — find your situation
-below.
+
 
 ## I'm a member of a lab whose PI already uses murmurent
 
