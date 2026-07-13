@@ -7,7 +7,7 @@ accumulate institutional knowledge across every project. See
 the full design.
 
 Murmurent can be used as a standalone agentic AI OS environment, as a means to integrate
-members of the same lab, or as a means of intergrating labs and core facilities across
+members of the same lab, or as a means of integrating labs and core facilities across
 a centre or University.
 
 > **Stuck on any step below?** Once you've installed [Claude Code](https://claude.com/claude-code),
@@ -29,33 +29,32 @@ key** (your unique ID). Then set your personal info — `murmurent whoami` shows
 handle + key.
 
 
-## [Everyone] Set up your identity:
+## [Everyone] Set up your identity
 
 ```bash
 murmurent init          # sets your handle, name, email, GitHub (choose member / PI / mayor)
 ```
 
-`init` mints your identity key and records your handle/name/email/GitHub; everything
-else builds on it, whether or not you ever join a lab. 
+The `init` records who you are: your handle/name/email/GitHub; everything
+else builds on it, whether or not you ever join a lab/core. 
 You have a choice to be either (i) a user (termed a 'member'), (ii) a PI who leads 
-a lab or core facility, or (iii) a mayor how runs a centre (which consists of multiple labs
+a lab or core facility, or (iii) a mayor who runs a centre (which consists of multiple labs
 and cores). You have to specify one of these three options during the `init` procedure.
 
-You're ready to run Murmurent locally. Several vignettes can help get you started.
+You're ready to run Murmurent locally. Several vignettes can help get you started
 [`docs/getting_started.md`](docs/getting_started.md).
 
 
-## Federating individuals of all types
+## Federating individuals, gropus and centres 
 
 Murmurent allows members to join labs or cores, and it allows labs/cores to join centres. 
-This is based on crytographic identity cards that establish your identity and "right to belong".
+This is based on cryptographic identity cards that establish your identity and "right to belong".
 
-## If you are a member of a lab whose PI already uses murmurent
+## [Members] If you are a member of a lab whose PI already uses murmurent
 
 You need a **membership ID** (a signed identity certificate) from your PI
 to include you in the lab or core. You need to be in the Slack workspace of your
-PI and you need to know your official Slack name. You will also need the 
-official name of your lab or core.
+PI. You will also need the official name of your lab or co re.
 
 1. Request your ID:
    ```bash
@@ -82,12 +81,15 @@ official name of your lab or core.
    ```
    The **trust root** is that `pubkey` value inside `pi_card` —
    `ed25519:Rgmuqeen5X3lW4pFV8GHVFafw0ozSxGk+uUeLC279Fw=`. It's a short
-   string. You must pass it explicitly in the `import-card` command next:
+   string.
+   Confirm that trust-root value with your PI out-of-band
+   (in person or by phone, not the same Slack message).
+   You must pass it explicitly in the `import-card` command next:
    ```bash
    murmurent import-card bundle.json --trust-root ed25519:Rgmuqeen5X3lW4pFV8GHVFafw0ozSxGk+uUeLC279Fw=
    ```
    
-4. Confirm it worked — you don't need to keep the output:
+5. Confirm it worked — you don't need to keep the output:
    ```bash
    murmurent whoami        # now lists your group and role
    ```
@@ -95,7 +97,10 @@ official name of your lab or core.
    knows you're a member of the lab. 
 
 
-## If you are a PI of a lab or core ...
+## [PIs] If you are a PI of a lab or core ...
+
+Once you have completed your `init`, you need to set up some infrastructure 
+for your members.
 
 1. Connect your lab's Slack. This lets member IDs travel by DM instead
    of by hand:
@@ -118,7 +123,7 @@ official name of your lab or core.
 Full identity flow (enroll → issue → import → revoke): [`docs/identity.md`](docs/identity.md).
 
 
-## If you are a PI registering my lab or core with an existing centre
+## [PIs] If you are a PI registering your lab or core with an existing centre
 
 If you want to join an existing Murmurent centre, you send the centre's mayor 
 an **encrypted join request**, and they send
@@ -126,9 +131,9 @@ you back a signed **PI ID**. Now:
 
 1. Find your centre in the public **implementations directory** —
    [`murmurent_public`](https://github.com/hallettmiket/murmurent_public) lists
-   every institution running murmurent, the address to send join requests to, and
+   every institution running Murmurent, the address to send join requests to, and
    the public key your request is encrypted to. If your institution isn't listed,
-   it may not run murmurent yet.
+   it may not run Murmurent yet.
 2. Run the join script. It asks a few questions, encrypts your request to your
    centre's key, and opens your email app ready to send:
    ```sh
@@ -139,17 +144,16 @@ you back a signed **PI ID**. Now:
    and nothing about you is posted publicly. Press **Send**. 
 3. Once the mayor approves, they send your **PI ID** back for you to import:
    ```bash
-   `murmurent import-card <bundle> --trust-root <centre-trust-root>`
+   murmurent import-card <bundle> --trust-root <centre-trust-root>
    ```
    Confirm the trust-root value with the mayor
    out-of-band before you rely on it. 
 
-Once you hold your PI ID, you are your lab's certificate authority — continue
-with the next section to connect Slack and start issuing member IDs.
+Once you hold your PI ID, you are your lab's certificate authority.
 
 
 
-## If I  want to establish a new Murmurent centre at my institution as the Mayor...
+## [Mayors] If you  want to establish a new Murmurent centre at your institution as the Mayor...
 
 You'll need:
 
@@ -213,7 +217,7 @@ scripted / server runs, and `--no-sentinel` when running under `sudo` or in CI.
 ### Make your centre joinable
 
 We cannot assume
-that perspective members already belong to the Centre's Slack workspace.
+that prospective members already belong to the Centre's Slack workspace.
 The next steps are as follows:
 
 1. Encryption key for join requests. `centre-init` generates an `age` keypair
@@ -226,7 +230,7 @@ The next steps are as follows:
    clones [`murmurent_public`](https://github.com/hallettmiket/murmurent_public),
    writes your directory row, and publishes your signing key + revocation list
    so members can verify IDs. It prints a `git push` for you to run.
-4. Set up Slack. Create a `wigamig-<unique-name>` workspace + bot token and
+4. Set up Slack. Create a `murmurent-<unique-name>` workspace + bot token and
    smoke-test with `murmurent centre-slack-smoke`. Guide:
    [`docs/slack_setup.md`](docs/slack_setup.md).
 
