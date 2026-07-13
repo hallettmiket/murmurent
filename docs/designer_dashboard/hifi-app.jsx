@@ -8211,21 +8211,10 @@ function App() {
           <LabMembersPanel peers={D.peers} span="c-12" />
         </div>
 
-        {/* Installations: open workspace or install from here. */}
-        <div className="grid" style={{marginBottom:14}}>
-          <InstallationsBox span="c-12" />
-        </div>
-
-        {/* Where you work: Projects + Machines (conceptually paired —
-            installations live at the intersection of the two). */}
+        {/* Where you work: Projects (a set of repos + machines) + Machines. */}
         <div className="grid" style={{marginBottom:14}}>
           <ProjectsPanel projects={D.projects} span="c-7" />
           <MachinesPanel span="c-5" />
-        </div>
-
-        {/* Activity feed sits below — context for the action zone. */}
-        <div className="grid" style={{marginBottom:14}}>
-          <ActivityPanel span="c-12" />
         </div>
 
         {/* Daily action zone (order: Requests → Receptionist → All SEAs). */}
@@ -8293,18 +8282,6 @@ function App() {
             terminal request history. */}
         <div className="grid" style={{marginBottom:14}}>
           <CoreServicesPanel span="c-12" />
-        </div>
-
-        {/* Centre broadcasts — PI sends; everyone reads. */}
-        <div className="grid" style={{marginBottom:14}}>
-          <BroadcastsPanel span="c-12" />
-        </div>
-
-        {/* Centre projects (centre_cable_guy front door). PI of
-            primary_lab can declare + reconcile their projects; members
-            see a read-only listing of every centre project they belong to. */}
-        <div className="grid" style={{marginBottom:14}}>
-          <CentreProjectsPanel span="c-12" />
         </div>
 
         {/* Lab's core charges this month (Phase 4d). PI-only;
