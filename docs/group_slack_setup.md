@@ -45,6 +45,7 @@ you own. Create it once, click by click:
    | `im:write` | open a real DM to a member (onboarding steps); without it, DMs land in the bot's *App messages* tab, not the member's Direct Messages |
    | `users:read.email` | resolve a member's email → their Slack account |
    | `groups:read`, `channels:read` | look up channel ids by name |
+   | `channels:join` | let murmurent **auto-join a public channel** it needs to post to (e.g. `#claude-test`) instead of you `/invite`-ing the bot by hand. Public channels only — private channels still need a one-time manual invite. |
 
 5. Scroll back **up** to **OAuth Tokens for Your Workspace** → **Install to
    Workspace** → **Allow**.
