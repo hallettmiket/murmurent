@@ -1,6 +1,8 @@
 #!/usr/bin/env sh
-# murmurent-join.sh — the one script a prospective member runs to join a murmurent
-# institution. It:
+# murmurent-join.sh — the script a PI/leader runs to register their EXISTING lab or
+# core with a murmurent centre. Assumes you've already installed murmurent + run
+# `murmurent init` (so your group exists). Members do NOT use this — they get their
+# card straight from their PI (`murmurent import-card`). It:
 #   1. installs `age` (encryption) if you don't have it,
 #   2. asks you a few questions (no file to edit),
 #   3. encrypts your answers to your registrar's public key,
@@ -102,30 +104,20 @@ choose_institution() {
 # --- 3. the form (interactive) ---------------------------------------------
 fill_form() {
   say ""
-  say "Two paths:"
-  say "  • start your OWN group — a lab or a core (you become its PI/leader)"
-  say "  • JOIN an existing group as a member (student, postdoc, staff)"
+  say "This registers your EXISTING lab or core with this centre. You already"
+  say "created it when you ran 'murmurent init' / 'pi-init' — this affiliates it with"
+  say "the centre, and you stay its PI/leader (your members keep working). A lab is a"
+  say "research group; a core is a shared facility (e.g. proteomics)."
   say ""
-  case "$(ask '  Start a new group, or join one? (new / join): ')" in
-    j*|J*)
-      KIND=member
-      say ""; say "Joining an existing group — a few questions:"
-      NAME="$(ask '  Which group do you want to join? (its exact name): ')"
-      PI="$(ask '  Your handle = your netname (e.g. @jsmith): ')"
-      RQEMAIL="$(ask '  Your email (how the PI reaches you): ')"
-      JUST="$(ask '  One sentence: who are you / why join?: ')"
-      ;;
-    *)
-      say ""; say "Starting a new group — you become its PI. A lab is a research"
-      say "group; a core is a shared facility (e.g. proteomics)."
-      KIND="$(ask '  A lab or a core? (lab / core): ')"
-      case "$KIND" in l*|L*) KIND=lab ;; c*|C*) KIND=core ;; esac
-      NAME="$(ask '  Name for your '"$KIND"' (short, e.g. hallett_lab): ')"
-      PI="$(ask '  Your handle = your netname (you are the PI, e.g. @jsmith): ')"
-      RQEMAIL="$(ask '  Your email (how the registrar reaches you): ')"
-      JUST="$(ask '  One sentence: who are you / what is this group?: ')"
-      ;;
-  esac
+  say "(A member of a lab? You don't run this — ask your PI for a membership ID and"
+  say " run 'murmurent import-card'. This script is only for PIs/leaders.)"
+  say ""
+  KIND="$(ask '  Is it a lab or a core? (lab / core): ')"
+  case "$KIND" in l*|L*) KIND=lab ;; c*|C*) KIND=core ;; *) KIND=lab ;; esac
+  NAME="$(ask '  Your group'"'"'s short name (the one you used at init, e.g. mh): ')"
+  PI="$(ask '  Your handle = your netname (you are the PI, e.g. @jsmith): ')"
+  RQEMAIL="$(ask '  Your email (how the registrar reaches you): ')"
+  JUST="$(ask '  One sentence: who are you / what is this group?: ')"
 }
 
 # --- 4. encrypt ------------------------------------------------------------

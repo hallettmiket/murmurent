@@ -140,6 +140,7 @@ def import_card(card: dict, *, env: dict[str, str] | None = None) -> list[str]:
     labs: dict[str, dict] = {}
     cores: dict[str, dict] = {}
     registrars: list[str] = []
+    from . import repo as _repo
     for role in card.get("roles", []):
         if role.get("kind") == "registrar":
             registrars.append(netname)
@@ -148,6 +149,18 @@ def import_card(card: dict, *, env: dict[str, str] | None = None) -> list[str]:
         group = role["group"]
         kind = _group_kind(role)
         gpi = _R._normalize(role.get("pi") or netname)
+        if gpi == netname:
+            # This machine's owner IS this group's PI/leader. The authoritative
+            # lab-mgmt is their single ~/repos clone (created + version-controlled
+            # by pi-init / self_issue, and pushable to GitHub) — NOT a second copy
+            # under lab_info/. Point the registry at that one canonical location so
+            # the dashboard (registry) and the CLI (pinned pointer) never diverge.
+            # The clone + the PI's member record are written by self_issue.
+            canonical = _repo._pinned_lab_mgmt_path() or _repo.lab_repo_path(group)
+            entry = {"pi": f"@{gpi}", "lab_mgmt_path": str(canonical), "status": "active"}
+            (cores if kind == "core" else labs)[group] = entry
+            actions.append(f"registered {kind} '{group}' → {canonical}")
+            continue
         gdir = lab_info / ("cores" if kind == "core" else "labs") / group / "lab-mgmt"
         (gdir / "members").mkdir(parents=True, exist_ok=True)
         (gdir / "lab.md").write_text(

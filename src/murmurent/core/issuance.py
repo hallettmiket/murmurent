@@ -215,7 +215,8 @@ def make_enrollment(handle: str, *, nonce: str | None = None,
     return _cert.make_enrollment_request(
         handle, priv=priv, nonce=nonce or os.urandom(8).hex(),
         centre=centre_name, group=group,
-        email=str(prof.get("email") or ""), github=str(prof.get("github") or ""))
+        email=str(prof.get("email") or ""), github=str(prof.get("github") or ""),
+        slack=str(prof.get("slack") or ""))
 
 
 def _scoped_from_signed(payload: dict) -> dict:
