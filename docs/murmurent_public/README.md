@@ -23,9 +23,10 @@ curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/murmurent_public/ma
 sh murmurent-join.sh
 ```
 
-Press **Send**. Once the mayor approves, they send you back your **PI ID** to
-import. *(By hand instead? [`join/join-form.txt`](join/join-form.txt) is the plain
-form.)*
+Press **Send**. Once the mayor approves, they send you back your **PI ID** — see
+[Registering your lab or core with a centre](https://github.com/hallettmiket/murmurent#pis-if-you-are-a-pi-registering-your-lab-or-core-with-an-existing-centre)
+in the main README for how to import it and what comes next. *(By hand instead?
+[`join/join-form.txt`](join/join-form.txt) is the plain form.)*
 
 ## Mayors — list your centre
 
