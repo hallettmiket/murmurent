@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # Purpose: One-command install of murmurent for ANYONE — member, PI, or mayor.
-#          Installs the CLI + commons + hooks, then hands off to `murmurent init`,
-#          the one-time role-picker that sets up your session. This script does
-#          NOT assume you are the mayor.
+#          Installs the CLI + commons + hooks, then points you to `murmurent init`
+#          (the one-time role-picker) as a separate step — it does NOT run init for
+#          you. This script does NOT assume you are the mayor.
 # Author:  Mike Hallett (with Claude Code)
 #
 # Two ways to run it:
@@ -22,9 +22,10 @@
 #   3. Installs the murmurent CLI (`uv tool install`).
 #   4. Wires the commons into ~/.claude/ (agents, rules, skills) via setup.sh.
 #   5. Registers the data-governance hooks + MCP servers (`murmurent install --hooks`).
-#   6. Prints the next step: launch the dashboard and fill the centre-setup form.
+#   6. Prints the next step and stops — it does NOT run `murmurent init` for you.
 #
 # What it deliberately does NOT do (out of scope / needs a human):
+#   - Run `murmurent init` (the interactive role-picker — you run it yourself next).
 #   - Install or log in to Claude Code (separate binary, interactive OAuth).
 #   - Run `gh auth login` (interactive GitHub auth).
 #   - Fill the centre-setup form (that's the mayor's actual input).
@@ -32,7 +33,6 @@
 # Env overrides:
 #   MURMURENT_REPO_DIR   where to clone/expect the repo (default ~/repos/murmurent)
 #   MURMURENT_BRANCH     branch to clone/checkout (default main)
-#   NO_LAUNCH=1        skip the offer to launch the dashboard at the end
 # ─────────────────────────────────────────────────────────────────────────────
 
 set -euo pipefail
@@ -136,24 +136,17 @@ bash "$REPO_DIR/scripts/setup.sh"
 step "5/6 registering data-governance hooks + MCP servers"
 murmurent install --hooks
 
-# ── 6. Set up your session ───────────────────────────────────────────────────
-step "6/6 murmurent is installed — now set up your session"
+# ── 6. Installed — point the user at the next step (do NOT run it for them) ───
+step "6/6 murmurent is installed"
 cat <<'EOF'
-  Run the one-time setup. It picks your role (member / PI / mayor) and collects
-  the info to initialise your session:
+  Next, run the one-time setup yourself — it's a separate, interactive step:
 
       murmurent init
 
-  (Members ask their PI for a membership ID; PIs register with their mayor;
-   only mayors bootstrap a centre. `murmurent init` walks you through your path.)
+  It picks your role (member / PI / mayor) and collects the info to initialise
+  your session. (Members ask their PI for a membership ID; PIs self-issue their
+  ID or register with a centre's mayor; only mayors bootstrap a centre. `murmurent
+  init` walks you through your path.)
 EOF
 
-if [[ "${NO_LAUNCH:-0}" != "1" && -t 0 ]]; then
-  printf "\nRun 'murmurent init' now? [Y/n] "
-  read -r reply
-  if [[ -z "$reply" || "$reply" == "y" || "$reply" == "Y" ]]; then
-    exec murmurent init
-  fi
-fi
-
-ok "done. Run 'murmurent init' when you're ready."
+ok "done — now run 'murmurent init' to set up your session."
