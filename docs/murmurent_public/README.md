@@ -30,10 +30,17 @@ in the main README for how to import it and what comes next. *(By hand instead?
 
 ## Mayors — list your centre
 
-From your centre, run `murmurent centre-hub-publish` — it writes your directory row
-here plus your signing key + revocation list (so members can verify IDs) and
-prints a `git push` for you to run. See the mayor setup in the
-[code repo](https://github.com/hallettmiket/murmurent).
+From your centre, run:
+
+```bash
+murmurent centre-hub-publish --submit
+```
+
+It writes your directory row here plus your signing key + revocation list (so
+members can verify IDs), and — with `--submit` — publishes it (a direct push if you
+have write access to the hub, otherwise a fork + pull request). Drop `--submit` to
+just write the files and print the push steps for you to run by hand. See the mayor
+setup in the [code repo](https://github.com/hallettmiket/murmurent).
 
 ## Institutions using murmurent
 
