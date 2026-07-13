@@ -854,6 +854,54 @@ def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
                    f"yourself:\n    {import_hint}")
 
 
+@click.command("member-audit",
+                help="PI: check that every member on the roster holds a VALID "
+                     "identity certificate. Flags members who were never issued a "
+                     "card, whose card was revoked, or whose card expired. Reads "
+                     "only your local records (roster + issuance ledger + CRL); "
+                     "removes nobody. Use --notify to DM yourself the flagged list.")
+@click.option("--group", default="", help="Lab/group (default: your current lab). Only used for --notify.")
+@click.option("--notify", is_flag=True, help="DM the flagged list to the PI on the lab's Slack.")
+def member_audit_cmd(group: str, notify: bool) -> None:
+    from ..core import member_audit as _ma
+    statuses = _ma.audit()
+    flagged = [s for s in statuses if not s.valid]
+    centre = _ma.resolve_centre()
+    click.echo(f"Member certificate audit (centre: {centre or '—'})")
+    click.echo(f"  {len(statuses)} member(s); {len(flagged)} without a valid certificate.")
+    if not flagged:
+        click.echo("  ✓ every member holds a valid certificate.")
+        return
+    for s in flagged:
+        click.echo(f"    ! @{s.handle} ({s.role}) [{s.cert}] — {s.detail}")
+    click.echo("\n  Nobody was removed. Deactivate any that shouldn't have access "
+               "from the dashboard (Lab members) or `murmurent group-remove-member`.")
+    if notify:
+        from ..core import group_reconcile as _gr
+        from ..core import membership as _m
+        if not group:
+            try:
+                from ..dashboard import snapshot as _snap
+                group = _snap._current_lab_settings().name or ""
+            except Exception:  # noqa: BLE001
+                group = ""
+        if not group:
+            click.echo("  ! --notify needs a group; pass --group <lab>.")
+            return
+        lines = "\n".join(f"  • @{s.handle} ({s.role}) — {s.detail}" for s in flagged)
+        text = (f":rotating_light: *Member certificate audit — {group}*\n"
+                f"{len(flagged)} member(s) lack a valid certificate:\n\n{lines}\n\n"
+                "Nobody was removed automatically — review on the dashboard.\n\n"
+                "All worship me and I will let you serve me.")
+        pi_email = ""
+        try:
+            pi_email = _m.get(_m.pi_handle()).email
+        except Exception:  # noqa: BLE001
+            pass
+        ok, detail = _gr.send_group_dm(group, text=text, email=pi_email)
+        click.echo(f"  {'✓ DM sent' if ok else '! DM failed: ' + detail}")
+
+
 @click.command("issue-project-card",
                 help="PI: sign a PROJECT-scoped card for a member's enrollment, "
                      "binding their key to a project within a lab you lead (group "

@@ -1588,6 +1588,7 @@ from .commands.init_cmd import init_command as _init_command
 from .commands.centre_cmd import enroll as _enroll
 from .commands.centre_cmd import issue_pi_card_cmd as _issue_pi_card_cmd
 from .commands.centre_cmd import issue_member_card_cmd as _issue_member_card_cmd
+from .commands.centre_cmd import member_audit_cmd as _member_audit_cmd
 from .commands.centre_cmd import issue_project_card_cmd as _issue_project_card_cmd
 from .commands.centre_cmd import revoke_project_cmd as _revoke_project_cmd
 from .commands.centre_cmd import import_signed_card_cmd as _import_signed_card_cmd
@@ -1618,6 +1619,7 @@ cli.add_command(_init_command)
 cli.add_command(_enroll)
 cli.add_command(_issue_pi_card_cmd)
 cli.add_command(_issue_member_card_cmd)
+cli.add_command(_member_audit_cmd)
 cli.add_command(_issue_project_card_cmd)
 cli.add_command(_revoke_project_cmd)
 cli.add_command(_import_signed_card_cmd)

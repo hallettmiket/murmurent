@@ -45,6 +45,31 @@ def _pi_handle() -> str:
     """Resolve the PI handle from lab.md (fresh per call for tests)."""
     from ..core.lab import pi_handle as _resolved
     return _resolved()
+
+
+def _pi_github(pi_handle: str) -> str:
+    """The PI's own GitHub username, for the Lab settings identity block.
+
+    Prefers the PI's member record (``members/<pi>.md`` github:), then falls
+    back to the machine's ``~/.murmurent/profile.yaml`` (what they typed at
+    ``murmurent init``). The registry-materialised member file is often minimal,
+    so the profile fallback is what usually carries it.
+    """
+    norm = (pi_handle or "").strip().lstrip("@").lower()
+    if norm:
+        gh = str(_load_member_profile(norm).get("github") or "").strip().lstrip("@")
+        if gh:
+            return gh
+    try:
+        import yaml as _yaml
+        prof_path = Path.home() / ".murmurent" / "profile.yaml"
+        if prof_path.is_file():
+            prof = _yaml.safe_load(prof_path.read_text(encoding="utf-8")) or {}
+            if str(prof.get("handle") or "").strip().lstrip("@").lower() == norm:
+                return str(prof.get("github") or "").strip().lstrip("@")
+    except Exception:
+        pass
+    return ""
 NOTEBOOK_DIR_NAME = "lab-notebook"
 PERSONAL_ORACLE_DIR = Path.home() / ".claude" / "agent-memory" / "oracle"
 # Per-machine installation manifests, written by the install wizard.
@@ -487,7 +512,10 @@ def _vault_health() -> C.VaultHealth:
         return C.VaultHealth(status="unregistered", detail="")
 
 
-_AGENT_LINE_RE = __import__("re").compile(r"^\[(\d\d:\d\d)\]\s+(\S+?):\s+(.*)$")
+# Optional ``YYYY-MM-DD `` date prefix inside the bracket — new hook lines carry
+# it, older time-only lines don't (date group is then None → "").
+_AGENT_LINE_RE = __import__("re").compile(
+    r"^\[(?:(\d{4}-\d\d-\d\d) )?(\d\d:\d\d)\]\s+(\S+?):\s+(.*)$")
 _ANSI_RE = __import__("re").compile(r"\x1b\[[0-9;]*m")
 
 
@@ -513,12 +541,19 @@ def _agents_activity(*, limit: int = 16) -> list[C.AgentActivity]:
         m = _AGENT_LINE_RE.match(line)
         if not m:
             continue
-        time_s, agent, text = m.group(1), m.group(2), m.group(3)
+        date_s, time_s, agent, text = m.group(1) or "", m.group(2), m.group(3), m.group(4)
+        # Guard against legacy ``agent:`` fake-out lines lingering in an older
+        # log. The hook (scripts/murmurent_log_agent_event.sh) no longer writes
+        # nameless lines at all — a real subagent always carries its type — so
+        # new logs never contain these. This drop is only for lines written
+        # before that fix; the panel is for genuinely-dispatched agents only.
+        if agent.lower() in ("agent", "unhandled"):
+            continue
         started = text.startswith("starting")
         if started:
             text = text.split("—", 1)[1].strip() if "—" in text else text
-        out.append(C.AgentActivity(time=time_s, agent=agent, text=text[:200],
-                                   started=started))
+        out.append(C.AgentActivity(date=date_s, time=time_s, agent=agent,
+                                   text=text[:200], started=started))
         if len(out) >= limit:
             break
     return out
@@ -556,10 +591,16 @@ def _lab_settings(lab_name: str) -> C.LabSettings:
             kind = str(meta.get("kind") or "lab").lower()
             if kind not in ("lab", "core"):
                 kind = "lab"
+            _pi = str(meta.get("pi") or _pi_handle())
             return C.LabSettings(
                 name=str(meta.get("name") or lab_name),
-                display_name=str(meta.get("display_name") or f"{lab_name.capitalize()} Lab"),
-                pi_handle=str(meta.get("pi") or _pi_handle()),
+                # Blank display_name → show the bare lab id (do NOT invent a
+                # "<Capitalized> Lab" label the PI never chose).
+                display_name=str(meta.get("display_name") or ""),
+                pi_handle=_pi,
+                pi_github=_pi_github(_pi),
+                slack_workspace=str(meta.get("slack_workspace") or ""),
+                slack_invite_url=str(meta.get("slack_invite_url") or ""),
                 kind=kind,
                 website=meta.get("website") or None,
                 admins=list(meta.get("admins") or []),
@@ -1208,17 +1249,17 @@ def _peers(
         # inactive members even before they're on any project.
         from ..core import membership as _m
 
+        # The PI's "Lab members" roster is the WHOLE group, the PI included —
+        # a one-person lab must still list its one member (the PI), not read
+        # "no members yet". So, unlike the member lens, we do NOT skip the
+        # viewer here.
         peer_handles: dict[str, list[str]] = {}
         for rec in _m.iter_members():
-            if rec.handle == norm_viewer:
-                continue
             peer_handles.setdefault(rec.handle, [])
         # Then layer project-membership info on top.
         for p in project_summaries:
             for raw in p.members:
                 peer = raw.lstrip("@").lower()
-                if peer == norm_viewer:
-                    continue
                 peer_handles.setdefault(peer, []).append(p.name)
     else:
         # Member: only peers from shared projects, scoped to those projects.
@@ -1259,6 +1300,16 @@ def _peers(
                 exp_index[key] = exp_index.get(key, 0) + 1
 
     today_d = _dt.date.today()
+    # Certificate standing per member — only the PI lens has the local ledger +
+    # CRL to compute it against, so members see a blank badge. Best-effort: a
+    # missing identity setup just yields an empty map (no badges), never an error.
+    cert_map: dict[str, str] = {}
+    if persona == "pi":
+        try:
+            from ..core import member_audit as _ma
+            cert_map = _ma.status_map()
+        except Exception:  # noqa: BLE001
+            cert_map = {}
     rows: list[C.PeerRow] = []
     for peer, projects in sorted(peer_handles.items()):
         unique_projects = sorted(set(projects))
@@ -1288,6 +1339,7 @@ def _peers(
                 experiments=experiments,
                 status="inactive" if member_status == "inactive" else "active",  # type: ignore[arg-type]
                 lab_sudo=bool(peer_profile.get("lab_sudo", False)),
+                cert=cert_map.get(peer.lower(), ""),
             )
         )
     return rows
