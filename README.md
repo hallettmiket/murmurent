@@ -108,6 +108,37 @@ to include you in the lab or core. You've already run `murmurent init` (see
    knows you're a member of the lab. If your dashboard is open, restart it to
    pick up the new role.
 
+## I'm a PI registering my lab or core with an existing centre
+
+If your institution already runs a murmurent centre, you don't self-issue your
+own ID — you send the centre's mayor an **encrypted join request**, and they send
+you back a signed **PI ID**. You've already run `murmurent init` and chose **PI**
+(see [Download Murmurent](#download-murmurent) above); now:
+
+1. Find your centre in the public **implementations directory** —
+   [`murmurent_public`](https://github.com/hallettmiket/murmurent_public) lists
+   every institution running murmurent, the address to send join requests to, and
+   the public key your request is encrypted to. If your institution isn't listed,
+   it may not run murmurent yet — ask your lab manager or run it standalone (you're
+   already set up above).
+2. Run the join script. It asks a few questions, encrypts your request to your
+   centre's key, and opens your email app ready to send:
+   ```sh
+   curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/murmurent_public/main/join/murmurent-join.sh
+   sh murmurent-join.sh
+   ```
+   The request is encrypted to your centre's registrar — only they can read it,
+   and nothing about you is posted publicly. Press **Send**. *(Prefer to do it by
+   hand? The plain form lives at [`join/join-form.txt`](https://github.com/hallettmiket/murmurent_public/blob/main/join/join-form.txt).)*
+3. Once the mayor approves, they send your **PI ID** back to import — the same
+   `murmurent import-card <bundle> --trust-root <centre-trust-root>` flow a member
+   uses (see the member section above). Confirm the trust-root value with the mayor
+   out-of-band before you rely on it. See [`docs/identity.md`](docs/identity.md)
+   for the full flow.
+
+Once you hold your PI ID, you are your lab's certificate authority — continue
+with the next section to connect Slack and start issuing member IDs.
+
 ## I'm a PI of a lab or core
 
 You are your lab's certificate authority.
