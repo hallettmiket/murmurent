@@ -43,8 +43,9 @@ signing) and must be kept as close to offline as your workflow allows.
    - Store the encrypted copy somewhere physically separate from the laptop (a
      locked drawer, an institutional secrets vault, a second encrypted device).
      **Not** another file on the same disk, and **never** in any git repo.
-2. **Never commit it.** The `murmurent-push` skill excludes `~/.murmurent/keys/**` by
-   path, but the key never belongs in a working tree in the first place.
+2. **Never commit it.** The `murmurent-push` skill refuses secret-shaped
+   filenames (`*_ed25519`, `*.pem`, `id_*`, …), which would catch a stray
+   root key — but the key never belongs in a working tree in the first place.
 3. **Never wire it into CI or any automated signer.** A CI credential that can
    reach the root key turns a CI compromise into a centre compromise. Card
    issuance is a deliberate, human-run action.

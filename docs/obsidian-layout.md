@@ -1,7 +1,7 @@
 # Obsidian vault layout (murmurent side)
 
 Your personal Oracle, lab notebook, and cross-project knowledge live
-in your Obsidian vault. This doc covers the **wigamig-side**
+in your Obsidian vault. This doc covers the **murmurent-side**
 conventions — what subfolders murmurent writes to and reads from. For
 **vault-side** organization (how *you* organize your notes overall,
 including the `maps-legends/` folder), see the `CLAUDE.md` at the

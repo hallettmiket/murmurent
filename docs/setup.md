@@ -151,7 +151,7 @@ unchanged.
 
 ```bash
 # one secret, known to the registrar(s):
-sudo -u murmurent sh -c 'umask 077; openssl rand -hex 32 > ~wigamig/.murmurent/dashboard_secret'
+sudo -u murmurent sh -c 'umask 077; openssl rand -hex 32 > ~murmurent/.murmurent/dashboard_secret'
 #   ...or set MURMURENT_DASHBOARD_SECRET in the systemd unit's Environment=.
 ```
 

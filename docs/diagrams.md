@@ -116,29 +116,28 @@ stateDiagram-v2
 
 ## 5. Onboarding sequence
 
-Four stages: invitation, local setup, approval, confirmation.
+Four stages: identity, enrollment, issuance, confirmation. Membership is a
+signed certificate (see [identity.md](identity.md)); the roster follows from
+issuance, not from a PR.
 
 ```mermaid
 sequenceDiagram
-    participant PI
     participant New as New member
-    participant LMR as lab-mgmt repo
-    participant CC as ~/.claude
-    participant LV as Lab VM
-    PI->>LMR: file Onboard issue<br/>(profile, projects, roles)
-    New->>CC: murmurent onboard <group> --profile <p>
-    CC->>CC: install agents<br/>(freeze cascade)
-    CC->>CC: configure MCP servers
-    CC->>CC: generate age key pair
-    CC->>LMR: PR with public key +<br/>members/<handle>.md
-    PI->>LMR: review + approve PR
-    PI->>LMR: murmurent project admit<br/>(per project)
-    LMR->>LV: ACL sync
-    LMR->>LMR: re-encrypt age bundles
-    PI->>LMR: murmurent role assign<br/>(per starting role)
-    New->>CC: murmurent doctor
-    CC-->>New: All checks passed
-    PI->>LMR: close onboarding issue
+    participant NM as New member's machine
+    participant PI
+    participant PM as PI's machine
+    New->>NM: murmurent init
+    NM->>NM: set handle, email, Slack<br/>generate ed25519 keypair
+    New->>NM: murmurent enroll --group <lab>
+    NM-->>New: enroll.json<br/>(proof of key possession)
+    New->>PI: send enroll.json (DM / email)
+    PI->>PM: murmurent issue-member-card enroll.json --group <lab>
+    PM->>PM: verify proof, sign member card,<br/>record on roster (members/<handle>.md)
+    PM-->>New: bundle.json DM'd on Slack<br/>(member card + PI card)
+    New->>NM: murmurent import-card bundle.json<br/>--trust-root <root>
+    NM->>NM: pin trust root, verify chain,<br/>store card
+    New->>NM: murmurent whoami
+    NM-->>New: group + role confirmed
 ```
 
 ## 6. Permissions surface

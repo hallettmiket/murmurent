@@ -15,8 +15,8 @@ marked **[manual]**.
 
 ## 1. Create the workspace  [manual]
 
-In Slack, create a workspace named **`wigamig-<unique_name>`** (e.g.
-`wigamig-bioconvergence`). Then:
+In Slack, create a workspace named **`murmurent-<unique_name>`** (e.g.
+`murmurent-bioconvergence`). Then:
 
 - **Create a channel named exactly `#general`.** Newer Slack workspaces **no
   longer ship with a `#general`** (you may see `#social` or a welcome channel
@@ -59,7 +59,7 @@ it once — click by click:
    Workspace** → **Allow**.
 6. Copy the **Bot User OAuth Token** — it starts with `xoxb-`.
 7. Back in Slack, invite the bot to `#general` so it can post there: in the
-   `#general` channel, type `/invite @murmurent` (the bot's name). The bot is
+   `#general` channel, type `/invite @mayor` (the bot's name). The bot is
    auto-added to any private channel it *creates*, but must be invited to
    pre-existing channels like `#general`.
 

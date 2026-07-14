@@ -11,7 +11,9 @@ centre root key  ──signs──▶  PI card  ──(PI's key) signs──▶ 
 
 A card only verifies if it was signed by the group's **real** PI. So you cannot
 claim a group you're not in, and each person has a unique cryptographic ID (their
-public-key **fingerprint**).
+public-key **fingerprint**). Projects extend this chain one more level — the
+creator gets a *project-lead* delegation card and signs project members in with
+their own key (see [Delegating a project lead](#delegating-a-project-lead-projects)).
 
 **A mayor is optional.** By default a PI is their **own root** — a lab runs
 standalone (`murmurent pi-init`), the PI signs member cards, and members pin the
@@ -98,6 +100,35 @@ Now issue member cards as above; members import with
 `murmurent import-card <bundle> --trust-root <your-trust-root>`. If you later join a
 centre, the mayor issues you a **separate** centre PI card attesting the same key
 (see below) — your members keep working, they just gain a higher anchor.
+
+## Delegating a project lead (projects)
+
+Project membership extends the chain one level. When a project is created,
+the PI signs its creator a **project-lead card** — a delegation credential
+scoped to exactly that project. From then on the **lead's own key** signs each
+member's project card; the PI is not involved per join:
+
+```
+centre root ──▶ PI card ──▶ project-lead card ──(lead's key) signs──▶ project card
+                              (the creator)                            (a project member)
+```
+
+- `murmurent issue-project-lead-card <handle> --project <p>` — PI delegates
+  (done automatically when a project is approved from the dashboard; the
+  bundle is DM'd to the lead).
+- `murmurent project-add-member <handle> --project <p>` — lead signs a
+  member in. One click when the member's key is already attested on the
+  roster; external/keyless members first run
+  `murmurent enroll --project <p>` and send the file (`--enrollment`).
+- `murmurent project-remove-member` — revokes the card (CRL) and kicks the
+  member from the project's private Slack channel.
+- `murmurent project-whoami` — prove which projects this machine's cards
+  certify you for.
+
+Revoking the **lead card** invalidates every project card it signed — the
+verifier checks the delegation link against the fail-closed CRL. Deleting a
+project revokes lead + member cards in one CRL bump. The full walkthrough is
+[project_creation.md](project_creation.md).
 
 ## Onboarding a PI into a centre (mayor / admin registrar)
 
