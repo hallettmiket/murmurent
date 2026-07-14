@@ -107,6 +107,10 @@ class JoinRequest:
     # alongside the freshly-scaffolded primary repo (code + manuscript + …).
     machines: list[str] | None = None
     attach_repos: list[str] | None = None
+    # (10) inter-group projects: the agreed shared Slack workspace (a group id
+    # whose bot token hosts the project channel + cert DMs). Required at filing
+    # time when the proposed members span groups; re-validated at approve.
+    slack_workspace: str | None = None
 
     def to_meta(self) -> dict[str, Any]:
         meta: dict[str, Any] = {
@@ -131,6 +135,7 @@ class JoinRequest:
             ("slack_channel_name", self.slack_channel_name),
             ("machines", self.machines),
             ("attach_repos", self.attach_repos),
+            ("slack_workspace", self.slack_workspace),
         ):
             if value is not None:
                 meta[key] = value
@@ -188,6 +193,7 @@ def parse_request(path: Path) -> JoinRequest:
         slack_channel_name=_opt_str(meta.get("slack_channel_name")),
         machines=_opt_list(meta.get("machines")),
         attach_repos=_opt_list(meta.get("attach_repos")),
+        slack_workspace=_opt_str(meta.get("slack_workspace")),
         body=parsed.body,
         path=path,
     )
@@ -309,6 +315,10 @@ def approve(
         )
     today = today or _dt.date.today()
     if req.kind == "project-create":
+        # Re-run the inter-group workspace gate: rosters may have changed
+        # between filing and approval, so approval also fails closed.
+        _require_workspace_if_inter_group(
+            list(req.proposed_members or []), req.slack_workspace or "")
         _create_project_from_request(req)
     else:
         _add_to_project_members(req.project, req.requester)
@@ -333,6 +343,7 @@ def file_create_request(
     slack_channel_name: str | None = None,
     machines: list[str] | None = None,
     attach_repos: list[str] | None = None,
+    slack_workspace: str | None = None,
 ) -> JoinRequest:
     """File a ``project-create`` request.
 
@@ -342,6 +353,11 @@ def file_create_request(
     full host set; ``host`` (the primary scaffold target) is derived from
     ``machines[0]`` when a set is given. ``attach_repos`` names existing
     inventory repos to fold in alongside the freshly-scaffolded repo.
+
+    ``slack_workspace`` names the group whose Slack workspace hosts the
+    project. REQUIRED when the proposed members span multiple groups
+    (inter-group project) — the groups must decide on a shared workspace
+    BEFORE the project can exist; filing fails otherwise.
     """
     today = today or _dt.date.today()
     if find_project(project) is not None:
@@ -362,6 +378,8 @@ def file_create_request(
         # them (project = set of machines).
         host = norm_machines[0]
     norm_attach = [r.strip() for r in (attach_repos or []) if r and r.strip()]
+    norm_ws = (slack_workspace or "").strip()
+    _require_workspace_if_inter_group(norm_members, norm_ws)
     # No duplicate-pending check here — multiple people might propose related
     # projects and the PI sorts it out.
 
@@ -382,9 +400,41 @@ def file_create_request(
         slack_channel_name=(slack_channel_name.strip() if isinstance(slack_channel_name, str) and slack_channel_name.strip() else None),
         machines=norm_machines or None,
         attach_repos=norm_attach or None,
+        slack_workspace=norm_ws or None,
     )
     write_request(req)
     return req
+
+
+def _require_workspace_if_inter_group(members: list[str], workspace: str) -> None:
+    """Hard gate for inter-group projects: members spanning multiple groups
+    MUST name an agreed shared Slack workspace (with a resolvable bot token)
+    or the project definition halts. Single-group projects pass untouched."""
+    try:
+        from . import cert_provision as _cprov
+        inter = _cprov.is_inter_group(members)
+    except Exception:  # noqa: BLE001 — no roster ⇒ can't classify ⇒ don't block
+        return
+    if not inter:
+        return
+    if not workspace:
+        raise RequestError(
+            "project members span multiple groups — the groups must decide on "
+            "a shared Slack workspace before an inter-group project can be "
+            "created. Pick one (certificates + the project channel go through "
+            "it) and make sure its bot token exists at "
+            "~/.config/murmurent/groups/<workspace>/slack-token.")
+    try:
+        from . import group_reconcile as _gr
+        token = _gr.resolve_group_slack_token(workspace) or ""
+    except Exception:  # noqa: BLE001
+        token = ""
+    if not token:
+        raise RequestError(
+            f"no Slack bot token for shared workspace '{workspace}' — expected "
+            f"$MURMURENT_GROUP_SLACK_TOKEN or "
+            f"~/.config/murmurent/groups/{workspace}/slack-token. Run "
+            f"`murmurent group-slack-setup {workspace}` first.")
 
 
 def _create_project_from_request(req: JoinRequest) -> None:
@@ -411,6 +461,7 @@ def _create_project_from_request(req: JoinRequest) -> None:
             lead=lead,
             skip_github=True,
         )
+        _stamp_slack_workspace(req)
         return
     _project_cmd.cmd_new(
         req.project,
@@ -427,6 +478,23 @@ def _create_project_from_request(req: JoinRequest) -> None:
         repo_kind=req.repo_kind or "github",
         local_repo_root=req.local_repo_root,
     )
+    _stamp_slack_workspace(req)
+
+
+def _stamp_slack_workspace(req: JoinRequest) -> None:
+    """Record the agreed shared workspace on the cert project (best-effort —
+    the scaffold registered the project; this annotates where its Slack
+    lives so provisioning + cert DMs use the right token)."""
+    if not req.slack_workspace:
+        return
+    try:
+        from . import cert_projects as _cp
+        cur = _cp.get(req.project)
+        if cur is not None:
+            _cp.upsert(req.project, lab=cur.lab,
+                       slack_workspace=req.slack_workspace)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def decline(

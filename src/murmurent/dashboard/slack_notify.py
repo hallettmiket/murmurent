@@ -800,7 +800,7 @@ def core_request_rescheduled(
 # ---------------------------------------------------------------------------
 
 
-def _channel_member_ids(channel_id: str) -> set[str]:
+def _channel_member_ids(channel_id: str, *, token: str | None = None) -> set[str]:
     """Return the set of user IDs currently in ``channel_id`` (empty on failure).
 
     Pages through ``conversations.members`` so private channels with
@@ -808,8 +808,9 @@ def _channel_member_ids(channel_id: str) -> set[str]:
     or auth error returns an empty set rather than raising — the caller
     is doing a diff, and an empty "existing" set just means we try to
     invite everyone (Slack itself dedupes via ``already_in_channel``).
+    ``token`` overrides the centre bot token (group/shared-workspace callers).
     """
-    tok = _token()
+    tok = token or _token()
     if not tok:
         return set()
     out: set[str] = set()
@@ -841,9 +842,10 @@ def _channel_member_ids(channel_id: str) -> set[str]:
     return out
 
 
-def _lookup_user_id_by_email(email: str) -> str | None:
-    """Return the Slack user_id for ``email`` (None if not in the workspace)."""
-    tok = _token()
+def _lookup_user_id_by_email(email: str, *, token: str | None = None) -> str | None:
+    """Return the Slack user_id for ``email`` (None if not in the workspace).
+    ``token`` overrides the centre bot token (group/shared-workspace callers)."""
+    tok = token or _token()
     if not tok or not email:
         return None
     try:
@@ -914,21 +916,23 @@ def invite_members_to_channel(
     member_handles: list[str],
     *,
     member_email_map: dict[str, str] | None = None,
+    token: str | None = None,
 ) -> dict:
     """Invite ``member_handles`` to an existing channel by id.
 
     Resolves each handle→email→Slack user_id and batch-invites those not
     already present. Same structured result + idempotency as
     ``sync_project_channel_members`` (which now delegates here); reusable for
-    lab/core channels which have no CHARTER-derived slug. Best-effort."""
-    tok = _token()
+    lab/core channels which have no CHARTER-derived slug. Best-effort.
+    ``token`` overrides the centre bot token (group/shared-workspace callers)."""
+    tok = token or _token()
     if not tok:
         return {"channel_id": channel_id, "invited": [], "already_in": [],
                 "unresolved": [{"handle": h, "reason": "no slack token configured"}
                                for h in member_handles],
                 "error": "no slack token configured"}
 
-    existing = _channel_member_ids(channel_id)
+    existing = _channel_member_ids(channel_id, token=tok)
     email_map = member_email_map or {}
     invited: list[str] = []
     already_in: list[str] = []
@@ -942,7 +946,7 @@ def invite_members_to_channel(
         if not email:
             unresolved.append({"handle": handle, "reason": "no email on record"})
             continue
-        uid = _lookup_user_id_by_email(email)
+        uid = _lookup_user_id_by_email(email, token=tok)
         if not uid:
             unresolved.append({"handle": handle,
                                "reason": f"no slack account for {email}"})

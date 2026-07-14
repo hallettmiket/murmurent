@@ -57,15 +57,54 @@ def member_github_map(handles=None) -> dict[str, str]:
     return out
 
 
-def _default_creator(name: str):
+def resolve_project_slack(project: str, *, env: dict | None = None) -> tuple[str, str]:
+    """Which Slack workspace hosts ``project``, and the bot token for it.
+
+    Returns ``(workspace, token)``. ``workspace`` is ``cp.slack_workspace``
+    when set (an inter-group project's agreed shared workspace) else the
+    owning lab. The token comes from the group-token mechanism
+    (``$MURMURENT_GROUP_SLACK_TOKEN`` /
+    ``~/.config/murmurent/groups/<workspace>/slack-token``) — a shared
+    workspace is just a named token dir. Empty token is NOT an error here
+    (callers degrade like every other Slack seam); creation-time validation
+    for inter-group projects is the hard gate."""
+    cp = _cp.get(project, env)
+    if cp is None:
+        raise CertProvisionError(f"no cert-project named {project!r}")
+    workspace = cp.slack_workspace or cp.lab
+    token = ""
+    if workspace:
+        try:
+            from . import group_reconcile as _gr
+            token = _gr.resolve_group_slack_token(workspace) or ""
+        except Exception:  # noqa: BLE001
+            token = ""
+    return workspace, token
+
+
+def is_inter_group(members, *, env: dict | None = None) -> bool:
+    """True when the proposed ``members`` span more than one group: any handle
+    absent from THIS lab's roster is (from this machine's vantage) external.
+    The deployable check on a PI machine — the full cross-lab member→group map
+    only exists at the registrar level. An EMPTY roster can't classify anyone
+    (the lab isn't running the cert-membership model yet) → not inter-group."""
+    roster = {m.handle.lstrip("@").lower() for m in _mem.iter_members()}
+    if not roster:
+        return False
+    return any(str(h).lstrip("@").lower() not in roster for h in (members or []))
+
+
+def _default_creator(name: str, *, token: str | None = None):
     from . import centre_provision as _prov
-    return _prov.slack_create_channel(name, private=True)
+    return _prov.slack_create_channel(name, private=True, token=token)
 
 
-def _default_inviter(channel_id: str, handles: list[str], *, member_email_map: dict):
+def _default_inviter(channel_id: str, handles: list[str], *, member_email_map: dict,
+                     token: str | None = None):
     from ..dashboard import slack_notify as _sn
     return _sn.invite_members_to_channel(channel_id, handles,
-                                         member_email_map=member_email_map)
+                                         member_email_map=member_email_map,
+                                         token=token)
 
 
 def provision_slack(project: str, *, lab: str | None = None,
@@ -81,8 +120,15 @@ def provision_slack(project: str, *, lab: str | None = None,
     cp = _cp.get(project, env)
     if cp is None:
         raise CertProvisionError(f"no cert-project named {project!r}")
-    creator = creator or _default_creator
-    inviter = inviter or _default_inviter
+    # Resolve the hosting workspace's token once (group or shared workspace);
+    # bind it into the DEFAULT seams only, so injected test seams keep their
+    # signatures. Empty token → the engines fall back to the centre token and
+    # then to their token-free no-op, exactly as before.
+    _ws, _tok = resolve_project_slack(project, env=env)
+    creator = creator or (lambda name: _default_creator(name, token=_tok or None))
+    inviter = inviter or (lambda cid, hs, *, member_email_map:
+                          _default_inviter(cid, hs, member_email_map=member_email_map,
+                                           token=_tok or None))
 
     channel_id = cp.slack_channel_id
     created = False
@@ -184,10 +230,10 @@ def provision_github(project: str, *, org: str | None = None, lab: str | None = 
 # is the security-critical enforcement; infra teardown is cleanup).
 # ---------------------------------------------------------------------------
 
-def _default_channel_archiver(channel_id: str):
+def _default_channel_archiver(channel_id: str, *, token: str | None = None):
     """Slack ``conversations.archive``. Returns ``(ok, detail)``."""
     from ..dashboard import slack_notify as _sn
-    tok = _sn._token()
+    tok = token or _sn._token()
     if not tok:
         return (False, "no slack token configured")
     try:
@@ -221,7 +267,9 @@ def teardown(project: str, *, env: dict | None = None,
     cp = _cp.get(project, env)
     if cp is None:
         raise CertProvisionError(f"no cert-project named {project!r}")
-    archiver = channel_archiver or _default_channel_archiver
+    _ws, _tok = resolve_project_slack(project, env=env)
+    archiver = channel_archiver or (
+        lambda cid: _default_channel_archiver(cid, token=_tok or None))
     remover = collab_remover or _default_collab_remover
     out: dict = {"channel_archived": None, "collaborators_removed": []}
     if cp.slack_channel_id:
@@ -256,23 +304,23 @@ def _diff(desired, actual) -> tuple[list, list]:
     return sorted(d - a), sorted(a - d)
 
 
-def _default_channel_ids_fetcher(channel_id: str) -> set:
+def _default_channel_ids_fetcher(channel_id: str, *, token: str | None = None) -> set:
     from ..dashboard import slack_notify as _sn
-    return _sn._channel_member_ids(channel_id)
+    return _sn._channel_member_ids(channel_id, token=token)
 
 
-def _default_uid_resolver(handles, email_map):
+def _default_uid_resolver(handles, email_map, *, token: str | None = None):
     from ..dashboard import slack_notify as _sn
     out = {}
     for h in handles:
         email = email_map.get(h)
-        out[h] = _sn._lookup_user_id_by_email(email) if email else None
+        out[h] = _sn._lookup_user_id_by_email(email, token=token) if email else None
     return out
 
 
-def _default_kicker(channel_id: str, uid: str):
+def _default_kicker(channel_id: str, uid: str, *, token: str | None = None):
     from ..dashboard import slack_notify as _sn
-    tok = _sn._token()
+    tok = token or _sn._token()
     if not tok:
         return (False, "no slack token configured")
     try:
@@ -310,10 +358,15 @@ def reconcile_slack(project: str, *, env: dict | None = None, apply: bool = True
     if not cp.slack_channel_id:
         return {"ok": False, "error": "not_provisioned", "invited": [],
                 "kicked": [], "unresolved": []}
-    ids_fetcher = ids_fetcher or _default_channel_ids_fetcher
-    uid_resolver = uid_resolver or _default_uid_resolver
-    inviter = inviter or _default_inviter
-    kicker = kicker or _default_kicker
+    _ws, _tok = resolve_project_slack(project, env=env)
+    ids_fetcher = ids_fetcher or (
+        lambda cid: _default_channel_ids_fetcher(cid, token=_tok or None))
+    uid_resolver = uid_resolver or (
+        lambda hs, em: _default_uid_resolver(hs, em, token=_tok or None))
+    inviter = inviter or (lambda cid, hs, *, member_email_map:
+                          _default_inviter(cid, hs, member_email_map=member_email_map,
+                                           token=_tok or None))
+    kicker = kicker or (lambda cid, uid: _default_kicker(cid, uid, token=_tok or None))
 
     handles = [m.lstrip("@").lower() for m in cp.members]
     resolved = uid_resolver(handles, member_email_map(handles))
@@ -417,4 +470,5 @@ def workspace_check(project: str, *, env: dict | None = None,
 
 __all__ = ["CertProvisionError", "slack_channel_name", "member_email_map",
            "member_github_map", "provision_slack", "provision_github", "teardown",
-           "reconcile_slack", "reconcile_github", "workspace_check"]
+           "reconcile_slack", "reconcile_github", "workspace_check",
+           "resolve_project_slack", "is_inter_group"]

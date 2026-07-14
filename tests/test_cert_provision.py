@@ -308,3 +308,92 @@ def test_workspace_check_no_resolver_marks_all_missing():
 def test_workspace_check_unknown_project_raises():
     with pytest.raises(CPROV.CertProvisionError, match="no cert-project"):
         CPROV.workspace_check("ghost")
+
+
+# ---- workspace resolution + inter-group classification (item 10) -------------
+
+def test_resolve_project_slack_defaults_to_owning_lab(monkeypatch):
+    CP.upsert("p", lab="lab_mh")
+    monkeypatch.setenv("MURMURENT_GROUP_SLACK_TOKEN", "xoxb-lab-token")
+    ws, tok = CPROV.resolve_project_slack("p")
+    assert ws == "lab_mh" and tok == "xoxb-lab-token"
+
+
+def test_resolve_project_slack_honours_shared_workspace(monkeypatch, tmp_path):
+    CP.upsert("p", lab="lab_mh", slack_workspace="shared_ws")
+    # token file at ~/.config/murmurent/groups/shared_ws/slack-token
+    monkeypatch.delenv("MURMURENT_GROUP_SLACK_TOKEN", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    tok_dir = tmp_path / ".config" / "murmurent" / "groups" / "shared_ws"
+    tok_dir.mkdir(parents=True)
+    (tok_dir / "slack-token").write_text("xoxb-shared\n", encoding="utf-8")
+    ws, tok = CPROV.resolve_project_slack("p")
+    assert ws == "shared_ws" and tok == "xoxb-shared"
+
+
+def test_resolve_project_slack_empty_token_is_soft(monkeypatch, tmp_path):
+    """No token ⇒ ('workspace', '') — callers degrade like every Slack seam."""
+    CP.upsert("p", lab="lab_mh")
+    monkeypatch.delenv("MURMURENT_GROUP_SLACK_TOKEN", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    ws, tok = CPROV.resolve_project_slack("p")
+    assert ws == "lab_mh" and tok == ""
+
+
+def test_is_inter_group_classifies_against_roster():
+    MEM.upsert_member("@allie", role="postdoc")
+    MEM.upsert_member("@bob", role="student")
+    assert not CPROV.is_inter_group(["@allie", "bob"])
+    assert CPROV.is_inter_group(["@allie", "@stranger"])
+
+
+def test_is_inter_group_empty_roster_cannot_classify():
+    # no members dir at all → not running the cert model → never inter-group
+    assert not CPROV.is_inter_group(["@anyone"])
+
+
+def test_inter_group_create_requires_workspace(monkeypatch, tmp_path):
+    """The item-10 hard gate: members spanning groups + no agreed workspace →
+    the project definition halts with an actionable error."""
+    from murmurent.core import requests as REQ
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    MEM.upsert_member("@allie", role="postdoc")
+    with pytest.raises(REQ.RequestError, match="shared Slack workspace"):
+        REQ.file_create_request(requester="@allie", project="xproj",
+                                proposed_members=["@allie", "@foreigner"])
+
+
+def test_inter_group_create_requires_resolvable_token(monkeypatch, tmp_path):
+    from murmurent.core import requests as REQ
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.delenv("MURMURENT_GROUP_SLACK_TOKEN", raising=False)
+    monkeypatch.setenv("HOME", str(tmp_path))
+    MEM.upsert_member("@allie", role="postdoc")
+    with pytest.raises(REQ.RequestError, match="no Slack bot token"):
+        REQ.file_create_request(requester="@allie", project="xproj",
+                                proposed_members=["@allie", "@foreigner"],
+                                slack_workspace="shared_ws")
+
+
+def test_inter_group_create_with_workspace_and_token_files(monkeypatch, tmp_path):
+    from murmurent.core import requests as REQ
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.setenv("MURMURENT_GROUP_SLACK_TOKEN", "xoxb-shared")
+    MEM.upsert_member("@allie", role="postdoc")
+    req = REQ.file_create_request(requester="@allie", project="xproj",
+                                  proposed_members=["@allie", "@foreigner"],
+                                  slack_workspace="shared_ws")
+    assert req.slack_workspace == "shared_ws"
+    # round-trips through the on-disk request file
+    back = REQ.parse_request(req.path)
+    assert back.slack_workspace == "shared_ws"
+
+
+def test_single_group_create_needs_no_workspace(monkeypatch, tmp_path):
+    from murmurent.core import requests as REQ
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    MEM.upsert_member("@allie", role="postdoc")
+    MEM.upsert_member("@bob", role="student")
+    req = REQ.file_create_request(requester="@allie", project="yproj",
+                                  proposed_members=["@allie", "@bob"])
+    assert req.slack_workspace is None
