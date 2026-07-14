@@ -281,6 +281,15 @@ class ProjectRow(BaseModel):
     # a cert project can be ``is_cert`` with no CHARTER on disk.
     is_cert: bool = False
     cert_members: list[str] = []
+    # (7) members on the record who hold NO project card yet — drives the
+    # lead's "issue certs" button (the creator≠PI flow).
+    uncertified_members: list[str] = []
+    # (7) the VIEWER's verified standing on this project, from their locally
+    # stored card bundle: "lead" | "member" | "none".
+    my_cert: str = "none"
+    # (10) the group whose Slack workspace hosts this project (inter-group
+    # projects agree on one); empty/None = the owning lab's own workspace.
+    slack_workspace: str | None = None
     # Multi-repo: the project's repo set (code + manuscript + …). Each is
     # {name, role, host, path, overleaf}. Empty for legacy/CHARTER-only rows.
     repos: list[dict] = []

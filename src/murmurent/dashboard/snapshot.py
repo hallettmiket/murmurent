@@ -137,6 +137,13 @@ def build_response(
         cp.name: [{"name": r.name, "role": r.role, "host": r.host,
                    "path": r.path, "overleaf": r.overleaf} for r in cp.repos]
         for cp in cert_projects_all}
+    # (7) who actually HOLDS a project card (vs merely listed) + (10) which
+    # workspace hosts each project — feeds uncertified_members / slack_workspace.
+    cert_certified_by_name = {
+        cp.name: {str(c.get("handle") or "").lstrip("@").lower()
+                  for c in cp.certs}
+        for cp in cert_projects_all}
+    cert_ws_by_name = {cp.name: cp.slack_workspace for cp in cert_projects_all}
     for cp in cert_projects_all:
         if cp.name in charter_names:
             continue
@@ -159,7 +166,6 @@ def build_response(
         return _is_member(p)
     project_summaries_all_visible = [p for p in all_project_summaries if _visible_to_viewer(p)]
     project_summaries = [p for p in project_summaries_all_visible if p.status != "archived"]
-    archived_summaries = [p for p in project_summaries_all_visible if p.status == "archived"]
     all_seas = list(_iter_all_seas())
 
     # Cross-link gate: True when this handle is the centre's registrar.
@@ -213,10 +219,13 @@ def build_response(
         spark_labels=_spark_labels(today_d),
         projects=_projects(project_summaries, all_seas, today_d,
                            cert_names=cert_names, cert_members=cert_members_by_name,
-                           cert_repos=cert_repos_by_name),
-        archived_projects=_projects(archived_summaries, all_seas, today_d,
-                                    cert_names=cert_names, cert_members=cert_members_by_name,
-                                    cert_repos=cert_repos_by_name),
+                           cert_repos=cert_repos_by_name,
+                           cert_certified=cert_certified_by_name,
+                           cert_ws=cert_ws_by_name, viewer=norm),
+        # (9) Deleted/archived projects are HIDDEN from the dashboard entirely
+        # (recovery is CLI-only: `murmurent project-unarchive`). The contract
+        # field stays for API compat but is always empty now.
+        archived_projects=[],
         peers=_peers(
             snap,
             project_summaries,
@@ -1088,10 +1097,15 @@ def _projects(
     cert_names: set[str] | None = None,
     cert_members: dict[str, list[str]] | None = None,
     cert_repos: dict[str, list[dict]] | None = None,
+    cert_certified: dict[str, set[str]] | None = None,
+    cert_ws: dict[str, str] | None = None,
+    viewer: str = "",
 ) -> list[C.ProjectRow]:
     cert_names = cert_names or set()
     cert_members = cert_members or {}
     cert_repos = cert_repos or {}
+    cert_certified = cert_certified or {}
+    cert_ws = cert_ws or {}
     rows: list[C.ProjectRow] = []
     for p in projects:
         open_seas = 0
@@ -1203,11 +1217,38 @@ def _projects(
                 decommissioned_by=p.decommissioned_by,
                 is_cert=p.name in cert_names,
                 cert_members=cert_members.get(p.name, []),
+                uncertified_members=[
+                    m for m in cert_members.get(p.name, [])
+                    if m.lstrip("@").lower() not in cert_certified.get(p.name, set())
+                ],
+                my_cert=_viewer_project_cert(p.name, viewer,
+                                             cert_members.get(p.name, [])),
+                slack_workspace=(cert_ws.get(p.name) or None),
                 repos=cert_repos.get(p.name, []),
                 machines=_project_machines(host, cert_repos.get(p.name, [])),
             )
         )
     return rows
+
+
+def _viewer_project_cert(project: str, viewer: str, members: list[str]) -> str:
+    """The viewer's own verified standing on ``project``: "lead" | "member" |
+    "none" — from the card bundle stored on THIS machine (that is the whole
+    point: membership is what you can cryptographically prove, not what a
+    list says). Only attempted when the viewer is on the member list."""
+    if not viewer or not any(m.lstrip("@").lower() == viewer for m in members):
+        return "none"
+    try:
+        from ..core import issuance as _iss
+        v = _iss.verify_project_membership(project)
+    except Exception:  # noqa: BLE001
+        return "none"
+    if not v.ok:
+        return "none"
+    if v.kind == "project_lead" or any(
+            (r or {}).get("kind") == "project_lead" for r in (v.roles or ())):
+        return "lead"
+    return "member"
 
 
 def _project_machines(host: str, repos: list[dict]) -> list[str]:
