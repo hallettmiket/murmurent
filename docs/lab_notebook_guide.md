@@ -99,8 +99,8 @@ This scaffolds:
 …and the corresponding lab-VM directories:
 
 ```
-/data/lab_vm/wigamig/raw/dcis_sc_tutorial/3_titration_v3/      (read-only after ingest)
-/data/lab_vm/wigamig/refined/dcis_sc_tutorial/3_titration_v3/  (analysis outputs)
+$MURMURENT_LAB_VM_ROOT/raw/dcis_sc_tutorial/3_titration_v3/      (read-only after ingest)
+$MURMURENT_LAB_VM_ROOT/refined/dcis_sc_tutorial/3_titration_v3/  (analysis outputs)
 ```
 
 ### `notebook.md` — what to write
@@ -148,12 +148,12 @@ Export PNG/PDF to `sketches/`. Same embed syntax:
 **Screenshots (FACS plot, software output):**
 
 `sketches/` is fine. If it's instrument-derived, prefer `murmurent
-experiment ingest` — the file lands in `/data/lab_vm/wigamig/refined/<project>/<exp>/instrument_outputs/`
+experiment ingest` — the file lands in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/instrument_outputs/`
 with checksums and the notebook's `instrument_outputs:` list updates
 automatically.
 
 **Don't** commit anything bigger than ~2 MB to the repo. Big images
-go in `/data/lab_vm/wigamig/refined/<project>/<exp>/` and you reference them
+go in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/` and you reference them
 by path in the notebook body.
 
 ### Linking to data files on the lab VM
@@ -164,13 +164,13 @@ canonical store). Reference them by absolute path:
 ```markdown
 ## Raw data
 
-- Sequencing run: `/data/lab_vm/wigamig/raw/dcis_sc_tutorial/3_titration_v3/run_001.fastq.gz`
-- Clinical metadata: `/data/lab_vm/wigamig/raw/dcis_sc_tutorial/3_titration_v3/clin.csv`
+- Sequencing run: `$MURMURENT_LAB_VM_ROOT/raw/dcis_sc_tutorial/3_titration_v3/run_001.fastq.gz`
+- Clinical metadata: `$MURMURENT_LAB_VM_ROOT/raw/dcis_sc_tutorial/3_titration_v3/clin.csv`
 
 ## Refined outputs
 
-- Count matrix: `/data/lab_vm/wigamig/refined/dcis_sc_tutorial/3_titration_v3/counts.parquet`
-- QC report: `/data/lab_vm/wigamig/refined/dcis_sc_tutorial/3_titration_v3/qc_report.html`
+- Count matrix: `$MURMURENT_LAB_VM_ROOT/refined/dcis_sc_tutorial/3_titration_v3/counts.parquet`
+- QC report: `$MURMURENT_LAB_VM_ROOT/refined/dcis_sc_tutorial/3_titration_v3/qc_report.html`
 ```
 
 `murmurent push <project> --refined 3_titration_v3` walks the refined
@@ -242,8 +242,8 @@ sections are present and writes a final summary into the project's
     ├── pages/                                   ← photos
     └── sketches/                                ← drawings
 
-/data/lab_vm/wigamig/raw/dcis_sc_tutorial/3_titration_v3/      ← raw data (read-only)
-/data/lab_vm/wigamig/refined/dcis_sc_tutorial/3_titration_v3/  ← analysis outputs
+$MURMURENT_LAB_VM_ROOT/raw/dcis_sc_tutorial/3_titration_v3/      ← raw data (read-only)
+$MURMURENT_LAB_VM_ROOT/refined/dcis_sc_tutorial/3_titration_v3/  ← analysis outputs
 
 ~/repos/lab_mgmt/                        ← lab-mgmt repo (shared via git)
 └── oracle/

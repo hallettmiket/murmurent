@@ -1,7 +1,7 @@
 # Data storage — raw is immutable, refined is append-only
 
 All data except very small files in-repo lives under
-``$MURMURENT_LAB_VM_ROOT`` (production: ``/data/lab_vm/wigamig/``):
+``$MURMURENT_LAB_VM_ROOT`` (the lab server sets it in the environment):
 
 - **``raw/<project>/``** — original data from the lab, a collaborator,
   or a public resource. **No code may modify these files**, including

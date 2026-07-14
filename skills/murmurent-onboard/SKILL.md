@@ -56,7 +56,7 @@ murmurent join-request approve <id> --actor @<mayor>
 murmurent join-request decline <id> --actor @<mayor>
 ```
 **Slack provisioning is automatic here** — `approve` reads the bot token from
-`$MURMURENT_SLACK_TOKEN` **or** the `~/.config/wigamig/slack-token` file, so the
+`$MURMURENT_SLACK_TOKEN` **or** the `~/.config/murmurent/groups/<lab>/slack-token` file, so the
 group's private channel gets created and members invited without exporting
 anything, *as long as that token file / env var is set for the centre's
 workspace*. If neither is present, the record is still approved and the Slack

@@ -20,7 +20,7 @@ then run for real**.
 | `centre` (default) | `~/.murmurent/lab_info/` only → centre-init is first-run again | everything else |
 | `install` | centre + reinstall the tool from `~/repos/murmurent` (`uv tool install --force --python 3.12 -e '.[dashboard,slack,mcp]'`) + `scripts/setup.sh` + `murmurent install --hooks` | credentials, installations, audit |
 | `full` | install + machine-local **caches** (`workspaces/`, `*.log`, `dashboard.pid`, `security/agent_cache`, stale `RESUME.md`) | credentials, `installations/`, `decommissions/`, audit logs, `hosts.yaml`/`machine.yaml` |
-| `data` | **all data you entered** into `~/.murmurent` — `lab_info/`, `profile.yaml`, `hosts`/`machine`/`master_folders` yaml, `inventory/`, `cores/`, `onboarding/`, `decommissions/`, `security/`, identity/cards/trust/revocation, logs — everything *except* key material (allowlist-based, so new files are caught) | `keys/`, `age/`, `installations/` (other projects), and `~/.config/wigamig`. **No reinstall.** |
+| `data` | **all data you entered** into `~/.murmurent` — `lab_info/`, `profile.yaml`, `hosts`/`machine`/`master_folders` yaml, `inventory/`, `cores/`, `onboarding/`, `decommissions/`, `security/`, identity/cards/trust/revocation, logs — everything *except* key material (allowlist-based, so new files are caught) | `keys/`, `age/`, `installations/` (other projects), and `~/.config/murmurent`. **No reinstall.** |
 
 Use `data` for "wipe everything I've entered and start over, but keep my keys and
 credentials." It's the level to reach for when `full` leaves too much behind
@@ -28,7 +28,7 @@ credentials." It's the level to reach for when `full` leaves too much behind
 
 Opt-in extras (only with the flag): `--nuke-installations` (also wipes
 `~/.murmurent/installations/` — **other projects' manifests**),
-`--nuke-credentials` (also wipes `~/.config/wigamig/` — the **slack-token +
+`--nuke-credentials` (also wipes `~/.config/murmurent/` — the **slack-tokens +
 keys**), `--nuke-keys` (with `--level data`, **also** removes `~/.murmurent/keys/`
 + `age/` for a fully fresh identity; default keeps them), `--nuke-labs` (also
 removes this machine's **lab-management repos** `~/repos/murmurent_lab_mgmt_* (legacy: ~/repos/wigamig_*)` — they hold
@@ -85,14 +85,14 @@ base/envs + pipx and removes any murmurent it finds. Working clones under
    instead of `--dry-run`. The script refuses to do anything destructive
    without `--yes`, so this two-step is enforced, not just convention.
 
-4. **Report.** Show the backup tarball path (`~/.wigamig_backups/reset_*.tgz`)
+4. **Report.** Show the backup tarball path (`~/.murmurent_backups/reset_*.tgz`)
    and the restore one-liner, then confirm `murmurent centre-status` reports
    "no centre initialised". If the level was `install`/`full`, confirm
    `murmurent dashboard --hifi` still launches.
 
 ## Guardrails (the script enforces these — don't work around them)
 
-- **Backup is mandatory and lands OUTSIDE `~/.murmurent`** (`~/.wigamig_backups/`)
+- **Backup is mandatory and lands OUTSIDE `~/.murmurent`** (`~/.murmurent_backups/`)
   so even a full wipe can't delete it. Never pass a flag to skip it; there
   isn't one.
 - **Never** touches `~/repos/*` working clones, `~/.claude/CLAUDE.md`,
@@ -101,7 +101,7 @@ base/envs + pipx and removes any murmurent it finds. Working clones under
   and only when they have no uncommitted/unpushed work). Nothing else under
   `~/repos` is ever touched.
 - **Credentials and other-project installs are preserved by default.** On this
-  machine `~/.config/wigamig/slack-token` + `keys/` are real, and
+  machine `~/.config/murmurent/` slack-tokens + `keys/` are real, and
   `~/.murmurent/installations/` holds manifests for the user's *other* projects
   (manuscript, mp3/mp4, …). Removing either needs the explicit `--nuke-*` flag
   AND a clear go-ahead from the user.

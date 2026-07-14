@@ -78,7 +78,7 @@ Plus the side effects on:
 - **Slack**: per-project channels, guest invites
 - **GitHub**: per-project repo collaborators
 - **Filesystem on each lab server**: per-project ACLs on
-  `<lab_vm_root>/wigamig/{raw,refined}/<project>/`
+  `<lab_vm_root>/{raw,refined}/<project>/`
 
 ## Core operations
 
@@ -129,7 +129,7 @@ Reads `<lab_info>/projects/<project>.md` for the desired member set
    (existing logic — don't duplicate). You just call it.
 3. **Filesystem ACLs**: for each registered lab server, run
    `/opt/murmurent/murmurent_project_acl.sh` via sudo to create
-   `<lab_vm_root>/wigamig/{raw,refined}/<project>/` with an
+   `<lab_vm_root>/{raw,refined}/<project>/` with an
    inheriting ACE granting `r-x` to the project's Unix group and
    `r-x-c` to the core's group when applicable.
 4. **Audit**: append a one-line summary to

@@ -147,7 +147,7 @@ lab_mgmt/
         │   ├── itc_microcal_peaq.md
         │   ├── circular_dichroism.md
         │   └── ...
-        └── data/                   # pointers to /data/lab_vm/wigamig/core/<core>/
+        └── data/                   # pointers to $MURMURENT_LAB_VM_ROOT/core/<core>/
             └── DATA_LAYOUT.md      # describes how the core's data tree is organised
 ```
 
@@ -180,7 +180,7 @@ service_modes:                      # which modes murmurent wires up (for now: i
   - consultation                    # advisory; not bookable
   - independent_data_collection     # bookable; user runs the equipment
   - fee_for_service_data_collection # bookable; core staff runs the equipment
-data_root: /data/lab_vm/wigamig/core/biocore  # where job data lives
+data_root: $MURMURENT_LAB_VM_ROOT/core/biocore  # where job data lives
 billing:
   cost_centre: "C2-12345"           # Western fund code; placeholder
   invoice_period: monthly
@@ -220,11 +220,11 @@ The `TrainingCompliancePanel` data builder already iterates `iter_members()` fro
 
 ### 4e. Security guard scope (item 4 in your spec)
 
-The security guard's Tier 1 + Tier 2 audit currently scopes to `/data/lab_vm/wigamig/{raw,refined,...}`. Extend the snapshot script's path list to include `/data/lab_vm/wigamig/core/<core>/{raw,refined,jobs}/` for every registered core.
+The security guard's Tier 1 + Tier 2 audit currently scopes to `$MURMURENT_LAB_VM_ROOT/{raw,refined,...}`. Extend the snapshot script's path list to include `$MURMURENT_LAB_VM_ROOT/core/<core>/{raw,refined,jobs}/` for every registered core.
 
 Concretely:
 
-- `scripts/lab_sec_dump.sh` enumerates `/data/lab_vm/wigamig/core/*/` and `nfs4_getfacl -R` each. Per-core budget (mirror the per-project budget we added in v6 for refined).
+- `scripts/lab_sec_dump.sh` enumerates `$MURMURENT_LAB_VM_ROOT/core/*/` and `nfs4_getfacl -R` each. Per-core budget (mirror the per-project budget we added in v6 for refined).
 - The Tier 2 ACL template (the Dumeaux reference in `docs/security-dashboard.md`) gets a parallel **CORE-RAW-IMMUTABLE-01**, **CORE-REFINED-LAB-WRITE-01**, **CORE-JOB-DELIVERY-01** rule family. Same patterns as raw/refined, just scoped to core paths.
 - A new finding category **CORE-OVER-EXPOSED-DATA-01** (warn): job data dirs at `core/<core>/jobs/<job_id>/` should be readable by exactly the requesting lab's group + the core's group, nothing more.
 
@@ -383,7 +383,7 @@ A `core/scheduling.py` module + a sqlite-backed table (or files in `lab_mgmt/cor
 
 **Phase A: Option A (Google Calendar MCP).** Fast to ship, leverages infra already in this CC environment, lets users see bookings in their existing tools. Murmurent owns the *policy* layer (training enforcement, fee snapshotting, lab-affiliation tracking) and Google owns the *calendar* layer.
 
-**Phase B (if Phase A reveals friction):** evaluate Booked Scheduler as a self-hosted alternative. Migration is straightforward because all the wigamig-side state (request_id, fee_at_booking, training_verified, job_id) is independent of the calendar backend.
+**Phase B (if Phase A reveals friction):** evaluate Booked Scheduler as a self-hosted alternative. Migration is straightforward because all the murmurent-side state (request_id, fee_at_booking, training_verified, job_id) is independent of the calendar backend.
 
 Concretely for Phase A:
 
@@ -489,7 +489,7 @@ The use case: a Hallett-lab member books bioCore's ITC service. ITC produces ~10
 ### Storage layout
 
 ```
-/data/lab_vm/wigamig/core/biocore/
+$MURMURENT_LAB_VM_ROOT/core/biocore/
 ├── jobs/
 │   ├── 2026-05-23-knabavil-itc-001/
 │   │   ├── manifest.json                    # request_id, service, requester, lab, fee
@@ -545,7 +545,7 @@ Identity:
   member of the core itself (core staff see all jobs in their core).
 
 Audit:
-  Every call logged to /var/log/wigamig/core_data_access.log on the
+  Every call logged to /var/log/murmurent/core_data_access.log on the
   host where the MCP server runs (lab server, near the data).
 ```
 
@@ -557,15 +557,15 @@ On the lab server (biodatsci) close to the data. The user's local CC session con
 
 The user asked. Other MCP candidates for cores:
 
-- **`wigamig-core-services`** — list services, check availability, quote a fee, book a slot, cancel. Lets a researcher say "claude, find me an ITC slot tomorrow morning" and the agent does the conversation with bioCore via MCP. This is *exactly* what MCP is for.
-- **`wigamig-core-billing`** — read-only access to a lab's spend in a period, for PI's monthly review.
-- **`wigamig-core-training`** — what training do I have, when does it expire, when's the next session.
+- **`murmurent-core-services`** — list services, check availability, quote a fee, book a slot, cancel. Lets a researcher say "claude, find me an ITC slot tomorrow morning" and the agent does the conversation with bioCore via MCP. This is *exactly* what MCP is for.
+- **`murmurent-core-billing`** — read-only access to a lab's spend in a period, for PI's monthly review.
+- **`murmurent-core-training`** — what training do I have, when does it expire, when's the next session.
 
 The agent-side wins are clear: a member of the Hallett lab can now have a conversation like "I have a sample at 8 µM, can I run ITC this week?" and the agent checks training, books the slot, and confirms — all via MCPs. That's a step change in UX.
 
 ### Cores with existing data infrastructure
 
-Many established cores (genomics core with sequencers writing to BaseSpace, proteomics core with mass-spec data on a vendor server) will not migrate their data to `/data/lab_vm/wigamig/core/<core>/`. Murmurent needs to handle the "core stores its data elsewhere; murmurent is just the access layer" case:
+Many established cores (genomics core with sequencers writing to BaseSpace, proteomics core with mass-spec data on a vendor server) will not migrate their data to `$MURMURENT_LAB_VM_ROOT/core/<core>/`. Murmurent needs to handle the "core stores its data elsewhere; murmurent is just the access layer" case:
 
 - The core's `data_root` field can be a URL (s3://, https://, sftp://) or a mount path on the lab server.
 - The `murmurent-core-data` MCP's `read_job_file` implementation per-core handles the backend (filesystem, s3, http GET, vendor API).
@@ -668,7 +668,7 @@ Estimate: roughly +1 week distributed across Phases 1-5 (each phase's UI is +1-2
 ### Phase 1 — Core CRUD + security audit (≈ 1 week)
 
 - Registrar can add/delete/rename cores; add/remove core members; rotate leader.
-- Security guard's snapshot script extends to walk `/data/lab_vm/wigamig/core/<core>/`.
+- Security guard's snapshot script extends to walk `$MURMURENT_LAB_VM_ROOT/core/<core>/`.
 - Tier 2 ACL templates for core dirs.
 - Slack notifications when core membership changes.
 
@@ -714,8 +714,8 @@ Estimate: roughly +1 week distributed across Phases 1-5 (each phase's UI is +1-2
 
 ### Phase 6 (optional / nice-to-have)
 
-- `wigamig-core-services` MCP for conversational booking.
-- `wigamig-core-billing` MCP for read-only spend queries.
+- `murmurent-core-services` MCP for conversational booking.
+- `murmurent-core-billing` MCP for read-only spend queries.
 - Stripe direct-pay for external customers.
 - Migration tools for cores with existing booking systems (Booked Scheduler export, etc.).
 

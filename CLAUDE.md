@@ -69,7 +69,7 @@ Auto-loaded into every CC session via `~/.claude/rules/`:
 
 Defined in [`skills/`](skills/), symlinked into `~/.claude/skills/` by
 [`scripts/setup.sh`](scripts/setup.sh). Each is a single-purpose slash
-command available in any wigamig-bootstrapped CC session.
+command available in any murmurent-bootstrapped CC session.
 
 | Skill | Role |
 |---|---|
