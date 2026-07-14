@@ -286,3 +286,194 @@ def test_enrollment_tampered_payload_rejected(world):
     req = C.make_enrollment_request("@allie", priv=world["member"], nonce="n-1")
     req["payload"]["handle"] = "@someone_else"
     assert not C.verify_enrollment(req)
+
+
+# ---- project delegation chain (root → PI → lead → member) --------------------
+
+@pytest.fixture
+def pworld(world):
+    """world + a project lead (@allie promoted) and a project member (@bob).
+
+    The lead card delegates yxia_lab/dcis_17 to @allie; @allie signs @bob's
+    project card with her own key."""
+    lead = world["member"]          # @allie's keypair doubles as the lead key
+    bob = Ed25519PrivateKey.generate()
+    lead_card = C.issue_project_lead_card(
+        handle="@allie", lead_pubkey=lead.public_key(), project="dcis_17",
+        lab="yxia_lab", centre="qa", pi_priv=world["pi"], pi_handle="@yxia266",
+        issued_at=T0)
+    proj_card = C.issue_project_card_by_lead(
+        handle="@bob", member_pubkey=bob.public_key(), group="yxia_lab/dcis_17",
+        centre="qa", lead_priv=lead, lead_handle="@allie",
+        roles=[{"kind": "project_member", "project": "dcis_17",
+                "lab": "yxia_lab", "group": "yxia_lab/dcis_17"}],
+        issued_at=T0)
+    return dict(world, lead=lead, bob=bob, lead_card=lead_card,
+                proj_card=proj_card)
+
+
+def _pv(pw, **kw):
+    """verify_project_card with pworld defaults, at T0 unless overridden."""
+    kw.setdefault("root_pub", pw["root_pub"])
+    kw.setdefault("now", T0)
+    kw.setdefault("crl", pw["crl"])
+    kw.setdefault("centre", "qa")
+    return C.verify_project_card(pw["proj_card"], pw["lead_card"], pw["pi_card"], **kw)
+
+
+def test_project_chain_verifies(pworld):
+    v = _pv(pworld)
+    assert v.ok and v.reason == "ok"
+    assert v.handle == "@bob" and v.group == "yxia_lab/dcis_17"
+    assert v.kind == "member"
+    assert any(r.get("kind") == "project_member" for r in v.roles)
+
+
+def test_lead_card_verifies_standalone(pworld):
+    v = C.verify_project_lead_card(pworld["lead_card"], pworld["pi_card"],
+                                   root_pub=pworld["root_pub"], now=T0,
+                                   crl=pworld["crl"], centre="qa")
+    assert v.ok and v.handle == "@allie" and v.kind == "project_lead"
+    assert v.group == "yxia_lab/dcis_17"
+
+
+def test_pi_self_delegation_verifies(pworld):
+    """PI == lead: the PI self-delegates and signs project cards directly."""
+    lead_card = C.issue_project_lead_card(
+        handle="@yxia266", lead_pubkey=pworld["pi"].public_key(),
+        project="dcis_17", lab="yxia_lab", centre="qa", pi_priv=pworld["pi"],
+        pi_handle="@yxia266", issued_at=T0)
+    proj = C.issue_project_card_by_lead(
+        handle="@bob", member_pubkey=pworld["bob"].public_key(),
+        group="yxia_lab/dcis_17", centre="qa", lead_priv=pworld["pi"],
+        lead_handle="@yxia266",
+        roles=[{"kind": "project_member", "project": "dcis_17",
+                "lab": "yxia_lab", "group": "yxia_lab/dcis_17"}], issued_at=T0)
+    v = C.verify_project_card(proj, lead_card, pworld["pi_card"],
+                              root_pub=pworld["root_pub"], now=T0,
+                              crl=pworld["crl"], centre="qa")
+    assert v.ok
+
+
+def test_tampered_project_payload_rejected(pworld):
+    pworld["proj_card"]["payload"]["subject"]["handle"] = "@mallory"
+    assert not _pv(pworld)
+
+
+def test_tampered_lead_payload_rejected(pworld):
+    pworld["lead_card"]["payload"]["group"] = "yxia_lab/other_project"
+    v = _pv(pworld)
+    assert not v.ok and "lead card invalid" in v.reason
+
+
+def test_revoked_lead_kills_every_project_card(pworld):
+    """Revoking the lead's card_id invalidates all cards the lead signed."""
+    lead_id = pworld["lead_card"]["payload"]["card_id"]
+    crl = C.build_crl(centre="qa", revoked=[lead_id], root_priv=pworld["root"],
+                      serial=2, issued_at=T0)
+    v = _pv(pworld, crl=crl)
+    assert not v.ok and "lead card revoked" in v.reason
+
+
+def test_revoked_project_leaf_only(pworld):
+    leaf_id = pworld["proj_card"]["payload"]["card_id"]
+    crl = C.build_crl(centre="qa", revoked=[leaf_id], root_priv=pworld["root"],
+                      serial=2, issued_at=T0)
+    v = _pv(pworld, crl=crl)
+    assert not v.ok and v.reason == "revoked"
+    # the lead card itself is still fine
+    lv = C.verify_project_lead_card(pworld["lead_card"], pworld["pi_card"],
+                                    root_pub=pworld["root_pub"], now=T0,
+                                    crl=crl, centre="qa")
+    assert lv.ok
+
+
+def test_lead_cannot_sign_for_a_different_project(pworld):
+    """Delegation is scoped: a card for another project's group is rejected
+    even though the lead's signature is valid."""
+    rogue = C.issue_project_card_by_lead(
+        handle="@bob", member_pubkey=pworld["bob"].public_key(),
+        group="yxia_lab/other_project", centre="qa", lead_priv=pworld["lead"],
+        lead_handle="@allie",
+        roles=[{"kind": "project_member", "project": "other_project",
+                "lab": "yxia_lab", "group": "yxia_lab/other_project"}],
+        issued_at=T0)
+    v = C.verify_project_card(rogue, pworld["lead_card"], pworld["pi_card"],
+                              root_pub=pworld["root_pub"], now=T0,
+                              crl=pworld["crl"], centre="qa")
+    assert not v.ok and v.reason == "project/lead group mismatch"
+
+
+def test_attacker_signed_project_card_rejected(pworld):
+    attacker = Ed25519PrivateKey.generate()
+    forged = C.issue_project_card_by_lead(
+        handle="@bob", member_pubkey=pworld["bob"].public_key(),
+        group="yxia_lab/dcis_17", centre="qa", lead_priv=attacker,
+        lead_handle="@allie",
+        roles=[{"kind": "project_member"}], issued_at=T0)
+    v = C.verify_project_card(forged, pworld["lead_card"], pworld["pi_card"],
+                              root_pub=pworld["root_pub"], now=T0,
+                              crl=pworld["crl"], centre="qa")
+    assert not v.ok and v.reason in ("issuer/lead mismatch", "bad lead signature")
+
+
+def test_member_card_cannot_act_as_lead_card(pworld):
+    """A plain member card (kind=member) presented as the delegation link is
+    structurally rejected — a member can never be an issuer."""
+    v = C.verify_project_card(pworld["proj_card"], pworld["member_card"],
+                              pworld["pi_card"], root_pub=pworld["root_pub"],
+                              now=T0, crl=pworld["crl"], centre="qa")
+    assert not v.ok and "not a project-lead card" in v.reason
+
+
+def test_lead_card_cannot_pose_as_member_card(pworld):
+    """The delegation card can never pass the plain member-card verifier."""
+    v = C.verify_member_card(pworld["lead_card"], pworld["pi_card"],
+                             root_pub=pworld["root_pub"], now=T0,
+                             crl=pworld["crl"], centre="qa")
+    assert not v.ok and v.reason == "not a member card"
+
+
+def test_project_card_without_role_rejected(pworld):
+    bare = C.issue_project_card_by_lead(
+        handle="@bob", member_pubkey=pworld["bob"].public_key(),
+        group="yxia_lab/dcis_17", centre="qa", lead_priv=pworld["lead"],
+        lead_handle="@allie", roles=[], issued_at=T0)
+    v = C.verify_project_card(bare, pworld["lead_card"], pworld["pi_card"],
+                              root_pub=pworld["root_pub"], now=T0,
+                              crl=pworld["crl"], centre="qa")
+    assert not v.ok and v.reason == "no project_member role"
+
+
+def test_lead_expired_at_leaf_issue_time_rejected(pworld):
+    """Temporal nesting: a project card issued after the lead card expired is
+    rejected even if presented while the lead card would otherwise be renewed."""
+    late = T0 + timedelta(days=120)          # beyond the lead card's 90-day TTL
+    proj = C.issue_project_card_by_lead(
+        handle="@bob", member_pubkey=pworld["bob"].public_key(),
+        group="yxia_lab/dcis_17", centre="qa", lead_priv=pworld["lead"],
+        lead_handle="@allie",
+        roles=[{"kind": "project_member"}], issued_at=late)
+    crl = C.build_crl(centre="qa", revoked=[], root_priv=pworld["root"],
+                      serial=3, issued_at=late)
+    # fresh lead+pi cards so only the ORIGINAL lead card is expired at `late`
+    v = C.verify_project_card(proj, pworld["lead_card"], pworld["pi_card"],
+                              root_pub=pworld["root_pub"], now=late,
+                              crl=crl, centre="qa")
+    assert not v.ok  # lead card expired (chain fails at step 1)
+
+
+def test_project_chain_missing_crl_fails_closed(pworld):
+    v = _pv(pworld, crl=None)
+    assert not v.ok and "no CRL" in v.reason
+
+
+def test_project_chain_stale_crl_fails_closed(pworld):
+    late = T0 + timedelta(days=30)
+    v = _pv(pworld, now=late)   # CRL issued at T0 → >7 days old
+    assert not v.ok and "stale CRL" in v.reason
+
+
+def test_project_chain_wrong_centre_rejected(pworld):
+    v = _pv(pworld, centre="other_centre")
+    assert not v.ok

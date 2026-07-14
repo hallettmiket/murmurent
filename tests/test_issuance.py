@@ -514,3 +514,165 @@ def test_cli_issue_and_import_round_trip(mayor_world, monkeypatch, tmp_path):
     assert res2.exit_code == 0, res2.output
     assert "verified" in res2.output
     assert R.lab_mgmt_path_for_handle("yxia266")[0] == "yxia_lab"
+
+
+# ---- lead-delegated project cards (root → PI → lead → member) ----------------
+
+def _standalone_pi(monkeypatch, tmp_path, *, home="pi_home"):
+    """Standalone PI machine with a lab + one carded member (@allie).
+
+    Returns (trust_root, allie_priv). @allie's pubkey lands on the roster at
+    member-card issuance, which is what one-click project issuance reads."""
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / home))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / f"{home}_li"))
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "shared_lab_mgmt"))
+    K.generate_keypair()
+    out = ISS.self_issue_pi_card("@yxia266", "xia_lab")
+    allie = Ed25519PrivateKey.generate()
+    m_req = C.make_enrollment_request("@allie", priv=allie, nonce="a1",
+                                      group="xia_lab", email="allie@x.edu")
+    ISS.issue_member_card("@allie", enrollment=m_req, group="xia_lab")
+    return out["trust_root"], allie
+
+
+def test_member_card_issuance_records_pubkey_on_roster(monkeypatch, tmp_path):
+    from murmurent.core import membership as MEM
+    _trust, allie = _standalone_pi(monkeypatch, tmp_path)
+    rec = MEM.get("allie")
+    assert rec.pubkey == K.encode_public(allie.public_key())
+
+
+def test_pi_self_delegates_and_issues_one_click(monkeypatch, tmp_path):
+    """PI == lead: self-delegation stores the lead bundle locally; a project
+    card for a roster-keyed member is one click, no fresh PoP."""
+    trust, allie = _standalone_pi(monkeypatch, tmp_path)
+    lead = ISS.issue_project_lead_card("@yxia266", project="dcis_17")
+    assert lead["lead_card"]["payload"]["kind"] == "project_lead"
+    assert lead["group"] == "xia_lab/dcis_17"
+
+    bundle = ISS.issue_project_card_from_roster("@allie", project="dcis_17")
+    assert bundle["project_card"]["payload"]["group"] == "xia_lab/dcis_17"
+    # registry mirrors both: allie certified, yxia266 is lead + certified
+    from murmurent.core import cert_projects as CP
+    cp = CP.get("dcis_17")
+    assert cp is not None and cp.lead == "@yxia266"
+    assert {m.lstrip("@") for m in cp.members} == {"yxia266", "allie"}
+
+    # member side: import + prove membership; lab member bundle untouched
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "allie_home"))
+    v, _actions = ISS.verify_and_import_project_card(bundle, trust_root=trust)
+    assert v.ok and v.handle == "@allie" and v.group == "xia_lab/dcis_17"
+    pv = ISS.verify_project_membership("dcis_17")
+    assert pv.ok and pv.handle == "@allie"
+    member_bundles = list(ISS.cards_dir().glob("*_member.json"))
+    assert member_bundles == []          # project import never clobbers the lab card
+
+
+def test_from_roster_raises_no_recorded_key(monkeypatch, tmp_path):
+    _trust, _allie = _standalone_pi(monkeypatch, tmp_path)
+    ISS.issue_project_lead_card("@yxia266", project="dcis_17")
+    with pytest.raises(ISS.NoRecordedKey):
+        ISS.issue_project_card_from_roster("@bob", project="dcis_17")
+
+
+def test_pop_fallback_records_pubkey_for_next_time(monkeypatch, tmp_path):
+    _trust, _allie = _standalone_pi(monkeypatch, tmp_path)
+    ISS.issue_project_lead_card("@yxia266", project="dcis_17")
+    bob = Ed25519PrivateKey.generate()
+    req = C.make_enrollment_request("@bob", priv=bob, nonce="b1",
+                                    email="bob@x.edu", slack="bobslack")
+    out = ISS.issue_project_card_pop("@bob", enrollment=req, project="dcis_17")
+    assert out["project_card"]["payload"]["subject"]["handle"] == "@bob"
+    # roster now has bob's key → the NEXT project add is one-click
+    from murmurent.core import membership as MEM
+    assert MEM.get("bob").pubkey == K.encode_public(bob.public_key())
+    ISS.issue_project_lead_card("@yxia266", project="proj_two")
+    assert ISS.issue_project_card_from_roster("@bob", project="proj_two")["project_card"]
+
+
+def test_member_delegated_lead_issues_from_their_machine(monkeypatch, tmp_path):
+    """creator == member: the PI delegates to @allie; on HER machine (her key,
+    the shared roster) she signs @bob's project card herself."""
+    trust, _ = _standalone_pi(monkeypatch, tmp_path)
+    # allie's real key lives on HER machine — pin her machine key as the lead key
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "allie_home"))
+    K.generate_keypair()
+    allie_pub = K.encode_public(K.load_public())
+    # back on the PI machine: delegate the project to allie's machine key
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi_home"))
+    lead_bundle = ISS.issue_project_lead_card("@allie", project="dcis_17",
+                                              pubkey=allie_pub)
+    assert lead_bundle["lead_card"]["payload"]["subject"]["pubkey"] == allie_pub
+    # no lead bundle materializes on the PI machine (allie ≠ PI)
+    assert not list(ISS.cards_dir().glob("*_lead_*.json"))
+
+    # bob gets carded on the PI machine so his pubkey is on the shared roster
+    bob = Ed25519PrivateKey.generate()
+    ISS.issue_member_card("@bob", enrollment=C.make_enrollment_request(
+        "@bob", priv=bob, nonce="b1", group="xia_lab"), group="xia_lab")
+
+    # allie's machine: import the DM'd lead bundle, then one-click bob
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "allie_home"))
+    v, _actions = ISS.verify_and_import_project_card(
+        {"lead_card": lead_bundle["lead_card"], "pi_card": lead_bundle["pi_card"]},
+        trust_root=trust)
+    assert v.ok and v.kind == "project_lead"
+    out = ISS.issue_project_card_from_roster("@bob", project="dcis_17")
+    assert out["project_card"]["payload"]["issuer"]["handle"] == "@allie"
+    # a valid lead card also proves allie's own membership
+    assert ISS.verify_project_membership("dcis_17").ok
+
+
+def test_non_lead_machine_cannot_sign_project_cards(monkeypatch, tmp_path):
+    """The crypto gate: a machine whose key ≠ the delegated lead key refuses."""
+    trust, _ = _standalone_pi(monkeypatch, tmp_path)
+    stranger = Ed25519PrivateKey.generate()
+    lead_bundle = ISS.issue_project_lead_card(
+        "@allie", project="dcis_17",
+        pubkey=K.encode_public(stranger.public_key()))
+    # mallory's machine imports the (public) lead bundle but holds her own key
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "mallory_home"))
+    K.generate_keypair()
+    ISS.verify_and_import_project_card(
+        {"lead_card": lead_bundle["lead_card"], "pi_card": lead_bundle["pi_card"]},
+        trust_root=trust)
+    with pytest.raises(ISS.IssuanceError, match="does not match"):
+        ISS.issue_project_card_from_roster("@allie", project="dcis_17")
+
+
+def test_delete_project_with_zero_certs(monkeypatch, tmp_path):
+    """A project registered but never certified is still deletable; the report
+    is written and the registry archives."""
+    _standalone_pi(monkeypatch, tmp_path)
+    from murmurent.core import cert_projects as CP
+    CP.upsert("empty_proj", lab="xia_lab")
+    out = ISS.delete_project("empty_proj", by_handle="@yxia266")
+    assert out["revoked"] == 0 and out["crl"] is None
+    assert out["report"] and "empty_proj" in out["report"]
+    assert CP.get("empty_proj").status == "archived"
+
+
+def test_delete_project_revokes_lead_and_members(monkeypatch, tmp_path):
+    """Full delete: lead + member cards all land on the CRL in one bump, and
+    the member's stored proof then FAILS verification."""
+    trust, _allie = _standalone_pi(monkeypatch, tmp_path)
+    ISS.issue_project_lead_card("@yxia266", project="dcis_17")
+    bundle = ISS.issue_project_card_from_roster("@allie", project="dcis_17")
+
+    # allie imports her proof (verifies now)…
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "allie_home"))
+    ISS.verify_and_import_project_card(bundle, trust_root=trust)
+    assert ISS.verify_project_membership("dcis_17").ok
+
+    # …PI deletes the project…
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi_home"))
+    out = ISS.delete_project("dcis_17", by_handle="@yxia266")
+    assert out["revoked"] == 2            # lead card + allie's project card
+
+    # …and allie's proof dies once she holds the distributed CRL.
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "allie_home"))
+    from murmurent.core import revocation as REV
+    realm = out["crl"]["payload"]["centre"]        # the PI's self-realm
+    REV.import_distributed_crl(realm, out["crl"])
+    pv = ISS.verify_project_membership("dcis_17")
+    assert not pv.ok and "revoked" in pv.reason

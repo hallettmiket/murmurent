@@ -131,6 +131,11 @@ class CertProject:
     host: str = "local"                    # primary repo's host
     remote_path: str = ""                  # primary repo's remote path (host != local)
     slack_channel_id: str = ""             # provisioned in Phase C
+    # The group whose Slack workspace hosts this project's channel + DMs.
+    # Empty = the owning lab's own workspace. REQUIRED (validated at project
+    # creation) when the members span multiple groups — the groups must decide
+    # on a shared workspace before an inter-group project can exist.
+    slack_workspace: str = ""
     github_repo: str = ""                  # provisioned in Phase C, e.g. "org/name"
     members: tuple[str, ...] = ()          # certified member handles (@-prefixed)
     # One entry per issued project card: {handle, fingerprint, card_id}.
@@ -146,6 +151,7 @@ class CertProject:
                 "code_repo": self.code_repo, "host": self.host,
                 "remote_path": self.remote_path,
                 "slack_channel_id": self.slack_channel_id,
+                "slack_workspace": self.slack_workspace,
                 "github_repo": self.github_repo, "members": list(self.members),
                 "certs": [dict(c) for c in self.certs],
                 "repos": [r.to_dict() for r in self.repos]}
@@ -205,6 +211,7 @@ def _parse(path: Path) -> CertProject:
         choreography=str(chor) if chor else None,
         code_repo=code_repo, host=host, remote_path=remote_path,
         slack_channel_id=str(meta.get("slack_channel_id") or ""),
+        slack_workspace=str(meta.get("slack_workspace") or ""),
         github_repo=str(meta.get("github_repo") or ""),
         members=members,
         certs=certs,
@@ -245,6 +252,8 @@ def _render(p: CertProject) -> str:
         meta["choreography"] = p.choreography
     if p.slack_channel_id:
         meta["slack_channel_id"] = p.slack_channel_id
+    if p.slack_workspace:
+        meta["slack_workspace"] = p.slack_workspace
     if p.github_repo:
         meta["github_repo"] = p.github_repo
     # The authoritative repo set (code + manuscript + …) is now the ONLY on-disk
@@ -276,6 +285,7 @@ def upsert(name: str, *, lab: str, member: str | None = None,
            choreography: str | None = None, code_repo: str | None = None,
            host: str | None = None, remote_path: str | None = None,
            repos=None, slack_channel_id: str | None = None,
+           slack_workspace: str | None = None,
            github_repo: str | None = None,
            today: str | None = None, env: dict | None = None) -> CertProject:
     """Create or update a cert project. Optionally add a certified ``member``
@@ -330,8 +340,35 @@ def upsert(name: str, *, lab: str, member: str | None = None,
         choreography=_keep(choreography, cur.choreography),
         code_repo=n_code, host=n_host, remote_path=n_remote,
         slack_channel_id=_keep(slack_channel_id, cur.slack_channel_id),
+        slack_workspace=_keep(slack_workspace, cur.slack_workspace),
         github_repo=_keep(github_repo, cur.github_repo),
         members=tuple(members), certs=tuple(certs), repos=new_repos)
+    _write(updated, env)
+    return updated
+
+
+def remove_member(name: str, handle: str, *, env: dict | None = None) -> CertProject:
+    """Drop ``handle`` from a project's members + certs (the registry side of a
+    removal — the caller revokes their card via the CRL separately). Removing
+    the LEAD is refused: that's delete-the-project or a future transfer-lead,
+    never a silent membership edit."""
+    cur = get(name, env)
+    if cur is None:
+        raise CertProjectError(f"no cert-project named {name!r}")
+    at = _norm(handle)
+    if cur.lead and _norm(cur.lead) == at:
+        raise CertProjectError(
+            f"@{at.lstrip('@')} is the project lead — delete the project (or "
+            "transfer the lead) instead of removing them")
+    members = tuple(m for m in cur.members if _norm(m) != at)
+    certs = tuple(c for c in cur.certs if _norm(c.get("handle")) != at)
+    updated = CertProject(
+        name=cur.name, lab=cur.lab, status=cur.status, created=cur.created,
+        lead=cur.lead, sensitivity=cur.sensitivity,
+        choreography=cur.choreography, code_repo=cur.code_repo, host=cur.host,
+        remote_path=cur.remote_path, slack_channel_id=cur.slack_channel_id,
+        slack_workspace=cur.slack_workspace, github_repo=cur.github_repo,
+        members=members, certs=certs, repos=cur.repos)
     _write(updated, env)
     return updated
 
@@ -443,6 +480,6 @@ def set_status(name: str, status: str, *, env: dict | None = None) -> CertProjec
 
 __all__ = ["CertProject", "RepoRef", "VALID_REPO_ROLES", "CertProjectError",
            "REGISTRY_DIR", "registry_dir", "project_path", "get", "iter_projects",
-           "projects_for_member", "upsert", "add_repo", "set_status",
+           "projects_for_member", "upsert", "remove_member", "add_repo", "set_status",
            "register_from_summary", "backfill_from_charter", "slack_channel_for",
            "project_name_for_cwd"]

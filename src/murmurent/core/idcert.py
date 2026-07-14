@@ -173,6 +173,49 @@ def issue_member_card(*, handle, member_pubkey, group, centre,
     return _sign_envelope(payload, pi_priv)
 
 
+def issue_project_lead_card(*, handle, lead_pubkey, project, lab, centre,
+                            pi_priv: Ed25519PrivateKey, pi_handle="",
+                            issued_at=None, ttl_days=DEFAULT_TTL_DAYS,
+                            card_id=None) -> dict:
+    """The PI signs a **delegation credential**: ``handle`` is the lead of
+    ``<lab>/<project>`` and may sign project cards for it with their own key.
+
+    Distinct ``kind == "project_lead"`` (not ``member`` + role) so chain shape
+    stays structural: a lead card can never pass ``verify_member_card`` and a
+    member card can never act as an issuer in ``verify_project_card``. Revoking
+    this card's ``card_id`` on the CRL kills every project card it signed —
+    the mid-chain CRL check in :func:`verify_project_card` fails closed.
+
+    The PI==lead case is plain self-delegation (``lead_pubkey`` is the PI's own
+    key); the chain verifies identically."""
+    group = f"{lab}/{project}"
+    payload = _card_payload(
+        kind="project_lead", centre=centre, handle=handle,
+        subject_pub=lead_pubkey, group=group,
+        roles=[{"kind": "project_lead", "project": project, "lab": lab,
+                "group": group}],
+        issuer_handle=pi_handle, issuer_pub=pi_priv.public_key(),
+        issued_at=issued_at, ttl_days=ttl_days, card_id=card_id)
+    return _sign_envelope(payload, pi_priv)
+
+
+def issue_project_card_by_lead(*, handle, member_pubkey, group, centre,
+                               lead_priv: Ed25519PrivateKey, lead_handle="",
+                               roles=None, issued_at=None,
+                               ttl_days=DEFAULT_TTL_DAYS, card_id=None) -> dict:
+    """The project **lead** signs a member's project card with the lead's OWN
+    key. ``group`` is the project realm (``<lab>/<project>``) and must equal
+    the lead card's ``group`` — :func:`verify_project_card` enforces that the
+    delegation is scoped to exactly this project. Leaf card (``kind ==
+    "member"``), same envelope shape as :func:`issue_member_card`."""
+    payload = _card_payload(
+        kind="member", centre=centre, handle=handle, subject_pub=member_pubkey,
+        group=group, roles=roles, issuer_handle=lead_handle,
+        issuer_pub=lead_priv.public_key(), issued_at=issued_at,
+        ttl_days=ttl_days, card_id=card_id)
+    return _sign_envelope(payload, lead_priv)
+
+
 # ---------------------------------------------------------------------------
 # CRL (signed by the centre root; mandatory + fail-closed on verify)
 # ---------------------------------------------------------------------------
@@ -336,6 +379,146 @@ def verify_member_card(member_card, pi_card, *, root_pub, now=None,
                    kind="member", roles=tuple(p.get("roles") or ()))
 
 
+def verify_project_lead_card(lead_card, pi_card, *, root_pub, now=None,
+                             skew_seconds=DEFAULT_SKEW_SECONDS, crl=None,
+                             centre=None, require_crl=True) -> Verdict:
+    """Verify a project-lead delegation card: root → PI → lead.
+
+    Mirrors :func:`verify_member_card` except the mid card is ``kind ==
+    "project_lead"``. The lead card's pubkey (root→PI-authenticated) is what
+    later verifies the project cards this lead signed."""
+    now = now or _now()
+    skew = timedelta(seconds=skew_seconds)
+    if require_crl:
+        ok, _revoked, reason = _check_crl(crl, root_pub, now, centre)
+        if not ok:
+            return Verdict(False, reason)
+    pv = verify_pi_card(pi_card, root_pub=root_pub, now=now,
+                        skew_seconds=skew_seconds, crl=crl, centre=centre,
+                        require_crl=require_crl)
+    if not pv.ok:
+        return Verdict(False, f"PI card invalid: {pv.reason}")
+    pi_payload = pi_card["payload"]
+    pi_pubkey = pi_payload["subject"]["pubkey"]
+    pi_fpr = pi_payload["subject"]["fingerprint"]
+
+    if not isinstance(lead_card, dict):
+        return Verdict(False, "malformed lead card")
+    p, sig = lead_card.get("payload"), lead_card.get("signature")
+    if not isinstance(p, dict) or not sig:
+        return Verdict(False, "malformed lead card")
+    if p.get("version") != SIGNED_CARD_VERSION:
+        return Verdict(False, "unsupported card version")
+    if p.get("kind") != "project_lead":
+        return Verdict(False, "not a project-lead card")
+    if centre and p.get("centre") != centre:
+        return Verdict(False, "wrong centre")
+    if p.get("centre") != pi_payload.get("centre"):
+        return Verdict(False, "centre mismatch across chain")
+    if (p.get("issuer") or {}).get("fingerprint") != pi_fpr:
+        return Verdict(False, "issuer/PI mismatch")
+    # signature checked with the PI key FROM THE PI CARD (root-authenticated)
+    if not K.verify(p, sig, pi_pubkey):
+        return Verdict(False, "bad PI signature")
+    if r := _temporal_reason(p, now, skew):
+        return Verdict(False, r)
+    # the PI card must have been valid at the moment the lead card was issued
+    try:
+        issued = _parse(p["issued_at"])
+    except Exception:  # noqa: BLE001
+        return Verdict(False, "bad lead timestamps")
+    if _temporal_reason(pi_payload, issued, timedelta(0)):
+        return Verdict(False, "PI card not valid at lead card's issue time")
+    if require_crl:
+        ok, revoked, reason = _check_crl(crl, root_pub, now, centre or p.get("centre"))
+        if not ok:
+            return Verdict(False, reason)
+        if p["card_id"] in revoked or p["subject"]["fingerprint"] in revoked:
+            return Verdict(False, "lead card revoked")
+    subj = p["subject"]
+    return Verdict(True, "ok", handle=subj["handle"], group=p.get("group"),
+                   fingerprint=subj["fingerprint"], pubkey=subj["pubkey"],
+                   kind="project_lead", roles=tuple(p.get("roles") or ()))
+
+
+def verify_project_card(project_card, lead_card, pi_card, *, root_pub, now=None,
+                        skew_seconds=DEFAULT_SKEW_SECONDS, crl=None,
+                        centre=None, require_crl=True) -> Verdict:
+    """Verify a project-membership card by walking root → PI → lead → member.
+
+    1. the lead card verifies as a delegation credential (which itself walks
+       root → PI, both against the fail-closed CRL);
+    2. the project card verifies against the lead pubkey *from the lead card*
+       (never from the leaf), the issuer fingerprints match, the leaf is
+       ``kind == "member"`` with a ``project_member`` role, its ``group``
+       equals the lead card's ``group`` (the delegation is scoped to exactly
+       one project), it is temporally valid, and the lead card was valid at
+       the leaf's issue time;
+    3. the leaf is not on the (fail-closed) CRL.
+
+    Revoking the lead card therefore invalidates every project card it signed
+    — step 1 fails — with no extra machinery."""
+    now = now or _now()
+    skew = timedelta(seconds=skew_seconds)
+    if require_crl:
+        ok, _revoked, reason = _check_crl(crl, root_pub, now, centre)
+        if not ok:
+            return Verdict(False, reason)
+    lv = verify_project_lead_card(lead_card, pi_card, root_pub=root_pub,
+                                  now=now, skew_seconds=skew_seconds, crl=crl,
+                                  centre=centre, require_crl=require_crl)
+    if not lv.ok:
+        return Verdict(False, f"lead card invalid: {lv.reason}")
+    lead_payload = lead_card["payload"]
+    lead_pubkey = lead_payload["subject"]["pubkey"]
+    lead_fpr = lead_payload["subject"]["fingerprint"]
+
+    if not isinstance(project_card, dict):
+        return Verdict(False, "malformed project card")
+    p, sig = project_card.get("payload"), project_card.get("signature")
+    if not isinstance(p, dict) or not sig:
+        return Verdict(False, "malformed project card")
+    if p.get("version") != SIGNED_CARD_VERSION:
+        return Verdict(False, "unsupported card version")
+    if p.get("kind") != "member":                     # leaf-only enforcement
+        return Verdict(False, "not a member card")
+    if not any((r or {}).get("kind") == "project_member"
+               for r in (p.get("roles") or [])):
+        return Verdict(False, "no project_member role")
+    if centre and p.get("centre") != centre:
+        return Verdict(False, "wrong centre")
+    if p.get("centre") != lead_payload.get("centre"):
+        return Verdict(False, "centre mismatch across chain")
+    # the delegation is scoped: the lead may sign for THE project it was
+    # delegated, nothing else
+    if p.get("group") != lead_payload.get("group"):
+        return Verdict(False, "project/lead group mismatch")
+    if (p.get("issuer") or {}).get("fingerprint") != lead_fpr:
+        return Verdict(False, "issuer/lead mismatch")
+    # signature checked with the lead key FROM THE LEAD CARD (chain-authenticated)
+    if not K.verify(p, sig, lead_pubkey):
+        return Verdict(False, "bad lead signature")
+    if r := _temporal_reason(p, now, skew):
+        return Verdict(False, r)
+    # the lead card must have been valid at the moment the leaf was issued
+    try:
+        issued = _parse(p["issued_at"])
+    except Exception:  # noqa: BLE001
+        return Verdict(False, "bad project-card timestamps")
+    if _temporal_reason(lead_payload, issued, timedelta(0)):
+        return Verdict(False, "lead card not valid at project card's issue time")
+    if require_crl:
+        ok, revoked, reason = _check_crl(crl, root_pub, now, centre or p.get("centre"))
+        if not ok:
+            return Verdict(False, reason)
+        if p["card_id"] in revoked or p["subject"]["fingerprint"] in revoked:
+            return Verdict(False, "revoked")
+    subj = p["subject"]
+    return Verdict(True, "ok", handle=subj["handle"], group=p.get("group"),
+                   fingerprint=subj["fingerprint"], pubkey=subj["pubkey"],
+                   kind="member", roles=tuple(p.get("roles") or ()))
+
+
 # ---------------------------------------------------------------------------
 # Proof-of-possession (issuance-time)
 # ---------------------------------------------------------------------------
@@ -439,7 +622,9 @@ def verify_or_pin_root(centre: str, root_pubkey) -> tuple[bool, str]:
 __all__ = [
     "Verdict", "SIGNED_CARD_VERSION", "DEFAULT_TTL_DAYS", "CRL_MAX_AGE_DAYS",
     "issue_pi_card", "issue_member_card",
+    "issue_project_lead_card", "issue_project_card_by_lead",
     "verify_pi_card", "verify_member_card",
+    "verify_project_lead_card", "verify_project_card",
     "build_crl", "make_enrollment_request", "verify_enrollment",
     "pin_root", "load_pinned_root", "verify_or_pin_root", "trust_dir",
     "dumps", "loads",

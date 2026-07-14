@@ -89,6 +89,8 @@ class MemberRecord:
     slack: str = ""  # the member's Slack username / member id (shown in the Lab members list)
     card_fingerprint: str = ""  # the member's identity-card key fingerprint (revocation index)
     card_id: str = ""           # the issued card's id (revocation index)
+    pubkey: str = ""            # the ed25519 pubkey attested at card issuance
+                                # (enables one-click project-card issuance — no fresh PoP)
     certifications: list[str] = field(default_factory=list)
     created: str | None = None
     deactivated_at: str | None = None
@@ -123,6 +125,7 @@ def parse_member(path: Path) -> MemberRecord:
         slack=str(meta.get("slack") or "").strip().lstrip("@"),
         card_fingerprint=str(meta.get("card_fingerprint") or "").strip(),
         card_id=str(meta.get("card_id") or "").strip(),
+        pubkey=str(meta.get("pubkey") or "").strip(),
         certifications=[str(c) for c in (meta.get("certifications") or [])],
         created=str(meta.get("created")) if meta.get("created") else None,
         deactivated_at=str(meta.get("deactivated_at")) if meta.get("deactivated_at") else None,
@@ -182,6 +185,7 @@ def add(
     slack: str = "",
     card_fingerprint: str = "",
     card_id: str = "",
+    pubkey: str = "",
     certifications: list[str] | None = None,
     today: _dt.date | None = None,
 ) -> MemberRecord:
@@ -208,6 +212,7 @@ def add(
         slack=(slack or "").strip().lstrip("@"),
         card_fingerprint=(card_fingerprint or "").strip(),
         card_id=(card_id or "").strip(),
+        pubkey=(pubkey or "").strip(),
         certifications=list(certifications or []),
         created=today.isoformat(),
     )
@@ -225,13 +230,14 @@ def upsert_member(
     slack: str | None = None,
     card_fingerprint: str | None = None,
     card_id: str | None = None,
+    pubkey: str | None = None,
     today: _dt.date | None = None,
 ) -> MemberRecord:
     """Add the member if absent, else update the provided fields (``None`` leaves a
     field unchanged). Re-activates a previously-removed member. This is what card
     issuance calls so the roster stays the single source of truth: a carded member
-    always appears in ``members/<handle>.md`` with their email, github, and the
-    card's fingerprint/id (the revocation index)."""
+    always appears in ``members/<handle>.md`` with their email, github, the
+    card's fingerprint/id (the revocation index), and the attested pubkey."""
     norm = _strip_at(handle)
     p = member_path(norm)
     if not p.is_file():
@@ -239,6 +245,7 @@ def upsert_member(
                    role=role or "staff", email=email or "", github=github or "",
                    slack=slack or "",
                    card_fingerprint=card_fingerprint or "", card_id=card_id or "",
+                   pubkey=pubkey or "",
                    today=today)
     rec = parse_member(p)
     if full_name is not None:
@@ -257,6 +264,8 @@ def upsert_member(
         rec.card_fingerprint = card_fingerprint.strip()
     if card_id is not None:
         rec.card_id = card_id.strip()
+    if pubkey is not None:
+        rec.pubkey = pubkey.strip()
     rec.status = ACTIVE            # (re-)carding a member makes them active
     rec.deactivated_at = None
     _write(rec)
@@ -430,6 +439,8 @@ def _write(rec: MemberRecord) -> Path:
         meta["card_fingerprint"] = rec.card_fingerprint
     if rec.card_id:
         meta["card_id"] = rec.card_id
+    if rec.pubkey:
+        meta["pubkey"] = rec.pubkey
     if rec.certifications:
         meta["certifications"] = list(rec.certifications)
     if rec.created:
