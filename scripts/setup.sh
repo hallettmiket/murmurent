@@ -185,21 +185,33 @@ else
   warn "no skills/ dir in murmurent — skipping"
 fi
 
-# ── macOS one-click dashboard launcher (every member: mayor, PI, member) ──────
-# Creates ~/Applications/Murmurent Dashboard.app so anyone gets a Dock/Launchpad
-# icon that starts the dashboard and opens it in their default browser.
-# Best-effort + macOS-only; non-Darwin platforms skip silently.
+# ── One-click dashboard launcher (every member: mayor, PI, member) ────────────
+# Gives anyone a menu/Dock icon that starts the dashboard and opens it in their
+# browser. macOS gets a ~/Applications/*.app bundle; Linux gets a freedesktop
+# .desktop entry in the applications menu — distro-agnostic, so it works on
+# Linux Mint, Ubuntu, Fedora, and any XDG-compliant desktop. Best-effort;
+# other platforms skip with a note.
 echo
-echo "macOS dashboard launcher:"
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  if bash "$REPO_DIR/scripts/create_mac_app.sh" >/dev/null 2>&1; then
-    ok "created ~/Applications/Murmurent Dashboard.app — drag it to your Dock for one-click access"
-  else
-    warn "couldn't create the launcher app (run scripts/create_mac_app.sh manually)"
-  fi
-else
-  warn "not macOS — skipping the .app launcher (create one for your OS manually)"
-fi
+echo "Dashboard launcher:"
+case "$(uname -s)" in
+  Darwin)
+    if bash "$REPO_DIR/scripts/create_mac_app.sh" >/dev/null 2>&1; then
+      ok "created ~/Applications/Murmurent Dashboard.app — drag it to your Dock for one-click access"
+    else
+      warn "couldn't create the launcher app (run scripts/create_mac_app.sh manually)"
+    fi
+    ;;
+  Linux)
+    if bash "$REPO_DIR/scripts/create_linux_launcher.sh" >/dev/null 2>&1; then
+      ok "added \"Murmurent Dashboard\" to your applications menu (search \"murmurent\")"
+    else
+      warn "couldn't create the launcher (run scripts/create_linux_launcher.sh manually)"
+    fi
+    ;;
+  *)
+    warn "unrecognised platform — skipping the launcher (create one for your OS manually)"
+    ;;
+esac
 
 echo
 echo "Done. Verify with:"
