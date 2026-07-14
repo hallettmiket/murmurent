@@ -56,9 +56,11 @@ nav:
   - Home: index.md
   - Getting started:
       - Why Murmurent? (five vignettes): getting_started.md
+      - The reference agents: agents.md
       - Install & setup: setup.md
   - Working day to day:
       - Creating a project (intra & inter-group): project_creation.md
+      - How murmurent remembers (the three tiers): memory.md
       - The Oracle (personal & lab memory): oracle-workflow.md
       - The lab notebook: lab_notebook_guide.md
       - The VSCode workflow: vscode-workflow.md
