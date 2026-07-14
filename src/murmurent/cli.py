@@ -1590,6 +1590,11 @@ from .commands.centre_cmd import issue_pi_card_cmd as _issue_pi_card_cmd
 from .commands.centre_cmd import issue_member_card_cmd as _issue_member_card_cmd
 from .commands.centre_cmd import member_audit_cmd as _member_audit_cmd
 from .commands.centre_cmd import issue_project_card_cmd as _issue_project_card_cmd
+from .commands.centre_cmd import issue_project_lead_card_cmd as _issue_project_lead_card_cmd
+from .commands.centre_cmd import project_add_member_cmd as _project_add_member_cmd
+from .commands.centre_cmd import project_remove_member_cmd as _project_remove_member_cmd
+from .commands.centre_cmd import project_whoami_cmd as _project_whoami_cmd
+from .commands.centre_cmd import project_unarchive_cmd as _project_unarchive_cmd
 from .commands.centre_cmd import revoke_project_cmd as _revoke_project_cmd
 from .commands.centre_cmd import import_signed_card_cmd as _import_signed_card_cmd
 from .commands.centre_cmd import pi_init as _pi_init
@@ -1621,6 +1626,11 @@ cli.add_command(_issue_pi_card_cmd)
 cli.add_command(_issue_member_card_cmd)
 cli.add_command(_member_audit_cmd)
 cli.add_command(_issue_project_card_cmd)
+cli.add_command(_issue_project_lead_card_cmd)
+cli.add_command(_project_add_member_cmd)
+cli.add_command(_project_remove_member_cmd)
+cli.add_command(_project_whoami_cmd)
+cli.add_command(_project_unarchive_cmd)
 cli.add_command(_revoke_project_cmd)
 cli.add_command(_import_signed_card_cmd)
 cli.add_command(_pi_init)

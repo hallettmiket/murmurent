@@ -973,6 +973,191 @@ def revoke_project_cmd(project: str, lab: str) -> None:
                "fail-closed check. Slack/GitHub teardown is a later phase.")
 
 
+@click.command("issue-project-lead-card",
+                help="PI: delegate a project to its creator (the LEAD). Signs a "
+                     "project_lead card against the lead's roster-attested key; "
+                     "the lead then signs member project cards with their OWN "
+                     "key. DM'd via the project's Slack workspace by default.")
+@click.argument("handle")
+@click.option("--project", required=True, help="Project to delegate.")
+@click.option("--lab", default="", help="Lab that owns the project "
+              "(default: the sole lab you lead).")
+@click.option("--enrollment", "enrollment_file", default="",
+              help="PoP enrollment file (when the lead has no roster key).")
+@click.option("--dm/--no-dm", default=True,
+              help="DM the lead bundle on Slack (default: yes).")
+@click.option("--out", "out_file", type=click.Path(dir_okay=False), default=None,
+              help="Also write the lead bundle to a file.")
+def issue_project_lead_card_cmd(handle: str, project: str, lab: str,
+                                enrollment_file: str, dm: bool,
+                                out_file: str | None) -> None:
+    from ..core import issuance as _iss
+    from ..core import project_members as _pm
+    import json as _json
+    from pathlib import Path as _P
+    enrollment = None
+    if enrollment_file:
+        try:
+            enrollment = _json.loads(_P(enrollment_file).expanduser()
+                                     .read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise click.ClickException(f"cannot read enrollment: {exc}") from exc
+    try:
+        bundle = _iss.issue_project_lead_card(handle, project=project,
+                                              lab=lab or None,
+                                              enrollment=enrollment)
+    except _iss.IssuanceError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"✓ delegated project {bundle['group']} to {handle} "
+               f"(lead card {bundle['lead_card']['payload']['card_id'][:8]}…)")
+    dm_bundle = {"lead_card": bundle["lead_card"], "pi_card": bundle["pi_card"]}
+    if out_file:
+        _P(out_file).write_text(_json.dumps(dm_bundle, indent=2), encoding="utf-8")
+        click.echo(f"  lead bundle → {out_file}")
+    if dm:
+        res = _pm._dm_bundle(project, handle, dm_bundle,
+                             kind="project LEAD card")
+        click.echo(f"  {'✓ DM sent via ' + res['workspace'] if res['sent'] else '! DM failed: ' + res['detail']}")
+        if not res["sent"] and not out_file:
+            click.echo(_json.dumps(dm_bundle, indent=2))
+    elif not out_file:
+        click.echo(_json.dumps(dm_bundle, indent=2))
+
+
+@click.command("project-add-member",
+                help="LEAD: add a member to your project — one click when their "
+                     "key is on the roster (no fresh enrollment), else pass their "
+                     "PoP file with --enrollment. Issues their project card, DMs "
+                     "the bundle over the project's workspace, and invites them "
+                     "to the private channel.")
+@click.argument("handle")
+@click.option("--project", required=True, help="Project to add them to.")
+@click.option("--lab", default="", help="Lab that owns the project.")
+@click.option("--enrollment", "enrollment_file", default="",
+              help="PoP enrollment file (fallback for keyless/external members).")
+@click.option("--dm/--no-dm", default=True,
+              help="DM the bundle on Slack (default: yes).")
+def project_add_member_cmd(handle: str, project: str, lab: str,
+                           enrollment_file: str, dm: bool) -> None:
+    from ..core import issuance as _iss
+    from ..core import project_members as _pm
+    import json as _json
+    from pathlib import Path as _P
+    enrollment = None
+    if enrollment_file:
+        try:
+            enrollment = _json.loads(_P(enrollment_file).expanduser()
+                                     .read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            raise click.ClickException(f"cannot read enrollment: {exc}") from exc
+    try:
+        out = _pm.add_member(project, handle, lab=lab or None,
+                             enrollment=enrollment, dm=dm)
+    except (_iss.IssuanceError, _pm.ProjectMemberError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not out.get("ok"):
+        raise click.ClickException(
+            f"{out.get('detail', out.get('error'))}\n"
+            f"  Fallback: they run `murmurent enroll --project {project}` and "
+            f"send you the file; re-run with --enrollment <file>.")
+    click.echo(f"✓ {handle} added to {out['group']}")
+    dm_res = out.get("dm") or {}
+    click.echo(f"  {'✓ DM sent via ' + dm_res.get('workspace', '') if dm_res.get('sent') else 'DM: ' + str(dm_res.get('detail'))}")
+    slack = out.get("slack") or {}
+    if slack.get("ok"):
+        click.echo(f"  channel sync: +{len(slack.get('invited') or [])} invited")
+    if not dm_res.get("sent"):
+        click.echo("  Hand them the bundle manually:")
+        click.echo(_json.dumps(out["bundle"], indent=2))
+
+
+@click.command("project-remove-member",
+                help="PI: remove a member from a project — revokes their project "
+                     "card (CRL), drops them from the registry, kicks them from "
+                     "the private channel, and removes GitHub access. Refuses to "
+                     "remove the lead (delete the project instead).")
+@click.argument("handle")
+@click.option("--project", required=True, help="Project to remove them from.")
+@click.option("--lab", default="", help="Lab that owns the project.")
+def project_remove_member_cmd(handle: str, project: str, lab: str) -> None:
+    from ..core import issuance as _iss
+    from ..core import project_members as _pm
+    from ..core import revocation as _rev
+    try:
+        out = _pm.remove_member(project, handle, lab=lab or None)
+    except (_iss.IssuanceError, _pm.ProjectMemberError, _rev.RevocationError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"✓ {handle} removed from {project}"
+               + (" (card revoked)" if out.get("revoked") else " (no card to revoke)"))
+    slack = out.get("slack") or {}
+    if slack.get("ok"):
+        click.echo(f"  channel sync: -{len(slack.get('kicked') or [])} kicked")
+
+
+@click.command("project-whoami",
+                help="Prove which projects THIS machine's cards certify you for: "
+                     "verifies every stored project/lead bundle against the "
+                     "pinned root + freshest CRL and prints the verdicts.")
+@click.option("--project", default="", help="Check one project only.")
+def project_whoami_cmd(project: str) -> None:
+    from ..core import issuance as _iss
+    import json as _json
+    d = _iss.cards_dir()
+    names: set[str] = set()
+    if d.is_dir():
+        for path in sorted(list(d.glob("*_project_*.json"))
+                           + list(d.glob("*_lead_*.json"))):
+            try:
+                b = _json.loads(path.read_text(encoding="utf-8"))
+                ref = b.get("project_card") or b.get("lead_card") or b.get("member_card") or {}
+                group = str((ref.get("payload") or {}).get("group") or "")
+                proj = group.partition("/")[2]
+            except Exception:  # noqa: BLE001
+                continue
+            if proj:
+                names.add(proj)
+    if project:
+        names = {p for p in names if p == project} or {project}
+    if not names:
+        click.echo("No project cards on this machine.")
+        return
+    for proj in sorted(names):
+        v = _iss.verify_project_membership(proj)
+        if v.ok:
+            role = "lead" if v.kind == "project_lead" else "member"
+            click.echo(f"✓ {v.group} — {role} ({v.handle})")
+        else:
+            click.echo(f"✗ {proj} — {v.reason}")
+
+
+@click.command("project-unarchive",
+                help="PI: bring a deleted/archived project back. Flips the "
+                     "registry (and CHARTER, when present) to active. Revoked "
+                     "certificates STAY revoked — re-issue project cards after.")
+@click.option("--project", required=True, help="Project to unarchive.")
+def project_unarchive_cmd(project: str) -> None:
+    from ..core import cert_projects as _cp
+    restored = []
+    cur = _cp.get(project)
+    if cur is not None and cur.status == "archived":
+        _cp.set_status(project, "active")
+        restored.append("cert-project registry")
+    try:
+        from ..core import projects as _projects
+        _projects.unarchive_project(project)
+        restored.append("CHARTER")
+    except Exception:  # noqa: BLE001
+        pass
+    if not restored:
+        raise click.ClickException(
+            f"nothing to unarchive for {project!r} (not found, or already active)")
+    click.echo(f"✓ {project} unarchived ({', '.join(restored)}).")
+    click.echo("  Certificates were revoked at delete time and STAY revoked — "
+               "re-issue them (dashboard: project → members → issue, or "
+               "`murmurent project-add-member`). Unarchive the Slack channel "
+               "from Slack admin if you want it back.")
+
+
 @click.command("import-card",
                 help="Import a SIGNED identity card you were issued (a PI card, or "
                      "a member-card bundle). Verifies it chains to the centre root "
@@ -993,7 +1178,13 @@ def import_signed_card_cmd(card_file: str, trust_root: str) -> None:
     except ValueError as exc:
         raise click.ClickException(f"not valid card JSON: {exc}") from exc
     try:
-        if isinstance(obj, dict) and "member_card" in obj:
+        if isinstance(obj, dict) and ("project_card" in obj
+                                      or ("lead_card" in obj and "member_card" not in obj)):
+            # Project bundle: a member's proof ({project_card, lead_card,
+            # pi_card}) or the lead's own delegation ({lead_card, pi_card}).
+            verdict, actions = _iss.verify_and_import_project_card(
+                obj, trust_root=trust_root or None)
+        elif isinstance(obj, dict) and "member_card" in obj:
             verdict, actions = _iss.verify_and_import_member_card(
                 obj, trust_root=trust_root or None)
         else:

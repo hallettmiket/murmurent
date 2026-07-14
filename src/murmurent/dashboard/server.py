@@ -88,6 +88,18 @@ class CreateProjectRequestBody(BaseModel):
     # into the project alongside the freshly-scaffolded primary repo.
     machines: list[str] = []
     attach_repos: list[str] = []
+    # (10) inter-group projects: the agreed shared Slack workspace. REQUIRED
+    # (validated server-side) when the proposed members span groups.
+    slack_workspace: str | None = None
+
+
+class ProjectMemberBody(BaseModel):
+    """JSON body for ``POST /api/project/{project}/members`` — add a member.
+    ``enrollment`` is the PoP fallback for keyless/external members."""
+
+    handle: str
+    enrollment: dict | None = None
+    dm: bool = True
 
 
 class AddMemberBody(BaseModel):
@@ -980,6 +992,7 @@ def create_app() -> FastAPI:
                 slack_channel_name=body.slack_channel_name,
                 machines=body.machines,
                 attach_repos=body.attach_repos,
+                slack_workspace=body.slack_workspace,
             )
         except request_actions.RequestForbidden as exc:
             raise HTTPException(status_code=403, detail=str(exc))
@@ -1013,38 +1026,75 @@ def create_app() -> FastAPI:
         probes: list[dict] = []
         if action == "approve" and req.kind == "project-create":
             import logging as _logging
-            from . import slack_notify as _notify
+            from ..core import cert_provision as _cprov
+            from ..core import project_members as _pm
             from ..core import project_provision as _pp
             from ..core.preflight import Probe as _Probe
             from ..core.repo import lab_mgmt_repo_root as _lmgmt
             _log = _logging.getLogger(__name__)
-            # Create Slack channel. Best-effort: the project-approval flow
-            # must succeed even when the Slack bot lacks scopes or is
-            # offline — the PI can link an existing channel later via
-            # /api/project/<name>/link_slack_channel.
+            # (8) PRIVATE Slack channel via the cert-provision path (was the
+            # public create_project_channel). Membership is synced to the
+            # project's CERTIFIED members from here on; the workspace token
+            # comes from resolve_project_slack (owning lab, or the agreed
+            # shared workspace for inter-group projects). Best-effort: the
+            # approval must succeed even when Slack is offline/scopeless.
             try:
-                ch = _notify.create_project_channel(
-                    req.project, channel_name=req.slack_channel_name,
-                )
-                if ch:
-                    # create_project_channel persists id+name internally;
-                    # no need to re-write here.
-                    _notify._post(ch, f":rocket: Project `{req.project}` approved! Welcome to the channel.")
+                slack_out = _cprov.provision_slack(req.project)
+                if slack_out.get("ok") and slack_out.get("channel_id"):
                     probes.append(_Probe(
-                        name="slack channel", status="ok",
-                        detail=f"channel id {ch}", required=False,
+                        name="slack channel (private)", status="ok",
+                        detail=f"channel id {slack_out['channel_id']}",
+                        required=False,
                     ).to_dict())
                 else:
                     probes.append(_Probe(
-                        name="slack channel", status="warn",
-                        detail="slack returned no channel id — link an existing one from the panel",
+                        name="slack channel (private)", status="warn",
+                        detail=str(slack_out.get("detail")
+                                   or slack_out.get("error")
+                                   or "channel not created — provision later from the panel"),
                         required=False,
                     ).to_dict())
-            except _notify.SlackScopeError as scope_exc:
-                _log.warning("Slack scope issue during project-approve: %s", scope_exc)
+            except Exception as slack_exc:  # noqa: BLE001
+                _log.warning("private-channel provisioning failed for %s: %s",
+                             req.project, slack_exc)
                 probes.append(_Probe(
-                    name="slack channel", status="warn",
-                    detail=f"slack scope: {scope_exc}", required=False,
+                    name="slack channel (private)", status="warn",
+                    detail=str(slack_exc), required=False,
+                ).to_dict())
+
+            # (7) Project certificates: the creator (lead) gets the delegation
+            # card; when the PI IS the creator, every roster-keyed member is
+            # carded + DM'd right now. Best-effort — cert failures surface as
+            # probes, never block the approval (re-issue from the panel).
+            try:
+                lab_name = snap_mod._current_lab_settings().name or ""
+                certs_out = _pm.create_project_certs(
+                    req.project, lab=lab_name,
+                    lead=(req.proposed_lead or req.requester),
+                    members=list(req.proposed_members or []))
+                issued_n = len(certs_out.get("issued") or [])
+                waiting = certs_out.get("awaiting_lead") or []
+                pending = certs_out.get("pending_enrollment") or []
+                errors = certs_out.get("errors") or []
+                detail_bits = [f"{issued_n} member card(s) issued"]
+                if waiting:
+                    detail_bits.append(f"{len(waiting)} awaiting the lead's machine")
+                if pending:
+                    detail_bits.append(f"{len(pending)} need enrollment")
+                if errors:
+                    detail_bits.append(f"{len(errors)} error(s): "
+                                       + "; ".join(e.get("detail", "") for e in errors))
+                probes.append(_Probe(
+                    name="project certificates",
+                    status="ok" if not errors else "warn",
+                    detail=" · ".join(detail_bits), required=False,
+                ).to_dict())
+            except Exception as cert_exc:  # noqa: BLE001
+                _log.warning("project-cert issuance failed for %s: %s",
+                             req.project, cert_exc)
+                probes.append(_Probe(
+                    name="project certificates", status="warn",
+                    detail=str(cert_exc), required=False,
                 ).to_dict())
 
             # Provision the git origin. Phase 4: resolve the project's
@@ -3352,20 +3402,51 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail=str(exc))
         return {"ok": True, "report": str(report)}
 
-    @app.post("/api/project/{project}/unarchive")
-    def unarchive_project_endpoint(
+    @app.post("/api/project/{project}/delete")
+    def delete_project_endpoint(
         project: str,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
-        """Bring a previously-archived project back to active. PI only."""
-        from ..core import projects as _projects
+        """(9) Unified project delete. PI only (revocation needs the CRL-signing
+        key, so the crypto enforces this regardless of HTTP authz).
 
-        _require_pi(user)
+        Revokes every project certificate (lead + members, one CRL bump),
+        archives the private Slack channel, drops GitHub collaborators, flips
+        the registry (and CHARTER, when one exists) to ``archived``, and writes
+        a decommission report. The project disappears from the dashboard
+        entirely; NO data files are deleted. Recovery is CLI-only
+        (``murmurent project-unarchive`` — certs stay revoked, re-issue)."""
+        from ..core import issuance as _iss
+        from ..core import projects as _projects
+        from ..core import revocation as _rev
+
+        actor = _require_pi(user)
+        out: dict = {"ok": True, "project": project}
+        cert_deleted = False
         try:
-            _projects.unarchive_project(project)
-        except _projects.ProjectNotFound as exc:
-            raise HTTPException(status_code=404, detail=str(exc))
-        return {"ok": True}
+            res = _iss.delete_project(project, by_handle=actor)
+            out.update({"group": res["group"], "revoked": res["revoked"],
+                        "report": res.get("report")})
+            cert_deleted = True
+        except (_iss.IssuanceError, _rev.RevocationError) as exc:
+            out["cert_delete_error"] = str(exc)
+        # CHARTER-backed projects also flip their charter status so the
+        # snapshot's charter path hides them too.
+        try:
+            report = _projects.archive_project(project, by_handle=actor)
+            out.setdefault("report", str(report))
+            out["charter_archived"] = True
+        except _projects.ProjectNotFound:
+            out["charter_archived"] = False
+        except Exception as exc:  # noqa: BLE001
+            out["charter_archived"] = False
+            out["charter_error"] = str(exc)
+        if not cert_deleted and not out.get("charter_archived"):
+            raise HTTPException(
+                status_code=404,
+                detail=out.get("cert_delete_error")
+                or f"no project named {project!r}")
+        return out
 
     @app.post("/api/project/{project}/cert-delete")
     def cert_delete_project_endpoint(
@@ -3456,6 +3537,94 @@ def create_app() -> FastAPI:
         except _cprov.CertProvisionError as exc:
             raise HTTPException(status_code=404, detail=str(exc))
         return {"ok": True, "check": check, "slack": slack, "github": github}
+
+    @app.post("/api/project/{project}/members")
+    def add_project_member_endpoint(
+        project: str,
+        body: ProjectMemberBody,
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """(7) Add a member to a project. Lead or PI only (UI gate — the crypto
+        gate is that only the machine holding the delegated lead key can sign).
+
+        One click when the member's pubkey is on the roster: their project card
+        is issued, DM'd over the project's Slack workspace, and they're invited
+        to the private channel. A keyless/external member returns
+        ``{"ok": false, "error": "no_recorded_key"}`` — re-call with their PoP
+        ``enrollment`` (they run `murmurent enroll --project <p>`)."""
+        from ..core import issuance as _iss
+        from ..core import project_members as _pm
+
+        _require_project_lead(project, user)
+        handle = body.handle.strip().lstrip("@")
+        if not handle:
+            raise HTTPException(status_code=422, detail="handle is required")
+        try:
+            out = _pm.add_member(project, handle, enrollment=body.enrollment,
+                                 dm=body.dm)
+        except (_iss.IssuanceError, _pm.ProjectMemberError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        # Don't ship the full bundle back to the browser unless the DM failed
+        # (then the lead needs it to hand over manually).
+        if out.get("ok") and (out.get("dm") or {}).get("sent"):
+            out.pop("bundle", None)
+        return out
+
+    @app.delete("/api/project/{project}/members/{handle}")
+    def remove_project_member_endpoint(
+        project: str,
+        handle: str,
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """(7)/(8) Remove a member: revoke their project card (CRL), drop them
+        from the registry, kick them from the private channel, drop GitHub
+        access. Lead or PI only; refuses to remove the lead."""
+        from ..core import issuance as _iss
+        from ..core import project_members as _pm
+        from ..core import revocation as _rev
+
+        _require_project_lead(project, user)
+        try:
+            return _pm.remove_member(project, handle)
+        except _pm.ProjectMemberError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        except (_iss.IssuanceError, _rev.RevocationError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    @app.post("/api/project/{project}/issue-certs")
+    def issue_project_certs_endpoint(
+        project: str,
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Batch-issue project cards to every UNCERTIFIED member with a roster
+        key — the lead's one-click after importing their delegation card (the
+        creator≠PI flow). Lead or PI only."""
+        from ..core import cert_projects as _cp
+        from ..core import issuance as _iss
+        from ..core import project_members as _pm
+
+        _require_project_lead(project, user)
+        cp = _cp.get(project)
+        if cp is None:
+            raise HTTPException(status_code=404,
+                                detail=f"no cert-project named {project!r}")
+        certified = {str(c.get("handle") or "").lstrip("@").lower()
+                     for c in cp.certs}
+        pending = [m for m in cp.members
+                   if m.lstrip("@").lower() not in certified]
+        results: list[dict] = []
+        for m in pending:
+            try:
+                out = _pm.add_member(project, m.lstrip("@"))
+            except (_iss.IssuanceError, _pm.ProjectMemberError) as exc:
+                results.append({"handle": m, "ok": False, "detail": str(exc)})
+                continue
+            results.append({"handle": m, "ok": bool(out.get("ok")),
+                            "error": out.get("error"),
+                            "dm": out.get("dm")})
+        return {"ok": True, "project": project,
+                "issued": [r for r in results if r.get("ok")],
+                "failed": [r for r in results if not r.get("ok")]}
 
     @app.post("/api/project/{project}/provision/install")
     def provision_install(
@@ -5680,6 +5849,27 @@ def create_app() -> FastAPI:
                 status_code=403,
                 detail=f"only the lab PI (@{_pi()}) can perform this action",
             )
+        return actor
+
+    def _require_project_lead(project: str, user: str) -> str:
+        """The actor must be the project's LEAD or the lab PI. This is the UI
+        gate only — the crypto is the real one (project cards can only be
+        signed by the machine holding the delegated lead key)."""
+        from ..core import cert_projects as _cp
+        from ..core.lab import pi_handle as _pi
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        cp = _cp.get(project)
+        lead = (cp.lead if cp else "").lstrip("@").lower()
+        try:
+            pi = _pi().lower()
+        except Exception:  # noqa: BLE001
+            pi = ""
+        if actor.lower() not in {lead, pi} or not actor:
+            raise HTTPException(
+                status_code=403,
+                detail=f"only the project lead (@{lead or '?'}) or the lab PI "
+                       f"can manage {project!r} membership")
         return actor
 
     @app.post("/api/sea_catalog")

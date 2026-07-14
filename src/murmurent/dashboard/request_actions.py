@@ -163,11 +163,14 @@ def file_create_request(
     slack_channel_name: str | None = None,
     machines: list[str] | None = None,
     attach_repos: list[str] | None = None,
+    slack_workspace: str | None = None,
 ) -> FileResult:
     """Propose creating a new project. PI approval scaffolds the repo.
 
     A project is a set of repos + a set of machines: ``machines`` is the
     full host set and ``attach_repos`` the existing repos to fold in.
+    ``slack_workspace`` is required (validated in core) when the members
+    span groups — the inter-group hard gate.
     """
     if not actor:
         raise RequestForbidden("no actor identity resolved")
@@ -185,6 +188,7 @@ def file_create_request(
             slack_channel_name=slack_channel_name,
             machines=machines,
             attach_repos=attach_repos,
+            slack_workspace=slack_workspace,
         )
     except RequestError as exc:
         msg = str(exc)
