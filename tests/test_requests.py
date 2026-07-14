@@ -282,3 +282,49 @@ def test_endpoint_404_for_missing_request(world):
     client = _client()
     res = client.post("/api/request/999/approve?user=mhallet", json={})
     assert res.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# project = a set of EXISTING repos — approval registers, never scaffolds
+# ---------------------------------------------------------------------------
+
+
+def test_approve_with_attach_repos_registers_without_scaffolding(world, tmp_path):
+    """A create request that names its repo set is registered over the clones
+    the user already has: the cert-project record carries the repos + members
+    and NO new ~/repos/<project> directory is created."""
+    from murmurent.core import cert_projects as CP
+
+    # two pre-existing clones in the projects root (the "Repo location" dirs)
+    for rname in ("dcis_code", "dcis_manuscript"):
+        (world / "repos" / rname).mkdir(parents=True, exist_ok=True)
+
+    req = req_core.file_create_request(
+        requester="@allie", project="dcis_17",
+        proposed_members=["@allie", "@mhallet"],
+        attach_repos=["dcis_code", "dcis_manuscript"],
+    )
+    req_core.approve(req, approver="@mhallet")
+
+    # no new repo scaffolded for the project itself
+    assert not (world / "repos" / "dcis_17").exists()
+
+    cp = CP.get("dcis_17")
+    assert cp is not None and cp.status == "active"
+    assert cp.lead == "@allie"
+    assert {r.name for r in cp.repos} == {"dcis_code", "dcis_manuscript"}
+    # role heuristic: manuscript repos are recognised by name
+    roles = {r.name: r.role for r in cp.repos}
+    assert roles["dcis_manuscript"] == "manuscript"
+    assert roles["dcis_code"] == "code"
+    assert {m.lstrip("@") for m in cp.members} == {"allie", "mhallet"}
+
+
+def test_approve_without_attach_repos_keeps_legacy_scaffold(world):
+    """The CLI/legacy path (no repo set named) still scaffolds a fresh repo."""
+    req = req_core.file_create_request(
+        requester="@allie", project="fresh_proj",
+        proposed_members=["@allie"],
+    )
+    req_core.approve(req, approver="@mhallet")
+    assert (world / "repos" / "fresh_proj" / "CHARTER.md").is_file()
