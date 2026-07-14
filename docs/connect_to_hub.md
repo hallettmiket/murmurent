@@ -17,7 +17,7 @@ The address prospective members write to. Set it on the centre (hand-edit
 `~/.murmurent/lab_info/centre.md` frontmatter, or the `/registrar` profile editor):
 
 ```yaml
-join_email: wigamig-western@uwo.ca      # a shared/role address is ideal
+join_email: murmurent-western@uwo.ca      # a shared/role address is ideal
 ```
 
 ```bash

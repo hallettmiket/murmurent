@@ -9,7 +9,7 @@ called out explicitly as *not shipped* rather than implied.
 
 ## 1. What murmurent touches in your vault (and what it leaves alone)
 
-Murmurent (Murmurent's reference implementation) does **not** read your whole
+Murmurent does **not** read your whole
 vault. It only ever touches two subfolders, both configurable per machine
 (`~/.murmurent/machine.yaml`, see §6):
 

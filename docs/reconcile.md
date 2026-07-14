@@ -36,7 +36,7 @@ Exit codes:
 Set up once:
 
 ```
-/routine create wigamig-reconcile
+/routine create murmurent-reconcile
   prompt: |
     Run `murmurent reconcile --slack-body` in the shell and capture the
     output. If exit code is 1 (actionable drift was found in dry-run

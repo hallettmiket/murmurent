@@ -84,9 +84,11 @@ roster, so the form demands one more thing — and if she skips it, creation
 This is deliberate: the shared workspace is where the project channel lives
 and where certificates are DM'd, so it must exist *before* the project does.
 
-**2. The groups decide.** The two PIs agree whose workspace hosts the project
-(say the Hallett lab's — or a dedicated shared one; either way it's just a
-workspace with a bot token on file):
+**2. The groups decide.** The two PIs agree which of their labs' registered
+workspaces hosts the project (say the Hallett lab's) — what matters is that
+the workspace's bot token is on file. (A dedicated stand-alone workspace works
+too, once it's registered as a group with the registrar — `group-slack-setup`
+refuses unregistered names.)
 
 ```bash
 # one-time, on the machine that will provision the project:

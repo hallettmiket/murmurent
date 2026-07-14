@@ -1,8 +1,11 @@
 # Slack integration design
 
-> Status: design (2026-05-08). No implementation yet. This file is the
-> contract we'll build against in the next phase. PRs against this doc
-> are how we change the design.
+> Status: design (2026-05-08), **partially implemented** (Phase 11):
+> `murmurent slack mirror` / `slack distil` and the
+> `oracle drafts / approve / decline` review loop are live
+> (`core/slack_mirror.py`, `core/slack_distill.py`). Bulk fetch
+> (`--all/--since`), cron, redaction, and the weekly digest are not yet
+> built. PRs against this doc are how we change the remaining design.
 
 ## Goal
 
@@ -218,7 +221,7 @@ These are the questions I'd want answered as a PR comment on this doc:
    a pilot, or all current project channels at once?
 2. Where does the bot's OAuth token live? Slack app config has it; we
    need to store it locally for the cron to read. Default proposal:
-   `~/.config/wigamig/slack-token` (mode 0600), with a fallback to
+   `~/.config/murmurent/slack-token` (mode 0600), with a fallback to
    `$MURMURENT_SLACK_TOKEN` env var for ephemeral use.
 3. Distillation timing: 02:00 local seems right for North America.
    If the lab has trans-Atlantic collaborators (Barbados meetings?),

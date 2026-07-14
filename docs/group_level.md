@@ -10,6 +10,12 @@ tags: [murmurent, design]
 > Re-read in full before every edit; keep the document internally consistent.
 > See companions: [[cli_manual]], [[diagrams]].
 > Origin notes: [[murmurent notes]].
+>
+> **⚠ Project model superseded (2026-07):** the project-birth flow described
+> below (PI approval scaffolds a fresh repo + charter) predates the
+> certificate-based model. Projects are now a set of *existing* repos +
+> machines + cryptographically certified members, with the creator as lead —
+> [project_creation.md](project_creation.md) is the source of truth.
 
 ## Taxonomy
 
@@ -87,7 +93,7 @@ defaults:
 
 Some preferences are cross-cutting (multiple agents care): plotting library, figure size, citation style, prose style. Some are agent-specific (only one agent ever uses them): Zotero collection name, GPU id, patent jurisdictions.
 
-**Cross-cutting fields use a controlled vocabulary** so a member can set them once and have every relevant agent honour the setting. The vocabulary is documented at `wigamig/preferences.md` and updated via PR (adding a field requires a brief justification: why does this need to be cross-cutting?).
+**Cross-cutting fields use a controlled vocabulary** so a member can set them once and have every relevant agent honour the setting. The vocabulary is documented at `murmurent/preferences.md` and updated via PR (adding a field requires a brief justification: why does this need to be cross-cutting?).
 
 | Field | Type | Used by |
 |---|---|---|
@@ -103,9 +109,9 @@ Some preferences are cross-cutting (multiple agents care): plotting library, fig
 | `package_manager` | enum (`uv`/`pip`/`poetry`/`conda`/`renv`) | blacksmith |
 | `audit_verbosity` | enum (`terse`/`standard`/`verbose`) | adversary |
 
-**Agent-specific fields** stay free-form; the agent picks its own field names. Examples: `bookworm.zotero_collection`, `saul_goodman.jurisdictions`, `blacksmith.gpu_id`.
+**Agent-specific fields** stay free-form; the agent picks its own field names. Examples: `bookworm.zotero_collection`, `lawyer.jurisdictions`, `blacksmith.gpu_id`.
 
-**Guild-level extensions to the vocabulary** are supported. The chemistry guild may add `mol_format: smiles | inchi | mol2` as a standardised field for its agents at `wigamig/guilds/chemistry/preferences.md`. The centre vocabulary is the base; guilds extend it.
+**Guild-level extensions to the vocabulary** are supported. The chemistry guild may add `mol_format: smiles | inchi | mol2` as a standardised field for its agents at `murmurent/guilds/chemistry/preferences.md`. The centre vocabulary is the base; guilds extend it.
 
 #### Personal preferences profile
 
@@ -143,7 +149,7 @@ A member who sets `plotting: seaborn` once in their profile gets seaborn from ev
 - **Possible misspellings**: free-form fields with Levenshtein distance < 3 to a standardised field name produce a warning ("did you mean `figure_size`?").
 - **Missing-but-expected**: an agent that produces figures without `plotting` or `figure_size` produces a warning.
 
-All checks **warn rather than hard-reject**. The controlled vocabulary will lag actual practice; rejection would bottleneck adding new fields. Members fix warnings either by aligning to the vocabulary or by extending the vocabulary via PR to `wigamig/preferences.md`.
+All checks **warn rather than hard-reject**. The controlled vocabulary will lag actual practice; rejection would bottleneck adding new fields. Members fix warnings either by aligning to the vocabulary or by extending the vocabulary via PR to `murmurent/preferences.md`.
 
 #### Why this layout
 
@@ -428,7 +434,7 @@ Because raw is immutable once committed, classification has to happen *before* t
 
 #### 1. Instrument profiles
 
-A YAML file per known instrument at `wigamig/instruments/<type>.yaml` (centre default) or `lab-mgmt-repo/instruments/<type>.yaml` (lab override) declares which extensions and patterns are raw vs derived. Example:
+A YAML file per known instrument at `murmurent/instruments/<type>.yaml` (centre default) or `lab-mgmt-repo/instruments/<type>.yaml` (lab override) declares which extensions and patterns are raw vs derived. Example:
 
 ```yaml
 ---
@@ -683,14 +689,14 @@ This:
 | Artefact | Location |
 |---|---|
 | Onboarding issue | lab-management repo issues |
-| Onboarding profile | `wigamig/onboarding/<profile>.md` (centre) or `lab-mgmt-repo/onboarding/<profile>.md` (lab override) |
+| Onboarding profile | `murmurent/onboarding/<profile>.md` (centre) or `lab-mgmt-repo/onboarding/<profile>.md` (lab override) |
 | Member profile note | `lab-mgmt-repo/members/<github-handle>.md` |
 | Member age public key | `lab-mgmt-repo/keys/<github-handle>.age` |
 | Audit entries | one per project admit, one per role assignment |
 
 ### Profile catalog
 
-Four profiles ship as centre defaults at `wigamig/onboarding/<profile>.md`. Each lab can override or extend at `lab-mgmt-repo/onboarding/<profile>.md` — lab-specific version wins when both exist. New lab-specific profiles (e.g. `clinical-fellow` for a translational lab) are just additional files.
+Four profiles ship as centre defaults at `murmurent/onboarding/<profile>.md`. Each lab can override or extend at `lab-mgmt-repo/onboarding/<profile>.md` — lab-specific version wins when both exist. New lab-specific profiles (e.g. `clinical-fellow` for a translational lab) are just additional files.
 
 #### `student`
 
@@ -716,7 +722,7 @@ lead_eligible: false
 expiry: null
 ```
 
-`saul_goodman` excluded by default — IP concerns rarely matter for students; can be added later via `murmurent agent add`.
+`lawyer` excluded by default — IP concerns rarely matter for students; can be added later via `murmurent agent add`.
 
 #### `postdoc`
 
@@ -735,7 +741,7 @@ agents:
   - adversary
   - conscience
   - security_guard
-  - saul_goodman
+  - lawyer
 default_projects: []
 default_roles: []             # rotating roles like adversary_chair assigned later
 permissions: member
@@ -881,13 +887,13 @@ parent: null
 
 A **choreography** is a recurring multi-actor pattern: a recipe for how a project (or experiment) is conducted, with which agents, in what order, producing what artefacts.
 
-The CLAUDE.md already names four: `drug_discovery_litl`, `clinical_cohort`, `method_benchmarking`, `imaging_phenotyping`. Each is documented as a markdown skill at `wigamig/choreographies/<name>.md`:
+The CLAUDE.md already names four: `drug_discovery_litl`, `clinical_cohort`, `method_benchmarking`, `imaging_phenotyping`. Each is documented as a markdown skill at `murmurent/choreographies/<name>.md`:
 
 ```markdown
 ---
 name: drug_discovery_litl
 description: Dry-lab Lab-in-the-Loop drug discovery
-agents: [blacksmith, adversary, bookworm, saul_goodman]
+agents: [blacksmith, adversary, bookworm, lawyer]
 artefacts:
   - hypotheses.md
   - candidates.csv
@@ -904,7 +910,7 @@ success_criteria:
 1. Generate candidate hypotheses (blacksmith)
 2. Audit for data leakage and confounding (adversary)
 3. Cross-reference literature for prior art (bookworm)
-4. Freedom-to-operate check (saul_goodman)
+4. Freedom-to-operate check (lawyer)
 5. Produce a candidate list with confidence scores
 
 ## Required squad shape
@@ -912,7 +918,7 @@ success_criteria:
 - 1+ blacksmith operators
 - adversary_chair operator
 - bookworm operator
-- 1 saul_goodman operator (often shared with another project)
+- 1 lawyer operator (often shared with another project)
 ```
 
 ### Adoption
@@ -934,8 +940,8 @@ Choreography is invoked as a CC skill:
 
 ### Where choreographies live
 
-- **Centre-level**: `wigamig/choreographies/*.md`. Available to every group.
-- **Guild-level**: `wigamig/guilds/<group>/choreographies/*.md`. Group-specific patterns.
+- **Centre-level**: `murmurent/choreographies/*.md`. Available to every group.
+- **Guild-level**: `murmurent/guilds/<group>/choreographies/*.md`. Group-specific patterns.
 - **Project-level**: a project may declare a one-off choreography in its repo at `CHOREOGRAPHY.md`, useful for unique work.
 
 ## Knowledge and continuity verbs
@@ -973,8 +979,8 @@ The day-to-day verbs handle moment-to-moment work. The verbs in this section pro
 **Purpose:** make knowledge transferable. Students leave; their methods leave with them unless captured.
 
 **Mechanism:** two artefact kinds, three scopes:
-- **Protocol** — a lab procedure (wet or dry). Lives at `<project repo>/src/protocols/<name>.md` (project-scoped), `<wigamig-repo>/guilds/<group>/protocols/<name>.md` (group-scoped), or `<wigamig-repo>/protocols/<name>.md` (centre-scoped).
-- **Skill** — a Claude Code-discoverable instruction set the model invokes by name. Lives at `<wigamig-repo>/guilds/<group>/skills/<name>.md` or `<wigamig-repo>/skills/<name>.md`.
+- **Protocol** — a lab procedure (wet or dry). Lives at `<project repo>/src/protocols/<name>.md` (project-scoped), `<murmurent-repo>/guilds/<group>/protocols/<name>.md` (group-scoped), or `<murmurent-repo>/protocols/<name>.md` (centre-scoped).
+- **Skill** — a Claude Code-discoverable instruction set the model invokes by name. Lives at `<murmurent-repo>/guilds/<group>/skills/<name>.md` or `<murmurent-repo>/skills/<name>.md`.
 
 Both share a templated body:
 
@@ -1055,7 +1061,7 @@ A failed experiment can be analytically concluded — we examined the failure, d
 - **Adversary**: methodological critique — controls, sample size, confounders, statistical assumptions, leakage, did the assay actually measure what we think.
 - **Blacksmith**: computational comparison to public datasets, optional GUI for inspection, replication checks.
 - **Conscience**: framing concerns (EDID-relevant language, problematic categorisations).
-- **Saul Goodman**: any IP / patent angle.
+- **Lawyer**: any IP / patent angle.
 
 Bots run frozen versions for reproducibility. Triggered by `<scope> examine <id>`.
 
@@ -1252,7 +1258,7 @@ Plus a project-level sensitivity-tier framework that layers extra controls (`sta
 
 ## Claude Code hooks (gap #1, design)
 
-Seven hooks compose the murmurent protection layer. Each is a small script registered in `~/.claude/settings.json`. Hook scripts live in the murmurent repo at `wigamig/hooks/` and are symlinked into `~/.claude/hooks/` by `murmurent install`. The CC harness invokes them with the tool call (or prompt) on stdin as JSON; the hook responds with JSON declaring allow / deny / modify.
+Seven hooks compose the murmurent protection layer. Each is a small script registered in `~/.claude/settings.json`. Hook scripts live in the murmurent repo at `murmurent/hooks/` and are symlinked into `~/.claude/hooks/` by `murmurent install`. The CC harness invokes them with the tool call (or prompt) on stdin as JSON; the hook responds with JSON declaring allow / deny / modify.
 
 ### Active project context
 
@@ -1401,24 +1407,24 @@ The murmurent install script writes the seven hooks into `~/.claude/settings.jso
   "hooks": {
     "PreToolUse": [
       {"match": {"tool_name": "Write|Edit|Bash|NotebookEdit"},
-       "command": ["python3", "~/.claude/hooks/wigamig_raw_guard.py"]},
+       "command": ["python3", "~/.claude/hooks/raw_guard.py"]},
       {"match": {"tool_name": "*"},
-       "command": ["python3", "~/.claude/hooks/wigamig_xproject_guard.py"]},
+       "command": ["python3", "~/.claude/hooks/xproject_guard.py"]},
       {"match": {"tool_name": "Bash|WebFetch|Write|mcp__slack__*"},
-       "command": ["python3", "~/.claude/hooks/wigamig_secrets_pre.py"]}
+       "command": ["python3", "~/.claude/hooks/secrets_pre.py"]}
     ],
     "PostToolUse": [
       {"match": {"tool_name": "*"},
-       "command": ["python3", "~/.claude/hooks/wigamig_audit.py"]},
+       "command": ["python3", "~/.claude/hooks/audit.py"]},
       {"match": {"tool_name": "*"},
-       "command": ["python3", "~/.claude/hooks/wigamig_secrets_post.py"]}
+       "command": ["python3", "~/.claude/hooks/secrets_post.py"]}
     ],
     "UserPromptSubmit": [
-      {"command": ["python3", "~/.claude/hooks/wigamig_context_inject.py"]},
-      {"command": ["python3", "~/.claude/hooks/wigamig_frozen_check.py"]}
+      {"command": ["python3", "~/.claude/hooks/context_inject.py"]},
+      {"command": ["python3", "~/.claude/hooks/frozen_check.py"]}
     ],
     "Stop": [
-      {"command": ["python3", "~/.claude/hooks/wigamig_session_summary.py"]}
+      {"command": ["python3", "~/.claude/hooks/session_summary.py"]}
     ]
   }
 }
@@ -1521,7 +1527,7 @@ These five gaps cover the layers below the assistant: audit log integrity, authe
 The audit trail is only as good as our ability to prove it wasn't rewritten.
 
 - **Signed commits** required on the lab-management repo and every project repo (gpg or sigstore). Branch protection rejects unsigned commits to `main`.
-- **Branch protection**: no force-push, no history rewrite, no merge without review on `main` of any wigamig-managed repo.
+- **Branch protection**: no force-push, no history rewrite, no merge without review on `main` of any murmurent-managed repo.
 - **Tamper-evident chain** for sensitive projects: each audit-log entry includes the SHA-256 of the previous entry. `murmurent audit verify <repo>` walks the chain and validates both signatures and hashes; breaks are loud.
 - **Retention** controlled by REB approval. Default 10 years post-publication (Tri-Council guidance), longer if the REB requires. Archive-encrypted bundles outlive the project repo.
 
@@ -1543,7 +1549,7 @@ This makes "PI-only" enforced by the MCP, not just hinted by the CLI.
 
 Three tiers, three storage strategies:
 
-- **Personal** (member API keys, age private keys): `~/.config/wigamig/secrets/` (file mode 600), wrapped by macOS Keychain or 1Password where available. Never committed anywhere. Rotated on device loss.
+- **Personal** (member API keys, age private keys): `~/.config/murmurent/secrets/` (file mode 600), wrapped by macOS Keychain or 1Password where available. Never committed anywhere. Rotated on device loss.
 - **Group-shared** (lab VM service tokens, group API keys, group's age archive key): `lab-mgmt-repo/secrets/<name>.age`, encrypted with `age` to the role-holders authorised for the secret. Rotated every 90 days for active services; immediately on member release.
 - **Project-scoped** (project API keys, third-party tokens): in the project repo as `secrets/<name>.age`, encrypted to project MEMBERS. Rotated on member release.
 
@@ -1583,10 +1589,10 @@ Each project declares a sensitivity tier in its `CHARTER.md` frontmatter. The ti
 
 ### Policy file
 
-The control-per-tier matrix is single-sourced at `wigamig/sensitivity-policy.yaml` (centre default), with lab override at `lab-mgmt-repo/sensitivity-policy.yaml`. Adding a new tier or amending controls is a PR.
+The control-per-tier matrix is single-sourced at `murmurent/sensitivity-policy.yaml` (centre default), with lab override at `lab-mgmt-repo/sensitivity-policy.yaml`. Adding a new tier or amending controls is a PR.
 
 ```yaml
-# wigamig/sensitivity-policy.yaml (excerpt)
+# murmurent/sensitivity-policy.yaml (excerpt)
 tiers:
   standard:
     mcp_token_ttl: 8h
@@ -1702,9 +1708,9 @@ The required-vs-elected distinction is enforced: a member cannot opt out of a co
 - **Skill** — a Claude Code-discoverable instruction set, invoked by name. Group- or centre-scoped.
 - **Freeze** — immutable snapshot of a project at a point in time: git tag + manifest + age-encrypted bundle. Used for paper / thesis / grant submission moments.
 - **oracle_curator** — group-level role responsible for facilitating finalisation choreographies and handling periodic legacy maintenance (cross-reference health, citation rot, tag drift). Quotaed to 2; annual rotation.
-- **Standardised vocabulary** — controlled list of cross-cutting `defaults` field names documented at `wigamig/preferences.md`; guilds extend via `wigamig/guilds/<group>/preferences.md`. Used for fields multiple agents share (plotting, citation_style, prose_style, etc.).
+- **Standardised vocabulary** — controlled list of cross-cutting `defaults` field names documented at `murmurent/preferences.md`; guilds extend via `murmurent/guilds/<group>/preferences.md`. Used for fields multiple agents share (plotting, citation_style, prose_style, etc.).
 - **Personal preferences profile** — `~/.claude/murmurent-preferences.yaml`, local to each member's machine, sets standardised fields once for all `personal` agents. Never committed to group repos.
-- **Onboarding profile** — YAML+markdown spec at `wigamig/onboarding/<profile>.md` (centre default) or `lab-mgmt-repo/onboarding/<profile>.md` (lab override) bundling agents-to-install, default permissions, lead eligibility, and expiry for a class of new member. Four centre defaults: `student`, `postdoc`, `pi-collab`, `visitor`. Cores are themselves groups, not profiles within a group.
-- **Sensitivity tier** — project-level property declared in `CHARTER.md` frontmatter: `standard` / `restricted` / `clinical`. Controls per tier defined in `wigamig/sensitivity-policy.yaml`. Projects in the same group can be at different tiers.
+- **Onboarding profile** — YAML+markdown spec at `murmurent/onboarding/<profile>.md` (centre default) or `lab-mgmt-repo/onboarding/<profile>.md` (lab override) bundling agents-to-install, default permissions, lead eligibility, and expiry for a class of new member. Four centre defaults: `student`, `postdoc`, `pi-collab`, `visitor`. Cores are themselves groups, not profiles within a group.
+- **Sensitivity tier** — project-level property declared in `CHARTER.md` frontmatter: `standard` / `restricted` / `clinical`. Controls per tier defined in `murmurent/sensitivity-policy.yaml`. Projects in the same group can be at different tiers.
 - **PHIPA / TCPS 2 / REB** — Personal Health Information Protection Act (Ontario), Tri-Council Policy Statement on research ethics, Research Ethics Board. Together they govern `clinical` projects.
 - **Required vs elected controls** — required controls come from a project's sensitivity tier; elected controls are stricter-than-required preferences a member opts into. Members cannot opt out of required.

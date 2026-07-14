@@ -22,7 +22,7 @@ project B's lab record when both touch the same lab).
 
 Both tiers use [`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md).
 Required frontmatter: `title`, `date`, `project`, `sensitivity`,
-`tags`, `sources`. Optional: `related` (Obsidian wikilinks).
+`tags`, `sources`. Optional: `related` (Obsidian wikilinks), `source_sea`, `source_exp`, `url`.
 
 ## Personal Oracle
 

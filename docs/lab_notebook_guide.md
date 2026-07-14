@@ -1,6 +1,6 @@
 # Lab Notebook Guide
 
-> A concrete, opinionated guide for keeping a wigamig-compatible lab notebook
+> A concrete, opinionated guide for keeping a murmurent-compatible lab notebook
 > as a Hallett Lab member. Read this once. Bookmark it. Don't reinvent.
 
 There are **two distinct things** in murmurent that the word "notebook" can
@@ -63,9 +63,10 @@ decision, or note that the lab should see, copy that section into:
 
 - A **finding** in the project repo: `<project>/findings/YYYY-MM-DD_topic.md`,
   then `murmurent push <project>` — visible to project members on next pull.
-- An **oracle entry** for lab-wide knowledge:
-  `murmurent publish <path> --to oracle` — surfaces in the dashboard's
-  "Group oracle · recent" panel for everyone.
+- An **oracle entry** for lab-wide knowledge: stage a draft with the
+  Oracle agent, then `murmurent oracle publish <slug>` — surfaces in the
+  dashboard's "Group oracle · recent" panel for everyone (see
+  [oracle-workflow.md](oracle-workflow.md)).
 
 Don't push your raw daily journal. It has half-formed thoughts.
 
@@ -225,7 +226,7 @@ sections are present and writes a final summary into the project's
 | Add a screenshot of an instrument | `murmurent experiment ingest <project> <slug> <source-dir>` |
 | Update refined-data checksums | `murmurent push <project> --refined <slug>` |
 | Make my notebook visible to the PI | `murmurent push <project>` (or `--finalize` for a PR) |
-| Promote a finding lab-wide | `murmurent publish <path> --to oracle` |
+| Promote a finding lab-wide | `murmurent oracle publish <slug>` (stage the draft first — see [oracle-workflow.md](oracle-workflow.md)) |
 
 ---
 

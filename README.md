@@ -45,7 +45,7 @@ You're ready to run Murmurent locally. Several vignettes can help get you starte
 [`docs/getting_started.md`](docs/getting_started.md).
 
 
-## Federating individuals, gropus and centres 
+## Federating individuals, groups and centres 
 
 Murmurent allows members to join labs or cores, and it allows labs/cores to join centres. 
 This is based on cryptographic identity cards that establish your identity and "right to belong".
@@ -54,7 +54,7 @@ This is based on cryptographic identity cards that establish your identity and "
 
 You need a **membership ID** (a signed identity certificate) from your PI
 to include you in the lab or core. You need to be in the Slack workspace of your
-PI. You will also need the official name of your lab or co re.
+PI. You will also need the official name of your lab or core.
 
 1. Request your ID:
    ```bash
@@ -89,7 +89,7 @@ PI. You will also need the official name of your lab or co re.
    murmurent import-card bundle.json --trust-root ed25519:Rgmuqeen5X3lW4pFV8GHVFafw0ozSxGk+uUeLC279Fw=
    ```
    
-5. Confirm it worked — you don't need to keep the output:
+4. Confirm it worked — you don't need to keep the output:
    ```bash
    murmurent whoami        # now lists your group and role
    ```
@@ -153,7 +153,7 @@ Once you hold your PI ID, you are your lab's certificate authority.
 
 
 
-## [Mayors] If you  want to establish a new Murmurent centre at your institution as the Mayor...
+## [Mayors] If you want to establish a new Murmurent centre at your institution as the Mayor...
 
 You'll need:
 

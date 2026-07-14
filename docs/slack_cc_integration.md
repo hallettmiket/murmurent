@@ -46,7 +46,7 @@ built. The PI is the lab's certificate authority (self-issued via `pi-init`).
 
 **Slack bot token** — the PI creates one Slack app in the existing lab workspace,
 grants these, and pastes the token into the one-time setup form (stored in
-`~/.config/wigamig/`, never committed; treated like the signing/age keys):
+`~/.config/murmurent/groups/<group>/`, never committed; treated like the signing/age keys):
 
 | Scope | For |
 |---|---|
@@ -83,7 +83,7 @@ grants these, and pastes the token into the one-time setup form (stored in
 ### Phase A — Foundations: setup form + identity mapping
 - Extend the PI's one-time setup (`group-setup` / `murmurent init` PI path) to capture
   the **lab Slack workspace id + bot token** and the **lab GitHub org/account**;
-  store the token in `~/.config/wigamig/`.
+  store the token in `~/.config/murmurent/groups/<group>/`.
 - Establish the per-member **identity map**: murmurent handle ↔ email ↔ Slack user id
   (`users.lookupByEmail`) ↔ GitHub login. Email is the join key (captured on the
   member's enrollment/card).

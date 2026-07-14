@@ -8,6 +8,12 @@ tags: [murmurent, manual]
 > Working draft. Companion to [[group_level]] design.
 > Updated as new commands emerge in the design conversation.
 > Re-read in full before every edit; keep it consistent with [[group_level]].
+>
+> **⚠ Project lifecycle superseded (2026-07):** the `project new / admit /
+> release` flow below predates the certificate-based project model. Projects
+> are now a set of *existing* repos + machines + certified members, created
+> from the dashboard and managed with the identity commands in the next
+> section — see [project_creation.md](project_creation.md).
 
 ## Overview
 
@@ -81,6 +87,25 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 | `murmurent role revoke <role> <member>` *PI* | Open a revoke issue |
 | `murmurent role transfer <role> <from> <to>` *PI* | Open a transfer issue |
 | `murmurent role ack <issue>` | Acknowledge a proposed assignment (proposed operator) |
+
+### Identity & project certificates (current model)
+
+| Command | Who | Effect |
+|---|---|---|
+| `murmurent init` | everyone | One-time identity setup (handle, email, Slack) |
+| `murmurent enroll [--group <g>] [--project <p>]` | member | Proof-of-possession request to send to the PI / project lead |
+| `murmurent pi-init <lab>` | PI | Self-issue your PI ID; become your lab's trust root |
+| `murmurent issue-member-card <enroll.json> --group <g>` | PI | Sign a member card (DM'd on Slack by default) |
+| `murmurent import-card <bundle.json> [--trust-root <r>]` | anyone | Verify + store a card you were issued (PI / member / lead / project) |
+| `murmurent whoami` | anyone | Your verified identity + trust root |
+| `murmurent issue-project-lead-card <handle> --project <p>` | PI | Delegate a project to its creator (the lead) |
+| `murmurent project-add-member <handle> --project <p> [--enrollment <f>]` | lead | Sign a member into a project (cert + DM + channel invite) |
+| `murmurent project-remove-member <handle> --project <p>` | PI | Revoke a member's project card + kick from the channel |
+| `murmurent project-whoami` | anyone | Prove which projects this machine's cards certify you for |
+| `murmurent project-unarchive --project <p>` | PI | Bring a deleted project back (certs stay revoked — re-issue) |
+| `murmurent revoke-project --project <p>` | PI | Revoke every card issued for a project |
+| `murmurent member-audit` | PI | Check every roster member holds a valid certificate |
+| `murmurent crl` / `murmurent revoke` | PI/mayor | Inspect / extend the revocation list |
 
 ### Projects
 
