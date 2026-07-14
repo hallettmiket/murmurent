@@ -438,15 +438,24 @@ def _require_workspace_if_inter_group(members: list[str], workspace: str) -> Non
 
 
 def _create_project_from_request(req: JoinRequest) -> None:
-    """Run the actual scaffolding for an approved project-create request."""
+    """Run the actual registration for an approved project-create request."""
     if req.kind != "project-create":
+        return
+    # A project is a set of EXISTING repos + machines + members. When the
+    # request names its repo set (the dashboard flow), no new repo is
+    # scaffolded — the project is registered over the clones the user
+    # already has (folders come from the machine's Repo location dirs).
+    if req.attach_repos:
+        _register_project_from_repos(req)
+        _stamp_slack_workspace(req)
         return
     members_csv = ",".join(req.proposed_members or [])
     sensitivity = req.proposed_sensitivity or "standard"
     lead = req.proposed_lead or req.requester
     description = req.justification or f"Proposed by {req.requester}."
-    # Reuse the CLI command's logic — it already handles charter,
-    # MEMBERS file, lab-VM dirs, and the lab-mgmt registry entry.
+    # Legacy/CLI path (no repo set named): reuse the CLI command's logic —
+    # it scaffolds a fresh repo with charter, MEMBERS file, lab-VM dirs,
+    # and the lab-mgmt registry entry.
     from ..commands import project_cmd as _project_cmd
     host = (req.host or "local").strip() or "local"
     if host != "local":
@@ -479,6 +488,61 @@ def _create_project_from_request(req: JoinRequest) -> None:
         local_repo_root=req.local_repo_root,
     )
     _stamp_slack_workspace(req)
+
+
+def _repo_clone_location(name: str, preferred_host: str) -> tuple[str, str]:
+    """(host, path) of an existing clone of ``name``, from the cached repo
+    inventory — preferring ``preferred_host``, then ``local``. Falls back to
+    the conventional ``~/repos/<name>`` on the preferred host when the cache
+    has no answer (fresh install, stale cache)."""
+    try:
+        from . import repo_inventory as _inv
+        cached = _inv.latest_report_path()
+        if cached is not None:
+            report = _inv.load_report(cached) or {}
+            for row in report.get("rows") or []:
+                if str(row.get("name") or "") != name:
+                    continue
+                clones = row.get("clones") or []
+                for want in (preferred_host, "local"):
+                    for c in clones:
+                        if str(c.get("host") or "") == want and c.get("path"):
+                            return want, str(c["path"])
+                if clones and clones[0].get("path"):
+                    return (str(clones[0].get("host") or "local"),
+                            str(clones[0]["path"]))
+    except Exception:  # noqa: BLE001 — cache is an optimisation, never a gate
+        pass
+    return preferred_host or "local", str(Path.home() / "repos" / name)
+
+
+def _register_project_from_repos(req: JoinRequest) -> None:
+    """Register an approved project over its EXISTING repos (no scaffolding).
+
+    Writes the authoritative cert-project record: metadata + the repo set
+    (each repo resolved to a clone the requester already has, via the repo
+    inventory) + the member list (uncertified — project cards certify them
+    at the next step of the approve flow)."""
+    from . import cert_projects as _cp
+    try:
+        from .lab import load_lab_config
+        lab = load_lab_config().lab or ""
+    except Exception:  # noqa: BLE001
+        lab = ""
+    lead = req.proposed_lead or req.requester
+    _cp.upsert(req.project, lab=lab, lead=_at(lead),
+               sensitivity=req.proposed_sensitivity or "standard")
+    preferred = (req.host or "local").strip() or "local"
+    for rname in req.attach_repos or []:
+        host, path = _repo_clone_location(rname, preferred)
+        # Role heuristic: manuscript repos are usually named so; everything
+        # else defaults to code. Editable later from the project's repo list.
+        role = "manuscript" if "manuscript" in rname.lower() else "code"
+        _cp.add_repo(req.project, repo_name=rname, role=role,
+                     host=host, path=path,
+                     overleaf=(role == "manuscript"))
+    for m in req.proposed_members or []:
+        _cp.upsert(req.project, lab=lab, member=m)
 
 
 def _stamp_slack_workspace(req: JoinRequest) -> None:

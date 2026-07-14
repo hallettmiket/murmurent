@@ -2,7 +2,10 @@
 
 A murmurent **project** is three sets, not a folder:
 
-- a set of **repos** (a code repo, a manuscript repo, a data repo, …),
+- a set of **repos** — *existing* clones picked from your machines' repo
+  folders (`~/repos` etc.; the folders themselves are configured on the
+  Machines panel under *Repo location*). Creating a project never creates a
+  repo — clone or `git init` it first, then group it into a project;
 - a set of **machines** (your laptop, the lab VM, …),
 - a set of **members** — and membership is *cryptographic*: each member holds
   a signed **project certificate** they can prove, not just a name on a list.
@@ -19,21 +22,25 @@ through Slack, members are invited when they join and removed when they leave.
 
 ## Vignette 1 — An intra-group project (everyone is in your lab)
 
-Allie (a member of the Hallett lab) wants to start `dcis_17` with Bob.
+Allie (a member of the Hallett lab) wants to start `dcis_17` with Bob. She
+already has the two repos that make up the work — `dcis_code` and
+`dcis_manuscript` — cloned under `~/repos` on her laptop.
 
 **1. Propose.** On her dashboard, Allie clicks **＋ new project** and picks:
 
 - *name*: `dcis_17`
 - *members*: `@allie`, `@bob` (from the lab roster dropdown)
-- *machines*: her laptop + `lab-server` (first pick = where the repo is scaffolded)
-- *repos*: the new `dcis_17` repo is created automatically; she also attaches
-  the existing `dcis_manuscript` repo so code and paper live in one project
+- *machines*: her laptop + `lab-server`
+- *repos*: `dcis_code` + `dcis_manuscript`, selected from the clones murmurent
+  already found in her repo folders — code and paper grouped into one project.
+  (No new repo is created here; if a repo doesn't exist yet, clone or
+  `git init` it first and it appears in the picker.)
 
 She submits; the request lands in the PI's approval queue.
 
-**2. PI approves.** One click. Murmurent scaffolds the repo (CHARTER, MEMBERS,
-README), creates the **private** Slack channel, and — because Allie is the
-creator — issues her the **project-lead card** and DMs it to her:
+**2. PI approves.** One click. Murmurent registers the project over the
+selected repos, creates the **private** Slack channel, and — because Allie is
+the creator — issues her the **project-lead card** and DMs it to her:
 
 > **Slack DM to @allie:** Your murmurent project LEAD card for 'dcis_17' is
 > ready. Save the JSON below as bundle.json, then run:

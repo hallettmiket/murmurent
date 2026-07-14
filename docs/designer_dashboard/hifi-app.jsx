@@ -3450,12 +3450,12 @@ function NewProjectModal({ onClose }) {
   // the project name so it's obvious what will be created if they
   // leave this blank. Validation is server-side (normalize_channel_name).
   const [slackChannelName, setSlackChannelName] = useState("");
-  // (5) A project is a set of repos + a set of machines. ``machines`` is the
-  // full host set the project lives on (populated from /api/hosts); the first
-  // selected machine is the primary scaffold target. ``attachRepos`` are
-  // existing inventory repos to fold in alongside the freshly-created repo —
-  // this is what lets a project pair a code repo with a manuscript repo, the
-  // way murmurent itself does.
+  // (5) A project is a set of EXISTING repos + a set of machines. ``machines``
+  // is the full host set the project lives on (populated from /api/hosts).
+  // ``attachRepos`` is the project's repo set, picked from the clones the
+  // user already has (folders come from the machine's Repo location dirs —
+  // ~/repos etc.); project creation never scaffolds a new repo. Each option
+  // carries the hosts it exists on so the picker shows where a repo lives.
   const [hosts, setHosts] = useState([{ name: "local", kind: "local", is_remote: false, description: "this laptop" }]);
   const [selectedMachines, setSelectedMachines] = useState(["local"]);
   const [repoOptions, setRepoOptions] = useState([]);
@@ -3470,12 +3470,18 @@ function NewProjectModal({ onClose }) {
       .then(r => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))
       .then(j => {
         if (cancelled) return;
-        const names = [];
+        const opts = [];
         for (const row of (j.rows || [])) {
-          const nm = (row && (row.name || (row.github && row.github.name))) || "";
-          if (nm && !names.includes(nm)) names.push(nm);
+          const nm = (row && row.name) || "";
+          const clones = (row && row.clones) || [];
+          // Only repos that actually EXIST somewhere are selectable —
+          // GitHub-only rows can't form a project (clone them first).
+          if (!nm || clones.length === 0) continue;
+          if (!opts.some(o => o.name === nm)) {
+            opts.push({ name: nm, hosts: [...new Set(clones.map(c => c.host))] });
+          }
         }
-        setRepoOptions(names);
+        setRepoOptions(opts);
       })
       .catch(err => console.warn("[murmurent] /api/inventory/repos failed", err));
     return () => { cancelled = true; };
@@ -3514,6 +3520,11 @@ function NewProjectModal({ onClose }) {
     if (!name.trim()) { setErr("project name is required"); return; }
     if (selectedMembers.length === 0) { setErr("add at least one member"); return; }
     if (selectedMachines.length === 0) { setErr("select at least one machine"); return; }
+    if (attachRepos.length === 0) {
+      setErr("select at least one repo — projects are built from repos you " +
+             "already have (clone or create the repo first)");
+      return;
+    }
     if (externalMembers.length > 0 && !slackWorkspace.trim()) {
       setErr("members span multiple groups — name the agreed shared Slack workspace");
       return;
@@ -3680,35 +3691,40 @@ function NewProjectModal({ onClose }) {
         </div>
         {selectedMachines.some(m => m !== "local") && (
           <div className="muted" style={{fontSize:11, marginTop:2}}>
-            On approval, murmurent scaffolds the primary repo on
-            <code> {selectedMachines[0]}</code> and records the full machine
-            set on the project; remote hosts get a local placeholder dir so
-            the dashboard can render them.
+            The full machine set is recorded on the project;
+            <code> {selectedMachines[0]}</code> is the primary host.
           </div>
         )}
 
-        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>repos</label>
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>repos (select at least one)</label>
         <div className="muted" style={{fontSize:11, marginTop:-2, marginBottom:2, lineHeight:1.5}}>
-          A project is a set of repos. A new repo named <code>{name.trim() || "<project>"}</code> is
-          scaffolded as the project's primary repo; attach any existing repos to
-          pair with it (e.g. a manuscript repo alongside the code repo, the way
-          murmurent itself is code + manuscript).
+          A project is a set of repos you <strong>already have</strong> — pick
+          them from your machines' repo folders (creating a project never
+          creates a repo; clone or <code>git init</code> it first, then come
+          back). Pair code with its manuscript repo, the way murmurent itself
+          is code + manuscript.
         </div>
         {repoOptions.length === 0 ? (
-          <div className="muted" style={{fontSize:11}}>No existing repos in the inventory to attach.</div>
+          <div className="muted" style={{fontSize:11}}>
+            No repos found on your machines — clone one into a Repo location
+            dir (e.g. <code>~/repos</code>) first, then refresh the Repos panel.
+          </div>
         ) : (
           <div style={{display:"flex", flexWrap:"wrap", gap:6, maxHeight:120, overflowY:"auto"}}>
-            {repoOptions.map(nm => {
-              const on = attachRepos.includes(nm);
+            {repoOptions.map(opt => {
+              const on = attachRepos.includes(opt.name);
               return (
-                <label key={nm}
+                <label key={opt.name}
                        style={{display:"inline-flex", alignItems:"center", gap:5,
                                fontSize:12, padding:"3px 8px", cursor:"pointer",
                                border:"1px solid " + (on ? "var(--purple)" : "var(--rule-strong)"),
                                background: on ? "rgba(79,38,131,0.10)" : "transparent",
                                color: on ? "var(--purple)" : "var(--ink-2)", borderRadius:2}}>
-                  <input type="checkbox" checked={on} onChange={() => toggleRepo(nm)} />
-                  <span className="mono">{nm}</span>
+                  <input type="checkbox" checked={on} onChange={() => toggleRepo(opt.name)} />
+                  <span className="mono">{opt.name}</span>
+                  <span className="muted" style={{fontSize:10}}>
+                    ({(opt.hosts || []).join(", ") || "?"})
+                  </span>
                 </label>
               );
             })}
