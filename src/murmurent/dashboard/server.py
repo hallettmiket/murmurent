@@ -348,6 +348,15 @@ class HostScanDirsBody(BaseModel):
     scan_dirs: list[str]
 
 
+class HostUpdateBody(BaseModel):
+    """JSON body for ``PATCH /api/hosts/{name}`` — the Machines editor. Any
+    field left ``None`` is unchanged. ``lab_vm_root`` = the machine's Files
+    root; ``scan_dirs`` = its Repo location(s)."""
+
+    lab_vm_root: str | None = None
+    scan_dirs: list[str] | None = None
+
+
 class AdoptCloneBody(BaseModel):
     """JSON body for ``POST /api/inventory/adopt``.
 
@@ -3602,6 +3611,24 @@ def create_app() -> FastAPI:
         from ..core import hosts as _hosts
         try:
             updated = _hosts.update_scan_dirs(name, body.scan_dirs)
+        except _hosts.HostNotFound as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except _hosts.HostError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {"ok": True, "host": _host_row(updated)}
+
+    @app.patch("/api/hosts/{name}")
+    def patch_host(name: str, body: HostUpdateBody) -> dict:
+        """Update a machine's Files root (``lab_vm_root``) and/or Repo location
+        (``scan_dirs``) from the dashboard Machines editor. Leaves other fields
+        untouched."""
+        from ..core import hosts as _hosts
+        try:
+            updated = _hosts.update_host(
+                name,
+                lab_vm_root=body.lab_vm_root,
+                scan_dirs=(tuple(body.scan_dirs) if body.scan_dirs is not None else None),
+            )
         except _hosts.HostNotFound as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         except _hosts.HostError as exc:

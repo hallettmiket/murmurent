@@ -6870,7 +6870,6 @@ function ScanDirsEditor({ hostName, initial, onSaved, onCancel }) {
 function MachineCard({ machine, isCurrent, onEditClick, onRemove, onScanDirsSaved }) {
   const wb = machine.wigamig_base;
   const scanDirs = machine.scan_dirs || [];
-  const [editingScan, setEditingScan] = useState(false);
   const labelStyle = {
     fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
     textTransform:"uppercase", color:"var(--muted)",
@@ -6897,7 +6896,7 @@ function MachineCard({ machine, isCurrent, onEditClick, onRemove, onScanDirsSave
           )}
           {onRemove && (window.DATA.persona === "pi") && (
             <button type="button" className="btn sm" onClick={onRemove}
-                    style={{color:"var(--red)"}}>remove</button>
+                    style={{color:"var(--red)"}}>delete</button>
           )}
         </div>
       </div>
@@ -6909,50 +6908,18 @@ function MachineCard({ machine, isCurrent, onEditClick, onRemove, onScanDirsSave
       {machine.description && (
         <div style={{fontSize:11, color:"var(--muted)", marginTop:4}}>{machine.description}</div>
       )}
-      <div style={{marginTop:8, fontSize:12, lineHeight:1.55}}>
-        <div><span style={labelStyle}>wigamig_base</span><code className="mono">{wb || "—"}</code></div>
-        <div><span style={labelStyle}>raw</span><code className="mono">{_joinUnder(wb, "raw")}</code></div>
-        <div><span style={labelStyle}>refined</span><code className="mono">{_joinUnder(wb, "refined")}</code></div>
-        <div><span style={labelStyle}>lab_notebooks</span><code className="mono">{_joinUnder(wb, "lab_notebooks")}</code></div>
-        {(machine.obsidian_vault_path || machine.obsidian_vault_name) && (
-          <div style={{marginTop:4, paddingTop:4, borderTop:"1px dashed var(--rule)"}}>
-            <span style={labelStyle}>obsidian vault</span>
-            <code className="mono">
-              {machine.obsidian_vault_path || machine.obsidian_vault_name}
-            </code>
-            <div style={{fontSize:10.5, color:"var(--muted)", marginLeft:120, marginTop:2}}>
-              not under wigamig_base — typically in iCloud Drive
-            </div>
-          </div>
-        )}
-        {/* scan_dirs: where the Repo Inventory looks for git clones on
-            this host. Empty = defaults (~/repo + ~/repos). Editable for
-            any host whose parent passed onScanDirsSaved. */}
-        <div style={{marginTop:4, paddingTop:4, borderTop:"1px dashed var(--rule)"}}>
-          <div className="row" style={{alignItems:"baseline", gap:6}}>
-            <span style={labelStyle}>scan dirs</span>
-            <code className="mono" style={{flex:1}}>
-              {scanDirs.length === 0
-                ? <span className="muted">default (~/repo + ~/repos)</span>
-                : scanDirs.join(", ")}
-            </code>
-            {onScanDirsSaved && !editingScan && (
-              <button type="button" className="btn sm ghost"
-                      onClick={() => setEditingScan(true)}>edit</button>
-            )}
-          </div>
-          {editingScan && (
-            <ScanDirsEditor
-              hostName={machine.name}
-              initial={scanDirs}
-              onCancel={() => setEditingScan(false)}
-              onSaved={async () => {
-                setEditingScan(false);
-                await onScanDirsSaved();
-              }}
-            />
-          )}
-        </div>
+      {/* Three locations per machine: Obsidian vault, Files (the data root —
+          raw/ + refined/ live under it), and Repo location (where clones live).
+          All editable together from the single "edit" button above. */}
+      <div style={{marginTop:8, fontSize:12, lineHeight:1.7}}>
+        <div><span style={labelStyle}>Obsidian vault</span>
+          <code className="mono">{machine.obsidian_vault_path || machine.obsidian_vault_name || "—"}</code></div>
+        <div><span style={labelStyle}>Files</span>
+          <code className="mono">{wb || "—"}</code></div>
+        <div><span style={labelStyle}>Repo location</span>
+          <code className="mono">{scanDirs.length === 0
+            ? <span className="muted">default (~/repo + ~/repos)</span>
+            : scanDirs.join(", ")}</code></div>
       </div>
     </div>
   );
@@ -6966,6 +6933,9 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
     notebook_subfolder:  initial.notebook_subfolder  || "lab-notebook",
     oracle_subfolder:    initial.oracle_subfolder    || "oracle",
   });
+  // Repo location (scan_dirs) is stored on the host registry, not machine.yaml,
+  // so it's a separate field + a second save call.
+  const [repos, setRepos] = useState((initial.scan_dirs || []).join("\n"));
   const [busy, setBusy] = useState(false);
   const [msg, setMsg]   = useState(null);
   // Server-returned preflight probes (wigamig_base subfolder mkdirs +
@@ -6991,6 +6961,15 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
         throw new Error(d.detail || ("HTTP " + res.status));
       }
       const body = await res.json();
+      // Also persist Repo location (scan_dirs) to the local host registry.
+      try {
+        const scan_dirs = repos.split("\n").map(s => s.trim()).filter(Boolean);
+        await fetch("/api/hosts/local/scan-dirs", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ scan_dirs }),
+        });
+      } catch (_) {}
       setProbes(body.probes || []);
       setOverall(body.overall || "ok");
       setMsg("saved");
@@ -7033,19 +7012,16 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
         Saved to <code>~/.murmurent/machine.yaml</code>.
       </p>
 
-      <div style={labelStyle}>wigamig_base (root for raw/refined/lab_notebooks; working clones go to ~/repos/)</div>
+      <div style={labelStyle}>Files (data root — raw/ + refined/ + lab_notebooks/ live under it)</div>
       <input style={inputStyle} value={form.wigamig_base}
              onChange={update("wigamig_base")} placeholder="~/wigamig" />
 
-      <div style={labelStyle}>raw</div>
-      <div style={derivedStyle}>{_joinUnder(form.wigamig_base, "raw")}</div>
-      <div style={labelStyle}>refined</div>
-      <div style={derivedStyle}>{_joinUnder(form.wigamig_base, "refined")}</div>
-      <div style={labelStyle}>lab_notebooks</div>
-      <div style={derivedStyle}>{_joinUnder(form.wigamig_base, "lab_notebooks")}</div>
+      <div style={labelStyle}>Repo location (one path per line; where clones live)</div>
+      <textarea style={{...inputStyle, minHeight:56, resize:"vertical"}} value={repos}
+                onChange={e => setRepos(e.target.value)} placeholder={"repos\nwork/clones"} />
 
       <div style={{borderTop:"1px solid var(--rule)", marginTop:10, paddingTop:6}}>
-        <div style={labelStyle}>obsidian vault path (full)</div>
+        <div style={labelStyle}>Obsidian vault (full path)</div>
         <input style={inputStyle} value={form.obsidian_vault_path}
                onChange={update("obsidian_vault_path")}
                placeholder="/Users/you/.../obsidian-lab" />
@@ -7262,12 +7238,62 @@ const MachineSettingsModal = MachinesModal;
    sits next to Projects (below Installations). Replaces the old footer
    "⚙ machines" button — machines are conceptually part of the dashboard's
    content, not chrome. */
+/* Unified editor for a REMOTE machine — Files (data root) + Repo location.
+   (Obsidian vaults are per-user/local, so they aren't set for remote hosts.)
+   Saves via PATCH /api/hosts/<name>. */
+function HostEditForm({ host, onCancel, onSaved }) {
+  const [files, setFiles] = useState(host.wigamig_base || "");
+  const [repos, setRepos] = useState((host.scan_dirs || []).join("\n"));
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true); setMsg(null);
+    try {
+      const scan_dirs = repos.split("\n").map(s => s.trim()).filter(Boolean);
+      const res = await fetch("/api/hosts/" + encodeURIComponent(host.name), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({ lab_vm_root: files, scan_dirs }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || ("HTTP " + res.status)); }
+      setMsg("saved");
+      setTimeout(onSaved, 700);
+    } catch (ex) { setMsg(String(ex.message || ex)); }
+    finally { setBusy(false); }
+  };
+  const lbl = {fontFamily:"var(--mono)", fontSize:10, letterSpacing:1, textTransform:"uppercase",
+               color:"var(--muted)", marginTop:8, marginBottom:2};
+  const inp = {padding:"5px 8px", border:"1px solid var(--rule-strong)", borderRadius:2,
+               fontFamily:"var(--mono)", fontSize:12, width:"100%", boxSizing:"border-box", background:"var(--paper)"};
+  return (
+    <form onSubmit={submit} style={{border:"1px solid var(--purple-soft)", borderRadius:2,
+          padding:14, background:"var(--card)", marginBottom:10}}>
+      <h4 style={{margin:0, fontFamily:"var(--serif)", fontSize:15, color:"var(--purple-deep)"}}>Edit: {host.name}</h4>
+      <p className="muted" style={{fontSize:11, margin:"2px 0 4px"}}>
+        Remote machine. (Obsidian vaults are per-user/local, so not set here.)
+      </p>
+      <div style={lbl}>Files (data root — raw/ + refined/ live under it)</div>
+      <input style={inp} value={files} onChange={e => setFiles(e.target.value)} placeholder="/data/lab_vm/…" />
+      <div style={lbl}>Repo location (one path per line; where clones live)</div>
+      <textarea style={{...inp, minHeight:60, resize:"vertical"}} value={repos}
+                onChange={e => setRepos(e.target.value)} placeholder={"repos\nwork/clones"} />
+      <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:8, alignItems:"center"}}>
+        {msg && <span className="muted" style={{fontSize:11, marginRight:"auto"}}>{msg}</span>}
+        <button type="button" className="btn sm ghost" onClick={onCancel}>cancel</button>
+        <button type="submit" className="btn sm primary" disabled={busy}>{busy ? "…" : "save"}</button>
+      </div>
+    </form>
+  );
+}
+
 function MachinesPanel({ span = "c-5" }) {
   const ms = window.DATA.machine_settings || {};
   const [thisMachine, setThisMachine] = useState({ short_hostname: "", kind: "host" });
   const [hosts, setHosts] = useState([]);
   const [loadErr, setLoadErr] = useState(null);
   const [editingThis, setEditingThis] = useState(false);
+  const [editingHost, setEditingHost] = useState(null);   // remote machine being edited
   const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
@@ -7343,27 +7369,39 @@ function MachinesPanel({ span = "c-5" }) {
         </div>
       </header>
       <div style={{padding:"10px 14px"}}>
-        {editingThis ? (
-          <ThisMachineEditor
-            initial={ms}
-            onSaved={() => setEditingThis(false)}
-            onCancel={() => setEditingThis(false)}
-          />
-        ) : (
-          <MachineCard machine={thisCard} isCurrent
-                       onEditClick={() => setEditingThis(true)}
-                       onScanDirsSaved={refreshHosts} />
-        )}
         {loadErr && (
           <div style={{color:"var(--red)", fontSize:12, marginBottom:8}}>
             load failed: {loadErr}
           </div>
         )}
-        {remoteCards.map(m => (
-          <MachineCard key={m.name} machine={m} isCurrent={false}
-                       onRemove={() => removeHost(m.name)}
-                       onScanDirsSaved={refreshHosts} />
-        ))}
+        {editingThis ? (
+          <ThisMachineEditor
+            initial={{ ...ms, scan_dirs: thisCard.scan_dirs }}
+            onSaved={() => { setEditingThis(false); refreshHosts(); }}
+            onCancel={() => setEditingThis(false)}
+          />
+        ) : editingHost ? (
+          <HostEditForm
+            host={remoteCards.find(m => m.name === editingHost) || {}}
+            onCancel={() => setEditingHost(null)}
+            onSaved={async () => { setEditingHost(null); await refreshHosts(); }}
+          />
+        ) : (
+          /* Up to 3 machine cards per row. */
+          <div style={{display:"flex", flexWrap:"wrap", gap:10, alignItems:"stretch"}}>
+            <div style={{flex:"1 1 calc(33.333% - 7px)", minWidth:230, display:"flex"}}>
+              <MachineCard machine={thisCard} isCurrent
+                           onEditClick={() => setEditingThis(true)} />
+            </div>
+            {remoteCards.map(m => (
+              <div key={m.name} style={{flex:"1 1 calc(33.333% - 7px)", minWidth:230, display:"flex"}}>
+                <MachineCard machine={m} isCurrent={false}
+                             onEditClick={() => setEditingHost(m.name)}
+                             onRemove={() => removeHost(m.name)} />
+              </div>
+            ))}
+          </div>
+        )}
         {showAdd && (
           <HostAddForm onCancel={() => setShowAdd(false)} onAdded={async () => {
             setShowAdd(false);
