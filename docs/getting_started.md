@@ -136,6 +136,7 @@ knowledge across every project. The full vision is in
 | You want to… | Read |
 |---|---|
 | See every CLI command | [`cli_manual.md`](cli_manual.md) |
+| Create a project (intra- or inter-group) | [`project_creation.md`](project_creation.md) |
 | Understand the Oracle (personal vs lab) | [`oracle-workflow.md`](oracle-workflow.md) |
 | Set up the 4-quadrant VSCode workflow | [`vscode-workflow.md`](vscode-workflow.md) |
 | Understand membership IDs & trust | [`identity.md`](identity.md) |

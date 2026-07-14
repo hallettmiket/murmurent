@@ -91,6 +91,9 @@ command available in any wigamig-bootstrapped CC session.
 - [`docs/style/documentation.md`](docs/style/documentation.md) — script-header + README conventions.
 - [`docs/group_level.md`](docs/group_level.md) — group-level architecture notes.
 - [`docs/cli_manual.md`](docs/cli_manual.md) — CLI command reference.
+- [`docs/project_creation.md`](docs/project_creation.md) — vignettes: creating
+  intra- and inter-group projects (lead-signed certificates, private channel,
+  shared-workspace gate).
 - [`docs/slack_setup.md`](docs/slack_setup.md) — mayor's one-time Slack setup:
   workspace + bot token + scopes, `centre-slack-smoke` / `centre-slack-setup`,
   and how lab/core/mayor channels + broadcasts get created.
