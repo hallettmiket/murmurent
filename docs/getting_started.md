@@ -72,7 +72,7 @@ configure them — you just address the right one:
 Each agent leads its reply with a one-line verdict (so you see the punchline at a
 glance) and stays in its lane. Full roster (Oracle, Bookworm, Blacksmith,
 Adversary, Artist, Conscience, Lawyer, Security Guard, and more) in
-[`CLAUDE.md`](../CLAUDE.md#reference-agents-the-commons).
+[`CLAUDE.md`](https://github.com/hallettmiket/murmurent/blob/main/CLAUDE.md#reference-agents-the-commons).
 
 ---
 
@@ -107,7 +107,7 @@ hook layer, so they hold even when you (or the model) get careless:
 Raw data stays immutable; refined data stays append-only; secrets and PHI get
 caught before they reach a commit (that's the **Security Guard**'s job). These
 guardrails are what make it safe to let an agent loose on real lab data. See
-[`../rules/data-storage.md`](../rules/data-storage.md).
+[`../rules/data-storage.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/data-storage.md).
 
 ---
 
@@ -127,7 +127,7 @@ in:
 
 That's the "village" idea: independent groups, shared commons, accumulating
 knowledge across every project. The full vision is in
-[`CLAUDE.md`](../CLAUDE.md) and the design docs under [`.`](.).
+[`CLAUDE.md`](https://github.com/hallettmiket/murmurent/blob/main/CLAUDE.md) and the design docs under [`.`](.).
 
 ---
 
@@ -140,5 +140,5 @@ knowledge across every project. The full vision is in
 | Understand the Oracle (personal vs lab) | [`oracle-workflow.md`](oracle-workflow.md) |
 | Set up the 4-quadrant VSCode workflow | [`vscode-workflow.md`](vscode-workflow.md) |
 | Understand membership IDs & trust | [`identity.md`](identity.md) |
-| Learn the data-storage rules | [`../rules/data-storage.md`](../rules/data-storage.md) |
-| Read the full architecture | [`../CLAUDE.md`](../CLAUDE.md) |
+| Learn the data-storage rules | [`../rules/data-storage.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/data-storage.md) |
+| Read the full architecture | [`../CLAUDE.md`](https://github.com/hallettmiket/murmurent/blob/main/CLAUDE.md) |

@@ -115,7 +115,7 @@ Half a day of focused rename + grep verification + one back-compat shim per quer
 
 The right place was already wired up in murmurent:
 
-- The **centre registrar** ([src/murmurent/core/registrar.py](../src/murmurent/core/registrar.py)) maintains `~/.murmurent/lab_info/` as the centre-wide registry. Index file `_registry.yaml` + per-entity directories under `labs/`, `cores/`, `collaborations/`.
+- The **centre registrar** ([src/murmurent/core/registrar.py](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/registrar.py)) maintains `~/.murmurent/lab_info/` as the centre-wide registry. Index file `_registry.yaml` + per-entity directories under `labs/`, `cores/`, `collaborations/`.
 - Each core gets a **self-contained per-core mini-repo** at `~/.murmurent/lab_info/cores/<name>/lab-mgmt/` — a directory tree that mirrors the per-lab `lab_mgmt/` layout (members/, projects/, requests/, audit/) but owned by the centre's registrar, not by any one lab's PI.
 - Full CRUD already exists: `create_core`, `archive_core`, `unarchive_core`, edit endpoints, and a Cores panel on `/registrar` that calls into them.
 

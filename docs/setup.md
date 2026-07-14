@@ -42,7 +42,7 @@ What each step does:
 
 Use the dashboard's *adopt* button (for existing clones) or
 *install* button (for fresh ones). Both call
-[`core.projectize`](../src/murmurent/core/projectize.py) under the
+[`core.projectize`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/projectize.py) under the
 hood, which writes:
 
 1. `CHARTER.md` at the clone root (if missing).

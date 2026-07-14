@@ -251,9 +251,9 @@ carries the core's short id in its `project` field. Categories:
 
 ## Tier 2 setup
 
-Murmurent ships [`scripts/lab_sec_dump.sh`](../scripts/lab_sec_dump.sh)
+Murmurent ships [`scripts/lab_sec_dump.sh`](https://github.com/hallettmiket/murmurent/blob/main/scripts/lab_sec_dump.sh)
 (the root-owned snapshot script) and
-[`scripts/sudoers.d/murmurent_sec_dump`](../scripts/sudoers.d/murmurent_sec_dump)
+[`scripts/sudoers.d/murmurent_sec_dump`](https://github.com/hallettmiket/murmurent/blob/main/scripts/sudoers.d/murmurent_sec_dump)
 (the NOPASSWD grant template, currently authorising `mhallet` and
 `vdumeaux`). One-time install on the target host:
 

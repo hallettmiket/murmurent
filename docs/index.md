@@ -1,0 +1,48 @@
+# Murmurent
+
+**Shared agentic-AI infrastructure for research groups** — built on
+[Claude Code](https://claude.com/claude-code). Murmurent turns a brilliant
+but forgetful generalist into a research team with a memory and house rules:
+
+- **Reference agents** — a bench of specialists (literature scout,
+  computational workhorse, skeptical reviewer, security auditor, …) you
+  delegate to by name.
+- **The Oracle** — persistent, structured memory that survives across
+  sessions and projects, personal *and* lab-shared.
+- **Hard rules + hooks** — data-governance guardrails enforced in software:
+  raw data is immutable, refined data is append-only, secrets never reach a
+  commit.
+- **Cryptographic membership** — labs, cores, and projects are held together
+  by signed identity certificates (centre root → PI → lead → member), not by
+  lists someone forgot to update.
+- **The village** — independent groups sharing a commons: pooled agents,
+  cross-group projects, and institutional knowledge that accumulates instead
+  of evaporating.
+
+## Where to start
+
+| You are… | Start here |
+|---|---|
+| New — what does this add over plain Claude Code? | [Getting started](getting_started.md) |
+| Installing on your machine | [Install & setup](setup.md) |
+| Starting a project (in your lab, or across labs) | [Creating a project](project_creation.md) |
+| A PI setting up your lab | [Group Slack setup](group_slack_setup.md) · [The lab-mgmt repo](lab_mgmt.md) |
+| A mayor bootstrapping a centre | [Centre Slack setup](slack_setup.md) · [Hub setup](hub_setup.md) |
+| Wondering how the trust model works | [Membership IDs & the trust chain](identity.md) |
+| Looking for a command | [CLI manual](cli_manual.md) |
+
+## The five social units
+
+Murmurent models a bioconvergence centre as **individuals**, **groups**
+(PI + trainees), **collaborations** (groups working together),
+**cores** (shared facilities), and the **administration**. Each group runs
+its own documented pattern using shared agents and rules — *choreography,
+not orchestration*: no central controller decides every move, which limits
+the blast radius of any failure and preserves each group's autonomy.
+
+## Repositories
+
+| Repo | Purpose |
+|---|---|
+| [`hallettmiket/murmurent`](https://github.com/hallettmiket/murmurent) | this codebase — agents, rules, hooks, MCP servers, CLI, dashboard |
+| [`hallettmiket/murmurent_public`](https://github.com/hallettmiket/murmurent_public) | the global onboarding hub — institution directory + join intake |

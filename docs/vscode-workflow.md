@@ -18,7 +18,7 @@ restore VSCode's persisted layout — **arrange the quadrants once
 and they stick**.
 
 The dashboard's *open workspace* button calls the same launcher
-(see [`src/murmurent/dashboard/server.py`](../src/murmurent/dashboard/server.py)
+(see [`src/murmurent/dashboard/server.py`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/dashboard/server.py)
 `workspace_launch` local branch).
 
 ## Quadrant layout
@@ -55,7 +55,7 @@ text is what we can control.
 ## Live agent reporter (BR pane)
 
 User-global hooks in `~/.claude/settings.json` invoke
-[`scripts/murmurent_log_agent_event.sh`](../scripts/murmurent_log_agent_event.sh)
+[`scripts/murmurent_log_agent_event.sh`](https://github.com/hallettmiket/murmurent/blob/main/scripts/murmurent_log_agent_event.sh)
 on:
 
 - `PreToolUse(Agent)` → writes `<agent>: starting — <description>`

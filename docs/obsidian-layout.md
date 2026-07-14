@@ -55,7 +55,7 @@ the staging/aggregation tier for cross-user notebook collation
 | Lab | `~/repos/lab_mgmt/oracle/<YYYY-MM-DD>_<slug>.md` | `murmurent oracle publish` (gated) |
 
 Both tiers use the same frontmatter schema
-([`rules/oracle_schema.md`](../rules/oracle_schema.md)) and are
+([`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md)) and are
 searched together by the `murmurent-oracle` MCP server.
 
 ## `maps-legends/` (vault-side)
