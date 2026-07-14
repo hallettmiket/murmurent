@@ -129,10 +129,11 @@ def find_provider(providers: list[GitProvider], pid: str) -> GitProvider | None:
 def parse_logins(meta: dict[str, Any]) -> dict[str, str]:
     """Read the ``git_logins:`` map from a member's frontmatter.
 
-    Back-fills ``git_logins["github"]`` from the legacy
-    ``contact.github`` field so members who haven't re-saved their
-    profile since the refactor still resolve correctly. The back-fill
-    is read-only: it does not mutate the on-disk file.
+    Back-fills ``git_logins["github"]`` from the top-level ``github:``
+    field (what :mod:`core.membership` writes on add/upsert) and from
+    the legacy ``contact.github`` field, so members resolve correctly
+    regardless of which flow created their profile. The back-fill is
+    read-only: it does not mutate the on-disk file.
     """
     raw = meta.get("git_logins")
     out: dict[str, str] = {}
@@ -141,6 +142,10 @@ def parse_logins(meta: dict[str, Any]) -> dict[str, str]:
             if not k or v in (None, ""):
                 continue
             out[str(k)] = str(v).strip().lstrip("@")
+    if "github" not in out:
+        top = meta.get("github")
+        if top:
+            out["github"] = str(top).strip().lstrip("@")
     if "github" not in out:
         contact = meta.get("contact") if isinstance(meta.get("contact"), dict) else {}
         legacy = (contact or {}).get("github")

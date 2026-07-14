@@ -120,12 +120,24 @@ Steps:
    If it exists and `status: active`, report and stop (already provisioned).
 3. **Check machine** — read `<lab-mgmt>/machines/<machine_id>.md`. If missing, run
    REGISTER_MACHINE first.
-4. **Generate SSH key guidance** — produce the exact commands the member should run
+4. **Grant lab_mgmt roster access (read-only)** — every member needs a read-only
+   clone of the lab's lab_mgmt repo (it's how their Lab Members panel and daily
+   reconcile receive the roster the PI pushes). With PI approval, either run
+   `murmurent group-reconcile <lab> --apply` (grants for the whole roster via
+   `core.group_reconcile.grant_lab_mgmt_read`) or grant just this member:
+   `gh api -X PUT repos/<lab-mgmt-slug>/collaborators/<github_login> -f permission=pull`.
+   **Always `permission=pull`** — members must never get write on lab_mgmt (the PI
+   stays the only writer, which keeps member-side `git pull --ff-only` conflict-free).
+   Requires `github:` in the member's profile; if missing, ask them for their
+   GitHub login and record it first.
+5. **Generate SSH key guidance** — produce the exact commands the member should run
    on their machine (key generation + `ssh-copy-id` or equivalent). You do not
    generate the key yourself; the member must do this on their own machine.
-5. **Generate the provisioning checklist** — a step-by-step script the member runs
+6. **Generate the provisioning checklist** — a step-by-step script the member runs
    once they have SSH access. Include:
    - [ ] Verify SSH key is accepted: `ssh <username>@<hostname> whoami`
+   - [ ] Accept the lab_mgmt GitHub invitation (emailed by step 4)
+   - [ ] Clone the roster repo (read-only): `git clone git@github.com:<lab-mgmt-slug>.git ~/repos/lab_mgmt`
    - [ ] Clone project repo: `git clone git@github.com:hallettmiket/<project>.git ~/repos/<project>`
    - [ ] Install GitHub CLI: `gh auth login`
    - [ ] Install VS Code (link to download)
@@ -137,7 +149,7 @@ Steps:
    - [ ] Verify lab-base access: `ls <raw_path>` and `ls <refined_path>`
    - [ ] For laptop + SSH mount: install sshfs, run mount command
    - [ ] Confirm to PI when all steps complete
-6. **Write the installation record**:
+7. **Write the installation record**:
 
 ```markdown
 ---
@@ -171,10 +183,10 @@ issues: []
 Provisioning checklist issued YYYY-MM-DD. Awaiting member confirmation.
 ```
 
-7. **Slack**: post to `#<project>` channel and DM the member:
+8. **Slack**: post to `#<project>` channel and DM the member:
    > Cable Guy: provisioning checklist for @didi on biodatadci issued. Reply here when complete.
 
-8. **Oracle**: ask Oracle to record:
+9. **Oracle**: ask Oracle to record:
    > Member @didi provisioned on biodatadci for project dcis_imaging_genomics (YYYY-MM-DD).
 
 ---

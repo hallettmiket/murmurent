@@ -1290,13 +1290,16 @@ def _peers(
 ) -> list[C.PeerRow]:
     """Build the Group panel rows.
 
-    Member lens (default): rows = peers in the viewer's projects;
-    each peer's per-peer involvement is restricted to **shared**
-    projects only (so a member never sees what a peer is doing on a
-    project the viewer isn't on).
+    Member lens (default): rows = the WHOLE lab roster (PI and viewer
+    included), read from the member's read-only lab_mgmt clone — every
+    member has one (docs/lab_mgmt.md). Per-peer involvement is still
+    restricted to **shared** projects only (so a member never sees
+    what a peer is doing on a project the viewer isn't on). On a
+    machine with no lab_mgmt clone this degrades to the old behaviour:
+    peers from shared projects only.
 
-    PI lens: rows = every member of every project on disk;
-    per-peer involvement is unrestricted across the whole lab.
+    PI lens: rows = the roster plus every member of every project on
+    disk; per-peer involvement is unrestricted across the whole lab.
     """
     norm_viewer = viewer.lstrip("@").lower()
 
@@ -1325,15 +1328,27 @@ def _peers(
                 peer = raw.lstrip("@").lower()
                 peer_handles.setdefault(peer, []).append(p.name)
     else:
-        # Member: only peers from shared projects, scoped to those projects.
+        # Member: seed from the canonical roster so the panel answers
+        # "who is in my lab?" — the PI and project-less lab mates
+        # included — not just "who shares a project with me?". The
+        # roster (<lab-mgmt>/members/*.md) is readable by every member
+        # by design. Best-effort: no lab_mgmt clone → roster is empty
+        # and only shared-project peers remain (the old behaviour).
+        from ..core import membership as _m
+
         peer_handles = {}
+        try:
+            for rec in _m.iter_members():
+                peer_handles.setdefault(rec.handle, [])
+        except Exception:  # noqa: BLE001
+            pass
+        # Layer per-peer involvement on top, scoped to SHARED projects
+        # only — the privacy rule is unchanged.
         for p in project_summaries:
             if p.name not in viewer_projects:
                 continue
             for raw in p.members:
                 peer = raw.lstrip("@").lower()
-                if peer == norm_viewer:
-                    continue
                 peer_handles.setdefault(peer, []).append(p.name)
 
     # Index SEAs and experiments by (project, handle) once.

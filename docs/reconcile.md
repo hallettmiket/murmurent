@@ -4,6 +4,13 @@
 reality across every registered host and reports drift. Default is
 dry-run; `--apply` repairs the actionable subset.
 
+Before the detectors run, reconcile fast-forwards the local **lab_mgmt
+clone** (`git pull --ff-only`) so the roster and cert-project registry
+reflect what the PI last pushed — this is what keeps a member's Lab
+Members panel current without clicking its update button. Offline,
+diverged, or not-a-git-clone lab_mgmt is a note in the report, never
+a failure.
+
 ## What counts as drift
 
 | Kind | Severity | Auto-repair? | Repair action |

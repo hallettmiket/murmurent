@@ -93,7 +93,7 @@ class AnthropicAdapter:
     discards).
     """
 
-    def __init__(self, model: str = "claude-sonnet-4-6") -> None:
+    def __init__(self, model: str = "claude-sonnet-5") -> None:
         self.model = model
 
     def complete(self, *, prompt: str, system: str = "") -> LLMResponse:

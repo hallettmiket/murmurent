@@ -2820,6 +2820,19 @@ async function postAuditNotify() {
   }
   return res.json();
 }
+
+// Roster freshness + refresh: the roster lives in each member's read-only
+// lab_mgmt clone; "update" = git pull --ff-only server-side, then refetch.
+async function getRosterInfo() {
+  const res = await fetch("/api/members/roster-info", { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+async function postRosterRefresh() {
+  const res = await fetch("/api/members/refresh", { method: "POST", headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
 // Colour + label for a member's certificate standing (from PeerRow.cert).
 const CERT_TONE = { valid:"green", uncertified:"red", revoked:"red", expired:"amber", mismatch:"amber" };
 const CERT_LABEL = { valid:"✓ id", uncertified:"no cert", revoked:"revoked", expired:"expired", mismatch:"mismatch" };
@@ -2977,6 +2990,27 @@ function LabMembersPanel({ peers, span="c-6" }) {
   const [busyHandle, setBusyHandle] = useState(null);
   const [audit, setAudit] = useState(null);     // {flagged:[...], counts, ...}
   const [auditBusy, setAuditBusy] = useState(false);
+  // Roster freshness (lab_mgmt clone): {is_git, ok, detail, as_of}.
+  const [roster, setRoster] = useState(null);
+  const [rosterBusy, setRosterBusy] = useState(false);
+
+  useEffect(() => {
+    getRosterInfo().then(setRoster).catch(() => {});
+  }, []);
+
+  const onRosterUpdate = async () => {
+    setRosterBusy(true);
+    try {
+      const r = await postRosterRefresh();
+      setRoster(r);
+      if (r.is_git && !r.ok) {
+        alert("Roster pull failed: " + (r.detail || "unknown error") +
+              "\n\nShowing the cached roster from " + (r.as_of ? r.as_of.slice(0, 10) : "an unknown date") + ".");
+      }
+      await refresh();  // re-snapshot so new/removed members appear
+    } catch (ex) { alert(ex.message || ex); }
+    finally { setRosterBusy(false); }
+  };
 
   const runAudit = async () => {
     setAuditBusy(true);
@@ -3030,10 +3064,17 @@ function LabMembersPanel({ peers, span="c-6" }) {
         <h2>Lab members</h2>
         <div className="row" style={{gap:6}}>
           <span className="meta">
-            {isPI
-              ? `${activeCount} active${inactiveCount ? " · " + inactiveCount + " inactive" : ""}`
-              : `${peers.length} shared-project peers`}
+            {`${activeCount} active${inactiveCount ? " · " + inactiveCount + " inactive" : ""}`}
+            {roster && roster.as_of && (
+              <span title={"roster from " + (roster.path || "lab_mgmt") + ", last commit " + roster.as_of}>
+                {" · as of " + roster.as_of.slice(0, 10)}
+              </span>
+            )}
           </span>
+          <button className="btn sm" disabled={rosterBusy} onClick={onRosterUpdate}
+                  title="Pull the lab_mgmt roster the PI last pushed, then refresh this panel">
+            {rosterBusy ? "…" : "update"}
+          </button>
           {isPI && (
             <button className="btn sm" disabled={auditBusy} onClick={runAudit}
                     title="Check every member holds a valid identity certificate">
@@ -3116,8 +3157,10 @@ function LabMembersPanel({ peers, span="c-6" }) {
                 <span><strong style={{color:"var(--ink-2)"}}>{p.open_seas}</strong> open SEAs</span>
                 <span><strong style={{color:"var(--ink-2)"}}>{p.experiments}</strong> experiments</span>
               </div>
-              {isPI && p.handle.toLowerCase() === myHandle && (
-                <span className="mono muted" style={{fontSize:11}}>you (PI)</span>
+              {p.handle.toLowerCase() === myHandle && (
+                <span className="mono muted" style={{fontSize:11}}>
+                  {isPI ? "you (PI)" : "you"}
+                </span>
               )}
               {isPI && p.handle.toLowerCase() !== myHandle && (
                 <button
@@ -3136,7 +3179,9 @@ function LabMembersPanel({ peers, span="c-6" }) {
           <div className="muted" style={{padding:"14px", fontSize:13}}>
             {isPI
               ? <>No members yet. Click <code>＋ add</code> to seed the lab roster.</>
-              : "No peers in your projects."}
+              : <>No roster found on this machine. Your lab_mgmt clone may be
+                 missing{roster && roster.path ? <> (expected at <code>{roster.path}</code>)</> : null} —
+                 clone it per <code>docs/lab_mgmt.md</code>, then click <code>update</code>.</>}
           </div>
         )}
       </div>
@@ -3329,8 +3374,12 @@ function AgentToggleButton({ agent }) {
           borderRadius:2, background:"#fff", color:"var(--ink)",
         }}>
         <option value="">model…</option>
-        <option value="opus">opus (4.7)</option>
-        <option value="sonnet">sonnet (4.6)</option>
+        {/* Values are floating aliases (what gets written to the agent's
+            model: frontmatter); the parenthetical is just the current tier
+            version for display — keep in sync with VALID_MODELS in
+            dashboard/server.py when models bump. */}
+        <option value="opus">opus (4.8)</option>
+        <option value="sonnet">sonnet (5)</option>
         <option value="haiku">haiku (4.5)</option>
       </select>
       <button className="btn sm" disabled={busy} onClick={onToggle}>
@@ -8057,10 +8106,6 @@ function Footer() {
           <img className="western-mini" src="assets/western_longWhite.png" alt="Western University" />
         </a>
         <span className="dept">Department of Biochemistry · London, ON, Canada</span>
-        <div className="links">
-          <a href="mailto:michael.hallett@uwo.ca" target="_blank" rel="noopener">Contact</a>
-          <a href="https://hallettmiket.github.io" target="_blank" rel="noopener">Join Us</a>
-        </div>
       </div>
       <div className="ack">
         We acknowledge that Western University is located on the traditional lands of the Anishinaabek, Haudenosaunee, Lūnaapéewak and Attawandaron peoples.
@@ -8141,20 +8186,20 @@ function App() {
           <AgentsActivityPanel activity={D.agents_activity} span="c-12" />
         </div>
 
+        {/* Repo inventory: cross-machine + GitHub audit — one column per
+            registered machine (local included). Cached weekly, on-demand
+            refresh. Per-row "↑ adopt" / "Install on <machine>" pre-fill
+            the adopt/install wizards. Sits above Inventory: repos are
+            the more frequently-consulted of the two. Terminal twin:
+            `murmurent repo {list,status,adopt}`. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <RepoInventoryPanel span="c-12" />
+        </div>
+
         {/* Inventory: things you check, but not every day. (Lab members moved
             to the top of the page.) */}
         <div className="grid" style={{marginBottom:14}}>
           <InventoryPanel inv={D.inventory} span="c-12" />
-        </div>
-
-        {/* Repo inventory: cross-machine + GitHub audit. Cached weekly,
-            on-demand refresh. Per-row "Install on <machine>" pre-fills
-            the install wizard for repos that exist on GitHub but
-            aren't cloned/initialized on a chosen host. Sits below
-            Lab Members + Inventory — same "things you check, but not
-            every day" tier. */}
-        <div className="grid" style={{marginBottom:14}}>
-          <RepoInventoryPanel span="c-12" />
         </div>
 
         {/* SEAs we offer (catalog) - every member sees; PI edits.

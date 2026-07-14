@@ -125,7 +125,7 @@ class StubLLM:
 class AnthropicLLM:
     """Wraps the Anthropic SDK with a single ``complete`` method."""
 
-    model: str = "claude-sonnet-4-6"
+    model: str = "claude-sonnet-5"
 
     def complete(self, *, prompt: str, system: str = "") -> str:
         try:

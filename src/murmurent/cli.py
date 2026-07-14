@@ -231,6 +231,101 @@ def host_test_cmd(name: str) -> None:
 
 
 # ---------------------------------------------------------------------------
+# repo — terminal twin of the dashboard's Repos panel
+# ---------------------------------------------------------------------------
+
+
+@cli.group("repo", help="Cross-machine repo inventory: list, adoption status, adopt.")
+def repo_group() -> None:
+    pass
+
+
+@repo_group.command(
+    "list",
+    help="List every git clone on every registered machine (local included) "
+         "with its adoption verdict.",
+)
+@click.option("--host", "host_name", default=None,
+              help="Limit to one registered host (see `murmurent host list`).")
+def repo_list_cmd(host_name: str | None) -> None:
+    from .commands import repo_cmd as _repo_cmd
+    raise SystemExit(_repo_cmd.cmd_list(host_name))
+
+
+@repo_group.command(
+    "status",
+    help="Has this repo been adopted (made murmurent-ready)? TARGET is a path "
+         "(checked directly) or a repo name (searched on every registered "
+         "machine). Exit 0 = adopted, 1 = not adopted, 2 = not found.",
+)
+@click.argument("target")
+@click.option("--host", "host_name", default=None,
+              help="Check on this registered host (default: local for paths, "
+                   "all hosts for names).")
+def repo_status_cmd(target: str, host_name: str | None) -> None:
+    from .commands import repo_cmd as _repo_cmd
+    raise SystemExit(_repo_cmd.cmd_status(target, host_name))
+
+
+@repo_group.command(
+    "adopt",
+    help="Promote an existing clone to a murmurent project (CHARTER.md + "
+         "registry entry + installation manifest + .claude/agents bootstrap) — "
+         "the CLI twin of the Repos panel's ↑ adopt button.",
+)
+@click.argument("path")
+@click.option("--project", default=None,
+              help="Project name (default: basename of PATH).")
+@click.option("--lead", default=None,
+              help="Project lead handle (default: @$MURMURENT_USER).")
+@click.option("--members", "members_csv", default=None,
+              help="Comma-separated handles (default: just the lead).")
+@click.option("--sensitivity",
+              type=click.Choice(["standard", "restricted", "clinical"]),
+              default="standard", show_default=True)
+@click.option("--description", default="", help="One-paragraph charter body.")
+@click.option("--choreography", default=None)
+@click.option("--agents", "agents_csv", default=None,
+              help="Comma-separated commons agents to symlink into .claude/agents/.")
+@click.option("--host", "host_name", default="local", show_default=True,
+              help="'local' or a registered SSH host; remote adopts write "
+                   "CHARTER + bootstrap over one batched SSH session.")
+@click.option("--reb-number", "reb_number", default=None,
+              help="Required when --sensitivity clinical.")
+@click.option("--reb-expires", "reb_expires", default=None)
+@click.option("--data-residency", "data_residency", default=None)
+def repo_adopt_cmd(
+    path: str,
+    project: str | None,
+    lead: str | None,
+    members_csv: str | None,
+    sensitivity: str,
+    description: str,
+    choreography: str | None,
+    agents_csv: str | None,
+    host_name: str,
+    reb_number: str | None,
+    reb_expires: str | None,
+    data_residency: str | None,
+) -> None:
+    from .commands import repo_cmd as _repo_cmd
+    raise SystemExit(_repo_cmd.cmd_adopt(
+        path=path,
+        project=project,
+        lead=lead,
+        members_csv=members_csv,
+        sensitivity=sensitivity,
+        description=description,
+        choreography=choreography,
+        agents_csv=agents_csv,
+        host_name=host_name,
+        reb_number=reb_number,
+        reb_expires=reb_expires,
+        data_residency=data_residency,
+    ))
+
+
+# ---------------------------------------------------------------------------
 # group
 # ---------------------------------------------------------------------------
 

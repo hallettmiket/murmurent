@@ -27,6 +27,7 @@ class GroupReconcileResult:
     group: str
     slack: list[str] = field(default_factory=list)     # human-readable lines
     github: list[str] = field(default_factory=list)
+    lab_mgmt: list[str] = field(default_factory=list)  # read-only roster-repo access
     invite_url: str = ""
     applied: bool = False
 
@@ -217,16 +218,63 @@ def send_group_dm(group: str, *, text: str, slack_user_id: str = "",
     return (ok, "sent" if ok else "Slack post failed")
 
 
-def _gh_add_collaborator(repo: str, login: str, *, runner=subprocess.run):
-    """PUT repos/{repo}/collaborators/{login} via gh. Returns (ok, detail)."""
+def _gh_add_collaborator(repo: str, login: str, *, permission: str | None = None,
+                         runner=subprocess.run):
+    """PUT repos/{repo}/collaborators/{login} via gh. Returns (ok, detail).
+
+    ``permission=None`` keeps GitHub's default for the endpoint (push) —
+    right for project repos members contribute to. Pass ``"pull"`` for
+    read-only access (the lab_mgmt roster repo).
+    """
     if not (repo and login):
         return False, "missing repo or login"
-    proc = runner(["gh", "api", "-X", "PUT", f"repos/{repo}/collaborators/{login}"],
-                  capture_output=True, text=True)
+    cmd = ["gh", "api", "-X", "PUT", f"repos/{repo}/collaborators/{login}"]
+    if permission:
+        cmd += ["-f", f"permission={permission}"]
+    proc = runner(cmd, capture_output=True, text=True)
     if proc.returncode == 0:
         return True, "invited/added"
     detail = (proc.stderr or proc.stdout or "gh error").strip().splitlines()
     return False, (detail[0][:120] if detail else "gh error")
+
+
+def lab_mgmt_repo_slug() -> str:
+    """``owner/name`` of the lab_mgmt roster repo on GitHub, from the local
+    clone's ``origin`` URL. '' when there's no clone, no remote, or a
+    non-GitHub remote — callers treat that as "nothing to reconcile".
+    """
+    from .repo import lab_mgmt_repo_root
+    root = lab_mgmt_repo_root()
+    if not (root / ".git").exists():
+        return ""
+    try:
+        proc = subprocess.run(["git", "-C", str(root), "remote", "get-url", "origin"],
+                              capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    if proc.returncode != 0:
+        return ""
+    url = proc.stdout.strip()
+    for prefix in ("git@github.com:", "https://github.com/",
+                   "http://github.com/", "ssh://git@github.com/"):
+        if url.startswith(prefix):
+            slug = url[len(prefix):]
+            return slug[:-4] if slug.endswith(".git") else slug
+    return ""
+
+
+def grant_lab_mgmt_read(login: str, *, repo: str = "", runner=subprocess.run):
+    """Give ``login`` read-only (pull) access to the lab_mgmt roster repo.
+
+    This is what lets a member's machine clone/pull the roster — the GH
+    side of the Lab Members panel. Read-only on purpose: the PI stays the
+    only writer, so member-side ``git pull --ff-only`` can never conflict.
+    Returns (ok, detail); (False, reason) when no repo is resolvable.
+    """
+    repo = repo or lab_mgmt_repo_slug()
+    if not repo:
+        return False, "lab_mgmt has no GitHub remote — push it first (see docs/lab_mgmt.md)"
+    return _gh_add_collaborator(repo, login, permission="pull", runner=runner)
 
 
 def group_reconcile(
@@ -237,12 +285,17 @@ def group_reconcile(
     apply: bool = False,
     workspace_checker=None,     # (email) -> bool | None
     collaborator_adder=None,    # (repo, login) -> (bool, detail)
+    lab_mgmt_granter=None,      # (repo, login) -> (bool, detail), read-only grant
 ) -> GroupReconcileResult:
     """Diff the group roster vs the group's Slack workspace + GitHub repo.
 
     Slack membership is read-only (Slack can't API-add to a workspace on
     free/Pro — a person not in it is flagged so the PI emails them the invite
     link). GitHub collaborator adds only happen with ``apply=True``.
+
+    Also ensures every roster member with a GitHub login has **read-only**
+    access to the lab_mgmt roster repo (when it has a GitHub remote) — the
+    grant that lets their machine pull the roster for the Lab Members panel.
     """
     from . import registrar as _R
     prof = _R.read_group_profile(group, env=env)
@@ -252,11 +305,16 @@ def group_reconcile(
     tok = token if token is not None else resolve_group_slack_token(group)
     check = workspace_checker or (lambda email: _slack_user_exists(email, tok))
     add = collaborator_adder or (lambda repo, login: _gh_add_collaborator(repo, login))
+    grant = lab_mgmt_granter or (lambda repo, login: grant_lab_mgmt_read(login, repo=repo))
     repo = prof.get("github", "")
+    lm_repo = lab_mgmt_repo_slug()
 
     if not roster:
         res.slack.append("(no members on the roster yet)")
         return res
+    if not lm_repo:
+        res.lab_mgmt.append("(lab_mgmt has no GitHub remote — push it so members "
+                            "can pull the roster; see docs/lab_mgmt.md)")
 
     for handle, m in sorted(roster.items()):
         email, ghlogin = m["email"], m["github"]
@@ -277,6 +335,20 @@ def group_reconcile(
                 res.slack.append(f"@{handle}: NOT in the group workspace — send them the invite link")
             else:
                 res.slack.append(f"@{handle}: workspace lookup failed (check the token/scopes)")
+
+        # --- lab_mgmt roster repo: read-only access for every member ---
+        if lm_repo:
+            if not ghlogin:
+                res.lab_mgmt.append(f"@{handle}: no GitHub login on file — "
+                                    "they need to register one")
+            elif not apply:
+                res.lab_mgmt.append(f"@{handle} ({ghlogin}): would grant read-only "
+                                    f"access to {lm_repo} (run with --apply)")
+            else:
+                ok, detail = grant(lm_repo, ghlogin)
+                res.lab_mgmt.append(f"@{handle} ({ghlogin}): "
+                                    + (f"read access to {lm_repo} ✓" if ok
+                                       else "FAILED — " + detail))
 
         # --- group GitHub repo collaborator ---
         if not repo:
