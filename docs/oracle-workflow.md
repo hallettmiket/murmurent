@@ -20,7 +20,7 @@ project B's lab record when both touch the same lab).
 
 ## Schema (shared)
 
-Both tiers use [`rules/oracle_schema.md`](../rules/oracle_schema.md).
+Both tiers use [`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md).
 Required frontmatter: `title`, `date`, `project`, `sensitivity`,
 `tags`, `sources`. Optional: `related` (Obsidian wikilinks).
 
@@ -33,7 +33,7 @@ this machine with:
 murmurent oracle path
 ```
 
-The [`oracle` agent](../agents/oracle.md) maintains it. It refuses
+The [`oracle` agent](https://github.com/hallettmiket/murmurent/blob/main/agents/oracle.md) maintains it. It refuses
 to write entries missing required schema fields. Every entry must
 also use Obsidian `[[wikilinks]]` (not Markdown links) so the
 graph view in Obsidian resolves them.
@@ -41,7 +41,7 @@ graph view in Obsidian resolves them.
 ## Lab Oracle
 
 Lives in `~/repos/lab_mgmt/oracle/` (the lab-mgmt git repo). The
-[`lab_oracle` agent](../agents/lab_oracle.md) is read-only — its
+[`lab_oracle` agent](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md) is read-only — its
 toolset excludes Write by design. Entries arrive only via the
 publish flow.
 
@@ -113,7 +113,7 @@ than crashing.
 
 ## See also
 
-- [`agents/oracle.md`](../agents/oracle.md) — personal Oracle behavior + voice.
-- [`agents/lab_oracle.md`](../agents/lab_oracle.md) — read-only lab tier.
-- [`rules/oracle_schema.md`](../rules/oracle_schema.md) — required frontmatter.
+- [`agents/oracle.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/oracle.md) — personal Oracle behavior + voice.
+- [`agents/lab_oracle.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md) — read-only lab tier.
+- [`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md) — required frontmatter.
 - [`docs/obsidian-layout.md`](obsidian-layout.md) — vault-side organization (your `maps-legends`, etc.).

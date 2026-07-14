@@ -171,5 +171,5 @@ lab specifics belong in `lab_mgmt`. Inter-lab relations belong in
 - [`docs/cores_plan.md`](cores_plan.md) §4 — how a core's own
   `lab_mgmt` (yes, cores have one too, parallel to labs) mounts
   inside `~/.murmurent/lab_info/cores/<core>/lab-mgmt/`.
-- [`agents/cable_guy.md`](../agents/cable_guy.md) — the per-lab
+- [`agents/cable_guy.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/cable_guy.md) — the per-lab
   cable_guy that owns most of the read/write surface on this repo.

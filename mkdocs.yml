@@ -1,0 +1,86 @@
+site_name: Murmurent
+site_description: >-
+  Shared agentic-AI infrastructure for research groups — agents, rules,
+  cryptographic membership, and institutional memory on top of Claude Code.
+site_url: https://hallettmiket.github.io/murmurent/
+repo_url: https://github.com/hallettmiket/murmurent
+repo_name: hallettmiket/murmurent
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+  features:
+    - navigation.sections
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+
+# Internal working documents that shouldn't render on the public site.
+exclude_docs: |
+  implementation_prompt*.md
+  backlog.md
+  cores_plan.md
+  cores_smoke_runbook.md
+  designer_dashboard/
+  murmurent_public/
+
+nav:
+  - Home: index.md
+  - Getting started:
+      - Why Murmurent? (five vignettes): getting_started.md
+      - Install & setup: setup.md
+  - Working day to day:
+      - Creating a project (intra & inter-group): project_creation.md
+      - The Oracle (personal & lab memory): oracle-workflow.md
+      - The lab notebook: lab_notebook_guide.md
+      - The VSCode workflow: vscode-workflow.md
+      - Obsidian layout: obsidian-layout.md
+      - Obsidian usage: obsidian-usage.md
+      - Drift detection (reconcile): reconcile.md
+  - Identity & trust:
+      - Membership IDs & the trust chain: identity.md
+      - The centre root key: centre_root_key.md
+      - Security dashboard: security-dashboard.md
+  - Slack:
+      - Centre Slack setup (mayor): slack_setup.md
+      - Group Slack setup (PI): group_slack_setup.md
+      - Slack integration: slack_integration.md
+      - Slack ↔ Claude Code: slack_cc_integration.md
+  - Labs, cores & centres:
+      - The lab-mgmt repo: lab_mgmt.md
+      - Group-level architecture: group_level.md
+      - Hub setup (mayor): hub_setup.md
+      - Connecting to the hub: connect_to_hub.md
+  - Reference:
+      - CLI manual: cli_manual.md
+      - Diagrams: diagrams.md
+      - Code style: style/code-style.md
+      - Documentation conventions: style/documentation.md

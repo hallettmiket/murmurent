@@ -38,6 +38,9 @@ dev = [
     "black>=24.0",
     "isort>=5.13",
 ]
+docs = [
+    "mkdocs-material>=9.5",
+]
 mcp = [
     "mcp>=1.0",
 ]
