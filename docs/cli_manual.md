@@ -122,6 +122,18 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 | `murmurent project end <name> --reason <r>` *PI* | Terminal event |
 | `murmurent project archive <name>` *PI* | Archive repo + data |
 
+### Repos (cross-machine inventory + adopt)
+
+Terminal twin of the dashboard's **Repos** panel. All three commands
+use the same core modules as the panel (`core.repo_inventory`,
+`core.adopt`), so the two surfaces can't drift.
+
+| Command | Effect |
+|---|---|
+| `murmurent repo list [--host <name>]` | Every git clone on every registered machine (local included), grouped by host, each with its adoption verdict (`✓ adopted` / `± partial` / `• clone`) |
+| `murmurent repo status <path-or-name> [--host <name>]` | Has this repo been adopted (murmurent-ready)? A path is checked directly (local, or on `--host` over SSH); a bare name is searched on every registered machine. Reports the CHARTER.md / `.claude/agents/` / installation-manifest components. Exit 0 = adopted, 1 = not adopted, 2 = not found — scriptable |
+| `murmurent repo adopt <path> [--project <n>] [--lead @h] [--members @a,@b] [--sensitivity s] [--agents a,b] [--host <name>]` | Promote an existing clone to a murmurent project: writes CHARTER.md, the cert-project registry entry, the installation manifest, and bootstraps `.claude/agents/`. Defaults: project = basename, lead = `@$MURMURENT_USER`, members = the lead. Remote hosts get CHARTER + bootstrap over one batched SSH session |
+
 ### Experiments
 
 Experiments follow the lab project structure: `exp/<integer>_<slug>/` in the project repo, with raw and refined data on the lab VM.

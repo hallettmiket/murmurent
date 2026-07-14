@@ -542,6 +542,17 @@ def reconcile(*, apply: bool = False) -> ReconcileReport:
     """
     now = _dt.datetime.now(_dt.timezone.utc).replace(microsecond=0).isoformat()
     report = ReconcileReport(generated_at=now)
+    # Freshen the lab_mgmt clone first (roster + cert-project registry both
+    # live there), so the detectors below — and the Lab Members panel —
+    # read what the PI last pushed, not a stale local copy. Best-effort:
+    # offline / diverged / not-a-git-clone is a note, never a failure.
+    try:
+        from . import roster_sync as _rs
+        sync = _rs.pull_lab_mgmt()
+        if sync.is_git and not sync.ok:
+            report.errors.append(f"lab_mgmt pull: {sync.detail}")
+    except Exception as exc:  # noqa: BLE001
+        report.errors.append(f"lab_mgmt pull: {exc}")
     for detector in (
         detect_orphan_installations,
         detect_orphan_registries,

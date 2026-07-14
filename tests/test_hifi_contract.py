@@ -415,14 +415,14 @@ def test_member_peer_row_carries_per_peer_involvement(world):
     assert isinstance(bob.experiments, int)
 
 
-def test_member_peers_only_includes_shared_project_peers(world):
-    """Member persona: peer list = members of viewer's projects only."""
+def test_member_peers_include_whole_roster(world):
+    """Member persona: rows are seeded from the lab_mgmt roster, so a
+    member sees the WHOLE lab — the PI and themselves included — not just
+    shared-project peers. Per-peer project involvement stays scoped to
+    shared projects (pinned separately above)."""
     resp = snapshot.build_response("cassie", today=_dt.date(2026, 5, 8))
     handles = {p.handle for p in resp.peers}
-    # cassie is only on dcis_test (clinical), so we shouldn't see bbb_test-only members.
-    # Both fixture projects share members in this case, so this just confirms
-    # the_pi/allie/bob are visible (peers from dcis_test).
-    assert "the_pi" in handles or "allie" in handles
+    assert {"the_pi", "allie", "bob", "cassie"} <= handles
 
 
 def test_pi_persona_peers_include_lab_wide_view(world):

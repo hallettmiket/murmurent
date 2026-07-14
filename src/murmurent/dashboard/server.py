@@ -2049,174 +2049,24 @@ def create_app() -> FastAPI:
         body: AdoptCloneBody,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
-        """Adopt an existing local git clone as a murmurent project.
+        """Adopt an existing git clone (local or SSH host) as a murmurent
+        project.
 
-        Delegates to :func:`core.projectize.make_wigamig_project` so the
-        clone ends up in **all three** dashboard panels (Repos shows
-        ✓ murmurent, Projects gets a lab_mgmt registry entry, Installations
-        gets a manifest pointing at this machine).
-
-        Refuses when:
-          - clone_path isn't inside ``~/repos/`` (escape guard)
-          - clone_path isn't a git working tree
-          - a CHARTER.md already exists (don't silently overwrite —
-            user should edit by hand, or remove and re-adopt)
-
-        Defaults to this machine's settings for raw/refined/notebook
-        paths (read from ``~/.murmurent/machine.yaml``). The Repos-panel
-        adopt modal doesn't ask the user for those — they're a
-        per-machine setting, not a per-project decision.
+        Thin HTTP wrapper over :func:`core.adopt.adopt_clone` — the same
+        chokepoint ``murmurent repo adopt`` uses — so the clone ends up
+        in **all three** dashboard panels (Repos shows ✓ murmurent,
+        Projects gets a registry entry, Installations gets a manifest).
+        Validation (path under ~/repos, is a git tree, CHARTER absent,
+        host registered) lives in core.adopt; refusals arrive as
+        :class:`core.adopt.AdoptError` and map onto HTTP statuses via
+        ``core.adopt.ERROR_HTTP_STATUS``.
         """
-        import os
-        from ..core import hosts as _hosts_mod
-        from ..core import projectize as _proj
-        from ..core import remote as _remote_mod
-        from . import machine_settings as _ms
+        from ..core import adopt as _adopt
         from .snapshot import INSTALLATIONS_DIR
 
-        is_remote = body.host and body.host != "local"
-
-        if is_remote:
-            # SSH-host adopt. Validate host exists, the path is under
-            # the host's project_root, and a clone (.git) exists at the
-            # path. Path validation is done via a single SSH probe so
-            # we don't open multiple round-trips.
-            try:
-                host_obj = _hosts_mod.resolve(body.host)
-            except _hosts_mod.HostNotFound as exc:
-                raise HTTPException(status_code=404, detail=str(exc))
-            if host_obj.kind != "ssh":
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"host {body.host!r} is not an SSH host",
-                )
-            # The clone_path the dashboard sends comes from the
-            # inventory scanner, which already constrained the search
-            # to host.scan_dirs (defaulting to ~/repo + ~/repos). Still
-            # double-check with the host's project_root to defend
-            # against a hand-crafted POST.
-            proot = (host_obj.project_root or "~/repos").rstrip("/")
-            # Probe: does the path exist on the remote and have .git?
-            rem = _remote_mod.Remote(host_obj)
-            qpath = body.clone_path.replace("'", "'\\''")
-            try:
-                res = rem.run(
-                    f"if [ -d '{qpath}/.git' ]; then echo OK; "
-                    f"elif [ -d '{qpath}' ]; then echo NOGIT; "
-                    f"else echo NOPATH; fi",
-                    check=False, timeout=20,
-                )
-            except _remote_mod.RemoteError as exc:
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"ssh probe to {body.host} failed: "
-                           f"{(exc.stderr or str(exc)).strip()}",
-                )
-            verdict = (res.stdout or "").strip().splitlines()[-1] if res.stdout else ""
-            if verdict == "NOPATH":
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"path does not exist on {body.host}: {body.clone_path}",
-                )
-            if verdict == "NOGIT":
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"not a git working tree on {body.host}: {body.clone_path}",
-                )
-            if verdict != "OK":
-                raise HTTPException(
-                    status_code=502,
-                    detail=f"unexpected probe verdict {verdict!r}: {res.stderr or ''}",
-                )
-
-            # The endpoint can't easily check "is CHARTER absent" without
-            # a second SSH round-trip; the remote-adopt script itself
-            # handles that case by emitting `charter:ok:already exists...`
-            # instead of overwriting, so a 409 here would be
-            # belt-and-braces. Skip — let the script decide and surface
-            # the result as a probe.
-            actor = (user or os.environ.get("MURMURENT_USER", "")).strip().lstrip("@") \
-                or body.lead.lstrip("@")
-            wb = (host_obj.lab_vm_root or "~/wigamig").rstrip("/")
-            try:
-                result = _proj.make_wigamig_project(
-                    clone_path=Path(body.clone_path),
-                    project=body.project,
-                    lead=body.lead,
-                    members=body.members,
-                    sensitivity=body.sensitivity,
-                    description=body.description,
-                    choreography=body.choreography,
-                    agents=list(body.agents or []),
-                    reb_number=body.reb_number,
-                    reb_expires=body.reb_expires,
-                    data_residency=body.data_residency,
-                    member=actor,
-                    machine_type="lab_server",
-                    hostname=host_obj.ssh_host or body.host,
-                    username=host_obj.remote_user or "",
-                    has_direct_access=False,
-                    lab_base=wb,
-                    raw_path=f"{wb}/raw",
-                    refined_path=f"{wb}/refined",
-                    notebook_path=f"{wb}/lab_notebooks",
-                    ssh_remote=body.host,
-                    mount_point=host_obj.mount_point or None,
-                    installations_dir=INSTALLATIONS_DIR,
-                )
-            except Exception as exc:
-                raise HTTPException(status_code=500, detail=f"projectize failed: {exc}") from exc
-
-            # If charter step on the remote failed, surface as 422 so
-            # the modal renders the probe ladder with red status.
-            charter_probe = next((p for p in result.probes if p.name == "charter"), None)
-            if charter_probe and charter_probe.status == "fail":
-                raise HTTPException(status_code=422, detail=charter_probe.detail)
-
-            return {
-                "ok": True,
-                "project": body.project,
-                "host": body.host,
-                "clone_path": body.clone_path,
-                "registry_path": str(result.registry_path) if result.registry_path else None,
-                "manifest_path": str(result.manifest_path) if result.manifest_path else None,
-                "probes": [p.to_dict() for p in result.probes],
-            }
-
-        # ---- Local adopt (host == "local") ----
-        clone = Path(body.clone_path).expanduser().resolve()
-        repos_root = (Path.home() / "repos").resolve()
         try:
-            clone.relative_to(repos_root)
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"clone_path must live under {repos_root} (got {clone})",
-            )
-        if not (clone / ".git").exists():
-            raise HTTPException(
-                status_code=400,
-                detail=f"not a git working tree: {clone}",
-            )
-        if (clone / "CHARTER.md").exists():
-            raise HTTPException(
-                status_code=409,
-                detail=(f"{clone / 'CHARTER.md'} already exists — "
-                        "edit by hand instead of re-adopting"),
-            )
-
-        # Pull this-machine defaults from machine.yaml so the manifest
-        # carries real paths, not adopt-modal-was-too-lazy-to-ask blanks.
-        try:
-            ms = _ms.load()
-        except Exception:
-            ms = None
-        actor = (user or os.environ.get("MURMURENT_USER", "")).strip().lstrip("@") or body.lead.lstrip("@")
-        wb = ((ms.wigamig_base if ms else None) or "~/wigamig").rstrip("/")
-
-        try:
-            result = _proj.make_wigamig_project(
-                clone_path=clone,
+            outcome = _adopt.adopt_clone(
+                clone_path=body.clone_path,
                 project=body.project,
                 lead=body.lead,
                 members=body.members,
@@ -2224,42 +2074,40 @@ def create_app() -> FastAPI:
                 description=body.description,
                 choreography=body.choreography,
                 agents=list(body.agents or []),
+                host=body.host or "local",
                 reb_number=body.reb_number,
                 reb_expires=body.reb_expires,
                 data_residency=body.data_residency,
-                member=actor,
-                machine_type="laptop",
-                hostname=os.uname().nodename,
-                username=os.environ.get("USER", ""),
-                has_direct_access=True,
-                lab_base=wb,
-                raw_path=f"{wb}/raw",
-                refined_path=f"{wb}/refined",
-                notebook_path=f"{wb}/lab_notebooks",
+                actor=user,
                 installations_dir=INSTALLATIONS_DIR,
             )
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=f"projectize failed: {exc}") from exc
-
-        # If charter validation failed projectize reports it via a probe
-        # with status=fail+required=True; surface as 422 like before.
-        charter_probe = next((p for p in result.probes if p.name == "charter"), None)
-        if charter_probe and charter_probe.status == "fail":
-            raise HTTPException(status_code=422, detail=charter_probe.detail)
-
-        return {
-            "ok": True,
-            "project": body.project,
-            "host": "local",
-            "clone_path": str(clone),
-            "registry_path": str(result.registry_path) if result.registry_path else None,
-            "manifest_path": str(result.manifest_path) if result.manifest_path else None,
-            "probes": [p.to_dict() for p in result.probes],
-        }
+        except _adopt.AdoptError as exc:
+            raise HTTPException(
+                status_code=_adopt.ERROR_HTTP_STATUS.get(exc.code, 500),
+                detail=str(exc),
+            ) from exc
+        return outcome.to_dict()
 
     # -----------------------------------------------------------------
     # Membership (PI-only roster mgmt)
     # -----------------------------------------------------------------
+
+    @app.get("/api/members/roster-info")
+    def get_roster_info() -> dict:
+        """Freshness of this machine's lab_mgmt roster clone — the Lab
+        Members panel's "as of <date>" stamp. Read-only, any persona."""
+        from ..core import roster_sync as _rs
+        return _rs.roster_info().to_dict()
+
+    @app.post("/api/members/refresh")
+    def post_members_refresh() -> dict:
+        """Pull the lab_mgmt clone (--ff-only) so the roster reflects
+        what the PI last pushed — the Lab Members panel's update button.
+        Any persona: members refresh their read-only clone; a failure
+        comes back as ``ok: false`` + detail, never a 5xx (the panel
+        keeps rendering the cached roster with its stamp)."""
+        from ..core import roster_sync as _rs
+        return _rs.pull_lab_mgmt().to_dict()
 
     @app.post("/api/members")
     def add_member_endpoint(

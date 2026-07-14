@@ -1806,12 +1806,15 @@ def group_reconcile_cmd(group: str, apply: bool) -> None:
     elif any("NOT in the group workspace" in s for s in res.slack):
         click.echo("  (set the group's slack_invite_url via `murmurent group-setup` "
                    "so you have a link to send.)")
+    click.echo("\nLab-mgmt roster repo (read-only access):")
+    for line in (res.lab_mgmt or ["  (nothing to check)"]):
+        click.echo(f"  {line}")
     click.echo("\nGroup GitHub repo:")
     for line in (res.github or ["  (no github repo set — `murmurent group-setup "
                                 f"{group} --set github=<org>/<repo>`)"]):
         click.echo(f"  {line}")
-    if not apply and res.github:
-        click.echo("\n  Re-run with --apply to add the GitHub collaborators.")
+    if not apply and (res.github or res.lab_mgmt):
+        click.echo("\n  Re-run with --apply to apply the GitHub grants.")
 
 
 @click.command("group-remove-member",
