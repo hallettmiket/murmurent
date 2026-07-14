@@ -4,7 +4,7 @@ description: Murmurent-aware stage/commit/push for a murmurent-enabled repo. Exc
 user_invocable: true
 ---
 
-Stage changed files, create a descriptive commit, push to the remote tracking branch, and post a Slack release note — but with **wigamig-specific safety rules** that go beyond plain git. This skill is for repos that contain a `CHARTER.md` at the root (wigamig-adopted projects). For a non-wigamig repo, use `/commit-push` instead.
+Stage changed files, create a descriptive commit, push to the remote tracking branch, and post a Slack release note — but with **murmurent-specific safety rules** that go beyond plain git. This skill is for repos that contain a `CHARTER.md` at the root (murmurent-adopted projects). For a non-murmurent repo, use `/commit-push` instead.
 
 ## Pre-flight (do this BEFORE staging)
 

@@ -91,9 +91,9 @@ type: lab_server
 hostname: lab-server.example.edu
 username_convention: "Western username (e.g. jdoe123)"
 lab_base: /data/lab_vm
-raw_path: /data/lab_vm/wigamig/raw
-refined_path: /data/lab_vm/wigamig/refined
-notebook_path: /data/lab_vm/wigamig/notebooks
+raw_path: $MURMURENT_LAB_VM_ROOT/raw
+refined_path: $MURMURENT_LAB_VM_ROOT/refined
+notebook_path: $MURMURENT_LAB_VM_ROOT/notebooks
 access: direct
 registered: YYYY-MM-DD
 registered_by: "@pi_handle"
@@ -149,9 +149,9 @@ hostname: lab-server.example.edu
 username: didi
 access: direct
 lab_base: /data/lab_vm
-raw_path: /data/lab_vm/wigamig/raw
-refined_path: /data/lab_vm/wigamig/refined
-notebook_path: /data/lab_vm/wigamig/notebooks
+raw_path: $MURMURENT_LAB_VM_ROOT/raw
+refined_path: $MURMURENT_LAB_VM_ROOT/refined
+notebook_path: $MURMURENT_LAB_VM_ROOT/notebooks
 infra_components:
   - git
   - vscode

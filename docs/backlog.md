@@ -65,7 +65,7 @@ harmless; when the developer has done any local smoke testing (e.g.
 left an expired OAuth token), 6+ booking tests flake.
 
 **Scope.** ~1 hour. One-line addition to each affected fixture:
-`monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "wigamig_home"))`.
+`monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "murmurent_home"))`.
 
 **First step.** `grep -L MURMURENT_HOME tests/test_*.py` to find all
 test files that monkeypatch `MURMURENT_LAB_INFO_ROOT` but not
@@ -119,12 +119,12 @@ The default location is `~/repos/lab_mgmt`, overrideable via
 `$MURMURENT_LAB_MGMT_REPO`.
 
 **Rename recommendation.** **Do NOT rename to `murmurent-mgmt` or
-`wigamig-lab`.** The current name correctly signals that this is the
+`murmurent-lab`.** The current name correctly signals that this is the
 *lab's own* repo, not part of the murmurent commons. It belongs to the
 PI, lives under the lab's GitHub org (`<labpi>/lab_mgmt`), and is
 analogous to a department's filing cabinet — not a murmurent artifact.
 Renaming would blur the boundary between centre-wide tooling
-(`wigamig/`) and group-scoped governance (`lab_mgmt/`).
+(`murmurent/`) and group-scoped governance (`lab_mgmt/`).
 
 **Scope.** ~2 hours of docs work. Add a `docs/lab_mgmt.md` explaining
 the above, with a layout diagram + the "what you should and

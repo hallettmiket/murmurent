@@ -13,13 +13,13 @@
 #            hosts/machine/master_folders yaml, inventory/, cores/, onboarding/,
 #            decommissions/, security/, identity/cards/trust/revocation, logs,
 #            …) — everything EXCEPT your key material. KEEPS keys/, age/,
-#            installations/ (other projects), and ~/.config/wigamig. Robust: it
+#            installations/ (other projects), and ~/.config/murmurent. Robust: it
 #            keeps an allowlist and removes the rest, so new data files are
 #            caught automatically. No reinstall.
 #
 # Destructive extras (never happen without the explicit flag):
 #   --nuke-installations   also remove ~/.murmurent/installations (other projects)
-#   --nuke-credentials     also remove ~/.config/wigamig (slack-token + keys)
+#   --nuke-credentials     also remove ~/.config/murmurent (slack-tokens + keys)
 #   --nuke-keys            with --level data, ALSO remove ~/.murmurent/keys + age
 #                          (a fully fresh identity; default keeps them)
 #   --nuke-labs            ALSO remove this machine's murmurent lab-management repos
@@ -39,7 +39,7 @@
 #   reset.sh --level install --uninstall --yes
 #
 # Safety:
-#   * ALWAYS writes a timestamped backup tarball to ~/.wigamig_backups/ FIRST
+#   * ALWAYS writes a timestamped backup tarball to ~/.murmurent_backups/ FIRST
 #     (outside ~/.murmurent, so a full wipe can't take the backup with it).
 #   * --dry-run prints exactly what would happen and changes nothing.
 #   * Never touches ~/repos/* clones, ~/.claude/CLAUDE.md, ~/.claude/memory,
@@ -58,8 +58,9 @@ NUKE_LABS=0
 UNINSTALL=0
 
 WIG="$HOME/.murmurent"
-CFG="$HOME/.config/wigamig"
-BACKUPS="$HOME/.wigamig_backups"
+CFG="$HOME/.config/murmurent"
+CFG_LEGACY="$HOME/.config/wigamig"        # pre-rename config dir on older machines
+BACKUPS="$HOME/.murmurent_backups"
 REPO="${MURMURENT_REPO:-$HOME/repos/murmurent}"
 REPOS_ROOT="${MURMURENT_REPOS_ROOT:-$HOME/repos}"
 
@@ -112,7 +113,7 @@ if [ "$DRY" = 1 ]; then say "  DRY: would pkill -f 'murmurent dashboard'";
 else pkill -f "murmurent dashboard" 2>/dev/null || true; sleep 1; fi
 
 # 2. ALWAYS back up first ---------------------------------------------------
-say "2. backing up (~/.murmurent + ~/.config/wigamig)"
+say "2. backing up (~/.murmurent + ~/.config/murmurent)"
 TS="$(date +%Y%m%d-%H%M%S)"
 BK="$BACKUPS/reset_${LEVEL}_${TS}.tgz"
 if [ "$DRY" = 1 ]; then
@@ -121,7 +122,8 @@ else
   mkdir -p "$BACKUPS"; chmod 700 "$BACKUPS"
   tar -czf "$BK" \
     -C "$HOME" "$(basename "$WIG")" \
-    $( [ -d "$CFG" ] && printf -- '-C %s %s' "$(dirname "$CFG")" "$(basename "$CFG")" ) \
+    $( [ -d "$CFG" ] && printf -- '-C %s %s ' "$(dirname "$CFG")" "$(basename "$CFG")" ) \
+    $( [ -d "$CFG_LEGACY" ] && printf -- '-C %s %s' "$(dirname "$CFG_LEGACY")" "$(basename "$CFG_LEGACY")" ) \
     2>/dev/null || tar -czf "$BK" -C "$HOME" "$(basename "$WIG")" 2>/dev/null || true
   chmod 600 "$BK" 2>/dev/null || true
   say "  backup: $BK  ($(du -h "$BK" 2>/dev/null | cut -f1))"
@@ -210,7 +212,10 @@ fi
 # 6. explicit nukes (opt-in only) -------------------------------------------
 say "6. opt-in nukes"
 if [ "$NUKE_INSTALL" = 1 ]; then rmrf "$WIG/installations" "installations/ (OTHER PROJECTS)"; else say "  (keep) installations/"; fi
-if [ "$NUKE_CREDS" = 1 ];   then rmrf "$CFG" "credentials (~/.config/wigamig: slack-token + keys)"; else say "  (keep) credentials"; fi
+if [ "$NUKE_CREDS" = 1 ];   then
+  rmrf "$CFG" "credentials (~/.config/murmurent: slack-tokens + keys)"
+  [ -d "$CFG_LEGACY" ] && rmrf "$CFG_LEGACY" "legacy credentials (~/.config/wigamig)"
+else say "  (keep) credentials"; fi
 
 # 7. murmurent lab-management repos (~/repos/murmurent_lab_mgmt_*, legacy wigamig_*) ---
 # These hold the lab ROSTER (members/*.md) — the source of truth for identity.

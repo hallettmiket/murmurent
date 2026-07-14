@@ -48,7 +48,7 @@ Stand up the Python package, CLI skeleton, agent registry, frontmatter and repo-
    - Creates `~/repos/lab_mgmt/` locally
    - Creates `hallettmiket/lab_mgmt` private GitHub repo via `gh repo create --private`
    - Member profile files for `mike`, `allie`, `bob`, `cassie` at `members/<handle>.md` (frontmatter: handle, role, status, certifications)
-   - Generates dummy age key pairs per persona; commits public keys to `keys/<handle>.age`; private keys saved locally outside the repo (e.g. `~/.config/wigamig/keys/<handle>.age-private`)
+   - Generates dummy age key pairs per persona; commits public keys to `keys/<handle>.age`; private keys saved locally outside the repo (e.g. `~/.config/murmurent/keys/<handle>.age-private`)
    - Empty `inventory/`, `projects/`, `dashboards/`, `audit/`, `roles/`, `onboarding/` directories with `.gitkeep`
    - Initial commit and push
 

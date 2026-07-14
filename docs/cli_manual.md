@@ -128,10 +128,10 @@ Experiments follow the lab project structure: `exp/<integer>_<slug>/` in the pro
 
 | Command | Effect |
 |---|---|
-| `murmurent experiment new --project <project> --name <slug>` | Scaffold `exp/<next-int>_<slug>/` with `README.md`, `run_all.py` skeleton, `notebook.md` template; create `/data/lab_vm/wigamig/raw/<project>/<exp>/` and `/data/lab_vm/wigamig/refined/<project>/<exp>/`; open `notebook.md` in Obsidian |
+| `murmurent experiment new --project <project> --name <slug>` | Scaffold `exp/<next-int>_<slug>/` with `README.md`, `run_all.py` skeleton, `notebook.md` template; create `$MURMURENT_LAB_VM_ROOT/raw/<project>/<exp>/` and `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/`; open `notebook.md` in Obsidian |
 | `murmurent experiment list [--project <project>]` | List experiments and their `status` |
 | `murmurent experiment status <project> <slug> --set <state>` | Update the `status` field on a notebook entry |
-| `murmurent experiment ingest <project> <slug> <source> [--instrument <t>] [--accept] [--dry-run]` | Classify files in `<source>` as raw vs derived (instrument profile + generic patterns), present for mandatory review, then copy: raw → `/data/lab_vm/wigamig/raw/<project>/<slug>/` (chmod a-w), derived → `.../refined/<project>/<slug>/instrument_outputs/`. Compute SHA-256; update `raw_data:`, `instrument_outputs:`, `checksums:` in `notebook.md`. See [Ingest classification](group_level.md#ingest-classification-raw-vs-derived). |
+| `murmurent experiment ingest <project> <slug> <source> [--instrument <t>] [--accept] [--dry-run]` | Classify files in `<source>` as raw vs derived (instrument profile + generic patterns), present for mandatory review, then copy: raw → `$MURMURENT_LAB_VM_ROOT/raw/<project>/<slug>/` (chmod a-w), derived → `.../refined/<project>/<slug>/instrument_outputs/`. Compute SHA-256; update `raw_data:`, `instrument_outputs:`, `checksums:` in `notebook.md`. See [Ingest classification](group_level.md#ingest-classification-raw-vs-derived). |
 | `murmurent experiment attach <project> <slug> <file>` | Place a documentation file (photo of paper notebook page, sketch) into the appropriate subfolder; downsamples camera photos; never used for data files |
 
 ### Inventory
@@ -253,7 +253,7 @@ Note: `provision` is no longer a CLI command; it is a tool on the `inventory` MC
 |---|---|
 | `murmurent push <project> [--message <m>]` | Push current branch as `member/<handle>/<topic>` (direct, no review) |
 | `murmurent push <project> --finalize` | Open a PR from the personal branch to `main`; trigger bot + human reviews per path rules |
-| `murmurent push <project> --refined <exp>` | Recompute checksums in `/data/lab_vm/wigamig/refined/<project>/<exp>/`, update notebook `refined_data` + `checksums`, push to personal branch |
+| `murmurent push <project> --refined <exp>` | Recompute checksums in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/`, update notebook `refined_data` + `checksums`, push to personal branch |
 | `murmurent pull <project>` | Fetch latest |
 | `murmurent cite <reference>` | Resolve and insert a citation; checks group oracle |
 | `murmurent audit <target>` | Invoke `adversary` on a path or PR |
@@ -304,7 +304,7 @@ Triggered: adversary (src/**), security_guard (always)
 
 ```
 $ murmurent push dcis_imaging --refined 3_titration
-Recomputed SHA-256 for 5 files in /data/lab_vm/wigamig/refined/dcis_imaging/3_titration/
+Recomputed SHA-256 for 5 files in $MURMURENT_LAB_VM_ROOT/refined/dcis_imaging/3_titration/
 Updated exp/3_titration/notebook.md (refined_data, checksums).
 Pushed to member/the_pi/3_titration-analysis (direct).
 ```
@@ -317,8 +317,8 @@ Created exp/3_titration/
   README.md, run_all.py, notebook.md
   pages/, sketches/, data/
   notebook.md frontmatter pre-filled: experiment=3_titration, date=2026-05-06, performer=@the_pi
-Created /data/lab_vm/wigamig/raw/dcis_imaging/3_titration/
-Created /data/lab_vm/wigamig/refined/dcis_imaging/3_titration/
+Created $MURMURENT_LAB_VM_ROOT/raw/dcis_imaging/3_titration/
+Created $MURMURENT_LAB_VM_ROOT/refined/dcis_imaging/3_titration/
 Opening notebook.md in Obsidian.
 ```
 
@@ -326,9 +326,9 @@ Opening notebook.md in Obsidian.
 
 ```
 $ murmurent experiment ingest dcis_imaging 3_titration ~/Downloads/scope_export
-Copied 12 files to /data/lab_vm/wigamig/raw/dcis_imaging/3_titration/
+Copied 12 files to $MURMURENT_LAB_VM_ROOT/raw/dcis_imaging/3_titration/
 Computed SHA-256 checksums.
-Set /data/lab_vm/wigamig/raw/dcis_imaging/3_titration/ to chmod a-w (read-only).
+Set $MURMURENT_LAB_VM_ROOT/raw/dcis_imaging/3_titration/ to chmod a-w (read-only).
 Updated raw_data and checksums in exp/3_titration/notebook.md.
 ```
 
