@@ -234,6 +234,13 @@ function TopBar() {
   return (
     <div className="topbar">
       <span className="uwo" style={{fontWeight:600}}>{labLabel}</span>
+      <a href="http://mikehallett.science/murmurent/" target="_blank" rel="noopener"
+         title="Murmurent documentation — getting started, projects, identity, CLI reference"
+         style={{marginLeft:14, fontFamily:"var(--mono)", fontSize:12,
+                 color:"var(--purple)", textDecoration:"none",
+                 borderBottom:"1px dotted var(--purple)"}}>
+        📖 docs
+      </a>
       <span className="who">
         signed in as <code>@{m.handle}</code> · {kindLabel}: <code>{m.lab || ls.name}</code>
       </span>
@@ -6555,11 +6562,13 @@ function HostsModal({ onClose }) {
 }
 
 function HostAddForm({ onCancel, onAdded }) {
+  /* Mirrors the machine cards: beyond the connection details (name,
+     SSH host, username), a machine is described by the same three fields
+     the cards show — Obsidian vault, Files, Repo locations. */
   const [form, setForm] = useState({
-    name: "biodatsci", ssh_host: "biodatsci", remote_user: "",
-    project_root: "~/repos", wigamig_base: "~/wigamig",
-    vault_root: "~/Obsidian", description: "",
-    scan_dirs_text: "",
+    name: "", ssh_host: "", remote_user: "",
+    vault_root: "~/Obsidian", files_root: "~/lab_vm/data",
+    repos_text: "~/repos", description: "",
   });
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState(null);
@@ -6568,17 +6577,26 @@ function HostAddForm({ onCancel, onAdded }) {
   const submit = async (e) => {
     e.preventDefault();
     if (!form.name.trim() || !form.ssh_host.trim()) {
-      setErr("name and ssh_host required"); return;
+      setErr("name and SSH host are required"); return;
     }
     setBusy(true); setErr(null);
     try {
-      const { scan_dirs_text, ...rest } = form;
-      const scan_dirs = scan_dirs_text
+      const repos = form.repos_text
         .split("\n").map(s => s.trim()).filter(Boolean);
       const r = await fetch("/api/hosts", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ ...rest, scan_dirs }),
+        body: JSON.stringify({
+          name: form.name.trim(),
+          ssh_host: form.ssh_host.trim(),
+          remote_user: form.remote_user.trim(),
+          vault_root: form.vault_root.trim() || "~/Obsidian",
+          lab_vm_root: form.files_root.trim() || "~/lab_vm/data",
+          // First repo location doubles as where new clones land.
+          project_root: repos[0] || "~/repos",
+          scan_dirs: repos,
+          description: form.description.trim(),
+        }),
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
@@ -6601,53 +6619,44 @@ function HostAddForm({ onCancel, onAdded }) {
       padding:"10px 14px", background:"var(--paper)",
     }}>
       <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
-        <strong style={{fontFamily:"var(--serif)"}}>Register SSH host</strong>
+        <strong style={{fontFamily:"var(--serif)"}}>Add machine</strong>
         <button type="button" className="btn sm ghost" onClick={onCancel}>cancel</button>
       </div>
       <div className="row" style={{gap:10, marginTop:6}}>
         <div style={{flex:1}}>
           <div style={lbl}>name (short id)</div>
-          <input style={inp} value={form.name} onChange={set("name")} />
+          <input style={inp} value={form.name} onChange={set("name")}
+                 placeholder="biodatsci" />
         </div>
         <div style={{flex:2}}>
-          <div style={lbl}>ssh_host (alias in ~/.ssh/config or full hostname)</div>
-          <input style={inp} value={form.ssh_host} onChange={set("ssh_host")} />
+          <div style={lbl}>SSH host (alias in ~/.ssh/config or full hostname)</div>
+          <input style={inp} value={form.ssh_host} onChange={set("ssh_host")}
+                 placeholder="biodatsci.schulich.uwo.ca" />
         </div>
       </div>
       <div className="row" style={{gap:10, marginTop:4}}>
         <div style={{flex:1}}>
-          <div style={lbl}>remote_user (netname on host)</div>
+          <div style={lbl}>username on host (optional)</div>
           <input style={inp} value={form.remote_user} onChange={set("remote_user")}
                  placeholder="mhallet" />
         </div>
-        <div style={{flex:1}}>
-          <div style={lbl}>project_root</div>
-          <input style={inp} value={form.project_root} onChange={set("project_root")} />
-        </div>
-      </div>
-      <div className="row" style={{gap:10, marginTop:4}}>
-        <div style={{flex:1}}>
-          <div style={lbl}>wigamig_base (raw/ + refined/ + lab_notebooks/ live here; working clones go to ~/repos/)</div>
-          <input style={inp} value={form.wigamig_base} onChange={set("wigamig_base")} />
-        </div>
-        <div style={{flex:1}}>
-          <div style={lbl}>obsidian vault root (separate)</div>
+        <div style={{flex:2}}>
+          <div style={lbl}>Obsidian vault (full path)</div>
           <input style={inp} value={form.vault_root} onChange={set("vault_root")} />
         </div>
       </div>
-      <div style={lbl}>description (free text)</div>
-      <input style={inp} value={form.description} onChange={set("description")} />
-      <div style={lbl}>
-        scan dirs (one per line; absolute paths used verbatim, others under <code>$HOME</code>;
-        leave blank for default <code>~/repo</code> + <code>~/repos</code>)
-      </div>
+      <div style={lbl}>Files (data root — raw/ + refined/ live here)</div>
+      <input style={inp} value={form.files_root} onChange={set("files_root")} />
+      <div style={lbl}>Repo locations (one per line; the first is where new clones go)</div>
       <textarea style={{...inp, fontFamily:"var(--mono)", minHeight:54, resize:"vertical"}}
-                value={form.scan_dirs_text} onChange={set("scan_dirs_text")}
-                placeholder={"repos\nwork/clones\n/srv/projects"} />
+                value={form.repos_text} onChange={set("repos_text")}
+                placeholder={"~/repos\n/srv/projects"} />
+      <div style={lbl}>description (free text, optional)</div>
+      <input style={inp} value={form.description} onChange={set("description")} />
       <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:10, alignItems:"baseline"}}>
         {err && <span style={{color:"var(--red)", fontSize:11, marginRight:"auto"}}>{err}</span>}
         <button type="submit" className="btn sm primary" disabled={busy}>
-          {busy ? "…" : "register"}
+          {busy ? "…" : "add machine"}
         </button>
       </div>
     </form>
