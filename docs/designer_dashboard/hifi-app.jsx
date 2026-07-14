@@ -1859,6 +1859,25 @@ function ProjectReposBlock({ proj: p, isPI, userParam }) {
           <button className="btn sm" onClick={() => setShow(true)}>+ add repo</button>
         )}
       </div>
+      {(() => {
+        // (5) A project is a set of repos + a set of machines. Show the
+        // machine set the project spans (falls back to the single host).
+        const machines = (p.machines && p.machines.length) ? p.machines : [p.host || "local"];
+        return (
+          <div style={{display:"flex", alignItems:"center", gap:8, flexWrap:"wrap", marginTop:6}}>
+            <span style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+                  textTransform:"uppercase", color:"var(--muted)"}}>machines</span>
+            {machines.map((m, i) => (
+              <span key={i}
+                    style={{fontFamily:"var(--mono)", fontSize:11, padding:"1px 7px",
+                    borderRadius:3, border:"1px solid var(--rule-strong)",
+                    color: m === "local" ? "var(--ink-2)" : "var(--purple)"}}>
+                {m === "local" ? "local" : "🌐 " + m}{i === 0 && machines.length > 1 ? " · primary" : ""}
+              </span>
+            ))}
+          </div>
+        );
+      })()}
       {isPI && show && (
         <div style={{marginTop:6, display:"flex", gap:6, flexWrap:"wrap", alignItems:"center"}}>
           <input placeholder="repo name (e.g. X_manuscript)" value={f.repo_name}
@@ -3382,19 +3401,40 @@ function NewProjectModal({ onClose }) {
   // the project name so it's obvious what will be created if they
   // leave this blank. Validation is server-side (normalize_channel_name).
   const [slackChannelName, setSlackChannelName] = useState("");
-  // Item 3 (R3): install target. Populated from /api/hosts on mount.
-  // Defaults to "local"; selecting a remote host (e.g. lab-server) makes
-  // approval scaffold the project on that machine over SSH.
+  // (5) A project is a set of repos + a set of machines. ``machines`` is the
+  // full host set the project lives on (populated from /api/hosts); the first
+  // selected machine is the primary scaffold target. ``attachRepos`` are
+  // existing inventory repos to fold in alongside the freshly-created repo —
+  // this is what lets a project pair a code repo with a manuscript repo, the
+  // way murmurent itself does.
   const [hosts, setHosts] = useState([{ name: "local", kind: "local", is_remote: false, description: "this laptop" }]);
-  const [host, setHost] = useState("local");
+  const [selectedMachines, setSelectedMachines] = useState(["local"]);
+  const [repoOptions, setRepoOptions] = useState([]);
+  const [attachRepos, setAttachRepos] = useState([]);
   useEffect(() => {
     let cancelled = false;
     fetch("/api/hosts", { credentials: "same-origin", headers: { Accept: "application/json" } })
       .then(r => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))
       .then(j => { if (!cancelled && Array.isArray(j.hosts) && j.hosts.length) setHosts(j.hosts); })
       .catch(err => console.warn("[murmurent] /api/hosts failed; defaulting to local", err));
+    fetch("/api/inventory/repos", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(r => r.ok ? r.json() : Promise.reject(new Error("HTTP " + r.status)))
+      .then(j => {
+        if (cancelled) return;
+        const names = [];
+        for (const row of (j.rows || [])) {
+          const nm = (row && (row.name || (row.github && row.github.name))) || "";
+          if (nm && !names.includes(nm)) names.push(nm);
+        }
+        setRepoOptions(names);
+      })
+      .catch(err => console.warn("[murmurent] /api/inventory/repos failed", err));
     return () => { cancelled = true; };
   }, []);
+  const toggleMachine = (nm) =>
+    setSelectedMachines(sel => sel.includes(nm) ? sel.filter(m => m !== nm) : [...sel, nm]);
+  const toggleRepo = (nm) =>
+    setAttachRepos(sel => sel.includes(nm) ? sel.filter(r => r !== nm) : [...sel, nm]);
 
   const addFromDropdown = (handle) => {
     if (!handle) return;
@@ -3417,6 +3457,7 @@ function NewProjectModal({ onClose }) {
     e.preventDefault();
     if (!name.trim()) { setErr("project name is required"); return; }
     if (selectedMembers.length === 0) { setErr("add at least one member"); return; }
+    if (selectedMachines.length === 0) { setErr("select at least one machine"); return; }
     setBusy(true); setErr(null);
     try {
       await postCreateProjectRequest({
@@ -3426,7 +3467,9 @@ function NewProjectModal({ onClose }) {
         justification: justification.trim(),
         repo_kind: repoKind,
         local_repo_root: repoKind === "local" ? (localRepoRoot.trim() || null) : null,
-        host,
+        host: selectedMachines[0] || "local",
+        machines: selectedMachines,
+        attach_repos: attachRepos,
         slack_channel_name: slackChannelName.trim() || null,
       });
       if (typeof window.__murmurentFetchData === "function") {
@@ -3526,22 +3569,66 @@ function NewProjectModal({ onClose }) {
           <option value="clinical">clinical</option>
         </select>
 
-        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>install on host</label>
-        <select value={host} onChange={e => setHost(e.target.value)}
-                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}>
-          {hosts.map(h => (
-            <option key={h.name} value={h.name}>
-              {h.name}{h.is_remote ? " (" + (h.ssh_host || h.name) + ")" : " — this laptop"}
-            </option>
-          ))}
-        </select>
-        {host !== "local" && (
-          <div className="muted" style={{fontSize:11, marginTop:-4}}>
-            On approval, murmurent will SSH into <code>{host}</code> and
-            scaffold the project at
-            <code> {(hosts.find(h => h.name === host) || {}).project_root || "~/repos"}/{name.trim() || "<project>"}</code>.
-            A local placeholder dir is created at <code>~/repos/{name.trim() || "<project>"}/</code>
-            so the dashboard can render the project (working tree lives on the remote host).
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>machines</label>
+        <div className="muted" style={{fontSize:11, marginTop:-2, marginBottom:2, lineHeight:1.5}}>
+          A project is a set of machines. Pick every host the project lives on;
+          the first selected is the primary scaffold target.
+        </div>
+        <div style={{display:"flex", flexWrap:"wrap", gap:6}}>
+          {hosts.map(h => {
+            const on = selectedMachines.includes(h.name);
+            const primary = on && selectedMachines[0] === h.name;
+            return (
+              <label key={h.name}
+                     style={{display:"inline-flex", alignItems:"center", gap:5,
+                             fontSize:12, padding:"3px 8px", cursor:"pointer",
+                             border:"1px solid " + (on ? "var(--purple)" : "var(--rule-strong)"),
+                             background: on ? "rgba(79,38,131,0.10)" : "transparent",
+                             color: on ? "var(--purple)" : "var(--ink-2)", borderRadius:2}}>
+                <input type="checkbox" checked={on} onChange={() => toggleMachine(h.name)} />
+                <span className="mono">{h.name}</span>
+                {h.is_remote
+                  ? <span className="muted" style={{fontSize:10}}>({h.ssh_host || h.name})</span>
+                  : <span className="muted" style={{fontSize:10}}>this laptop</span>}
+                {primary && <span style={{fontSize:10, color:"var(--tiger)"}}>· primary</span>}
+              </label>
+            );
+          })}
+        </div>
+        {selectedMachines.some(m => m !== "local") && (
+          <div className="muted" style={{fontSize:11, marginTop:2}}>
+            On approval, murmurent scaffolds the primary repo on
+            <code> {selectedMachines[0]}</code> and records the full machine
+            set on the project; remote hosts get a local placeholder dir so
+            the dashboard can render them.
+          </div>
+        )}
+
+        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>repos</label>
+        <div className="muted" style={{fontSize:11, marginTop:-2, marginBottom:2, lineHeight:1.5}}>
+          A project is a set of repos. A new repo named <code>{name.trim() || "<project>"}</code> is
+          scaffolded as the project's primary repo; attach any existing repos to
+          pair with it (e.g. a manuscript repo alongside the code repo, the way
+          murmurent itself is code + manuscript).
+        </div>
+        {repoOptions.length === 0 ? (
+          <div className="muted" style={{fontSize:11}}>No existing repos in the inventory to attach.</div>
+        ) : (
+          <div style={{display:"flex", flexWrap:"wrap", gap:6, maxHeight:120, overflowY:"auto"}}>
+            {repoOptions.map(nm => {
+              const on = attachRepos.includes(nm);
+              return (
+                <label key={nm}
+                       style={{display:"inline-flex", alignItems:"center", gap:5,
+                               fontSize:12, padding:"3px 8px", cursor:"pointer",
+                               border:"1px solid " + (on ? "var(--purple)" : "var(--rule-strong)"),
+                               background: on ? "rgba(79,38,131,0.10)" : "transparent",
+                               color: on ? "var(--purple)" : "var(--ink-2)", borderRadius:2}}>
+                  <input type="checkbox" checked={on} onChange={() => toggleRepo(nm)} />
+                  <span className="mono">{nm}</span>
+                </label>
+              );
+            })}
           </div>
         )}
 
@@ -3666,6 +3753,14 @@ function RequestActionRow({ req, isPI }) {
       {isCreate && req.proposed_members && (
         <div className="mono muted" style={{fontSize:11, marginTop:4}}>
           members: {req.proposed_members.join(", ")} · sens: {req.proposed_sensitivity || "standard"}
+        </div>
+      )}
+      {isCreate && (req.machines && req.machines.length > 0) && (
+        <div className="mono muted" style={{fontSize:11, marginTop:2}}>
+          machines: {req.machines.join(", ")}
+          {req.attach_repos && req.attach_repos.length > 0
+            ? " · repos: " + req.attach_repos.join(", ")
+            : ""}
         </div>
       )}
       {req.justification && (

@@ -82,6 +82,12 @@ class CreateProjectRequestBody(BaseModel):
     # Useful when the lab already has a channel that doesn't follow
     # the convention, or wants a different name at create time.
     slack_channel_name: str | None = None
+    # (5) 2026-07: a project is a set of repos + a set of machines. ``machines``
+    # is the full host set the project lives on (``host`` is derived from the
+    # first when set). ``attach_repos`` names existing inventory repos to fold
+    # into the project alongside the freshly-scaffolded primary repo.
+    machines: list[str] = []
+    attach_repos: list[str] = []
 
 
 class AddMemberBody(BaseModel):
@@ -972,6 +978,8 @@ def create_app() -> FastAPI:
                 local_repo_root=body.local_repo_root,
                 host=body.host,
                 slack_channel_name=body.slack_channel_name,
+                machines=body.machines,
+                attach_repos=body.attach_repos,
             )
         except request_actions.RequestForbidden as exc:
             raise HTTPException(status_code=403, detail=str(exc))
