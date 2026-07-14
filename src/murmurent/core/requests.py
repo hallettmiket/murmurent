@@ -100,6 +100,13 @@ class JoinRequest:
     # → murmurent uses the conventional ``proj-<project>``. Persisted so
     # the PI's approve flow knows what to ask Slack to create.
     slack_channel_name: str | None = None
+    # (5) 2026-07: a project is a set of repos + a set of machines. ``machines``
+    # is the full host set the project lives on; ``host`` above stays the
+    # primary scaffold target (= machines[0]) for the pre-(5) approval path.
+    # ``attach_repos`` names existing inventory repos to fold into the project
+    # alongside the freshly-scaffolded primary repo (code + manuscript + …).
+    machines: list[str] | None = None
+    attach_repos: list[str] | None = None
 
     def to_meta(self) -> dict[str, Any]:
         meta: dict[str, Any] = {
@@ -122,6 +129,8 @@ class JoinRequest:
             ("local_repo_root", self.local_repo_root),
             ("host", self.host),
             ("slack_channel_name", self.slack_channel_name),
+            ("machines", self.machines),
+            ("attach_repos", self.attach_repos),
         ):
             if value is not None:
                 meta[key] = value
@@ -150,6 +159,15 @@ def parse_request(path: Path) -> JoinRequest:
     proposed_members = meta.get("proposed_members")
     if proposed_members is not None and not isinstance(proposed_members, list):
         proposed_members = list(proposed_members)
+
+    def _opt_list(value: Any) -> list[str] | None:
+        if value is None:
+            return None
+        if isinstance(value, (list, tuple)):
+            return [str(v).strip() for v in value if str(v).strip()]
+        s = str(value).strip()
+        return [s] if s else None
+
     return JoinRequest(
         id=int(meta["id"]),
         requester=str(meta["requester"]),
@@ -168,6 +186,8 @@ def parse_request(path: Path) -> JoinRequest:
         local_repo_root=_opt_str(meta.get("local_repo_root")),
         host=_opt_str(meta.get("host")),
         slack_channel_name=_opt_str(meta.get("slack_channel_name")),
+        machines=_opt_list(meta.get("machines")),
+        attach_repos=_opt_list(meta.get("attach_repos")),
         body=parsed.body,
         path=path,
     )
@@ -311,10 +331,17 @@ def file_create_request(
     local_repo_root: str | None = None,
     host: str = "local",
     slack_channel_name: str | None = None,
+    machines: list[str] | None = None,
+    attach_repos: list[str] | None = None,
 ) -> JoinRequest:
     """File a ``project-create`` request.
 
     Refuses if a project with that name already exists locally.
+
+    A project is a set of repos + a set of machines. ``machines`` is the
+    full host set; ``host`` (the primary scaffold target) is derived from
+    ``machines[0]`` when a set is given. ``attach_repos`` names existing
+    inventory repos to fold in alongside the freshly-scaffolded repo.
     """
     today = today or _dt.date.today()
     if find_project(project) is not None:
@@ -328,6 +355,13 @@ def file_create_request(
         norm_members.insert(0, _at(requester))
     if not norm_members:
         raise RequestError("project-create needs at least one member")
+    norm_machines = [m.strip() for m in (machines or []) if m and m.strip()]
+    if norm_machines:
+        # The primary scaffold target is the first machine in the set; the
+        # rest are recorded so the approval flow can extend the project onto
+        # them (project = set of machines).
+        host = norm_machines[0]
+    norm_attach = [r.strip() for r in (attach_repos or []) if r and r.strip()]
     # No duplicate-pending check here — multiple people might propose related
     # projects and the PI sorts it out.
 
@@ -346,6 +380,8 @@ def file_create_request(
         local_repo_root=local_repo_root,
         host=(host or "local"),
         slack_channel_name=(slack_channel_name.strip() if isinstance(slack_channel_name, str) and slack_channel_name.strip() else None),
+        machines=norm_machines or None,
+        attach_repos=norm_attach or None,
     )
     write_request(req)
     return req

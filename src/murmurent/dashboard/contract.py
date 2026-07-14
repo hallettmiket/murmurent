@@ -284,6 +284,10 @@ class ProjectRow(BaseModel):
     # Multi-repo: the project's repo set (code + manuscript + …). Each is
     # {name, role, host, path, overleaf}. Empty for legacy/CHARTER-only rows.
     repos: list[dict] = []
+    # (5): a project is a set of repos + a set of machines. ``machines`` is the
+    # distinct host set the project spans (derived from ``host`` + each repo's
+    # host). Single-element for legacy single-host projects.
+    machines: list[str] = []
 
 
 class PeerRow(BaseModel):
@@ -512,6 +516,12 @@ class JoinRequestRow(BaseModel):
     proposed_members: list[str] | None = None
     proposed_sensitivity: str | None = None
     proposed_lead: str | None = None
+    # (5): a project is a set of repos + a set of machines. ``machines`` is
+    # the full host set proposed; ``attach_repos`` the existing repos to fold
+    # in alongside the freshly-scaffolded primary repo. Shown in the PI's
+    # approval queue so the intent is visible before approving.
+    machines: list[str] | None = None
+    attach_repos: list[str] | None = None
 
 
 class CatalogEntryRow(BaseModel):

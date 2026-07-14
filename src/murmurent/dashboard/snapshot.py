@@ -1204,9 +1204,24 @@ def _projects(
                 is_cert=p.name in cert_names,
                 cert_members=cert_members.get(p.name, []),
                 repos=cert_repos.get(p.name, []),
+                machines=_project_machines(host, cert_repos.get(p.name, [])),
             )
         )
     return rows
+
+
+def _project_machines(host: str, repos: list[dict]) -> list[str]:
+    """The distinct host set a project spans (project = set of machines).
+
+    Preserves ``host`` as the first entry (the primary scaffold target),
+    then appends any additional distinct hosts named by the project's repos.
+    """
+    machines = [host or "local"]
+    for r in repos or []:
+        h = str((r or {}).get("host") or "").strip()
+        if h and h not in machines:
+            machines.append(h)
+    return machines
 
 
 def _humanize(when: _dt.date | None, today_d: _dt.date) -> str:
@@ -1505,6 +1520,8 @@ def _to_request_row(r) -> C.JoinRequestRow:
         proposed_members=r.proposed_members,
         proposed_sensitivity=r.proposed_sensitivity,
         proposed_lead=r.proposed_lead,
+        machines=getattr(r, "machines", None),
+        attach_repos=getattr(r, "attach_repos", None),
     )
 
 

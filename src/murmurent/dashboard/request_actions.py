@@ -161,8 +161,14 @@ def file_create_request(
     local_repo_root: str | None = None,
     host: str = "local",
     slack_channel_name: str | None = None,
+    machines: list[str] | None = None,
+    attach_repos: list[str] | None = None,
 ) -> FileResult:
-    """Propose creating a new project. PI approval scaffolds the repo."""
+    """Propose creating a new project. PI approval scaffolds the repo.
+
+    A project is a set of repos + a set of machines: ``machines`` is the
+    full host set and ``attach_repos`` the existing repos to fold in.
+    """
     if not actor:
         raise RequestForbidden("no actor identity resolved")
     try:
@@ -177,6 +183,8 @@ def file_create_request(
             local_repo_root=local_repo_root,
             host=host,
             slack_channel_name=slack_channel_name,
+            machines=machines,
+            attach_repos=attach_repos,
         )
     except RequestError as exc:
         msg = str(exc)
