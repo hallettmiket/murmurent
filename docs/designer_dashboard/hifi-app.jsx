@@ -372,7 +372,6 @@ function RepoInventoryPanel({ span = "c-12" }) {
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState(null);
   const [showAllGithub, setShowAllGithub] = useState(false);
-  const [installCtx, setInstallCtx] = useState(null);  // {project, machine}
   const [adoptCtx,   setAdoptCtx]   = useState(null);  // {name, path, origin}
   // Hosts the user has registered. Sourced once on mount so the table
   // columns are stable across refreshes. The inventory report also
@@ -456,29 +455,21 @@ function RepoInventoryPanel({ span = "c-12" }) {
           color:"var(--ink-2)",
         }}>
           <strong style={{fontFamily:"var(--mono)", color:"var(--purple-deep)"}}>
-            clone · adopt · install · open
-          </strong>{" — each host cell shows what's there now and offers the next step:"}
+            clone · adopt
+          </strong>{" — each host cell shows what's there now:"}
           <ul style={{margin:"4px 0 0 18px", padding:0}}>
             <li>
               <span className="mono" style={{color:"var(--muted)"}}>—</span>{" "}
               <em>nothing here.</em> Repo isn't on this host and has no GitHub origin to clone from.
             </li>
             <li>
-              <span className="mono">+ install</span> — repo lives on GitHub but isn't on this host.
-              <em> One click does</em> <strong>clone</strong> (git clone into <code>~/repos/&lt;name&gt;</code>) +
-              <strong> adopt</strong> (write CHARTER.md, lab_mgmt registry entry, <code>.claude/agents/</code>) +
-              <strong> install</strong> (mkdir raw/refined, write installation manifest).
-              You become the lead; sensitivity defaults to <code>standard</code> — edit CHARTER.md after.
-            </li>
-            <li>
               <span className="mono">• clone</span> + <span className="mono">↑ adopt</span> — repo is on
-              this host but never made wigamig-ready. <strong>Adopt</strong> writes CHARTER + registry + manifest
+              this host but never made murmurent-ready. <strong>Adopt</strong> writes CHARTER + registry
               + bootstraps <code>.claude/agents/</code>. The modal asks for lead, members, and sensitivity.
             </li>
             <li>
-              <span className="mono" style={{color:"var(--green)"}}>✓ murmurent</span> — fully wigamig-ready.
-              See it in <em>Projects</em> and <em>Installations</em>; <strong>open</strong> it from the
-              Installations row's launcher.
+              <span className="mono" style={{color:"var(--green)"}}>✓ murmurent</span> — fully
+              murmurent-ready. See it in <em>Projects</em>.
             </li>
           </ul>
         </div>
@@ -514,7 +505,6 @@ function RepoInventoryPanel({ span = "c-12" }) {
                   key={r.key + ":" + i}
                   row={r}
                   knownHosts={knownHosts}
-                  onInstall={(project, machine, repoUrl) => setInstallCtx({project, machine, repoUrl})}
                   onAdopt={(ctx) => setAdoptCtx(ctx)}
                 />
               ))}
@@ -522,19 +512,6 @@ function RepoInventoryPanel({ span = "c-12" }) {
           </table>
         )}
       </div>
-      {installCtx && (
-        <InstallModal
-          initialProject={installCtx.project}
-          initialMachine={installCtx.machine}
-          initialRepoUrl={installCtx.repoUrl}
-          onClose={() => {
-            setInstallCtx(null);
-            // After the install wizard closes, refresh the inventory
-            // so a newly-cloned repo shows up immediately.
-            load(true);
-          }}
-        />
-      )}
       {adoptCtx && (
         <AdoptCloneModal
           clone={adoptCtx}
@@ -548,7 +525,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
   );
 }
 
-function RepoInventoryRow({ row, knownHosts, onInstall, onAdopt }) {
+function RepoInventoryRow({ row, knownHosts, onAdopt }) {
   const gh = row.github;
   const cloneByHost = {};
   for (const c of (row.clones || [])) cloneByHost[c.host] = c;
@@ -609,19 +586,6 @@ function RepoInventoryRow({ row, knownHosts, onInstall, onAdopt }) {
             </button>
           )}
         </span>
-      );
-    }
-    if (gh && !row.local_only) {
-      // GitHub URL passed through so the InstallModal can do a one-shot
-      // clone+adopt+install without round-tripping through ↑ adopt
-      // first. The server clones into ~/repos/<name> (local) or
-      // ~/repos/<name> on the remote host (SSH) before projectizing.
-      const cloneUrl = `git@github.com:${gh.full_name}.git`;
-      return (
-        <button className="btn sm" style={{fontSize:11, padding:"2px 6px"}}
-                onClick={() => onInstall(gh.name, host === "local" ? "this" : host, cloneUrl)}>
-          + install
-        </button>
       );
     }
     return <span className="muted" style={{fontSize:11}}>—</span>;
