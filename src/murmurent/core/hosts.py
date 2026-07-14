@@ -291,6 +291,39 @@ def update_scan_dirs(
     return updated
 
 
+def update_host(
+    name: str,
+    *,
+    lab_vm_root: str | None = None,
+    scan_dirs: tuple[str, ...] | list[str] | None = None,
+    env: dict[str, str] | None = None,
+) -> Host:
+    """Update a registered host's Files root (``lab_vm_root``) and/or Repo
+    location (``scan_dirs``), leaving every other field untouched. ``None``
+    means "don't change". Used by the dashboard Machines editor."""
+    registry = read(env)
+    if name not in registry:
+        raise HostNotFound(f"no host registered as {name!r}")
+    current = registry[name]
+    updated = Host(
+        name=current.name,
+        kind=current.kind,
+        ssh_host=current.ssh_host,
+        remote_user=current.remote_user,
+        project_root=current.project_root,
+        lab_vm_root=(lab_vm_root.strip() or current.lab_vm_root)
+                    if lab_vm_root is not None else current.lab_vm_root,
+        vault_root=current.vault_root,
+        mount_point=current.mount_point,
+        description=current.description,
+        scan_dirs=_coerce_scan_dirs(scan_dirs) if scan_dirs is not None
+                  else current.scan_dirs,
+    )
+    registry[name] = updated
+    write(registry, env)
+    return updated
+
+
 __all__ = [
     "Host",
     "HostError",
@@ -306,4 +339,5 @@ __all__ = [
     "add",
     "remove",
     "update_scan_dirs",
+    "update_host",
 ]
