@@ -1820,6 +1820,189 @@ const REPO_ROLE_COLOUR = { code: "#1565c0", manuscript: "#8e2f6b",
 
 // The project's repo set (code + manuscript + …) + a PI "add repo" affordance.
 // This is where a project gains its manuscript repo alongside its code repo.
+/* (7)/(8) ProjectMembersBlock — the project's certified membership, managed by
+   its LEAD (or the PI). Adding a member issues their lead-signed project card
+   (one click when their key is on the roster), DMs the bundle over the
+   project's Slack workspace, and invites them to the private channel; removing
+   revokes the card (CRL) + kicks them. The viewer's own verified standing
+   (p.my_cert, from the card bundle on THEIR machine) shows as a 🔑 chip. */
+function ProjectMembersBlock({ proj: p }) {
+  const persona = window.DATA.persona || "member";
+  const isPI = persona === "pi";
+  const viewer = ((window.DATA.member || {}).handle || "").replace(/^@/, "").toLowerCase();
+  const leadNorm = (p.lead || "").replace(/^@/, "").toLowerCase();
+  const canManage = isPI || (viewer && viewer === leadNorm);
+  const certMembers = p.cert_members || [];
+  const uncertified = p.uncertified_members || [];
+  const groupMembers = window.DATA.group_members || [];
+  const [busy, setBusy] = React.useState(null);   // handle currently in flight
+  const [err, setErr] = React.useState(null);
+  const userParam = ((window.DATA.member || {}).handle || "").replace(/^@/, "");
+  const q = userParam ? "?user=" + encodeURIComponent(userParam) : "";
+
+  const refresh = async () => {
+    if (typeof window.__murmurentFetchData === "function") {
+      try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
+    }
+  };
+
+  const addMember = async (handle, enrollment) => {
+    if (!handle) return;
+    setBusy(handle); setErr(null);
+    try {
+      const r = await fetch("/api/project/" + encodeURIComponent(p.name) + "/members" + q,
+        { method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ handle, enrollment: enrollment || null }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error((typeof j.detail === "string" ? j.detail : null) || r.statusText);
+      if (!j.ok && j.error === "no_recorded_key") {
+        // PoP fallback: the member has no attested key on the roster (carded
+        // before pubkey recording, or external). Paste their enrollment.
+        const pasted = window.prompt(
+          "@" + handle + " has no attested key on the roster.\n\n" +
+          "Ask them to run:\n    murmurent enroll --project " + p.name + "\n" +
+          "and send you the JSON. Paste it here:");
+        if (pasted && pasted.trim()) {
+          let obj = null;
+          try { obj = JSON.parse(pasted); }
+          catch (_) { throw new Error("that wasn't valid enrollment JSON"); }
+          setBusy(null);
+          return addMember(handle, obj);
+        }
+        return;
+      }
+      const dm = j.dm || {};
+      window.alert("@" + handle + " added to " + p.name + ".\n" +
+                   (dm.sent ? "Card DM'd via " + (dm.workspace || "Slack") + "."
+                            : "DM failed (" + (dm.detail || "?") + ") — see the server log for the bundle."));
+      await refresh();
+    } catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(null); }
+  };
+
+  const removeMember = async (handle) => {
+    const h = handle.replace(/^@/, "");
+    const ok = window.confirm(
+      "Remove @" + h + " from " + p.name + "?\n\n" +
+      "Their project certificate is revoked (CRL), they are kicked from the " +
+      "private Slack channel, and GitHub access is dropped.");
+    if (!ok) return;
+    setBusy(h); setErr(null);
+    try {
+      const r = await fetch("/api/project/" + encodeURIComponent(p.name) +
+                            "/members/" + encodeURIComponent(h) + q,
+        { method: "DELETE", headers: { Accept: "application/json" } });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error((typeof j.detail === "string" ? j.detail : null) || r.statusText);
+      await refresh();
+    } catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(null); }
+  };
+
+  const issueCerts = async () => {
+    setBusy("__batch__"); setErr(null);
+    try {
+      const r = await fetch("/api/project/" + encodeURIComponent(p.name) + "/issue-certs" + q,
+        { method: "POST", headers: { Accept: "application/json" } });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error((typeof j.detail === "string" ? j.detail : null) || r.statusText);
+      window.alert("Issued " + ((j.issued || []).length) + " certificate(s)" +
+                   ((j.failed || []).length ? "; " + j.failed.length + " failed (" +
+                    j.failed.map(f => f.handle + ": " + (f.detail || f.error || "?")).join("; ") + ")" : "."));
+      await refresh();
+    } catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(null); }
+  };
+
+  const inProject = new Set(
+    [...certMembers, ...uncertified].map(m => m.replace(/^@/, "").toLowerCase()));
+  const addable = groupMembers.filter(
+    m => !inProject.has(String(m).replace(/^@/, "").toLowerCase()));
+
+  const chip = (label, color, bg, title) => (
+    <span title={title} style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:0.5,
+          padding:"1px 5px", borderRadius:2, color, background:bg, marginLeft:4}}>
+      {label}
+    </span>
+  );
+
+  return (
+    <div style={{marginBottom:8, paddingBottom:8, borderBottom:"1px solid var(--rule)"}}>
+      <div style={{display:"flex", alignItems:"center", gap:8, flexWrap:"wrap"}}>
+        <span style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+              textTransform:"uppercase", color:"var(--muted)"}}>members</span>
+        {p.my_cert && p.my_cert !== "none" && chip(
+          "🔑 you: " + p.my_cert, "var(--green)", "rgba(58,138,95,0.10)",
+          "Your machine holds a verified " + p.my_cert + " certificate for this project.")}
+        {certMembers.map(m => {
+          const h = m.replace(/^@/, "");
+          return (
+            <span key={m} className="mono"
+                  style={{fontSize:11, padding:"2px 6px", borderRadius:2,
+                          background:"rgba(79,38,131,0.08)", color:"var(--purple)",
+                          display:"inline-flex", alignItems:"center", gap:4}}>
+              🔑 @{h}{h.toLowerCase() === leadNorm ? " · lead" : ""}
+              {canManage && h.toLowerCase() !== leadNorm && (
+                <button type="button" disabled={busy === h}
+                        onClick={() => removeMember(h)}
+                        title={"Remove @" + h + ": revoke cert + kick from channel"}
+                        style={{background:"none", border:0, cursor:"pointer",
+                                color:"var(--red)", fontSize:13, padding:0, lineHeight:1}}>
+                  {busy === h ? "…" : "×"}
+                </button>
+              )}
+            </span>
+          );
+        })}
+        {uncertified.map(m => {
+          const h = m.replace(/^@/, "");
+          return (
+            <span key={m} className="mono"
+                  style={{fontSize:11, padding:"2px 6px", borderRadius:2,
+                          border:"1px dashed var(--rule-strong)", color:"var(--muted)",
+                          display:"inline-flex", alignItems:"center", gap:4}}
+                  title="On the member list but holds NO project certificate yet.">
+              @{h} · no cert
+              {canManage && (
+                <button type="button" className="btn sm" disabled={busy === h}
+                        onClick={() => addMember(h)}
+                        style={{fontSize:10, padding:"0 5px"}}>
+                  {busy === h ? "…" : "issue"}
+                </button>
+              )}
+            </span>
+          );
+        })}
+        {certMembers.length === 0 && uncertified.length === 0 && (
+          <span className="muted" style={{fontSize:11}}>no certified members yet</span>
+        )}
+        {canManage && uncertified.length > 1 && (
+          <button type="button" className="btn sm" disabled={busy === "__batch__"}
+                  onClick={issueCerts} title="Issue certificates to every uncertified member with a roster key, DM the bundles, and invite them to the channel.">
+            {busy === "__batch__" ? "…" : "issue all (" + uncertified.length + ")"}
+          </button>
+        )}
+        {canManage && (
+          <select value="" disabled={!!busy}
+                  onChange={e => addMember(e.target.value.replace(/^@/, ""))}
+                  style={{fontSize:11, padding:"2px 4px", fontFamily:"var(--mono)",
+                          border:"1px solid var(--rule-strong)", borderRadius:2}}>
+            <option value="">＋ add member…</option>
+            {addable.map(h => <option key={h} value={h}>{h}</option>)}
+          </select>
+        )}
+        {!canManage && (
+          <span className="muted" style={{fontSize:10}}
+                title="Only the project lead (or the PI) controls who joins.">
+            membership controlled by {p.lead || "the lead"}
+          </span>
+        )}
+        {err && <span style={{color:"var(--red)", fontSize:11}}>{err}</span>}
+      </div>
+    </div>
+  );
+}
+
 function ProjectReposBlock({ proj: p, isPI, userParam }) {
   const repos = p.repos || [];
   const [show, setShow] = React.useState(false);
@@ -2018,6 +2201,7 @@ function ProjectDetailRows({ proj: p }) {
 
   return (
     <div>
+      <ProjectMembersBlock proj={p} />
       <ProjectReposBlock proj={p} isPI={isPI} userParam={userParam} />
       {/* Remote — project identity (github OR local bare repo) */}
       <div style={row}>
@@ -2170,77 +2354,48 @@ function SlackSyncButton({ project, userParam }) {
 function ProjectsPanel({ projects, span="c-5" }) {
   const [openProj, setOpenProj] = useState(null);
   const [showNewProj, setShowNewProj] = useState(false);
-  const [showDecom, setShowDecom] = useState(false);
-  const [busyDecom, setBusyDecom] = useState(null);  // project name currently being archived
+  const [busyDecom, setBusyDecom] = useState(null);  // project name currently being deleted
   const persona = window.DATA.persona || "member";
   const isPI = persona === "pi";
-  const archived = window.DATA.archived_projects || [];
   // Pending project-create requests — shown as an approval queue for the PI.
   const pendingCreate = (window.DATA.requests_pending || []).filter(
     r => r.kind === "project-create"
   );
 
-  // Soft-delete a project: POST to /api/project/<name>/archive. The PI is
-  // shown a confirm dialog because the action is reversible but emits a
-  // decommission report — best to opt in deliberately.
-  const archiveProj = async (name) => {
+  // (9) Unified delete: revoke every project certificate (CRL), archive the
+  // private Slack channel, flip registry + CHARTER to archived, write the
+  // decommission report. The project disappears from the dashboard entirely;
+  // recovery is CLI-only.
+  const deleteProj = async (name) => {
     const ok = window.confirm(
-      `Decommission project "${name}"?\n\n` +
+      `Delete project "${name}"?\n\n` +
       "murmurent will:\n" +
-      `  • flip the project's status to "archived" in CHARTER.md\n` +
-      "  • write a decommission report to ~/.murmurent/decommissions/\n\n" +
-      "murmurent will NOT delete any files (working clone, lab-base raw/refined, " +
-      "Slack channel, GitHub repo are all left alone — review the report).\n\n" +
-      "You can unarchive at any time from the Decommissioned section."
+      "  • revoke every member's project certificate (CRL)\n" +
+      "  • archive the project's private Slack channel\n" +
+      "  • drop GitHub collaborator access\n" +
+      "  • archive the record + write a decommission report\n\n" +
+      "NO data files are deleted (working clone, lab-base raw/refined stay " +
+      "put). The project disappears from this dashboard; recovery is " +
+      "CLI-only:\n    murmurent project-unarchive --project " + name + "\n" +
+      "(revoked certificates stay revoked — re-issue after unarchive)."
     );
     if (!ok) return;
     setBusyDecom(name);
     try {
       const r = await fetch(
-        "/api/project/" + encodeURIComponent(name) + "/archive",
+        "/api/project/" + encodeURIComponent(name) + "/delete",
         { method: "POST", headers: { Accept: "application/json" } },
       );
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
-      window.alert("Project '" + name + "' decommissioned.\n\nReport: " + j.report);
+      window.alert("Project '" + name + "' deleted.\n\n" +
+                   (j.revoked || 0) + " certificate(s) revoked." +
+                   (j.report ? "\nReport: " + j.report : ""));
       if (typeof window.__murmurentFetchData === "function") {
         await window.__murmurentFetchData(window.DATA.persona);
       }
     } catch (ex) {
-      window.alert("Archive failed: " + (ex.message || ex));
-    } finally {
-      setBusyDecom(null);
-    }
-  };
-
-  // Remove a cert-project (PI only): revoke every project card via the CRL and
-  // archive the registry record. Distinct from "archive" (CHARTER soft-delete) —
-  // this tears down the certified membership at the identity layer.
-  const certDeleteProj = async (name) => {
-    const ok = window.confirm(
-      `Remove cert-project "${name}"?\n\n` +
-      "murmurent will:\n" +
-      "  • revoke every project card (added to the CRL)\n" +
-      "  • archive the project's registry record\n\n" +
-      "Members lose access when they next hit a fail-closed check. The Slack " +
-      "channel + GitHub repo are left alone (teardown is a later phase)."
-    );
-    if (!ok) return;
-    setBusyDecom(name);
-    try {
-      const r = await fetch(
-        "/api/project/" + encodeURIComponent(name) + "/cert-delete",
-        { method: "POST", headers: { Accept: "application/json" } },
-      );
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
-      window.alert("Cert-project '" + name + "' removed.\n\n" +
-                   (j.revoked || 0) + " card(s) revoked (" + (j.group || name) + ").");
-      if (typeof window.__murmurentFetchData === "function") {
-        await window.__murmurentFetchData(window.DATA.persona);
-      }
-    } catch (ex) {
-      window.alert("Remove failed: " + (ex.message || ex));
+      window.alert("Delete failed: " + (ex.message || ex));
     } finally {
       setBusyDecom(null);
     }
@@ -2304,25 +2459,6 @@ function ProjectsPanel({ projects, span="c-5" }) {
     }
   };
 
-  const unarchiveProj = async (name) => {
-    setBusyDecom(name);
-    try {
-      const r = await fetch(
-        "/api/project/" + encodeURIComponent(name) + "/unarchive",
-        { method: "POST", headers: { Accept: "application/json" } },
-      );
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
-      if (typeof window.__murmurentFetchData === "function") {
-        await window.__murmurentFetchData(window.DATA.persona);
-      }
-    } catch (ex) {
-      window.alert("Unarchive failed: " + (ex.message || ex));
-    } finally {
-      setBusyDecom(null);
-    }
-  };
-
   return (
     <div className={"panel "+span}>
       <header>
@@ -2334,19 +2470,6 @@ function ProjectsPanel({ projects, span="c-5" }) {
               <span> · <strong style={{color:"var(--tiger-deep)"}}>
                 {pendingCreate.length} pending
               </strong></span>
-            )}
-            {archived.length > 0 && (
-              <span> · <button
-                type="button"
-                onClick={() => setShowDecom(s => !s)}
-                style={{
-                  background:"transparent", border:0, padding:0,
-                  color:"var(--muted)", cursor:"pointer",
-                  textDecoration:"underline", fontFamily:"var(--mono)",
-                  fontSize:11, letterSpacing:0.5,
-                }}>
-                {archived.length} decommissioned {showDecom ? "▾" : "▸"}
-              </button></span>
             )}
           </span>
           <button className="btn sm" onClick={() => setShowNewProj(true)}>＋ new project</button>
@@ -2446,17 +2569,15 @@ function ProjectsPanel({ projects, span="c-5" }) {
                       )}
                       <button
                         type="button"
-                        title={p.is_cert
-                          ? "Remove this cert-project: revoke every project card (CRL) and archive the record."
-                          : "Decommission this project (soft delete; reversible). Writes a manual-cleanup report."}
+                        title="Delete this project: revoke all certificates, archive the Slack channel + record, hide from the dashboard. No data files deleted; recovery is CLI-only."
                         disabled={busyDecom === p.name}
-                        onClick={() => p.is_cert ? certDeleteProj(p.name) : archiveProj(p.name)}
+                        onClick={() => deleteProj(p.name)}
                         style={{
                           background:"transparent", border:"1px solid var(--rule-strong)",
                           borderRadius:2, padding:"1px 6px", cursor:"pointer",
                           fontSize:11, color:"var(--red)", fontFamily:"var(--mono)",
                         }}>
-                        {busyDecom === p.name ? "…" : (p.is_cert ? "remove" : "archive")}
+                        {busyDecom === p.name ? "…" : "delete"}
                       </button>
                     </td>
                   )}
@@ -2479,62 +2600,8 @@ function ProjectsPanel({ projects, span="c-5" }) {
             ))}
           </tbody>
         </table>
-        {showDecom && archived.length > 0 && (
-          <div style={{
-            borderTop:"2px dashed var(--rule)",
-            background:"var(--paper-2)",
-            padding:"8px 12px",
-          }}>
-            <div className="mono muted" style={{
-              fontSize:10, letterSpacing:1, textTransform:"uppercase",
-              marginBottom:6,
-            }}>
-              Decommissioned ({archived.length})
-            </div>
-            <table className="dt" style={{background:"transparent"}}>
-              <tbody>
-                {archived.map(p => (
-                  <tr key={p.name}>
-                    <td>
-                      <div style={{fontWeight:500, color:"var(--muted)",
-                                   textDecoration:"line-through"}}>
-                        {p.name}
-                      </div>
-                      <div className="mono" style={{fontSize:11, color:"var(--muted)"}}>
-                        {p.decommissioned_at
-                          ? "decommissioned " + p.decommissioned_at.slice(0, 10)
-                          : "archived"}
-                        {p.decommissioned_by ? " by " + p.decommissioned_by : ""}
-                      </div>
-                    </td>
-                    <td style={{width:90, color:"var(--muted)"}}>
-                      <Pill tone={p.sens==="clinical"?"red":""}>{p.sens}</Pill>
-                    </td>
-                    <td className="mono" style={{fontSize:12, color:"var(--muted)"}}>
-                      {p.lead}
-                    </td>
-                    {isPI && (
-                      <td style={{width:90, textAlign:"right"}}>
-                        <button
-                          type="button"
-                          disabled={busyDecom === p.name}
-                          onClick={() => unarchiveProj(p.name)}
-                          title="Bring this project back to active. No files are touched."
-                          style={{
-                            background:"transparent", border:"1px solid var(--rule-strong)",
-                            borderRadius:2, padding:"1px 6px", cursor:"pointer",
-                            fontSize:11, color:"var(--green)", fontFamily:"var(--mono)",
-                          }}>
-                          {busyDecom === p.name ? "…" : "unarchive"}
-                        </button>
-                      </td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        {/* (9) Deleted projects are hidden entirely — no Decommissioned
+            section. Recovery is CLI-only: murmurent project-unarchive. */}
       </div>
     </div>
   );
@@ -3342,24 +3409,6 @@ async function postRequestAction(id, action, body = {}) {
   }
   return res.json();
 }
-async function postJoinRequest(project, justification) {
-  const params = new URLSearchParams(window.location.search);
-  const userParam = params.get("user");
-  const url = "/api/request/join" + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
-  const res = await fetch(url, {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify({ project, justification }),
-  });
-  if (!res.ok) {
-    let detail = "HTTP " + res.status;
-    try { detail = (await res.json()).detail || detail; } catch (_) {}
-    throw new Error(detail);
-  }
-  return res.json();
-}
-
 async function postCreateProjectRequest(payload) {
   const params = new URLSearchParams(window.location.search);
   const userParam = params.get("user");
@@ -3453,11 +3502,22 @@ function NewProjectModal({ onClose }) {
   };
   const removeMember = (h) => setSelectedMembers(selectedMembers.filter(m => m !== h));
 
+  // (10) Inter-group detection (client-side hint; the server check is
+  // authoritative): any selected member not in this lab's roster is external.
+  const normSet = new Set(groupMembers.map(m => String(m).replace(/^@/, "").toLowerCase()));
+  const externalMembers = selectedMembers.filter(
+    m => !normSet.has(String(m).replace(/^@/, "").toLowerCase()));
+  const [slackWorkspace, setSlackWorkspace] = useState("");
+
   const submit = async (e) => {
     e.preventDefault();
     if (!name.trim()) { setErr("project name is required"); return; }
     if (selectedMembers.length === 0) { setErr("add at least one member"); return; }
     if (selectedMachines.length === 0) { setErr("select at least one machine"); return; }
+    if (externalMembers.length > 0 && !slackWorkspace.trim()) {
+      setErr("members span multiple groups — name the agreed shared Slack workspace");
+      return;
+    }
     setBusy(true); setErr(null);
     try {
       await postCreateProjectRequest({
@@ -3471,6 +3531,7 @@ function NewProjectModal({ onClose }) {
         machines: selectedMachines,
         attach_repos: attachRepos,
         slack_channel_name: slackChannelName.trim() || null,
+        slack_workspace: slackWorkspace.trim() || null,
       });
       if (typeof window.__murmurentFetchData === "function") {
         await window.__murmurentFetchData(window.DATA.persona);
@@ -3560,6 +3621,28 @@ function NewProjectModal({ onClose }) {
                          borderRadius:2, fontFamily:"var(--mono)"}}/>
           <button type="button" className="btn sm" onClick={addFromInput}>add</button>
         </div>
+
+        {/* (10) Inter-group: members from outside this lab require an agreed
+            shared Slack workspace — the project channel + certificate DMs go
+            through it. Server-side validation is authoritative; creation
+            HALTS if the workspace (or its bot token) is missing. */}
+        {externalMembers.length > 0 && (
+          <>
+            <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", color:"var(--tiger-deep)"}}>
+              shared slack workspace (required — inter-group project)
+            </label>
+            <div className="muted" style={{fontSize:11, marginTop:-2, lineHeight:1.5}}>
+              {externalMembers.join(", ")} {externalMembers.length === 1 ? "is" : "are"} not
+              in this lab — the groups must decide on a Slack workspace. Enter the
+              group id whose workspace hosts the project (bot token expected at
+              <code> ~/.config/murmurent/groups/&lt;workspace&gt;/slack-token</code>).
+            </div>
+            <input value={slackWorkspace}
+                   onChange={e => setSlackWorkspace(e.target.value)}
+                   placeholder="e.g. mh  (or a dedicated shared workspace id)"
+                   style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
+          </>
+        )}
 
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>sensitivity</label>
         <select value={sensitivity} onChange={e => setSensitivity(e.target.value)}
@@ -3820,107 +3903,10 @@ function RequestActionRow({ req, isPI }) {
   );
 }
 
-function RequestStatusRow({ req }) {
-  const tone =
-    req.state === "approved" ? "green" :
-    req.state === "declined" ? "red"   : "amber";
-  return (
-    <div style={{padding:"7px 14px", borderBottom:"1px solid var(--rule)"}}>
-      <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline"}}>
-        <span className="mono" style={{fontSize:12}}>
-          #{req.id} · {req.project}
-        </span>
-        <Pill tone={tone}>{req.state}</Pill>
-      </div>
-      <div className="mono muted" style={{fontSize:10, marginTop:2}}>
-        filed {req.created_at || "—"}
-        {req.resolved_at && <span> · resolved {req.resolved_at} by {req.resolved_by}</span>}
-      </div>
-      {req.state === "declined" && req.decline_reason && (
-        <div style={{fontSize:11, color:"var(--red)", marginTop:3}}>
-          {req.decline_reason}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function NewJoinRequestButton() {
-  const [busy, setBusy] = useState(false);
-  const [err, setErr]   = useState(null);
-  const onClick = async () => {
-    const project = window.prompt("Project name to request joining (e.g. dcis_sc_tutorial):");
-    if (!project || !project.trim()) return;
-    const justification = window.prompt(
-      "Why do you want to join this project? (visible to the PI)"
-    ) || "";
-    setBusy(true); setErr(null);
-    try {
-      await postJoinRequest(project.trim(), justification.trim());
-      if (typeof window.__murmurentFetchData === "function") {
-        await window.__murmurentFetchData(window.DATA.persona);
-      }
-    } catch (ex) {
-      setErr(String(ex.message || ex));
-      alert("Request failed: " + (ex.message || ex));
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <button className="btn sm" disabled={busy} onClick={onClick}>
-      {busy ? "…" : "＋ join project"}
-    </button>
-  );
-}
-
-function RequestsPanel({ pending, mine, span="c-6" }) {
-  const persona = window.DATA.persona || "member";
-  const isPI    = persona === "pi";
-  const showQueue = isPI ? (pending || []) : [];
-  // Member view: show only project-join (not project-create) requests in
-  // the Requests panel. project-create requests show up in the PI's queue
-  // and on the Projects panel; members track those via the Projects panel
-  // header chip.
-  const isJoin = (r) => r.kind !== "project-create";
-  const filteredQueue = showQueue.filter(isJoin);
-  const filteredMine  = (mine || []).filter(isJoin);
-
-  const headerLabel = isPI
-    ? `${filteredQueue.length} pending`
-    : `${filteredMine.filter(r => r.state === "pending").length} pending · ${
-        filteredMine.filter(r => r.state !== "pending").length} resolved`;
-
-  return (
-    <div className={"panel "+span}>
-      <header>
-        <h2>Requests · project join</h2>
-        <div className="row" style={{gap:6}}>
-          <span className="meta">{headerLabel}</span>
-          <NewJoinRequestButton />
-        </div>
-      </header>
-      <div className="body" style={{padding:"6px 0"}}>
-        {isPI && filteredQueue.length === 0 && (
-          <div className="muted" style={{padding:"14px", fontSize:13}}>
-            No pending requests. Members will appear here when they ask to join a project.
-          </div>
-        )}
-        {isPI && filteredQueue.map(r => (
-          <RequestActionRow key={r.id} req={r} isPI={true} />
-        ))}
-        {!isPI && filteredMine.length === 0 && (
-          <div className="muted" style={{padding:"14px", fontSize:13}}>
-            You haven't filed any join requests. Click <code>＋ join project</code> above.
-          </div>
-        )}
-        {!isPI && filteredMine.map(r => (
-          <RequestStatusRow key={r.id} req={r} />
-        ))}
-      </div>
-    </div>
-  );
-}
+/* (11) The standalone "Requests · project join" window is gone: project
+   membership is now lead-controlled (certificates issued from the project's
+   Members section), not request-to-join. Project-CREATE approvals still live
+   in the ProjectsPanel queue (RequestActionRow). */
 
 /* ───────── SEA catalog (we offer) ───────── */
 async function postCatalogUpsert(body) {
@@ -5289,223 +5275,10 @@ function CentreProjectsPanel({ span="c-12" }) {
   );
 }
 
-/* ───────── Collaborations (item #9: PI proposes; registrar approves) ─────────
-   PIs use this panel to request a new cross-lab collaboration; the
-   registrar's dashboard has the matching approve/decline UI. Members
-   see only collabs they're a party to (read-only). The registry of
-   live collaborations isn't shown here — only the request lifecycle —
-   because the day-to-day work of a collab lives in the collab's own
-   projects/oracle, which surface elsewhere. */
-
-function CollaborationsPanel({ span="c-12" }) {
-  const persona = window.DATA.persona || "member";
-  const isPI = persona === "pi";
-  const m = window.DATA.member || {};
-  const myHandle = (m.handle || "").toLowerCase();
-  const [rows, setRows] = useState(null);     // null = loading; [] = empty
-  const [showPropose, setShowPropose] = useState(false);
-
-  const refresh = async () => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const userParam = params.get("user") || myHandle;
-      const r = await fetch(
-        "/api/collaboration/requests?user=" + encodeURIComponent(userParam),
-        { headers: { Accept: "application/json" } },
-      );
-      const j = await r.json();
-      setRows(j.requests || []);
-    } catch (_) { setRows([]); }
-  };
-  useEffect(() => { refresh(); }, []);
-
-  const pending  = (rows || []).filter(r => r.state === "pending");
-  const recent   = (rows || []).filter(r => r.state !== "pending").slice(0, 5);
-
-  return (
-    <div className={"panel " + span}>
-      <header>
-        <h2>Collaborations</h2>
-        <div className="row" style={{gap:6}}>
-          <span className="meta">
-            {pending.length} pending
-            {recent.length > 0 && <span> · {recent.length} recent</span>}
-          </span>
-          {isPI && (
-            <button className="btn sm" onClick={() => setShowPropose(true)}>
-              ＋ propose collaboration
-            </button>
-          )}
-        </div>
-      </header>
-      {showPropose && (
-        <ProposeCollaborationModal onClose={() => setShowPropose(false)} onFiled={refresh} />
-      )}
-      <div className="body" style={{padding:0}}>
-        {rows === null ? (
-          <div style={{padding:"14px 18px", color:"var(--muted)", fontSize:12}}>loading…</div>
-        ) : rows.length === 0 ? (
-          <div style={{padding:"14px 18px", color:"var(--muted)", fontSize:12}}>
-            No collaboration requests yet.
-            {isPI && " Use “propose collaboration” to file the first one."}
-          </div>
-        ) : (
-          <table className="dt">
-            <thead><tr>
-              <th>name</th>
-              <th style={{width:100}}>state</th>
-              <th>groups</th>
-              <th>PIs</th>
-              <th style={{width:110}}>filed</th>
-            </tr></thead>
-            <tbody>
-              {pending.concat(recent).map(r => (
-                <tr key={r.id}>
-                  <td>
-                    <strong>{r.proposed_name}</strong>
-                    <div className="mono muted" style={{fontSize:11}}>
-                      #{r.id} · by {r.requester}
-                    </div>
-                  </td>
-                  <td>
-                    <Pill tone={
-                      r.state === "approved" ? "green"
-                      : r.state === "declined" ? "red"
-                      : ""
-                    }>{r.state}</Pill>
-                  </td>
-                  <td className="mono" style={{fontSize:12}}>
-                    {(r.proposed_groups || []).join(" + ")}
-                  </td>
-                  <td className="mono" style={{fontSize:12}}>
-                    {(r.proposed_pis || []).join(", ")}
-                  </td>
-                  <td className="muted" style={{fontSize:11}}>
-                    {r.created_at ? r.created_at.slice(0,10) : ""}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ProposeCollaborationModal({ onClose, onFiled }) {
-  const [form, setForm] = useState({
-    proposed_name: "",
-    partner_groups: "",     // comma-separated; viewer's lab pre-appended on submit
-    partner_pis: "",        // comma-separated handles
-    justification: "",
-  });
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(null);
-  const m = window.DATA.member || {};
-  const myLab = (window.DATA.lab_settings || {}).name || "";
-
-  const update = (k) => (e) => setForm(p => ({...p, [k]: e.target.value}));
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true); setErr(null);
-    try {
-      const partnerGroups = form.partner_groups
-        .split(",").map(s => s.trim().toLowerCase()).filter(Boolean);
-      const partnerPis = form.partner_pis
-        .split(",").map(s => s.trim()).filter(Boolean)
-        .map(s => s.startsWith("@") ? s : "@" + s);
-      // Include the viewer's own lab + PI handle so the registrar sees the
-      // full group/PI set. The viewer is always a partner — they're the proposer.
-      const myGroupSlug = String(myLab).toLowerCase().replace(/\s+lab$/i, "");
-      const groups = Array.from(new Set([myGroupSlug, ...partnerGroups])).filter(Boolean);
-      const pis = Array.from(new Set(["@" + (m.handle || ""), ...partnerPis])).filter(s => s !== "@");
-
-      const params = new URLSearchParams(window.location.search);
-      const userParam = params.get("user") || m.handle;
-      const r = await fetch("/api/collaboration/propose?user=" + encodeURIComponent(userParam), {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          proposed_name: form.proposed_name.trim().toLowerCase(),
-          proposed_groups: groups,
-          proposed_pis: pis,
-          proposed_member_subset: {},  // registrar can fill via edit flow
-          justification: form.justification.trim(),
-        }),
-      });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
-      if (onFiled) await onFiled();
-      onClose();
-    } catch (ex) {
-      setErr(String(ex.message || ex));
-    } finally { setBusy(false); }
-  };
-
-  const lbl = { fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
-                textTransform:"uppercase", color:"var(--muted)", marginTop:8, marginBottom:2 };
-  const inp = { padding:"5px 8px", border:"1px solid var(--rule-strong)", borderRadius:2,
-                fontFamily:"var(--mono)", fontSize:12, width:"100%", boxSizing:"border-box" };
-
-  return (
-    <div onClick={onClose} style={{
-      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
-      display:"flex", alignItems:"flex-start", justifyContent:"center",
-      zIndex:200, padding:"40px 20px", overflowY:"auto",
-    }}>
-      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
-        background:"var(--card)", border:"1px solid var(--rule-strong)",
-        borderRadius:2, padding:18, width:"min(560px, 96vw)",
-      }}>
-        <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
-          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
-            Propose a collaboration
-          </h2>
-          <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
-        </div>
-        <p className="muted" style={{fontSize:12, margin:"4px 0 10px"}}>
-          Files a request to the registrar. Your lab is included automatically;
-          list the partner labs + their PIs. The registrar can adjust the
-          member subset before approving.
-        </p>
-
-        <div style={lbl}>short ID (snake_case)</div>
-        <input style={inp} value={form.proposed_name}
-               onChange={update("proposed_name")}
-               placeholder="e.g. dcis_imaging" required />
-
-        <div style={lbl}>partner lab IDs (comma-separated)</div>
-        <input style={inp} value={form.partner_groups}
-               onChange={update("partner_groups")}
-               placeholder="e.g. core_lead, imaging_core" required />
-        <div style={{fontSize:11, color:"var(--muted)", marginTop:2}}>
-          Your own lab (<code>{myLab}</code>) is added automatically.
-        </div>
-
-        <div style={lbl}>partner PIs (comma-separated handles)</div>
-        <input style={inp} value={form.partner_pis}
-               onChange={update("partner_pis")}
-               placeholder="e.g. @core_lead, @dlee" required />
-
-        <div style={lbl}>justification (optional)</div>
-        <textarea style={{...inp, minHeight:60, resize:"vertical"}}
-                  value={form.justification}
-                  onChange={update("justification")}
-                  placeholder="What is the collaboration for?" />
-
-        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:14, alignItems:"baseline"}}>
-          {err && <span style={{color:"var(--red)", fontSize:11, marginRight:"auto"}}>{err}</span>}
-          <button type="button" className="btn sm ghost" onClick={onClose}>cancel</button>
-          <button type="submit" className="btn sm primary" disabled={busy}>
-            {busy ? "…" : "file request"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
+/* (12) The Collaborations window is gone: inter-group work is now plain
+   projects whose members span groups (with an agreed shared Slack
+   workspace enforced at creation). The registrar dashboard keeps its own
+   collaboration-registry UI.  */
 
 /* ───────── DecommissionsPanel — browse past soft-deletes ─────────
    The dashboard's "where did X go?" panel. Lists every decommission
@@ -8317,24 +8090,15 @@ function App() {
           <MachinesPanel span="c-5" />
         </div>
 
-        {/* Daily action zone (order: Requests → Receptionist → All SEAs). */}
-        <div className="grid" style={{marginBottom:14}}>
-          <RequestsPanel
-            pending={D.requests_pending}
-            mine={D.requests_mine}
-            span="c-12"
-          />
-        </div>
-
+        {/* Daily action zone (Receptionist → All SEAs). Project-join requests
+            and the Collaborations window are gone — membership is
+            lead-controlled via certificates (project → Members), and
+            inter-group work is just a project spanning groups. */}
         {persona === "pi" && (
           <div className="grid" style={{marginBottom:14}}>
             <ReceptionistPanel inbound={D.inbound_requests} span="c-12" />
           </div>
         )}
-
-        <div className="grid" style={{marginBottom:14}}>
-          <CollaborationsPanel span="c-12" />
-        </div>
 
         <div className="grid" style={{marginBottom:14}}>
           <SeasPanel seas={D.seas} span="c-12" />
