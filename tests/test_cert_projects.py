@@ -218,3 +218,41 @@ def test_backfill_from_charter(monkeypatch, tmp_path):
     # idempotent: a second run doesn't duplicate members
     CP.backfill_from_charter()
     assert list(CP.get("dcis_sc").members).count("@allie") == 1
+
+
+def test_remove_member_drops_member_and_cert():
+    CP.upsert("p", lab="lab_mh", lead="@allie", member="@allie",
+              cert={"fingerprint": "fa", "card_id": "cA"})
+    CP.upsert("p", lab="lab_mh", member="@bob",
+              cert={"fingerprint": "fb", "card_id": "cB"})
+    out = CP.remove_member("p", "bob")
+    assert out.members == ("@allie",)
+    assert {c["handle"] for c in out.certs} == {"@allie"}
+    # metadata untouched
+    assert out.lead == "@allie" and out.status == "active"
+
+
+def test_remove_member_refuses_the_lead():
+    CP.upsert("p", lab="lab_mh", lead="@allie", member="@allie",
+              cert={"fingerprint": "fa", "card_id": "cA"})
+    with pytest.raises(CP.CertProjectError, match="lead"):
+        CP.remove_member("p", "@allie")
+
+
+def test_remove_member_requires_project():
+    with pytest.raises(CP.CertProjectError, match="no cert-project"):
+        CP.remove_member("ghost", "@allie")
+
+
+def test_slack_workspace_round_trips():
+    CP.upsert("p", lab="lab_mh", slack_workspace="shared_ws")
+    assert CP.get("p").slack_workspace == "shared_ws"
+    # metadata-free membership upsert keeps it
+    CP.upsert("p", lab="lab_mh", member="@allie",
+              cert={"fingerprint": "fa", "card_id": "cA"})
+    p = CP.get("p")
+    assert p.slack_workspace == "shared_ws"
+    assert p.to_dict()["slack_workspace"] == "shared_ws"
+    # empty default when never set
+    CP.upsert("q", lab="lab_mh")
+    assert CP.get("q").slack_workspace == ""

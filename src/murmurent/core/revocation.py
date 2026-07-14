@@ -81,19 +81,24 @@ def _save(p: Path, obj) -> None:
 
 def record_issued(centre: str, *, handle: str, card_id: str,
                   fingerprint: str, kind: str,
-                  issued_at: str = "", valid_until: str = "") -> None:
+                  issued_at: str = "", valid_until: str = "",
+                  pubkey: str = "") -> None:
     """Record an issued card so it can later be revoked by handle, and so a
     member-validity audit can tell "issued? / expired?" from the PI's own
     machine. Best-effort; called from the issuer's machine at issuance time.
     ``issued_at`` / ``valid_until`` are the card's own ISO timestamps (added
     2026-07; older ledger entries omit them → the audit treats expiry as
-    unknown for those rather than flagging them)."""
+    unknown for those rather than flagging them). ``pubkey`` is the attested
+    subject key (secondary source for one-click project issuance when the
+    roster file is unavailable)."""
     led = _load(_ledger_path(centre), {})
     entry = {"card_id": card_id, "fingerprint": fingerprint, "kind": kind}
     if issued_at:
         entry["issued_at"] = issued_at
     if valid_until:
         entry["valid_until"] = valid_until
+    if pubkey:
+        entry["pubkey"] = pubkey
     led[_norm(handle)] = entry
     _save(_ledger_path(centre), led)
 
@@ -120,11 +125,17 @@ def _project_ledger_path(centre: str, group: str) -> Path:
 
 
 def record_project_issued(centre: str, group: str, *, handle: str,
-                          card_id: str, fingerprint: str) -> None:
-    """Record a project-scoped card so :func:`revoke_project` can find it."""
+                          card_id: str, fingerprint: str,
+                          kind: str = "project_member") -> None:
+    """Record a project-scoped card so :func:`revoke_project` can find it.
+
+    ``kind`` distinguishes the lead's delegation card (``"project_lead"``)
+    from member project cards — both live in the same per-project ledger so
+    :func:`revoke_project` revokes the whole chain in one serial bump."""
     p = _project_ledger_path(centre, group)
     led = _load(p, {})
-    led[_norm(handle)] = {"card_id": card_id, "fingerprint": fingerprint}
+    led[_norm(handle)] = {"card_id": card_id, "fingerprint": fingerprint,
+                          "kind": kind}
     _save(p, led)
 
 
@@ -218,6 +229,23 @@ def revoke_member(centre: str, handle: str) -> dict:
                   fingerprint=rec.get("fingerprint") or None)
 
 
+def revoke_with_local_key(centre: str, *, card_id: str | None = None,
+                          fingerprint: str | None = None) -> dict:
+    """Like :func:`revoke` but signs with whatever CRL-signing key this machine
+    holds (centre root for the mayor, the machine's own identity key for a
+    standalone PI — see :func:`_crl_signing_priv`). Used by per-member project
+    removal, where the actor is a PI/lead, not the mayor."""
+    priv = _crl_signing_priv()
+    if priv is None:
+        raise RevocationError(
+            "no signing key on this machine (need the centre root key or your PI key)")
+    ids = [i for i in (card_id, fingerprint) if i]
+    if not ids:
+        raise RevocationError("nothing to revoke (need card_id or fingerprint)")
+    _add(centre, ids)
+    return publish(centre, signing_priv=priv)
+
+
 def revoke_project(centre: str, group: str) -> dict:
     """Revoke EVERY card issued for project ``group`` (``<lab>/<project>``): union
     all their ids + fingerprints into the CRL in a single serial bump, then
@@ -262,7 +290,9 @@ def import_distributed_crl(centre: str, crl) -> None:
 
 
 __all__ = [
-    "RevocationError", "record_issued", "lookup_issued", "revoked_ids",
-    "revoke", "revoke_member", "publish", "build_fresh_crl", "current_crl",
+    "RevocationError", "record_issued", "lookup_issued", "issued_ledger",
+    "record_project_issued", "project_ledger", "revoked_ids",
+    "revoke", "revoke_member", "revoke_project", "revoke_with_local_key",
+    "publish", "build_fresh_crl", "current_crl",
     "import_distributed_crl",
 ]
