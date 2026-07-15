@@ -538,9 +538,30 @@ def create_app() -> FastAPI:
     """Build the FastAPI application."""
     app = FastAPI(
         title="murmurent dashboard",
-        description="Hi-fi Hallett Lab dashboard — Western University.",
+        description="Hi-fi murmurent group dashboard.",
         version="0.1.0",
     )
+
+    # Version-skew guard: the dashboard serves its JSX fresh from disk, so
+    # after a `git pull` the BROWSER can be newer than the PYTHON process
+    # and call API routes this server doesn't have yet. The stock 404 body
+    # ("Not Found") then surfaces in panels looking like a data error
+    # (issue #19: "add member ... responds with 'not found'"). Rewrite the
+    # bare route-miss 404 on /api/ paths to say what to actually do.
+    # Endpoint-raised 404s carry their own detail and pass through as-is.
+    from starlette.exceptions import HTTPException as _StarletteHTTPException
+
+    @app.exception_handler(_StarletteHTTPException)
+    async def _http_exc_with_skew_hint(request: Request, exc: _StarletteHTTPException):
+        detail = exc.detail
+        if (exc.status_code == 404 and detail == "Not Found"
+                and request.url.path.startswith("/api/")):
+            detail = (
+                "this dashboard server has no such endpoint — murmurent was "
+                "probably updated after the dashboard started. Restart it "
+                "(`murmurent dashboard --hifi`) and reload the page.")
+        return JSONResponse({"detail": detail}, status_code=exc.status_code,
+                            headers=getattr(exc, "headers", None) or None)
 
     # Opt-in session auth (see dashboard/auth.py). When a dashboard secret
     # is configured, every mutating request must carry a valid signed

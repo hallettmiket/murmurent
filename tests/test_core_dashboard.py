@@ -257,3 +257,19 @@ def test_core_pi_dashboard_is_the_core_dashboard(world):
     # A handle that leads no core gets the ordinary lab UI.
     res = client.get("/dashboard?user=random_member", follow_redirects=False)
     assert res.status_code == 200
+
+
+def test_api_route_miss_404_explains_version_skew(world):
+    """Issue #19: a browser newer than the server process (JSX is read
+    fresh from disk, Python routes are not) hits routes that don't exist
+    and got a bare "Not Found". The rewritten detail says to restart.
+    Endpoint-raised 404s keep their own detail; non-API misses are
+    untouched."""
+    client = TestClient(create_app())
+    res = client.get("/api/definitely/not/a/route")
+    assert res.status_code == 404
+    assert "restart" in res.json()["detail"].lower()
+    # An endpoint's own 404 detail passes through unchanged.
+    res = client.get("/api/core/dashboard?core=ghost_core")
+    assert res.status_code == 404
+    assert "restart" not in res.json()["detail"].lower()
