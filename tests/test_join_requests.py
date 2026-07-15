@@ -412,7 +412,7 @@ def test_send_group_dm_with_file_uploads_instead_of_posting(monkeypatch):
     def fake_upload(channel, *, filename, content, title="", initial_comment="", token=None):
         calls.update(channel=channel, filename=filename, content=content,
                      initial_comment=initial_comment, token=token)
-        return True
+        return SN.SlackUploadResult(True)
     monkeypatch.setattr(SN, "_upload_file", fake_upload)
     ok, detail = GR.send_group_dm("dcis", text="download & import", slack_user_id="U777",
                                    token="xoxb-x", file_content='{"member_card": 1}')
@@ -431,7 +431,8 @@ def test_send_group_dm_file_upload_missing_scope_degrades_to_text(monkeypatch):
     from murmurent.dashboard import slack_notify as SN
     posted = {}
     monkeypatch.setattr(SN, "_open_dm", lambda uid, tok: "D999")
-    monkeypatch.setattr(SN, "_upload_file", lambda *a, **k: False)
+    monkeypatch.setattr(SN, "_upload_file", lambda *a, **k: SN.SlackUploadResult(
+        False, step="getUploadURLExternal", error="missing_scope"))
     monkeypatch.setattr(
         SN, "_post",
         lambda channel, text, **kw: (posted.update(channel=channel, text=text), True)[1])
@@ -450,7 +451,8 @@ def test_send_group_dm_file_upload_and_text_both_fail(monkeypatch):
     from murmurent.core import group_reconcile as GR
     from murmurent.dashboard import slack_notify as SN
     monkeypatch.setattr(SN, "_open_dm", lambda uid, tok: "D999")
-    monkeypatch.setattr(SN, "_upload_file", lambda *a, **k: False)
+    monkeypatch.setattr(SN, "_upload_file", lambda *a, **k: SN.SlackUploadResult(
+        False, step="upload_post", error="http_503"))
     monkeypatch.setattr(SN, "_post", lambda *a, **k: False)
     ok, detail = GR.send_group_dm("dcis", text="hi", slack_user_id="U777",
                                    token="xoxb-x", file_content="{}")
@@ -484,7 +486,8 @@ def test_slack_upload_file_three_step_flow(monkeypatch):
     monkeypatch.setattr("httpx.post", fake_post)
     ok = SN._upload_file("D999", filename="bundle.json", content="hello",
                          initial_comment="import me", token="xoxb-x")
-    assert ok is True
+    assert ok            # truthy result — legacy callers unaffected
+    assert ok.ok is True and ok.error == ""
     assert seen["reserve_params"] == {"filename": "bundle.json", "length": "5"}
     assert seen["uploaded_bytes"] == b"hello"
     assert seen["complete_payload"]["channel_id"] == "D999"
@@ -492,13 +495,20 @@ def test_slack_upload_file_three_step_flow(monkeypatch):
     assert seen["complete_payload"]["initial_comment"] == "import me"
 
 
-def test_slack_upload_file_missing_scope_returns_false(monkeypatch):
+def test_slack_upload_file_missing_scope_reports_step_and_error(monkeypatch):
+    """#22: the bare-bool return hid WHICH step failed and WHY. The result
+    now carries both, and the PI-facing hint names the concrete fix."""
     from murmurent.dashboard import slack_notify as SN
     from unittest.mock import MagicMock
     m = MagicMock()
     m.json.return_value = {"ok": False, "error": "missing_scope"}
     monkeypatch.setattr("httpx.get", lambda url, **kw: m)
-    assert SN._upload_file("D999", filename="b.json", content="x", token="xoxb-x") is False
+    res = SN._upload_file("D999", filename="b.json", content="x", token="xoxb-x")
+    assert not res                                   # falsy — legacy contract
+    assert res.step == "getUploadURLExternal" and res.error == "missing_scope"
+    hint = SN.upload_error_hint(res)
+    assert "files.getUploadURLExternal" in hint and "missing_scope" in hint
+    assert "reinstall" in hint                       # the actual fix, spelled out
 
 
 def test_resolve_group_slack_user_id_happy_path(monkeypatch):

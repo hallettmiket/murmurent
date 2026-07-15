@@ -418,9 +418,62 @@ def _post(channel: str, text: str, *, token: str | None = None) -> bool:
         return False
 
 
+@dataclass
+class SlackUploadResult:
+    """Outcome of a Slack external-file upload.
+
+    On failure, ``step`` names *which* of the three upload stages failed
+    (``getUploadURLExternal`` / ``upload_post`` / ``completeUploadExternal``,
+    or ``token`` / ``transport``) and ``error`` carries the Slack error code
+    (or an ``http_<status>`` / exception string). This is what lets the caller
+    tell the PI *why* the attachment didn't go (e.g. "missing_scope at
+    files.getUploadURLExternal — reinstall the app") instead of always guessing
+    "probably a missing scope."
+
+    Defines ``__bool__`` so legacy truthiness checks (``if _upload_file(...):``)
+    keep working — an ``ok`` result is truthy, a failure is falsy.
+    """
+    ok: bool
+    step: str = ""
+    error: str = ""
+
+    def __bool__(self) -> bool:
+        return self.ok
+
+
+def upload_error_hint(result: "SlackUploadResult") -> str:
+    """Render a :class:`SlackUploadResult` failure as a mayor/PI-readable one-liner.
+
+    Names the failing step + Slack error code, and appends the concrete fix for
+    the common cases (``missing_scope`` → reinstall; ``not_in_channel`` → invite
+    the bot). Callers thread this into the DM fallback detail so the PI sees the
+    real reason the bundle arrived as text.
+    """
+    if result.ok:
+        return "upload succeeded"
+    step_label = {
+        "getUploadURLExternal": "files.getUploadURLExternal",
+        "upload_post": "the upload POST",
+        "completeUploadExternal": "files.completeUploadExternal",
+        "token": "token resolution",
+        "transport": "the network call",
+    }.get(result.step, result.step or "the upload")
+    err = result.error or "unknown"
+    base = f"upload failed at {step_label}: {err}"
+    if err == "missing_scope":
+        return (f"{base} — add files:write to the group bot and reinstall the "
+                "app to the workspace (adding the scope in the app config does "
+                "NOT grant it to an already-issued token)")
+    if err == "not_in_channel":
+        return f"{base} — invite the bot to that conversation, then retry"
+    if err == "no_token":
+        return f"{base} — set the group's Slack bot token first"
+    return base
+
+
 def _upload_file(channel: str, *, filename: str, content: str,
                  title: str = "", initial_comment: str = "",
-                 token: str | None = None) -> bool:
+                 token: str | None = None) -> SlackUploadResult:
     """Upload ``content`` to ``channel`` as a real, downloadable file attachment.
 
     Uses Slack's current three-step external-upload flow
@@ -430,13 +483,16 @@ def _upload_file(channel: str, *, filename: str, content: str,
     the message text next to the file, so callers can attach a bundle *and* the
     import instructions in one DM.
 
-    Like :func:`_post`, this is fire-and-forget: any failure (missing scope,
-    Slack outage) returns False so card issuance can fall back to manual
-    delivery — it never raises.
+    Like :func:`_post`, this never raises: any failure (missing scope, Slack
+    outage) is caught and reported, so card issuance can fall back to manual
+    delivery. Returns a :class:`SlackUploadResult` — truthy on success, and on
+    failure carrying the failing ``step`` + Slack ``error`` code so the caller
+    can tell the PI exactly what to fix (a bare bool couldn't say *why*). The
+    result stays truthy/falsy so ``if _upload_file(...):`` callers are unaffected.
     """
     tok = token if token is not None else _token()
     if not tok:
-        return False
+        return SlackUploadResult(False, step="token", error="no_token")
     channel = _route(channel)
     # A bare user id → open the real DM channel so the file lands in the
     # recipient's Direct Messages, not the bot's App-messages tab.
@@ -454,19 +510,25 @@ def _upload_file(channel: str, *, filename: str, content: str,
             timeout=5,
         ).json()
         if not reserved.get("ok"):
+            err = reserved.get("error") or "unknown"
             log.warning("files.getUploadURLExternal failed: %s (add the files:write scope?)",
-                        reserved.get("error"))
-            return False
+                        err)
+            return SlackUploadResult(False, step="getUploadURLExternal", error=err)
         upload_url = reserved.get("upload_url")
         file_id = reserved.get("file_id")
         if not (upload_url and file_id):
-            return False
+            return SlackUploadResult(False, step="getUploadURLExternal",
+                                     error="no_upload_url")
 
         # 2. POST the raw bytes to the returned upload URL (no bot token here).
+        #    Verified against the live Slack endpoint (2026-07-15): a raw body
+        #    via ``content=`` is accepted — it returns HTTP 200 "OK - <bytes>".
+        #    Multipart is NOT required here.
         put = httpx.post(upload_url, content=data, timeout=10)
         if put.status_code != 200:
             log.warning("Slack file upload POST returned HTTP %s", put.status_code)
-            return False
+            return SlackUploadResult(False, step="upload_post",
+                                     error=f"http_{put.status_code}")
 
         # 3. Complete the upload and share it into the channel/DM.
         payload: dict = {
@@ -482,13 +544,13 @@ def _upload_file(channel: str, *, filename: str, content: str,
             timeout=5,
         ).json()
         if not done.get("ok"):
-            log.warning("files.completeUploadExternal to %s failed: %s",
-                        channel, done.get("error"))
-            return False
-        return True
+            err = done.get("error") or "unknown"
+            log.warning("files.completeUploadExternal to %s failed: %s", channel, err)
+            return SlackUploadResult(False, step="completeUploadExternal", error=err)
+        return SlackUploadResult(True)
     except Exception as exc:  # noqa: BLE001
         log.warning("Slack file upload error: %s", exc)
-        return False
+        return SlackUploadResult(False, step="transport", error=str(exc)[:120])
 
 
 @dataclass
