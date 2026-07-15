@@ -1131,6 +1131,27 @@ def project_whoami_cmd(project: str) -> None:
             click.echo(f"✗ {proj} — {v.reason}")
 
 
+@click.command("project-repair-lead",
+                help="PI: repair a LEGACY project (created before the lead-card "
+                     "machinery) that fails member-add with 'no lead card for "
+                     "project …'. Re-issues the PI's self-delegation so one-click "
+                     "adds work again. No revocations; safe to re-run.")
+@click.argument("project")
+@click.option("--lab", default="", help="Lab that owns the project "
+              "(default: the sole lab you lead).")
+def project_repair_lead_cmd(project: str, lab: str) -> None:
+    from ..core import issuance as _iss
+    try:
+        out = _iss.repair_project_lead(project, lab=lab or None)
+    except _iss.IssuanceError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if out.get("already_present"):
+        click.echo(f"✓ {out['group']} — lead card already present; nothing to repair.")
+    else:
+        click.echo(f"✓ {out['group']} — re-issued the PI self-delegation. "
+                   "Member adds (dashboard ＋Add / issue-certs) work again.")
+
+
 @click.command("project-unarchive",
                 help="PI: bring a deleted/archived project back. Flips the "
                      "registry (and CHARTER, when present) to active. Revoked "

@@ -637,6 +637,83 @@ def _find_lead_bundle(project: str, *, lab: str | None = None) -> tuple[str, str
         "(`murmurent import-card <bundle.json>`)")
 
 
+def _try_self_heal_lead_bundle(project: str, *, lab: str | None = None,
+                               env: dict | None = None) -> tuple[str, str, dict] | None:
+    """Reconstruct the missing PI==lead self-delegation bundle for a *legacy*
+    project — one created before ``issue_project_lead_card`` stored that bundle
+    at creation time (issue #19).
+
+    Eligible only when THIS machine is the PI who leads the project's lab AND the
+    project's recorded lead is that PI (or unset). In that case the PI is simply
+    re-issuing a self-delegation they were always entitled to sign — no new
+    trust is minted, nothing is revoked. Returns ``(centre, group, bundle)`` on
+    success, or ``None`` when this machine isn't eligible (e.g. a non-PI lead
+    whose bundle genuinely needs importing, or a project delegated to someone
+    else) so the caller re-raises the original, correct error."""
+    try:
+        _centre, led = _leader_groups(env)
+        this_lab = _resolve_project_lab(led, project, lab)
+    except IssuanceError:
+        return None                       # this machine leads no matching lab
+    local = _ic.local_card(env=env) or {}
+    pi_handle = str(local.get("netname") or "").lstrip("@")
+    if not pi_handle:
+        return None
+    # Only self-heal a self-delegation project: a project delegated to a
+    # DIFFERENT lead must have THAT lead import their bundle — silently
+    # re-delegating it to the PI would change who the lead is.
+    try:
+        from . import cert_projects as _cp
+        rec = _cp.get(_norm_project(project), env=env)
+    except Exception:  # noqa: BLE001
+        rec = None
+    recorded_lead = str(getattr(rec, "lead", "") or "").lstrip("@").lower()
+    if recorded_lead and recorded_lead != pi_handle.lower():
+        return None
+    # Re-issue the PI's self-delegation; its tail stores the bundle locally.
+    issue_project_lead_card(f"@{pi_handle}", project=project, lab=this_lab, env=env)
+    return _find_lead_bundle(project, lab=lab)
+
+
+def _ensure_lead_bundle(project: str, *, lab: str | None = None,
+                        env: dict | None = None) -> tuple[str, str, dict]:
+    """Locate this machine's lead bundle for ``project``, self-healing the
+    legacy PI==lead gap (issue #19) when eligible. Falls back to the original
+    "import your lead bundle" error otherwise."""
+    try:
+        return _find_lead_bundle(project, lab=lab)
+    except IssuanceError:
+        healed = _try_self_heal_lead_bundle(project, lab=lab, env=env)
+        if healed is not None:
+            return healed
+        raise
+
+
+def repair_project_lead(project: str, *, lab: str | None = None,
+                        env: dict | None = None) -> dict:
+    """PI-facing repair for the issue #19 legacy gap: if this machine already
+    holds the project's lead bundle nothing happens; otherwise reconstruct the
+    PI==lead self-delegation so one-click member adds work again. Raises
+    :class:`IssuanceError` if this machine isn't eligible to self-heal (not the
+    PI of the project's lab, or the project is delegated to a different lead)."""
+    try:
+        centre, group, _bundle = _find_lead_bundle(project, lab=lab)
+        return {"repaired": False, "already_present": True,
+                "centre": centre, "group": group}
+    except IssuanceError:
+        pass
+    healed = _try_self_heal_lead_bundle(project, lab=lab, env=env)
+    if healed is None:
+        raise IssuanceError(
+            f"cannot repair project '{_norm_project(project)}' on this machine — "
+            "run this on the PI's machine (the PI must lead the project's lab, and "
+            "the project's lead must be that PI). A project delegated to a "
+            "different lead is fixed by having THAT lead import their bundle.")
+    centre, group, _bundle = healed
+    return {"repaired": True, "already_present": False,
+            "centre": centre, "group": group}
+
+
 def _issue_leaf_as_lead(handle: str, pubkey: str, *, centre: str, group: str,
                         bundle: dict, env: dict | None = None, issued_at=None,
                         ttl_days: int = _cert.DEFAULT_TTL_DAYS) -> dict:
@@ -683,7 +760,7 @@ def issue_project_card_from_roster(handle: str, *, project: str,
     proof-of-possession ceremony. Raises :class:`NoRecordedKey` when the roster
     has no key for them (pre-pubkey-recording members, external members) —
     callers fall back to :func:`issue_project_card_pop`."""
-    centre, group, bundle = _find_lead_bundle(project, lab=lab)
+    centre, group, bundle = _ensure_lead_bundle(project, lab=lab, env=env)
     pubkey = _roster_pubkey(handle)
     return _issue_leaf_as_lead(handle, pubkey, centre=centre, group=group,
                                bundle=bundle, env=env, issued_at=issued_at,
@@ -704,7 +781,7 @@ def issue_project_card_pop(handle: str, *, enrollment: dict, project: str,
         raise IssuanceError("enrollment request has no public key")
     if not _cert.verify_enrollment(enrollment, expected_nonce=expected_nonce):
         raise IssuanceError("proof-of-possession failed (bad enrollment signature/nonce)")
-    centre, group, bundle = _find_lead_bundle(project, lab=lab)
+    centre, group, bundle = _ensure_lead_bundle(project, lab=lab, env=env)
     out = _issue_leaf_as_lead(handle, pubkey, centre=centre, group=group,
                               bundle=bundle, env=env, issued_at=issued_at,
                               ttl_days=ttl_days)
@@ -1020,6 +1097,6 @@ __all__ = [
     "verify_and_import_member_card", "verify_local_identity", "cards_dir",
     "issue_project_lead_card", "issue_project_card_from_roster",
     "issue_project_card_pop", "verify_and_import_project_card",
-    "verify_project_membership", "delete_project",
+    "verify_project_membership", "delete_project", "repair_project_lead",
     "project_group", "project_context",
 ]

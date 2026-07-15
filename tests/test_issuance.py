@@ -592,6 +592,61 @@ def test_pop_fallback_records_pubkey_for_next_time(monkeypatch, tmp_path):
     assert ISS.issue_project_card_from_roster("@bob", project="proj_two")["project_card"]
 
 
+# ---- legacy PI==lead self-heal (issue #19) ----------------------------------
+
+def _legacy_pi_lead_project(monkeypatch, tmp_path, project="dcis_17"):
+    """A project as a PRE-lead-card-machinery project would look on the PI's
+    machine: a registry record with the PI as lead + members, but NO lead
+    bundle on disk (creation never wrote one)."""
+    trust, allie = _standalone_pi(monkeypatch, tmp_path)
+    from murmurent.core import cert_projects as CP
+    CP.upsert(project, lab="xia_lab", lead="@yxia266", member="@yxia266")
+    CP.upsert(project, lab="xia_lab", member="@allie")
+    assert not list(ISS.cards_dir().glob("*_lead_*.json"))   # the legacy gap
+    return trust, allie
+
+
+def test_add_member_self_heals_missing_lead_bundle(monkeypatch, tmp_path):
+    """Issue #19: adding a member to a legacy PI==lead project no longer fails
+    with 'no lead card' — the PI's self-delegation is reconstructed on the fly
+    and the one-click issue then succeeds."""
+    _legacy_pi_lead_project(monkeypatch, tmp_path)
+    bundle = ISS.issue_project_card_from_roster("@allie", project="dcis_17")
+    assert bundle["project_card"]["payload"]["group"] == "xia_lab/dcis_17"
+    # the reconstructed self-delegation is now on disk (future adds skip the heal)
+    assert list(ISS.cards_dir().glob("*_lead_*.json"))
+
+
+def test_repair_project_lead_is_idempotent(monkeypatch, tmp_path):
+    """The explicit repair reconstructs once, then reports already-present."""
+    _legacy_pi_lead_project(monkeypatch, tmp_path)
+    first = ISS.repair_project_lead("dcis_17")
+    assert first["repaired"] is True and first["group"] == "xia_lab/dcis_17"
+    second = ISS.repair_project_lead("dcis_17")
+    assert second["repaired"] is False and second["already_present"] is True
+
+
+def test_self_heal_refuses_when_lead_is_someone_else(monkeypatch, tmp_path):
+    """A project delegated to a DIFFERENT lead is NOT silently re-delegated to
+    the PI — the original 'import your lead bundle' error stands."""
+    _standalone_pi(monkeypatch, tmp_path)
+    from murmurent.core import cert_projects as CP
+    CP.upsert("dcis_17", lab="xia_lab", lead="@allie", member="@allie")
+    with pytest.raises(ISS.IssuanceError, match="no lead card|import your lead bundle"):
+        ISS.issue_project_card_from_roster("@allie", project="dcis_17")
+    with pytest.raises(ISS.IssuanceError, match="cannot repair"):
+        ISS.repair_project_lead("dcis_17")
+
+
+def test_repair_project_lead_refuses_on_non_pi_machine(monkeypatch, tmp_path):
+    """A machine that leads no lab cannot self-heal — it must import the bundle."""
+    _standalone_pi(monkeypatch, tmp_path)
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "stranger_home"))
+    K.generate_keypair()
+    with pytest.raises(ISS.IssuanceError, match="cannot repair"):
+        ISS.repair_project_lead("dcis_17")
+
+
 def test_member_delegated_lead_issues_from_their_machine(monkeypatch, tmp_path):
     """creator == member: the PI delegates to @allie; on HER machine (her key,
     the shared roster) she signs @bob's project card herself."""

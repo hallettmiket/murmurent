@@ -1689,6 +1689,7 @@ from .commands.centre_cmd import issue_project_lead_card_cmd as _issue_project_l
 from .commands.centre_cmd import project_add_member_cmd as _project_add_member_cmd
 from .commands.centre_cmd import project_remove_member_cmd as _project_remove_member_cmd
 from .commands.centre_cmd import project_whoami_cmd as _project_whoami_cmd
+from .commands.centre_cmd import project_repair_lead_cmd as _project_repair_lead_cmd
 from .commands.centre_cmd import project_unarchive_cmd as _project_unarchive_cmd
 from .commands.centre_cmd import revoke_project_cmd as _revoke_project_cmd
 from .commands.centre_cmd import import_signed_card_cmd as _import_signed_card_cmd
@@ -1725,6 +1726,7 @@ cli.add_command(_issue_project_lead_card_cmd)
 cli.add_command(_project_add_member_cmd)
 cli.add_command(_project_remove_member_cmd)
 cli.add_command(_project_whoami_cmd)
+cli.add_command(_project_repair_lead_cmd)
 cli.add_command(_project_unarchive_cmd)
 cli.add_command(_revoke_project_cmd)
 cli.add_command(_import_signed_card_cmd)
