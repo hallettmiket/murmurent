@@ -811,3 +811,34 @@ def test_cli_enroll_dash_forces_pure_stdout(monkeypatch, tmp_path):
     res = CliRunner().invoke(cli, ["enroll", "--nonce", "abc", "--out", "-"])
     assert res.exit_code == 0, res.output
     assert json.loads(res.output)["payload"]["handle"] == "@hagaremam"
+
+
+def test_pi_init_prints_canonical_lab_mgmt_repo_name(monkeypatch, tmp_path):
+    """`pi-init` CREATES the roster repo, so it must also NAME it.
+
+    A PI who isn't told the name pushes it to GitHub as whatever they invent
+    (that's how one core ended up with a bare `lab_mgmt`), and then every
+    member's clone disagrees with the convention. Pin the name + the push
+    command in the output.
+    """
+    import yaml as _yaml
+    from click.testing import CliRunner
+
+    from murmurent.cli import cli
+
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi"))
+    monkeypatch.setenv("MURMURENT_REPOS_ROOT", str(tmp_path / "repos"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    monkeypatch.delenv("MURMURENT_LAB_MGMT_REPO", raising=False)
+    (tmp_path / "pi").mkdir(parents=True, exist_ok=True)
+    (tmp_path / "pi" / "profile.yaml").write_text(
+        _yaml.safe_dump({"handle": "@emucaki", "email": "e@x.edu", "github": "emucaki"}),
+        encoding="utf-8")
+    K.generate_keypair()
+
+    res = CliRunner().invoke(cli, ["pi-init", "bioinformatics", "--core"])
+    assert res.exit_code == 0, res.output
+    assert "murmurent_lab_mgmt_bioinformatics" in res.output
+    assert str(tmp_path / "repos" / "murmurent_lab_mgmt_bioinformatics") in res.output
+    assert "gh repo create" in res.output          # the push step, under the same name
+    assert "group-reconcile bioinformatics --apply" in res.output

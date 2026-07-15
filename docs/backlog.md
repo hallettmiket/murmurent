@@ -94,7 +94,7 @@ the wgm_<project> group members on the host.
 
 ---
 
-## 5. `lab_mgmt` repo — purpose docs + (do NOT rename)
+## 5. lab_mgmt repo — purpose docs (canonical name: `murmurent_lab_mgmt_<lab>`; resolved 2026-07-15)
 
 **The user's question:** what is `lab_mgmt`? Who needs it? Should
 it be renamed to `murmurent-mgmt`?

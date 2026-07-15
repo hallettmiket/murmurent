@@ -83,7 +83,7 @@ re-enable. The design refuses to bypass this from CC.
 
 ```bash
 python scripts/generate_dashboard.py
-ls ~/repos/lab_mgmt/dashboards/
+ls ~/repos/murmurent_lab_mgmt_<lab>/dashboards/
 ```
 
 The Streamlit app reads from these files. If you haven't seeded yet:
@@ -124,7 +124,7 @@ git clone git@github.com:hallettmiket/murmurent
 cd murmurent
 uv sync --extra dev --extra mcp --extra dashboard
 uv pip install -e .
-git clone git@github.com:hallettmiket/lab_mgmt ~/repos/
+git clone git@github.com:hallettmiket/murmurent_lab_mgmt_mh ~/repos/murmurent_lab_mgmt_mh
 git clone git@github.com:hallettmiket/dcis_sc_tutorial ~/repos/
 git clone git@github.com:hallettmiket/bbb_drug_screen ~/repos/
 murmurent install --hooks

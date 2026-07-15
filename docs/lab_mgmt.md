@@ -1,4 +1,4 @@
-# The `lab_mgmt` repository
+# The lab_mgmt repository (`murmurent_lab_mgmt_<lab>`)
 
 The single most-confusing piece of murmurent's filesystem layout is what
 `lab_mgmt` is, who needs it, and how it differs from
@@ -12,48 +12,69 @@ canonical roster, project registry, inventory, training records,
 audit log, and other day-to-day filing-cabinet contents for ONE
 research group.
 
-Different labs each have their own `lab_mgmt` repo under their own
-GitHub org. The Hallett lab's lives at
-`hallettmiket/lab_mgmt`; the Castellani lab's would live at
-`castellani-lab/lab_mgmt` (or wherever the Castellani PI hosts it).
+Different labs each have their own lab_mgmt repo under their own
+GitHub account/org. **The canonical name is `murmurent_lab_mgmt_<lab>`**
+(see "Naming — read this before creating the repo" below): the Hallett
+lab's lives at `hallettmiket/murmurent_lab_mgmt_mh`; a bioinformatics
+core's would be `<owner>/murmurent_lab_mgmt_bioinformatics`.
 
 The centre-wide registry (labs, cores, common SEAs, join requests)
 lives in a separate, distinct tree at `~/.murmurent/lab_info/`. That
 one is owned by the registrar, not by any single lab.
 
-## Why not rename it `murmurent-mgmt`?
+## Naming — read this before creating the repo
 
-Tempting — but no. The name `lab_mgmt` correctly signals "the lab's
-own management data," analogous to how a paper folder labelled "Lab
-Filing Cabinet" sits on the PI's bookshelf. Renaming to
-`murmurent-mgmt` would imply this is a murmurent-owned artifact you can
-update from the commons. It isn't: every murmurent install reads
-multiple `lab_mgmt` repos (one per lab in the centre) and never
-writes across labs.
+**The repo is named `murmurent_lab_mgmt_<lab>`, where `<lab>` is your
+group's registry slug** (e.g. `mh`, `bioinformatics`). Both the GitHub
+repo and the local clone directory use this exact name:
+
+```
+GitHub:      <your-account-or-org>/murmurent_lab_mgmt_<lab>   (private)
+local clone: ~/repos/murmurent_lab_mgmt_<lab>
+```
+
+You normally never create it by hand — **`murmurent pi-init <lab>`
+scaffolds it at exactly this path** (`core.repo.lab_repo_path`), and
+pins the machine's lab_mgmt pointer to it. If you do create the GitHub
+repo manually (e.g. to push an existing local scaffold), use the same
+name:
+
+```bash
+gh repo create <you>/murmurent_lab_mgmt_<lab> --private \
+  --source ~/repos/murmurent_lab_mgmt_<lab> --remote origin --push
+```
+
+Why this shape and not a bare `lab_mgmt`? Field experience: two groups
+independently created repos called `lab_mgmt` and they were
+indistinguishable in clones, invitations, and conversation. The
+`murmurent_` prefix announces what kind of repo it is; the `_<lab>`
+suffix says whose. Machines that host several labs' clones (a
+registrar's laptop, a shared server) get collision-free directories
+for free.
+
+Deviant names still *work* — member-side resolution auto-discovers any
+clone under `~/repos` that has the lab_mgmt shape (`lab.md` +
+`members/`) and pins it — but stick to the canonical name; discovery
+refuses to guess when two candidate clones both match.
 
 The clean conceptual boundary is:
 
 ```
-~/repos/murmurent/       ← Commons: agents, rules, skills, CLI source.
-                           Shared across the centre. Symlinked into
-                           ~/.claude/. Anyone can clone.
-~/repos/lab_mgmt/        ← One lab's filing cabinet. PI-owned.
-                           Members read; PI + delegates write.
-~/.murmurent/lab_info/     ← Centre registry. Registrar-owned.
-                           Lists every lab + core + common SEA in
-                           the centre.
+~/repos/murmurent/                  ← Commons: agents, rules, skills, CLI
+                                      source. Shared across the centre.
+                                      Symlinked into ~/.claude/.
+~/repos/murmurent_lab_mgmt_<lab>/   ← One lab's filing cabinet. PI-owned.
+                                      Members read; PI + delegates write.
+~/.murmurent/lab_info/              ← Centre registry. Registrar-owned.
+                                      Lists every lab + core + common SEA.
 ```
-
-Different roles read different trees. Renaming `lab_mgmt` would
-break the visual symmetry — the prefix would no longer announce who
-owns it.
 
 ## What lives in `lab_mgmt`?
 
-Default location is `~/repos/lab_mgmt/`. The directory layout:
+Canonical location is `~/repos/murmurent_lab_mgmt_<lab>/`. The directory layout:
 
 ```
-lab_mgmt/
+murmurent_lab_mgmt_<lab>/
 ├── lab.md                    PI handle, lab name, institution,
 │                             Slack workspace, GitHub org, lab-VM
 │                             base path. Single source of truth
@@ -95,8 +116,8 @@ lab_mgmt/
 
 | Person | Action | Where they get it |
 |---|---|---|
-| Lab PI | clone, write, push | `git clone git@github.com:<lab-org>/lab_mgmt ~/repos/lab_mgmt` |
-| Lab member (postdoc, student) | clone, read-only | same |
+| Lab PI | scaffolded by `murmurent pi-init <lab>` at `~/repos/murmurent_lab_mgmt_<lab>`; push it to GitHub under the same name | see "Naming" above |
+| Lab member (postdoc, student) | clone, read-only | `git clone git@github.com:<owner>/murmurent_lab_mgmt_<lab>.git ~/repos/murmurent_lab_mgmt_<lab>` (auto-discovered + pinned on first dashboard load) |
 | Core leader | clone OF THEIR CORE'S `lab_mgmt` (cores have their own) | same |
 | Registrar | reads multiple `lab_mgmt` repos via the centre registry | each lab's path is recorded in `~/.murmurent/lab_info/_registry.yaml` |
 | Mayor (bootstrap) | no | uses `~/.murmurent/lab_info/` instead |
@@ -116,16 +137,24 @@ using this order:
 1. **Thread-local override** — the dashboard sets this per-request
    so the registrar can switch between viewing different labs.
 2. **`$MURMURENT_LAB_MGMT_REPO` env var** — for tests + scripted use.
-3. **`~/repos/lab_mgmt`** — the default if it exists.
-4. **`~/repos/hallett-lab-mgmt`** — legacy fallback from before the
-   2026-05-14 rename. Will be removed in a future cleanup.
-5. **`~/repos/lab_mgmt`** — used unconditionally if none of the
-   above exists (so first-clone instructions can write to a known
-   location).
+3. **This machine's pinned pointer** (`~/.murmurent/lab_mgmt_path`) —
+   written by `murmurent pi-init <lab>`, and by discovery (step 5).
+4. **`~/repos/lab_mgmt`, then `~/repos/hallett-lab-mgmt`** — if either
+   exists. Pre-convention names, kept working for clones made before
+   `murmurent_lab_mgmt_<lab>` was settled; not what you should create.
+5. **Discovery** — scans `~/repos` for a directory with the lab_mgmt
+   shape (`lab.md` + `members/`), preferring one whose roster contains
+   your handle, and **pins** an unambiguous hit so this runs once. This
+   is what finds `~/repos/murmurent_lab_mgmt_<lab>` on a member machine
+   (they never run `pi-init`, so nothing pinned it). Two matching clones
+   → it refuses to guess and the panels stay empty; set
+   `MURMURENT_LAB_MGMT_REPO` to break the tie.
+6. **`~/repos/lab_mgmt`** — last-resort default if nothing above hit.
 
-The `MURMURENT_LAB_MGMT_REPO` env var is the right knob for tests and
-unusual deployments (e.g. multi-lab dev workstations). For a normal
-lab member, the default path just works.
+So the canonical clone path needs no configuration: `pi-init` pins it
+for the PI, discovery pins it for members. The `MURMURENT_LAB_MGMT_REPO`
+env var is the knob for tests and unusual deployments (e.g. a multi-lab
+dev workstation where discovery is ambiguous by design).
 
 ## Backfilling access for pre-existing members
 
@@ -145,10 +174,12 @@ Prerequisite: the lab_mgmt repo must be on GitHub (`git remote -v`
 shows an origin) — the reconcile output says so if it isn't.
 
 Each member then completes their side once: accept the GitHub
-invitation e-mail, and clone the repo as their lab_mgmt
-(`git clone git@github.com:<org>/<repo>.git ~/repos/lab_mgmt`, or set
-`MURMURENT_LAB_MGMT_REPO`). From then on their Lab Members panel and
-daily reconcile track what the PI pushes.
+invitation e-mail, and clone the repo under its own name
+(`git clone git@github.com:<owner>/murmurent_lab_mgmt_<lab>.git
+~/repos/murmurent_lab_mgmt_<lab>`). Resolution auto-discovers the
+clone and pins it on the next dashboard load; `MURMURENT_LAB_MGMT_REPO`
+remains the explicit override. From then on their Lab Members panel
+and daily reconcile track what the PI pushes.
 
 ## Reading + writing — who's allowed?
 
@@ -188,7 +219,7 @@ lab specifics belong in `lab_mgmt`. Inter-lab relations belong in
 ## See also
 
 - [`docs/setup.md`](setup.md) — first-time murmurent install on a new
-  machine, including the recommended `~/repos/lab_mgmt` clone.
+  machine, including the `~/repos/murmurent_lab_mgmt_<lab>` clone.
 - [`docs/group_level.md`](group_level.md) — the broader design
   document for group-scope murmurent operations.
 - [`docs/cores_plan.md`](cores_plan.md) §4 — how a core's own

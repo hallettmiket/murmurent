@@ -108,7 +108,7 @@ centre's `unique_name`, never a hardcoded university).
 |---|---|
 | [`hallettmiket/murmurent`](https://github.com/hallettmiket/murmurent) | this repo (**public**) — agents, rules, hooks, MCP servers, CLI, dashboard. Clone this to install murmurent / bootstrap a centre. |
 | `hallettmiket/murmurent_manuscript` | the paper (private; Overleaf-synced — see [`rules/manuscript.md`](rules/manuscript.md)) |
-| `hallettmiket/lab_mgmt` | per-group governance repo (private) — see [`docs/lab_mgmt.md`](docs/lab_mgmt.md) |
+| `hallettmiket/murmurent_lab_mgmt_<lab>` | per-group governance repo (private), one per lab/core — canonical name, see [`docs/lab_mgmt.md`](docs/lab_mgmt.md) |
 | [`hallettmiket/murmurent_public`](https://github.com/hallettmiket/murmurent_public) | global onboarding hub: institution directory + GitHub-issue join intake (no netnames / server paths). Novice-facing README kept trivial; maintainer/mayor setup lives in [`docs/hub_setup.md`](docs/hub_setup.md). |
 
 ## Quick setup

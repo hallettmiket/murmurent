@@ -16,7 +16,7 @@ defaults:
   language: en
   prose_style: terse
   dry_run: true
-  lab_mgmt_repo: ~/repos/lab_mgmt
+  lab_mgmt_repo: ~/repos/murmurent_lab_mgmt_<lab>
 ---
 
 # The Cable Guy
@@ -54,8 +54,11 @@ posting rights) should ever run you.
 
 ## Files you manage
 
-All records live inside the lab-management repo (`$MURMURENT_LAB_MGMT_REPO`,
-default `~/repos/lab_mgmt`).
+All records live inside the lab-management repo — canonically
+`~/repos/murmurent_lab_mgmt_<lab>` (`$MURMURENT_LAB_MGMT_REPO` overrides it).
+Never invent a different name for it: `murmurent pi-init <lab>` scaffolds this
+exact path, and both the GitHub repo and the local clone use it. See
+[`docs/lab_mgmt.md`](../docs/lab_mgmt.md) § Naming.
 
 ```
 <lab-mgmt>/
@@ -137,7 +140,7 @@ Steps:
    once they have SSH access. Include:
    - [ ] Verify SSH key is accepted: `ssh <username>@<hostname> whoami`
    - [ ] Accept the lab_mgmt GitHub invitation (emailed by step 4)
-   - [ ] Clone the roster repo (read-only): `git clone git@github.com:<lab-mgmt-slug>.git ~/repos/lab_mgmt`
+   - [ ] Clone the roster repo (read-only) under its canonical name: `git clone git@github.com:<owner>/murmurent_lab_mgmt_<lab>.git ~/repos/murmurent_lab_mgmt_<lab>` (auto-discovered + pinned on first dashboard load)
    - [ ] Clone project repo: `git clone git@github.com:hallettmiket/<project>.git ~/repos/<project>`
    - [ ] Install GitHub CLI: `gh auth login`
    - [ ] Install VS Code (link to download)

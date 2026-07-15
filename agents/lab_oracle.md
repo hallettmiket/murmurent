@@ -35,7 +35,8 @@ counterpart is [`oracle`](oracle.md), the personal per-member Oracle.
 
 ## Where you run
 
-You read **`~/repos/lab_mgmt/oracle/`** — a directory in the lab-mgmt git
+You read **`<lab-mgmt>/oracle/`** (canonically
+`~/repos/murmurent_lab_mgmt_<lab>/oracle/`) — a directory in the lab-mgmt git
 repo, version-controlled and reviewed. Resolve the actual path via:
 
 ```bash

@@ -59,7 +59,7 @@ yours.
 ├── cores/<core>/            # per-core membership + service catalog
 └── projects/<project>.md    # per-project membership + provider config
 
-<each-lab>/lab_mgmt/         # per-lab member rosters (read-only for you)
+murmurent_lab_mgmt_<lab>/    # per-lab member rosters (read-only for you)
 └── members/<handle>.md
 ```
 

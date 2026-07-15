@@ -1246,6 +1246,7 @@ def import_signed_card_cmd(card_file: str, trust_root: str) -> None:
 @click.argument("group")
 @click.option("--core", is_flag=True, help="This group is a core (default: lab).")
 def pi_init(group: str, core: bool) -> None:
+    from pathlib import Path as _P
     from ..core import issuance as _iss
     from ..core import identity as _id
     ident = _id.resolve(allow_unknown=True)
@@ -1255,11 +1256,23 @@ def pi_init(group: str, core: bool) -> None:
     except _iss.IssuanceError as exc:
         raise click.ClickException(str(exc)) from exc
     what = "core" if core else "lab"
+    lab_repo = out["lab_repo"]
+    repo_name = _P(lab_repo).name
     click.echo(f"✓ your PI ID for '{group}' is ready — you are this {what}'s root.")
     click.echo(f"  Give members this trust root so they can import their cards:\n"
                f"    {out['trust_root']}")
     click.echo(f"  Issue a member ID:  murmurent issue-member-card <their-enroll.json> "
                f"--group {group}")
+    # The roster repo is created here, so this is where the PI must learn its
+    # name: they push it to GitHub themselves, and a hand-picked name (`lab_mgmt`)
+    # is indistinguishable from every other group's once members clone it.
+    click.echo(f"\n  Your {what}'s management repo (the roster's home) is now at:\n"
+               f"    {lab_repo}")
+    click.echo(f"  Keep this name — `{repo_name}` — on GitHub too. Push it private,\n"
+               f"  then members get read-only access and clone it under the same name:\n"
+               f"    gh repo create <you>/{repo_name} --private --source {lab_repo} "
+               f"--remote origin --push\n"
+               f"    murmurent group-reconcile {group} --apply   # grants the roster read access")
     click.echo("  (A mayor can ALSO issue you a centre PI ID later — that's separate, "
                "for joining a centre; your members' cards keep working.)")
 

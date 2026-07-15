@@ -59,14 +59,22 @@ def murmurent_repo_root(env: dict[str, str] | None = None) -> Path:
 def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
     """Resolve the lab-management repo root.
 
+    The canonical repo is ``~/repos/murmurent_lab_mgmt_<lab>`` (see
+    ``lab_repo_path``); everything below is the machinery that finds it — plus
+    fallbacks for pre-convention clones.
+
     Resolution order:
       1. Thread-local override set by ``use_lab_mgmt_root()`` — used by the
          FastAPI dashboard to point each request at the viewer's own lab
          (so @core_lead sees her lab_mgmt, @the_pi sees his).
       2. ``$MURMURENT_LAB_MGMT_REPO`` env var
-      3. ``~/repos/lab_mgmt`` if it exists
-      4. ``~/repos/hallett-lab-mgmt`` (legacy fallback) if it exists
-      5. ``~/repos/lab_mgmt`` (the canonical default, even if missing)
+      3. This machine's pinned pointer (``~/.murmurent/lab_mgmt_path``), written
+         by ``pi-init`` and by discovery below.
+      4. ``~/repos/lab_mgmt`` if it exists (pre-convention name)
+      5. ``~/repos/hallett-lab-mgmt`` (legacy fallback) if it exists
+      6. Discovery: an unambiguous lab_mgmt-shaped clone under ``repos_root()``
+         — the member-machine case — pinned on the way out.
+      7. ``~/repos/lab_mgmt`` (last-resort default, even if missing)
     """
     override = getattr(_thread_local, "lab_mgmt_root", None)
     if override is not None:
@@ -196,17 +204,21 @@ def repos_root() -> Path:
 
 
 def lab_repo_path(group: str) -> Path:
-    """The lab-management repo for ``group`` — ``<repos>/lab_mgmt_<group>`` — named so
-    it is unmistakably a murmurent lab-management repo (the legacy ``wigamig_``
-    prefix predates the wigamig→murmurent rename)."""
+    """The canonical lab-management repo path for ``group``:
+    ``<repos>/murmurent_lab_mgmt_<group>``.
+
+    This name is the convention, not a mere default — the GitHub repo carries it
+    too (``<owner>/murmurent_lab_mgmt_<group>``), so a clone, an invitation, and
+    a directory listing all say which lab they belong to. ``pi-init`` scaffolds
+    here; ``docs/lab_mgmt.md`` documents it for humans."""
     safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in str(group or ""))
     return repos_root() / f"murmurent_lab_mgmt_{safe}"
 
 
 def set_lab_mgmt_path(path: str | Path) -> None:
     """Persistently point ``lab_mgmt_repo_root()`` at a lab's own management repo
-    (e.g. ``~/repos/lab_mgmt_mh``). Honours ``MURMURENT_HOME``. An explicit
-    ``$MURMURENT_LAB_MGMT_REPO`` still overrides it."""
+    (canonically ``~/repos/murmurent_lab_mgmt_<lab>``). Honours ``MURMURENT_HOME``.
+    An explicit ``$MURMURENT_LAB_MGMT_REPO`` still overrides it."""
     p = _lab_mgmt_pointer_path()
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(str(Path(path).expanduser()) + "\n", encoding="utf-8")
