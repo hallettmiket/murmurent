@@ -38,9 +38,11 @@ def pi_world(monkeypatch, tmp_path):
 
 
 def _dm_recorder(sent):
-    def dm(workspace, *, text, slack="", email="", token=None):
+    def dm(workspace, *, text, slack="", email="", token=None,
+           file_content=None, file_name="bundle.json"):
         sent.append({"workspace": workspace, "slack": slack, "email": email,
-                     "text": text})
+                     "text": text, "file_content": file_content,
+                     "file_name": file_name})
         return (True, "recorded")
     return dm
 

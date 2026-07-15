@@ -243,7 +243,8 @@ def test_cli_issue_member_card_dms_by_default(monkeypatch, tmp_path):
     from murmurent.core import group_reconcile as GR
     ef = _issue_member_card_setup(monkeypatch, tmp_path)
     seen = {}
-    def fake_send_group_dm(group, *, text, slack_user_id="", email="", slack="", token=None):
+    def fake_send_group_dm(group, *, text, slack_user_id="", email="", slack="", token=None,
+                           file_content=None, file_name="bundle.json"):
         seen.update(group=group, slack_user_id=slack_user_id, email=email)
         return True, "sent"
     monkeypatch.setattr(GR, "send_group_dm", fake_send_group_dm)
@@ -272,7 +273,8 @@ def test_cli_issue_member_card_explicit_dm_target_overrides_email(monkeypatch, t
     from murmurent.core import group_reconcile as GR
     ef = _issue_member_card_setup(monkeypatch, tmp_path)
     seen = {}
-    def fake_send_group_dm(group, *, text, slack_user_id="", email="", slack="", token=None):
+    def fake_send_group_dm(group, *, text, slack_user_id="", email="", slack="", token=None,
+                           file_content=None, file_name="bundle.json"):
         seen.update(slack_user_id=slack_user_id)
         return True, "sent"
     monkeypatch.setattr(GR, "send_group_dm", fake_send_group_dm)

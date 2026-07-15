@@ -30,10 +30,13 @@ class ProjectMemberError(RuntimeError):
 
 
 def _default_dm_sender(workspace: str, *, text: str, slack: str = "",
-                       email: str = "", token: str | None = None):
+                       email: str = "", token: str | None = None,
+                       file_content: str | None = None,
+                       file_name: str = "bundle.json"):
     from . import group_reconcile as _gr
     return _gr.send_group_dm(workspace, text=text, slack=slack, email=email,
-                             token=token)
+                             token=token, file_content=file_content,
+                             file_name=file_name)
 
 
 def _member_contact(handle: str) -> tuple[str, str]:
@@ -58,11 +61,13 @@ def _dm_bundle(project: str, handle: str, bundle: dict, *,
         return {"sent": False, "detail": str(exc), "workspace": ""}
     slack, email = _member_contact(handle)
     text = (
-        f"Your murmurent {kind} for project '{project}' is ready. Save the JSON "
-        f"below as bundle.json, then run:\n\n    murmurent import-card bundle.json\n\n"
-        f"```\n{json.dumps(bundle, indent=2)}\n```")
+        f"Your murmurent {kind} for project '{project}' is ready — your signed "
+        f"bundle.json is attached to this message. Download it, then run:\n\n"
+        f"    murmurent import-card bundle.json")
     ok, detail = dm_sender(workspace, text=text, slack=slack, email=email,
-                           token=token or None)
+                           token=token or None,
+                           file_content=json.dumps(bundle, indent=2),
+                           file_name="bundle.json")
     return {"sent": bool(ok), "detail": str(detail), "workspace": workspace}
 
 

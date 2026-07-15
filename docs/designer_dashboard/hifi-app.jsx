@@ -2896,6 +2896,19 @@ function AddMemberModal({ onClose }) {
                textTransform:"uppercase", color:"var(--muted)", marginTop:8};
   const bundleText = result ? JSON.stringify(result.bundle, null, 2) : "";
 
+  // Save the bundle as a real bundle.json file (the member imports the file,
+  // not copied-out text). Blob → object URL → synthetic click, revoke after.
+  const downloadBundle = () => {
+    try {
+      const blob = new Blob([bundleText], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "bundle.json";
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (_) {}
+  };
+
   return (
     <div onClick={onClose} style={{
       position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
@@ -2956,8 +2969,8 @@ function AddMemberModal({ onClose }) {
           </div>
           <div className="muted" style={{fontSize:12, lineHeight:1.5}}>
             {result.dm && result.dm.sent
-              ? <>The card bundle was <strong>DM'd to them on Slack</strong>. They import it with the command below.</>
-              : <>Send them this bundle (Slack DM couldn't be sent{result.dm && result.dm.detail ? `: ${result.dm.detail}` : ""}). They save it as <code>bundle.json</code> and run:</>}
+              ? <>The card bundle was <strong>DM'd to them on Slack</strong> as a <code>bundle.json</code> file attachment. They download it and run the command below.</>
+              : <>Send them this bundle (Slack DM couldn't be sent{result.dm && result.dm.detail ? `: ${result.dm.detail}` : ""}). Download it as <code>bundle.json</code> and they run:</>}
           </div>
           <code className="mono" style={{display:"block", fontSize:11, background:"var(--paper-2)",
                 border:"1px solid var(--rule)", borderRadius:2, padding:"6px 8px", overflowX:"auto"}}>
@@ -2972,6 +2985,9 @@ function AddMemberModal({ onClose }) {
             <button type="button" className="btn sm ghost"
               onClick={() => { try { navigator.clipboard.writeText(bundleText); } catch (_) {} }}>
               copy bundle
+            </button>
+            <button type="button" className="btn sm ghost" onClick={downloadBundle}>
+              download bundle.json
             </button>
             <button type="button" className="btn sm primary" onClick={onClose}>done</button>
           </div>

@@ -183,7 +183,9 @@ def resolve_slack_id_or_name(slack: str, token: str) -> str:
 
 def send_group_dm(group: str, *, text: str, slack_user_id: str = "",
                    email: str = "", slack: str = "",
-                   token: str | None = None) -> tuple[bool, str]:
+                   token: str | None = None,
+                   file_content: str | None = None,
+                   file_name: str = "bundle.json") -> tuple[bool, str]:
     """DM ``text`` to a member via the group's OWN Slack workspace (the token
     from :func:`resolve_group_slack_token`, or ``token`` to override).
 
@@ -191,7 +193,14 @@ def send_group_dm(group: str, *, text: str, slack_user_id: str = "",
     member's ``slack`` handle/id (from their enrollment); then ``email`` via
     ``users.lookupByEmail``. Never raises — a Slack outage or missing token can't
     break card issuance; the caller falls back to manual delivery. Returns
-    ``(ok, detail)``."""
+    ``(ok, detail)``.
+
+    When ``file_content`` is given it is uploaded as a real, downloadable file
+    named ``file_name`` (default ``bundle.json``), with ``text`` riding along as
+    the accompanying message — so a card bundle arrives as an attachment the
+    member can save with one click, not as plain text they must copy out of the
+    chat. Needs the bot's ``files:write`` scope; falls back to (False, detail)
+    if it's missing, exactly like the text path."""
     from ..dashboard import slack_notify as _sn
 
     tok = token if token is not None else resolve_group_slack_token(group)
@@ -214,6 +223,11 @@ def send_group_dm(group: str, *, text: str, slack_user_id: str = "",
     channel = _sn._open_dm(uid, tok)
     if not channel:
         return False, "couldn't open a DM (does the bot have the im:write scope?)"
+    if file_content is not None:
+        ok = _sn._upload_file(channel, filename=file_name, content=file_content,
+                              initial_comment=text, token=tok)
+        return (ok, "sent" if ok else
+                "Slack file upload failed (does the bot have the files:write scope?)")
     ok = _sn._post(channel, text, token=tok)
     return (ok, "sent" if ok else "Slack post failed")
 

@@ -401,6 +401,83 @@ def test_send_group_dm_post_failure(monkeypatch):
     assert detail == "Slack post failed"
 
 
+def test_send_group_dm_with_file_uploads_instead_of_posting(monkeypatch):
+    """When file_content is given, the bundle is uploaded as a real file with the
+    text riding along as the comment — NOT embedded inline via chat.postMessage."""
+    from murmurent.core import group_reconcile as GR
+    from murmurent.dashboard import slack_notify as SN
+    calls = {}
+    monkeypatch.setattr(SN, "_open_dm", lambda uid, tok: "D999")
+    monkeypatch.setattr(SN, "_post", lambda *a, **k: calls.setdefault("posted", True))
+    def fake_upload(channel, *, filename, content, title="", initial_comment="", token=None):
+        calls.update(channel=channel, filename=filename, content=content,
+                     initial_comment=initial_comment, token=token)
+        return True
+    monkeypatch.setattr(SN, "_upload_file", fake_upload)
+    ok, detail = GR.send_group_dm("dcis", text="download & import", slack_user_id="U777",
+                                   token="xoxb-x", file_content='{"member_card": 1}')
+    assert ok is True and detail == "sent"
+    assert "posted" not in calls  # did NOT fall back to inline chat.postMessage
+    assert calls["filename"] == "bundle.json"
+    assert calls["content"] == '{"member_card": 1}'
+    assert calls["initial_comment"] == "download & import"
+    assert calls["channel"] == "D999"
+
+
+def test_send_group_dm_file_upload_missing_scope_is_actionable(monkeypatch):
+    from murmurent.core import group_reconcile as GR
+    from murmurent.dashboard import slack_notify as SN
+    monkeypatch.setattr(SN, "_open_dm", lambda uid, tok: "D999")
+    monkeypatch.setattr(SN, "_upload_file", lambda *a, **k: False)
+    ok, detail = GR.send_group_dm("dcis", text="hi", slack_user_id="U777",
+                                   token="xoxb-x", file_content="{}")
+    assert ok is False
+    assert "files:write" in detail
+
+
+def test_slack_upload_file_three_step_flow(monkeypatch):
+    """_upload_file reserves a URL, POSTs the bytes, then completes the upload."""
+    from murmurent.dashboard import slack_notify as SN
+    from unittest.mock import MagicMock
+    seen = {}
+
+    def fake_get(url, **kw):
+        seen["reserve_params"] = kw.get("params")
+        m = MagicMock()
+        m.json.return_value = {"ok": True, "upload_url": "https://files.slack/up", "file_id": "F1"}
+        return m
+
+    def fake_post(url, **kw):
+        m = MagicMock()
+        if url == "https://files.slack/up":
+            seen["uploaded_bytes"] = kw.get("content")
+            m.status_code = 200
+        else:  # files.completeUploadExternal
+            seen["complete_payload"] = kw.get("json")
+            m.json.return_value = {"ok": True, "files": [{"id": "F1"}]}
+        return m
+
+    monkeypatch.setattr("httpx.get", fake_get)
+    monkeypatch.setattr("httpx.post", fake_post)
+    ok = SN._upload_file("D999", filename="bundle.json", content="hello",
+                         initial_comment="import me", token="xoxb-x")
+    assert ok is True
+    assert seen["reserve_params"] == {"filename": "bundle.json", "length": "5"}
+    assert seen["uploaded_bytes"] == b"hello"
+    assert seen["complete_payload"]["channel_id"] == "D999"
+    assert seen["complete_payload"]["files"] == [{"id": "F1", "title": "bundle.json"}]
+    assert seen["complete_payload"]["initial_comment"] == "import me"
+
+
+def test_slack_upload_file_missing_scope_returns_false(monkeypatch):
+    from murmurent.dashboard import slack_notify as SN
+    from unittest.mock import MagicMock
+    m = MagicMock()
+    m.json.return_value = {"ok": False, "error": "missing_scope"}
+    monkeypatch.setattr("httpx.get", lambda url, **kw: m)
+    assert SN._upload_file("D999", filename="b.json", content="x", token="xoxb-x") is False
+
+
 def test_resolve_group_slack_user_id_happy_path(monkeypatch):
     from murmurent.core import group_reconcile as GR
     from unittest.mock import patch, MagicMock

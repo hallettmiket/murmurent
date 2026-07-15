@@ -418,6 +418,79 @@ def _post(channel: str, text: str, *, token: str | None = None) -> bool:
         return False
 
 
+def _upload_file(channel: str, *, filename: str, content: str,
+                 title: str = "", initial_comment: str = "",
+                 token: str | None = None) -> bool:
+    """Upload ``content`` to ``channel`` as a real, downloadable file attachment.
+
+    Uses Slack's current three-step external-upload flow
+    (``files.getUploadURLExternal`` → POST the bytes to the returned URL →
+    ``files.completeUploadExternal``); the legacy ``files.upload`` is deprecated.
+    Requires the bot's ``files:write`` scope. ``initial_comment`` rides along as
+    the message text next to the file, so callers can attach a bundle *and* the
+    import instructions in one DM.
+
+    Like :func:`_post`, this is fire-and-forget: any failure (missing scope,
+    Slack outage) returns False so card issuance can fall back to manual
+    delivery — it never raises.
+    """
+    tok = token if token is not None else _token()
+    if not tok:
+        return False
+    channel = _route(channel)
+    # A bare user id → open the real DM channel so the file lands in the
+    # recipient's Direct Messages, not the bot's App-messages tab.
+    if channel and channel[:1] == "U":
+        channel = _open_dm(channel, tok) or channel
+    data = content.encode("utf-8")
+    try:
+        import httpx  # already a project dependency
+
+        # 1. Reserve a one-time upload URL + file id.
+        reserved = httpx.get(
+            "https://slack.com/api/files.getUploadURLExternal",
+            headers={"Authorization": f"Bearer {tok}"},
+            params={"filename": filename, "length": str(len(data))},
+            timeout=5,
+        ).json()
+        if not reserved.get("ok"):
+            log.warning("files.getUploadURLExternal failed: %s (add the files:write scope?)",
+                        reserved.get("error"))
+            return False
+        upload_url = reserved.get("upload_url")
+        file_id = reserved.get("file_id")
+        if not (upload_url and file_id):
+            return False
+
+        # 2. POST the raw bytes to the returned upload URL (no bot token here).
+        put = httpx.post(upload_url, content=data, timeout=10)
+        if put.status_code != 200:
+            log.warning("Slack file upload POST returned HTTP %s", put.status_code)
+            return False
+
+        # 3. Complete the upload and share it into the channel/DM.
+        payload: dict = {
+            "files": [{"id": file_id, "title": title or filename}],
+            "channel_id": channel,
+        }
+        if initial_comment:
+            payload["initial_comment"] = initial_comment
+        done = httpx.post(
+            "https://slack.com/api/files.completeUploadExternal",
+            headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=5,
+        ).json()
+        if not done.get("ok"):
+            log.warning("files.completeUploadExternal to %s failed: %s",
+                        channel, done.get("error"))
+            return False
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Slack file upload error: %s", exc)
+        return False
+
+
 @dataclass
 class SlackPostResult:
     """Structured outcome of a Slack post. ``ok`` False carries the Slack
