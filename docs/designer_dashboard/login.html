@@ -280,32 +280,33 @@
         pi:          !!(resolved && resolved.is_pi),
         registrar:   !!(resolved && resolved.is_registrar),
       };
-      // Unknown handles can still pick "member" — they'll see an empty
-      // dashboard, but we don't punish a typo with a 403.
+      // A PI (or registrar) does NOT get a "member" lens — the server
+      // derives the dashboard persona from their actual role, so picking
+      // "member" would land on their group dashboard anyway. Unknown
+      // handles CAN pick "member" (they see an empty dashboard; we don't
+      // punish a typo with a 403).
+      const holdsHigherRole = flags.pi || flags.registrar;
       const allowed = {
-        member:      true,
+        member:      !holdsHigherRole,
         pi:          flags.pi,
         registrar:   flags.registrar,
       };
       const defaultRole = (resolved && resolved.default_role) || "member";
-      selectedRole = allowed[defaultRole] ? defaultRole : "member";
+      selectedRole = allowed[defaultRole] ? defaultRole
+        : allowed.pi ? "pi"
+        : allowed.registrar ? "registrar"
+        : "member";
 
-      // A PI (or registrar) does NOT get a "member" lens — they sign in
-      // as their group role. Only offer "member" to people whose highest
-      // role IS member (or an unrecognised netname, which still gets the
-      // empty member view rather than a hard 403 on a typo).
-      const holdsHigherRole = flags.pi || flags.registrar;
-      const roleOrder = ["member", "pi", "registrar"]
-        .filter(role => !(role === "member" && holdsHigherRole));
-      if (holdsHigherRole && selectedRole === "member") {
-        selectedRole = allowed.pi ? "pi"
-          : allowed.registrar ? "registrar" : "member";
-      }
+      // Always render all three lenses — unavailable ones are greyed out
+      // with the reason, never hidden (a missing row reads as a bug).
+      const roleOrder = ["member", "pi", "registrar"];
 
       const rows = roleOrder.map(role => {
         const isAllowed = allowed[role];
         const why = role === "member"
-          ? (handle ? "available" : "claim a netname first")
+          ? (!handle ? "claim a netname first"
+             : holdsHigherRole ? "you sign in with your group role"
+             : "available")
           : (isAllowed ? "you hold this role" : "not authorised");
         const cls = isAllowed
           ? "ok"
