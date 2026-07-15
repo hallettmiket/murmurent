@@ -161,6 +161,25 @@ def import_card(card: dict, *, env: dict[str, str] | None = None) -> list[str]:
             (cores if kind == "core" else labs)[group] = entry
             actions.append(f"registered {kind} '{group}' → {canonical}")
             continue
+        # This machine's owner is a plain MEMBER of this group. They get a
+        # read-only clone of the group's lab_mgmt over GitHub (granted by
+        # `murmurent group-reconcile <group> --apply`), which is the real
+        # roster. Prefer it over a stub whenever it's already on disk: the
+        # registry path written here becomes a thread-local override in the
+        # dashboard (resolution step 1), so a stub recorded here would shadow
+        # the clone permanently — including from the self-healing discovery
+        # pass — and the member would see a roster containing only themselves.
+        clone = _repo.discover_lab_mgmt_clone_for_group(group, handle=netname)
+        if clone is not None:
+            entry = {"pi": f"@{gpi}", "lab_mgmt_path": str(clone), "status": "active"}
+            (cores if kind == "core" else labs)[group] = entry
+            actions.append(f"registered {kind} '{group}' → {clone} (existing clone)")
+            continue
+        # No clone found — they haven't accepted the GitHub invite yet, or are
+        # offline, or cloned somewhere we don't scan. Synthesize a minimal
+        # lab-mgmt so `is_member` resolves and they aren't locked out of their
+        # own dashboard. Marked as a stub so that resolution upgrades it to the
+        # real clone the moment one appears (registrar._heal_card_stub_entry).
         gdir = lab_info / ("cores" if kind == "core" else "labs") / group / "lab-mgmt"
         (gdir / "members").mkdir(parents=True, exist_ok=True)
         (gdir / "lab.md").write_text(
@@ -170,9 +189,18 @@ def import_card(card: dict, *, env: dict[str, str] | None = None) -> list[str]:
         (gdir / "members" / f"{netname}.md").write_text(
             f"---\nhandle: '@{netname}'\nstatus: active\nlab: {group}\n---\n\n# @{netname}\n",
             encoding="utf-8")
+        (gdir / _repo.CARD_STUB_MARKER).write_text(
+            f"Synthesized by `murmurent import-card` on {_dt.date.today().isoformat()} "
+            f"because no lab_mgmt clone for '{group}' was found under "
+            f"{_repo.repos_root()}.\nThis is a placeholder roster holding only "
+            f"@{netname}. Clone the group's lab_mgmt repo and this entry "
+            f"self-upgrades on the next dashboard load.\n",
+            encoding="utf-8")
         entry = {"pi": f"@{gpi}", "lab_mgmt_path": str(gdir), "status": "active"}
         (cores if kind == "core" else labs)[group] = entry
-        actions.append(f"materialized {kind} '{group}' (role: {role['kind']})")
+        actions.append(
+            f"materialized {kind} '{group}' (role: {role['kind']}) — placeholder "
+            f"roster; clone the group's lab_mgmt repo to see the full roster")
 
     reg_doc = {
         "version": 1,

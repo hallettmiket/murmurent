@@ -21,6 +21,9 @@ MEMBERS_FILENAME = "MEMBERS"
 # The lab_mgmt roster lives in a ``members/`` subdir (one <handle>.md per member);
 # distinct from the project-level ``MEMBERS`` file above.
 MEMBERS_SUBDIR = "members"
+# Marks a lab-mgmt dir as a synthesized card-import fallback rather than a real
+# clone (see ``identity_card.import_card`` + ``is_card_import_stub``).
+CARD_STUB_MARKER = ".murmurent_card_stub"
 DEFAULT_MURMURENT_REPO = Path("~/repos/murmurent").expanduser()
 # 2026-05-14: repo is being renamed from "hallett-lab-mgmt" to the per-group
 # convention "lab_mgmt". During the transition we prefer the new path but
@@ -156,6 +159,91 @@ def _discover_lab_mgmt_clone() -> Path | None:
         # Couldn't persist the pointer; still return the live hit for this call.
         pass
     return found
+
+
+def discover_lab_mgmt_clone_for_group(
+    group: str, *, handle: str | None = None,
+) -> Path | None:
+    """A real lab_mgmt clone of ``group`` that lists ``handle``, or None.
+
+    Group- and member-aware wrapper over :func:`_discover_lab_mgmt_clone` —
+    which already does the hard parts (match on SHAPE not name, so a
+    pre-convention ``~/repos/lab_mgmt`` is found as readily as a canonical
+    ``~/repos/murmurent_lab_mgmt_<lab>``; prefer a roster containing the current
+    user; refuse to guess when ambiguous). Two checks are layered on:
+
+    - **group**: the clone must not *contradict* the group asked about, so a
+      member of two groups can't have both registry entries collapse onto one
+      clone. A clone whose ``lab.md`` declares no ``lab:`` is accepted —
+      pre-convention clones predate the field.
+    - **roster**: the clone must actually carry ``members/<handle>.md``. This
+      one is load-bearing. ``_discover_lab_mgmt_clone`` only *prefers* rosters
+      containing the current user and falls back to the full candidate set when
+      none match, so without this check a member could be pointed at a clone
+      that doesn't know them yet (the PI hasn't pushed their record, or they
+      cloned early). ``is_member`` would then resolve False and the scoping gate
+      would refuse them their own dashboard — strictly worse than the stub,
+      whose entire job is to make ``is_member`` resolve. When the clone doesn't
+      list them, the stub is the better answer and we say so by returning None.
+    """
+    found = _discover_lab_mgmt_clone()
+    if found is None:
+        return None
+    declared = _lab_md_group(found)
+    if declared and str(group) and declared != str(group):
+        return None
+    if handle and not (found / MEMBERS_SUBDIR / f"{handle}.md").is_file():
+        return None
+    return found
+
+
+def _lab_md_group(path: Path) -> str:
+    """The group name a lab_mgmt clone declares in ``lab.md`` (``lab:``), or ''."""
+    try:
+        from .frontmatter import parse_file as _parse_file
+
+        meta = _parse_file(path / "lab.md").meta or {}
+    except Exception:  # noqa: BLE001 — an unreadable lab.md just means "unknown"
+        return ""
+    return str(meta.get("lab") or "").strip()
+
+
+def is_card_import_stub(path: str | Path) -> bool:
+    """True when ``path`` is a synthesized card-import stub, not a real clone.
+
+    ``import_card`` materializes a one-person lab-mgmt under ``lab_info/`` when a
+    member has no clone, so ``is_member`` still resolves. That fallback is fine
+    until a real clone shows up — then the stub must yield, because the registry
+    path it wrote is entered as a thread-local override and would otherwise
+    shadow the clone permanently (the member sees a roster of one: themselves).
+
+    Detection is marker-first: stubs written from now on carry
+    ``.murmurent_card_stub``. The heuristic below is only for stubs already in
+    the field (issued before the marker existed) — it requires ALL of: living
+    under ``lab_info_root()``, having no ``.git`` of its own, and a roster of at
+    most one member. Callers must additionally confirm the machine owner is a
+    plain *member* of the group (see ``registrar._heal_card_stub_entry``); a
+    registrar-scaffolded lab on the mayor's own machine has the same shape and
+    must never be mistaken for a stub.
+    """
+    p = Path(path).expanduser()
+    if (p / CARD_STUB_MARKER).is_file():
+        return True
+    if (p / ".git").exists():
+        return False  # a real clone, whatever else is true
+    from . import registrar as _registrar
+
+    try:
+        root = _registrar.lab_info_root().resolve()
+        if not p.resolve().is_relative_to(root):
+            return False
+    except (OSError, ValueError):
+        return False
+    try:
+        roster = list((p / MEMBERS_SUBDIR).glob("*.md"))
+    except OSError:
+        return False
+    return len(roster) <= 1
 
 
 def _current_handle() -> str | None:

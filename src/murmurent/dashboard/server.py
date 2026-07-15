@@ -658,7 +658,11 @@ def create_app() -> FastAPI:
         from ..core import registrar as _registrar
         from ..core import centre_init as _ci_gate
         from ..core.repo import use_lab_mgmt_root
-        match = _registrar.lab_mgmt_path_for_handle(handle)
+        # resolve_viewer_lab_mgmt (not the bare lookup): it additionally
+        # upgrades a card-import stub to the member's real lab_mgmt clone once
+        # one exists, so a member whose card predates that fix stops seeing a
+        # roster of just themselves — without hand-editing lab_mgmt_path.
+        match = _registrar.resolve_viewer_lab_mgmt(handle)
         # SCOPING GATE: in ANY initialised centre, the ONLY valid identities are
         # those the centre registry claims (a member/PI/leader of a registered
         # group) or a registrar. A netname that isn't claimed gets NO dashboard —
@@ -3805,7 +3809,7 @@ def create_app() -> FastAPI:
         # registry walk supports multi-lab logins — @core_lead is recognised
         # as PI of the core_lead lab even though @the_pi's lab_mgmt is the
         # default on this machine.
-        match = _reg.lab_mgmt_path_for_handle(norm)
+        match = _reg.resolve_viewer_lab_mgmt(norm)
         lab_name = match[0] if match else None
         lab_mgmt_override = match[1] if match else None
 

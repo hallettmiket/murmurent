@@ -440,6 +440,104 @@ def lab_mgmt_path_for_handle(handle: str, env: dict[str, str] | None = None) -> 
     return None
 
 
+def resolve_viewer_lab_mgmt(
+    handle: str, env: dict[str, str] | None = None,
+) -> tuple[str, str] | None:
+    """:func:`lab_mgmt_path_for_handle`, plus a self-heal for card-import stubs.
+
+    Use this — not the bare lookup — wherever the result becomes a
+    ``repo.use_lab_mgmt_root()`` override for the machine's OWN owner (i.e. the
+    dashboard). The bare lookup stays pure because ``identity_card.build_card``
+    calls it for arbitrary *other* people's handles on the mayor's machine,
+    where healing would be meaningless at best.
+
+    Why heal at all: ``import_card`` used to unconditionally record a
+    one-person stub for every group the owner didn't lead. That path is entered
+    as a thread-local override — resolution step 1 — so it outranks the env
+    var, the pinned pointer, the defaults, AND ``_discover_lab_mgmt_clone()``.
+    Members who later cloned the real roster stayed stuck on the stub with no
+    way out but hand-editing ``lab_mgmt_path``. Machines already in that state
+    repair themselves here, on the next dashboard load, with no user action.
+    """
+    match = lab_mgmt_path_for_handle(handle, env)
+    if match is None:
+        return None
+    group, path = match
+    healed = _heal_card_stub_entry(group, path, handle, env)
+    return (group, healed) if healed else match
+
+
+def _heal_card_stub_entry(
+    group: str, path: str, handle: str, env: dict[str, str] | None = None,
+) -> str | None:
+    """Repoint ``group``'s registry entry from a card stub to a real clone.
+
+    Returns the clone's path when the entry was upgraded (and persisted), else
+    ``None``. Deliberately conservative — every one of these must hold:
+
+      1. this machine has an identity card and ``handle`` owns it (so we only
+         ever rewrite the local machine's own scoped registry);
+      2. the card says the owner is a plain ``member`` of ``group`` — NOT its
+         PI/leader. This is what keeps a registrar-scaffolded lab on the
+         mayor's machine safe: it lives under ``lab_info/`` with a one-person
+         roster and no ``.git``, i.e. stub-shaped, but its owner is the PI;
+      3. the recorded path really is a stub (:func:`repo.is_card_import_stub`);
+      4. an unambiguous real clone for ``group`` exists on disk.
+
+    Any miss → no write, keep the stub. A member who genuinely has no clone
+    yet keeps their working (if lonely) dashboard.
+    """
+    from . import repo as _repo
+
+    norm = _normalize(handle)
+    try:
+        from . import identity_card as _ic
+
+        card = _ic.local_card()
+    except Exception:  # noqa: BLE001
+        return None
+    if not card or _normalize(card.get("netname")) != norm or not norm:
+        return None
+    role = next((r for r in card.get("roles", [])
+                 if str(r.get("group") or "") == str(group)), None)
+    if role is None or role.get("kind") != "member":
+        return None
+    if not path or not _repo.is_card_import_stub(path):
+        return None
+    clone = _repo.discover_lab_mgmt_clone_for_group(group, handle=norm)
+    if clone is None:
+        return None
+    kind = "cores" if role.get("group_kind") == "core" else "labs"
+    if not _repoint_lab_mgmt_path(group, kind, str(clone), env):
+        return None
+    return str(clone)
+
+
+def _repoint_lab_mgmt_path(
+    group: str, kind: str, new_path: str, env: dict[str, str] | None = None,
+) -> bool:
+    """Surgically rewrite one group's ``lab_mgmt_path`` in ``_registry.yaml``.
+
+    A raw YAML edit rather than a ``read_registry``/``write_registry`` round
+    trip: the round trip is lossy for keys the dataclasses don't model, and a
+    self-heal must not silently drop fields it doesn't understand.
+    """
+    p = registry_path(env)
+    try:
+        doc = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+        entry = (doc.get(kind) or {}).get(group)
+        if not isinstance(entry, dict):
+            return False
+        if entry.get("lab_mgmt_path") == new_path:
+            return False
+        entry["lab_mgmt_path"] = new_path
+        p.write_text(yaml.safe_dump(doc, sort_keys=False, allow_unicode=True),
+                     encoding="utf-8")
+    except (OSError, yaml.YAMLError):
+        return False
+    return True
+
+
 def write_registry(reg: Registry, env: dict[str, str] | None = None) -> Path:
     """Serialise ``reg`` to ``_registry.yaml``. Creates parent dirs.
 
