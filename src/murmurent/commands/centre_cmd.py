@@ -823,10 +823,10 @@ def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
     self_rooted = (pi_p.get("issuer") or {}).get("fingerprint") == pi_p["subject"]["fingerprint"]
     if self_rooted:
         root = pi_p["subject"]["pubkey"]
-        import_hint = f"murmurent import-card <bundle-file> --trust-root {root}"
+        import_hint = f"murmurent import-card bundle.json --trust-root {root}"
     else:
         import_hint = ("murmurent centre-pin <centre>, then "
-                       "murmurent import-card <bundle-file>")
+                       "murmurent import-card bundle.json")
 
     if out_file:
         _P(out_file).write_text(text, encoding="utf-8")
@@ -841,13 +841,13 @@ def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
     member_email = str((enrollment.get("payload") or {}).get("email") or "")
     member_slack = str((enrollment.get("payload") or {}).get("slack") or "")
     dm_text = (
-        f"Your murmurent member ID for '{group}' is ready. Save the JSON below "
-        f"as a file (e.g. bundle.json), then run:\n\n"
-        f"    {import_hint}\n\n"
-        f"```\n{text}\n```"
+        f"Your murmurent member ID for '{group}' is ready — your signed "
+        f"bundle.json is attached to this message. Download it, then run:\n\n"
+        f"    {import_hint}"
     )
     ok, detail = _gr.send_group_dm(group, text=dm_text, slack_user_id=dm_user_id,
-                                    slack=member_slack, email=member_email)
+                                    slack=member_slack, email=member_email,
+                                    file_content=text, file_name="bundle.json")
     if ok:
         click.echo(f"\n✓ DM'd {subj} their card on Slack")
     else:
@@ -1642,6 +1642,8 @@ _GROUP_SLACK_SCOPES = [
     ("chat:write",        "post events + broadcasts"),
     ("im:write",          "open a real DM to a member (onboarding), not just "
                            "the bot's App messages tab"),
+    ("files:write",       "attach the signed bundle.json to the onboarding DM "
+                           "as a downloadable file (not pasted plain text)"),
     ("users:read.email",  "resolve a member's email → their Slack account"),
     ("groups:read",       "look up channel ids by name"),
     ("channels:read",     "look up channel ids by name"),

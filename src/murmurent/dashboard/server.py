@@ -2190,11 +2190,11 @@ def create_app() -> FastAPI:
         pi_p = bundle["pi_card"]["payload"]
         self_rooted = (pi_p.get("issuer") or {}).get("fingerprint") == pi_p["subject"]["fingerprint"]
         if self_rooted:
-            import_hint = ("save the bundle as bundle.json, then run: "
-                           f"murmurent import-card bundle.json --trust-root {pi_p['subject']['pubkey']}")
+            import_hint = (f"murmurent import-card bundle.json "
+                           f"--trust-root {pi_p['subject']['pubkey']}")
         else:
-            import_hint = ("save the bundle as bundle.json, then run: "
-                           "murmurent centre-pin <centre> && murmurent import-card bundle.json")
+            import_hint = ("murmurent centre-pin <centre> && "
+                           "murmurent import-card bundle.json")
 
         try:
             _audit.write_event(
@@ -2210,11 +2210,12 @@ def create_app() -> FastAPI:
             member_email = str(payload.get("email") or "")
             member_slack = str(payload.get("slack") or "")
             dm_text = (
-                f"Your murmurent member ID for '{group}' is ready. Save the JSON "
-                f"below as bundle.json, then run:\n\n    {import_hint}\n\n"
-                f"```\n{_json.dumps(bundle, indent=2)}\n```")
-            dm_ok, dm_detail = _gr.send_group_dm(group, text=dm_text,
-                                                 slack=member_slack, email=member_email)
+                f"Your murmurent member ID for '{group}' is ready — your signed "
+                f"bundle.json is attached to this message. Download it, then run:"
+                f"\n\n    {import_hint}")
+            dm_ok, dm_detail = _gr.send_group_dm(
+                group, text=dm_text, slack=member_slack, email=member_email,
+                file_content=_json.dumps(bundle, indent=2), file_name="bundle.json")
 
         return {
             "ok": True,

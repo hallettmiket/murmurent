@@ -43,6 +43,7 @@ you own. Create it once, click by click:
    | `groups:write` | create your lab's private channels |
    | `chat:write` | post events + broadcasts |
    | `im:write` | open a real DM to a member (onboarding steps); without it, DMs land in the bot's *App messages* tab, not the member's Direct Messages |
+   | `files:write` | attach the signed `bundle.json` to the onboarding DM as a **downloadable file** instead of pasting it as plain text; without it, card issuance falls back to the inline-text delivery |
    | `users:read.email` | resolve a member's email → their Slack account |
    | `groups:read`, `channels:read` | look up channel ids by name |
    | `channels:join` | let murmurent **auto-join a public channel** it needs to post to (e.g. `#claude-test`) instead of you `/invite`-ing the bot by hand. Public channels only — private channels still need a one-time manual invite. |
