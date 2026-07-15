@@ -40,15 +40,33 @@ What each step does:
 
 ## Per-project wiring
 
-Use the dashboard's *adopt* button (for existing clones) or
-*install* button (for fresh ones). Both call
-[`core.projectize`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/projectize.py) under the
-hood, which writes:
+These are two different actions on the Repos panel — see
+[`ready_vs_projects.md`](ready_vs_projects.md) for the full picture.
 
-1. `.murmurent.yaml` readiness marker at the clone root (adopt; legacy repos carry `CHARTER.md` until `murmurent repo upgrade`).
-2. `lab_mgmt/projects/<name>.md` (the lab registry entry, if missing).
-   See [`lab_mgmt.md`](lab_mgmt.md) for what this repo is, who needs
-   it, and how it differs from `~/.murmurent/lab_info/`.
+**↑ adopt** (existing clone, not yet part of a project) calls
+[`core.adopt`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/adopt.py)
+/ [`core.repo_ready`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/repo_ready.py)
+and only makes the repo **murmurent-ready**:
+
+1. `.murmurent.yaml` readiness marker at the clone root (legacy repos
+   carry `CHARTER.md` instead, until `murmurent repo upgrade` converts it).
+2. `.claude/agents/` symlinks for the agents you picked.
+
+No project, no lab_mgmt registry entry, no installation manifest is
+written — attach the ready repo to a project separately when you need one.
+
+**+ install** (fresh clone, or an existing project onto an additional
+machine) calls
+[`core.projectize`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/projectize.py),
+which writes:
+
+1. `CHARTER.md` at the clone root, if missing (a project's primary repo
+   still gets this legacy-shaped bootstrap — `murmurent repo upgrade`
+   converts it to `.murmurent.yaml` later without touching the project
+   record).
+2. `lab_mgmt/cert_projects/<name>.md` (the authoritative project registry
+   entry, if missing). See [`lab_mgmt.md`](lab_mgmt.md) for what this
+   repo is, who needs it, and how it differs from `~/.murmurent/lab_info/`.
 3. `~/.murmurent/installations/<name>.yaml` (this-machine manifest).
 4. `.claude/agents/` symlinks for the agents you picked.
 5. `.vscode/settings.json` (murmurent chrome — title, activity bar
@@ -56,7 +74,7 @@ hood, which writes:
 6. `.gitignore` line for `.claude/settings.json` (machine-local
    permissions/grants don't escape to git).
 
-Existing files are preserved on re-run.
+Existing files are preserved on re-run, on both paths.
 
 ## Remote host setup
 
@@ -73,7 +91,10 @@ scripts/install_remote.sh lab-server
 
 After that, `↑ adopt` works for `• clone` rows on lab-server in the
 Repos panel (writes CHARTER + bootstrap + chrome on the remote
-over a single batched SSH session).
+over a single batched SSH session). This is readiness only, same as a
+local adopt — no project is created; the remote script predates
+`.murmurent.yaml`, so the repo shows as `ready (legacy)` until someone
+runs `murmurent repo upgrade` against it later.
 
 ## Verify
 

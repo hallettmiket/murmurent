@@ -126,13 +126,16 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 
 Terminal twin of the dashboard's **Repos** panel. All three commands
 use the same core modules as the panel (`core.repo_inventory`,
-`core.adopt`), so the two surfaces can't drift.
+`core.adopt`), so the two surfaces can't drift. **"Murmurent-ready" and
+"a project" are two different things** — see
+[`ready_vs_projects.md`](ready_vs_projects.md) if that split isn't
+obvious yet.
 
 | Command | Effect |
 |---|---|
 | `murmurent repo list [--host <name>]` | Every git clone on every registered machine (local included), grouped by host, each with its readiness verdict (`✓ ready` / `± partial` / `• clone`) |
 | `murmurent repo status <path-or-name> [--host <name>]` | Is this repo murmurent-ready? A path is checked directly (local, or on `--host` over SSH); a bare name is searched on every registered machine. Reports the `.murmurent.yaml` marker (or legacy `CHARTER.md`) + `.claude/agents/` components. Exit 0 = ready, 1 = not ready, 2 = not found — scriptable |
-| `murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]` | Make an existing clone **murmurent-ready**: writes the `.murmurent.yaml` readiness marker and bootstraps `.claude/agents/`. Creates NO project — a project is a set of repos + members, made via `murmurent project new` (which attaches ready repos) |
+| `murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]` | Make an existing clone **murmurent-ready**: writes the `.murmurent.yaml` readiness marker and bootstraps `.claude/agents/`. Creates NO project, no lab_mgmt registry entry — a project is a set of repos + members, made via the dashboard's **New Project** flow (see [`project_creation.md`](project_creation.md)), which attaches already-ready repos |
 | `murmurent repo upgrade [<path> \| --all] [--add-agents a,b] [--all-agents]` | Bring ready repos up to the current murmurent release: converts legacy `CHARTER.md` bootstraps to the marker, migrates the marker schema, re-links commons agents, re-stamps `bootstrap_version`. Agent *content* updates never need this — symlinks track the commons clone automatically |
 
 ### Experiments

@@ -73,7 +73,7 @@ command available in any murmurent-bootstrapped CC session.
 
 | Skill | Role |
 |---|---|
-| [`/murmurent-push`](skills/murmurent-push/SKILL.md) | Murmurent-aware stage/commit/push: skips per-machine + secret-shaped files, refuses large files that belong in `refined/`, never touches `/data/lab_vm/raw\|refined/`, posts a Slack release note. Use instead of generic `/commit-push` for any repo with a `CHARTER.md`. |
+| [`/murmurent-push`](skills/murmurent-push/SKILL.md) | Murmurent-aware stage/commit/push: skips per-machine + secret-shaped files, refuses large files that belong in `refined/`, never touches `/data/lab_vm/raw\|refined/`, posts a Slack release note. Use instead of generic `/commit-push` for any **murmurent-ready** repo (`.murmurent.yaml`, or a legacy `CHARTER.md` bootstrap). |
 | [`/murmurent-admin`](skills/murmurent-admin/SKILL.md) | Prime context before admin-level (centre / mayor / registrar / join / provisioning) work: reloads murmurent's purpose from the manuscript + code, pins Obsidian maps-legends and CC guidance to the top, enforces the manuscript pull-first rule. |
 | [`/murmurent-reset`](skills/murmurent-reset/SKILL.md) | Back up, then reset this machine's murmurent state to a fresh start (so `centre-init` is first-run again). Tiered `centre`/`install`/`full`; always tarballs `~/.murmurent` first; credentials + other-project installs are protected behind explicit `--nuke` flags; `--dry-run` previews. Use for a clean slate / fresh copy from the repo. |
 | [`/murmurent-onboard`](skills/murmurent-onboard/SKILL.md) | Mayor/registrar helper: process an incoming **encrypted** join-request email end to end — decrypt + file it, show who's asking, then (on explicit OK) approve + provision (lab/core Slack channel, GitHub repo, FS ACLs) or decline. Approval reads the Slack token from env **or** the `~/.config` file so the channel is created without exporting anything. |
@@ -84,6 +84,10 @@ command available in any murmurent-bootstrapped CC session.
 - [`docs/obsidian-layout.md`](docs/obsidian-layout.md) — vault-side conventions + cross-reference to vault's own `CLAUDE.md` and `maps-legends/`.
 - [`docs/vscode-workflow.md`](docs/vscode-workflow.md) — launcher, 4-quadrant layout, agent reporter, tmux copy-paste.
 - [`docs/setup.md`](docs/setup.md) — per-machine + per-project install steps.
+- [`docs/ready_vs_projects.md`](docs/ready_vs_projects.md) — "murmurent-ready"
+  (repo-level: `.murmurent.yaml` + commons agents) vs. a project
+  (governance-level: repos + certified members, in `cert_projects/`) — the
+  split that replaced adopt-also-minting-a-project.
 - [`docs/reconcile.md`](docs/reconcile.md) — `murmurent reconcile` drift-detection routine + daily `/routine` schedule.
 - [`docs/style/code-style.md`](docs/style/code-style.md) — Python/R style
   preferences (CC follows the same defaults; this is for human reference,

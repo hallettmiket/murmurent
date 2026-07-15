@@ -92,9 +92,17 @@ murmurent_lab_mgmt_<lab>/
 │                             personal-vault drafts via the publish
 │                             flow). Read by every member; written by
 │                             the oracle MCP after PI review.
-├── projects/                 Per-project registry entries. Each
-│                             holds the project's charter, members
-│                             subset, status.
+├── cert_projects/            THE authoritative project registry — one
+│                             .md per project (name, lab, lead,
+│                             sensitivity, certified members, repos,
+│                             Slack channel). This is what the
+│                             dashboard's Projects panel reads; it no
+│                             longer scans ~/repos for CHARTER.md files.
+├── projects/                 Legacy CHARTER-mirror registry that
+│                             cert_projects/ replaced (2026-07-15
+│                             split). Old entries may still be present
+│                             for history; new projects are recorded
+│                             in cert_projects/ only.
 ├── roles/                    Role assignments (lab_manager,
 │                             oracle_curator, sysadmin, …) with
 │                             audit history.
@@ -189,7 +197,8 @@ and daily reconcile track what the PI pushes.
 | `members/*.md` | everyone | PI (or `cable_guy` via PI delegation) |
 | `inventory/*.md` | everyone | `lab_manager` role via the inventory MCP |
 | `oracle/*.md` | everyone | `oracle_curator` role via the oracle publish flow |
-| `projects/*.md` | everyone | project lead + PI |
+| `cert_projects/*.md` | everyone | project lead + PI (written by the dashboard's New Project flow / `core.cert_projects`) |
+| `projects/*.md` (legacy) | everyone | project lead + PI |
 | `roles/*.md`, `audit/*.md` | everyone | PI |
 | `compliance.md` | everyone | PI |
 

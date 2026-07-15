@@ -18,6 +18,13 @@ project should exist; the lead controls who's in it.
 Every project also gets a **private Slack channel**: certificates are DM'd
 through Slack, members are invited when they join and removed when they leave.
 
+A project is a different, bigger thing than a repo simply being
+**murmurent-ready** (having the commons agents wired in via `murmurent repo
+adopt`) — readiness is plumbing a repo needs before it's useful in a
+project, not a project itself. See
+[`ready_vs_projects.md`](ready_vs_projects.md) if you're not sure which one
+you're looking at.
+
 ---
 
 ## Vignette 1 — An intra-group project (everyone is in your lab)

@@ -225,8 +225,14 @@ Steps (in order; stop and report if any step fails):
 4. **Obsidian vault folder** — create `<notebook_path>/<project>/` on each member's
    registered machine, or add to provisioning checklist.
 
-5. **Write project record** to `<lab-mgmt>/projects/<project>/CHARTER.md` (if not
-   already scaffolded by `murmurent new-project`).
+5. **Write project record** to `<lab-mgmt>/cert_projects/<project>.md` — the
+   authoritative project registry (if not already written by the dashboard's
+   New Project flow / `core.cert_projects`). This is a separate step from
+   the repo's own readiness: the repo also needs `murmurent repo adopt`
+   (or the equivalent bootstrap) to be **murmurent-ready**
+   (`.murmurent.yaml` + `.claude/agents/`) — a `CHARTER.md` alone does not
+   make it one, and a project record here does not make the repo ready by
+   itself either. See [`docs/ready_vs_projects.md`](../docs/ready_vs_projects.md).
 
 6. **Oracle**: record the new project lineage, lead, and sensitivity.
 
@@ -238,7 +244,11 @@ Trigger: PI says "check installations" or weekly cron.
 
 For each `status: active` record in `<lab-mgmt>/installations/`:
 1. Check member is still active in `<lab-mgmt>/members/`.
-2. Check project still exists (CHARTER.md present).
+2. Check project still exists — i.e. `status: active` in its
+   `<lab-mgmt>/cert_projects/<project>.md` record, not the presence of a
+   `CHARTER.md` file (a repo's `CHARTER.md`/`.murmurent.yaml` only tells
+   you the repo is murmurent-ready, not whether it's still an active
+   project).
 3. Verify lab-base paths are reachable **if** the machine is the current host
    (i.e. `$HOSTNAME` matches or `ssh <hostname> ls <raw_path>` returns 0 within
    a 10-second timeout). Remote checks are best-effort; failures produce `WARN`

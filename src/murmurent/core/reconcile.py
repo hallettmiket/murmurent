@@ -29,9 +29,12 @@ What we detect (all enabled by default):
      as a warning; user decides whether to re-adopt (write a fresh
      CHARTER) or remove from murmurent.
   4. **unadopted_clone** — git clone present in a scan dir but not
-     yet a murmurent project. Already surfaced by the Repo Inventory
-     panel; here we just include the count so the daily summary
-     gives a full picture of "what's on disk vs what murmurent sees".
+     yet murmurent-ready (no readiness marker + agent links). It is
+     NOT about projects: readiness is a repo property, and a ready
+     repo may belong to no project at all (see docs/ready_vs_projects.md).
+     Already surfaced by the Repo Inventory panel; here we just include
+     the count so the daily summary gives a full picture of "what's on
+     disk vs what murmurent sees".
   5. **lab_mgmt_uncommitted / lab_mgmt_unpushed** — lab_mgmt edits
      that haven't reached the lab (members receive the roster via
      git pull, so local-only edits are invisible to everyone else).
@@ -502,7 +505,7 @@ def detect_missing_charters() -> list[DriftFinding]:
 
 
 def detect_unadopted_clones() -> list[DriftFinding]:
-    """Count clones that aren't yet murmurent projects, grouped by host.
+    """Count clones that aren't yet murmurent-ready, grouped by host.
     Uses the most recent cached inventory report rather than running
     a fresh scan — reconciliation should be cheap. One finding per
     host with a rolled-up count, not per-clone, so the daily summary
@@ -530,7 +533,7 @@ def detect_unadopted_clones() -> list[DriftFinding]:
             severity="info",
             target=f"{n} clones",
             host=host,
-            detail=f"{n} git clones on {host} are not yet murmurent projects",
+            detail=f"{n} git clones on {host} are not yet murmurent-ready",
             suggested_action="click ↑ adopt in the Repos panel",
         ))
     return findings
