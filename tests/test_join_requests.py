@@ -424,15 +424,38 @@ def test_send_group_dm_with_file_uploads_instead_of_posting(monkeypatch):
     assert calls["channel"] == "D999"
 
 
-def test_send_group_dm_file_upload_missing_scope_is_actionable(monkeypatch):
+def test_send_group_dm_file_upload_missing_scope_degrades_to_text(monkeypatch):
+    """Upload failure (e.g. no files:write) degrades to inline text so the bundle
+    still reaches the member — never lost — and the detail explains the scope gap."""
+    from murmurent.core import group_reconcile as GR
+    from murmurent.dashboard import slack_notify as SN
+    posted = {}
+    monkeypatch.setattr(SN, "_open_dm", lambda uid, tok: "D999")
+    monkeypatch.setattr(SN, "_upload_file", lambda *a, **k: False)
+    monkeypatch.setattr(
+        SN, "_post",
+        lambda channel, text, **kw: (posted.update(channel=channel, text=text), True)[1])
+    ok, detail = GR.send_group_dm("dcis", text="download & import", slack_user_id="U777",
+                                   token="xoxb-x", file_content='{"member_card": 1}')
+    assert ok is True                              # bundle still delivered, as text
+    assert "files:write" in detail                 # PI told why + how to fix
+    assert posted["channel"] == "D999"
+    assert '{"member_card": 1}' in posted["text"]  # the bundle itself is in the message
+    assert "download & import" in posted["text"]   # original instructions preserved
+
+
+def test_send_group_dm_file_upload_and_text_both_fail(monkeypatch):
+    """When BOTH the file upload and the inline-text fallback fail, return
+    (False, detail) so the caller tells the PI to deliver the bundle by hand."""
     from murmurent.core import group_reconcile as GR
     from murmurent.dashboard import slack_notify as SN
     monkeypatch.setattr(SN, "_open_dm", lambda uid, tok: "D999")
     monkeypatch.setattr(SN, "_upload_file", lambda *a, **k: False)
+    monkeypatch.setattr(SN, "_post", lambda *a, **k: False)
     ok, detail = GR.send_group_dm("dcis", text="hi", slack_user_id="U777",
                                    token="xoxb-x", file_content="{}")
     assert ok is False
-    assert "files:write" in detail
+    assert "by hand" in detail
 
 
 def test_slack_upload_file_three_step_flow(monkeypatch):

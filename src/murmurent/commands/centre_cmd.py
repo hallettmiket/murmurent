@@ -849,7 +849,8 @@ def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
                                     slack=member_slack, email=member_email,
                                     file_content=text, file_name="bundle.json")
     if ok:
-        click.echo(f"\n✓ DM'd {subj} their card on Slack")
+        note = "" if detail == "sent" else f"\n  ({detail})"
+        click.echo(f"\n✓ DM'd {subj} their card on Slack{note}")
     else:
         click.echo(f"\n! could not DM on Slack ({detail}) — send them this bundle "
                    f"yourself:\n    {import_hint}")

@@ -199,8 +199,13 @@ def send_group_dm(group: str, *, text: str, slack_user_id: str = "",
     named ``file_name`` (default ``bundle.json``), with ``text`` riding along as
     the accompanying message — so a card bundle arrives as an attachment the
     member can save with one click, not as plain text they must copy out of the
-    chat. Needs the bot's ``files:write`` scope; falls back to (False, detail)
-    if it's missing, exactly like the text path."""
+    chat. Needs the bot's ``files:write`` scope.
+
+    If the upload can't happen (most often a missing ``files:write`` scope) the
+    bundle is NOT dropped: it degrades to posting the bundle inline as text so
+    the member still receives it — ``(True, detail)`` where ``detail`` names the
+    scope gap so the PI knows why it arrived as text and how to fix it. Only when
+    BOTH the upload and the text fallback fail is ``(False, detail)`` returned."""
     from ..dashboard import slack_notify as _sn
 
     tok = token if token is not None else resolve_group_slack_token(group)
@@ -224,10 +229,28 @@ def send_group_dm(group: str, *, text: str, slack_user_id: str = "",
     if not channel:
         return False, "couldn't open a DM (does the bot have the im:write scope?)"
     if file_content is not None:
-        ok = _sn._upload_file(channel, filename=file_name, content=file_content,
-                              initial_comment=text, token=tok)
-        return (ok, "sent" if ok else
-                "Slack file upload failed (does the bot have the files:write scope?)")
+        if _sn._upload_file(channel, filename=file_name, content=file_content,
+                            initial_comment=text, token=tok):
+            return True, "sent"
+        # Graceful degradation: the upload failed (almost always a missing
+        # ``files:write`` scope). Rather than deliver nothing, post the bundle
+        # inline as text so the member still receives it — never lose the
+        # bundle — and flag the scope gap in the detail so the PI knows why it
+        # arrived as text and how to get a real attachment next time.
+        fallback = (
+            f"{text}\n\n"
+            f"(Couldn't attach {file_name} as a downloadable file. Copy "
+            f"everything between the ``` fences below into a file named "
+            f"{file_name}.)\n```\n{file_content}\n```")
+        if _sn._post(channel, fallback, token=tok):
+            return True, (
+                f"sent as inline text — the Slack file upload failed, most "
+                f"likely a missing files:write scope. Add files:write to the "
+                f"group bot and reinstall for a downloadable {file_name} "
+                f"attachment next time.")
+        return False, ("Slack file upload failed (missing files:write scope?) "
+                       "and the inline-text fallback also failed (missing "
+                       "chat:write scope?) — send the bundle to the member by hand")
     ok = _sn._post(channel, text, token=tok)
     return (ok, "sent" if ok else "Slack post failed")
 
