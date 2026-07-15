@@ -18,6 +18,9 @@ from pathlib import Path
 
 CHARTER_FILENAME = "CHARTER.md"
 MEMBERS_FILENAME = "MEMBERS"
+# The lab_mgmt roster lives in a ``members/`` subdir (one <handle>.md per member);
+# distinct from the project-level ``MEMBERS`` file above.
+MEMBERS_SUBDIR = "members"
 DEFAULT_MURMURENT_REPO = Path("~/repos/murmurent").expanduser()
 # 2026-05-14: repo is being renamed from "hallett-lab-mgmt" to the per-group
 # convention "lab_mgmt". During the transition we prefer the new path but
@@ -79,7 +82,90 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
         return DEFAULT_LAB_MGMT_REPO
     if LEGACY_LAB_MGMT_REPO.exists():
         return LEGACY_LAB_MGMT_REPO
+    # Everything above missed. A MEMBER machine (no env var, no pin — they
+    # never ran pi-init) natural-names its clone after the repo itself
+    # (``~/repos/murmurent_lab_mgmt_<lab>``), NOT ``~/repos/lab_mgmt``, so the
+    # roster silently resolves to a non-existent default and every panel goes
+    # empty. Self-heal: scan for a clone that looks like a lab_mgmt repo and,
+    # on an unambiguous hit, pin it so this discovery runs exactly once.
+    discovered = _discover_lab_mgmt_clone()
+    if discovered is not None:
+        return discovered
     return DEFAULT_LAB_MGMT_REPO
+
+
+def _looks_like_lab_mgmt_clone(path: Path) -> bool:
+    """A directory is a plausible lab_mgmt clone when it carries both a
+    ``lab.md`` (the group config) and a ``members/`` roster directory."""
+    return (path / "lab.md").is_file() and (path / MEMBERS_SUBDIR).is_dir()
+
+
+def _discover_lab_mgmt_clone() -> Path | None:
+    """Best-effort discovery of a member's lab_mgmt clone under ``repos_root()``.
+
+    Only called when the env var, the pinned pointer, and both default paths
+    have all missed — i.e. the member-machine case. Scans the top level of
+    ``repos_root()`` for directories that look like a lab_mgmt clone (``lab.md``
+    + ``members/``). When the current user's handle can be resolved, candidates
+    whose roster contains that handle are preferred.
+
+    Returns the discovered clone on a **unique** hit — and PINS it (via
+    :func:`set_lab_mgmt_path`) so subsequent resolutions take the pinned branch
+    above and never re-scan. On zero or ambiguous hits it returns ``None`` and
+    the caller falls through to the unchanged default (no pin written).
+
+    Loop-safe: pinning is what stops the recursion (the next call short-circuits
+    on ``_pinned_lab_mgmt_path``); this function itself never calls
+    ``lab_mgmt_repo_root``.
+    """
+    root = repos_root()
+    try:
+        entries = sorted(p for p in root.iterdir() if p.is_dir())
+    except OSError:
+        return None
+
+    candidates = [p for p in entries if _looks_like_lab_mgmt_clone(p)]
+    if not candidates:
+        return None
+
+    # Prefer a clone whose roster actually contains the current user. If the
+    # handle can't be resolved (or matches nothing), fall back to the full set.
+    handle = _current_handle()
+    if handle:
+        member_file = f"{handle}.md"
+        with_me = [p for p in candidates if (p / MEMBERS_SUBDIR / member_file).is_file()]
+        if with_me:
+            candidates = with_me
+
+    if len(candidates) != 1:
+        # Zero (shouldn't happen here) or ambiguous — don't guess, don't pin.
+        return None
+
+    found = candidates[0]
+    try:
+        set_lab_mgmt_path(found)
+    except OSError:
+        # Couldn't persist the pointer; still return the live hit for this call.
+        pass
+    return found
+
+
+def _current_handle() -> str | None:
+    """Resolve the current user's bare handle for discovery, or ``None``.
+
+    Tolerant: never raises, and treats the sentinel ``unknown`` identity as
+    unresolved so discovery falls back to the whole candidate set.
+    """
+    try:
+        from . import identity as _identity
+
+        ident = _identity.resolve(allow_unknown=True)
+    except Exception:  # noqa: BLE001
+        return None
+    handle = (ident.handle or "").strip().lstrip("@")
+    if not handle or handle == "unknown":
+        return None
+    return handle
 
 
 def _wig_home() -> Path:
