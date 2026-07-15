@@ -86,10 +86,26 @@ def lab_info_root(env: dict[str, str] | None = None) -> Path:
     """Return the registrar's data root.
 
     Production setting: ``/data/lab_info/``. Development default:
-    ``~/.murmurent/lab_info/``. Override via ``$MURMURENT_LAB_INFO_ROOT``.
+    ``<murmurent home>/lab_info/``. Override via ``$MURMURENT_LAB_INFO_ROOT``.
+
+    Resolution order: ``$MURMURENT_LAB_INFO_ROOT``, else ``$MURMURENT_HOME``'s
+    ``lab_info/``, else ``~/.murmurent/lab_info/``.
+
+    ``$MURMURENT_HOME`` is honoured because ``DEFAULT_LAB_INFO_ROOT`` is bound at
+    import time from the REAL ``Path.home()``: isolating ``$MURMURENT_HOME`` (as
+    tests and ad-hoc scripts do, and as every other module honours via
+    ``repo._wig_home``) otherwise left this one path pointing at the live
+    machine, and a `pi-init` smoke run wrote a bogus core into the operator's
+    real registry — which the dashboard then trusted over their actual lab.
     """
     source = os.environ if env is None else env
-    return Path(source.get(LAB_INFO_ENV_VAR, DEFAULT_LAB_INFO_ROOT)).expanduser()
+    explicit = source.get(LAB_INFO_ENV_VAR)
+    if explicit:
+        return Path(explicit).expanduser()
+    home = source.get("MURMURENT_HOME")
+    if home:
+        return Path(home).expanduser() / "lab_info"
+    return DEFAULT_LAB_INFO_ROOT
 
 
 def registry_path(env: dict[str, str] | None = None) -> Path:

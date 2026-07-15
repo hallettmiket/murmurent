@@ -1596,3 +1596,30 @@ def test_registrar_cert_specs_use_same_fields_as_pi_dashboard(isolated, tmp_path
     assert spec.short == "tcps_2"      # <- this is what the JSX renders as the column header
     assert spec.name == "TCPS 2"       # <- this is what shows up in the tooltip
     assert spec.cadence_years == 3
+
+
+def test_lab_info_root_honours_murmurent_home(monkeypatch, tmp_path):
+    """$MURMURENT_HOME must isolate the registry too.
+
+    DEFAULT_LAB_INFO_ROOT is bound at import time from the real Path.home(),
+    so before this, isolating MURMURENT_HOME (the obvious way to sandbox a
+    run) still resolved lab_info to the LIVE machine — a `pi-init` smoke run
+    wrote a bogus core into the operator's real registry, and their dashboard
+    trusted it over their actual lab. Explicit MURMURENT_LAB_INFO_ROOT still
+    wins; with neither set, the real default stands.
+    """
+    from murmurent.core import registrar as REG
+
+    monkeypatch.delenv("MURMURENT_LAB_INFO_ROOT", raising=False)
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "home"))
+    assert REG.lab_info_root() == tmp_path / "home" / "lab_info"
+    assert REG.registry_path() == tmp_path / "home" / "lab_info" / "_registry.yaml"
+
+    # Explicit override still wins over MURMURENT_HOME.
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "explicit"))
+    assert REG.lab_info_root() == tmp_path / "explicit"
+
+    # Neither set → the import-time default (the live machine).
+    monkeypatch.delenv("MURMURENT_LAB_INFO_ROOT", raising=False)
+    monkeypatch.delenv("MURMURENT_HOME", raising=False)
+    assert REG.lab_info_root() == REG.DEFAULT_LAB_INFO_ROOT
