@@ -1664,6 +1664,9 @@ _GROUP_SLACK_SCOPES = [
     ("chat:write",        "post events + broadcasts"),
     ("im:write",          "open a real DM to a member (onboarding), not just "
                            "the bot's App messages tab"),
+    ("im:history",        "read back the bot's own DM threads, so murmurent can "
+                          "verify a delivery actually landed (e.g. a member's "
+                          "bundle.json)"),
     ("files:write",       "attach the signed bundle.json to the onboarding DM "
                            "as a downloadable file (not pasted plain text)"),
     ("users:read.email",  "resolve a member's email → their Slack account"),

@@ -51,6 +51,8 @@ it once — click by click:
    | `channels:manage` | create public channels (if you use any) |
    | `chat:write` | post events + broadcasts |
    | `im:write` | open a real DM to a member (onboarding + decision DMs); without it, DMs land in the bot's *App messages* tab, not the member's Direct Messages |
+   | `files:write` | attach signed bundles (e.g. `bundle.json`) to DMs as **downloadable files** instead of pasting them as plain text; without it, delivery falls back to inline text |
+   | `im:history` | read back the bot's **own** DM threads so murmurent can verify a delivery actually landed; without it, murmurent can send DMs but never check on them |
    | `users:read.email` | resolve a member's email → their Slack account |
    | `groups:read`, `channels:read` | look up channel ids by name (e.g. `#general`) |
    | `channels:join` | let murmurent **auto-join a public channel** it needs to post to (e.g. `#claude-test`) instead of manually `/invite`-ing the bot. Public channels only — private channels still need a one-time manual invite. |
