@@ -56,8 +56,11 @@ def _seed_core(name="biocore", display="BioCORE", leader="@biocore_leader"):
 
 # ---- VALID_ROLES ----------------------------------------------------------
 
-def test_valid_roles_includes_core_leader():
-    assert "core_leader" in role_audit.VALID_ROLES
+def test_valid_roles_has_three_lenses_only():
+    """A PI leads either a lab or a core — one PI lens for both (issue
+    #18). core_leader is retired as a login role; core-leader AUTHORITY
+    (can_admin on /api/core/dashboard etc.) is unaffected."""
+    assert role_audit.VALID_ROLES == {"member", "pi", "registrar"}
 
 
 # ---- /core HTML route -----------------------------------------------------
@@ -117,29 +120,35 @@ def test_core_dashboard_registrar_can_admin_other_cores(world):
 
 # ---- login resolver -------------------------------------------------------
 
-def test_login_resolve_flags_core_leader(world):
+def test_login_resolve_core_leader_is_pi(world):
+    """The leader of a core resolves as a PI — same lens as a lab PI
+    (issue #18). The retired core_leader fields are gone from the
+    payload entirely."""
     _seed_core()
     client = TestClient(create_app())
     res = client.get("/api/login/resolve?user=biocore_leader")
     d = res.json()
-    assert d["is_core_leader"] is True
-    assert d["core_leader_of"] == ["biocore"]
+    assert d["is_pi"] is True
+    assert d["pi_lab"] == "biocore"
+    assert d["default_role"] == "pi"
+    assert "is_core_leader" not in d
+    assert "core_leader_of" not in d
 
 
-def test_login_resolve_non_leader_non_registrar_has_core_leader_false(world):
-    """A handle that is NEITHER a core leader NOR a centre registrar
-    gets is_core_leader=false. the_pi is the registrar in this fixture
-    so they get the implicit-leader shortcut (covered in a separate test);
-    a fresh handle should not."""
+def test_login_resolve_outsider_is_plain_member(world):
+    """A handle that leads nothing and isn't a registrar gets only the
+    member lens."""
     _seed_core()
     client = TestClient(create_app())
-    res = client.get("/api/login/resolve?user=random_outsider")
-    d = res.json()
-    assert d["is_core_leader"] is False
-    assert d["core_leader_of"] == []
+    d = client.get("/api/login/resolve?user=random_outsider").json()
+    assert d["is_pi"] is False
+    assert d["is_registrar"] is False
+    assert d["default_role"] == "member"
 
 
-def test_login_select_core_leader_routes_to_core_dashboard(world):
+def test_login_select_core_leader_role_is_rejected(world):
+    """core_leader is no longer a valid login role — even for the actual
+    core leader, who signs in as PI instead."""
     _seed_core()
     client = TestClient(create_app())
     res = client.post("/api/login/select", json={
@@ -147,38 +156,21 @@ def test_login_select_core_leader_routes_to_core_dashboard(world):
         "role": "core_leader",
         "remember_user": False,
     })
-    assert res.status_code == 200, res.text
-    d = res.json()
-    assert d["ok"] is True
-    assert d["role"] == "core_leader"
-    assert d["next"] == "/core?core=biocore&user=biocore_leader"
+    assert res.status_code == 400
 
 
-def test_login_select_rejects_core_leader_for_non_leader(world):
+def test_login_select_routes_core_pi_to_dashboard(world):
     _seed_core()
     client = TestClient(create_app())
-    # Use a totally unrelated handle (not the registered registrar,
-    # not the seeded core leader). The registrar shortcut tested
-    # below means @the_pi (the registrar here) IS a valid core_leader.
     res = client.post("/api/login/select", json={
-        "handle": "random_outsider",
-        "role": "core_leader",
+        "handle": "biocore_leader",
+        "role": "pi",
         "remember_user": False,
     })
-    assert res.status_code == 403
-
-
-def test_resolver_grants_registrar_implicit_core_leader_access(world):
-    """Centre registrars manage cores (add/remove/rotate), so they get
-    is_core_leader=true for all registered cores. Avoids forcing them
-    to type the actual leader's handle to open a core dashboard."""
-    _seed_core()
-    client = TestClient(create_app())
-    res = client.get("/api/login/resolve?user=the_pi")  # the_pi is the registrar
+    assert res.status_code == 200, res.text
     d = res.json()
-    assert d["is_registrar"] is True
-    assert d["is_core_leader"] is True
-    assert "biocore" in d["core_leader_of"]
+    assert d["ok"] is True and d["role"] == "pi"
+    assert d["next"] == "/dashboard?user=biocore_leader&persona=pi"
 
 
 def test_core_services_list_empty(world):
@@ -228,9 +220,11 @@ def test_core_services_list_unknown_core_404(world):
     assert res.status_code == 404
 
 
-def test_registrar_can_select_core_leader_role_and_routes_to_first_core(world):
+def test_registrar_signs_in_as_registrar_not_core_leader(world):
+    """Registrars keep implicit ADMIN over every core (can_admin on the
+    core endpoints, pinned above) but sign in through the registrar
+    lens — the core_leader login shortcut is retired with the role."""
     _seed_core(name="biocore")
-    # Second core, so we exercise the "first core" routing.
     R.create_core(
         name="genomics", display_name="Genomics Core",
         leader_handle="@genomics_leader",
@@ -239,9 +233,9 @@ def test_registrar_can_select_core_leader_role_and_routes_to_first_core(world):
     res = client.post("/api/login/select", json={
         "handle": "the_pi", "role": "core_leader", "remember_user": False,
     })
+    assert res.status_code == 400
+    res = client.post("/api/login/select", json={
+        "handle": "the_pi", "role": "registrar", "remember_user": False,
+    })
     assert res.status_code == 200, res.text
-    d = res.json()
-    # core_leader_of is alphabetised by registry insertion order; bioCORE
-    # was registered first so it's at index 0.
-    assert d["next"].startswith("/core?core=")
-    assert "user=the_pi" in d["next"]
+    assert res.json()["next"] == "/registrar?user=the_pi"

@@ -229,10 +229,11 @@ def test_login_resolve_registrar_from_registry(isolated, tmp_path, monkeypatch):
     assert "alice" in body["registrar_centres"]
 
 
-def test_login_resolve_core_leader_is_not_a_lab_pi(isolated, tmp_path, monkeypatch):
-    """A core LEADER must resolve as core_leader, NOT as a lab PI. Cores reuse
-    the ``pi:`` field internally for their leader, which used to make the
-    resolver read it as a lab PI (emucaki showing PI view but no core view)."""
+def test_login_resolve_core_pi_is_a_pi(isolated, tmp_path, monkeypatch):
+    """A core's PI resolves as a plain PI — there is no separate core-leader
+    login (issue #18: emucaki leads a core; a PI leads either a lab or a
+    core and gets the same PI lens for both). The retired core_leader
+    role must not leak back into the payload."""
     from murmurent.core.registrar import CoreEntry
     core_dir = _seed_lab_mgmt(tmp_path, lab_id="biocore", pi="emucaki",
                               members=[("emucaki", "lead")])
@@ -240,11 +241,20 @@ def test_login_resolve_core_leader_is_not_a_lab_pi(isolated, tmp_path, monkeypat
         cores=[CoreEntry(name="biocore", pi="@emucaki", lab_mgmt_path=str(core_dir))],
     ))
     monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(core_dir))
-    body = TestClient(create_app()).get("/api/login/resolve?user=emucaki").json()
-    assert body["is_core_leader"] is True
-    assert "biocore" in body["core_leader_of"]
-    assert body["is_pi"] is False              # NOT misclassified as a lab PI
-    assert body["default_role"] == "core_leader"
+    client = TestClient(create_app())
+    body = client.get("/api/login/resolve?user=emucaki").json()
+    assert body["is_pi"] is True
+    assert body["pi_lab"] == "biocore"
+    assert body["default_role"] == "pi"
+    assert "is_core_leader" not in body
+    # And the retired role is refused at select time.
+    res = client.post("/api/login/select",
+                      json={"handle": "emucaki", "role": "core_leader"})
+    assert res.status_code == 400
+    # The PI lens routes a core PI to the ordinary dashboard.
+    res = client.post("/api/login/select", json={"handle": "emucaki", "role": "pi"})
+    assert res.status_code == 200
+    assert res.json()["next"] == "/dashboard?user=emucaki&persona=pi"
 
 
 def test_dashboard_gate_rejects_unknown_on_initialised_centre(isolated, tmp_path, monkeypatch):

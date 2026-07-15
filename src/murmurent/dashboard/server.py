@@ -3798,8 +3798,6 @@ def create_app() -> FastAPI:
                 "is_member": False,
                 "is_pi": False,
                 "is_registrar": False,
-                "is_core_leader": False,
-                "core_leader_of": [],
                 "pi_lab": None,
                 "registrar_centres": [],
                 "default_role": "member",
@@ -3819,63 +3817,35 @@ def create_app() -> FastAPI:
                 is_member = rec.status == _mem.ACTIVE
             except _mem.MemberNotFound:
                 is_member = False
-        # pi? — ONLY if this handle is the PI of a registered LAB. Cores reuse
-        # the ``pi:`` field internally for their leader, so reading lab.md's pi
-        # (via _pi_handle) misclassified a *core leader* as a lab PI. Check the
-        # labs list directly and keep lab-PI and core-leader strictly separate.
+        # pi? — the handle leads a registered active group, LAB OR CORE.
+        # A PI leads either a lab or a core; the lens is the same either
+        # way (issue #18) — there is no separate core-leader login. Both
+        # entry kinds carry their leader in the ``pi:`` field, so one
+        # walk over labs + cores covers both.
         pi_lab_name: str | None = None
         try:
             _reg_now = _reg.read_registry()
-            for _l in _reg_now.labs:
-                if _l.status == "active" and _l.pi.lstrip("@").lower() == norm:
-                    pi_lab_name = _l.name
+            for _g in [*_reg_now.labs, *_reg_now.cores]:
+                if _g.status == "active" and _g.pi.lstrip("@").lower() == norm:
+                    pi_lab_name = _g.name
                     break
         except Exception:
             pass
         is_pi_role = pi_lab_name is not None
         # registrar? (centre-level — independent of lab)
         is_reg = _reg.is_registrar(norm)
-        # core_leader? walk the centre registrar's cores and check if
-        # this handle is the leader of any registered (non-archived)
-        # core. Phase 1 of the cores rollout (docs/cores_plan.md §10).
-        # A handle can lead multiple cores; we surface the list so the
-        # login page can present a core-picker when there's more than one.
-        #
-        # Special case: centre registrars get is_core_leader=true for
-        # ALL registered cores. Rationale: the registrar manages cores
-        # (add/remove, rotate leaders, archive) and routinely needs to
-        # open any core's dashboard to investigate — gating that behind
-        # "type the actual leader's handle" is friction for no security
-        # gain (they could rotate themselves to leader anyway).
-        core_leader_of: list[str] = []
-        try:
-            reg = _reg.read_registry()
-            for c in reg.cores:
-                if c.status != "active":
-                    continue
-                if c.pi.lstrip("@").lower() == norm or is_reg:
-                    core_leader_of.append(c.name)
-        except Exception:
-            pass
-        is_core_leader = bool(core_leader_of)
         # default lens: highest privilege the user holds
         if is_reg:
             default = "registrar"
         elif is_pi_role:
             default = "pi"
-        elif is_core_leader:
-            default = "core_leader"
-        elif is_member:
-            default = "member"
         else:
-            default = "member"  # unknown handle — still let them try
+            default = "member"  # members + unknown handles alike
         return {
             "handle": norm,
             "is_member": is_member,
             "is_pi": is_pi_role,
             "is_registrar": is_reg,
-            "is_core_leader": is_core_leader,
-            "core_leader_of": core_leader_of,
             "pi_lab": pi_lab_name or lab_name or None,
             "registrar_centres": _reg.registrars() or (
                 [_reg.registrar_handle()] if _reg.registrar_handle() else []
@@ -5594,14 +5564,10 @@ def create_app() -> FastAPI:
         if role == "registrar":
             next_url = f"/registrar?user={handle}"
         elif role == "pi":
+            # Lab PIs and core PIs alike — one PI lens (issue #18). The
+            # /core page remains reachable from the dashboard for core
+            # operations; it just isn't a login destination.
             next_url = f"/dashboard?user={handle}&persona=pi"
-        elif role == "core_leader":
-            # Pick the first (and usually only) core this handle leads.
-            # Multi-core leaders can switch via a future picker; for now
-            # the path goes to the first registered core they own.
-            cores = roles.get("core_leader_of") or []
-            target = cores[0] if cores else ""
-            next_url = f"/core?core={target}&user={handle}"
         else:
             next_url = f"/dashboard?user={handle}&persona=member"
         return {

@@ -35,7 +35,9 @@ from typing import Iterable
 DEFAULT_LOG_PATH = Path.home() / ".murmurent" / "role_audit.log"
 ENV_VAR = "MURMURENT_ROLE_AUDIT_LOG"
 
-VALID_ROLES = frozenset({"member", "pi", "registrar", "core_leader"})
+# Three lenses only. A PI leads either a lab or a core — same lens for
+# both (issue #18); "core_leader" was retired as a login role.
+VALID_ROLES = frozenset({"member", "pi", "registrar"})
 
 
 def log_path(env: dict[str, str] | None = None) -> Path:
