@@ -239,3 +239,21 @@ def test_registrar_signs_in_as_registrar_not_core_leader(world):
     })
     assert res.status_code == 200, res.text
     assert res.json()["next"] == "/registrar?user=the_pi"
+
+
+def test_core_pi_dashboard_is_the_core_dashboard(world):
+    """One dashboard per group (issue #18): a core's PI signing in as PI
+    lands directly on their core's dashboard — no separate destination
+    to know about. A non-core viewer still gets the lab UI."""
+    _seed_core()
+    client = TestClient(create_app())
+    res = client.get("/dashboard?user=biocore_leader&persona=pi",
+                     follow_redirects=False)
+    assert res.status_code == 307
+    assert res.headers["location"] == "/core?core=biocore&user=biocore_leader"
+    # Following through serves the core dashboard page.
+    res = client.get("/dashboard?user=biocore_leader&persona=pi")
+    assert res.status_code == 200 and "CORE DASHBOARD" in res.text
+    # A handle that leads no core gets the ordinary lab UI.
+    res = client.get("/dashboard?user=random_member", follow_redirects=False)
+    assert res.status_code == 200
