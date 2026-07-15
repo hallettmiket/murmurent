@@ -286,14 +286,14 @@ def test_detect_unadopted_clones_from_cached_inventory(world):
             {
                 "key": "x", "name": "x",
                 "clones": [
-                    {"host": "local", "path": "/x", "is_murmurent_installed": False},
-                    {"host": "lab-server", "path": "/x", "is_murmurent_installed": False},
+                    {"host": "local", "path": "/x", "is_murmurent_ready": False},
+                    {"host": "lab-server", "path": "/x", "is_murmurent_ready": False},
                 ],
             },
             {
                 "key": "y", "name": "y",
                 "clones": [
-                    {"host": "local", "path": "/y", "is_murmurent_installed": True},
+                    {"host": "local", "path": "/y", "is_murmurent_ready": True},
                 ],
             },
         ],

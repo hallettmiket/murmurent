@@ -556,8 +556,8 @@ function RepoInventoryRow({ row, knownHosts, onAdopt }) {
   );
 
   // Per-host cell. Four states:
-  //   ✓ wig — cloned + wigamig-initialized (CHARTER + .claude/agents/)
-  //   • clone + ↑ adopt — cloned but missing CHARTER.md or .claude/agents/.
+  //   ✓ murmurent — cloned + murmurent-ready (CHARTER + .claude/agents/)
+  //   • clone + ↑ adopt — cloned but not yet murmurent-ready.
   //     Adopt works for both local and SSH hosts: local writes CHARTER
   //     on the filesystem; SSH writes CHARTER + bootstraps over a
   //     single batched SSH session.
@@ -566,7 +566,7 @@ function RepoInventoryRow({ row, knownHosts, onAdopt }) {
   const hostCell = (host) => {
     const c = cloneByHost[host];
     if (c) {
-      const wig = c.is_murmurent_installed;
+      const wig = c.is_murmurent_ready;
       if (wig) {
         return (
           <span title={c.path} style={{
@@ -576,7 +576,7 @@ function RepoInventoryRow({ row, knownHosts, onAdopt }) {
           </span>
         );
       }
-      // Cloned but not initialized — offer adopt regardless of host.
+      // Cloned but not murmurent-ready — offer adopt regardless of host.
       // The endpoint branches local vs SSH; the modal passes `host`
       // through unchanged.
       return (

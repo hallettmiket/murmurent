@@ -515,7 +515,7 @@ def detect_unadopted_clones() -> list[DriftFinding]:
     counts: dict[str, int] = {}
     for row in data.get("rows", []):
         for c in row.get("clones", []) or []:
-            if not c.get("is_murmurent_installed"):
+            if not c.get("is_murmurent_ready"):
                 host = c.get("host") or "unknown"
                 counts[host] = counts.get(host, 0) + 1
     findings: list[DriftFinding] = []

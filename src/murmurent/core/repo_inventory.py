@@ -54,7 +54,7 @@ class RepoOnHost:
     origin_url: str                 # "" when the repo has no ``origin`` remote
     has_charter: bool               # ``CHARTER.md`` at the working-tree root
     has_claude_dir: bool            # ``.claude/agents/`` exists
-    is_murmurent_installed: bool      # both of the above + manifest in ~/.murmurent
+    is_murmurent_ready: bool          # CHARTER + .claude/agents — the repo is a murmurent project
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -261,12 +261,12 @@ def list_machine_repos(host_name: str) -> tuple[list[RepoOnHost], str | None]:
             origin_url=origin,
             has_charter=charter == "1",
             has_claude_dir=claude == "1",
-            # The full murmurent-installed signal is "has charter + has
-            # claude/agents". Installation manifests live in
+            # "murmurent-ready" = "has charter + has claude/agents" — the
+            # repo-side state. Installation manifests live in
             # ~/.murmurent/installations/<name>.yaml which we'd need a
             # second SSH call to check — skipped for v1 since the
             # in-repo state is the leading indicator anyway.
-            is_murmurent_installed=(charter == "1" and claude == "1"),
+            is_murmurent_ready=(charter == "1" and claude == "1"),
         ))
     return out, None
 
