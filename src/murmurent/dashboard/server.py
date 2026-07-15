@@ -7426,29 +7426,18 @@ def create_app() -> FastAPI:
             user explicitly picks their role for this session."""
             return _html_page("login.html")
 
-        @app.get("/dashboard")
-        def dashboard_index(
-            user: str = Query("", description="Viewer handle from the login page."),
-        ):
+        @app.get("/dashboard", response_class=HTMLResponse)
+        def dashboard_index() -> HTMLResponse:
             """Member / PI dashboard. Reached from the login page with
             ``?user=<handle>&persona=member|pi``.
 
-            One dashboard per group: a lab and a core each have a PI, and
-            the PI's dashboard describes THEIR group. When the signed-in
-            handle leads an active **core**, their dashboard IS the core
-            dashboard (members, service catalog, requests, billing,
-            settings) — served directly, not linked to (issue #18).
+            One dashboard for every group: a lab and a core each have a
+            PI, and the PI's dashboard describes THEIR group. The page is
+            group-kind-aware (``lab_settings.kind`` flips the labels to
+            "Core members", "Core settings", …) rather than a separate
+            destination — issue #18. Core-service operations additionally
+            live at /core?core=<name> until they're folded in.
             """
-            norm = (user or "").strip().lstrip("@").lower()
-            if norm:
-                try:
-                    from ..core import registrar as _reg
-                    for c in _reg.read_registry().cores:
-                        if c.status == "active" and c.pi.lstrip("@").lower() == norm:
-                            return RedirectResponse(
-                                f"/core?core={c.name}&user={norm}", status_code=307)
-                except Exception:  # noqa: BLE001 — registry trouble → lab UI
-                    pass
             return _html_page("Murmurent Dashboard Hi-Fi.html")
 
         @app.get("/registrar", response_class=HTMLResponse)

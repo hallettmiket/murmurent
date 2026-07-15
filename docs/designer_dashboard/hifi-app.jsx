@@ -225,6 +225,14 @@ function Sparkline({ data, w=180, h=36 }) {
 }
 
 /* ───────── header ───────── */
+// Group-kind noun (issue #18): a core's dashboard is the SAME page as a
+// lab's — it just says "Core members", "Core settings", … Kind comes from
+// lab_settings.kind ("lab" | "core"), derived server-side from the group's
+// lab.md (a core scaffold declares ``core: <name>``).
+function groupNoun() {
+  return ((window.DATA.lab_settings || {}).kind === "core") ? "Core" : "Lab";
+}
+
 function TopBar() {
   const m = window.DATA.member || {};
   const ls = window.DATA.lab_settings || {};
@@ -279,7 +287,7 @@ function CmdBar({ query, setQuery }) {
         <button
           type="button"
           onClick={() => setShowLabTop(true)}
-          title="Lab settings — set your group's parameters (PI / admin)"
+          title={groupNoun() + " settings — set your group's parameters (PI / admin)"}
           style={{
             marginLeft: 10, fontFamily: "var(--mono)", fontSize: 11,
             letterSpacing: 1, textTransform: "uppercase",
@@ -287,7 +295,7 @@ function CmdBar({ query, setQuery }) {
             border: "1px solid var(--purple)", borderRadius: 2,
             padding: "3px 10px", cursor: "pointer", fontWeight: 600,
           }}>
-          ⚙ Lab settings
+          ⚙ {groupNoun()} settings
         </button>
       )}
       <div className="persona-badge" title={
@@ -3079,7 +3087,7 @@ function LabMembersPanel({ peers, span="c-6" }) {
   return (
     <div className={"panel "+span}>
       <header>
-        <h2>Lab members</h2>
+        <h2>{groupNoun()} members</h2>
         <div className="row" style={{gap:6}}>
           <span className="meta">
             {`${activeCount} active${inactiveCount ? " · " + inactiveCount + " inactive" : ""}`}
@@ -7820,7 +7828,7 @@ function LabSettingsModal({ onClose }) {
       }}>
         <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
           <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:20, color:"var(--purple-deep)"}}>
-            Lab settings
+            {groupNoun()} settings
           </h2>
           <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
         </div>
@@ -8014,14 +8022,14 @@ function FooterMeta() {
                 <>
                   <button
                     type="button"
-                    title="Lab settings (PI / admin)"
+                    title={groupNoun() + " settings (PI / admin)"}
                     onClick={() => setShowLabSettings(true)}
                     style={{
                       background:"transparent", border:"1px solid var(--rule-strong)",
                       borderRadius:2, padding:"1px 6px", cursor:"pointer",
                       fontSize:11, color:"var(--purple)",
                     }}>
-                    ⚙ lab
+                    ⚙ {groupNoun().toLowerCase()}
                   </button>
                   <MasterFoldersDot onClick={() => setShowLabSettings(true)} />
                 </>

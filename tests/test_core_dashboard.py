@@ -241,22 +241,27 @@ def test_registrar_signs_in_as_registrar_not_core_leader(world):
     assert res.json()["next"] == "/registrar?user=the_pi"
 
 
-def test_core_pi_dashboard_is_the_core_dashboard(world):
-    """One dashboard per group (issue #18): a core's PI signing in as PI
-    lands directly on their core's dashboard — no separate destination
-    to know about. A non-core viewer still gets the lab UI."""
+def test_core_pi_gets_the_one_dashboard_with_core_kind(world, monkeypatch):
+    """One dashboard for every group (issue #18): a core's PI gets the
+    SAME page as a lab PI — no redirect, no separate destination. The
+    page adapts via lab_settings.kind == "core" (labels read "Core
+    members", "Core settings", …), inferred from the core-scaffolded
+    lab.md which declares ``core: <name>`` and no ``kind:`` field."""
     _seed_core()
     client = TestClient(create_app())
     res = client.get("/dashboard?user=biocore_leader&persona=pi",
                      follow_redirects=False)
-    assert res.status_code == 307
-    assert res.headers["location"] == "/core?core=biocore&user=biocore_leader"
-    # Following through serves the core dashboard page.
-    res = client.get("/dashboard?user=biocore_leader&persona=pi")
-    assert res.status_code == 200 and "CORE DASHBOARD" in res.text
-    # A handle that leads no core gets the ordinary lab UI.
-    res = client.get("/dashboard?user=random_member", follow_redirects=False)
-    assert res.status_code == 200
+    assert res.status_code == 200                      # not a 307 anymore
+    assert "hifi-app.jsx" in res.text                  # the one dashboard
+
+    # kind inference from the core's own lab.md.
+    from murmurent.core import registrar as R2
+    from murmurent.dashboard import snapshot as snap
+    entry = next(c for c in R2.read_registry().cores if c.name == "biocore")
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", entry.lab_mgmt_path)
+    ls = snap._lab_settings("biocore")
+    assert ls.kind == "core"
+    assert ls.name == "biocore"
 
 
 def test_api_route_miss_404_explains_version_skew(world):

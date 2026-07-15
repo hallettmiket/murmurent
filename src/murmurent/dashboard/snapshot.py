@@ -597,16 +597,22 @@ def _lab_settings(lab_name: str) -> C.LabSettings:
                 C.GitProvider(**p.to_dict())
                 for p in _gp.resolve_providers(meta)
             ]
-            kind = str(meta.get("kind") or "lab").lower()
+            # Group kind drives the dashboard's noun ("Core members" vs
+            # "Lab members" — issue #18). Explicit ``kind:`` wins; a core
+            # scaffold declares ``core: <name>`` instead of ``lab:``, so
+            # the presence of that key is the reliable signal on files
+            # create_core wrote (they carry no ``kind:`` field).
+            kind = str(meta.get("kind") or "").lower()
             if kind not in ("lab", "core"):
-                kind = "lab"
+                kind = "core" if meta.get("core") else "lab"
             _pi = str(meta.get("pi") or _pi_handle())
-            # lab.md convention: ``lab:`` is the short id, ``name:`` is the human
-            # display label (this is what POST /api/lab/settings + group-setup
-            # write). So LabSettings.name (the short id, used in paths) comes from
-            # ``lab:``, and display_name comes from ``name:`` (or an explicit
+            # lab.md convention: ``lab:`` (or ``core:``) is the short id,
+            # ``name:`` is the human display label (this is what POST
+            # /api/lab/settings + group-setup write). So LabSettings.name
+            # (the short id, used in paths) comes from ``lab:``/``core:``,
+            # and display_name comes from ``name:`` (or an explicit
             # ``display_name:``). A bare ``name: <short-id>`` is NOT a real label.
-            _short = str(meta.get("lab") or lab_name)
+            _short = str(meta.get("lab") or meta.get("core") or lab_name)
             _display = str(meta.get("display_name") or meta.get("name") or "")
             if _display == _short:
                 _display = ""
