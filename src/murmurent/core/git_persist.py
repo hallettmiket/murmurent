@@ -243,13 +243,28 @@ def _push(repo: Path) -> GitProbe:
                 if (push.stderr or push.stdout).strip() else "pushed",
             required=False,
         )
+    err = (push.stderr or push.stdout).strip()
+    last = err.splitlines()[-1] if err else f"push exited {push.returncode}"
+    # A 403/permission failure on lab_mgmt is not transient: members hold
+    # READ-ONLY clones by design, so "run git push manually" is a lie for
+    # them — they can never push (#21). Say what's actually true, and warn
+    # that the stranded local commit will block future --ff-only roster
+    # pulls once upstream moves.
+    if "403" in err or "permission denied" in err.lower() or "denied to" in err.lower():
+        return GitProbe(
+            name="git push",
+            status="warn",
+            detail=(f"{last} — this clone looks READ-ONLY (members can't push "
+                    "to lab_mgmt). Your edit is committed locally but the lab "
+                    "will NOT receive it, and the local commit will block "
+                    "roster pulls once the PI pushes. Ask your PI to apply "
+                    "this change on their machine, then reset your clone: "
+                    "`git reset --hard origin/HEAD`"),
+            required=False,
+        )
     return GitProbe(
         name="git push",
         status="warn",
-        detail=(
-            (push.stderr or push.stdout).strip().splitlines()[-1]
-            if (push.stderr or push.stdout).strip()
-            else f"push exited {push.returncode}"
-        ) + " — commit saved locally; run `git push` manually when ready",
+        detail=f"{last} — commit saved locally; run `git push` manually when ready",
         required=False,
     )

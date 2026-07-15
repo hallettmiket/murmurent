@@ -130,3 +130,35 @@ def test_existing_identity_is_not_overwritten(tmp_path):
     # The commit is authored by the real identity, not the fallback.
     assert _git(root, "log", "-1", "--format=%ae").stdout.strip() \
         == "real@person.example"
+
+
+def test_push_403_explains_read_only_clone(tmp_path, monkeypatch):
+    """#21 follow-up: a member's push to lab_mgmt fails 403 BY DESIGN
+    (read-only clones). The probe must say so — not 'run git push
+    manually when ready', which a member can never do."""
+    import subprocess
+    from types import SimpleNamespace
+    from murmurent.core import git_persist as GP
+
+    repo = tmp_path / "lm"
+    repo.mkdir()
+    subprocess.run(["git", "-C", str(repo), "init"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "origin",
+                    "https://github.com/corewestern/lab_mgmt.git"],
+                   check=True, capture_output=True)
+    real_run = subprocess.run
+
+    def fake_run(cmd, **kw):
+        if cmd[:2] == ["git", "-C"] and "push" in cmd:
+            return SimpleNamespace(returncode=128, stdout="",
+                                   stderr="fatal: unable to access "
+                                          "'https://github.com/corewestern/lab_mgmt.git/': "
+                                          "The requested URL returned error: 403")
+        return real_run(cmd, **kw)
+
+    monkeypatch.setattr(GP.subprocess, "run", fake_run)
+    probe = GP._push(repo)
+    assert probe.status == "warn"
+    assert "READ-ONLY" in probe.detail
+    assert "run `git push` manually" not in probe.detail
+    assert "git reset --hard" in probe.detail
