@@ -773,3 +773,41 @@ def test_issue_member_card_wrong_group_names_the_led_groups(monkeypatch, tmp_pat
     with pytest.raises(ISS.IssuanceError, match="you lead: bioinformatics"):
         ISS.issue_member_card("@zed", enrollment=_member_req("@zed", "n3"),
                               group="Bioinformatics Lab")
+
+
+# ---- enroll writes a file for humans (issue #14 follow-up) -------------------
+
+def test_cli_enroll_interactive_writes_enroll_json(monkeypatch, tmp_path):
+    """A human at a terminal gets enroll.json written to disk (hagar1998's
+    report on #14: printing forced hand-making the file); pipes keep pure
+    JSON (pinned by test_cli_enroll_produces_valid_request, where the
+    CliRunner stdout is not a tty)."""
+    from murmurent.cli import cli
+    from murmurent.commands import centre_cmd as CC
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "h"))
+    monkeypatch.setenv("MURMURENT_USER", "hagaremam")
+    monkeypatch.delenv("MURMURENT_NO_AUTOKEY", raising=False)
+    monkeypatch.setattr(CC, "_stdout_is_tty", lambda: True)
+    runner = CliRunner()
+    with runner.isolated_filesystem(temp_dir=tmp_path):
+        res = runner.invoke(cli, ["enroll", "--nonce", "abc",
+                                  "--project", "initial_testing"])
+        assert res.exit_code == 0, res.output
+        from pathlib import Path as _Path
+        req = json.loads(_Path("enroll.json").read_text(encoding="utf-8"))
+        assert req["payload"]["handle"] == "@hagaremam"
+        assert C.verify_enrollment(req, expected_nonce="abc")
+        assert "wrote enrollment request" in res.output
+        assert "Send the file enroll.json" in res.output
+
+
+def test_cli_enroll_dash_forces_pure_stdout(monkeypatch, tmp_path):
+    from murmurent.cli import cli
+    from murmurent.commands import centre_cmd as CC
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "h"))
+    monkeypatch.setenv("MURMURENT_USER", "hagaremam")
+    monkeypatch.delenv("MURMURENT_NO_AUTOKEY", raising=False)
+    monkeypatch.setattr(CC, "_stdout_is_tty", lambda: True)  # even on a tty
+    res = CliRunner().invoke(cli, ["enroll", "--nonce", "abc", "--out", "-"])
+    assert res.exit_code == 0, res.output
+    assert json.loads(res.output)["payload"]["handle"] == "@hagaremam"

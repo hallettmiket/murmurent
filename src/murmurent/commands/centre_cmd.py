@@ -684,6 +684,16 @@ def identity_import(card_file: str) -> None:
     click.echo("\nRestart your murmurent dashboard; the login will now show your role.")
 
 
+def _stdout_is_tty() -> bool:
+    """Is stdout a human at a terminal? Split out so tests can patch it —
+    `enroll` writes enroll.json for humans but stays pure-JSON for pipes."""
+    import sys
+    try:
+        return sys.stdout.isatty()
+    except Exception:  # noqa: BLE001
+        return False
+
+
 @click.command("enroll",
                 help="Produce a proof-of-possession enrollment request (proves "
                      "you hold your key) to send to the mayor/PI so they can issue "
@@ -694,7 +704,9 @@ def identity_import(card_file: str) -> None:
 @click.option("--project", default="", help="Project you're enrolling into "
               "(optional; your PI issues a project-scoped card).")
 @click.option("--out", "out_file", type=click.Path(dir_okay=False), default=None,
-              help="Write the request to a file (default: print).")
+              help="Write the request to a file (default: enroll.json when run "
+                   "interactively; pure JSON on stdout when piped). Use '-' to "
+                   "force stdout.")
 def enroll(nonce: str, group: str, project: str, out_file: str | None) -> None:
     from ..core import issuance as _iss
     from ..core import identity as _id
@@ -709,7 +721,12 @@ def enroll(nonce: str, group: str, project: str, out_file: str | None) -> None:
     except _iss.IssuanceError as exc:
         raise click.ClickException(str(exc)) from exc
     text = __import__("json").dumps(req, indent=2)
-    if not out_file:
+    if out_file is None and _stdout_is_tty():
+        # A human at a terminal wants the FILE they were told to send
+        # (issue #14: printing to the terminal forced manual copy-paste
+        # into a hand-made enroll.json). Pipes still get pure JSON below.
+        out_file = "enroll.json"
+    if out_file in (None, "-"):
         # Bare JSON on stdout is for scripting/piping — keep it pure, no
         # trailing prose, so callers can parse it directly.
         click.echo(text)
