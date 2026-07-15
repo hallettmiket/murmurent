@@ -61,6 +61,42 @@ def _git_root(path: Path) -> Path | None:
     return Path(res.stdout.strip())
 
 
+def _ensure_identity(repo: Path) -> None:
+    """Guarantee ``git commit`` inside ``repo`` has an author identity.
+
+    Members clone lab_mgmt read-only and edit their own profile via the
+    dashboard; the save auto-commits into that clone. On a fresh member
+    machine that has never run ``git config --global user.email/user.name``,
+    the commit fails with *"Author identity unknown … unable to auto-detect
+    email address (got '<user>@<host>.(none)')"* — the very error tt8804
+    reported (murmurent#21). The mayor-side commit helpers already guard
+    against this (:func:`core.registrar._git_init_if_needed`); this brings
+    the member-side path to parity.
+
+    Best-effort and non-destructive: only sets a **repo-local** identity,
+    and only for the fields git cannot already resolve (global config,
+    if present, is left to win). Mirrors the registrar's ``@murmurent.local``
+    convention. Never raises — a config hiccup must not block the save.
+    """
+    handle = "murmurent-member"
+    try:  # a nicer identity if we can resolve the current user
+        from .identity import resolve
+        handle = resolve(allow_unknown=True).handle or handle
+    except Exception:  # noqa: BLE001 - identity is a nicety, not required
+        pass
+    for key, value in (("user.name", f"murmurent ({handle})"),
+                       ("user.email", f"{handle}@murmurent.local")):
+        existing = subprocess.run(
+            ["git", "-C", str(repo), "config", "--get", key],
+            check=False, capture_output=True, text=True,
+        )
+        if existing.returncode != 0 or not existing.stdout.strip():
+            subprocess.run(
+                ["git", "-C", str(repo), "config", key, value],
+                check=False, capture_output=True, text=True,
+            )
+
+
 def _is_dirty(repo: Path, file_rel: str) -> bool:
     """Does ``file_rel`` differ from HEAD inside ``repo``?
 
@@ -145,6 +181,10 @@ def commit_and_push(
             probes.append(_push(repo))
         return probes
 
+    # A fresh member machine may have no git identity configured. Set a
+    # best-effort repo-local fallback before committing so the save lands
+    # instead of failing with "Author identity unknown" (murmurent#21).
+    _ensure_identity(repo)
     commit = subprocess.run(
         ["git", "-C", str(repo), "commit", "-m", message, "--", file_rel],
         check=False, capture_output=True, text=True,
