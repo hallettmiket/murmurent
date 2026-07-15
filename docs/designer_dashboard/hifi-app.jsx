@@ -479,12 +479,13 @@ function RepoInventoryPanel({ span = "c-12" }) {
             </li>
             <li>
               <span className="mono">• clone</span> + <span className="mono">↑ adopt</span> — repo is on
-              this host but never made murmurent-ready. <strong>Adopt</strong> writes CHARTER + registry
-              + bootstraps <code>.claude/agents/</code>. The modal asks for lead, members, and sensitivity.
+              this host but not yet murmurent-ready. <strong>Adopt</strong> writes the readiness
+              marker + bootstraps <code>.claude/agents/</code>. No project is created — attach
+              ready repos to a project via <strong>New Project</strong>.
             </li>
             <li>
-              <span className="mono" style={{color:"var(--green)"}}>✓ murmurent</span> — fully
-              murmurent-ready. See it in <em>Projects</em>.
+              <span className="mono" style={{color:"var(--green)"}}>✓ ready</span> — fully
+              murmurent-ready; attach it to a project when you need one.
             </li>
           </ul>
         </div>
@@ -572,7 +573,7 @@ function RepoInventoryRow({ row, knownHosts, onAdopt }) {
           <span title={c.path} style={{
             fontSize:11, color:"var(--green)", fontFamily:"var(--mono)",
           }}>
-            ✓ murmurent
+            ✓ ready
           </span>
         );
       }
@@ -625,17 +626,13 @@ function RepoInventoryRow({ row, knownHosts, onAdopt }) {
   );
 }
 
-/* ── AdoptCloneModal: promote a plain git clone to a murmurent project.
-   Pops from the Repo Inventory's "↑ adopt" button on • clone rows
-   for the local host. POSTs /api/inventory/adopt which writes
-   CHARTER.md + runs the layer-2 CC bootstrap. Returns probes which
-   we render inline so the user sees what landed and what didn't. */
+/* ── AdoptCloneModal: make a plain git clone murmurent-READY.
+   Pops from the Repo Inventory's "↑ adopt" button on • clone rows.
+   POSTs /api/inventory/adopt, which writes the .murmurent.yaml
+   readiness marker + the CC bootstrap (commons agent symlinks,
+   CLAUDE.md stub). Creates NO project — a project is a set of repos +
+   members, made via New Project, which attaches ready repos. */
 function AdoptCloneModal({ clone, onClose }) {
-  // Pre-fill from the row + the logged-in member so the common case
-  // (lead = me, members = [me], sensitivity = standard) is one click.
-  const myHandle = window.DATA.member?.handle
-    ? "@" + window.DATA.member.handle
-    : "@" + (window.DATA.persona === "pi" ? "pi" : "you");
   // Default agent pick mirrors InstallModal: all non-disabled agents,
   // minus `receptionist` for non-PI users (PI-only role).
   const [pickedAgents, setPickedAgents] = useState(() => {
@@ -646,56 +643,26 @@ function AdoptCloneModal({ clone, onClose }) {
   const toggleAgent = (name) => setPickedAgents(p =>
     p.includes(name) ? p.filter(n => n !== name) : [...p, name]
   );
-  const [form, setForm] = useState({
-    project:        clone.name || "",
-    lead:           myHandle,
-    members_text:   myHandle,
-    sensitivity:    "standard",
-    choreography:   "",
-    description:    "",
-    reb_number:     "",
-    reb_expires:    "",
-    data_residency: "",
-  });
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState(null);
   const [probes, setProbes] = useState(null);
-  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const submit = async (e) => {
     e.preventDefault();
     setBusy(true); setErr(null); setProbes(null);
     try {
-      const members = form.members_text
-        .split(/[\s,]+/).map(s => s.trim()).filter(Boolean);
-      const agents = pickedAgents;
-      const payload = {
-        clone_path:  clone.path,
-        project:     form.project.trim(),
-        lead:        form.lead.trim(),
-        members,
-        sensitivity: form.sensitivity,
-        description: form.description,
-        agents,
-        host:        clone.host || "local",
-      };
-      if (form.choreography) payload.choreography = form.choreography;
-      if (form.sensitivity === "clinical") {
-        payload.reb_number     = form.reb_number;
-        payload.reb_expires    = form.reb_expires;
-        payload.data_residency = form.data_residency;
-      }
       const r = await fetch("/api/inventory/adopt", {
         method: "POST",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          clone_path: clone.path,
+          agents:     pickedAgents,
+          host:       clone.host || "local",
+        }),
       });
       const body = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(body.detail || ("HTTP " + r.status));
       setProbes(body.probes || []);
-      // Refresh the whole dashboard snapshot (Projects, Installations,
-      // peers, etc.) since adopt now lands rows in multiple panels.
-      // The Repos panel re-fetches separately via onClose(true) below.
       if (typeof window.__murmurentFetchData === "function") {
         try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
       }
@@ -706,9 +673,6 @@ function AdoptCloneModal({ clone, onClose }) {
     } finally { setBusy(false); }
   };
 
-  const inp = {padding:"5px 8px", border:"1px solid var(--rule-strong)",
-               borderRadius:2, fontFamily:"var(--mono)", fontSize:12,
-               width:"100%", boxSizing:"border-box"};
   const lbl = {fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
                textTransform:"uppercase", color:"var(--muted)",
                marginTop:8, marginBottom:2};
@@ -721,97 +685,30 @@ function AdoptCloneModal({ clone, onClose }) {
     }}>
       <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
         background:"var(--card)", border:"1px solid var(--rule-strong)",
-        borderRadius:2, padding:18, width:"min(640px, 96vw)",
+        borderRadius:2, padding:18, width:"min(560px, 96vw)",
         display:"flex", flexDirection:"column", gap:2,
       }}>
         <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
           <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18,
                       color:"var(--purple-deep)"}}>
-            Adopt clone as murmurent project
+            Make repo murmurent-ready
           </h2>
           <button type="button" className="btn sm ghost"
                   onClick={() => onClose(false)}>✕ close</button>
         </div>
         <p className="muted" style={{fontSize:12, margin:"4px 0 6px"}}>
-          {clone.host && clone.host !== "local" ? (
-            <>
-              Writes <code>CHARTER.md</code> + bootstraps <code>.claude/agents/</code> on
-              {" "}<strong>{clone.host}</strong> over a single SSH session, at
-              {" "}<code className="mono">{clone.path}</code>. After this, the
-              Repo Inventory will show <strong style={{color:"var(--green)"}}>✓ murmurent</strong> for
-              this clone on {clone.host}, and a row appears in Projects + Installations.
-            </>
-          ) : (
-            <>
-              Writes <code>CHARTER.md</code> at <code className="mono">{clone.path}</code>
-              {" "}and bootstraps <code>.claude/agents/</code>. After this, the
-              Repo Inventory will show <strong style={{color:"var(--green)"}}>✓ murmurent</strong> for
-              this clone.
-            </>
-          )}
+          Bootstraps <code className="mono">{clone.name}</code>
+          {clone.host && clone.host !== "local" ? <> on <strong>{clone.host}</strong> (one SSH session)</> : null}
+          {" "}— writes the readiness marker and symlinks the picked commons agents into
+          {" "}<code>.claude/agents/</code>. This does <strong>not</strong> create a project:
+          a project is a <em>set of repos + members</em>; attach ready repos via
+          {" "}<strong>New Project</strong> when you need one.
         </p>
 
-        <div className="row" style={{gap:10}}>
-          <div style={{flex:1}}>
-            <div style={lbl}>project name</div>
-            <input style={inp} value={form.project} onChange={set("project")} required />
-          </div>
-          <div style={{flex:1}}>
-            <div style={lbl}>lead (handle)</div>
-            <input style={inp} value={form.lead} onChange={set("lead")} required
-                   placeholder="@the_pi" />
-          </div>
-        </div>
-
-        <div style={lbl}>members (space- or comma-separated handles)</div>
-        <input style={inp} value={form.members_text} onChange={set("members_text")}
-               placeholder="@the_pi @alice" required />
-
-        <div className="row" style={{gap:10}}>
-          <div style={{flex:1}}>
-            <div style={lbl}>sensitivity</div>
-            <select style={inp} value={form.sensitivity} onChange={set("sensitivity")}>
-              <option value="standard">standard</option>
-              <option value="restricted">restricted</option>
-              <option value="clinical">clinical</option>
-            </select>
-          </div>
-          <div style={{flex:1}}>
-            <div style={lbl}>choreography (optional)</div>
-            <select style={inp} value={form.choreography} onChange={set("choreography")}>
-              <option value="">— none —</option>
-              <option value="drug_discovery_litl">drug_discovery_litl</option>
-              <option value="clinical_cohort">clinical_cohort</option>
-              <option value="method_benchmarking">method_benchmarking</option>
-              <option value="imaging_phenotyping">imaging_phenotyping</option>
-            </select>
-          </div>
-        </div>
-
-        {form.sensitivity === "clinical" && (
-          <div className="row" style={{gap:10}}>
-            <div style={{flex:1}}>
-              <div style={lbl}>reb_number</div>
-              <input style={inp} value={form.reb_number} onChange={set("reb_number")} required />
-            </div>
-            <div style={{flex:1}}>
-              <div style={lbl}>reb_expires (YYYY-MM-DD)</div>
-              <input style={inp} value={form.reb_expires} onChange={set("reb_expires")} required />
-            </div>
-            <div style={{flex:1}}>
-              <div style={lbl}>data_residency</div>
-              <input style={inp} value={form.data_residency} onChange={set("data_residency")} required />
-            </div>
-          </div>
-        )}
-
-        <div style={lbl}>description (one line for the CHARTER body)</div>
-        <input style={inp} value={form.description} onChange={set("description")}
-               placeholder="Personal hockey analytics." />
-
         <div style={lbl}>
-          murmurent agents to symlink — defaults to your install-wizard pick;
-          click pills to deselect
+          murmurent agents to symlink — click pills to deselect. New releases:
+          agent content updates automatically (symlinks); pick up NEW agents later
+          with <code>murmurent repo upgrade</code>.
         </div>
         <div style={{display:"flex", flexWrap:"wrap", gap:6}}>
           {(window.DATA.agents || []).filter(a => !a.disabled).map(a => (
@@ -847,7 +744,7 @@ function AdoptCloneModal({ clone, onClose }) {
           <button type="button" className="btn sm ghost"
                   onClick={() => onClose(false)} disabled={busy}>cancel</button>
           <button type="submit" className="btn sm primary" disabled={busy}>
-            {busy ? "adopting…" : "adopt"}
+            {busy ? "bootstrapping…" : "make ready"}
           </button>
         </div>
       </form>

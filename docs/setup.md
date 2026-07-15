@@ -45,7 +45,7 @@ Use the dashboard's *adopt* button (for existing clones) or
 [`core.projectize`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/projectize.py) under the
 hood, which writes:
 
-1. `CHARTER.md` at the clone root (if missing).
+1. `.murmurent.yaml` readiness marker at the clone root (adopt; legacy repos carry `CHARTER.md` until `murmurent repo upgrade`).
 2. `lab_mgmt/projects/<name>.md` (the lab registry entry, if missing).
    See [`lab_mgmt.md`](lab_mgmt.md) for what this repo is, who needs
    it, and how it differs from `~/.murmurent/lab_info/`.

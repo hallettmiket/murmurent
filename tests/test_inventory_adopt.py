@@ -1,14 +1,12 @@
-"""Tests for ``POST /api/inventory/adopt`` — the "promote a plain git
-clone to a murmurent project" wizard exposed on the Repo Inventory panel.
+"""Tests for ``POST /api/inventory/adopt`` — "make this clone
+murmurent-READY" from the Repo Inventory panel.
 
-What this endpoint must guarantee:
-  - Writes a valid CHARTER.md at the clone root (uses
-    :func:`murmurent.core.charter.render_charter`)
+What this endpoint must guarantee (post readiness/project split):
+  - Writes the ``.murmurent.yaml`` readiness marker at the clone root
   - Runs the layer-2 CC bootstrap so ``.claude/agents/`` exists
-  - Refuses paths outside ``~/repos/`` (escape guard — the dashboard
-    sends absolute paths from the inventory scanner)
-  - Refuses dirs that aren't a git working tree
-  - Refuses to silently overwrite an existing CHARTER.md
+  - Creates NO project (no CHARTER.md, no registry record, no manifest)
+  - Refuses paths outside ``~/repos/`` and non-git dirs
+  - Points a legacy CHARTER.md bootstrap at `murmurent repo upgrade`
 """
 
 from __future__ import annotations
@@ -50,33 +48,31 @@ def _make_git_clone(repos: Path, name: str) -> Path:
     return p
 
 
-def test_adopt_writes_charter_and_runs_bootstrap(world):
+def test_adopt_writes_marker_and_runs_bootstrap(world):
     clone = _make_git_clone(world["repos"], "hockey_stats")
     client = TestClient(create_app())
     res = client.post("/api/inventory/adopt", json={
         "clone_path": str(clone),
-        "project": "hockey_stats",
-        "lead": "@the_pi",
-        "members": ["@the_pi"],
-        "sensitivity": "standard",
-        "description": "Personal hockey analytics.",
+        "lab": "mh",
         "agents": ["blacksmith"],
     })
     assert res.status_code == 200, res.text
     body = res.json()
-    assert body["ok"] is True
-    # CHARTER.md was written with valid frontmatter.
-    charter = (clone / "CHARTER.md").read_text()
-    assert "project: hockey_stats" in charter
-    assert "lead: '@the_pi'" in charter
-    assert "sensitivity: standard" in charter
+    assert body["ok"] is True and body["repo"] == "hockey_stats"
+    # Readiness marker written; NO project artefacts.
+    import yaml as _yaml
+    marker = _yaml.safe_load((clone / ".murmurent.yaml").read_text())
+    assert marker["murmurent"] == 1
+    assert marker["lab"] == "mh"
+    assert marker["agents"] == ["blacksmith"]
+    assert not (clone / "CHARTER.md").exists()
     # .claude/agents/blacksmith.md was symlinked from the commons.
     agent_link = clone / ".claude" / "agents" / "blacksmith.md"
     assert agent_link.is_symlink()
     assert "blacksmith" in str(agent_link.readlink())
     # Probes reported back so the UI can render them inline.
     steps = {p["name"]: p["status"] for p in body["probes"]}
-    assert steps["charter"] == "ok"
+    assert steps["marker"] == "ok"
     assert steps["cc_agent: blacksmith"] == "ok"
 
 
@@ -87,10 +83,7 @@ def test_adopt_refuses_path_outside_repos(world):
     elsewhere = world["home"].parent / "elsewhere"
     (elsewhere / ".git").mkdir(parents=True)
     client = TestClient(create_app())
-    res = client.post("/api/inventory/adopt", json={
-        "clone_path": str(elsewhere),
-        "project": "x", "lead": "@the_pi", "members": ["@the_pi"],
-    })
+    res = client.post("/api/inventory/adopt", json={"clone_path": str(elsewhere)})
     assert res.status_code == 400
     assert "must live under" in res.json()["detail"]
 
@@ -99,38 +92,32 @@ def test_adopt_refuses_non_git_dir(world):
     bare = world["repos"] / "not_a_repo"
     bare.mkdir()
     client = TestClient(create_app())
-    res = client.post("/api/inventory/adopt", json={
-        "clone_path": str(bare),
-        "project": "x", "lead": "@the_pi", "members": ["@the_pi"],
-    })
+    res = client.post("/api/inventory/adopt", json={"clone_path": str(bare)})
     assert res.status_code == 400
     assert "not a git working tree" in res.json()["detail"]
 
 
-def test_adopt_refuses_when_charter_already_exists(world):
-    """A clone that's already a murmurent project must not get its
-    CHARTER.md silently overwritten — the user should edit by hand
-    or remove the file and re-adopt explicitly."""
+def test_adopt_points_legacy_charter_at_upgrade(world):
+    """A pre-split bootstrap (CHARTER.md) shouldn't be re-adopted over —
+    the conversion path is `murmurent repo upgrade`."""
     clone = _make_git_clone(world["repos"], "already_a_project")
     (clone / "CHARTER.md").write_text("---\nproject: already\n---\n")
     client = TestClient(create_app())
-    res = client.post("/api/inventory/adopt", json={
-        "clone_path": str(clone),
-        "project": "already_a_project",
-        "lead": "@the_pi", "members": ["@the_pi"],
-    })
+    res = client.post("/api/inventory/adopt", json={"clone_path": str(clone)})
     assert res.status_code == 409
-    assert "already exists" in res.json()["detail"]
+    assert "murmurent repo upgrade" in res.json()["detail"]
 
 
-def test_adopt_propagates_charter_validation_errors(world):
-    """Empty members list or unknown sensitivity must come back as a
-    422 (charter-validation) rather than a 500."""
-    clone = _make_git_clone(world["repos"], "badmeta")
+def test_adopt_is_idempotent_on_marker(world):
+    """Re-adopting a marker-ready repo refreshes the bootstrap instead of
+    erroring — the marker (and its agent picks) are preserved."""
+    clone = _make_git_clone(world["repos"], "again")
     client = TestClient(create_app())
-    res = client.post("/api/inventory/adopt", json={
-        "clone_path": str(clone),
-        "project": "badmeta",
-        "lead": "@the_pi", "members": [],  # invalid: must be non-empty
-    })
-    assert res.status_code == 422
+    first = client.post("/api/inventory/adopt",
+                        json={"clone_path": str(clone), "agents": ["blacksmith"]})
+    assert first.status_code == 200
+    second = client.post("/api/inventory/adopt", json={"clone_path": str(clone)})
+    assert second.status_code == 200, second.text
+    import yaml as _yaml
+    marker = _yaml.safe_load((clone / ".murmurent.yaml").read_text())
+    assert marker["agents"] == ["blacksmith"]           # pick preserved

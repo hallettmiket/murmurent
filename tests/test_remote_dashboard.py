@@ -169,6 +169,15 @@ def _seed_local_project(repos: Path, lab_mgmt: Path, name: str = "loc") -> None:
         "---\n",
         encoding="utf-8",
     )
+    # Registry-primary projects (2026-07-15 split): the panel reads
+    # cert_projects, so seed the registry record too.
+    from murmurent.core import cert_projects as _CP
+    from murmurent.core.projects import load_summary
+    from murmurent.core.repo import ProjectRepo
+    _CP.register_from_summary(
+        load_summary(ProjectRepo(path=p, charter_path=p / "CHARTER.md",
+                                 members_path=None)),
+        code_repo=str(p), host="local")
 
 
 def _seed_remote_pointer(repos: Path, lab_mgmt: Path, name: str = "rem") -> None:
@@ -201,6 +210,14 @@ def _seed_remote_pointer(repos: Path, lab_mgmt: Path, name: str = "rem") -> None
         "---\n",
         encoding="utf-8",
     )
+    from murmurent.core import cert_projects as _CP
+    from murmurent.core.projects import load_summary
+    from murmurent.core.repo import ProjectRepo
+    _CP.register_from_summary(
+        load_summary(ProjectRepo(path=p, charter_path=p / "CHARTER.md",
+                                 members_path=None)),
+        code_repo=str(p), host="lab-server",
+        remote_path=f"/home/the_pi/repos/{name}")
 
 
 def test_project_row_marks_local_project_as_host_local(world):

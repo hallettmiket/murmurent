@@ -55,17 +55,27 @@ def _make_clone(repos: Path, name: str) -> Path:
 def test_status_plain_clone(world):
     clone = _make_clone(world["repos"], "grace")
     st = _adopt.adoption_status(str(clone))
-    assert st.is_git and not st.adopted
+    assert st.is_git and not st.ready
     assert st.verdict == "plain clone"
 
 
-def test_status_partial_then_adopted(world):
+def test_status_partial_then_ready(world):
     clone = _make_clone(world["repos"], "dcis")
-    (clone / "CHARTER.md").write_text("---\nproject: dcis\n---\n")
+    (clone / ".murmurent.yaml").write_text("murmurent: 1\nlab: mh\n")
     assert _adopt.adoption_status(str(clone)).verdict == "partial"
     (clone / ".claude" / "agents").mkdir(parents=True)
     st = _adopt.adoption_status(str(clone))
-    assert st.adopted and st.verdict == "adopted"
+    assert st.ready and st.verdict == "ready"
+
+
+def test_status_legacy_charter_counts_as_ready(world):
+    """Pre-split bootstraps (CHARTER.md) stay ready — other deployments
+    upgrade at their own pace via `murmurent repo upgrade`."""
+    clone = _make_clone(world["repos"], "dcis_old")
+    (clone / "CHARTER.md").write_text("---\nproject: dcis_old\n---\n")
+    (clone / ".claude" / "agents").mkdir(parents=True)
+    st = _adopt.adoption_status(str(clone))
+    assert st.ready and st.verdict == "ready (legacy)"
 
 
 def test_status_missing_and_not_git(world):
@@ -113,18 +123,33 @@ def test_cli_adopt_then_status(world):
     clone = _make_clone(world["repos"], "hockey_stats")
     runner = CliRunner()
     res = runner.invoke(cli, [
-        "repo", "adopt", str(clone),
-        "--lead", "@the_pi", "--agents", "blacksmith",
-        "--description", "Personal hockey analytics.",
+        "repo", "adopt", str(clone), "--agents", "blacksmith", "--lab", "mh",
     ])
     assert res.exit_code == 0, res.output
-    assert "Adopted hockey_stats on local" in res.output
-    assert "project: hockey_stats" in (clone / "CHARTER.md").read_text()
+    assert "murmurent-ready on local" in res.output
+    marker = yaml.safe_load((clone / ".murmurent.yaml").read_text())
+    assert marker["lab"] == "mh" and marker["agents"] == ["blacksmith"]
+    assert not (clone / "CHARTER.md").exists()          # adopt makes NO project
     assert (clone / ".claude" / "agents" / "blacksmith.md").is_symlink()
 
     res = runner.invoke(cli, ["repo", "status", str(clone)])
     assert res.exit_code == 0, res.output
-    assert "✓ adopted" in res.output
+    assert "✓ ready" in res.output
+
+
+def test_cli_upgrade_converts_legacy_charter(world):
+    """`murmurent repo upgrade` converts a pre-split bootstrap: CHARTER.md
+    out, .murmurent.yaml in, agent links refreshed, version stamped."""
+    clone = _make_clone(world["repos"], "oldie")
+    (clone / "CHARTER.md").write_text("---\nproject: oldie\nlab: mh\n---\n")
+    (clone / ".claude" / "agents").mkdir(parents=True)
+    res = CliRunner().invoke(cli, ["repo", "upgrade", str(clone)])
+    assert res.exit_code == 0, res.output
+    assert not (clone / "CHARTER.md").exists()
+    marker = yaml.safe_load((clone / ".murmurent.yaml").read_text())
+    assert marker["lab"] == "mh"
+    assert marker["murmurent"] == 1 and marker["bootstrap_version"]
+    assert "converted legacy" in res.output
 
 
 def test_cli_status_exit_codes(world):
@@ -138,17 +163,9 @@ def test_cli_status_exit_codes(world):
     assert "not found" in res.output
 
 
-def test_cli_adopt_refuses_existing_charter(world):
+def test_cli_adopt_points_legacy_charter_at_upgrade(world):
     clone = _make_clone(world["repos"], "dcis")
     (clone / "CHARTER.md").write_text("---\nproject: dcis\n---\n")
-    res = CliRunner().invoke(cli, ["repo", "adopt", str(clone), "--lead", "@the_pi"])
-    assert res.exit_code != 0
-    assert "already exists" in res.output
-
-
-def test_cli_adopt_requires_lead(world, monkeypatch):
-    monkeypatch.delenv("MURMURENT_USER", raising=False)
-    clone = _make_clone(world["repos"], "grace")
     res = CliRunner().invoke(cli, ["repo", "adopt", str(clone)])
     assert res.exit_code != 0
-    assert "--lead" in res.output
+    assert "murmurent repo upgrade" in res.output

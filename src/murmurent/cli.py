@@ -254,9 +254,9 @@ def repo_list_cmd(host_name: str | None) -> None:
 
 @repo_group.command(
     "status",
-    help="Has this repo been adopted (made murmurent-ready)? TARGET is a path "
-         "(checked directly) or a repo name (searched on every registered "
-         "machine). Exit 0 = adopted, 1 = not adopted, 2 = not found.",
+    help="Is this repo murmurent-ready? TARGET is a path (checked directly) "
+         "or a repo name (searched on every registered machine). "
+         "Exit 0 = ready, 1 = not ready, 2 = not found.",
 )
 @click.argument("target")
 @click.option("--host", "host_name", default=None,
@@ -269,60 +269,47 @@ def repo_status_cmd(target: str, host_name: str | None) -> None:
 
 @repo_group.command(
     "adopt",
-    help="Promote an existing clone to a murmurent project (CHARTER.md + "
-         "registry entry + installation manifest + .claude/agents bootstrap) — "
-         "the CLI twin of the Repos panel's ↑ adopt button.",
+    help="Make an existing clone murmurent-READY (readiness marker + commons "
+         "agent symlinks + CLAUDE.md stub) — the CLI twin of the Repos "
+         "panel's ↑ adopt button. Creates NO project; attach ready repos to "
+         "a project via `murmurent project new`.",
 )
 @click.argument("path")
-@click.option("--project", default=None,
-              help="Project name (default: basename of PATH).")
-@click.option("--lead", default=None,
-              help="Project lead handle (default: @$MURMURENT_USER).")
-@click.option("--members", "members_csv", default=None,
-              help="Comma-separated handles (default: just the lead).")
-@click.option("--sensitivity",
-              type=click.Choice(["standard", "restricted", "clinical"]),
-              default="standard", show_default=True)
-@click.option("--description", default="", help="One-paragraph charter body.")
-@click.option("--choreography", default=None)
+@click.option("--lab", default=None,
+              help="Owning lab slug (default: this machine's lab).")
 @click.option("--agents", "agents_csv", default=None,
               help="Comma-separated commons agents to symlink into .claude/agents/.")
 @click.option("--host", "host_name", default="local", show_default=True,
-              help="'local' or a registered SSH host; remote adopts write "
-                   "CHARTER + bootstrap over one batched SSH session.")
-@click.option("--reb-number", "reb_number", default=None,
-              help="Required when --sensitivity clinical.")
-@click.option("--reb-expires", "reb_expires", default=None)
-@click.option("--data-residency", "data_residency", default=None)
-def repo_adopt_cmd(
-    path: str,
-    project: str | None,
-    lead: str | None,
-    members_csv: str | None,
-    sensitivity: str,
-    description: str,
-    choreography: str | None,
-    agents_csv: str | None,
-    host_name: str,
-    reb_number: str | None,
-    reb_expires: str | None,
-    data_residency: str | None,
-) -> None:
+              help="'local' or a registered SSH host; remote adopts bootstrap "
+                   "over one batched SSH session.")
+def repo_adopt_cmd(path: str, lab: str | None, agents_csv: str | None,
+                   host_name: str) -> None:
     from .commands import repo_cmd as _repo_cmd
     raise SystemExit(_repo_cmd.cmd_adopt(
-        path=path,
-        project=project,
-        lead=lead,
-        members_csv=members_csv,
-        sensitivity=sensitivity,
-        description=description,
-        choreography=choreography,
-        agents_csv=agents_csv,
-        host_name=host_name,
-        reb_number=reb_number,
-        reb_expires=reb_expires,
-        data_residency=data_residency,
-    ))
+        path=path, lab=lab, agents_csv=agents_csv, host_name=host_name))
+
+
+@repo_group.command(
+    "upgrade",
+    help="Bring a murmurent-ready repo up to the CURRENT murmurent release: "
+         "convert a legacy CHARTER.md bootstrap to the readiness marker, "
+         "migrate the marker schema, re-link commons agents, and re-stamp "
+         "bootstrap_version. Agent CONTENT updates never need this — the "
+         "symlinks track the commons clone automatically.",
+)
+@click.argument("path", required=False)
+@click.option("--all", "all_repos", is_flag=True,
+              help="Upgrade every murmurent-ready repo under ~/repos.")
+@click.option("--add-agents", "add_agents_csv", default=None,
+              help="Comma-separated commons agents to ADD to the repo's links.")
+@click.option("--all-agents", is_flag=True,
+              help="Link every agent in the commons (new releases included).")
+def repo_upgrade_cmd(path: str | None, all_repos: bool,
+                     add_agents_csv: str | None, all_agents: bool) -> None:
+    from .commands import repo_cmd as _repo_cmd
+    raise SystemExit(_repo_cmd.cmd_upgrade(
+        path=path, all_repos=all_repos, add_agents_csv=add_agents_csv,
+        all_agents=all_agents))
 
 
 # ---------------------------------------------------------------------------

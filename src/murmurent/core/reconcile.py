@@ -409,7 +409,8 @@ def detect_orphan_registries() -> list[DriftFinding]:
 
 def detect_missing_charters() -> list[DriftFinding]:
     """For each install manifest with a still-alive working tree,
-    verify CHARTER.md is still present. Surfaces as ``warn`` (no
+    verify the readiness marker is still present (.murmurent.yaml, or
+    the legacy CHARTER.md bootstrap). Surfaces as ``warn`` (no
     auto-fix; the user should either re-adopt or remove)."""
     findings: list[DriftFinding] = []
     inst_dir = _installations_dir()
@@ -427,19 +428,22 @@ def detect_missing_charters() -> list[DriftFinding]:
         if (data.get("ssh_remote") or "").strip():
             continue  # handled below
         local_path = Path(f"~/repos/{project}").expanduser()
-        if local_path.is_dir() and not (local_path / "CHARTER.md").exists():
+        if (local_path.is_dir()
+                and not (local_path / ".murmurent.yaml").exists()
+                and not (local_path / "CHARTER.md").exists()):
             findings.append(DriftFinding(
                 kind="missing_charter",
                 severity="warn",
                 target=project,
                 host="local",
-                detail=f"clone exists at {local_path} but CHARTER.md is missing",
+                detail=(f"clone exists at {local_path} but its readiness "
+                        "marker (.murmurent.yaml / legacy CHARTER.md) is missing"),
                 suggested_action="re-adopt or remove from murmurent",
                 artefact_path=str(manifest_path),
             ))
 
-    # Remote: batch CHARTER existence checks per host (same shape as
-    # the path-alive probe but checking for CHARTER.md too).
+    # Remote: batch readiness-marker existence checks per host (same
+    # shape as the path-alive probe; marker or legacy CHARTER counts).
     remote_groups: dict[str, list[tuple[str, str]]] = {}
     for manifest_path in sorted(inst_dir.glob("*.yaml")):
         if manifest_path.parent.name == ARCHIVE_SUBDIR:
@@ -469,7 +473,8 @@ def detect_missing_charters() -> list[DriftFinding]:
         script = (
             f'for p in {quoted}; do '
             '  if [ -d "$p/.git" ]; then '
-            '    if [ -f "$p/CHARTER.md" ]; then printf "%s\\n" "OK:$p"; '
+            '    if [ -f "$p/.murmurent.yaml" ] || [ -f "$p/CHARTER.md" ]; '
+            '    then printf "%s\\n" "OK:$p"; '
             '    else printf "%s\\n" "NOCHARTER:$p"; fi; '
             '  fi; '
             'done'

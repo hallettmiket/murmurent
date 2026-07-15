@@ -194,15 +194,14 @@ def _mock_remote(monkeypatch, *, probe_verdict: str = "OK",
 
 
 def test_remote_adopt_happy_path(world, monkeypatch):
-    """Full SSH adopt: probe says OK, script lands CHARTER + agents +
-    CLAUDE.md, local lab_mgmt + manifest still written."""
+    """Full SSH adopt (readiness split, 2026-07-15): probe says OK, the
+    batched script bootstraps the repo on the host. NO project artefacts
+    on this side — adopt makes a repo ready; projects are made by the
+    New Project flow attaching ready repos."""
     calls = _mock_remote(monkeypatch)
     client = TestClient(create_app())
     res = client.post("/api/inventory/adopt", json={
         "clone_path": "/home/UWO/the_pi/repos/demo",
-        "project": "demo",
-        "lead": "@the_pi",
-        "members": ["@the_pi"],
         "agents": ["blacksmith"],
         "host": "lab-server",
     })
@@ -210,17 +209,13 @@ def test_remote_adopt_happy_path(world, monkeypatch):
     body = res.json()
     assert body["ok"] is True
     assert body["host"] == "lab-server"
-    # Local side effects: lab_mgmt registry + installation manifest.
-    assert (world["lab_mgmt"] / "cert_projects" / "demo.md").is_file()
-    manifest = world["home"] / ".murmurent" / "installations" / "demo.yaml"
-    assert manifest.is_file()
-    m = yaml.safe_load(manifest.read_text())
-    assert m["ssh_remote"] == "lab-server"
-    assert m["machine_type"] == "lab_server"
-    assert m["access"] == "ssh"
-    # Probes include the remote-adopt records.
+    assert body["repo"] == "demo"
+    # Adopt no longer mints a project: no registry record, no manifest.
+    assert not (world["lab_mgmt"] / "cert_projects" / "demo.md").exists()
+    assert not (world["home"] / ".murmurent" / "installations" / "demo.yaml").exists()
+    # Probes include the remote bootstrap records.
     probe_names = [p["name"] for p in body["probes"]]
-    assert "charter" in probe_names
+    assert "charter" in probe_names          # legacy-shape marker on the host
     assert "cc_agent" in probe_names
     # We made at least two SSH calls: the path probe + the adopt script.
     assert len(calls) >= 2
@@ -233,7 +228,6 @@ def test_remote_adopt_refuses_when_path_missing(world, monkeypatch):
     client = TestClient(create_app())
     res = client.post("/api/inventory/adopt", json={
         "clone_path": "/home/UWO/the_pi/repos/ghost",
-        "project": "ghost", "lead": "@x", "members": ["@x"],
         "host": "lab-server",
     })
     assert res.status_code == 400

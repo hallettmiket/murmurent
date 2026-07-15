@@ -122,13 +122,13 @@ def build_response(
     # without a ``lab:`` doesn't surface in @core_lead's dashboard.
     member_profile_for_lab = _load_member_profile(norm)
     viewer_lab = str(member_profile_for_lab.get("lab") or "")
-    all_project_summaries = [load_summary(repo) for repo in iter_local_projects()]
-    charter_names = {p.name for p in all_project_summaries}
-    # Cert-projects are the authoritative project model; merge them into the one
-    # project list, keyed by name. A cert-project with a matching CHARTER repo
-    # enriches that row (its name is flagged is_cert below); one without a repo
-    # appears on its own (a code repo is optional). With zero cert-projects this
-    # loop is a no-op, so the list is identical to the CHARTER-only behaviour.
+    # Projects come from the lab_mgmt registry (cert_projects/) and ONLY
+    # from there. A project is a named set of repos + members — a repo
+    # that merely carries the murmurent bootstrap is "murmurent-ready",
+    # not a project, and belongs in the Repos panel until it's attached
+    # to one (terminology split, 2026-07-15). The old behaviour — scanning
+    # ~/repos for CHARTER.md and minting a pseudo-project per repo — is
+    # what let five trial adoptions masquerade as projects.
     from ..core import cert_projects as _cp
     cert_projects_all = _cp.iter_projects()
     cert_names = {cp.name for cp in cert_projects_all}
@@ -144,10 +144,8 @@ def build_response(
                   for c in cp.certs}
         for cp in cert_projects_all}
     cert_ws_by_name = {cp.name: cp.slack_workspace for cp in cert_projects_all}
-    for cp in cert_projects_all:
-        if cp.name in charter_names:
-            continue
-        all_project_summaries.append(ProjectSummary(
+    all_project_summaries = [
+        ProjectSummary(
             name=cp.name,
             path=(Path(cp.code_repo).expanduser() if cp.code_repo
                   else Path(f"~/repos/{cp.name}").expanduser()),
@@ -157,7 +155,9 @@ def build_response(
             choreography=cp.choreography,
             lab=cp.lab or None,
             status=cp.status,
-        ))
+        )
+        for cp in cert_projects_all
+    ]
     def _is_member(p) -> bool:
         return any(m.lstrip("@").lower() == norm for m in p.members)
     def _visible_to_viewer(p) -> bool:

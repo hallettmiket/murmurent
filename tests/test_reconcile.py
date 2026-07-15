@@ -273,7 +273,7 @@ def test_detect_missing_charter(world):
     assert len(findings) == 1
     assert findings[0].kind == "missing_charter"
     assert findings[0].severity == "warn"
-    assert "CHARTER.md is missing" in findings[0].detail
+    assert "readiness marker" in findings[0].detail
 
 
 def test_detect_unadopted_clones_from_cached_inventory(world):

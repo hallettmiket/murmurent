@@ -130,9 +130,10 @@ use the same core modules as the panel (`core.repo_inventory`,
 
 | Command | Effect |
 |---|---|
-| `murmurent repo list [--host <name>]` | Every git clone on every registered machine (local included), grouped by host, each with its adoption verdict (`✓ adopted` / `± partial` / `• clone`) |
-| `murmurent repo status <path-or-name> [--host <name>]` | Has this repo been adopted (murmurent-ready)? A path is checked directly (local, or on `--host` over SSH); a bare name is searched on every registered machine. Reports the CHARTER.md / `.claude/agents/` / installation-manifest components. Exit 0 = adopted, 1 = not adopted, 2 = not found — scriptable |
-| `murmurent repo adopt <path> [--project <n>] [--lead @h] [--members @a,@b] [--sensitivity s] [--agents a,b] [--host <name>]` | Promote an existing clone to a murmurent project: writes CHARTER.md, the cert-project registry entry, the installation manifest, and bootstraps `.claude/agents/`. Defaults: project = basename, lead = `@$MURMURENT_USER`, members = the lead. Remote hosts get CHARTER + bootstrap over one batched SSH session |
+| `murmurent repo list [--host <name>]` | Every git clone on every registered machine (local included), grouped by host, each with its readiness verdict (`✓ ready` / `± partial` / `• clone`) |
+| `murmurent repo status <path-or-name> [--host <name>]` | Is this repo murmurent-ready? A path is checked directly (local, or on `--host` over SSH); a bare name is searched on every registered machine. Reports the `.murmurent.yaml` marker (or legacy `CHARTER.md`) + `.claude/agents/` components. Exit 0 = ready, 1 = not ready, 2 = not found — scriptable |
+| `murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]` | Make an existing clone **murmurent-ready**: writes the `.murmurent.yaml` readiness marker and bootstraps `.claude/agents/`. Creates NO project — a project is a set of repos + members, made via `murmurent project new` (which attaches ready repos) |
+| `murmurent repo upgrade [<path> \| --all] [--add-agents a,b] [--all-agents]` | Bring ready repos up to the current murmurent release: converts legacy `CHARTER.md` bootstraps to the marker, migrates the marker schema, re-links commons agents, re-stamps `bootstrap_version`. Agent *content* updates never need this — symlinks track the commons clone automatically |
 
 ### Experiments
 

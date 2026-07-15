@@ -4,11 +4,11 @@ description: Murmurent-aware stage/commit/push for a murmurent-enabled repo. Exc
 user_invocable: true
 ---
 
-Stage changed files, create a descriptive commit, push to the remote tracking branch, and post a Slack release note — but with **murmurent-specific safety rules** that go beyond plain git. This skill is for repos that contain a `CHARTER.md` at the root (murmurent-adopted projects). For a non-murmurent repo, use `/commit-push` instead.
+Stage changed files, create a descriptive commit, push to the remote tracking branch, and post a Slack release note — but with **murmurent-specific safety rules** that go beyond plain git. This skill is for **murmurent-ready** repos — a `.murmurent.yaml` readiness marker (or a legacy `CHARTER.md` bootstrap) at the root. For a non-murmurent repo, use `/commit-push` instead.
 
 ## Pre-flight (do this BEFORE staging)
 
-1. **Confirm it's a murmurent repo.** The current working tree must contain `CHARTER.md` at its root. If not, stop and tell the user "this isn't a murmurent project — use /commit-push instead."
+1. **Confirm the repo is murmurent-ready.** The working tree must contain `.murmurent.yaml` (the readiness marker) or a legacy `CHARTER.md` at its root. If neither, stop and tell the user "this repo isn't murmurent-ready — use /commit-push instead." (A legacy `CHARTER.md` also means: suggest `murmurent repo upgrade` after the push.)
 
 2. **Refuse if the diff touches `/data/lab_vm/raw/` or `/data/lab_vm/refined/`.** Those paths are immutable per murmurent's data-storage rule (`rules/data-storage.md`). The hook layer would block it anyway, but check `git status` for any path matching `^data/lab_vm/(raw|refined)/` and refuse the commit with a clear explanation. (Note: project repos under `~/repos/<name>/` should never contain such paths; this guard catches misconfigured `.gitignore` or symlinks.)
 
@@ -26,7 +26,7 @@ Stage changed files, create a descriptive commit, push to the remote tracking br
 
 5. **Skip `.claude/settings.json` even if it shows up changed.** The per-project `.claude/settings.json` is .gitignored by `project_cc_init.bootstrap_local` because it contains machine-absolute paths and per-machine permission allowlists. If `.gitignore` is missing the entry, add the entry to `.gitignore` first (`echo '.claude/settings.json' >> .gitignore`) and include that `.gitignore` change in the commit — but do NOT stage `.claude/settings.json` itself.
 
-6. **Validate `CHARTER.md` if it was modified.** Check it still parses as YAML frontmatter and has the required fields (`project`, `lead`, `members`, `sensitivity`). If broken, refuse the commit with the specific error.
+6. **Validate `.murmurent.yaml` / `CHARTER.md` if modified.** The marker must parse as YAML with `murmurent:` (schema int) and `lab:`; a legacy CHARTER needs `project`, `lead`, `members`, `sensitivity`. If broken, refuse the commit with the specific error.
 
 7. **Validate `MEMBERS` file if it was modified.** Should be one `@handle` per line. Refuse if a line doesn't match `^@[A-Za-z0-9_-]+$`.
 
@@ -49,7 +49,7 @@ Once the pre-flight passes, follow the standard commit-push flow with these murm
 ## After the push: Slack release note
 
 Post the release note to **the project's own Slack channel** — this repo is a
-project (it has a `CHARTER.md`), so its activity belongs in its channel, not the
+project-attached repo, so its activity belongs in the project's channel, not the
 centre-wide dev channel. Resolve the channel id first:
 
 ```bash
@@ -62,7 +62,7 @@ murmurent project channel        # prints the cert-project's Slack channel id
   **skip the Slack post** (don't fall back to #claude-test — a project's notes go
   to its own channel only). The push still succeeded.
 - If it exits with **"not inside a project repo"** → this isn't a project after
-  all; the skill shouldn't have run (it requires `CHARTER.md`).
+  all; post no Slack note (a ready-but-unattached repo has no project channel — that's normal).
 
 Message body:
 - **First line**: `**<repo-name>** · `<branch>` · `<short-hash>` — _<commit-title>_`
@@ -75,12 +75,12 @@ Use `mcp__claude_ai_Slack__slack_send_message`, NOT `mcp__slack__slack_post_mess
 
 | Situation | Action | Reason |
 |---|---|---|
-| Repo lacks `CHARTER.md` at root | Refuse; suggest `/commit-push` | Not a murmurent project |
+| Repo lacks a readiness marker (`.murmurent.yaml` / legacy `CHARTER.md`) | Refuse; suggest `/commit-push` | Not murmurent-ready |
 | Diff touches `data/lab_vm/raw\|refined/` | Refuse | rules/data-storage.md (immutable) |
 | Secret-shaped filename in diff | Stop and ask | Prevent credential leak |
 | File > 1 MB in `data/`/`src/`/`exp/`/`obsolete/` | Refuse; suggest refined/ | rules/project-structure.md |
 | `.claude/settings.json` staged | Drop from stage; ensure in `.gitignore` | Machine-absolute paths leak across collaborators |
-| `CHARTER.md` invalid YAML / missing fields | Refuse | rules/oracle_schema.md governs CHARTER too |
+| Marker/CHARTER invalid YAML / missing fields | Refuse | corrupt readiness metadata |
 | User asks for `--force`/`--no-verify`/`--amend` | Ask for explicit confirmation | Defaults from CLAUDE.md |
 
 ## What this skill explicitly does NOT do
@@ -96,7 +96,7 @@ Use `mcp__claude_ai_Slack__slack_send_message`, NOT `mcp__slack__slack_post_mess
 ```
 > /murmurent-push
 Pre-flight ✓
-  - CHARTER.md present
+  - readiness marker present
   - no /data/lab_vm/* in diff
   - no secret-shaped files
   - largest in-repo file: 24 KB (data/sample.csv)

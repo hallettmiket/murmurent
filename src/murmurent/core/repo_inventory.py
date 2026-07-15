@@ -52,9 +52,9 @@ class RepoOnHost:
     host: str                       # "local" / "lab-server"
     path: str                       # ``$HOME/repos/<name>`` absolute on the host
     origin_url: str                 # "" when the repo has no ``origin`` remote
-    has_charter: bool               # ``CHARTER.md`` at the working-tree root
+    has_marker: bool                # readiness marker (.murmurent.yaml OR legacy CHARTER.md)
     has_claude_dir: bool            # ``.claude/agents/`` exists
-    is_murmurent_ready: bool          # CHARTER + .claude/agents — the repo is a murmurent project
+    is_murmurent_ready: bool        # marker + .claude/agents — the repo is murmurent-ready
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -185,8 +185,9 @@ def _scan_script(scan_dirs: tuple[str, ...]) -> str:
     This lets a host scan both ``~/repos`` and a shared mount like
     ``/srv/projects`` in the same pass.
 
-    Output format: ``<path>|<origin>|<has_charter>|<has_claude_agents>``
-    where ``has_charter`` and ``has_claude_agents`` are ``1`` or ``0``.
+    Output format: ``<path>|<origin>|<has_marker>|<has_claude_agents>``
+    where ``has_marker`` (readiness marker: .murmurent.yaml, or the
+    legacy CHARTER.md bootstrap) and ``has_claude_agents`` are 1/0.
     Uses ``|`` because git remote URLs can contain ``:`` (ssh form).
     """
     quoted = " ".join(shlex.quote(d) for d in scan_dirs)
@@ -207,9 +208,10 @@ def _scan_script(scan_dirs: tuple[str, ...]) -> str:
         # us inside the same SSH session. Falls back to empty if no
         # ``origin`` remote.
         '    url=$(git -C "$repo" remote get-url origin 2>/dev/null); '
-        '    charter=0; [ -f "$repo/CHARTER.md" ] && charter=1; '
+        '    marked=0; [ -f "$repo/.murmurent.yaml" ] && marked=1; '
+        '    [ -f "$repo/CHARTER.md" ] && marked=1; '
         '    claude=0; [ -d "$repo/.claude/agents" ] && claude=1; '
-        '    echo "$repo|$url|$charter|$claude"; '
+        '    echo "$repo|$url|$marked|$claude"; '
         '  done; '
         'done'
     )
@@ -254,19 +256,16 @@ def list_machine_repos(host_name: str) -> tuple[list[RepoOnHost], str | None]:
         parts = line.split("|", 3)
         if len(parts) < 4:
             continue
-        path, origin, charter, claude = parts
+        path, origin, marked, claude = parts
         out.append(RepoOnHost(
             host=host_name,
             path=path,
             origin_url=origin,
-            has_charter=charter == "1",
+            has_marker=marked == "1",
             has_claude_dir=claude == "1",
-            # "murmurent-ready" = "has charter + has claude/agents" — the
-            # repo-side state. Installation manifests live in
-            # ~/.murmurent/installations/<name>.yaml which we'd need a
-            # second SSH call to check — skipped for v1 since the
-            # in-repo state is the leading indicator anyway.
-            is_murmurent_ready=(charter == "1" and claude == "1"),
+            # "murmurent-ready" = readiness marker + .claude/agents —
+            # the repo-side state, independent of any project.
+            is_murmurent_ready=(marked == "1" and claude == "1"),
         ))
     return out, None
 

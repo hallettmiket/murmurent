@@ -1,33 +1,39 @@
 """
-Purpose: Single chokepoint for "adopt this existing clone as a murmurent
-        project" + "has this repo been adopted yet?" — shared by the
-        dashboard endpoint (``POST /api/inventory/adopt``) and the CLI
-        (``murmurent repo adopt`` / ``murmurent repo status``).
+Purpose: Single chokepoint for "make this clone murmurent-READY" +
+        "is this repo ready yet?" — shared by the dashboard endpoint
+        (``POST /api/inventory/adopt``) and the CLI
+        (``murmurent repo adopt`` / ``status`` / ``upgrade``).
 Author: Mike Hallett (with Claude Code)
-Date: 2026-07-14
-Input: Path to a git clone (local or on a registered SSH host) + project
-       metadata (lead, members, sensitivity, agents, …).
-Output: :class:`AdoptOutcome` wrapping the :class:`projectize.ProjectizeResult`,
-        or :class:`AdoptionStatus` for the read-only check.
+Date: 2026-07-14 (readiness split 2026-07-15)
+Input: Path to a git clone (local or on a registered SSH host).
+Output: :class:`AdoptOutcome` wrapping the readiness probes, or
+        :class:`AdoptionStatus` for the read-only check.
 
-Before this module existed the validation + host-branching lived inline
-in the dashboard endpoint, so the CLI had no way to adopt a repo without
-going through HTTP. The endpoint and the CLI now both call
-:func:`adopt_clone`; errors are raised as :class:`AdoptError` with a
-machine-readable ``code`` that the endpoint maps onto HTTP statuses.
+Terminology (2026-07-15 split): adopting a repo makes it
+**murmurent-ready** — the ``.murmurent.yaml`` marker + the CC bootstrap
+(:mod:`core.repo_ready`). It does NOT create a project. A *project* is
+a named set of repos + members recorded in the lab_mgmt registry
+(``cert_projects/``), created via the New Project flow which attaches
+already-ready repos. Before the split, adopt minted a one-repo project
+(CHARTER.md + registry record + manifest) — repos bootstrapped that way
+still count as ready ("legacy") and ``murmurent repo upgrade`` converts
+them to the marker.
+
+Remote (SSH) adopts still write the legacy CHARTER-style bootstrap on
+the host (the batched script predates the marker); that is recognized
+as ready and upgraded in place later.
 """
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 
 from . import hosts as _hosts
-from . import projectize as _proj
 from . import remote as _remote
+from . import repo_ready as _rr
 
 # code → the HTTP status the dashboard endpoint responds with. Kept here
 # so the mapping can't drift from the codes adopt_clone() raises.
@@ -35,7 +41,7 @@ ERROR_HTTP_STATUS = {
     "host_not_found": 404,
     "bad_request": 400,
     "conflict": 409,
-    "charter_failed": 422,
+    "bootstrap_failed": 422,
     "ssh_failed": 502,
     "internal": 500,
 }
@@ -53,87 +59,42 @@ class AdoptError(Exception):
 class AdoptOutcome:
     """What :func:`adopt_clone` produced, host-agnostic."""
 
-    project: str
+    repo: str
     host: str
     clone_path: str
-    result: _proj.ProjectizeResult
+    probes: list
 
     def to_dict(self) -> dict:
         return {
             "ok": True,
-            "project": self.project,
+            "repo": self.repo,
             "host": self.host,
             "clone_path": self.clone_path,
-            "registry_path": (
-                str(self.result.registry_path) if self.result.registry_path else None
-            ),
-            "manifest_path": (
-                str(self.result.manifest_path) if self.result.manifest_path else None
-            ),
-            "probes": [p.to_dict() for p in self.result.probes],
+            "probes": [p.to_dict() for p in self.probes],
         }
-
-
-def _local_wigamig_base() -> str:
-    """This machine's wigamig base (raw/refined/notebook parent).
-
-    Read via the dashboard's machine-settings loader so we honour the
-    same ``~/.murmurent/machine.yaml`` + legacy fallbacks the adopt
-    endpoint always used. Lazy import — core shouldn't pull the
-    dashboard package in at import time.
-    """
-    try:
-        from ..dashboard import machine_settings as _ms
-
-        ms = _ms.load()
-        return (ms.wigamig_base or "~/wigamig").rstrip("/")
-    except Exception:
-        return "~/wigamig"
 
 
 def adopt_clone(
     *,
     clone_path: str,
-    project: str,
-    lead: str,
-    members: list[str],
-    sensitivity: str = "standard",
-    description: str = "",
-    choreography: str | None = None,
+    lab: str = "",
     agents: list[str] | None = None,
     host: str = "local",
-    reb_number: str | None = None,
-    reb_expires: str | None = None,
-    data_residency: str | None = None,
-    actor: str = "",
-    installations_dir: Path | None = None,
 ) -> AdoptOutcome:
-    """Adopt an existing git clone as a murmurent project.
+    """Make an existing git clone murmurent-ready.
 
     ``host == "local"`` validates the path against ``~/repos/`` and
-    writes everything on this filesystem. Any other value must name a
-    registered SSH host: CHARTER + bootstrap are written on the remote
-    over one batched SSH session, while the local-side artefacts
-    (cert-project registry, installation manifest with ``ssh_remote``)
-    still land on this machine.
+    bootstraps on this filesystem. Any other value must name a
+    registered SSH host; the bootstrap runs on the remote over one
+    batched SSH session. No project is created — attach the ready repo
+    to a project separately.
 
     Raises :class:`AdoptError`; never touches HTTP.
     """
-    installations_dir = installations_dir or _proj.INSTALLATIONS_DIR_DEFAULT
-    actor = (actor or os.environ.get("MURMURENT_USER", "")).strip().lstrip("@") \
-        or lead.lstrip("@")
-
     if host and host != "local":
-        return _adopt_remote(
-            clone_path=clone_path, project=project, lead=lead, members=members,
-            sensitivity=sensitivity, description=description,
-            choreography=choreography, agents=agents, host=host,
-            reb_number=reb_number, reb_expires=reb_expires,
-            data_residency=data_residency, actor=actor,
-            installations_dir=installations_dir,
-        )
+        return _adopt_remote(clone_path=clone_path, lab=lab,
+                             agents=agents, host=host)
 
-    # ---- Local adopt ----
     clone = Path(clone_path).expanduser().resolve()
     repos_root = (Path.home() / "repos").resolve()
     try:
@@ -145,64 +106,37 @@ def adopt_clone(
         )
     if not (clone / ".git").exists():
         raise AdoptError(f"not a git working tree: {clone}", code="bad_request")
-    if (clone / "CHARTER.md").exists():
+    if (clone / _rr.LEGACY_MARKER).is_file():
         raise AdoptError(
-            f"{clone / 'CHARTER.md'} already exists — "
-            "edit by hand instead of re-adopting",
+            f"{clone} carries a legacy CHARTER.md bootstrap — run "
+            "`murmurent repo upgrade` to convert it instead of re-adopting",
             code="conflict",
         )
 
-    wb = _local_wigamig_base()
+    if not lab:
+        lab = _default_lab()
     try:
-        result = _proj.make_wigamig_project(
-            clone_path=clone,
-            project=project,
-            lead=lead,
-            members=members,
-            sensitivity=sensitivity,
-            description=description,
-            choreography=choreography,
-            agents=list(agents or []),
-            reb_number=reb_number,
-            reb_expires=reb_expires,
-            data_residency=data_residency,
-            member=actor,
-            machine_type="laptop",
-            hostname=os.uname().nodename,
-            username=os.environ.get("USER", ""),
-            has_direct_access=True,
-            lab_base=wb,
-            raw_path=f"{wb}/raw",
-            refined_path=f"{wb}/refined",
-            notebook_path=f"{wb}/lab_notebooks",
-            installations_dir=installations_dir,
-        )
-    except Exception as exc:
-        raise AdoptError(f"projectize failed: {exc}", code="internal") from exc
-
-    _raise_if_charter_failed(result)
-    return AdoptOutcome(project=project, host="local",
-                        clone_path=str(clone), result=result)
+        probes = _rr.make_ready(clone, lab=lab, agents=agents)
+    except Exception as exc:  # noqa: BLE001
+        raise AdoptError(f"bootstrap failed: {exc}", code="internal") from exc
+    _raise_if_required_failed(probes)
+    return AdoptOutcome(repo=clone.name, host="local",
+                        clone_path=str(clone), probes=probes)
 
 
-def _adopt_remote(
-    *,
-    clone_path: str,
-    project: str,
-    lead: str,
-    members: list[str],
-    sensitivity: str,
-    description: str,
-    choreography: str | None,
-    agents: list[str] | None,
-    host: str,
-    reb_number: str | None,
-    reb_expires: str | None,
-    data_residency: str | None,
-    actor: str,
-    installations_dir: Path,
-) -> AdoptOutcome:
-    """SSH-host branch of :func:`adopt_clone`."""
+def _default_lab() -> str:
+    """This machine's lab slug, best-effort (blank on a bare install)."""
+    try:
+        from .lab import load_lab_config
+        return str(load_lab_config().lab or "")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _adopt_remote(*, clone_path: str, lab: str,
+                  agents: list[str] | None, host: str) -> AdoptOutcome:
+    """SSH-host branch: bootstrap on the remote (legacy CHARTER shape —
+    the batched script predates the marker; recognized as ready)."""
     try:
         host_obj = _hosts.resolve(host)
     except _hosts.HostNotFound as exc:
@@ -210,10 +144,6 @@ def _adopt_remote(
     if host_obj.kind != "ssh":
         raise AdoptError(f"host {host!r} is not an SSH host", code="bad_request")
 
-    # Probe: does the path exist on the remote and have .git? One SSH
-    # round-trip; the remote-adopt script itself handles the CHARTER-
-    # already-exists case (emits ``charter:ok:already exists…`` instead
-    # of overwriting), so no second probe for it here.
     rem = _remote.Remote(host_obj)
     qpath = clone_path.replace("'", "'\\''")
     try:
@@ -231,87 +161,71 @@ def _adopt_remote(
     verdict = (res.stdout or "").strip().splitlines()[-1] if res.stdout else ""
     if verdict == "NOPATH":
         raise AdoptError(
-            f"path does not exist on {host}: {clone_path}", code="bad_request"
-        )
+            f"path does not exist on {host}: {clone_path}", code="bad_request")
     if verdict == "NOGIT":
         raise AdoptError(
-            f"not a git working tree on {host}: {clone_path}", code="bad_request"
-        )
+            f"not a git working tree on {host}: {clone_path}", code="bad_request")
     if verdict != "OK":
         raise AdoptError(
             f"unexpected probe verdict {verdict!r}: {res.stderr or ''}",
             code="ssh_failed",
         )
 
-    wb = (host_obj.lab_vm_root or "~/wigamig").rstrip("/")
+    from . import remote_adopt as _radopt
+    name = Path(clone_path).name
+    charter_text = (
+        "---\n"
+        f"lab: {lab or _default_lab() or ''}\n"
+        "---\n\n"
+        f"# {name}\n\n"
+        "murmurent-ready marker (legacy shape written over SSH; run "
+        "`murmurent repo upgrade` on the host to convert).\n"
+    )
     try:
-        result = _proj.make_wigamig_project(
-            clone_path=Path(clone_path),
-            project=project,
-            lead=lead,
-            members=members,
-            sensitivity=sensitivity,
-            description=description,
-            choreography=choreography,
-            agents=list(agents or []),
-            reb_number=reb_number,
-            reb_expires=reb_expires,
-            data_residency=data_residency,
-            member=actor,
-            machine_type="lab_server",
-            hostname=host_obj.ssh_host or host,
-            username=host_obj.remote_user or "",
-            has_direct_access=False,
-            lab_base=wb,
-            raw_path=f"{wb}/raw",
-            refined_path=f"{wb}/refined",
-            notebook_path=f"{wb}/lab_notebooks",
-            ssh_remote=host,
-            mount_point=host_obj.mount_point or None,
-            installations_dir=installations_dir,
-        )
-    except Exception as exc:
-        raise AdoptError(f"projectize failed: {exc}", code="internal") from exc
-
-    _raise_if_charter_failed(result)
-    return AdoptOutcome(project=project, host=host,
-                        clone_path=clone_path, result=result)
+        probes = _radopt.adopt_remote_clone(
+            host=host_obj, clone_path=clone_path, project=name,
+            charter_text=charter_text, agents=list(agents or []))
+    except Exception as exc:  # noqa: BLE001
+        raise AdoptError(f"remote bootstrap failed: {exc}", code="internal") from exc
+    _raise_if_required_failed(probes)
+    return AdoptOutcome(repo=name, host=host, clone_path=clone_path,
+                        probes=probes)
 
 
-def _raise_if_charter_failed(result: _proj.ProjectizeResult) -> None:
-    """A failed charter probe means the adopt didn't take — surface it
-    as a hard error (422 on the endpoint side)."""
-    charter_probe = next((p for p in result.probes if p.name == "charter"), None)
-    if charter_probe and charter_probe.status == "fail":
-        raise AdoptError(charter_probe.detail, code="charter_failed")
+def _raise_if_required_failed(probes) -> None:
+    for p in probes:
+        if getattr(p, "status", "") == "fail" and getattr(p, "required", False):
+            raise AdoptError(p.detail, code="bootstrap_failed")
 
 
 # ---------------------------------------------------------------------------
-# Read-only: has this repo been adopted yet?
+# Read-only: is this repo murmurent-ready yet?
 # ---------------------------------------------------------------------------
 
 
 @dataclass
 class AdoptionStatus:
-    """Adoption state of one clone on one host.
+    """Readiness state of one clone on one host.
 
-    ``adopted`` matches the Repos panel's ``✓ murmurent`` signal
-    (CHARTER.md + ``.claude/agents/`` in the working tree).
-    ``manifest_path`` additionally reports the local-side installation
-    manifest, when one references this clone.
+    ``ready`` matches the Repos panel's ✓ signal: a readiness marker
+    (``.murmurent.yaml``, or a legacy ``CHARTER.md`` bootstrap) plus
+    ``.claude/agents/``.
     """
 
     host: str
     path: str
     exists: bool
     is_git: bool
-    has_charter: bool
+    has_marker: bool
+    legacy_charter: bool
     has_claude_agents: bool
-    manifest_path: str | None = None
+    bootstrap_version: str = ""
 
     @property
-    def adopted(self) -> bool:
-        return self.exists and self.is_git and self.has_charter and self.has_claude_agents
+    def ready(self) -> bool:
+        return (self.exists and self.is_git
+                and (self.has_marker or self.legacy_charter)
+                and self.has_claude_agents)
 
     @property
     def verdict(self) -> str:
@@ -320,9 +234,10 @@ class AdoptionStatus:
             return "missing"
         if not self.is_git:
             return "not a git repo"
-        if self.adopted:
-            return "adopted"
-        if self.has_charter or self.has_claude_agents:
+        if self.ready:
+            return "ready (legacy)" if (self.legacy_charter
+                                        and not self.has_marker) else "ready"
+        if self.has_marker or self.legacy_charter or self.has_claude_agents:
             return "partial"
         return "plain clone"
 
@@ -332,12 +247,73 @@ class AdoptionStatus:
             "path": self.path,
             "exists": self.exists,
             "is_git": self.is_git,
-            "has_charter": self.has_charter,
+            "has_marker": self.has_marker,
+            "legacy_charter": self.legacy_charter,
             "has_claude_agents": self.has_claude_agents,
-            "manifest_path": self.manifest_path,
-            "adopted": self.adopted,
+            "bootstrap_version": self.bootstrap_version,
+            "ready": self.ready,
             "verdict": self.verdict,
         }
+
+
+def adoption_status(clone_path: str, *, host: str = "local") -> AdoptionStatus:
+    """Report whether the clone at ``clone_path`` on ``host`` is
+    murmurent-ready. Read-only; safe on any directory.
+
+    Local hosts are checked on the filesystem; SSH hosts with a single
+    batched probe. Raises :class:`AdoptError` (``host_not_found`` /
+    ``ssh_failed``) only for host-resolution or connection problems —
+    a missing path is a normal ``exists=False`` answer, not an error.
+    """
+    if host == "local":
+        p = Path(clone_path).expanduser().resolve()
+        r = _rr.readiness(p)
+        return AdoptionStatus(
+            host="local",
+            path=str(p),
+            exists=p.is_dir(),
+            is_git=p.is_dir() and (p / ".git").is_dir(),
+            has_marker=r.marker is not None,
+            legacy_charter=r.legacy_charter,
+            has_claude_agents=r.has_agents_dir,
+            bootstrap_version=str((r.marker or {}).get("bootstrap_version") or ""),
+        )
+
+    try:
+        host_obj = _hosts.resolve(host)
+    except _hosts.HostNotFound as exc:
+        raise AdoptError(str(exc), code="host_not_found") from exc
+    rem = _remote.Remote(host_obj)
+    qpath = clone_path.replace("'", "'\\''")
+    script = (
+        f"p='{qpath}'; "
+        'e=0; [ -d "$p" ] && e=1; '
+        'g=0; [ -d "$p/.git" ] && g=1; '
+        f'm=0; [ -f "$p/{_rr.MARKER_FILENAME}" ] && m=1; '
+        f'c=0; [ -f "$p/{_rr.LEGACY_MARKER}" ] && c=1; '
+        'a=0; [ -d "$p/.claude/agents" ] && a=1; '
+        'echo "$e|$g|$m|$c|$a"'
+    )
+    try:
+        res = rem.run(script, check=False, timeout=20)
+    except _remote.RemoteError as exc:
+        raise AdoptError(
+            f"ssh probe to {host} failed: {(exc.stderr or str(exc)).strip()}",
+            code="ssh_failed",
+        ) from exc
+    line = (res.stdout or "").strip().splitlines()[-1] if res.stdout else ""
+    parts = line.split("|")
+    if len(parts) != 5:
+        raise AdoptError(
+            f"unexpected probe output from {host}: {line!r}", code="ssh_failed")
+    e, g, m, c, a = (x == "1" for x in parts)
+    return AdoptionStatus(host=host, path=clone_path, exists=e, is_git=g,
+                          has_marker=m, legacy_charter=c, has_claude_agents=a)
+
+
+# ---------------------------------------------------------------------------
+# Legacy installation manifests (kept for the Installations panel)
+# ---------------------------------------------------------------------------
 
 
 def find_manifest_for(clone_path: str, *, host: str = "local",
@@ -345,18 +321,18 @@ def find_manifest_for(clone_path: str, *, host: str = "local",
     """Return the installation manifest that references ``clone_path``
     on ``host``, if any. Manifests always live on THIS machine (remote
     installs carry ``ssh_remote``), so this is a local scan either way.
+    Manifests are a project×machine record — written at project
+    install time, no longer by adopt.
     """
-    installations_dir = installations_dir or _proj.INSTALLATIONS_DIR_DEFAULT
+    if installations_dir is None:
+        from . import projectize as _proj
+        installations_dir = _proj.INSTALLATIONS_DIR_DEFAULT
     if not installations_dir.is_dir():
         return None
     if host == "local":
         want = str(Path(clone_path).expanduser().resolve())
     else:
         want = clone_path.rstrip("/")
-    # Fallback when no manifest records this exact path: manifests are
-    # keyed <project>.yaml and adopt defaults project = basename, so a
-    # same-named manifest on the same host is almost certainly this
-    # clone (recorded from a different mount/home prefix).
     name_match: Path | None = None
     want_name = Path(clone_path).name
     for mf in sorted(installations_dir.glob("*.yaml")):
@@ -387,63 +363,3 @@ def find_manifest_for(clone_path: str, *, host: str = "local",
             if got == want:
                 return mf
     return name_match
-
-
-def adoption_status(clone_path: str, *, host: str = "local",
-                    installations_dir: Path | None = None) -> AdoptionStatus:
-    """Report whether the clone at ``clone_path`` on ``host`` has been
-    adopted (murmurent-ready). Read-only; safe on any directory.
-
-    Local hosts are checked on the filesystem; SSH hosts with a single
-    batched probe. Raises :class:`AdoptError` (``host_not_found`` /
-    ``ssh_failed``) only for host-resolution or connection problems —
-    a missing path is a normal ``exists=False`` answer, not an error.
-    """
-    if host == "local":
-        p = Path(clone_path).expanduser().resolve()
-        exists = p.is_dir()
-        st = AdoptionStatus(
-            host="local",
-            path=str(p),
-            exists=exists,
-            is_git=exists and (p / ".git").is_dir(),
-            has_charter=exists and (p / "CHARTER.md").is_file(),
-            has_claude_agents=exists and (p / ".claude" / "agents").is_dir(),
-        )
-    else:
-        try:
-            host_obj = _hosts.resolve(host)
-        except _hosts.HostNotFound as exc:
-            raise AdoptError(str(exc), code="host_not_found") from exc
-        rem = _remote.Remote(host_obj)
-        qpath = clone_path.replace("'", "'\\''")
-        script = (
-            f"p='{qpath}'; "
-            'e=0; [ -d "$p" ] && e=1; '
-            'g=0; [ -d "$p/.git" ] && g=1; '
-            'c=0; [ -f "$p/CHARTER.md" ] && c=1; '
-            'a=0; [ -d "$p/.claude/agents" ] && a=1; '
-            'echo "$e|$g|$c|$a"'
-        )
-        try:
-            res = rem.run(script, check=False, timeout=20)
-        except _remote.RemoteError as exc:
-            raise AdoptError(
-                f"ssh probe to {host} failed: {(exc.stderr or str(exc)).strip()}",
-                code="ssh_failed",
-            ) from exc
-        line = (res.stdout or "").strip().splitlines()[-1] if res.stdout else ""
-        parts = line.split("|")
-        if len(parts) != 4:
-            raise AdoptError(
-                f"unexpected probe output from {host}: {line!r}", code="ssh_failed"
-            )
-        e, g, c, a = (x == "1" for x in parts)
-        st = AdoptionStatus(
-            host=host, path=clone_path, exists=e, is_git=g,
-            has_charter=c, has_claude_agents=a,
-        )
-
-    mf = find_manifest_for(st.path, host=host, installations_dir=installations_dir)
-    st.manifest_path = str(mf) if mf else None
-    return st

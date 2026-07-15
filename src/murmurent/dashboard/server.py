@@ -378,34 +378,19 @@ class HostUpdateBody(BaseModel):
 class AdoptCloneBody(BaseModel):
     """JSON body for ``POST /api/inventory/adopt``.
 
-    Promotes an existing git clone (one that shows up as ``• clone``
-    in the Repo Inventory) into a murmurent project by writing a
-    CHARTER.md and bootstrapping ``.claude/agents/``.
+    Makes an existing git clone (a ``• clone`` row in the Repo
+    Inventory) **murmurent-ready**: readiness marker + commons agent
+    symlinks + CLAUDE.md stub. No project fields — adoption doesn't
+    create a project; the New Project flow attaches ready repos.
 
-    ``host`` defaults to ``"local"`` (the laptop) — the clone path is
-    validated against ``~/repos/`` and CHARTER + bootstrap happen on
-    the filesystem directly. When ``host`` names a registered SSH host
-    (e.g. ``"lab-server"``), CHARTER + bootstrap are written *on the
-    remote* over a single batched SSH session, and the local-side
-    artefacts (lab_mgmt registry, installation manifest with
-    ``ssh_remote`` populated) still land on this machine so the
-    Projects + Installations panels see the new row immediately.
+    ``host`` defaults to ``"local"``; a registered SSH host name runs
+    the bootstrap on the remote over one batched SSH session.
     """
 
     clone_path: str                # absolute path on the target host
-    project: str                   # CHARTER project name
-    lead: str                      # e.g. "@the_pi"
-    members: list[str]             # at least one handle
-    sensitivity: str = "standard"  # standard | restricted | clinical
-    description: str = ""
-    choreography: str | None = None
-    agents: list[str] = []
+    lab: str = ""                  # owning lab slug (default: this machine's)
+    agents: list[str] = []         # commons agents to symlink (empty = none)
     host: str = "local"            # "local" or a registered SSH host name
-    # Clinical-only fields. Required when sensitivity == "clinical";
-    # render_charter() will raise if they're missing.
-    reb_number: str | None = None
-    reb_expires: str | None = None
-    data_residency: str | None = None
 
 
 class LoginSelectBody(BaseModel):
@@ -2070,37 +2055,24 @@ def create_app() -> FastAPI:
         body: AdoptCloneBody,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
-        """Adopt an existing git clone (local or SSH host) as a murmurent
-        project.
+        """Make an existing git clone (local or SSH host) murmurent-READY.
 
         Thin HTTP wrapper over :func:`core.adopt.adopt_clone` — the same
-        chokepoint ``murmurent repo adopt`` uses — so the clone ends up
-        in **all three** dashboard panels (Repos shows ✓ murmurent,
-        Projects gets a registry entry, Installations gets a manifest).
-        Validation (path under ~/repos, is a git tree, CHARTER absent,
-        host registered) lives in core.adopt; refusals arrive as
-        :class:`core.adopt.AdoptError` and map onto HTTP statuses via
-        ``core.adopt.ERROR_HTTP_STATUS``.
+        chokepoint ``murmurent repo adopt`` uses. Adoption bootstraps the
+        REPO only (readiness marker + commons agents); it does NOT create
+        a project — attach ready repos to a project via the New Project
+        flow (a project = a set of repos + a set of members). Refusals
+        arrive as :class:`core.adopt.AdoptError` and map onto HTTP
+        statuses via ``core.adopt.ERROR_HTTP_STATUS``.
         """
         from ..core import adopt as _adopt
-        from .snapshot import INSTALLATIONS_DIR
 
         try:
             outcome = _adopt.adopt_clone(
                 clone_path=body.clone_path,
-                project=body.project,
-                lead=body.lead,
-                members=body.members,
-                sensitivity=body.sensitivity,
-                description=body.description,
-                choreography=body.choreography,
-                agents=list(body.agents or []),
+                lab=(body.lab or "").strip(),
+                agents=list(body.agents or []) or None,
                 host=body.host or "local",
-                reb_number=body.reb_number,
-                reb_expires=body.reb_expires,
-                data_residency=body.data_residency,
-                actor=user,
-                installations_dir=INSTALLATIONS_DIR,
             )
         except _adopt.AdoptError as exc:
             raise HTTPException(
