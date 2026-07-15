@@ -2943,7 +2943,9 @@ function AddMemberModal({ onClose }) {
             <div style={{border:"1px solid var(--rule)", borderRadius:2, background:"var(--paper-2)",
                          padding:"8px 10px", fontSize:12.5, lineHeight:1.6}}>
               <div style={{fontWeight:600, marginBottom:2}}>You are certifying:</div>
-              <div><span className="muted">handle</span> <code className="mono">@{parsed.handle}</code></div>
+              {/* Enrollment payloads store the handle WITH a leading @
+                  (idcert._norm) — strip before prefixing or it renders @@. */}
+              <div><span className="muted">handle</span> <code className="mono">@{String(parsed.handle).replace(/^@+/,"")}</code> <span className="muted" style={{fontSize:11}}>(murmurent netname, not Slack)</span></div>
               {parsed.email  && <div><span className="muted">email</span> <code className="mono">{parsed.email}</code></div>}
               {parsed.github && <div><span className="muted">github</span> <code className="mono">@{String(parsed.github).replace(/^@/,"")}</code></div>}
               {parsed.slack  && <div><span className="muted">slack</span> <code className="mono">@{String(parsed.slack).replace(/^@/,"")}</code> <span className="muted" style={{fontSize:11}}>(card DM'd here)</span></div>}

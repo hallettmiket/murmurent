@@ -2163,9 +2163,11 @@ def create_app() -> FastAPI:
 
         actor = _require_pi(user)
 
-        group = (body.group or "").strip() or (snap_mod._current_lab_settings().name or "")
-        if not group:
-            raise HTTPException(status_code=422, detail="no group/lab to add the member to")
+        # Group resolution lives in issuance: blank means "the group this
+        # PI leads", read from their own identity card. The old fallback
+        # to the lab settings *name* passed a display name ("Bioinformatics
+        # Lab") where the card holds the slug ("bioinformatics") — issue #16.
+        group = (body.group or "").strip() or None
 
         enrollment = body.enrollment or {}
         payload = enrollment.get("payload") if isinstance(enrollment, dict) else None
@@ -2184,6 +2186,10 @@ def create_app() -> FastAPI:
             # PoP failure / not-your-group / missing PI card → 422 with the reason.
             raise HTTPException(status_code=422, detail=str(exc))
 
+        # Adopt the group issuance actually resolved (slug from the PI's
+        # card) — the audit line, Slack DM routing, and response all key
+        # off it.
+        group = bundle["member_card"]["payload"].get("group") or group or ""
         subj = bundle["member_card"]["payload"]["subject"]
         # Tell the PI exactly what trust root the member must pin (self-rooted
         # standalone lab → the PI's own key; centre lab → centre-pin flow).

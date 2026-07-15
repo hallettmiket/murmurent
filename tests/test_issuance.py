@@ -678,3 +678,43 @@ def test_delete_project_revokes_lead_and_members(monkeypatch, tmp_path):
     REV.import_distributed_crl(realm, out["crl"])
     pv = ISS.verify_project_membership("dcis_17")
     assert not pv.ok and "revoked" in pv.reason
+
+
+# ---- group resolution on member cards (issue #16) ---------------------------
+
+def _solo_core_pi(monkeypatch, tmp_path, handle="@emucaki", group="bioinformatics"):
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "pi_home"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "pi_li"))
+    K.generate_keypair()
+    ISS.self_issue_pi_card(handle, group)
+
+
+def _member_req(handle, nonce, group="bioinformatics"):
+    priv = Ed25519PrivateKey.generate()
+    return C.make_enrollment_request(handle, priv=priv, nonce=nonce, group=group)
+
+
+def test_issue_member_card_blank_group_uses_the_led_group(monkeypatch, tmp_path):
+    """Issue #16: the dashboard sends no group — issuance resolves it from
+    the PI's own card (they lead exactly one group), instead of the old
+    endpoint fallback that guessed a display name."""
+    _solo_core_pi(monkeypatch, tmp_path)
+    bundle = ISS.issue_member_card("@hagaremam", enrollment=_member_req("@hagaremam", "n1"),
+                                   group=None)
+    assert bundle["member_card"]["payload"]["group"] == "bioinformatics"
+
+
+def test_issue_member_card_group_match_is_case_insensitive(monkeypatch, tmp_path):
+    _solo_core_pi(monkeypatch, tmp_path)
+    bundle = ISS.issue_member_card("@tim", enrollment=_member_req("@tim", "n2"),
+                                   group="Bioinformatics")
+    assert bundle["member_card"]["payload"]["group"] == "bioinformatics"
+
+
+def test_issue_member_card_wrong_group_names_the_led_groups(monkeypatch, tmp_path):
+    """The refusal now says what the card DOES authorise, so a PI staring
+    at "you do not lead group 'Bioinformatics Lab'" can self-correct."""
+    _solo_core_pi(monkeypatch, tmp_path)
+    with pytest.raises(ISS.IssuanceError, match="you lead: bioinformatics"):
+        ISS.issue_member_card("@zed", enrollment=_member_req("@zed", "n3"),
+                              group="Bioinformatics Lab")

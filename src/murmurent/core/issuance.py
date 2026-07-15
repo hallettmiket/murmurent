@@ -288,7 +288,7 @@ def verify_and_import_pi_card(card, *, trust_root: str | None = None,
 # Group-registrar (PI) side: issue a member card signed with the PI's own key
 # ---------------------------------------------------------------------------
 
-def issue_member_card(handle: str, *, enrollment: dict, group: str,
+def issue_member_card(handle: str, *, enrollment: dict, group: str | None = None,
                       env: dict | None = None, issued_at=None,
                       ttl_days: int = _cert.DEFAULT_TTL_DAYS,
                       expected_nonce: str | None = None) -> dict:
@@ -298,7 +298,13 @@ def issue_member_card(handle: str, *, enrollment: dict, group: str,
     Runs on the PI's machine: it uses the PI's local identity card to confirm
     they lead ``group``, verifies the member's proof-of-possession, then returns
     a **bundle** ``{"member_card", "pi_card"}`` so the member receives the whole
-    chain (member → PI → root) needed to verify."""
+    chain (member → PI → root) needed to verify.
+
+    ``group`` is the registry slug (e.g. ``bioinformatics``). ``None``/blank
+    means "the group I lead" — resolved from the PI's own card when they lead
+    exactly one group (the dashboard flow; issue #16 came from the endpoint
+    guessing a display name here). An explicit value is matched against the
+    card's led groups case-insensitively."""
     if not _k.have_keys():
         raise IssuanceError("no local keypair; you need your own key to sign member cards")
     local = _ic.local_card(env=env)
@@ -307,9 +313,27 @@ def issue_member_card(handle: str, *, enrollment: dict, group: str,
     centre_name = local.get("centre") or ""
     led = {r.get("group"): r.get("kind") for r in local.get("roles", [])
            if r.get("kind") in ("lab_pi", "core_leader")}
+    if not led:
+        raise IssuanceError(
+            "your identity card records no lab or core led by you — "
+            "re-import your PI card (`murmurent import-card`)")
+    group = (group or "").strip()
+    if not group:
+        if len(led) == 1:
+            group = next(iter(led))
+        else:
+            raise IssuanceError(
+                "you lead more than one group ("
+                + ", ".join(sorted(led)) + ") — say which one to issue for")
+    elif group not in led:
+        # Tolerate case drift ("Bioinformatics" for "bioinformatics") —
+        # anything beyond that is a real mismatch, reported with what the
+        # card actually says so the caller can self-correct.
+        group = {g.lower(): g for g in led}.get(group.lower(), group)
     if group not in led:
         raise IssuanceError(
-            f"you do not lead group '{group}' — cannot issue its member cards")
+            f"you do not lead group '{group}' — cannot issue its member cards "
+            f"(your card says you lead: {', '.join(sorted(led))})")
     group_kind = "core" if led[group] == "core_leader" else "lab"
 
     pi_card_path = cards_dir() / f"{_safe(centre_name)}_pi.json"
