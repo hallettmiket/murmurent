@@ -129,3 +129,15 @@ def test_parse_logins_backfills_from_top_level_github():
     assert parse_logins({"github": "@vaibhavg037"}) == {"github": "vaibhavg037"}
     # git_logins wins when both are present.
     assert parse_logins({"github": "old", "git_logins": {"github": "new"}}) == {"github": "new"}
+
+
+def test_grant_skips_the_repo_owner():
+    """Backfilling access for a whole roster hits the PI too — GitHub
+    422s on inviting the repo owner to their own repo, so the grant
+    treats the owner as already-covered instead of failing."""
+    calls = []
+    ok, detail = _gr.grant_lab_mgmt_read(
+        "hallettmiket", repo="hallettmiket/murmurent_lab_mgmt_mh",
+        runner=_fake_runner(calls))
+    assert ok and "owner" in detail
+    assert calls == []  # no API call made

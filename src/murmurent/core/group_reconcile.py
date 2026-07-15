@@ -311,6 +311,11 @@ def grant_lab_mgmt_read(login: str, *, repo: str = "", runner=subprocess.run):
     repo = repo or lab_mgmt_repo_slug()
     if not repo:
         return False, "lab_mgmt has no GitHub remote — push it first (see docs/lab_mgmt.md)"
+    # The repo owner (usually the PI) can't be invited to their own repo —
+    # GitHub rejects it with a 422. They already have full access.
+    owner = repo.split("/", 1)[0]
+    if login.strip().lstrip("@").lower() == owner.lower():
+        return True, "repo owner — already has full access"
     return _gh_add_collaborator(repo, login, permission="pull", runner=runner)
 
 

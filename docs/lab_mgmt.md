@@ -127,6 +127,29 @@ The `MURMURENT_LAB_MGMT_REPO` env var is the right knob for tests and
 unusual deployments (e.g. multi-lab dev workstations). For a normal
 lab member, the default path just works.
 
+## Backfilling access for pre-existing members
+
+Members added **before** the automatic lab_mgmt grant existed (or via
+any path that skipped it) can be granted access a posteriori — the
+grant pass works from the whole roster, not just new additions:
+
+```bash
+murmurent group-reconcile <group> --apply
+```
+
+For every active roster member with a `github:` login this ensures
+**read-only** collaborator access on the lab_mgmt repo (idempotent;
+already-granted members and the repo owner are no-ops). Members whose
+profile lacks a GitHub login are listed so the PI can collect them.
+Prerequisite: the lab_mgmt repo must be on GitHub (`git remote -v`
+shows an origin) — the reconcile output says so if it isn't.
+
+Each member then completes their side once: accept the GitHub
+invitation e-mail, and clone the repo as their lab_mgmt
+(`git clone git@github.com:<org>/<repo>.git ~/repos/lab_mgmt`, or set
+`MURMURENT_LAB_MGMT_REPO`). From then on their Lab Members panel and
+daily reconcile track what the PI pushes.
+
 ## Reading + writing — who's allowed?
 
 | Path under `lab_mgmt/` | Read | Write |
