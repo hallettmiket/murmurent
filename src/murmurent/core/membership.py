@@ -49,6 +49,32 @@ INACTIVE = "inactive"
 # wrote (or ``None`` for activations). Lets the API endpoint surface the
 # path back to the caller without changing set_status's return shape.
 last_report_path: "Path | None" = None
+
+# Probes from the most recent roster-change commit/push (see _persist).
+# Endpoints can surface these so the PI notices a failed push.
+last_persist_probes: list = []
+
+
+def _persist(path: Path, message: str) -> None:
+    """Commit + best-effort push a roster change so it reaches members.
+
+    Every mutation of ``members/<handle>.md`` must land in git — members'
+    machines receive the roster via ``git pull`` of the lab_mgmt repo
+    (Lab Members panel + daily reconcile), so an uncommitted roster edit
+    is invisible to the whole lab. Delegates to
+    :func:`core.git_persist.commit_and_push`, which no-ops outside a git
+    checkout and treats push failure as a warn (the local commit is the
+    durable part). Never raises: a git hiccup must not undo or block the
+    roster write itself.
+    """
+    global last_persist_probes
+    try:
+        from .git_persist import commit_and_push
+        last_persist_probes = commit_and_push(path, message, push=True)
+    except Exception as exc:  # noqa: BLE001
+        last_persist_probes = []
+        import logging
+        logging.getLogger(__name__).warning("roster persist failed: %s", exc)
 VALID_STATUSES: tuple[str, ...] = (ACTIVE, INACTIVE)
 VALID_ROLES: tuple[str, ...] = (
     "pi",
@@ -216,7 +242,7 @@ def add(
         certifications=list(certifications or []),
         created=today.isoformat(),
     )
-    _write(rec)
+    _persist(_write(rec), f"roster: add @{norm} ({role})")
     return rec
 
 
@@ -268,7 +294,7 @@ def upsert_member(
         rec.pubkey = pubkey.strip()
     rec.status = ACTIVE            # (re-)carding a member makes them active
     rec.deactivated_at = None
-    _write(rec)
+    _persist(_write(rec), f"roster: update @{norm}")
     return rec
 
 
@@ -313,7 +339,8 @@ def set_status(
     today = today or _dt.date.today()
     rec.status = status
     rec.deactivated_at = today.isoformat() if status == INACTIVE else None
-    _write(rec)
+    _persist(_write(rec),
+             f"roster: {'deactivate' if status == INACTIVE else 'reactivate'} @{norm}")
 
     global last_report_path
     last_report_path = None
@@ -384,6 +411,7 @@ def set_lab_sudo(handle: str, grant: bool) -> Path:
     else:
         meta.pop("lab_sudo", None)
     path.write_text(dump_document(meta, parsed.body or ""), encoding="utf-8")
+    _persist(path, f"roster: lab_sudo {'grant' if grant else 'revoke'} @{norm}")
     return path
 
 

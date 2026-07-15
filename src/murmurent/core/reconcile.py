@@ -13,7 +13,7 @@ Output: ``ReconcileReport`` — list of :class:`DriftFinding` rows.
         Dry-run by default; ``apply()`` does the actual deactivation
         (archive manifest, flip registry ``status: archived``).
 
-What we detect (all four enabled by default):
+What we detect (all enabled by default):
 
   1. **orphan_installation** — manifest at
      ``~/.murmurent/installations/<name>.yaml`` whose target working
@@ -32,6 +32,9 @@ What we detect (all four enabled by default):
      yet a murmurent project. Already surfaced by the Repo Inventory
      panel; here we just include the count so the daily summary
      gives a full picture of "what's on disk vs what murmurent sees".
+  5. **lab_mgmt_uncommitted / lab_mgmt_unpushed** — lab_mgmt edits
+     that haven't reached the lab (members receive the roster via
+     git pull, so local-only edits are invisible to everyone else).
 
 Why dry-run by default: a transient SSH failure (lab-server down for
 a reboot during the daily check) would otherwise auto-deactivate
@@ -533,6 +536,69 @@ def detect_unadopted_clones() -> list[DriftFinding]:
 # ---------------------------------------------------------------------------
 
 
+def detect_lab_mgmt_unsynced() -> list[DriftFinding]:
+    """lab_mgmt edits that haven't reached the lab.
+
+    Members receive the roster (and every other lab_mgmt artefact) via
+    ``git pull`` of the lab_mgmt repo, so two states mean the lab can't
+    see what this machine has:
+
+      - **uncommitted changes** in the working tree (a writer bypassed
+        the auto-commit, or a hand-edit wasn't committed);
+      - **unpushed commits** (committed locally, never pushed — offline
+        save, or a push that failed silently).
+
+    Both are ``warn``: no auto-repair, because sweeping up arbitrary
+    working-tree changes could commit the PI's work-in-progress.
+    """
+    import subprocess as _sp
+
+    from .repo import lab_mgmt_repo_root
+
+    root = lab_mgmt_repo_root()
+    if not (root / ".git").exists():
+        return []
+    findings: list[DriftFinding] = []
+
+    def _git(*args: str):
+        return _sp.run(["git", "-C", str(root), *args],
+                       capture_output=True, text=True, timeout=20)
+
+    try:
+        status = _git("status", "--porcelain")
+        dirty = [ln for ln in (status.stdout or "").splitlines() if ln.strip()]
+        if status.returncode == 0 and dirty:
+            findings.append(DriftFinding(
+                kind="lab_mgmt_uncommitted",
+                severity="warn",
+                target=str(root),
+                host="local",
+                detail=(f"{len(dirty)} uncommitted change(s) in lab_mgmt — "
+                        "invisible to the lab until committed and pushed"),
+                suggested_action=f"review + commit + push in {root}",
+                artefact_path=str(root),
+            ))
+        # Unpushed commits: needs an upstream to compare against. No
+        # upstream/remote is roster_sync's department — skip quietly.
+        ahead = _git("rev-list", "--count", "@{u}..HEAD")
+        if ahead.returncode == 0:
+            n = int((ahead.stdout or "0").strip() or 0)
+            if n:
+                findings.append(DriftFinding(
+                    kind="lab_mgmt_unpushed",
+                    severity="warn",
+                    target=str(root),
+                    host="local",
+                    detail=(f"{n} unpushed lab_mgmt commit(s) — members' "
+                            "dashboards won't see them until pushed"),
+                    suggested_action=f"git -C {root} push",
+                    artefact_path=str(root),
+                ))
+    except (OSError, _sp.SubprocessError, ValueError):
+        return findings
+    return findings
+
+
 def reconcile(*, apply: bool = False) -> ReconcileReport:
     """Run all four detectors and return a report.
 
@@ -558,6 +624,7 @@ def reconcile(*, apply: bool = False) -> ReconcileReport:
         detect_orphan_registries,
         detect_missing_charters,
         detect_unadopted_clones,
+        detect_lab_mgmt_unsynced,
     ):
         try:
             report.findings.extend(detector())

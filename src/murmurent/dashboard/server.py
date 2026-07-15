@@ -2138,7 +2138,11 @@ def create_app() -> FastAPI:
         return {"ok": True, "member": {
             "handle": rec.handle, "full_name": rec.full_name,
             "role": rec.role, "status": rec.status, "created": rec.created,
-        }}
+        },
+            # Roster changes auto-commit+push (members receive the roster
+            # via git pull) — surface the probes so a failed push is seen.
+            "git": [p.to_dict() for p in _m.last_persist_probes],
+        }
 
     @app.post("/api/members/issue-card")
     def issue_member_card_endpoint(
