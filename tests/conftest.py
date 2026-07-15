@@ -62,3 +62,18 @@ def _isolate_repos_root(monkeypatch, tmp_path):
     a lab-mgmt repo (``pi-init`` → ``~/repos/wigamig_<lab>``) never writes into the
     developer's real ``~/repos``."""
     monkeypatch.setenv("MURMURENT_REPOS_ROOT", str(tmp_path / "_repos"))
+
+
+@pytest.fixture(autouse=True)
+def _isolate_lab_mgmt_and_lab_info(monkeypatch, tmp_path):
+    """Point the lab_mgmt + lab_info resolution at per-test temp dirs.
+
+    Without this, a test that never sets ``MURMURENT_LAB_MGMT_REPO`` falls
+    through the (isolated, hence empty) pinned pointer to the developer's
+    REAL ``~/repos/lab_mgmt`` — which is how five test cert-project records
+    (lab: '', pytest tmp paths) leaked into it on 2026-07-09. Same story
+    for the centre registry. Tests that need specific paths still just
+    setenv again — fixture-level setenv overrides this autouse default.
+    """
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "_lab_mgmt"))
+    monkeypatch.setenv("MURMURENT_LAB_INFO_ROOT", str(tmp_path / "_lab_info"))

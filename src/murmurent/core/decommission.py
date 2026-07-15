@@ -38,6 +38,12 @@ def _decommission_dir() -> Path:
     env = os.environ.get("MURMURENT_DECOMMISSION_DIR")
     if env:
         return Path(env).expanduser()
+    # Honour MURMURENT_HOME (the test suite's autouse isolation + any
+    # relocated install) — hardcoding ~ let every delete/deactivate test
+    # write real reports into the developer's ~/.murmurent/decommissions.
+    home = os.environ.get("MURMURENT_HOME")
+    if home:
+        return Path(home).expanduser() / "decommissions"
     return Path("~/.murmurent/decommissions").expanduser()
 
 
