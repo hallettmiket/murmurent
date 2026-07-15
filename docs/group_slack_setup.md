@@ -53,6 +53,34 @@ you own. Create it once, click by click:
    Workspace** → **Allow**.
 6. Copy the **Bot User OAuth Token** — it starts with `xoxb-`.
 
+### Upgrading an existing bot (adding scopes later)
+
+Scopes added in the app config do **nothing until you reinstall the app**
+to the workspace (same OAuth & Permissions page → **Reinstall to
+Workspace** → Allow). The `xoxb-` token string usually stays the same —
+what changes is the grant behind it, so there's nothing to re-copy or
+re-store.
+
+Because the token doesn't change, the only way to know what's actually
+live is to ask Slack. Every API response carries the token's effective
+scopes in the `x-oauth-scopes` header:
+
+```bash
+curl -sI -X POST https://slack.com/api/auth.test \
+  -H "Authorization: Bearer $(cat ~/.config/murmurent/groups/<group>/slack-token)" \
+  | grep -i x-oauth-scopes
+```
+
+Compare that list against the table above. A documented-but-missing scope
+degrades in a scope-specific way rather than failing loudly — the ones
+people actually hit:
+
+| Missing scope | What you'll see |
+|---|---|
+| `channels:join` | posts to a public channel the bot was never invited to fail with `not_in_channel` (posting to channels it's already a member of still works, which hides the gap for a long time) |
+| `files:write` | card bundles arrive as inline fenced text instead of a downloadable `bundle.json` |
+| `im:history` | DMs send fine but murmurent can't read back its own threads to verify a delivery landed |
+
 ## 3. Run `group-slack-setup`
 
 ```bash

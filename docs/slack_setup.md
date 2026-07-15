@@ -60,6 +60,16 @@ it once — click by click:
 5. Scroll back **up** to **OAuth Tokens for Your Workspace** → **Install to
    Workspace** → **Allow**.
 6. Copy the **Bot User OAuth Token** — it starts with `xoxb-`.
+
+   > **Adding scopes later?** They do nothing until you **Reinstall to
+   > Workspace**; the `xoxb-` token string usually stays the same, so
+   > verify what's actually live via the `x-oauth-scopes` response header
+   > (`curl -sI -X POST https://slack.com/api/auth.test -H "Authorization:
+   > Bearer $TOKEN" | grep -i x-oauth-scopes`) rather than trusting the app
+   > config page. Missing scopes degrade quietly — e.g. no `channels:join`
+   > only surfaces as `not_in_channel` on public channels the bot was never
+   > invited to. See docs/group_slack_setup.md → "Upgrading an existing
+   > bot" for the symptom table.
 7. Back in Slack, invite the bot to `#general` so it can post there: in the
    `#general` channel, type `/invite @mayor` (the bot's name). The bot is
    auto-added to any private channel it *creates*, but must be invited to
