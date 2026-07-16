@@ -143,6 +143,7 @@ def world(monkeypatch, tmp_path):
 
 
 HIFI_TOP_LEVEL_KEYS = {
+    "version",
     "today",
     "persona",
     "member",
