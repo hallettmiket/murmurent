@@ -37,6 +37,9 @@ from .preflight import Probe
 from .repo import murmurent_repo_root
 
 MARKER_FILENAME = ".murmurent.yaml"
+# Versions the SHAPE of the .murmurent.yaml marker — independent of the
+# murmurent release version (murmurent.__version__). Bump only when the marker
+# format changes; do NOT bump it to match a release. (issue #24)
 MARKER_SCHEMA = 1
 LEGACY_MARKER = "CHARTER.md"   # pre-split repos carried a project charter
 

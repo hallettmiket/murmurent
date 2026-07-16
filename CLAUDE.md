@@ -89,6 +89,9 @@ command available in any murmurent-bootstrapped CC session.
   (governance-level: repos + certified members, in `cert_projects/`) — the
   split that replaced adopt-also-minting-a-project.
 - [`docs/reconcile.md`](docs/reconcile.md) — `murmurent reconcile` drift-detection routine + daily `/routine` schedule.
+- [`docs/versioning.md`](docs/versioning.md) — CalVer scheme (`YYYY.M.MICRO`),
+  single-source version in `__init__.py`, when to bump vs not, releases; schema
+  versions are independent.
 - [`docs/style/code-style.md`](docs/style/code-style.md) — Python/R style
   preferences (CC follows the same defaults; this is for human reference,
   not always-loaded).

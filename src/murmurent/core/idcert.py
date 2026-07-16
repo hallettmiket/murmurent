@@ -41,6 +41,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from . import idkeys as K
 
+# Versions the SHAPE of a signed identity card — independent of the murmurent
+# release version. Bump only on a card-format change, not to match a release. (#24)
 SIGNED_CARD_VERSION = 1
 DEFAULT_TTL_DAYS = 90          # long TTL → CRL fail-closed is the real revocation
 CRL_MAX_AGE_DAYS = 7           # a CRL older than this is "stale" → refuse (fail-closed)

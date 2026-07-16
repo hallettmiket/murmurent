@@ -30,6 +30,8 @@ import yaml
 
 from . import registrar as _R
 
+# Versions the SHAPE of an identity card — independent of the murmurent release
+# version. Bump only when the card format changes, not to match a release. (#24)
 CARD_VERSION = 1
 
 

@@ -1,6 +1,11 @@
 [project]
 name = "murmurent"
-version = "1.0.0"
+# Single source of truth: the version is read from src/murmurent/__init__.py
+# (see [tool.hatch.version] below), so `murmurent --version`, the package
+# metadata, and the bootstrap_version stamped into repo markers can never
+# disagree — which they did (issue #24: pyproject said 1.0.0 while the runtime
+# reported 0.1.0). Bump the version in exactly one place: __init__.py.
+dynamic = ["version"]
 description = "Multi-group agentic infrastructure for a bioconvergence centre — with the v1 registrar layer above any single lab."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -66,6 +71,12 @@ murmurent = "murmurent.cli:cli"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+# Version is read from the ``__version__ = "..."`` assignment in this file —
+# the one place the number is edited. Hatchling supports this natively, no
+# extra dependency.
+[tool.hatch.version]
+path = "src/murmurent/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/murmurent"]

@@ -958,7 +958,6 @@ wheels = [
 
 [[package]]
 name = "murmurent"
-version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
@@ -1032,7 +1031,7 @@ requires-dist = [
     { name = "uvicorn", specifier = ">=0.30" },
     { name = "uvicorn", marker = "extra == 'dashboard'", specifier = ">=0.30" },
 ]
-provides-extras = ["dev", "docs", "mcp", "dashboard", "slack", "gcal"]
+provides-extras = ["dashboard", "dev", "docs", "gcal", "mcp", "slack"]
 
 [[package]]
 name = "mypy-extensions"
