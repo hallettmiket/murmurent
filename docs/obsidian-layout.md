@@ -7,6 +7,41 @@ conventions — what subfolders murmurent writes to and reads from. For
 including the `maps-legends/` folder), see the `CLAUDE.md` at the
 root of your vault.
 
+## Two vaults: personal and lab (issue #25)
+
+Murmurent distinguishes **two** kinds of Obsidian vault. Each has a
+machine-independent *identity* (a GitHub repo) and a per-machine
+*location* (where the clone lives on this laptop/server):
+
+| Vault | GitHub repo (identity) | Owned by | Set the clone path in | Everyone-can-clone? |
+|---|---|---|---|---|
+| **Personal** | `murmurent_vault` (private, on the **person's** GitHub) | the individual (incl. the PI) | Machine window · Personal vault | no — private to the person |
+| **Lab (group)** | `murmurent_lab_mgmt_<lab>` (private, on the **lab's** GitHub) | the lab / core | Machine window · Lab vault | yes — every member gets read access |
+
+**The lab vault is the existing lab-management repo.** Per the PI's
+decision on issue #25 there is *no* separate `murmurent_vault_lab`
+repo — the group oracle, lab-notebook, and `maps-legends/` for the
+group all live under `murmurent_lab_mgmt_<lab>`, which members already
+clone (read-only via `group_reconcile.grant_lab_mgmt_read`) and which
+`roster_sync` already keeps fresh (ff-only pull). The issue's proposed
+`murmurent_vault_lab` name is therefore superseded by
+`murmurent_lab_mgmt_<lab>`.
+
+Identity vs location:
+- **Identity** (the GitHub repo) is machine-independent — the personal
+  repo is shown in the Profile window, the lab repo in Lab Settings.
+- **Location** (the clone path + oracle/lab-notebook subfolders) is
+  per-machine — set in the **Machine** window. The personal vault path
+  is editable there; the lab vault path is the resolved lab-mgmt clone
+  (read-only in the Machine window, managed at install / via the
+  `lab_mgmt` pin), so there is a single source of truth for "where the
+  lab vault clone is".
+
+Naming helpers live in `core/repo.py`: `personal_vault_repo_name()`
+(`murmurent_vault`), `lab_vault_repo_name(<lab>)`
+(`murmurent_lab_mgmt_<lab>`), plus `personal_vault_path()` /
+`lab_vault_path(<lab>)` for the canonical clone locations.
+
 ## Where the vault lives
 
 Resolve the path on this machine with:
@@ -51,8 +86,8 @@ the staging/aggregation tier for cross-user notebook collation
 
 | Tier | Path | Writable by |
 |---|---|---|
-| Personal | `<vault>/oracle/<YYYY-MM-DD>_<slug>.md` | `oracle` agent (your machine) |
-| Lab | `~/repos/lab_mgmt/oracle/<YYYY-MM-DD>_<slug>.md` | `murmurent oracle publish` (gated) |
+| Personal | `<personal-vault>/oracle/<YYYY-MM-DD>_<slug>.md` | `oracle` agent (your machine) |
+| Lab | `~/repos/murmurent_lab_mgmt_<lab>/oracle/<YYYY-MM-DD>_<slug>.md` | `murmurent oracle publish` (gated) |
 
 Both tiers use the same frontmatter schema
 ([`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md)) and are

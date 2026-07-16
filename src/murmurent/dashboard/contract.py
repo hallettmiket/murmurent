@@ -148,10 +148,22 @@ class MachineSettings(BaseModel):
     # Per-machine murmurent umbrella. Default ``~/wigamig``; on a lab
     # server this may resolve to ``/data/lab_vm/wigamig``.
     wigamig_base: str | None = None
-    # Obsidian vault — separate from wigamig_base.
+    # PERSONAL Obsidian vault — separate from wigamig_base. This is the
+    # per-user vault (GitHub repo convention: ``murmurent_vault`` on the
+    # person's own GitHub). The path here is where THIS machine's clone
+    # lives; the repo identity is machine-independent (Profile window).
+    #
+    # NOTE (issue #25): the LAB (group) vault is deliberately NOT a set of
+    # per-machine fields here. Per the PI's decision the lab vault IS the
+    # existing lab-mgmt repo (``murmurent_lab_mgmt_<lab>``), whose clone
+    # location is already pinned by ``core.repo.lab_mgmt_repo_root()`` and
+    # kept fresh by ``core.roster_sync``. Adding ``lab_vault_path`` here
+    # would create a second, competing notion of "where the lab vault
+    # clone is" — so the Machine window reads the lab-vault clone path
+    # from ``lab_settings.lab_mgmt_path`` instead.
     obsidian_vault_path: str | None = None      # absolute path on this machine
     obsidian_vault_name: str | None = None      # for obsidian:// URLs
-    notebook_subfolder: str = "lab-notebook"    # subfolder within the vault
+    notebook_subfolder: str = "lab-notebook"    # personal notebook subfolder
     oracle_subfolder: str = "oracle"            # personal oracle subfolder
     # Legacy field: the server-side lab_base value as seen from this
     # machine. Retained so the install wizard's old fallback still

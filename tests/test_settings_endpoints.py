@@ -140,7 +140,10 @@ def test_machine_settings_preflight_creates_subdirs(world, tmp_path):
     for sub in ("raw", "refined", "lab_notebooks"):
         assert names[sub]["status"] == "ok", names[sub]
         assert (base / sub).is_dir()
-    assert names["obsidian vault"]["status"] == "ok"
+    # Personal-vault probe (relabelled from "obsidian vault" in issue #25).
+    assert names["personal vault"]["status"] == "ok"
+    # Lab-vault probe (the lab-mgmt clone) is also surfaced.
+    assert "lab vault (lab-mgmt clone)" in names
 
 
 def test_probe_tolerates_shell_escaped_vault_path(tmp_path):
@@ -166,8 +169,8 @@ def test_machine_settings_obsidian_na_is_not_a_warning(world, tmp_path):
     })
     assert res.status_code == 200, res.text
     names = {p["name"]: p for p in res.json()["probes"]}
-    assert names["obsidian vault"]["status"] == "ok"
-    assert "not applicable" in names["obsidian vault"]["detail"]
+    assert names["personal vault"]["status"] == "ok"
+    assert "not applicable" in names["personal vault"]["detail"]
     on_disk = yaml.safe_load(world["machine_yaml"].read_text())
     assert on_disk["obsidian_vault_name"] is None
 

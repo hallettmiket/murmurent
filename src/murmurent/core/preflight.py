@@ -160,25 +160,29 @@ def probe_wigamig_base(wigamig_base: str | None) -> list[Probe]:
     return probes
 
 
-def probe_obsidian_vault(vault_path: str | None) -> Probe:
-    """Check that the Obsidian vault path exists.
+def probe_obsidian_vault(vault_path: str | None, *, label: str = "obsidian vault") -> Probe:
+    """Check that an Obsidian vault path exists.
 
     The vault is **not** auto-created — Obsidian itself manages the
     directory and the user might be pointing at a yet-to-be-mounted
     iCloud Drive folder. Missing → warn (yellow), present → green.
     Empty/unset → warn telling the user notes will fall back to
     ``wigamig_base/lab_notebooks``.
+
+    ``label`` names the probe row so the same check can front the
+    personal vault ("personal vault") and the lab vault ("lab vault",
+    issue #25) in one folder-check list.
     """
     if _is_na(vault_path):
         return Probe(
-            name="obsidian vault",
+            name=label,
             status="ok",
-            detail="not applicable — no Obsidian vault on this machine.",
+            detail="not applicable — no vault clone on this machine.",
             required=False,
         )
     if not vault_path or not str(vault_path).strip():
         return Probe(
-            name="obsidian vault",
+            name=label,
             status="warn",
             detail=(
                 "No vault path set — notebooks fall back to the large-file "
@@ -190,20 +194,20 @@ def probe_obsidian_vault(vault_path: str | None) -> Probe:
     target = _normalize(str(vault_path))
     if target.is_dir():
         return Probe(
-            name="obsidian vault",
+            name=label,
             status="ok",
             detail=str(target),
             required=False,
         )
     if target.exists():
         return Probe(
-            name="obsidian vault",
+            name=label,
             status="fail",
             detail=f"{target} exists but is not a directory.",
             required=False,
         )
     return Probe(
-        name="obsidian vault",
+        name=label,
         status="warn",
         detail=(
             f"{target} does not exist. Create it from Obsidian (File → New "

@@ -6860,12 +6860,32 @@ function MachineCard({ machine, isCurrent, onEditClick, onRemove, onScanDirsSave
       {machine.description && (
         <div style={{fontSize:11, color:"var(--muted)", marginTop:4}}>{machine.description}</div>
       )}
-      {/* Three locations per machine: Obsidian vault, Files (the data root —
-          raw/ + refined/ live under it), and Repo location (where clones live).
-          All editable together from the single "edit" button above. */}
+      {/* Per-machine locations. Two vaults (issue #25):
+            • PERSONAL vault — the member's own ``murmurent_vault`` clone;
+              its oracle/ + lab-notebook/ subfolders are shown resolved.
+            • LAB (group) vault — the lab-mgmt clone (``murmurent_lab_mgmt_<lab>``);
+              its oracle/ + lab-notebook/ subfolders are shown resolved.
+          Then Files (raw/ + refined/ live under it) and Repo location.
+          The personal vault is editable here; the lab vault clone location is
+          the lab-mgmt clone, managed at install / via the lab_mgmt pin. */}
       <div style={{marginTop:8, fontSize:12, lineHeight:1.7}}>
-        <div><span style={labelStyle}>Obsidian vault</span>
+        <div><span style={labelStyle}>Personal vault</span>
           <code className="mono">{machine.obsidian_vault_path || machine.obsidian_vault_name || "—"}</code></div>
+        {machine.obsidian_vault_path && (
+          <div style={{marginLeft:120, fontSize:11, color:"var(--muted)"}}>
+            <div>oracle → <code className="mono">{_joinPath(machine.obsidian_vault_path, machine.oracle_subfolder || "oracle")}</code></div>
+            <div>lab-notebook → <code className="mono">{_joinPath(machine.obsidian_vault_path, machine.notebook_subfolder || "lab-notebook")}</code></div>
+          </div>
+        )}
+        <div><span style={labelStyle}>Lab vault</span>
+          <code className="mono">{machine.lab_vault_path || <span className="muted">—</span>}</code>
+          {machine.lab_vault_path && <span className="muted" style={{fontSize:10, marginLeft:6}}>(lab-mgmt clone)</span>}</div>
+        {machine.lab_vault_path && (
+          <div style={{marginLeft:120, fontSize:11, color:"var(--muted)"}}>
+            <div>oracle → <code className="mono">{_joinPath(machine.lab_vault_path, "oracle")}</code></div>
+            <div>lab-notebook → <code className="mono">{_joinPath(machine.lab_vault_path, "lab-notebook")}</code></div>
+          </div>
+        )}
         <div><span style={labelStyle}>Files</span>
           <code className="mono">{wb || "—"}</code></div>
         <div><span style={labelStyle}>Repo location</span>
@@ -6897,6 +6917,10 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
     remote_user: initial.remote_user || initial.local_user || "",
   });
   const hostname = initial.hostname || "local";
+  // Lab (group) vault clone = the lab-mgmt clone (issue #25). Read-only here:
+  // its location is the resolved lab_mgmt_path, not a machine.yaml field.
+  const labVaultPath = initial.lab_vault_path
+    || ((window.DATA.lab_settings || {}).lab_mgmt_path || "");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg]   = useState(null);
   // Server-returned preflight probes (wigamig_base subfolder mkdirs +
@@ -6993,10 +7017,15 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
       <textarea style={{...inputStyle, minHeight:54, resize:"vertical"}} value={repos}
                 onChange={e => setRepos(e.target.value)} placeholder={"~/repos\nwork/clones"} />
 
-      <div style={labelStyle}>Obsidian vault (full path, or NA if none on this machine)</div>
+      <div style={{...labelStyle, marginTop:14, color:"var(--ink)", fontSize:11}}>
+        Personal vault <span style={{textTransform:"none", letterSpacing:0, color:"var(--muted)"}}>
+          — your own <code className="mono">murmurent_vault</code> clone on THIS machine (identity: your GitHub, set in Profile)
+        </span>
+      </div>
+      <div style={labelStyle}>vault path (full path, or NA if none on this machine)</div>
       <input style={inputStyle} value={form.obsidian_vault_path}
              onChange={update("obsidian_vault_path")}
-             placeholder="/Users/you/.../obsidian-lab   (or NA)" />
+             placeholder="/Users/you/.../murmurent_vault   (or NA)" />
 
       <div className="row" style={{gap:10, marginTop:4}}>
         <div style={{flex:1}}>
@@ -7010,6 +7039,40 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
                  onChange={update("oracle_subfolder")} />
         </div>
       </div>
+      {/* Resolved personal-vault subfolder paths — the issue's #1 gripe was
+          that these were invisible. Show them live as the user types. */}
+      {form.obsidian_vault_path && String(form.obsidian_vault_path).trim().toLowerCase() !== "na" && (
+        <div style={{marginTop:4, fontSize:11, color:"var(--muted)", fontFamily:"var(--mono)"}}>
+          <div>oracle → {_joinPath(form.obsidian_vault_path, form.oracle_subfolder || "oracle")}</div>
+          <div>lab-notebook → {_joinPath(form.obsidian_vault_path, form.notebook_subfolder || "lab-notebook")}</div>
+        </div>
+      )}
+
+      {/* Lab (group) vault — read-only here. It IS the lab-mgmt clone
+          (murmurent_lab_mgmt_<lab>); its location is managed at install /
+          via the lab_mgmt pin, and every member gets read access + auto-pull.
+          Issue #25: shown so the user sees where the group oracle + lab-notebook
+          resolve, without a competing per-machine path field. */}
+      <div style={{...labelStyle, marginTop:14, color:"var(--ink)", fontSize:11}}>
+        Lab (group) vault <span style={{textTransform:"none", letterSpacing:0, color:"var(--muted)"}}>
+          — the lab-mgmt clone <code className="mono">murmurent_lab_mgmt_&lt;lab&gt;</code> (identity: the lab's GitHub, set in Lab Settings)
+        </span>
+      </div>
+      {labVaultPath ? (
+        <div style={{
+          fontSize:11, color:"var(--muted)", fontFamily:"var(--mono)",
+          padding:"6px 8px", background:"var(--paper-2)",
+          border:"1px solid var(--rule)", borderRadius:2,
+        }}>
+          <div>clone → {labVaultPath}</div>
+          <div>oracle → {_joinPath(labVaultPath, "oracle")}</div>
+          <div>lab-notebook → {_joinPath(labVaultPath, "lab-notebook")}</div>
+        </div>
+      ) : (
+        <div style={{fontSize:11, color:"var(--muted)"}}>
+          No lab-mgmt clone resolved on this machine — clone the lab vault per docs/lab_mgmt.md.
+        </div>
+      )}
 
       {probes && probes.length > 0 && (
         <div style={{
@@ -7122,6 +7185,11 @@ function MachinesModal({ onClose }) {
     wigamig_base:        ms.wigamig_base        || "",
     obsidian_vault_path: ms.obsidian_vault_path || "",
     obsidian_vault_name: ms.obsidian_vault_name || "",
+    oracle_subfolder:    ms.oracle_subfolder    || "oracle",
+    notebook_subfolder:  ms.notebook_subfolder  || "lab-notebook",
+    // Lab (group) vault clone = the lab-mgmt clone (issue #25); its path is
+    // the resolved lab_mgmt_path from lab settings, not a machine.yaml field.
+    lab_vault_path: (window.DATA.lab_settings || {}).lab_mgmt_path || "",
     description: (thisMachine.short_hostname ? thisMachine.short_hostname + " · " : "")
                  + "OS user: " + (thisMachine.local_user || "?"),
     scan_dirs: localHost ? (localHost.scan_dirs || []) : [],
@@ -7367,6 +7435,11 @@ function MachinesPanel({ span = "c-5" }) {
     wigamig_base:        ms.wigamig_base        || "",
     obsidian_vault_path: ms.obsidian_vault_path || "",
     obsidian_vault_name: ms.obsidian_vault_name || "",
+    oracle_subfolder:    ms.oracle_subfolder    || "oracle",
+    notebook_subfolder:  ms.notebook_subfolder  || "lab-notebook",
+    // Lab (group) vault clone = the lab-mgmt clone (issue #25); its path is
+    // the resolved lab_mgmt_path from lab settings, not a machine.yaml field.
+    lab_vault_path: (window.DATA.lab_settings || {}).lab_mgmt_path || "",
     description: (thisMachine.short_hostname ? thisMachine.short_hostname + " · " : "")
                  + "OS user: " + (thisMachine.local_user || "?"),
     scan_dirs: localHost ? (localHost.scan_dirs || []) : [],

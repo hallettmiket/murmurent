@@ -1725,7 +1725,18 @@ def create_app() -> FastAPI:
 
         path = _ms.write(C.MachineSettings(**body.model_dump()))
         probes = _pf.probe_wigamig_base(body.wigamig_base)
-        probes.append(_pf.probe_obsidian_vault(body.obsidian_vault_path))
+        probes.append(_pf.probe_obsidian_vault(body.obsidian_vault_path, label="personal vault"))
+        # Lab (group) vault = the lab-mgmt clone (issue #25). Probe its oracle/
+        # dir so the folder-check confirms the group vault resolves + is
+        # readable on this machine. Best-effort: never fail the save on it.
+        try:
+            from ..core.repo import lab_mgmt_repo_root as _lmr
+            _lab_clone = _lmr()
+            probes.append(
+                _pf.probe_obsidian_vault(str(_lab_clone), label="lab vault (lab-mgmt clone)")
+            )
+        except Exception:
+            pass
         return {
             "ok": True,
             "path": str(path),

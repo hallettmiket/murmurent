@@ -303,6 +303,63 @@ def lab_repo_path(group: str) -> Path:
     return repos_root() / f"murmurent_lab_mgmt_{safe}"
 
 
+# ---------------------------------------------------------------------------
+# Obsidian vault repos (issue #25)
+# ---------------------------------------------------------------------------
+#
+# Two kinds of vault, two GitHub homes:
+#   * PERSONAL vault  → private repo ``murmurent_vault`` on the *person's* own
+#     GitHub. Every member (incl. the PI) has one. Holds their personal
+#     oracle, lab-notebook, and other Tier-II notes.
+#   * LAB (group) vault → per the PI's decision (issue #25) this is NOT a new
+#     ``murmurent_vault_lab`` repo; it IS the existing lab-management repo
+#     ``murmurent_lab_mgmt_<lab>`` (see :func:`lab_repo_path`). The lab oracle
+#     already lives at ``<lab_mgmt>/oracle/``, members already get read access
+#     via ``group_reconcile.grant_lab_mgmt_read``, and ``roster_sync`` already
+#     keeps it fresh — so lab-vault storage, access, and sync are solved.
+#
+# The issue's proposed ``murmurent_vault_lab`` name is therefore superseded by
+# the existing ``murmurent_lab_mgmt_<lab>`` convention. ``lab_vault_repo_name``
+# below returns that canonical name so callers don't hardcode the superseded
+# one.
+PERSONAL_VAULT_REPO_NAME = "murmurent_vault"
+
+
+def personal_vault_repo_name() -> str:
+    """Canonical GitHub repo name for a member's personal Obsidian vault:
+    ``murmurent_vault`` (a private repo on the person's own GitHub)."""
+    return PERSONAL_VAULT_REPO_NAME
+
+
+def personal_vault_path() -> Path:
+    """Suggested clone path for the personal vault on this machine:
+    ``<repos>/murmurent_vault``. This is the DEFAULT only — the actual
+    per-machine location is stored as ``obsidian_vault_path`` in
+    ``machine.yaml`` and may point anywhere (commonly an iCloud folder)."""
+    return repos_root() / PERSONAL_VAULT_REPO_NAME
+
+
+def lab_vault_repo_name(group: str) -> str:
+    """Canonical GitHub repo name for the lab (group) vault of ``group``.
+
+    Per issue #25 the lab vault is the existing lab-management repo, so this
+    returns ``murmurent_lab_mgmt_<group>`` — NOT the issue's proposed (and
+    now superseded) ``murmurent_vault_lab``. Kept as a named helper so the
+    dashboard / docs can show "the lab vault is <this repo>" without
+    re-deriving the convention."""
+    return lab_repo_path(group).name
+
+
+def lab_vault_path(group: str) -> Path:
+    """Clone path for the lab (group) vault on this machine.
+
+    Identical to :func:`lab_repo_path` — the lab vault IS the lab-mgmt clone.
+    Prefer :func:`lab_mgmt_repo_root` when you want the *pinned* location a
+    given machine actually resolved to; this helper only gives the canonical
+    ``<repos>/murmurent_lab_mgmt_<group>`` default."""
+    return lab_repo_path(group)
+
+
 def set_lab_mgmt_path(path: str | Path) -> None:
     """Persistently point ``lab_mgmt_repo_root()`` at a lab's own management repo
     (canonically ``~/repos/murmurent_lab_mgmt_<lab>``). Honours ``MURMURENT_HOME``.
