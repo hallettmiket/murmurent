@@ -29,6 +29,24 @@ def test_add_persists_github_and_card_fields(lab):
     assert "card_fingerprint: SHA256:fp" in M.member_path("allie").read_text()
 
 
+def test_official_handle_round_trips(lab):
+    """The per-person institutional netname persists top-level, @-stripped, and
+    survives a parse round-trip (GH #23)."""
+    M.add(handle="allie", full_name="Allie", official_handle="@ahall", slack="@a.h")
+    rec = M.parse_member(M.member_path("allie"))
+    assert rec.official_handle == "ahall"      # @ stripped
+    assert rec.slack == "a.h"
+    assert "official_handle: ahall" in M.member_path("allie").read_text()
+
+
+def test_upsert_updates_official_handle_subset(lab):
+    """upsert can set official_handle without disturbing other fields, and a
+    None leaves it unchanged."""
+    M.upsert_member("allie", email="a@x.edu", official_handle="ahall")
+    r = M.upsert_member("allie", github="gh2")     # official_handle omitted → kept
+    assert r.official_handle == "ahall" and r.github == "gh2" and r.email == "a@x.edu"
+
+
 def test_upsert_creates_then_updates_subset(lab):
     r1 = M.upsert_member("allie", email="a@x.edu", github="gh1",
                          card_fingerprint="fp1", card_id="c1")

@@ -192,6 +192,13 @@ class MemberSettingsBody(BaseModel):
     lab-mgmt frontmatter.
     """
 
+    # Handles — per-person, machine-independent. ``official_handle`` (e.g. a
+    # Western netname) and ``slack_handle`` persist to the top level of the
+    # member frontmatter (``official_handle`` and ``slack``, the roster
+    # fields). The murmurent handle is the file's ``handle`` (read-only);
+    # GitHub is ``github`` below.
+    official_handle: str | None = None
+    slack_handle: str | None = None
     # Contact
     email: str | None = None
     orcid: str | None = None
@@ -1778,6 +1785,21 @@ def create_app() -> FastAPI:
 
         _merge("contact", {k: getattr(body, k) for k in contact_keys if k in sent})
         _merge("location", {k: getattr(body, k) for k in location_keys if k in sent})
+
+        # Handles that live at the top level of the frontmatter (the roster
+        # model owns them, so writing them here keeps the roster + dashboard in
+        # sync). ``slack_handle`` maps onto the roster's ``slack`` key; the
+        # murmurent handle is the file's ``handle`` (never edited here).
+        def _set_top(key: str, value) -> None:
+            if value is None or (isinstance(value, str) and not value.strip()):
+                meta.pop(key, None)
+            else:
+                meta[key] = value.strip().lstrip("@") if isinstance(value, str) else value
+
+        if "official_handle" in sent:
+            _set_top("official_handle", body.official_handle)
+        if "slack_handle" in sent:
+            _set_top("slack", body.slack_handle)
 
         # Phase 3: per-provider git_logins map. Replaces the flat
         # ``contact.github`` for new code, but we keep contact.github

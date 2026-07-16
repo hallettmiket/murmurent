@@ -87,6 +87,13 @@ class MemberSettings(BaseModel):
     because they are per-machine, not per-member.
     """
 
+    # Handles — per-person, machine-independent identities. The murmurent
+    # handle is the member's ``handle`` (read-only). ``official_handle`` is
+    # their institutional netname (e.g. a Western netname); ``slack_handle``
+    # maps to the roster's top-level ``slack`` field; the GitHub handle is
+    # ``github`` below.
+    official_handle: str | None = None
+    slack_handle: str | None = None
     # Contact
     email: str | None = None
     orcid: str | None = None

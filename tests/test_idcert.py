@@ -270,6 +270,17 @@ def test_enrollment_pop_round_trip(world):
     assert C.verify_enrollment(req, expected_fingerprint=fpr, expected_nonce="n-123")
 
 
+def test_enrollment_carries_official_handle(world):
+    """official_handle rides inside the signed enrollment payload so the issuer
+    can record it on the roster in one round trip (GH #23)."""
+    req = C.make_enrollment_request("@allie", priv=world["member"], nonce="n-1",
+                                    official_handle="@ahall", slack="a.h")
+    assert req["payload"]["official_handle"] == "ahall"   # @ stripped
+    assert req["payload"]["slack"] == "a.h"
+    # Still self-consistent (the new field is inside the signed payload).
+    assert C.verify_enrollment(req, expected_nonce="n-1")
+
+
 def test_enrollment_wrong_nonce_rejected(world):
     req = C.make_enrollment_request("@allie", priv=world["member"], nonce="n-123")
     assert not C.verify_enrollment(req, expected_nonce="different")

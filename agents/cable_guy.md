@@ -119,6 +119,12 @@ Trigger: Install wizard submits, or PI says "provision @didi for dcis_imaging_ge
 Steps:
 1. **Verify member** — read `<lab-mgmt>/members/<handle>.md`. If missing, instruct PI
    to add the member via the dashboard (Members panel → Add member) first. Stop.
+   The member record carries their per-person identity handles, captured at
+   `murmurent init` / enrollment and shown in the dashboard's Personal Profile:
+   the murmurent handle (the file's `handle:`), `official_handle:` (institutional
+   netname), `slack:`, and `github:`. These are machine-independent — the OS
+   username the member logs in with on a given machine lives with that machine
+   (`remote_user` in `machines/<machine_id>.md`), not in the member record.
 2. **Check for duplicate** — read `<lab-mgmt>/installations/<handle>_<machine>_<project>.md`.
    If it exists and `status: active`, report and stop (already provisioned).
 3. **Check machine** — read `<lab-mgmt>/machines/<machine_id>.md`. If missing, run

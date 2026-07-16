@@ -113,6 +113,7 @@ class MemberRecord:
     email: str = ""  # used to resolve the member's Slack account (users.lookupByEmail)
     github: str = ""  # GitHub login, for repo collaborator management
     slack: str = ""  # the member's Slack username / member id (shown in the Lab members list)
+    official_handle: str = ""  # institutional netname (e.g. Western netname); display/record only
     card_fingerprint: str = ""  # the member's identity-card key fingerprint (revocation index)
     card_id: str = ""           # the issued card's id (revocation index)
     pubkey: str = ""            # the ed25519 pubkey attested at card issuance
@@ -149,6 +150,7 @@ def parse_member(path: Path) -> MemberRecord:
         email=str(meta.get("email") or "").strip(),
         github=str(meta.get("github") or "").strip().lstrip("@"),
         slack=str(meta.get("slack") or "").strip().lstrip("@"),
+        official_handle=str(meta.get("official_handle") or "").strip().lstrip("@"),
         card_fingerprint=str(meta.get("card_fingerprint") or "").strip(),
         card_id=str(meta.get("card_id") or "").strip(),
         pubkey=str(meta.get("pubkey") or "").strip(),
@@ -209,6 +211,7 @@ def add(
     email: str = "",
     github: str = "",
     slack: str = "",
+    official_handle: str = "",
     card_fingerprint: str = "",
     card_id: str = "",
     pubkey: str = "",
@@ -236,6 +239,7 @@ def add(
         email=(email or "").strip(),
         github=(github or "").strip().lstrip("@"),
         slack=(slack or "").strip().lstrip("@"),
+        official_handle=(official_handle or "").strip().lstrip("@"),
         card_fingerprint=(card_fingerprint or "").strip(),
         card_id=(card_id or "").strip(),
         pubkey=(pubkey or "").strip(),
@@ -254,6 +258,7 @@ def upsert_member(
     email: str | None = None,
     github: str | None = None,
     slack: str | None = None,
+    official_handle: str | None = None,
     card_fingerprint: str | None = None,
     card_id: str | None = None,
     pubkey: str | None = None,
@@ -269,7 +274,7 @@ def upsert_member(
     if not p.is_file():
         return add(handle=norm, full_name=full_name or norm,
                    role=role or "staff", email=email or "", github=github or "",
-                   slack=slack or "",
+                   slack=slack or "", official_handle=official_handle or "",
                    card_fingerprint=card_fingerprint or "", card_id=card_id or "",
                    pubkey=pubkey or "",
                    today=today)
@@ -286,6 +291,8 @@ def upsert_member(
         rec.github = github.strip().lstrip("@")
     if slack is not None:
         rec.slack = slack.strip().lstrip("@")
+    if official_handle is not None:
+        rec.official_handle = official_handle.strip().lstrip("@")
     if card_fingerprint is not None:
         rec.card_fingerprint = card_fingerprint.strip()
     if card_id is not None:
@@ -463,6 +470,8 @@ def _write(rec: MemberRecord) -> Path:
         meta["github"] = rec.github
     if rec.slack:
         meta["slack"] = rec.slack
+    if rec.official_handle:
+        meta["official_handle"] = rec.official_handle
     if rec.card_fingerprint:
         meta["card_fingerprint"] = rec.card_fingerprint
     if rec.card_id:

@@ -525,7 +525,7 @@ def verify_project_card(project_card, lead_card, pi_card, *, root_pub, now=None,
 
 def make_enrollment_request(handle, *, priv: Ed25519PrivateKey, nonce,
                             centre="", group="", email="", github="", slack="",
-                            name="") -> dict:
+                            name="", official_handle="") -> dict:
     """Subject-side: sign a fresh ``nonce`` challenge proving control of the key.
 
     The issuer verifies this BEFORE binding ``fingerprint(pubkey)`` into a card,
@@ -544,6 +544,7 @@ def make_enrollment_request(handle, *, priv: Ed25519PrivateKey, nonce,
         "email": email or "",
         "github": (github or "").lstrip("@"),
         "slack": (slack or "").lstrip("@"),
+        "official_handle": (official_handle or "").lstrip("@"),
         "nonce": str(nonce),
         "pubkey": K.encode_public(priv.public_key()),
     }

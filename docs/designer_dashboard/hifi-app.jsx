@@ -6196,9 +6196,11 @@ function NotebookPanel({ span="c-9" }) {
 function MemberProfileModal({ onClose }) {
   const m = window.DATA.member || {};
   const initial = window.DATA.member_settings || {};
-  const machineInitial = window.DATA.machine_settings || {};
   const labProviders = (window.DATA.lab_settings || {}).git_providers || [];
   const [form, setForm] = useState({
+    // Handles — per-person, machine-independent identities.
+    official_handle: initial.official_handle || "",
+    slack_handle:    initial.slack_handle    || "",
     email:    initial.email    || "",
     orcid:    initial.orcid    || "",
     bluesky:  initial.bluesky  || "",
@@ -6276,10 +6278,6 @@ function MemberProfileModal({ onClose }) {
     textTransform:"uppercase", color:"var(--purple-deep)",
   };
 
-  // Personal-vault display sources from machine_settings now — Obsidian
-  // paths moved out of the member profile because they're per-machine.
-  const vaultName = machineInitial.obsidian_vault_name || "—";
-
   return (
     <div onClick={onClose} style={{
       position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
@@ -6293,7 +6291,7 @@ function MemberProfileModal({ onClose }) {
       }}>
         <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
           <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:20, color:"var(--purple-deep)"}}>
-            Member profile
+            Personal Profile
           </h2>
           <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
         </div>
@@ -6311,7 +6309,39 @@ function MemberProfileModal({ onClose }) {
             <div><span className="muted">name</span> {_displayMemberName(m)}</div>
             <div><span className="muted">role</span> {_displayRole(m.role)}</div>
             <div><span className="muted">lab</span> {_displayLab(m.lab)}</div>
-            <div><span className="muted">personal vault</span> <code className="mono">{vaultName}/</code></div>
+          </div>
+        </div>
+
+        {/* Handles — per-person, machine-independent identities. The
+            username you log in with on a given computer is machine-dependent
+            and lives in Machine settings, not here. */}
+        <div style={sectionStyle}>
+          <h4 style={sectionHeader}>Handles</h4>
+          <div className="row" style={{gap:10, marginTop:4}}>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>official handle</div>
+              <input style={inputStyle} value={form.official_handle}
+                     onChange={update("official_handle")}
+                     placeholder="e.g. the_pit (your institutional netname)" />
+            </div>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>murmurent handle</div>
+              <input style={{...inputStyle, background:"var(--paper-2)", color:"var(--muted)"}}
+                     value={m.handle || ""} readOnly disabled />
+            </div>
+          </div>
+          <div className="row" style={{gap:10, marginTop:4}}>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>slack handle</div>
+              <input style={inputStyle} value={form.slack_handle}
+                     onChange={update("slack_handle")}
+                     placeholder="your-slack-username" />
+            </div>
+            <div style={{flex:1}}>
+              <div style={labelStyle}>github handle</div>
+              <input style={inputStyle} value={form.github} onChange={update("github")}
+                     placeholder="your-github-username" />
+            </div>
           </div>
         </div>
 
@@ -6332,13 +6362,10 @@ function MemberProfileModal({ onClose }) {
           </div>
           <div className="row" style={{gap:10, marginTop:4}}>
             <div style={{flex:1}}>
-              <div style={labelStyle}>GitHub</div>
-              <input style={inputStyle} value={form.github} onChange={update("github")} />
-            </div>
-            <div style={{flex:1}}>
               <div style={labelStyle}>OSF</div>
               <input style={inputStyle} value={form.osf} onChange={update("osf")} />
             </div>
+            <div style={{flex:1}}></div>
           </div>
           <div style={labelStyle}>website</div>
           <input style={inputStyle} value={form.website} onChange={update("website")} />
@@ -7847,10 +7874,6 @@ function LabSettingsModal({ onClose }) {
     borderRadius:2, fontFamily:"var(--mono)", fontSize:12, width:"100%",
     boxSizing:"border-box", background:"var(--paper)",
   };
-  const microHint = {
-    fontFamily:"var(--mono)", fontSize:9, letterSpacing:1,
-    textTransform:"uppercase", color:"var(--muted)", marginTop:2,
-  };
   const sectionHeader = {
     margin:0, fontFamily:"var(--mono)", fontSize:10, letterSpacing:1.5,
     textTransform:"uppercase", color:"var(--purple-deep)",
@@ -7859,33 +7882,13 @@ function LabSettingsModal({ onClose }) {
     borderTop:"1px solid var(--rule)", paddingTop:10, marginTop:6,
   };
 
-  // One machine + path row for the Storage section. Rendered as a function
-  // (not a nested component) so typing never loses input focus.
-  const storageRow = ({ label, host, path, onHost, onPath, hostPh, pathPh, hint }) => (
-    <div style={{marginTop:8}}>
-      <div style={labelStyle}>{label}</div>
-      <div className="row" style={{gap:8, alignItems:"flex-start"}}>
-        <div style={{flex:"0 0 40%"}}>
-          <input style={inputStyle} value={host} onChange={onHost} placeholder={hostPh} />
-          <div style={microHint}>machine</div>
-        </div>
-        <div style={{flex:1}}>
-          <input style={inputStyle} value={path} onChange={onPath} placeholder={pathPh} />
-          <div style={microHint}>path</div>
-        </div>
-      </div>
-      {hint ? <div style={{fontSize:11, color:"var(--muted)", marginTop:3, lineHeight:1.5}}>{hint}</div> : null}
-    </div>
-  );
+  // Storage-server rows moved out (GH #23) — they were machine-dependent. The
+  // storage form fields (files_host/path, notebook_*, obsidian_*, repos_*)
+  // are still seeded from ls and sent unchanged in the save payload so
+  // existing lab.md values persist; they're just no longer edited here.
 
   const githubOrg = (form.github_org || "").trim();
-  const filesBase = _joinHostPath(form.files_host, form.files_path);
   const labMgmtPath = ls.lab_mgmt_path || "lab_mgmt";
-  // Storage convention: everything for lab <id> lives under /data/<id>/.
-  // We derive the example paths off the real lab id so the placeholders show
-  // /data/mh/… for lab "mh", not a stale /data/lab_vm/wigamig.
-  const labId       = (ls.name || "").trim();
-  const dataRoot    = labId ? `/data/${labId}` : "/data/<lab id>";
 
   return (
     <div onClick={onClose} style={{
@@ -7916,11 +7919,6 @@ function LabSettingsModal({ onClose }) {
           <div className="row" style={{flexWrap:"wrap", gap:14, marginTop:6, fontSize:13}}>
             <div><span className="muted">lab id</span> <code className="mono">{ls.name || "—"}</code></div>
             <div><span className="muted">netname of PI</span> <code className="mono">{ls.pi_handle || "—"}</code></div>
-          </div>
-          <div className="muted" style={{fontSize:11, marginTop:4, lineHeight:1.5}}>
-            The lab id and PI netname you supplied at <code className="mono">murmurent init</code>.
-            The lab's GitHub and Slack — which are the PI's — are set in the GitHub
-            and Slack sections below.
           </div>
           <div style={labelStyle}>display name</div>
           <input style={inputStyle} value={form.display_name} onChange={update("display_name")}
@@ -7988,45 +7986,12 @@ function LabSettingsModal({ onClose }) {
             : null}
         </div>
 
-        {/* 5 · Storage servers */}
-        <div style={sectionStyle}>
-          <h4 style={sectionHeader}>Storage servers</h4>
-          <div style={{fontSize:11, color:"var(--muted)", marginTop:3, marginBottom:2, lineHeight:1.5}}>
-            Lab files are located here — just a suggestion; each lab picks its
-            own (e.g. <code className="mono">{dataRoot}</code>).
-          </div>
-          {storageRow({
-            label: "files",
-            host: form.files_host, path: form.files_path,
-            onHost: update("files_host"), onPath: update("files_path"),
-            hostPh: "lab-server.example.edu", pathPh: dataRoot,
-          })}
-          {/* Repos — moved here from the GitHub section. Same Machine/Path shape
-              as the other storage rows for consistency. */}
-          {storageRow({
-            label: "repos on the lab server",
-            host: form.repos_host, path: form.repos_path,
-            onHost: update("repos_host"), onPath: update("repos_path"),
-            hostPh: form.files_host || "lab-server.example.edu",
-            pathPh: `${dataRoot}/repos`,
-            hint: "Local copies of lab repos",
-          })}
-          {storageRow({
-            label: "lab notebooks",
-            host: form.notebook_host, path: form.notebook_path,
-            onHost: update("notebook_host"), onPath: update("notebook_path"),
-            hostPh: form.files_host || "lab-server.example.edu",
-            pathPh: filesBase ? _underLabBase(filesBase, "notebooks") : `${dataRoot}/notebooks`,
-            hint: "Where per-member lab notebooks live. Leave blank to keep them under the files path.",
-          })}
-          {storageRow({
-            label: "Obsidian",
-            host: form.obsidian_host, path: form.obsidian_path,
-            onHost: update("obsidian_host"), onPath: update("obsidian_path"),
-            hostPh: "this-laptop", pathPh: "~/Obsidian/lab-vault",
-            hint: "The lab's Obsidian vault location (per-member vaults are set in Machine settings).",
-          })}
-        </div>
+        {/* Storage servers section removed (GH #23): storage/lab-VM roots are
+            machine-dependent and now live with each machine (the "large-file
+            location" field in Machine settings). The lab_base / notebook /
+            obsidian / repos values are still round-tripped through the save
+            payload below (seeded from ls) so existing lab.md values persist
+            unchanged — they're just no longer edited from this modal. */}
 
         <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:14, alignItems:"center"}}>
           {msg && <span className="muted" style={{fontSize:11, marginRight:"auto"}}>{msg}</span>}
@@ -8077,14 +8042,14 @@ function FooterMeta() {
               {m.name || m.handle}
               <button
                 type="button"
-                title="Edit my profile"
+                title="Edit my personal profile"
                 onClick={() => setShowProfile(true)}
                 style={{
                   background:"transparent", border:"1px solid var(--rule-strong)",
                   borderRadius:2, padding:"1px 6px", cursor:"pointer",
                   fontSize:11, color:"var(--purple)",
                 }}>
-                ⚙ profile
+                ⚙ personal profile
               </button>
               {/* ⚙ machines button moved into the Machines content block
                   (next to Projects, below Installations). The MachinesModal

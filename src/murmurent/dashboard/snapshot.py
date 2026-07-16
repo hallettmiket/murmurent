@@ -408,6 +408,11 @@ def _member_settings(profile: dict) -> C.MemberSettings:
         obsidian_vault_name=_s(vault_name),
         notebook_subfolder=str(notebook_subfolder),
         oracle_subfolder=str(oracle_subfolder),
+        # Handles — per-person. official_handle + slack live at the top level
+        # of the member frontmatter (the roster model owns them); fall back to
+        # a contact-block copy if an older/dashboard-only write put them there.
+        official_handle=_s(profile.get("official_handle") or contact_d.get("official_handle")),
+        slack_handle=_s(profile.get("slack") or contact_d.get("slack")),
         email=_s(contact_d.get("email") or profile.get("email")),
         orcid=_s(contact_d.get("orcid")),
         bluesky=_s(contact_d.get("bluesky")),

@@ -67,12 +67,16 @@ def run_init() -> None:
     # Slack channel + GitHub repo, so they travel with your enrollment.
     name = click.prompt("Your full name", default="")
     email = click.prompt("Your email", default="")
+    official_handle = click.prompt(
+        "Your official / institutional handle (e.g. your Western netname; "
+        "may differ from the murmurent handle above)",
+        default=handle).strip().lstrip("@")
     github = click.prompt("Your GitHub username (optional)", default="").strip().lstrip("@")
     slack = click.prompt("Your Slack username or member ID (optional — lets your PI "
                          "DM your ID card straight back to you)",
                          default="").strip().lstrip("@")
     profile = {"handle": f"@{handle}", "role": role, "name": name, "email": email,
-               "github": github, "slack": slack}
+               "official_handle": official_handle, "github": github, "slack": slack}
 
     # 5. Role-specific info.
     if role == "pi":

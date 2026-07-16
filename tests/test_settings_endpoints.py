@@ -244,6 +244,38 @@ def test_member_settings_rewrites_contact_and_location(world):
     assert meta["location"]["office"] == "MSB-360"
 
 
+def test_member_settings_persists_handles_top_level(world):
+    """official_handle + slack_handle are per-person handles that persist to the
+    top level of the member frontmatter (official_handle / slack), where the
+    roster model reads them — not into the contact block (GH #23)."""
+    client = TestClient(create_app())
+    res = client.post("/api/member/settings", json={
+        "official_handle": "@the_pit", "slack_handle": "@mike.h",
+    })
+    assert res.status_code == 200, res.text
+
+    meta = parse_file(world["lab_mgmt"] / "members" / "the_pi.md").meta
+    # Stored top-level, @-stripped, and NOT tucked inside contact:.
+    assert meta["official_handle"] == "the_pit"
+    assert meta["slack"] == "mike.h"
+    assert "official_handle" not in meta.get("contact", {})
+    assert "slack" not in meta.get("contact", {})
+
+
+def test_member_settings_blank_handles_are_removed(world):
+    """Blanking a handle drops the key rather than storing an empty string."""
+    client = TestClient(create_app())
+    client.post("/api/member/settings", json={
+        "official_handle": "the_pit", "slack_handle": "mike.h",
+    })
+    client.post("/api/member/settings", json={
+        "official_handle": "", "slack_handle": "",
+    })
+    meta = parse_file(world["lab_mgmt"] / "members" / "the_pi.md").meta
+    assert "official_handle" not in meta
+    assert "slack" not in meta
+
+
 def test_member_settings_preserves_body_and_unknown_keys(world):
     """Certifications, obsidian, custom keys, and the body must survive."""
     client = TestClient(create_app())

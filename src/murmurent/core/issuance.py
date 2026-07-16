@@ -226,7 +226,8 @@ def make_enrollment(handle: str, *, nonce: str | None = None,
         handle, priv=priv, nonce=nonce or os.urandom(8).hex(),
         centre=centre_name, group=group,
         email=str(prof.get("email") or ""), github=str(prof.get("github") or ""),
-        slack=str(prof.get("slack") or ""), name=str(prof.get("name") or ""))
+        slack=str(prof.get("slack") or ""), name=str(prof.get("name") or ""),
+        official_handle=str(prof.get("official_handle") or ""))
 
 
 def _scoped_from_signed(payload: dict) -> dict:
@@ -368,6 +369,7 @@ def issue_member_card(handle: str, *, enrollment: dict, group: str | None = None
                        email=str(ep.get("email") or ""),
                        github=str(ep.get("github") or ""),
                        slack=str(ep.get("slack") or ""),
+                       official_handle=str(ep.get("official_handle") or ""),
                        card_fingerprint=member_card["payload"]["subject"]["fingerprint"],
                        card_id=member_card["payload"]["card_id"],
                        pubkey=str(pubkey))
@@ -794,6 +796,7 @@ def issue_project_card_pop(handle: str, *, enrollment: dict, project: str,
                            email=str(ep.get("email") or ""),
                            github=str(ep.get("github") or ""),
                            slack=str(ep.get("slack") or ""),
+                           official_handle=str(ep.get("official_handle") or ""),
                            pubkey=str(pubkey))
     except Exception:  # noqa: BLE001
         pass
