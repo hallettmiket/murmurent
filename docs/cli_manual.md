@@ -92,7 +92,7 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 
 | Command | Who | Effect |
 |---|---|---|
-| `murmurent init` | everyone | One-time identity setup (handle, email, Slack) |
+| `murmurent init` | everyone | One-time identity setup (handle, official/institutional handle, email, GitHub, Slack) |
 | `murmurent enroll [--group <g>] [--project <p>]` | member | Proof-of-possession request to send to the PI / project lead |
 | `murmurent pi-init <lab>` | PI | Self-issue your PI ID; become your lab's trust root |
 | `murmurent issue-member-card <enroll.json> --group <g>` | PI | Sign a member card (DM'd on Slack by default) |

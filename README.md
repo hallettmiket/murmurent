@@ -32,11 +32,12 @@ handle + key.
 ## [Everyone] Set up your identity
 
 ```bash
-murmurent init          # sets your handle, name, email, GitHub (choose member / PI / mayor)
+murmurent init          # sets your handle, name, email, official handle, GitHub, Slack (choose member / PI / mayor)
 ```
 
-The `init` records who you are: your handle/name/email/GitHub; everything
-else builds on it, whether or not you ever join a lab/core. 
+The `init` records who you are: your handle/name/email/official (institutional)
+handle/GitHub/Slack; everything else builds on it, whether or not you ever
+join a lab/core. 
 You have a choice to be either (i) a user (termed a 'member'), (ii) a PI who leads 
 a lab or core facility, or (iii) a mayor who runs a centre (which consists of multiple labs
 and cores). You have to specify one of these three options during the `init` procedure.
