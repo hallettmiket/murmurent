@@ -6832,6 +6832,14 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
   // Repo location (scan_dirs) is stored on the host registry, not machine.yaml,
   // so it's a separate field + a second save call.
   const [repos, setRepos] = useState((initial.scan_dirs || []).join("\n"));
+  // Connection fields live on the host registry (hosts.yaml), not machine.yaml.
+  // For the local machine they're recorded metadata — how OTHER machines reach
+  // this one — and are ignored when this machine talks to itself.
+  const [conn, setConn] = useState({
+    ssh_host:    initial.ssh_host    || "",
+    remote_user: initial.remote_user || "",
+  });
+  const hostname = initial.hostname || "local";
   const [busy, setBusy] = useState(false);
   const [msg, setMsg]   = useState(null);
   // Server-returned preflight probes (wigamig_base subfolder mkdirs +
@@ -6857,13 +6865,18 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
         throw new Error(d.detail || ("HTTP " + res.status));
       }
       const body = await res.json();
-      // Also persist Repo location (scan_dirs) to the local host registry.
+      // Also persist the host-registry fields (connection + Repo locations) to
+      // the local row. Same endpoint the remote-machine editor uses.
       try {
         const scan_dirs = repos.split("\n").map(s => s.trim()).filter(Boolean);
-        await fetch("/api/hosts/local/scan-dirs", {
+        await fetch("/api/hosts/local", {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
-          body: JSON.stringify({ scan_dirs }),
+          body: JSON.stringify({
+            ssh_host: conn.ssh_host.trim(),
+            remote_user: conn.remote_user.trim(),
+            scan_dirs,
+          }),
         });
       } catch (_) {}
       setProbes(body.probes || []);
@@ -6900,6 +6913,34 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
         <strong style={{fontFamily:"var(--serif)"}}>Edit this machine</strong>
         <button type="button" className="btn sm ghost" onClick={onCancel}>cancel</button>
       </div>
+      <div className="row" style={{gap:10, marginTop:6}}>
+        <div style={{flex:1}}>
+          <div style={labelStyle}>name (short id)</div>
+          {/* the local machine's name is fixed — shown, not editable. */}
+          <input style={{...inputStyle, color:"var(--muted)", background:"var(--paper-2)"}}
+                 value={hostname} readOnly disabled />
+        </div>
+        <div style={{flex:2}}>
+          <div style={labelStyle}>SSH host (alias in ~/.ssh/config or full hostname)</div>
+          <input style={inputStyle} value={conn.ssh_host}
+                 onChange={e => setConn(c => ({...c, ssh_host: e.target.value}))}
+                 placeholder="lab-server.example.edu" />
+        </div>
+      </div>
+      <div className="row" style={{gap:10, marginTop:4}}>
+        <div style={{flex:1}}>
+          <div style={labelStyle}>username on host (optional)</div>
+          <input style={inputStyle} value={conn.remote_user}
+                 onChange={e => setConn(c => ({...c, remote_user: e.target.value}))}
+                 placeholder="the_pi" />
+        </div>
+        <div style={{flex:2}}>
+          <div style={labelStyle}>Obsidian vault (full path)</div>
+          <input style={inputStyle} value={form.obsidian_vault_path}
+                 onChange={update("obsidian_vault_path")}
+                 placeholder="/Users/you/.../obsidian-lab" />
+        </div>
+      </div>
 
       <div style={labelStyle}>Files (data root — raw/ + refined/ live here)</div>
       <input style={inputStyle} value={form.wigamig_base}
@@ -6908,11 +6949,6 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
       <div style={labelStyle}>Repo locations (one per line; where clones live)</div>
       <textarea style={{...inputStyle, minHeight:54, resize:"vertical"}} value={repos}
                 onChange={e => setRepos(e.target.value)} placeholder={"~/repos\nwork/clones"} />
-
-      <div style={labelStyle}>Obsidian vault (full path)</div>
-      <input style={inputStyle} value={form.obsidian_vault_path}
-             onChange={update("obsidian_vault_path")}
-             placeholder="/Users/you/.../obsidian-lab" />
 
       <div className="row" style={{gap:10, marginTop:4}}>
         <div style={{flex:1}}>
@@ -7072,7 +7108,10 @@ function MachinesModal({ onClose }) {
 
         {editingThis ? (
           <ThisMachineEditor
-            initial={ms}
+            initial={{ ...ms, scan_dirs: thisCard.scan_dirs,
+                       ssh_host: localHost ? (localHost.ssh_host || "") : "",
+                       remote_user: localHost ? (localHost.remote_user || "") : "",
+                       hostname: thisMachine.short_hostname || "local" }}
             onSaved={() => setEditingThis(false)}
             onCancel={() => setEditingThis(false)}
           />
@@ -7303,7 +7342,10 @@ function MachinesPanel({ span = "c-5" }) {
         )}
         {editingThis ? (
           <ThisMachineEditor
-            initial={{ ...ms, scan_dirs: thisCard.scan_dirs }}
+            initial={{ ...ms, scan_dirs: thisCard.scan_dirs,
+                       ssh_host: localHost ? (localHost.ssh_host || "") : "",
+                       remote_user: localHost ? (localHost.remote_user || "") : "",
+                       hostname: thisMachine.short_hostname || "local" }}
             onSaved={() => { setEditingThis(false); refreshHosts(); }}
             onCancel={() => setEditingThis(false)}
           />
