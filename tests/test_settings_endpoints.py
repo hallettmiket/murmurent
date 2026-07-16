@@ -107,6 +107,18 @@ def test_machine_settings_round_trip(world):
     assert on_disk["obsidian_vault_name"] == "vault"
 
 
+def test_machine_settings_persists_machine_name(world):
+    """The "this machine" editor's friendly name round-trips through
+    machine.yaml (display only — the host-registry key stays "local")."""
+    client = TestClient(create_app())
+    res = client.post("/api/machine/settings",
+                      json={"machine_name": "my-laptop", "wigamig_base": "~/wigamig"})
+    assert res.status_code == 200, res.text
+    on_disk = yaml.safe_load(world["machine_yaml"].read_text())
+    assert on_disk["machine_name"] == "my-laptop"
+    assert ms_mod.load().machine_name == "my-laptop"
+
+
 def test_machine_settings_preflight_creates_subdirs(world, tmp_path):
     """Saving wigamig_base materializes the four standard subfolders and
     reports each in the preflight ``probes`` list with green status."""

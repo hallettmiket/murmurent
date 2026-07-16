@@ -175,6 +175,7 @@ class WorkspaceInitializeBody(BaseModel):
 class MachineSettingsBody(BaseModel):
     """JSON body for ``POST /api/machine/settings``."""
 
+    machine_name: str | None = None
     wigamig_base: str | None = None
     obsidian_vault_path: str | None = None
     obsidian_vault_name: str | None = None

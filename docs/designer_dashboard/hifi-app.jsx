@@ -6779,7 +6779,7 @@ function MachineCard({ machine, isCurrent, onEditClick, onRemove, onScanDirsSave
     }}>
       <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
         <div>
-          <strong style={{fontFamily:"var(--serif)", fontSize:15}}>{machine.name}</strong>
+          <strong style={{fontFamily:"var(--serif)", fontSize:15}}>{machine.display_name || machine.name}</strong>
           {" "}
           <Pill tone={machine.kind === "ssh" ? "purple" : "green"}>
             {machine.kind === "ssh" ? "SSH" : "this machine"}
@@ -6823,6 +6823,7 @@ function MachineCard({ machine, isCurrent, onEditClick, onRemove, onScanDirsSave
 
 function ThisMachineEditor({ initial, onSaved, onCancel }) {
   const [form, setForm] = useState({
+    machine_name:        initial.machine_name        || "",
     wigamig_base:        initial.wigamig_base        || "~/wigamig",
     obsidian_vault_path: initial.obsidian_vault_path || "",
     obsidian_vault_name: initial.obsidian_vault_name || "",
@@ -6832,12 +6833,12 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
   // Repo location (scan_dirs) is stored on the host registry, not machine.yaml,
   // so it's a separate field + a second save call.
   const [repos, setRepos] = useState((initial.scan_dirs || []).join("\n"));
-  // Connection fields live on the host registry (hosts.yaml), not machine.yaml.
-  // For the local machine they're recorded metadata — how OTHER machines reach
-  // this one — and are ignored when this machine talks to itself.
+  // SSH host + username live on the host registry (hosts.yaml). For this
+  // machine they're optional metadata — how OTHER machines reach it — and are
+  // ignored when the machine talks to itself. Username defaults to the OS user.
   const [conn, setConn] = useState({
     ssh_host:    initial.ssh_host    || "",
-    remote_user: initial.remote_user || "",
+    remote_user: initial.remote_user || initial.local_user || "",
   });
   const hostname = initial.hostname || "local";
   const [busy, setBusy] = useState(false);
@@ -6913,42 +6914,33 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
         <strong style={{fontFamily:"var(--serif)"}}>Edit this machine</strong>
         <button type="button" className="btn sm ghost" onClick={onCancel}>cancel</button>
       </div>
-      <div className="row" style={{gap:10, marginTop:6}}>
-        <div style={{flex:1}}>
-          <div style={labelStyle}>name (short id)</div>
-          {/* the local machine's name is fixed — shown, not editable. */}
-          <input style={{...inputStyle, color:"var(--muted)", background:"var(--paper-2)"}}
-                 value={hostname} readOnly disabled />
-        </div>
-        <div style={{flex:2}}>
-          <div style={labelStyle}>SSH host (alias in ~/.ssh/config or full hostname)</div>
-          <input style={inputStyle} value={conn.ssh_host}
-                 onChange={e => setConn(c => ({...c, ssh_host: e.target.value}))}
-                 placeholder="lab-server.example.edu" />
-        </div>
-      </div>
-      <div className="row" style={{gap:10, marginTop:4}}>
-        <div style={{flex:1}}>
-          <div style={labelStyle}>username on host (optional)</div>
-          <input style={inputStyle} value={conn.remote_user}
-                 onChange={e => setConn(c => ({...c, remote_user: e.target.value}))}
-                 placeholder="the_pi" />
-        </div>
-        <div style={{flex:2}}>
-          <div style={labelStyle}>Obsidian vault (full path)</div>
-          <input style={inputStyle} value={form.obsidian_vault_path}
-                 onChange={update("obsidian_vault_path")}
-                 placeholder="/Users/you/.../obsidian-lab" />
-        </div>
-      </div>
 
-      <div style={labelStyle}>Files (data root — raw/ + refined/ live here)</div>
+      <div style={labelStyle}>name (short id)</div>
+      <input style={inputStyle} value={form.machine_name}
+             onChange={update("machine_name")} placeholder={hostname} />
+
+      <div style={labelStyle}>SSH host — optional; only if other machines reach this one over SSH</div>
+      <input style={inputStyle} value={conn.ssh_host}
+             onChange={e => setConn(c => ({...c, ssh_host: e.target.value}))}
+             placeholder="(none — this is your local machine)" />
+
+      <div style={labelStyle}>username on this machine</div>
+      <input style={inputStyle} value={conn.remote_user}
+             onChange={e => setConn(c => ({...c, remote_user: e.target.value}))}
+             placeholder="mth" />
+
+      <div style={labelStyle}>Large file location</div>
       <input style={inputStyle} value={form.wigamig_base}
              onChange={update("wigamig_base")} placeholder="~/wigamig" />
 
       <div style={labelStyle}>Repo locations (one per line; where clones live)</div>
       <textarea style={{...inputStyle, minHeight:54, resize:"vertical"}} value={repos}
                 onChange={e => setRepos(e.target.value)} placeholder={"~/repos\nwork/clones"} />
+
+      <div style={labelStyle}>Obsidian vault (full path)</div>
+      <input style={inputStyle} value={form.obsidian_vault_path}
+             onChange={update("obsidian_vault_path")}
+             placeholder="/Users/you/.../obsidian-lab" />
 
       <div className="row" style={{gap:10, marginTop:4}}>
         <div style={{flex:1}}>
@@ -7057,8 +7049,10 @@ function MachinesModal({ onClose }) {
   // owned by machine.yaml.
   const localHost = hosts.find(h => h.name === "local");
   const thisCard = {
-    // Use the "local" key so onScanDirsSaved PATCHes the right row.
+    // Use the "local" key so onScanDirsSaved PATCHes the right row; the card
+    // title shows the friendly display_name (falling back to the hostname).
     name: "local",
+    display_name: ms.machine_name || thisMachine.short_hostname || "local",
     kind: "local",
     wigamig_base:        ms.wigamig_base        || "",
     obsidian_vault_path: ms.obsidian_vault_path || "",
@@ -7111,6 +7105,7 @@ function MachinesModal({ onClose }) {
             initial={{ ...ms, scan_dirs: thisCard.scan_dirs,
                        ssh_host: localHost ? (localHost.ssh_host || "") : "",
                        remote_user: localHost ? (localHost.remote_user || "") : "",
+                       local_user: thisMachine.local_user || "",
                        hostname: thisMachine.short_hostname || "local" }}
             onSaved={() => setEditingThis(false)}
             onCancel={() => setEditingThis(false)}
@@ -7302,6 +7297,7 @@ function MachinesPanel({ span = "c-5" }) {
   const localHost = hosts.find(h => h.name === "local");
   const thisCard = {
     name: "local",
+    display_name: ms.machine_name || thisMachine.short_hostname || "local",
     kind: "local",
     wigamig_base:        ms.wigamig_base        || "",
     obsidian_vault_path: ms.obsidian_vault_path || "",
@@ -7345,6 +7341,7 @@ function MachinesPanel({ span = "c-5" }) {
             initial={{ ...ms, scan_dirs: thisCard.scan_dirs,
                        ssh_host: localHost ? (localHost.ssh_host || "") : "",
                        remote_user: localHost ? (localHost.remote_user || "") : "",
+                       local_user: thisMachine.local_user || "",
                        hostname: thisMachine.short_hostname || "local" }}
             onSaved={() => { setEditingThis(false); refreshHosts(); }}
             onCancel={() => setEditingThis(false)}

@@ -133,6 +133,11 @@ class MachineSettings(BaseModel):
     separate, user-managed location that murmurent points into.
     """
 
+    # A friendly name for this machine (e.g. "my-laptop"). Editable in the
+    # dashboard's "this machine" editor; falls back to the OS hostname when
+    # unset. The host-registry key stays the fixed "local" — this is display
+    # only, so nothing that references the local machine by key breaks.
+    machine_name: str | None = None
     # Per-machine murmurent umbrella. Default ``~/wigamig``; on a lab
     # server this may resolve to ``/data/lab_vm/wigamig``.
     wigamig_base: str | None = None
