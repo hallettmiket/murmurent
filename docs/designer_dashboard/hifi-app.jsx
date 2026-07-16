@@ -1825,6 +1825,7 @@ function ProjectMembersBlock({ proj: p }) {
   const groupMembers = window.DATA.group_members || [];
   const [busy, setBusy] = React.useState(null);   // handle currently in flight
   const [err, setErr] = React.useState(null);
+  const [enrollFor, setEnrollFor] = React.useState(null);  // handle needing enrollment JSON
   const userParam = ((window.DATA.member || {}).handle || "").replace(/^@/, "");
   const q = userParam ? "?user=" + encodeURIComponent(userParam) : "";
 
@@ -1845,18 +1846,11 @@ function ProjectMembersBlock({ proj: p }) {
       if (!r.ok) throw new Error((typeof j.detail === "string" ? j.detail : null) || r.statusText);
       if (!j.ok && j.error === "no_recorded_key") {
         // PoP fallback: the member has no attested key on the roster (carded
-        // before pubkey recording, or external). Paste their enrollment.
-        const pasted = window.prompt(
-          "@" + handle + " has no attested key on the roster.\n\n" +
-          "Ask them to run:\n    murmurent enroll --project " + p.name + "\n" +
-          "and send you the JSON. Paste it here:");
-        if (pasted && pasted.trim()) {
-          let obj = null;
-          try { obj = JSON.parse(pasted); }
-          catch (_) { throw new Error("that wasn't valid enrollment JSON"); }
-          setBusy(null);
-          return addMember(handle, obj);
-        }
+        // before pubkey recording, or external). Open a modal with a COPYABLE
+        // enroll command + a paste box (native window.prompt text can't be
+        // selected/copied — the thing the user asked to fix).
+        setBusy(null);
+        setEnrollFor(handle);
         return;
       }
       const dm = j.dm || {};
@@ -1980,6 +1974,85 @@ function ProjectMembersBlock({ proj: p }) {
           </span>
         )}
         {err && <span style={{color:"var(--red)", fontSize:11}}>{err}</span>}
+      </div>
+      {enrollFor && (
+        <EnrollHelpModal
+          handle={enrollFor}
+          project={p.name}
+          onClose={() => setEnrollFor(null)}
+          onSubmit={(obj) => { setEnrollFor(null); addMember(enrollFor, obj); }}
+        />
+      )}
+    </div>
+  );
+}
+
+/* EnrollHelpModal — shown when adding a member who has no attested key yet.
+   Replaces a native window.prompt (whose text can't be selected) with a modal
+   that has a COPYABLE enroll command + a paste box for the JSON they send back. */
+function EnrollHelpModal({ handle, project, onClose, onSubmit }) {
+  const cmd = "murmurent enroll --project " + project;
+  const [json, setJson] = React.useState("");
+  const [copied, setCopied] = React.useState(false);
+  const [err, setErr] = React.useState(null);
+  const copy = () => {
+    (navigator.clipboard ? navigator.clipboard.writeText(cmd) : Promise.reject())
+      .then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); })
+      .catch(() => { setErr("couldn't copy — select the text and ⌘C"); });
+  };
+  const submit = () => {
+    const t = json.trim();
+    if (!t) { onClose(); return; }
+    let obj = null;
+    try { obj = JSON.parse(t); }
+    catch (_) { setErr("that wasn't valid enrollment JSON"); return; }
+    onSubmit(obj);
+  };
+  const h = String(handle).replace(/^@/, "");
+  return (
+    <div onClick={onClose} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"flex-start", justifyContent:"center",
+      zIndex:220, padding:"48px 20px", overflowY:"auto",
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--rule-strong)",
+        borderRadius:2, padding:18, width:"min(560px, 96vw)",
+      }}>
+        <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+          <strong style={{fontFamily:"var(--serif)", fontSize:16, color:"var(--purple-deep)"}}>
+            Enroll @{h} in {project}
+          </strong>
+          <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
+        </div>
+        <p className="muted" style={{fontSize:12, margin:"6px 0 8px"}}>
+          @{h} has no attested key on the roster yet. Send them this command; they run
+          it and send back the JSON it prints, which you paste below.
+        </p>
+        <div className="row" style={{gap:6, alignItems:"center"}}>
+          <input readOnly value={cmd} onFocus={e => e.target.select()} className="mono"
+                 style={{flex:1, minWidth:0, fontSize:12, padding:"5px 8px",
+                         border:"1px solid var(--rule-strong)", borderRadius:2,
+                         background:"var(--paper-2)"}} />
+          <button type="button" className="btn sm" onClick={copy}>
+            {copied ? "copied ✓" : "copy"}
+          </button>
+        </div>
+        <div style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+                     textTransform:"uppercase", color:"var(--muted)", margin:"10px 0 2px"}}>
+          paste their enrollment JSON
+        </div>
+        <textarea value={json} onChange={e => setJson(e.target.value)}
+                  placeholder={'{"handle": "@' + h + '", "project": "' + project + '", ...}'}
+                  style={{width:"100%", minHeight:120, boxSizing:"border-box",
+                          fontFamily:"var(--mono)", fontSize:12, padding:"6px 8px",
+                          border:"1px solid var(--rule-strong)", borderRadius:2,
+                          resize:"vertical"}} />
+        {err && <div style={{color:"var(--red)", fontSize:11, marginTop:4}}>{err}</div>}
+        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:10}}>
+          <button type="button" className="btn sm ghost" onClick={onClose}>cancel</button>
+          <button type="button" className="btn sm primary" onClick={submit}>add @{h}</button>
+        </div>
       </div>
     </div>
   );
