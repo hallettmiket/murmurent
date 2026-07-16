@@ -8226,19 +8226,19 @@ function App() {
                           labFolder={D.lab_oracle_folder} span="c-4" />
         </div>
 
-        {/* Live subagent feed — the browser equivalent of the tmux BR pane. */}
-        <div className="grid" style={{marginBottom:14}}>
-          <AgentsActivityPanel activity={D.agents_activity} span="c-12" />
-        </div>
-
         {/* Repo inventory: cross-machine + GitHub audit — one column per
             registered machine (local included). Cached weekly, on-demand
             refresh. Per-row "↑ adopt" / "Install on <machine>" pre-fill
-            the adopt/install wizards. Sits above Inventory: repos are
-            the more frequently-consulted of the two. Terminal twin:
-            `murmurent repo {list,status,adopt}`. */}
+            the adopt/install wizards. Sits above the live agent feed and
+            Inventory: repos are the more frequently-consulted. Terminal
+            twin: `murmurent repo {list,status,adopt}`. */}
         <div className="grid" style={{marginBottom:14}}>
           <RepoInventoryPanel span="c-12" />
+        </div>
+
+        {/* Live subagent feed — the browser equivalent of the tmux BR pane. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <AgentsActivityPanel activity={D.agents_activity} span="c-12" />
         </div>
 
         {/* Inventory: things you check, but not every day. (Lab members moved
