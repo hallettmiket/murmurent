@@ -502,12 +502,13 @@ function RepoInventoryPanel({ span = "c-12" }) {
               isn't on this machine.
             </li>
             <li>
-              <span className="mono">Cloned · not murmurent-ready</span> — the repo is here, but
-              murmurent isn't wired into it. <strong>Make ready</strong> writes the readiness
-              marker and links the commons agents into <code>.claude/agents/</code>.
+              <span className="mono">○ Cloned · not ready</span> — the repo is here, but
+              murmurent isn't wired into it (no <code>.murmurent.yaml</code> or legacy
+              <code>CHARTER.md</code>, no <code>.claude/agents/</code>). <strong>Make ready</strong>{" "}
+              writes the readiness marker and links the commons agents.
             </li>
             <li>
-              <span className="mono" style={{color:"var(--green)"}}>Cloned · murmurent-ready</span>{" "}
+              <span className="mono" style={{color:"var(--green)"}}>● Cloned · ready</span>{" "}
               — Claude Code sessions opened here have the murmurent agents + rules.{" "}
               <strong>Upgrade</strong> re-wires it against the current murmurent release (a new
               agent shipped, or the marker format changed). Agent *edits* arrive on their own —
@@ -545,12 +546,16 @@ function RepoInventoryPanel({ span = "c-12" }) {
           </div>
         )}
         {visibleRows.length > 0 && (
-          <table className="dt">
+          // width:auto + table-layout:auto override the .dt defaults
+          // (100% + fixed), so columns size to their content instead of the
+          // repo column hogging all the slack and the host cells being crushed
+          // to 120px (which shattered "Make ready" into vertical letters).
+          <table className="dt" style={{width:"auto", tableLayout:"auto", minWidth:"min(100%, 720px)"}}>
             <thead><tr>
-              <th>repo</th>
-              <th style={{width:90}}>github</th>
+              <th style={{width:"1%", whiteSpace:"nowrap", paddingRight:28}}>repo</th>
+              <th style={{whiteSpace:"nowrap", paddingRight:28}}>github</th>
               {knownHosts.map(h => (
-                <th key={h} style={{width:120, textAlign:"left"}}>{h}</th>
+                <th key={h} style={{textAlign:"left", whiteSpace:"nowrap"}}>{h}</th>
               ))}
             </tr></thead>
             <tbody>
@@ -627,16 +632,16 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
     }
     if (c.is_murmurent_ready) {
       return (
-        <span style={{display:"inline-flex", alignItems:"center", gap:5}}>
+        <span style={{display:"inline-flex", alignItems:"center", gap:8, whiteSpace:"nowrap"}}>
           <span title={c.path} style={{
-            fontSize:11, color:"var(--green)", fontFamily:"var(--mono)",
+            fontSize:11, color:"var(--green)", fontFamily:"var(--mono)", whiteSpace:"nowrap",
           }}>
-            Cloned · murmurent-ready
+            ● Cloned · ready
           </span>
           {/* Upgrade is local-only: repo_ready works on the filesystem, and the
               remote bootstrap still writes the legacy CHARTER shape. */}
           {onUpgrade && host === "local" && (
-            <button className="btn sm" style={{fontSize:10.5, padding:"1px 5px"}}
+            <button className="btn sm" style={{fontSize:11, padding:"3px 9px", whiteSpace:"nowrap"}}
                     disabled={upgrading === c.path}
                     title={"Re-wire this repo against the current murmurent release "
                          + "(new agents, marker format). Agent edits arrive on their "
@@ -653,14 +658,14 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
     // Cloned but not murmurent-ready — offer it regardless of host. The
     // endpoint branches local vs SSH; the modal passes `host` through.
     return (
-      <span style={{display:"inline-flex", alignItems:"center", gap:5}}>
+      <span style={{display:"inline-flex", alignItems:"center", gap:8, whiteSpace:"nowrap"}}>
         <span title={c.path} style={{
-          fontSize:11, color:"var(--muted)", fontFamily:"var(--mono)",
+          fontSize:11, color:"var(--muted)", fontFamily:"var(--mono)", whiteSpace:"nowrap",
         }}>
-          Cloned · not murmurent-ready
+          ○ Cloned · not ready
         </span>
         {onAdopt && (
-          <button className="btn sm" style={{fontSize:10.5, padding:"1px 5px"}}
+          <button className="btn sm" style={{fontSize:11, padding:"3px 9px", whiteSpace:"nowrap"}}
                   title={host === "local"
                     ? "Wire murmurent into this repo (marker + commons agents). Creates no project."
                     : `Wire murmurent into this repo on ${host}, over SSH. Creates no project.`}
