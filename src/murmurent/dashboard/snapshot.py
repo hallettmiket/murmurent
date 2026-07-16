@@ -187,7 +187,10 @@ def build_response(
     member_profile = _load_member_profile(norm)
     lab_name = str(member_profile.get("lab") or "")
 
+    from .. import __version__ as _mm_version
+
     return C.DashboardResponse(
+        version=_mm_version,
         today=_today_block(today_d),
         persona=effective_persona,  # type: ignore[arg-type]
         member=member_block,

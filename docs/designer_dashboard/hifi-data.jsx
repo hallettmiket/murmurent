@@ -19,6 +19,10 @@ const EMPTY_CONTACT = { email: "", orcid: "", github: "", bluesky: "", osf: "" }
 const EMPTY_LOCATION = { office: "", address: "", city: "", department: "" };
 
 const DATA = {
+  // Placeholder — the live /api/dashboard response (Object.assign below)
+  // overwrites this with the real murmurent.__version__ before first paint
+  // settles. Empty string renders no badge rather than a stale "v?".
+  version: "",
   today: { iso: "", pretty: "", weekday: "", week: 0 },
 
   member: { handle: "", name: "", role: "", lab: "",

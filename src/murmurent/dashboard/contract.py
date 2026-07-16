@@ -1006,6 +1006,9 @@ class DashboardResponse(BaseModel):
     instead.
     """
 
+    # murmurent release version (murmurent.__version__) — the header badge reads
+    # this so it can't drift from the single source (issue #24).
+    version: str = ""
     today: TodayBlock
     persona: Persona = "member"
     member: IdentityBlock
