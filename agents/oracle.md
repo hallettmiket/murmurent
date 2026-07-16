@@ -39,6 +39,8 @@ murmurent oracle-path
 
 (falls back to reading `~/.murmurent/machine.yaml` `obsidian_vault_path` + the `oracle_subfolder` setting, or the most-recently-opened vault from Obsidian's registry). **Never hardcode a vault path** — the same agent runs on multiple machines and the path varies.
 
+**Vault locations + maps-legends.** When your session starts *outside* the vault (in a project repo), run `murmurent vault paths` (prints JSON) to resolve both the personal and lab vault roots and each vault's `maps-legends/` folder. Consult `maps-legends/` for the vault's own taxonomy (maps of content, tag legends) before writing a new entry, so tags and structure stay consistent.
+
 Implications:
 - Every entry you write is browsable, searchable, and graphable in the member's personal Obsidian.
 - The notes are NOT shared with other lab members by default — they are the member's own working knowledge base.

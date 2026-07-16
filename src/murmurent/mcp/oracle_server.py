@@ -174,6 +174,26 @@ def _dir_if_exists(p: Path) -> Path | None:
         return None
 
 
+# One best-effort ff-only pull of the personal vault per process, so MCP
+# search reflects the latest push from another machine (issue #25 §4). Guarded
+# by a once-flag + ``MURMURENT_NO_VAULT_PULL`` opt-out (tests set it); every
+# failure is swallowed so a sandbox/network denial keeps the silent
+# degrade-to-empty behaviour rather than crashing search.
+_pulled_personal = False
+
+
+def _maybe_pull_personal() -> None:
+    global _pulled_personal
+    if _pulled_personal or os.environ.get("MURMURENT_NO_VAULT_PULL"):
+        return
+    _pulled_personal = True  # attempt at most once, even on failure
+    try:
+        from ..core import vault_sync as _vs
+        _vs.pull_personal_vault()
+    except Exception:  # noqa: BLE001 — read must degrade, never crash
+        pass
+
+
 def _iter_paths(kind: str) -> list[tuple[str, Path]]:
     """Yield (kind, path) for every .md entry in the requested tier(s).
 
@@ -183,6 +203,7 @@ def _iter_paths(kind: str) -> list[tuple[str, Path]]:
     """
     out: list[tuple[str, Path]] = []
     if kind in ("personal", "both", "all"):
+        _maybe_pull_personal()
         p = _safe_personal_dir()
         if p and p.is_dir():
             for f in p.rglob("*.md"):

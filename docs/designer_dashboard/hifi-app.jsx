@@ -2841,6 +2841,19 @@ async function postRosterRefresh() {
   if (!res.ok) throw new Error("HTTP " + res.status);
   return res.json();
 }
+// Personal-vault (murmurent_vault) freshness + refresh: the personal vault is
+// single-writer per person but multi-machine; "update" = git pull --ff-only
+// server-side, then refetch. Mirrors the roster helpers above.
+async function getVaultInfo() {
+  const res = await fetch("/api/vault/info", { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+async function postVaultRefresh() {
+  const res = await fetch("/api/vault/refresh", { method: "POST", headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
 // Colour + label for a member's certificate standing (from PeerRow.cert).
 const CERT_TONE = { valid:"green", uncertified:"red", revoked:"red", expired:"amber", mismatch:"amber" };
 const CERT_LABEL = { valid:"✓ id", uncertified:"no cert", revoked:"revoked", expired:"expired", mismatch:"mismatch" };
@@ -5797,16 +5810,48 @@ function PersonalOraclePanel({ data, span="c-4" }) {
     blocked:      { chip: "⚠ BLOCKED",     color: "var(--red)",    bg: "rgba(160,50,50,0.10)", bd: "rgba(160,50,50,0.35)" },
   };
   const hs = HEALTH[vh.status] || HEALTH.unregistered;
+  // Personal-vault git freshness ({is_git, ok, detail, as_of}) + ff-only pull.
+  const [vault, setVault] = useState(null);
+  const [vaultBusy, setVaultBusy] = useState(false);
+  useEffect(() => { getVaultInfo().then(setVault).catch(() => {}); }, []);
+  const onVaultUpdate = async () => {
+    setVaultBusy(true);
+    try {
+      const r = await postVaultRefresh();
+      setVault(r);
+      if (r.is_git && !r.ok) {
+        alert("Vault pull failed: " + (r.detail || "unknown error") +
+              "\n\nShowing the cached vault from " + (r.as_of ? r.as_of.slice(0, 10) : "an unknown date") + ".");
+      }
+      if (typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
+      }
+    } catch (ex) { alert(ex.message || ex); }
+    finally { setVaultBusy(false); }
+  };
   return (
     <div className={"panel "+span}>
       <header>
         <h2>Oracle · personal</h2>
-        <span style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:0.5,
-              padding:"1px 6px", borderRadius:2, color:hs.color,
-              background:hs.bg, border:"1px solid "+hs.bd}}
-              title={vh.path ? "vault oracle dir: "+vh.path : "no vault registered"}>
-          {hs.chip}
-        </span>
+        <div className="row" style={{gap:6, alignItems:"center"}}>
+          {vault && vault.as_of && (
+            <span className="meta" title={"personal vault from " + (vault.path || "murmurent_vault") + ", last commit " + vault.as_of}>
+              {"as of " + vault.as_of.slice(0, 10)}
+            </span>
+          )}
+          {vault && vault.is_git && (
+            <button className="btn sm" disabled={vaultBusy} onClick={onVaultUpdate}
+                    title="Pull your personal vault (--ff-only) from GitHub, then refresh this panel">
+              {vaultBusy ? "…" : "update"}
+            </button>
+          )}
+          <span style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:0.5,
+                padding:"1px 6px", borderRadius:2, color:hs.color,
+                background:hs.bg, border:"1px solid "+hs.bd}}
+                title={vh.path ? "vault oracle dir: "+vh.path : "no vault registered"}>
+            {hs.chip}
+          </span>
+        </div>
       </header>
       <div className="muted" style={{padding:"2px 14px 6px",
            fontSize:11, borderBottom:"1px solid var(--rule)"}}>

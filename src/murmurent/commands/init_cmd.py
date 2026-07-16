@@ -31,6 +31,67 @@ def profile_path() -> Path:
     return _home() / "profile.yaml"
 
 
+_VAULT_LATER_HINT = ("  • Create your personal vault any time:  "
+                     "murmurent vault init   (needs `gh auth login` first)")
+
+
+def _offer_vault_init(
+    handle: str,
+    *,
+    confirm=click.confirm,
+    prompt=click.prompt,
+    echo=click.echo,
+    gh_auth=None,
+    initializer=None,
+) -> dict:
+    """Prompt the member to create their personal vault (``murmurent_vault``).
+
+    PROMPTED, not silent (PI decision): asks Y/n, then offers a clone path
+    (default ``<repos>/murmurent_vault``, but they may enter an iCloud/Obsidian
+    path). Degrades gracefully — no gh auth, a declined prompt, or an offline
+    failure each print the run-later one-liner instead of breaking onboarding.
+
+    The ``confirm`` / ``prompt`` / ``echo`` / ``gh_auth`` / ``initializer`` seams
+    are injectable so the flow is unit-testable without a TTY or a real
+    ``gh repo create``. Returns a small status dict for tests + callers."""
+    from ..core import repo as _repo
+    from ..core import vault_provision as _vp
+
+    gh_auth = gh_auth or _vp.gh_auth_ready
+    initializer = initializer or _vp.init_personal_vault
+
+    if not gh_auth():
+        echo("\nPersonal vault: skipped — GitHub CLI isn't authenticated yet.")
+        echo(_VAULT_LATER_HINT)
+        return {"status": "no_gh_auth"}
+
+    echo("")
+    if not confirm("Create your personal vault (murmurent_vault) on your GitHub now?",
+                   default=True):
+        echo(_VAULT_LATER_HINT)
+        return {"status": "declined"}
+
+    default_path = str(_repo.personal_vault_path())
+    path = prompt("Where should this machine keep the vault clone "
+                  "(an iCloud/Obsidian folder is fine)", default=default_path)
+    try:
+        out = initializer(path=path)
+    except Exception as exc:  # noqa: BLE001 — onboarding must never crash on this
+        echo(f"  ! personal vault not created ({exc}).")
+        echo(_VAULT_LATER_HINT)
+        return {"status": "error", "detail": str(exc)}
+
+    if not out.get("ok"):
+        echo(f"  ! personal vault not created ({out.get('detail') or out.get('error')}).")
+        echo(_VAULT_LATER_HINT)
+        return {"status": "failed", "result": out}
+
+    echo(f"  ✓ personal vault ready: {out['repo']} → {out['path']}")
+    if not out.get("pushed"):
+        echo("    (committed locally; push it later with `murmurent vault sync`)")
+    return {"status": "created", "result": out}
+
+
 def run_init() -> None:
     from ..core import idkeys as _k
     from ..core import identity as _id
@@ -85,6 +146,12 @@ def run_init() -> None:
 
     profile_path().write_text(yaml.safe_dump(profile, sort_keys=False), encoding="utf-8")
     click.echo(f"\n✓ saved your profile to {profile_path()}")
+
+    # 5b. Offer to create the member's PERSONAL vault (murmurent_vault) now —
+    # PROMPTED, never silent (it needs their gh auth + the location is a personal
+    # choice). Everyone, incl. the PI, has a personal vault. Degrades to a
+    # one-liner when gh isn't authed / they decline (issue #25 onboarding hook).
+    _offer_vault_init(handle)
 
     # 6. Next steps, per role.
     click.echo("\nNext steps:")

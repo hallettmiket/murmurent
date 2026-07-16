@@ -2210,6 +2210,26 @@ def create_app() -> FastAPI:
         from ..core import roster_sync as _rs
         return _rs.pull_lab_mgmt().to_dict()
 
+    # -----------------------------------------------------------------
+    # Personal vault (murmurent_vault) freshness + ff-only pull (issue #25 §3)
+    # -----------------------------------------------------------------
+
+    @app.get("/api/vault/info")
+    def get_vault_info() -> dict:
+        """Freshness of this machine's personal-vault clone — the Personal
+        Oracle panel's "as of <date>" stamp. Read-only, any persona."""
+        from ..core import vault_sync as _vs
+        return _vs.vault_info().to_dict()
+
+    @app.post("/api/vault/refresh")
+    def post_vault_refresh() -> dict:
+        """Pull the personal vault (--ff-only) so a stale clone reflects what
+        another machine last pushed — the Personal Oracle panel's update
+        button. Never a 5xx: a failed pull comes back ``ok: false`` + detail
+        (mirrors ``/api/members/refresh``)."""
+        from ..core import vault_sync as _vs
+        return _vs.pull_personal_vault().to_dict()
+
     @app.post("/api/members")
     def add_member_endpoint(
         body: AddMemberBody,

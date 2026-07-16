@@ -44,6 +44,7 @@ EXPECTED_TOP_LEVEL = [
     "squad",
     "teach",
     "triage",
+    "vault",
 ]
 
 
@@ -69,6 +70,34 @@ def test_stub_commands_emit_v1_message() -> None:
     result = runner.invoke(cli, ["doctor"])
     assert result.exit_code == 0
     assert "not yet implemented" in result.output
+
+
+def test_vault_paths_prints_json(tmp_path, monkeypatch) -> None:
+    """`murmurent vault paths` prints JSON with the lab + personal vault roots
+    (issue #25 §5.2 — the agent-facing resolver)."""
+    import json
+
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "lab_mgmt"))
+    from murmurent.dashboard import machine_settings as ms
+    monkeypatch.setattr(ms, "MACHINE_FILE", tmp_path / "home" / "machine.yaml")
+
+    result = CliRunner().invoke(cli, ["vault", "paths"])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.output)
+    assert data["lab"]["root"] == str(tmp_path / "lab_mgmt")
+    assert data["lab"]["maps_legends"].endswith("maps-legends")
+    assert "personal" in data
+
+
+def test_vault_init_lab_scaffolds_no_second_repo(tmp_path, monkeypatch) -> None:
+    """`murmurent vault init --lab` scaffolds subfolders under the existing
+    lab-mgmt clone and creates NO second repo."""
+    lab = tmp_path / "lab_mgmt"
+    lab.mkdir()
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(lab))
+    result = CliRunner().invoke(cli, ["vault", "init", "--lab"])
+    assert result.exit_code == 0, result.output
+    assert (lab / "oracle").is_dir() and (lab / "maps-legends").is_dir()
 
 
 def test_oracle_doctor_reports_ok_when_readable(tmp_path, monkeypatch) -> None:

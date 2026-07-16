@@ -155,6 +155,12 @@ Steps:
    - [ ] Run Murmurent CC setup: `bash ~/repos/murmurent/scripts/setup.sh`
    - [ ] Install Obsidian (link to download)
    - [ ] Create Obsidian vault at `<notebook_path>` and register it in Obsidian
+   - [ ] Create your **personal vault** (`murmurent_vault`, a private repo on your
+         own GitHub): `murmurent vault init` — it creates the repo, scaffolds
+         `oracle/` + `lab-notebook/` + `maps-legends/`, clones it (pass
+         `--path <icloud/obsidian folder>` if you keep it there), and pins the
+         path in `machine.yaml`. **Prereq: `gh auth login` first.** Skippable —
+         `murmurent init` also offers this prompt, and you can run it any time later.
    - [ ] Verify lab-base access: `ls <raw_path>` and `ls <refined_path>`
    - [ ] For laptop + SSH mount: install sshfs, run mount command
    - [ ] Confirm to PI when all steps complete

@@ -1549,6 +1549,94 @@ def oracle_publish_cmd(slug: str, push: bool, dry_run: bool) -> None:
 
 
 # ---------------------------------------------------------------------------
+# vault — personal Obsidian vault (murmurent_vault) provisioning + sync (issue #25)
+# ---------------------------------------------------------------------------
+
+
+@cli.group("vault", help="Provision + sync your personal Obsidian vault (murmurent_vault).")
+def vault_group() -> None:
+    pass
+
+
+@vault_group.command("init", help="Create + clone your personal vault (or scaffold the lab vault).")
+@click.option("--path", "clone_path", default=None,
+              help="Where to clone the personal vault (default: <repos>/murmurent_vault; "
+                   "many users point this at an iCloud folder).")
+@click.option("--owner", default=None,
+              help="Your GitHub login (default: resolved via `gh api user`).")
+@click.option("--lab", "lab_vault", is_flag=True,
+              help="Instead scaffold the Tier-II subfolders under the EXISTING lab-mgmt "
+                   "clone (the lab vault). Creates no repo.")
+@click.option("--no-push", is_flag=True, help="Scaffold + commit but skip the push.")
+def vault_init_cmd(clone_path: str | None, owner: str | None, lab_vault: bool,
+                   no_push: bool) -> None:
+    from .core import vault_provision as _vp
+
+    if lab_vault:
+        out = _vp.init_lab_vault()
+        if not out.get("ok"):
+            raise click.ClickException(out.get("detail") or out.get("error", "failed"))
+        click.echo(f"Lab vault (lab-mgmt): {out['path']}")
+        if out["created"]:
+            click.echo("  scaffolded: " + ", ".join(out["created"]))
+        else:
+            click.echo("  already scaffolded — nothing to do")
+        return
+
+    out = _vp.init_personal_vault(path=clone_path, owner=owner, commit=not no_push)
+    if not out.get("ok"):
+        raise click.ClickException(out.get("detail") or out.get("error", "failed"))
+    click.echo(f"Personal vault: {out['repo']} → {out['path']}")
+    click.echo("  " + ("adopted existing clone" if out["adopted"]
+                       else ("created repo + cloned" if out["created_repo"] else "cloned")))
+    if out["scaffolded"]:
+        click.echo("  scaffolded: " + ", ".join(out["scaffolded"]))
+    click.echo(f"  committed: {'yes' if out['committed'] else 'no'} · "
+               f"pushed: {'yes' if out['pushed'] else 'no'} ({out['sync_detail']})")
+    click.echo(f"  pinned obsidian_vault_path in machine.yaml: "
+               f"{'yes' if out['pinned'] else 'no'}")
+
+
+@vault_group.command("paths", help="Print JSON with the personal + lab vault roots + maps-legends.")
+def vault_paths_cmd() -> None:
+    """For agents (oracle, bookworm, lab_oracle, …) whose session starts OUTSIDE
+    the vault, so they can locate both vaults + each maps-legends/ without a
+    hardcoded per-machine path or an env var."""
+    import json as _json
+    from .core import vault_provision as _vp
+
+    click.echo(_json.dumps(_vp.resolve_vault_paths(), indent=2))
+
+
+@vault_group.command("sync", help="Commit + push pending personal-vault changes (best-effort).")
+def vault_sync_cmd() -> None:
+    from .core import vault_sync as _vs
+
+    root = _vs.personal_vault_root()
+    if root is None:
+        raise click.ClickException(
+            "no personal vault registered — run `murmurent vault init` or set the "
+            "vault path in Machine settings.")
+    res = _vs.commit_and_push(root, message="vault: sync personal Oracle + lab-notebook")
+    click.echo(f"Personal vault: {root}")
+    click.echo(f"  committed: {'yes' if res.committed else 'no'} · "
+               f"pushed: {'yes' if res.pushed else 'no'}")
+    click.echo(f"  {res.detail}")
+
+
+@vault_group.command("info", help="Show the personal vault's clone path + freshness (no network).")
+def vault_info_cmd() -> None:
+    from .core import vault_sync as _vs
+
+    info = _vs.vault_info()
+    click.echo(f"Personal vault: {info.path or '(unregistered)'}")
+    click.echo(f"  git clone: {'yes' if info.is_git else 'no'}")
+    if info.as_of:
+        click.echo(f"  as of: {info.as_of[:10]}")
+    click.echo(f"  {info.detail or 'ok'}")
+
+
+# ---------------------------------------------------------------------------
 # member (Phase 13: roster mgmt)
 # ---------------------------------------------------------------------------
 

@@ -43,7 +43,11 @@ repo, version-controlled and reviewed. Resolve the actual path via:
 python -c "from murmurent.core.repo import lab_mgmt_repo_root; print(lab_mgmt_repo_root() / 'oracle')"
 ```
 
-(this honours `$MURMURENT_LAB_MGMT_REPO` overrides for testing).
+(this honours `$MURMURENT_LAB_MGMT_REPO` overrides for testing). You can also
+run `murmurent vault paths` (prints JSON) to resolve the lab vault root, its
+`oracle/`, `lab-notebook/`, and `maps-legends/` — plus the personal vault — in
+one call when your session starts outside the vault. Consult the lab
+`maps-legends/` for the shared taxonomy before interpreting entries.
 
 Every entry conforms to [`rules/oracle_schema.md`](../rules/oracle_schema.md):
 `title`, `date`, `project`, `sensitivity`, `tags`, `sources` (required) +
