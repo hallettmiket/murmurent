@@ -77,7 +77,20 @@ class Host:
     remote_user: str = ""
     project_root: str = "~/repos"
     lab_vm_root: str = "~/lab_vm/data"
+    # PERSONAL vault (issue #25): ``vault_root`` is the personal-vault clone
+    # path on THIS machine (the member's ``murmurent_vault``); its oracle/ +
+    # lab-notebook/ subfolders are per-machine so they round-trip here too.
     vault_root: str = "~/Documents/Obsidian"
+    oracle_subfolder: str = "oracle"          # personal vault oracle subfolder
+    notebook_subfolder: str = "lab-notebook"  # personal vault lab-notebook subfolder
+    # LAB (group) vault (issue #25): where the lab-mgmt clone
+    # (``murmurent_lab_mgmt_<lab>``) lives on THIS machine. On the *local*
+    # machine the dashboard reads this read-only from
+    # ``lab_settings.lab_mgmt_path``; a *remote* machine has no pinned local
+    # path, so it's an editable per-host field (empty = not set on this host).
+    # Its oracle/ + lab-notebook/ subfolders follow the lab-mgmt convention
+    # (``oracle`` / ``lab-notebook``), matching the local-machine treatment.
+    lab_vault_root: str = ""
     mount_point: str = ""  # SSHFS mount path on the laptop, for ssh kind
     description: str = ""
     # Extra directories to scan for git clones during repo-inventory.
@@ -143,6 +156,9 @@ def _coerce_host(name: str, raw: dict[str, Any]) -> Host:
         project_root=_str(raw.get("project_root"), "~/repos") or "~/repos",
         lab_vm_root=_str(raw.get("lab_vm_root"), "~/lab_vm/data") or "~/lab_vm/data",
         vault_root=_str(raw.get("vault_root"), "~/Documents/Obsidian") or "~/Documents/Obsidian",
+        oracle_subfolder=_str(raw.get("oracle_subfolder"), "oracle") or "oracle",
+        notebook_subfolder=_str(raw.get("notebook_subfolder"), "lab-notebook") or "lab-notebook",
+        lab_vault_root=_str(raw.get("lab_vault_root")),
         mount_point=_str(raw.get("mount_point")),
         description=_str(raw.get("description")),
         scan_dirs=_coerce_scan_dirs(raw.get("scan_dirs")),
@@ -223,6 +239,13 @@ def write(hosts: dict[str, Host], env: dict[str, str] | None = None) -> Path:
         row["project_root"]  = host.project_root
         row["lab_vm_root"]   = host.lab_vm_root
         row["vault_root"]    = host.vault_root
+        # Personal-vault subfolders: only persist when they differ from the
+        # convention default, so existing hosts.yaml stays terse.
+        if host.oracle_subfolder and host.oracle_subfolder != "oracle":
+            row["oracle_subfolder"] = host.oracle_subfolder
+        if host.notebook_subfolder and host.notebook_subfolder != "lab-notebook":
+            row["notebook_subfolder"] = host.notebook_subfolder
+        if host.lab_vault_root: row["lab_vault_root"] = host.lab_vault_root
         if host.mount_point: row["mount_point"] = host.mount_point
         if host.description: row["description"] = host.description
         if host.scan_dirs:   row["scan_dirs"]   = list(host.scan_dirs)
@@ -282,6 +305,9 @@ def update_scan_dirs(
         project_root=current.project_root,
         lab_vm_root=current.lab_vm_root,
         vault_root=current.vault_root,
+        oracle_subfolder=current.oracle_subfolder,
+        notebook_subfolder=current.notebook_subfolder,
+        lab_vault_root=current.lab_vault_root,
         mount_point=current.mount_point,
         description=current.description,
         scan_dirs=cleaned,
@@ -298,6 +324,9 @@ def update_host(
     remote_user: str | None = None,
     lab_vm_root: str | None = None,
     vault_root: str | None = None,
+    oracle_subfolder: str | None = None,
+    notebook_subfolder: str | None = None,
+    lab_vault_root: str | None = None,
     description: str | None = None,
     scan_dirs: tuple[str, ...] | list[str] | None = None,
     env: dict[str, str] | None = None,
@@ -306,14 +335,18 @@ def update_host(
 
     ``None`` means "don't change" for every field. The dashboard Machines
     editor now edits the same field set as the Add form: connection
-    (``ssh_host``, ``remote_user``), ``lab_vm_root`` (Files root),
-    ``vault_root`` (Obsidian), ``description``, and ``scan_dirs`` (Repo
-    locations). ``name`` and ``kind`` are identity and are never changed here.
+    (``ssh_host``, ``remote_user``), ``lab_vm_root`` (Files root), the
+    PERSONAL vault (``vault_root`` + ``oracle_subfolder`` /
+    ``notebook_subfolder``), the LAB vault clone (``lab_vault_root``),
+    ``description``, and ``scan_dirs`` (Repo locations). ``name`` and ``kind``
+    are identity and are never changed here.
 
-    Blanking rules differ by field: ``ssh_host`` and ``vault_root`` fall back
-    to the current value when cleared (an ssh host must keep a host; the vault
-    keeps its default), while ``remote_user`` and ``description`` accept an
-    empty string as an explicit clear.
+    Blanking rules differ by field: ``ssh_host``, ``vault_root``, and the two
+    subfolders fall back to the current value when cleared (an ssh host must
+    keep a host; the vault + its subfolders keep their convention), while
+    ``remote_user``, ``lab_vault_root``, and ``description`` accept an empty
+    string as an explicit clear (a machine may genuinely have no lab-mgmt
+    clone).
     """
     registry = read(env)
     if name not in registry:
@@ -334,6 +367,9 @@ def update_host(
         project_root=current.project_root,
         lab_vm_root=_keep_if_blank(lab_vm_root, current.lab_vm_root),
         vault_root=_keep_if_blank(vault_root, current.vault_root),
+        oracle_subfolder=_keep_if_blank(oracle_subfolder, current.oracle_subfolder),
+        notebook_subfolder=_keep_if_blank(notebook_subfolder, current.notebook_subfolder),
+        lab_vault_root=_allow_clear(lab_vault_root, current.lab_vault_root),
         mount_point=current.mount_point,
         description=_allow_clear(description, current.description),
         scan_dirs=_coerce_scan_dirs(scan_dirs) if scan_dirs is not None

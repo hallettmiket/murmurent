@@ -396,3 +396,85 @@ def test_update_host_blank_rules(isolated):
 def test_update_host_unknown_raises(isolated):
     with pytest.raises(hosts.HostNotFound):
         hosts.update_host("nope", ssh_host="x")
+
+
+# ---------------------------------------------------------------------------
+# Issue #25: per-machine vault-location fields (personal subfolders + the
+# lab-mgmt clone path) round-trip through hosts.yaml + update_host.
+# ---------------------------------------------------------------------------
+
+
+def test_vault_fields_round_trip(isolated):
+    """Personal-vault subfolders + the lab-mgmt clone path persist to
+    hosts.yaml and read back on the Host."""
+    hosts.add(hosts.Host(
+        name="lab-server", kind="ssh", ssh_host="lab-server",
+        vault_root="/home/the_pi/murmurent_vault",
+        oracle_subfolder="oracle-notes",
+        notebook_subfolder="daily",
+        lab_vault_root="/home/the_pi/murmurent_lab_mgmt_mh",
+    ))
+    bio = hosts.read()["lab-server"]
+    assert bio.oracle_subfolder == "oracle-notes"
+    assert bio.notebook_subfolder == "daily"
+    assert bio.lab_vault_root == "/home/the_pi/murmurent_lab_mgmt_mh"
+
+
+def test_vault_subfolders_default_to_convention(isolated):
+    """A pre-#25 hosts.yaml entry (no subfolder / lab-vault keys) keeps
+    working: subfolders fall back to the oracle/lab-notebook convention and
+    the lab-vault path is empty."""
+    hosts.add(hosts.Host(name="lab-server", kind="ssh", ssh_host="lab-server"))
+    bio = hosts.read()["lab-server"]
+    assert bio.oracle_subfolder == "oracle"
+    assert bio.notebook_subfolder == "lab-notebook"
+    assert bio.lab_vault_root == ""
+
+
+def test_convention_subfolders_omitted_from_yaml(isolated):
+    """Convention-default subfolders are not serialised, keeping existing
+    terse hosts.yaml files unchanged; a custom value IS written."""
+    import yaml as _yaml
+    hosts.add(hosts.Host(name="a", kind="ssh", ssh_host="a"))
+    hosts.add(hosts.Host(name="b", kind="ssh", ssh_host="b",
+                         oracle_subfolder="custom"))
+    raw = _yaml.safe_load(hosts.hosts_file().read_text())["hosts"]
+    assert "oracle_subfolder" not in raw["a"]
+    assert "notebook_subfolder" not in raw["a"]
+    assert raw["b"]["oracle_subfolder"] == "custom"
+
+
+def test_update_host_edits_vault_fields(isolated):
+    """update_host edits the new vault-location fields; subfolders keep their
+    value when blanked, lab_vault_root accepts an explicit clear."""
+    hosts.add(hosts.Host(
+        name="lab-server", kind="ssh", ssh_host="lab-server",
+        oracle_subfolder="oracle", notebook_subfolder="lab-notebook",
+        lab_vault_root="/old/lab_mgmt",
+    ))
+    u = hosts.update_host(
+        "lab-server", oracle_subfolder="orc", notebook_subfolder="nb",
+        lab_vault_root="/new/lab_mgmt",
+    )
+    assert (u.oracle_subfolder, u.notebook_subfolder, u.lab_vault_root) == (
+        "orc", "nb", "/new/lab_mgmt")
+
+    # Blank subfolder keeps current; blank lab_vault_root clears it.
+    u2 = hosts.update_host("lab-server", oracle_subfolder="  ",
+                           lab_vault_root="  ")
+    assert u2.oracle_subfolder == "orc"       # kept
+    assert u2.lab_vault_root == ""            # cleared
+
+
+def test_update_scan_dirs_preserves_vault_fields(isolated):
+    """Editing scan_dirs must not drop the #25 vault fields (they're rebuilt
+    on every update_scan_dirs write)."""
+    hosts.add(hosts.Host(
+        name="lab-server", kind="ssh", ssh_host="lab-server",
+        oracle_subfolder="orc", notebook_subfolder="nb",
+        lab_vault_root="/lab_mgmt",
+    ))
+    u = hosts.update_scan_dirs("lab-server", ["~/repos"])
+    assert u.oracle_subfolder == "orc"
+    assert u.notebook_subfolder == "nb"
+    assert u.lab_vault_root == "/lab_mgmt"

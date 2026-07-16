@@ -363,6 +363,11 @@ class HostAddBody(BaseModel):
     wigamig_base: str | None = None
     lab_vm_root: str = "~/wigamig"
     vault_root: str = "~/Obsidian"
+    # Personal-vault subfolders + lab-vault clone path on this machine
+    # (issue #25). Optional; conventions apply when omitted.
+    oracle_subfolder: str = "oracle"
+    notebook_subfolder: str = "lab-notebook"
+    lab_vault_root: str = ""
     mount_point: str = ""
     description: str = ""
     scan_dirs: list[str] = []
@@ -385,6 +390,11 @@ class HostUpdateBody(BaseModel):
     remote_user: str | None = None
     lab_vm_root: str | None = None
     vault_root: str | None = None
+    # Issue #25: personal-vault subfolders + the lab-mgmt clone path on this
+    # machine (the remote-machine editor's LAB-vault location field).
+    oracle_subfolder: str | None = None
+    notebook_subfolder: str | None = None
+    lab_vault_root: str | None = None
     description: str | None = None
     scan_dirs: list[str] | None = None
 
@@ -3661,6 +3671,11 @@ def create_app() -> FastAPI:
             "wigamig_base": h.lab_vm_root,
             "lab_vm_root": h.lab_vm_root,
             "vault_root": h.vault_root,
+            # Issue #25: personal-vault subfolders + lab-mgmt clone path so the
+            # machine cards + editors resolve both vaults' locations remotely.
+            "oracle_subfolder": h.oracle_subfolder,
+            "notebook_subfolder": h.notebook_subfolder,
+            "lab_vault_root": h.lab_vault_root,
             "mount_point": h.mount_point,
             "description": h.description,
             "scan_dirs": list(h.scan_dirs),
@@ -3694,6 +3709,9 @@ def create_app() -> FastAPI:
             project_root=body.project_root,
             lab_vm_root=wb,
             vault_root=body.vault_root,
+            oracle_subfolder=body.oracle_subfolder or "oracle",
+            notebook_subfolder=body.notebook_subfolder or "lab-notebook",
+            lab_vault_root=body.lab_vault_root,
             mount_point=body.mount_point,
             description=body.description,
             scan_dirs=tuple(body.scan_dirs),
@@ -3807,6 +3825,9 @@ def create_app() -> FastAPI:
                 remote_user=body.remote_user,
                 lab_vm_root=body.lab_vm_root,
                 vault_root=body.vault_root,
+                oracle_subfolder=body.oracle_subfolder,
+                notebook_subfolder=body.notebook_subfolder,
+                lab_vault_root=body.lab_vault_root,
                 description=body.description,
                 scan_dirs=(tuple(body.scan_dirs) if body.scan_dirs is not None else None),
             )

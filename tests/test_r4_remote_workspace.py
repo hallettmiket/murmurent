@@ -81,6 +81,50 @@ def test_post_host_duplicate_409(world):
     assert res2.status_code == 409
 
 
+def test_post_host_persists_vault_locations(world):
+    """Issue #25: the Add-machine form's personal-vault subfolders + lab-mgmt
+    clone path round-trip through POST /api/hosts → GET /api/hosts."""
+    client = TestClient(create_app())
+    res = client.post("/api/hosts", json={
+        "name": "lab-server",
+        "ssh_host": "lab-server",
+        "vault_root": "/home/the_pi/murmurent_vault",
+        "oracle_subfolder": "orc",
+        "notebook_subfolder": "nb",
+        "lab_vault_root": "/home/the_pi/murmurent_lab_mgmt_mh",
+    })
+    assert res.status_code == 200, res.text
+    row = next(h for h in client.get("/api/hosts").json()["hosts"]
+               if h["name"] == "lab-server")
+    assert row["vault_root"] == "/home/the_pi/murmurent_vault"
+    assert row["oracle_subfolder"] == "orc"
+    assert row["notebook_subfolder"] == "nb"
+    assert row["lab_vault_root"] == "/home/the_pi/murmurent_lab_mgmt_mh"
+
+
+def test_patch_host_edits_vault_locations(world):
+    """Issue #25: the remote-machine editor's PATCH updates both vaults'
+    per-machine locations."""
+    client = TestClient(create_app())
+    client.post("/api/hosts", json={"name": "lab-server", "ssh_host": "lab-server"})
+    res = client.patch("/api/hosts/lab-server", json={
+        "vault_root": "/srv/murmurent_vault",
+        "oracle_subfolder": "oracle2",
+        "notebook_subfolder": "notebook2",
+        "lab_vault_root": "/srv/murmurent_lab_mgmt_mh",
+    })
+    assert res.status_code == 200, res.text
+    h = res.json()["host"]
+    assert h["vault_root"] == "/srv/murmurent_vault"
+    assert h["oracle_subfolder"] == "oracle2"
+    assert h["notebook_subfolder"] == "notebook2"
+    assert h["lab_vault_root"] == "/srv/murmurent_lab_mgmt_mh"
+    # Persisted: a fresh GET sees the same values.
+    row = next(r for r in client.get("/api/hosts").json()["hosts"]
+               if r["name"] == "lab-server")
+    assert row["lab_vault_root"] == "/srv/murmurent_lab_mgmt_mh"
+
+
 def test_post_host_local_is_re_derivable(world):
     """The built-in 'local' row is always re-derivable — posting it again
     is a no-op rather than a 409. This matches the core hosts.add() rule
