@@ -139,6 +139,43 @@ def _default_cloner(owner: str, name: str, dest: Path) -> tuple[bool, str]:
     return (res.returncode == 0, (res.stderr or res.stdout or "").strip() or "cloned")
 
 
+def _default_adopt_pusher(dest: Path, owner: str, name: str,
+                          *, message: str) -> tuple[bool, bool, str]:
+    """Turn an existing dir into a git repo and push it to a NEW private
+    ``owner/name`` via gh. Returns ``(ok, pushed, detail)`` — best-effort push:
+    ``ok`` reflects the local commit, ``pushed`` the remote push (a network
+    failure keeps ``ok=True``). The caller has ALREADY written the .gitignore
+    that excludes sensitivity-tagged files, so `git add -A` never stages them."""
+    import subprocess
+    from . import project_provision as _pp
+
+    dest = Path(dest)
+
+    def _git(*args: str) -> subprocess.CompletedProcess:
+        return subprocess.run(["git", "-C", str(dest), *args],
+                              capture_output=True, text=True, timeout=120)
+
+    if not _pp._gh_available():
+        return (False, False, "gh CLI not installed")
+    if not (dest / ".git").exists():
+        r = _git("init", "-b", "main")
+        if r.returncode != 0:
+            return (False, False, (r.stderr or "git init failed").strip())
+    _install_precommit_guard(dest)
+    _git("add", "-A")
+    c = _git("commit", "-m", message)
+    if c.returncode != 0 and "nothing to commit" not in (c.stdout + c.stderr):
+        return (False, False, (c.stderr or c.stdout or "git commit failed").strip()[:300])
+    # Create the private repo FROM this local repo and push it in one gh call
+    # (handles auth via gh's git credential helper).
+    res = _pp._gh(["repo", "create", f"{owner}/{name}", "--private",
+                   "--source", str(dest), "--remote", "origin", "--push"])
+    if res.returncode == 0:
+        return (True, True, "created private repo + pushed")
+    return (True, False, "committed locally; gh repo create/push failed: "
+            + (res.stderr or res.stdout or "").strip()[:300])
+
+
 # ---------------------------------------------------------------------------
 # Scaffolding
 # ---------------------------------------------------------------------------
@@ -166,6 +203,170 @@ def scaffold_vault(root: Path) -> list[str]:
         claude.write_text(seed_claude_md(), encoding="utf-8")
         created.append(CLAUDE_MD)
     return created
+
+
+# ---------------------------------------------------------------------------
+# Adopting an EXISTING vault — keep sensitivity-tagged files off GitHub
+# ---------------------------------------------------------------------------
+
+# Machine-local / non-content cruft that should never ride into the vault repo.
+_VAULT_GITIGNORE_CRUFT: tuple[str, ...] = (
+    ".obsidian/workspace*",
+    ".obsidian/cache",
+    ".trash/",
+    ".DS_Store",
+    "*.tmp",
+)
+
+# Sensitivities that, by default, are kept OUT of the GitHub-backed vault. The
+# personal vault is a private repo, but "private on GitHub" is still egress to a
+# third party — clinical/PHI-tagged notes stay local unless the owner overrides.
+DEFAULT_EXCLUDED_SENSITIVITIES: tuple[str, ...] = ("clinical",)
+
+# The ONLY top-level folders a murmurent-scoped vault tracks. An existing
+# Obsidian vault usually holds far more (health/, journal/, recipes/, …); the
+# default adopt scope is "murmurent" — an ALLOWLIST that tracks just these +
+# CLAUDE.md and leaves everything else local (off GitHub). This is safer than a
+# clinical denylist, which would push untagged personal notes.
+MURMURENT_TRACKED_FOLDERS: tuple[str, ...] = ("oracle", "lab-notebook", "maps-legends")
+
+
+def _allowlist_gitignore_lines() -> list[str]:
+    """.gitignore that tracks ONLY the murmurent folders + CLAUDE.md; everything
+    else in the vault stays local. The ``/*`` ignore is top-level only, so a
+    re-included folder's contents are tracked once git descends into it."""
+    lines = [
+        "# murmurent vault — ALLOWLIST scope: only murmurent Tier-II folders are",
+        "# tracked on GitHub. Everything else in this Obsidian vault stays LOCAL.",
+        "# Re-run `murmurent vault init --adopt` to regenerate.",
+        "",
+        "/*",
+        "!/.gitignore",
+        "!/.gitattributes",
+        "!/CLAUDE.md",
+    ]
+    lines += [f"!/{d}/" for d in MURMURENT_TRACKED_FOLDERS]
+    return lines
+
+
+def scan_sensitive(vault_root: Path,
+                   *, sensitivities: tuple[str, ...] = DEFAULT_EXCLUDED_SENSITIVITIES,
+                   ) -> list[str]:
+    """Relative paths of ``.md`` files whose frontmatter ``sensitivity`` is in
+    ``sensitivities`` (default: clinical). Read-only; tolerant of unparseable
+    files (skipped). Content is NOT returned — only paths — so a caller can
+    show the exclusion list without surfacing PHI."""
+    from .frontmatter import parse_file as _pf
+    root = Path(vault_root)
+    want = {s.strip().lower() for s in sensitivities}
+    hits: list[str] = []
+    for p in root.rglob("*.md"):
+        if ".git" in p.parts:
+            continue
+        try:
+            meta = _pf(p).meta or {}
+        except Exception:  # noqa: BLE001 — an unreadable note just isn't scanned
+            continue
+        if str(meta.get("sensitivity") or "").strip().lower() in want:
+            hits.append(str(p.relative_to(root)))
+    return sorted(hits)
+
+
+def _vault_gitignore_lines(excluded_rel: list[str]) -> list[str]:
+    """The .gitignore body for a vault: machine-local cruft + each
+    sensitivity-tagged file anchored to the repo root."""
+    lines = [
+        "# murmurent vault — machine-local + sensitivity-tagged files kept off GitHub.",
+        "# Regenerate the sensitivity block with `murmurent vault init --adopt`.",
+        "",
+        *(_VAULT_GITIGNORE_CRUFT),
+    ]
+    if excluded_rel:
+        lines += ["", "# Sensitivity-tagged (e.g. clinical) — never pushed:"]
+        # Anchor with a leading slash so only the exact file is ignored (not a
+        # same-named file elsewhere). git-ignore treats '#' and trailing space
+        # specially — escape them.
+        for rel in excluded_rel:
+            esc = rel.replace("#", "\\#")
+            if esc != esc.rstrip():
+                esc = esc.rstrip() + "\\ " * (len(esc) - len(esc.rstrip()))
+            lines.append("/" + esc)
+    return lines
+
+
+def plan_adopt(vault_root: Path,
+               *, scope: str = "murmurent",
+               sensitivities: tuple[str, ...] = DEFAULT_EXCLUDED_SENSITIVITIES,
+               ) -> dict:
+    """Dry-run preview of adopting ``vault_root``. Pure — creates nothing, pushes
+    nothing. This is what a caller shows the user before any push.
+
+    ``scope="murmurent"`` (default, safest): ALLOWLIST — only the murmurent
+    folders are tracked; every other folder stays local. ``scope="all"``: the
+    whole vault minus sensitivity-tagged files (a denylist)."""
+    root = Path(vault_root)
+    all_md = [str(p.relative_to(root)) for p in root.rglob("*.md")
+              if ".git" not in p.parts]
+    top = lambda rel: rel.split("/", 1)[0]  # noqa: E731
+
+    if scope == "murmurent":
+        # Everything the allowlist re-includes (tracked); everything else local.
+        allowlisted = set(MURMURENT_TRACKED_FOLDERS) | {
+            "CLAUDE.md", ".gitignore", ".gitattributes"}
+        tracked = [f for f in all_md
+                   if top(f) in MURMURENT_TRACKED_FOLDERS or f in allowlisted]
+        local = sorted({top(f) for f in all_md if top(f) not in allowlisted})
+        return {
+            "vault": str(root), "exists": root.is_dir(),
+            "is_git": (root / ".git").exists(), "scope": "murmurent",
+            "tracked_folders": list(MURMURENT_TRACKED_FOLDERS),
+            "tracked_md": len(tracked),
+            "kept_local_folders": local,     # top-level names only — no content
+            "total_md": len(all_md),
+            "gitignore": _allowlist_gitignore_lines(),
+        }
+
+    excluded = scan_sensitive(root, sensitivities=sensitivities)
+    return {
+        "vault": str(root), "exists": root.is_dir(),
+        "is_git": (root / ".git").exists(), "scope": "all",
+        "excluded_sensitivities": list(sensitivities),
+        "excluded_files": excluded,          # paths only — no content
+        "excluded_count": len(excluded),
+        "total_md": len(all_md),
+        "tracked_md_estimate": len(all_md) - len(excluded),
+        "gitignore": _vault_gitignore_lines(excluded),
+    }
+
+
+def _install_precommit_guard(dest: Path) -> bool:
+    """Install a git pre-commit hook that REFUSES to commit any staged file
+    tagged ``sensitivity: clinical`` — an ongoing safety net so a clinical note
+    added later can't slip into the GitHub-backed vault even if .gitignore
+    misses it. Returns True if written."""
+    hooks = Path(dest) / ".git" / "hooks"
+    if not hooks.is_dir():
+        return False
+    hook = hooks / "pre-commit"
+    hook.write_text(
+        "#!/bin/sh\n"
+        "# murmurent vault guard: block committing clinical-tagged notes.\n"
+        "staged=$(git diff --cached --name-only --diff-filter=ACM | grep '\\.md$' || true)\n"
+        "bad=''\n"
+        "for f in $staged; do\n"
+        "  if [ -f \"$f\" ] && grep -qiE '^sensitivity:[[:space:]]*clinical' \"$f\"; then\n"
+        "    bad=\"$bad\\n  $f\"\n"
+        "  fi\n"
+        "done\n"
+        "if [ -n \"$bad\" ]; then\n"
+        "  printf 'murmurent vault: refusing to commit clinical-tagged file(s):%b\\n' \"$bad\"\n"
+        "  printf 'These stay local. Add them to .gitignore or drop the sensitivity tag.\\n'\n"
+        "  exit 1\n"
+        "fi\n",
+        encoding="utf-8",
+    )
+    hook.chmod(0o755)
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -241,6 +442,10 @@ def init_personal_vault(
     cloner=None,
     owner_resolver=None,
     syncer=None,
+    adopt_pusher=None,
+    adopt: bool = False,
+    adopt_scope: str = "murmurent",
+    sensitivities: tuple[str, ...] = DEFAULT_EXCLUDED_SENSITIVITIES,
     commit: bool = True,
 ) -> dict:
     """Provision this member's personal vault (``murmurent_vault``).
@@ -299,12 +504,44 @@ def init_personal_vault(
                 nonempty = any(dest.iterdir())
             except OSError:
                 nonempty = True
-            if nonempty:
+            if nonempty and not adopt:
                 return {"ok": False, "error": "exists_not_git", "repo": expected,
                         "path": str(dest),
                         "detail": f"{dest} exists and is not empty but is not a git "
-                                  f"repo. Refusing to clobber it — clone/init the vault "
-                                  f"manually, or choose an empty --path."}
+                                  f"repo. To back this existing vault on GitHub, re-run "
+                                  f"with --adopt (sensitivity-tagged notes are excluded); "
+                                  f"or choose an empty --path for a fresh vault."}
+            if nonempty and adopt:
+                # Adopt an EXISTING (non-git) Obsidian vault. Order is
+                # PHI-critical: write .gitignore BEFORE any `git add`, so
+                # excluded notes never enter git history / GitHub. Then
+                # scaffold + git-init + push.
+                #   scope="murmurent" (default): ALLOWLIST — only oracle/,
+                #     lab-notebook/, maps-legends/ + CLAUDE.md are tracked;
+                #     every other folder in the vault stays local.
+                #   scope="all": whole vault minus sensitivity-tagged files.
+                if adopt_scope == "murmurent":
+                    gi_lines = _allowlist_gitignore_lines()
+                    excluded = scan_sensitive(dest, sensitivities=sensitivities)
+                else:
+                    excluded = scan_sensitive(dest, sensitivities=sensitivities)
+                    gi_lines = _vault_gitignore_lines(excluded)
+                (dest / ".gitignore").write_text(
+                    "\n".join(gi_lines) + "\n", encoding="utf-8")
+                scaffolded = scaffold_vault(dest)
+                pusher = adopt_pusher or _default_adopt_pusher
+                ok, detail, pushed = pusher(dest, owner, name, message=(
+                    "vault: adopt existing Obsidian vault as murmurent personal vault "
+                    f"(scope={adopt_scope}; excluded content kept off GitHub via .gitignore)"))
+                if not ok:
+                    return {"ok": False, "error": "adopt_failed", "repo": expected,
+                            "path": str(dest), "detail": detail, "scope": adopt_scope}
+                pinned = _pin_machine_vault_path(dest)
+                return {"ok": True, "repo": expected, "owner": owner, "path": str(dest),
+                        "created_repo": True, "adopted": True, "cloned": False,
+                        "scope": adopt_scope, "clinical_excluded": excluded,
+                        "scaffolded": scaffolded, "committed": True, "pushed": pushed,
+                        "pinned": pinned, "sync_detail": detail}
             # empty dir → safe to create+clone into it below
 
     if not adopted:

@@ -1568,9 +1568,24 @@ def vault_group() -> None:
               help="Instead scaffold the Tier-II subfolders under the EXISTING lab-mgmt "
                    "clone (the lab vault). Creates no repo.")
 @click.option("--no-push", is_flag=True, help="Scaffold + commit but skip the push.")
+@click.option("--adopt", is_flag=True,
+              help="Back an EXISTING (non-git) Obsidian vault at --path: git-init it "
+                   "and push to a new private repo. By default tracks ONLY the "
+                   "murmurent folders (oracle/, lab-notebook/, maps-legends/) and "
+                   "keeps everything else local. Use for already-onboarded members.")
+@click.option("--include-all", is_flag=True,
+              help="With --adopt: back the WHOLE vault (minus files tagged "
+                   "sensitivity: clinical) instead of only the murmurent folders. "
+                   "Pushes personal folders (health/, journal/, …) to GitHub.")
+@click.option("--dry-run", is_flag=True,
+              help="With --adopt: preview exactly what would be tracked vs kept "
+                   "local, and print the .gitignore. Creates nothing, pushes nothing.")
 def vault_init_cmd(clone_path: str | None, owner: str | None, lab_vault: bool,
-                   no_push: bool) -> None:
+                   no_push: bool, adopt: bool, include_all: bool,
+                   dry_run: bool) -> None:
     from .core import vault_provision as _vp
+
+    scope = "all" if include_all else "murmurent"
 
     if lab_vault:
         out = _vp.init_lab_vault()
@@ -1583,7 +1598,33 @@ def vault_init_cmd(clone_path: str | None, owner: str | None, lab_vault: bool,
             click.echo("  already scaffolded — nothing to do")
         return
 
-    out = _vp.init_personal_vault(path=clone_path, owner=owner, commit=not no_push)
+    if dry_run:
+        from pathlib import Path as _P
+        from .core import repo as _repo
+        target = _P(clone_path).expanduser() if clone_path else _repo.personal_vault_path()
+        plan = _vp.plan_adopt(target, scope=scope)
+        click.echo(f"Adopt preview for {plan['vault']}  (scope: {plan['scope']}):")
+        if plan["scope"] == "murmurent":
+            click.echo(f"  TRACK on GitHub: {', '.join(plan['tracked_folders'])} + CLAUDE.md "
+                       f"(~{plan['tracked_md']} of {plan['total_md']} notes)")
+            if plan["kept_local_folders"]:
+                click.echo("  KEEP LOCAL (never pushed): "
+                           + ", ".join(plan["kept_local_folders"]))
+        else:
+            click.echo(f"  markdown notes: {plan['total_md']} · track ~"
+                       f"{plan['tracked_md_estimate']} · EXCLUDE {plan['excluded_count']} "
+                       f"(sensitivity: {', '.join(plan['excluded_sensitivities'])})")
+            for rel in plan["excluded_files"]:
+                click.echo(f"    - excluded: {rel}")
+        click.echo("\n  .gitignore that would be written:")
+        for ln in plan["gitignore"]:
+            click.echo(f"    | {ln}")
+        click.echo("\n  (dry run — nothing created or pushed. Re-run without --dry-run "
+                   "to adopt.)")
+        return
+
+    out = _vp.init_personal_vault(path=clone_path, owner=owner, adopt=adopt,
+                                  adopt_scope=scope, commit=not no_push)
     if not out.get("ok"):
         raise click.ClickException(out.get("detail") or out.get("error", "failed"))
     click.echo(f"Personal vault: {out['repo']} → {out['path']}")

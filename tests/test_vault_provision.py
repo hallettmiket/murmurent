@@ -246,3 +246,120 @@ def test_resolve_vault_paths_personal_from_machine_yaml(monkeypatch, tmp_path):
     assert out["personal"]["root"] == str(tmp_path / "myvault")
     assert out["personal"]["oracle"] == str(tmp_path / "myvault" / "oracle")
     assert out["personal"]["maps_legends"] == str(tmp_path / "myvault" / "maps-legends")
+
+
+# ---------------------------------------------------------------------------
+# --adopt: back an existing (non-git) vault, excluding clinical (issue #25)
+# ---------------------------------------------------------------------------
+
+
+def _vault_with_content(root: Path) -> Path:
+    """A believable existing Obsidian vault: one standard + one clinical note."""
+    (root / "oracle").mkdir(parents=True)
+    (root / "lab-notebook").mkdir(parents=True)
+    (root / "oracle" / "2026-05-01_qc_finding.md").write_text(
+        "---\ntitle: QC finding\nsensitivity: standard\n---\n\nkeep me\n", encoding="utf-8")
+    (root / "oracle" / "2026-05-02_patient_note.md").write_text(
+        "---\ntitle: patient note\nsensitivity: clinical\n---\n\nPHI — stay local\n",
+        encoding="utf-8")
+    (root / "lab-notebook" / "2026-05-03.md").write_text(
+        "---\nsensitivity: standard\n---\n\nday notes\n", encoding="utf-8")
+    return root
+
+
+def test_scan_sensitive_finds_only_clinical(tmp_path):
+    v = _vault_with_content(tmp_path / "vault")
+    hits = VP.scan_sensitive(v)
+    assert hits == ["oracle/2026-05-02_patient_note.md"]
+
+
+def test_plan_adopt_murmurent_scope_allowlists_folders(tmp_path):
+    v = _vault_with_content(tmp_path / "vault")
+    (v / "health").mkdir()
+    (v / "health" / "private.md").write_text("---\n---\npersonal\n", encoding="utf-8")
+    plan = VP.plan_adopt(v)                       # default scope = murmurent
+    assert plan["scope"] == "murmurent"
+    assert plan["tracked_folders"] == ["oracle", "lab-notebook", "maps-legends"]
+    assert "health" in plan["kept_local_folders"]
+    assert "/*" in plan["gitignore"] and "!/oracle/" in plan["gitignore"]
+    # pure: nothing written
+    assert not (v / ".git").exists() and not (v / ".gitignore").exists()
+
+
+def test_plan_adopt_all_scope_denylists_clinical(tmp_path):
+    v = _vault_with_content(tmp_path / "vault")
+    plan = VP.plan_adopt(v, scope="all")
+    assert plan["excluded_files"] == ["oracle/2026-05-02_patient_note.md"]
+    assert "/oracle/2026-05-02_patient_note.md" in plan["gitignore"]
+
+
+def test_adopt_excludes_clinical_before_push(tmp_path, monkeypatch):
+    v = _vault_with_content(tmp_path / "vault")
+    seen = {}
+
+    def fake_pusher(dest, owner, name, *, message):
+        # .gitignore MUST already exist + exclude the clinical file when the
+        # pusher runs — that's the PHI guarantee (never staged).
+        gi = (Path(dest) / ".gitignore").read_text()
+        seen["gitignore"] = gi
+        seen["called"] = (str(dest), owner, name)
+        return (True, True, "created + pushed")
+
+    # Whole-vault ("all") scope: clinical must be gitignored before the push.
+    out = VP.init_personal_vault(
+        path=str(v), owner="octocat", adopt=True, adopt_scope="all",
+        adopt_pusher=fake_pusher,
+        repo_creator=lambda o, n: (True, "created"),  # unused on adopt path
+    )
+    assert out["ok"] and out["adopted"] and out["pushed"]
+    assert "/oracle/2026-05-02_patient_note.md" in seen["gitignore"]
+    assert seen["called"][1:] == ("octocat", "murmurent_vault")
+    # machine.yaml pinned to the adopted vault
+    assert MS.load().obsidian_vault_path == str(v)
+
+
+def test_adopt_refused_without_flag(tmp_path):
+    v = _vault_with_content(tmp_path / "vault")
+    out = VP.init_personal_vault(path=str(v), owner="octocat",
+                                 repo_creator=lambda o, n: (True, "created"),
+                                 cloner=lambda o, n, d: (True, "cloned"))
+    assert out["ok"] is False and out["error"] == "exists_not_git"
+    assert "--adopt" in out["detail"]
+
+
+def test_precommit_guard_blocks_clinical(tmp_path):
+    """The installed pre-commit hook refuses a clinical-tagged staged file."""
+    v = tmp_path / "vault"
+    v.mkdir()
+    subprocess.run(["git", "-C", str(v), "init", "-b", "main"], check=True,
+                   capture_output=True)
+    assert VP._install_precommit_guard(v)
+    (v / "note.md").write_text("---\nsensitivity: clinical\n---\nPHI\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(v), "add", "note.md"], check=True, capture_output=True)
+    r = subprocess.run(["git", "-C", str(v), "commit", "-m", "x"],
+                       capture_output=True, text=True,
+                       env={"HOME": str(tmp_path), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin",
+                            "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t",
+                            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@t"})
+    assert r.returncode != 0
+    assert "clinical" in (r.stdout + r.stderr).lower()
+
+
+def test_adopt_murmurent_scope_only_tracks_murmurent_folders(tmp_path):
+    """Default --adopt (murmurent scope): the .gitignore is an allowlist so a
+    personal folder like health/ is never pushed."""
+    v = _vault_with_content(tmp_path / "vault")
+    (v / "health").mkdir()
+    (v / "health" / "private.md").write_text("---\n---\npersonal\n", encoding="utf-8")
+    seen = {}
+
+    def fake_pusher(dest, owner, name, *, message):
+        seen["gitignore"] = (Path(dest) / ".gitignore").read_text()
+        return (True, True, "created + pushed")
+
+    out = VP.init_personal_vault(path=str(v), owner="octocat", adopt=True,
+                                 adopt_pusher=fake_pusher)
+    assert out["ok"] and out["scope"] == "murmurent"
+    gi = seen["gitignore"]
+    assert "/*" in gi and "!/oracle/" in gi and "!/lab-notebook/" in gi
+    assert "health" not in gi          # personal folder not re-included → stays local
