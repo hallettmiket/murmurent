@@ -493,33 +493,28 @@ function RepoInventoryPanel({ span = "c-12" }) {
           background:"var(--paper-2)", borderBottom:"1px solid var(--rule)",
           color:"var(--ink-2)",
         }}>
-          <strong style={{fontFamily:"var(--mono)", color:"var(--purple-deep)"}}>
-            repo states
-          </strong>{" — each host cell says whether the repo is on that machine, and whether murmurent is wired into it:"}
+          Repo states — each host cell shows whether the repo is on that machine,
+          and whether murmurent is wired into it:
           <ul style={{margin:"4px 0 0 18px", padding:0}}>
             <li>
-              <span className="mono" style={{color:"var(--muted)"}}>Not cloned</span> — the repo
-              isn't on this machine.
+              Not cloned — the repo isn't on this machine.
             </li>
             <li>
-              <span className="mono">○ Cloned · not ready</span> — the repo is here, but
-              murmurent isn't wired into it (no <code>.murmurent.yaml</code> or legacy
-              <code>CHARTER.md</code>, no <code>.claude/agents/</code>). <strong>Make ready</strong>{" "}
-              writes the readiness marker and links the commons agents.
+              Cloned · not ready — the repo is here, but murmurent isn't wired
+              into it. The Make ready button writes the readiness marker and links
+              the commons agents.
             </li>
             <li>
-              <span className="mono" style={{color:"var(--green)"}}>● Cloned · ready</span>{" "}
-              — Claude Code sessions opened here have the murmurent agents + rules.{" "}
-              <strong>Upgrade</strong> re-wires it against the current murmurent release (a new
-              agent shipped, or the marker format changed). Agent *edits* arrive on their own —
-              the links point at your murmurent clone — so you only need this for structural changes.
+              Cloned · ready — Claude Code sessions opened here have the murmurent
+              agents and rules. The Upgrade button re-wires the repo to the current
+              murmurent release (a new agent, or a changed marker format); agent
+              edits arrive on their own, so you only need Upgrade for structural changes.
             </li>
           </ul>
           <div style={{marginTop:6}}>
-            Murmurent-ready is about <em>one repo</em>. A <strong>project</strong> is a different,
-            bigger thing — a named set of repos <em>and</em> members — created via{" "}
-            <strong>New Project</strong>, which attaches ready repos. Making a repo ready creates
-            no project.
+            Murmurent-ready is about one repo. A project is a bigger thing — a named
+            set of repos and members — created via New Project, which attaches ready
+            repos. Making a repo ready does not create a project.
           </div>
         </div>
         {err && (
