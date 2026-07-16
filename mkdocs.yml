@@ -58,6 +58,7 @@ nav:
       - Why Murmurent? (five vignettes): getting_started.md
       - The reference agents: agents.md
       - Install & setup: setup.md
+      - Personal vault setup: vault-setup.md
       - "Murmurent-ready vs. a project": ready_vs_projects.md
   - Working day to day:
       - Creating a project (intra & inter-group): project_creation.md

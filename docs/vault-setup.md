@@ -1,0 +1,92 @@
+# Setting up your personal vault (`murmurent_vault`)
+
+Your **personal vault** is a private GitHub repo, `murmurent_vault`, on your own
+GitHub account. It backs your murmurent Tier-II notes — your `oracle/`,
+`lab-notebook/`, and `maps-legends/` — so they're version-controlled, survive a
+lost laptop, and stay in sync across your machines. Murmurent creates the repo
+for you; you never make it by hand.
+
+New members are offered this during `murmurent init`. **This page is for members
+who were onboarded before the vault feature and already have an Obsidian vault
+with notes in it** — you *adopt* your existing vault rather than starting fresh.
+
+## Before you start
+
+- **Authenticate GitHub CLI:** `gh auth login` (the vault is created on *your*
+  GitHub, so murmurent acts as you).
+- Have murmurent installed and up to date (`murmurent --version`).
+
+## Two cases
+
+**You have NO Obsidian vault yet** — just run:
+
+```bash
+murmurent vault init
+```
+
+It creates `murmurent_vault`, scaffolds `oracle/ lab-notebook/ maps-legends/`,
+clones it (default `~/repos/murmurent_vault`, or pass `--path` for an iCloud
+folder), and pins it. Done.
+
+**You already have an Obsidian vault with notes** — adopt it. First **preview**
+(this changes nothing, pushes nothing):
+
+```bash
+murmurent vault init --adopt --dry-run --path "/path/to/your/obsidian-vault"
+```
+
+The preview shows exactly what would go to GitHub vs stay local. By default —
+the **murmurent scope** — only `oracle/`, `lab-notebook/`, and `maps-legends/`
+(plus a `CLAUDE.md`) are tracked; **every other folder in your vault (health,
+journal, personal notes, …) stays local and is never pushed.** Read the list,
+then run it for real:
+
+```bash
+murmurent vault init --adopt --path "/path/to/your/obsidian-vault"
+```
+
+That git-inits your vault, creates the private `murmurent_vault` repo, pushes
+only the murmurent folders, and points murmurent at it. Your dashboard's Oracle
+and Notebook panels don't change — they just become git-backed.
+
+## Important gotcha: symlinked folders
+
+If your `oracle/` (or `lab-notebook/` / `maps-legends/`) is a **symbolic link**
+— e.g. Obsidian pointing at `~/.claude/agent-memory/oracle` — git can't follow
+it, so that folder **silently won't get pushed**. After adopting, check:
+
+```bash
+git -C "/path/to/your/obsidian-vault" ls-files | sed 's|/.*||' | sort -u
+```
+
+If `oracle` is missing from that list but you have oracle notes, it's a symlink.
+Make the vault the real home (one copy, backed up, and the old location keeps
+working via a reverse symlink) — replace `<VAULT>` and `<REAL>` (the symlink
+target from `readlink <VAULT>/oracle`):
+
+```bash
+cp -R "<REAL>" ~/oracle_backup            # safety copy first
+rm "<VAULT>/oracle"                        # remove the symlink (target untouched)
+mv "<REAL>" "<VAULT>/oracle"               # move real content into the vault
+ln -s "<VAULT>/oracle" "<REAL>"            # reverse: old path now points at the vault
+git -C "<VAULT>" add oracle/ && git -C "<VAULT>" commit -m "vault: add oracle" && git -C "<VAULT>" push
+```
+
+## Sensitive notes stay off GitHub
+
+The murmurent scope already keeps your personal folders local. On top of that, a
+git pre-commit hook **refuses to commit any note tagged `sensitivity: clinical`**
+— clinical/PHI-tagged notes never reach GitHub, even a private repo. If you
+genuinely want your *whole* vault backed (minus clinical-tagged files), use
+`--adopt --include-all` instead — but that pushes your personal folders too, so
+only do it deliberately.
+
+## Day to day
+
+- `murmurent vault sync` — commit + push new oracle/notebook entries (best-effort).
+- `murmurent vault info` — where the clone is + how fresh it is.
+- `murmurent vault paths` — the resolved oracle / lab-notebook / maps-legends
+  paths (what the agents consult).
+
+The **lab (group) vault** is a separate thing — it's the existing lab-mgmt repo,
+already shared and synced; you don't set that up here.
