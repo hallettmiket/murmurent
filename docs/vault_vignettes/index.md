@@ -31,8 +31,8 @@ backs up to a private GitHub repo. See
 ## The six vignettes
 
 1. [Save a fact](1_save_a_fact.md)
-2. Recall a fact — coming soon
-3. How frontmatter and the `me` file shape how Claude talks to you — coming soon
-4. Add a manuscript (PDF) — coming soon
-5. Bring in a table — coming soon
-6. Share a fact with the lab — coming soon
+2. [Recall a fact](2_recall_a_fact.md)
+3. [How frontmatter and the `me` file shape how Claude talks to you](3_frontmatter_and_me.md)
+4. [Add a manuscript (PDF)](4_add_a_manuscript.md)
+5. [Bring in a table](5_bring_in_a_table.md)
+6. [Share a fact with the lab](6_share_with_the_lab.md)
