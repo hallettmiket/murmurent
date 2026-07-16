@@ -1,12 +1,12 @@
 # Versioning
 
 murmurent uses **CalVer**: `YYYY.M.MICRO` (e.g. `2026.7.0`). This page is the
-policy; the running record of releases is [`CHANGELOG.md`](../CHANGELOG.md).
+policy; the running record of releases is [`CHANGELOG.md`](https://github.com/hallettmiket/murmurent/blob/main/CHANGELOG.md).
 
 ## One number, one place
 
 The version lives in exactly one place — the `__version__` string in
-[`src/murmurent/__init__.py`](../src/murmurent/__init__.py). Everything else
+[`src/murmurent/__init__.py`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/__init__.py). Everything else
 reads from there:
 
 - `pyproject.toml` declares `dynamic = ["version"]` and points

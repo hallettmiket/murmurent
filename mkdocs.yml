@@ -51,6 +51,7 @@ exclude_docs: |
   cores_smoke_runbook.md
   designer_dashboard/
   murmurent_public/
+  diagrams/README.md
 
 nav:
   - Home: index.md
@@ -85,6 +86,7 @@ nav:
       - Connecting to the hub: connect_to_hub.md
   - Reference:
       - CLI manual: cli_manual.md
+      - Versioning: versioning.md
       - Diagrams: diagrams.md
       - Code style: style/code-style.md
       - Documentation conventions: style/documentation.md
