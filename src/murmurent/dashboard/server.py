@@ -553,10 +553,12 @@ STATIC_DIR = REPO_ROOT / "docs" / "designer_dashboard"
 
 def create_app() -> FastAPI:
     """Build the FastAPI application."""
+    from .. import __version__ as _mm_version
+
     app = FastAPI(
         title="murmurent dashboard",
         description="Hi-fi murmurent group dashboard.",
-        version="0.1.0",
+        version=_mm_version,
     )
 
     # Version-skew guard: the dashboard serves its JSX fresh from disk, so
@@ -7486,6 +7488,10 @@ def create_app() -> FastAPI:
             (top-right) on every page once a centre exists, so no page leaves
             the reader guessing which centre they're looking at."""
             html = (STATIC_DIR / filename).read_text(encoding="utf-8")
+
+            # Single-source version: pages carry a {{MM_VERSION}} placeholder
+            # rather than a hardcoded "v1.0.0" that drifted from __version__.
+            html = html.replace("{{MM_VERSION}}", _mm_version)
 
             # Installation badge — best-effort; absent before a centre exists.
             try:
