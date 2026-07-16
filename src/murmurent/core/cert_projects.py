@@ -276,7 +276,25 @@ def _write(p: CertProject, env: dict | None = None) -> Path:
     path = project_path(p.name, env)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(_render(p), encoding="utf-8")
+    _persist(path, f"cert-project: update {p.name}")
     return path
+
+
+def _persist(path: Path, message: str) -> None:
+    """Commit + best-effort push a cert-project change so it reaches members.
+
+    The dashboard reads ``cert_projects/`` from each member's OWN lab-mgmt
+    clone — an uncommitted project record is invisible to the whole lab (their
+    Projects panel would be empty). Mirrors ``membership._persist``: delegates
+    to ``git_persist.commit_and_push`` (no-ops outside a git checkout, treats
+    push failure as a warn), and never raises so a git hiccup can't block or
+    undo the write itself."""
+    try:
+        from .git_persist import commit_and_push
+        commit_and_push(path, message, push=True)
+    except Exception as exc:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning("cert-project persist failed: %s", exc)
 
 
 def upsert(name: str, *, lab: str, member: str | None = None,

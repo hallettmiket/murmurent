@@ -278,3 +278,22 @@ def test_slack_workspace_round_trips():
     # empty default when never set
     CP.upsert("q", lab="lab_mh")
     assert CP.get("q").slack_workspace == ""
+
+
+def test_upsert_commits_to_lab_mgmt_git(monkeypatch, tmp_path):
+    """A cert-project mutation must land in git — the dashboard reads
+    cert_projects/ from each member's OWN lab-mgmt clone, so an uncommitted
+    record is invisible to the lab. (Regression: cert_projects never persisted.)"""
+    import subprocess
+    root = tmp_path / "lab_mgmt"
+    (root / "members").mkdir(parents=True)
+    for a in (["init", "-b", "main"], ["config", "user.email", "t@t"],
+              ["config", "user.name", "t"]):
+        subprocess.run(["git", "-C", str(root), *a], check=True, capture_output=True)
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(root))
+
+    CP.upsert("proj_x", lab="mh", code_repo="/r/proj_x")
+
+    tracked = subprocess.run(["git", "-C", str(root), "ls-files"],
+                             capture_output=True, text=True).stdout
+    assert "cert_projects/proj_x.md" in tracked      # committed, not just written
