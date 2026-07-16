@@ -53,3 +53,24 @@ def test_scan_script_branches_absolute_vs_relative():
     assert '/*) full="$base"' in script
     # Relative branch: prepend $HOME.
     assert '*)  full="$HOME/$base"' in script
+
+
+def test_scan_script_expands_tilde_prefix(tmp_path):
+    """A ``~/repos`` entry must resolve to ``$HOME/repos``, not the literal
+    ``$HOME/~/repos``. Users type ``~/repos`` naturally (the field placeholder
+    even suggested it), and the old ``$HOME/$base`` join turned that into a
+    nonexistent path — so the scan silently found zero clones."""
+    import subprocess
+
+    home = tmp_path
+    repo = home / "repos" / "myproj"
+    (repo / ".git").mkdir(parents=True)
+    subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
+
+    for scan_dir in ("~/repos", "~", "repos"):
+        script = repo_inventory._scan_script((scan_dir,))
+        res = subprocess.run(
+            ["bash", "-c", script],
+            capture_output=True, text=True, env={"HOME": str(home), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"},
+        )
+        assert str(repo) in res.stdout, (scan_dir, res.stdout, res.stderr)

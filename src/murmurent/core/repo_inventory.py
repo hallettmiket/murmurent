@@ -195,6 +195,8 @@ def _scan_script(scan_dirs: tuple[str, ...]) -> str:
         f'for base in {quoted}; do '
         '  case "$base" in '
         '    /*) full="$base" ;; '
+        '    "~/"*) full="$HOME/${base#"~/"}" ;; '   # ~/repos -> $HOME/repos
+        '    "~") full="$HOME" ;; '
         '    *)  full="$HOME/$base" ;; '
         '  esac; '
         '  [ -d "$full" ] || continue; '
