@@ -2193,7 +2193,11 @@ function ProjectDetailRows({ proj: p }) {
   };
 
   const lbl = {display:"inline-block", width:70, color:"var(--muted)"};
-  const row = {marginBottom:4, display:"flex", alignItems:"center", gap:8};
+  // flexWrap so a wide row (the Slack provision input + two buttons) wraps
+  // within the Projects panel instead of overflowing into the Machines panel
+  // beside it. rowGap keeps wrapped lines readable.
+  const row = {marginBottom:4, display:"flex", alignItems:"center", gap:8,
+               flexWrap:"wrap", rowGap:4};
 
   const repoKind = p.repo_kind || "github";
   const remoteUrl = p.remote_url || null;
@@ -2272,9 +2276,11 @@ function ProjectDetailRows({ proj: p }) {
             style={{
               padding:"3px 6px", border:"1px solid var(--rule)",
               borderRadius:2, fontFamily:"var(--mono)", fontSize:11,
-              minWidth: 280,
+              // Grow to fill the row but shrink to fit the panel — never force
+              // horizontal overflow into the Machines panel beside it.
+              flex:"1 1 220px", minWidth:0, maxWidth:"100%", boxSizing:"border-box",
             }}
-            title="Override the wigamig-conventional proj-<project> name. Leave blank to use the default."
+            title="Override the default proj-<project> name. Leave blank to use the default."
           />
         )}
         {isPI && !p.slack_channel_id && !done.slack && (
