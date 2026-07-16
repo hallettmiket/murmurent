@@ -55,7 +55,10 @@ the command would refuse it and nothing would leave Sam's vault.
 
 ??? note "Under the hood"
     See [the oracle workflow](../oracle-workflow.md) for the full
-    promote-personal-to-lab flow, and [memory tiers](../memory.md)
-    for where the personal/lab governance boundary sits. Sensitivity
-    rules are defined in the
+    promote-personal-to-lab flow,
+    [what Murmurent touches in your vault](../obsidian-usage.md) §2.4 for
+    exactly what the publish command checks and what happens to the draft
+    afterward, and [memory tiers](../memory.md) for where the
+    personal/lab governance boundary sits. Sensitivity rules are defined
+    in the
     [oracle entry schema](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md).

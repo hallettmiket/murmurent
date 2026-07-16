@@ -65,7 +65,7 @@ run `murmurent oracle doctor`.
 |---|---|---|
 | `oracle/` | Personal Oracle entries (per-entry .md files, `MEMORY.md` index) | `oracle` agent |
 | `oracle/drafts/` | Entries staged for `murmurent oracle publish` | `oracle` agent |
-| `lab-notebook/` (default — see your `~/.murmurent/machine.yaml` `notebook_subfolder`) | Daily lab-notebook entries | the notebook tooling (`murmurent notebook ...`) |
+| `lab-notebook/` (default — see your `~/.murmurent/machine.yaml` `notebook_subfolder`) | Daily lab-notebook entries | the dashboard's "Lab notebook · today" **edit** button (creates the day's file from a template) |
 
 The rest of the vault is yours. Murmurent never writes outside the
 folders listed here.
@@ -95,11 +95,12 @@ searched together by the `murmurent-oracle` MCP server.
 
 ## `maps-legends/` (vault-side)
 
-Your vault has a `maps-legends/` folder that explains your
-personal organization (categories, conventions, where things go).
-Murmurent doesn't write there — that's purely yours — but Oracle
-entries may reference it via `[[wikilinks]]` so the graph view
-threads them in.
+`maps-legends/` is your own convention for organizing the vault
+(categories, conventions, where things go) — Murmurent doesn't read or
+write it. See [obsidian-usage.md §4](obsidian-usage.md) for the full
+picture of what Murmurent does and doesn't touch. Oracle entries may
+still reference it via `[[wikilinks]]` so Obsidian's graph view threads
+them in.
 
 If your vault's `CLAUDE.md` exists at the vault root, CC will
 pick it up automatically the next time it opens a file in the

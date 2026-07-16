@@ -77,9 +77,11 @@ embeddings — the schema itself is the index.
 ### 2.3 What writes to the personal tier
 
 The `oracle` agent is the intended writer of `oracle/` — it creates one
-file per entry and maintains a `MEMORY.md` index. Nothing currently in the
-codebase writes daily notebook entries programmatically; those are
-authored by hand (or by whatever editor you point at them) — see §7.
+file per entry and maintains a `MEMORY.md` index. The daily notebook
+entries under `lab-notebook/` are created by the dashboard's "Lab
+notebook · today" **edit** button: the first click of the day writes the
+file from a small template, then opens it in your editor — the *content*
+is yours to write. There is no `murmurent notebook` CLI (see §7).
 
 ### 2.4 Publishing personal → lab
 

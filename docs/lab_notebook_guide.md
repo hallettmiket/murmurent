@@ -8,30 +8,35 @@ mean. Knowing which is which prevents 90 % of confusion:
 
 | Term | Where it lives | Who can read it | What goes there |
 |---|---|---|---|
-| **Daily journal** | `~/lab-notebook/YYYY-MM-DD.md` (your laptop) | You only | Today's plan, decisions, scratch reasoning, links to SEAs you're touching. |
+| **Daily journal** | your Obsidian vault's `lab-notebook/YYYY-MM-DD.md` (or `~/lab-notebook/` if you have no vault registered) | You only | Today's plan, decisions, scratch reasoning, links to SEAs you're touching. |
 | **Experimental notebook** | `<project_repo>/exp/<n>_<slug>/notebook.md` | Every project member (via git) | The lab notebook *for that experiment*: protocol, run dates, instrument, data file paths, raw results, conclusion. |
 
 The dashboard's "Lab notebook · today" panel shows the **daily journal**.
 The PI sees your **experimental notebooks** the moment you `murmurent push`.
 
-## The daily journal — `~/lab-notebook/`
+## The daily journal — your vault's `lab-notebook/` folder
 
 ### Set up once
 
-```bash
-mkdir -p ~/lab-notebook
-# (optional but recommended) open ~/lab-notebook as an Obsidian vault
-```
+There's nothing to create by hand. The dashboard resolves where the daily
+journal lives, in this order:
 
-If you use Obsidian: `Open folder as vault…` → pick `~/lab-notebook`.
-The dashboard's `obsidian://` URL will then jump to the right file.
+1. `$MURMURENT_NOTEBOOK_DIR` if you set it (power users / non-Obsidian setups).
+2. **`<your-Obsidian-vault>/lab-notebook/`** — the normal case once you have a
+   vault registered, so entries sit alongside the rest of your notes and the
+   `obsidian://` link works.
+3. `~/lab-notebook/` — a fallback only when no vault is registered.
+
+The first time it resolves to the vault path, any pre-existing
+`~/lab-notebook/*.md` files are migrated in for you (one-time, logged).
 
 ### Daily flow
 
 1. Open the dashboard (`Open Dashboard.command`).
 2. Click **edit** in the "Lab notebook · today" panel header.
-   - First click of the day creates `~/lab-notebook/2026-05-08.md` from
-     a small template.
+   - First click of the day creates that day's file (e.g.
+     `2026-05-08.md`) in the resolved `lab-notebook/` folder from a small
+     template.
    - Subsequent clicks just open it.
 3. Write whatever helps you think. Use markdown. The dashboard renders
    these blocks: `#### heading`, paragraph (with `[[wikilinks]]`),
@@ -42,7 +47,7 @@ The dashboard's `obsidian://` URL will then jump to the right file.
 
 ### Picking a different editor
 
-Default order: `$MURMURENT_NOTEBOOK_EDITOR` → `$EDITOR` → `obsidian://` → `code` → platform default.
+Default order: `$MURMURENT_NOTEBOOK_EDITOR` → `obsidian://` (when the note is in a registered vault) → `$EDITOR`/`$VISUAL` → `code` → platform default.
 
 ```bash
 # Force Obsidian (assumes lab-notebook is registered as a vault)

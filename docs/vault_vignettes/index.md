@@ -28,7 +28,7 @@ write. It lives in [Obsidian](https://obsidian.md) on your computer and
 backs up to a private GitHub repo. See
 [setting up your personal vault](../vault-setup.md) for how to create one.
 
-## The six vignettes
+## The vignettes
 
 1. [Save a fact](1_save_a_fact.md)
 2. [Recall a fact](2_recall_a_fact.md)
@@ -36,3 +36,4 @@ backs up to a private GitHub repo. See
 4. [Add a manuscript (PDF)](4_add_a_manuscript.md)
 5. [Bring in a table](5_bring_in_a_table.md)
 6. [Share a fact with the lab](6_share_with_the_lab.md)
+7. [Recall across all your notes](7_recall_across_tiers.md)

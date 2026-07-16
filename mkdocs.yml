@@ -63,7 +63,7 @@ nav:
       - "Murmurent-ready vs. a project": ready_vs_projects.md
   - Working day to day:
       - Creating a project (intra & inter-group): project_creation.md
-      - How murmurent remembers (the three tiers): memory.md
+      - How Murmurent remembers (the three tiers): memory.md
       - The Oracle (personal & lab memory): oracle-workflow.md
       - Vault vignettes (step by step):
           - Start here: vault_vignettes/index.md
@@ -73,11 +73,11 @@ nav:
           - 4 · Add a manuscript (PDF): vault_vignettes/4_add_a_manuscript.md
           - 5 · Bring in a table: vault_vignettes/5_bring_in_a_table.md
           - 6 · Share a fact with the lab: vault_vignettes/6_share_with_the_lab.md
-      - The lab notebook: lab_notebook_guide.md
-      - The VSCode workflow: vscode-workflow.md
+          - 7 · Recall across all your notes: vault_vignettes/7_recall_across_tiers.md
       - Obsidian layout: obsidian-layout.md
       - Obsidian usage: obsidian-usage.md
-      - Drift detection (reconcile): reconcile.md
+      - The lab notebook: lab_notebook_guide.md
+      - The VSCode workflow: vscode-workflow.md
   - Identity & trust:
       - Membership IDs & the trust chain: identity.md
       - The centre root key: centre_root_key.md
@@ -89,6 +89,7 @@ nav:
       - Slack ↔ Claude Code: slack_cc_integration.md
   - Labs, cores & centres:
       - The lab-mgmt repo: lab_mgmt.md
+      - Drift detection (reconcile): reconcile.md
       - Group-level architecture: group_level.md
       - Hub setup (mayor): hub_setup.md
       - Connecting to the hub: connect_to_hub.md

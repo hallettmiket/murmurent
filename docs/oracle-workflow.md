@@ -58,10 +58,11 @@ murmurent oracle publish 2026-05-16_chrm_p14        # validate + copy + commit
 murmurent oracle publish 2026-05-16_chrm_p14 --push # commit + push in one shot
 ```
 
-`murmurent oracle publish` **refuses entries with `sensitivity:
-clinical` or `restricted`** — those must stay personal. It also
-refuses if the lab already has an entry at the same path (no
-silent overwrite of peer-reviewed content).
+`murmurent oracle publish` **refuses `sensitivity: clinical` /
+`restricted` entries** (those stay personal) and never overwrites an
+existing lab entry — see [obsidian-usage.md §2.4](obsidian-usage.md)
+for the full mechanics (identity checks, and what happens to the draft
+afterward).
 
 ## Search (MCP)
 
@@ -72,6 +73,11 @@ The `murmurent-oracle` MCP server (registered by `murmurent install
 - `oracle_get(path)`
 - `oracle_list(kind)`
 - `oracle_publish_draft(slug, push=False)`
+
+Every `oracle_search` / `oracle_get` / `oracle_list` call on the personal
+tier first attempts a best-effort `git pull --ff-only` of your vault (once
+per process), so recall always reflects your latest synced notes — even
+ones you saved on another machine.
 
 ### Three tiers, one query surface
 

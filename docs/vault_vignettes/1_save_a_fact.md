@@ -23,7 +23,9 @@ Sam just says it, in plain English, to Claude Code:
    missing, it asks Sam instead of guessing.
 3. It writes a new note into Sam's vault, at
    `oracle/2026-07-16_esr1-high-in-tumour-samples.md`.
-4. The note is now sitting in Sam's vault, ready to be searched or
+4. It adds a one-line pointer to `oracle/MEMORY.md`, the master index
+   the oracle reads first every time, so the note is easy to find later.
+5. The note is now sitting in Sam's vault, ready to be searched or
    recalled later.
 
 ```mermaid
@@ -76,6 +78,8 @@ controls.
     and the note uses Obsidian `[[wikilinks]]` (not plain markdown
     links) so it shows up correctly in Obsidian's graph view. See the
     [oracle workflow](../oracle-workflow.md) for how saved entries can
-    later be recalled or published to the lab, and
+    later be recalled or published to the lab,
     [what Murmurent touches in your vault](../obsidian-usage.md) for
-    exactly which folders it reads and writes.
+    exactly which folders it reads and writes, and
+    [setting up your personal vault](../vault-setup.md) for what
+    `vault sync`, `vault info`, and `vault paths` do day to day.
