@@ -135,12 +135,28 @@ def test_machine_settings_preflight_creates_subdirs(world, tmp_path):
     body = res.json()
     assert body["overall"] in ("ok", "warn")
     names = {p["name"]: p for p in body["probes"]}
-    assert names["wigamig_base set"]["status"] == "ok"
+    assert names["large-file location set"]["status"] == "ok"
     assert names["not protected"]["status"] == "ok"
     for sub in ("raw", "refined", "lab_notebooks"):
         assert names[sub]["status"] == "ok", names[sub]
         assert (base / sub).is_dir()
     assert names["obsidian vault"]["status"] == "ok"
+
+
+def test_machine_settings_obsidian_na_is_not_a_warning(world, tmp_path):
+    """Entering "NA" for the Obsidian vault is an explicit "no vault here" —
+    a clean green check, not a yellow warning about a forgotten field, and
+    no bogus vault name is derived from it."""
+    res = TestClient(create_app()).post("/api/machine/settings", json={
+        "wigamig_base": str(tmp_path / "base"),
+        "obsidian_vault_path": "NA",
+    })
+    assert res.status_code == 200, res.text
+    names = {p["name"]: p for p in res.json()["probes"]}
+    assert names["obsidian vault"]["status"] == "ok"
+    assert "not applicable" in names["obsidian vault"]["detail"]
+    on_disk = yaml.safe_load(world["machine_yaml"].read_text())
+    assert on_disk["obsidian_vault_name"] is None
 
 
 def test_machine_settings_rejects_protected_lab_vm_paths(world):

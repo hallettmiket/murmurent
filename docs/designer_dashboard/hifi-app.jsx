@@ -1347,10 +1347,17 @@ function InstallModal({ initialProject, initialMachine, initialRepoUrl, onClose 
               background:"var(--paper-2)", border:"1px solid var(--rule)",
             }}>
               <div style={{fontSize:11, marginBottom:6, color:"var(--muted)"}}>
-                preflight: <strong style={{
+                Folder check: <strong style={{
                   color: overall === "ok" ? "var(--green)" :
                          overall === "warn" ? "var(--tiger)" : "var(--red)",
-                }}>{overall}</strong>
+                }}>{
+                  overall === "ok" ? "all good" :
+                  overall === "warn" ? "proceeding — see the note(s) below" :
+                  "needs attention"
+                }</strong>
+                {" "}<span style={{color:"var(--muted)"}}>
+                  (✗ blocks; ! is a heads-up)
+                </span>
               </div>
               {probes.map((p, i) => (
                 <div key={p.name + i} style={{
@@ -1384,7 +1391,7 @@ function InstallModal({ initialProject, initialMachine, initialRepoUrl, onClose 
             <>
               <p className="muted" style={{fontSize:12, margin:0}}>
                 Pick a machine and a project — both already configured. The
-                machine's <code>wigamig_base</code> dictates where data will
+                machine's large-file location dictates where data will
                 land; the project's sensitivity dictates which git remote to
                 clone from.
               </p>
@@ -6937,10 +6944,10 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
       <textarea style={{...inputStyle, minHeight:54, resize:"vertical"}} value={repos}
                 onChange={e => setRepos(e.target.value)} placeholder={"~/repos\nwork/clones"} />
 
-      <div style={labelStyle}>Obsidian vault (full path)</div>
+      <div style={labelStyle}>Obsidian vault (full path, or NA if none on this machine)</div>
       <input style={inputStyle} value={form.obsidian_vault_path}
              onChange={update("obsidian_vault_path")}
-             placeholder="/Users/you/.../obsidian-lab" />
+             placeholder="/Users/you/.../obsidian-lab   (or NA)" />
 
       <div className="row" style={{gap:10, marginTop:4}}>
         <div style={{flex:1}}>
@@ -6961,10 +6968,17 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
           background:"var(--paper-2)", border:"1px solid var(--rule)", borderRadius:2,
         }}>
           <div style={{fontSize:11, marginBottom:6, color:"var(--muted)"}}>
-            preflight: <strong style={{
+            Folder check: <strong style={{
               color: overall === "ok" ? "var(--green)" :
                      overall === "warn" ? "var(--tiger)" : "var(--red)",
-            }}>{overall}</strong>
+            }}>{
+              overall === "ok" ? "all good" :
+              overall === "warn" ? "saved — see the note(s) below" :
+              "needs attention"
+            }</strong>
+            {" "}<span style={{color:"var(--muted)"}}>
+              (checks that the folders murmurent needs exist; ✗ blocks the save, ! is just a heads-up)
+            </span>
           </div>
           {probes.map(p => (
             <div key={p.name} style={{
@@ -6978,7 +6992,7 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
               }}>
                 {p.status === "ok" ? "✓" : p.status === "warn" ? "!" : "✗"}
               </span>
-              <span style={{width:140, color:"var(--muted)"}}>{p.name}</span>
+              <span style={{width:150, color:"var(--muted)"}}>{p.name}</span>
               <span style={{flex:1, color:"var(--ink)"}}>{p.detail}</span>
             </div>
           ))}
@@ -7093,11 +7107,11 @@ function MachinesModal({ onClose }) {
           <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
         </div>
         <p className="muted" style={{fontSize:12, margin:"4px 0 8px"}}>
-          Computers where you work. Each declares a <code>wigamig_base</code>
-          containing <code>raw/</code>, <code>refined/</code>,
-          <code> lab_notebooks/</code>, and <code>repos/</code>. The Obsidian
-          vault (which hosts your personal oracle) lives separately. Stored
-          in <code>~/.murmurent/machine.yaml</code> and <code>~/.murmurent/hosts.yaml</code>.
+          Computers where you work. Each declares a large-file location
+          containing <code>raw/</code>, <code>refined/</code>, and
+          <code>lab_notebooks/</code>. The Obsidian vault (which hosts your
+          personal oracle) lives separately. Stored in
+          <code>~/.murmurent/machine.yaml</code> and <code>~/.murmurent/hosts.yaml</code>.
         </p>
 
         {editingThis ? (

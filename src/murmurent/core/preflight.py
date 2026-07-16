@@ -84,13 +84,23 @@ def is_lab_vm_protected(path: str | Path) -> str | None:
     return None
 
 
+def _is_na(value: str | None) -> bool:
+    """True when the user explicitly typed a not-applicable marker.
+
+    Lets someone say "this machine has no Obsidian vault / no SSH host" on
+    purpose, so the check reads as a deliberate N/A rather than a warning about
+    a forgotten field.
+    """
+    return str(value or "").strip().lower() in {"na", "n/a", "none", "n.a.", "not applicable"}
+
+
 def probe_wigamig_base(wigamig_base: str | None) -> list[Probe]:
-    """Run the per-machine wigamig_base checks.
+    """Run the per-machine large-file-location checks.
 
     Steps (in order):
-      1. ``wigamig_base set`` — was a value provided at all?
+      1. ``large-file location set`` — was a value provided at all?
       2. ``not protected`` — guard against ``/data/lab_vm/raw|refined``.
-      3. ``wigamig_base exists`` — create with mkdir -p if missing.
+      3. ``large-file location exists`` — create with mkdir -p if missing.
       4. For each of :data:`MURMURENT_SUBDIRS`: create if missing.
 
     Returns one ``Probe`` per step. The caller decides whether to
@@ -99,14 +109,14 @@ def probe_wigamig_base(wigamig_base: str | None) -> list[Probe]:
     probes: list[Probe] = []
     if not wigamig_base or not str(wigamig_base).strip():
         probes.append(Probe(
-            name="wigamig_base set",
+            name="large-file location set",
             status="fail",
-            detail="No wigamig_base configured — set it before saving.",
+            detail="No large-file location set — enter one before saving.",
             required=True,
         ))
         return probes
     probes.append(Probe(
-        name="wigamig_base set",
+        name="large-file location set",
         status="ok",
         detail=wigamig_base,
         required=True,
@@ -133,7 +143,7 @@ def probe_wigamig_base(wigamig_base: str | None) -> list[Probe]:
     ))
 
     base = _normalize(str(wigamig_base))
-    probes.append(_ensure_dir(base, label="wigamig_base exists", required=True))
+    probes.append(_ensure_dir(base, label="large-file location exists", required=True))
 
     # If base couldn't be created, skip subfolders — they'll all fail
     # for the same reason and noise drowns the actual cause.
@@ -154,13 +164,21 @@ def probe_obsidian_vault(vault_path: str | None) -> Probe:
     Empty/unset → warn telling the user notes will fall back to
     ``wigamig_base/lab_notebooks``.
     """
+    if _is_na(vault_path):
+        return Probe(
+            name="obsidian vault",
+            status="ok",
+            detail="not applicable — no Obsidian vault on this machine.",
+            required=False,
+        )
     if not vault_path or not str(vault_path).strip():
         return Probe(
             name="obsidian vault",
             status="warn",
             detail=(
-                "No vault path configured — notebooks will fall back to "
-                "wigamig_base/lab_notebooks."
+                "No vault path set — notebooks fall back to the large-file "
+                "location's lab_notebooks/ folder. Enter NA if this machine "
+                "has no vault."
             ),
             required=False,
         )

@@ -81,6 +81,10 @@ def _derive_vault_name(vault_path: str | None) -> str | None:
     """
     if not vault_path:
         return None
+    # "NA" (any casing) is an explicit "no vault on this machine" marker, not a
+    # real path — don't derive a bogus vault name from it.
+    if str(vault_path).strip().lower() in {"na", "n/a", "none", "n.a.", "not applicable"}:
+        return None
     tail = Path(str(vault_path).rstrip("/")).name
     return tail or None
 
