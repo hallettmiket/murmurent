@@ -65,6 +65,9 @@ nav:
       - Creating a project (intra & inter-group): project_creation.md
       - How murmurent remembers (the three tiers): memory.md
       - The Oracle (personal & lab memory): oracle-workflow.md
+      - Vault vignettes (step by step):
+          - Start here: vault_vignettes/index.md
+          - 1 · Save a fact: vault_vignettes/1_save_a_fact.md
       - The lab notebook: lab_notebook_guide.md
       - The VSCode workflow: vscode-workflow.md
       - Obsidian layout: obsidian-layout.md
