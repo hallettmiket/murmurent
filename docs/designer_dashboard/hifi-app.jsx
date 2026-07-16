@@ -7141,50 +7141,98 @@ const MachineSettingsModal = MachinesModal;
    sits next to Projects (below Installations). Replaces the old footer
    "⚙ machines" button — machines are conceptually part of the dashboard's
    content, not chrome. */
-/* Unified editor for a REMOTE machine — Files (data root) + Repo location.
-   (Obsidian vaults are per-user/local, so they aren't set for remote hosts.)
-   Saves via PATCH /api/hosts/<name>. */
+/* Editor for a REMOTE machine. Deliberately a mirror of HostAddForm — same
+   layout, styling, and field set (minus the immutable name, shown read-only) —
+   so editing a machine looks and feels like adding one. Saves via
+   PATCH /api/hosts/<name>. */
 function HostEditForm({ host, onCancel, onSaved }) {
-  const [files, setFiles] = useState(host.wigamig_base || "");
-  const [repos, setRepos] = useState((host.scan_dirs || []).join("\n"));
+  const [form, setForm] = useState({
+    ssh_host: host.ssh_host || "",
+    remote_user: host.remote_user || "",
+    vault_root: host.obsidian_vault_path || "",
+    files_root: host.wigamig_base || "",
+    repos_text: (host.scan_dirs || []).join("\n"),
+    description: host.description || "",
+  });
   const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState(null);
+  const [err, setErr]   = useState(null);
+  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
+
   const submit = async (e) => {
     e.preventDefault();
-    setBusy(true); setMsg(null);
+    if (!form.ssh_host.trim()) { setErr("SSH host is required"); return; }
+    setBusy(true); setErr(null);
     try {
-      const scan_dirs = repos.split("\n").map(s => s.trim()).filter(Boolean);
+      const repos = form.repos_text.split("\n").map(s => s.trim()).filter(Boolean);
       const res = await fetch("/api/hosts/" + encodeURIComponent(host.name), {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ lab_vm_root: files, scan_dirs }),
+        body: JSON.stringify({
+          ssh_host: form.ssh_host.trim(),
+          remote_user: form.remote_user.trim(),
+          vault_root: form.vault_root.trim(),
+          lab_vm_root: form.files_root.trim(),
+          description: form.description.trim(),
+          scan_dirs: repos,
+        }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || ("HTTP " + res.status)); }
-      setMsg("saved");
-      setTimeout(onSaved, 700);
-    } catch (ex) { setMsg(String(ex.message || ex)); }
+      await onSaved();
+    } catch (ex) { setErr(String(ex.message || ex)); }
     finally { setBusy(false); }
   };
-  const lbl = {fontFamily:"var(--mono)", fontSize:10, letterSpacing:1, textTransform:"uppercase",
-               color:"var(--muted)", marginTop:8, marginBottom:2};
+
   const inp = {padding:"5px 8px", border:"1px solid var(--rule-strong)", borderRadius:2,
-               fontFamily:"var(--mono)", fontSize:12, width:"100%", boxSizing:"border-box", background:"var(--paper)"};
+               fontFamily:"var(--mono)", fontSize:12, width:"100%", boxSizing:"border-box"};
+  const lbl = {fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+               textTransform:"uppercase", color:"var(--muted)", marginTop:6, marginBottom:2};
   return (
-    <form onSubmit={submit} style={{border:"1px solid var(--purple-soft)", borderRadius:2,
-          padding:14, background:"var(--card)", marginBottom:10}}>
-      <h4 style={{margin:0, fontFamily:"var(--serif)", fontSize:15, color:"var(--purple-deep)"}}>Edit: {host.name}</h4>
-      <p className="muted" style={{fontSize:11, margin:"2px 0 4px"}}>
-        Remote machine. (Obsidian vaults are per-user/local, so not set here.)
-      </p>
-      <div style={lbl}>Files (data root — raw/ + refined/ live under it)</div>
-      <input style={inp} value={files} onChange={e => setFiles(e.target.value)} placeholder="/data/lab_vm/…" />
-      <div style={lbl}>Repo location (one path per line; where clones live)</div>
-      <textarea style={{...inp, minHeight:60, resize:"vertical"}} value={repos}
-                onChange={e => setRepos(e.target.value)} placeholder={"repos\nwork/clones"} />
-      <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:8, alignItems:"center"}}>
-        {msg && <span className="muted" style={{fontSize:11, marginRight:"auto"}}>{msg}</span>}
+    <form onSubmit={submit} style={{
+      border:"1px solid var(--rule-strong)", borderRadius:2,
+      padding:"10px 14px", background:"var(--paper)",
+    }}>
+      <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+        <strong style={{fontFamily:"var(--serif)"}}>Edit machine</strong>
         <button type="button" className="btn sm ghost" onClick={onCancel}>cancel</button>
-        <button type="submit" className="btn sm primary" disabled={busy}>{busy ? "…" : "save"}</button>
+      </div>
+      <div className="row" style={{gap:10, marginTop:6}}>
+        <div style={{flex:1}}>
+          <div style={lbl}>name (short id)</div>
+          {/* name is the machine's identity key — shown, not editable. */}
+          <input style={{...inp, color:"var(--muted)", background:"var(--paper-2)"}}
+                 value={host.name || ""} readOnly disabled />
+        </div>
+        <div style={{flex:2}}>
+          <div style={lbl}>SSH host (alias in ~/.ssh/config or full hostname)</div>
+          <input style={inp} value={form.ssh_host} onChange={set("ssh_host")}
+                 placeholder="lab-server.example.edu" />
+        </div>
+      </div>
+      <div className="row" style={{gap:10, marginTop:4}}>
+        <div style={{flex:1}}>
+          <div style={lbl}>username on host (optional)</div>
+          <input style={inp} value={form.remote_user} onChange={set("remote_user")}
+                 placeholder="the_pi" />
+        </div>
+        <div style={{flex:2}}>
+          <div style={lbl}>Obsidian vault (full path)</div>
+          <input style={inp} value={form.vault_root} onChange={set("vault_root")} />
+        </div>
+      </div>
+      <div style={lbl}>Files (data root — raw/ + refined/ live here)</div>
+      <input style={inp} value={form.files_root} onChange={set("files_root")}
+             placeholder="/data/lab_vm/…" />
+      <div style={lbl}>Repo locations (one per line; the first is where new clones go)</div>
+      <textarea style={{...inp, fontFamily:"var(--mono)", minHeight:54, resize:"vertical"}}
+                value={form.repos_text} onChange={set("repos_text")}
+                placeholder={"~/repos\n/srv/projects"} />
+      <div style={lbl}>description (free text, optional)</div>
+      <input style={inp} value={form.description} onChange={set("description")} />
+      <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:10, alignItems:"baseline"}}>
+        {err && <span style={{color:"var(--red)", fontSize:11, marginRight:"auto"}}>{err}</span>}
+        <button type="submit" className="btn sm primary" disabled={busy}>
+          {busy ? "…" : "save changes"}
+        </button>
       </div>
     </form>
   );

@@ -368,10 +368,16 @@ class HostScanDirsBody(BaseModel):
 
 class HostUpdateBody(BaseModel):
     """JSON body for ``PATCH /api/hosts/{name}`` — the Machines editor. Any
-    field left ``None`` is unchanged. ``lab_vm_root`` = the machine's Files
-    root; ``scan_dirs`` = its Repo location(s)."""
+    field left ``None`` is unchanged. Mirrors the Add-machine field set (minus
+    the immutable ``name``): ``ssh_host`` + ``remote_user`` (connection),
+    ``lab_vm_root`` (Files root), ``vault_root`` (Obsidian), ``description``,
+    and ``scan_dirs`` (Repo location(s))."""
 
+    ssh_host: str | None = None
+    remote_user: str | None = None
     lab_vm_root: str | None = None
+    vault_root: str | None = None
+    description: str | None = None
     scan_dirs: list[str] | None = None
 
 
@@ -3714,14 +3720,19 @@ def create_app() -> FastAPI:
 
     @app.patch("/api/hosts/{name}")
     def patch_host(name: str, body: HostUpdateBody) -> dict:
-        """Update a machine's Files root (``lab_vm_root``) and/or Repo location
-        (``scan_dirs``) from the dashboard Machines editor. Leaves other fields
-        untouched."""
+        """Update a machine's editable fields from the dashboard Machines
+        editor — the same set the Add form writes (connection, Files root,
+        Obsidian vault, description, Repo locations). Any field left ``None``
+        is unchanged; ``name``/``kind`` are immutable."""
         from ..core import hosts as _hosts
         try:
             updated = _hosts.update_host(
                 name,
+                ssh_host=body.ssh_host,
+                remote_user=body.remote_user,
                 lab_vm_root=body.lab_vm_root,
+                vault_root=body.vault_root,
+                description=body.description,
                 scan_dirs=(tuple(body.scan_dirs) if body.scan_dirs is not None else None),
             )
         except _hosts.HostNotFound as exc:

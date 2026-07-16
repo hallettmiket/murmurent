@@ -354,3 +354,45 @@ def test_remote_murmurent_version_parses_stdout(isolated, monkeypatch):
     monkeypatch.setattr(remote.subprocess, "run", fake_run)
     r = remote.Remote(_ssh_host())
     assert r.murmurent_version() == "murmurent, version 1.0.0"
+
+
+def test_update_host_edits_full_field_set(isolated):
+    """The Machines editor writes the same fields the Add form does. Each is
+    independently updatable; None leaves a field untouched."""
+    hosts.add(hosts.Host(
+        name="lab-server", kind="ssh", ssh_host="old.host", remote_user="u1",
+        lab_vm_root="/old", vault_root="~/V", description="d1",
+        scan_dirs=("~/repos",),
+    ))
+    u = hosts.update_host(
+        "lab-server", ssh_host="new.host", remote_user="u2",
+        lab_vm_root="/new", vault_root="~/V2", description="d2",
+        scan_dirs=["~/a", "~/b"],
+    )
+    assert (u.ssh_host, u.remote_user, u.lab_vm_root, u.vault_root,
+            u.description, u.scan_dirs) == (
+        "new.host", "u2", "/new", "~/V2", "d2", ("~/a", "~/b"))
+
+    # Partial update leaves untouched fields alone.
+    u2 = hosts.update_host("lab-server", remote_user="u3")
+    assert u2.remote_user == "u3"
+    assert u2.ssh_host == "new.host" and u2.lab_vm_root == "/new"
+
+
+def test_update_host_blank_rules(isolated):
+    """ssh_host/vault_root keep their current value when blanked (an ssh host
+    must keep a host); remote_user/description accept an empty-string clear."""
+    hosts.add(hosts.Host(
+        name="lab-server", kind="ssh", ssh_host="keep.host", remote_user="u1",
+        lab_vm_root="/d", vault_root="~/V", description="d1",
+        scan_dirs=("~/repos",),
+    ))
+    u = hosts.update_host("lab-server", ssh_host="   ", vault_root="  ",
+                          remote_user="  ", description="  ")
+    assert u.ssh_host == "keep.host" and u.vault_root == "~/V"
+    assert u.remote_user == "" and u.description == ""
+
+
+def test_update_host_unknown_raises(isolated):
+    with pytest.raises(hosts.HostNotFound):
+        hosts.update_host("nope", ssh_host="x")

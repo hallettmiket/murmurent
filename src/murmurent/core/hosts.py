@@ -294,28 +294,48 @@ def update_scan_dirs(
 def update_host(
     name: str,
     *,
+    ssh_host: str | None = None,
+    remote_user: str | None = None,
     lab_vm_root: str | None = None,
+    vault_root: str | None = None,
+    description: str | None = None,
     scan_dirs: tuple[str, ...] | list[str] | None = None,
     env: dict[str, str] | None = None,
 ) -> Host:
-    """Update a registered host's Files root (``lab_vm_root``) and/or Repo
-    location (``scan_dirs``), leaving every other field untouched. ``None``
-    means "don't change". Used by the dashboard Machines editor."""
+    """Update a registered host's editable fields, leaving the rest untouched.
+
+    ``None`` means "don't change" for every field. The dashboard Machines
+    editor now edits the same field set as the Add form: connection
+    (``ssh_host``, ``remote_user``), ``lab_vm_root`` (Files root),
+    ``vault_root`` (Obsidian), ``description``, and ``scan_dirs`` (Repo
+    locations). ``name`` and ``kind`` are identity and are never changed here.
+
+    Blanking rules differ by field: ``ssh_host`` and ``vault_root`` fall back
+    to the current value when cleared (an ssh host must keep a host; the vault
+    keeps its default), while ``remote_user`` and ``description`` accept an
+    empty string as an explicit clear.
+    """
     registry = read(env)
     if name not in registry:
         raise HostNotFound(f"no host registered as {name!r}")
     current = registry[name]
+
+    def _keep_if_blank(new: str | None, cur: str) -> str:
+        return (new.strip() or cur) if new is not None else cur
+
+    def _allow_clear(new: str | None, cur: str) -> str:
+        return new.strip() if new is not None else cur
+
     updated = Host(
         name=current.name,
         kind=current.kind,
-        ssh_host=current.ssh_host,
-        remote_user=current.remote_user,
+        ssh_host=_keep_if_blank(ssh_host, current.ssh_host),
+        remote_user=_allow_clear(remote_user, current.remote_user),
         project_root=current.project_root,
-        lab_vm_root=(lab_vm_root.strip() or current.lab_vm_root)
-                    if lab_vm_root is not None else current.lab_vm_root,
-        vault_root=current.vault_root,
+        lab_vm_root=_keep_if_blank(lab_vm_root, current.lab_vm_root),
+        vault_root=_keep_if_blank(vault_root, current.vault_root),
         mount_point=current.mount_point,
-        description=current.description,
+        description=_allow_clear(description, current.description),
         scan_dirs=_coerce_scan_dirs(scan_dirs) if scan_dirs is not None
                   else current.scan_dirs,
     )
