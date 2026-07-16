@@ -273,7 +273,7 @@ function CmdBar({ query, setQuery }) {
   return (
     <div className="cmdbar">
       {showLabTop && <LabSettingsModal onClose={() => setShowLabTop(false)} />}
-      <div className="home">murmurent{window.DATA.version ? <small> v{window.DATA.version}</small> : null}</div>
+      <div className="home">Murmurent{window.DATA.version ? <small> v{window.DATA.version}</small> : null}</div>
       <div className="search">
         <span className="mono muted" style={{fontSize:12}}>›</span>
         <input
