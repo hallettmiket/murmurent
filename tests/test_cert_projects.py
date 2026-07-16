@@ -176,6 +176,28 @@ def test_add_repo_replaces_by_name_and_needs_project():
         CP.add_repo("ghost", path="/r/x")
 
 
+def test_remove_repo_detaches_and_repromotes_primary():
+    CP.upsert("p", lab="lab_mh", code_repo="/r/p")           # primary code repo "p"
+    CP.add_repo("p", role="manuscript", repo_name="p_ms", path="/r/p_ms", overleaf=True)
+    CP.add_repo("p", role="data", repo_name="p_data", path="/r/p_data")
+
+    # Remove a non-primary repo.
+    CP.remove_repo("p", "p_data")
+    assert {r.name for r in CP.get("p").repos} == {"p", "p_ms"}
+
+    # Removing the primary code repo promotes the next repo; no resurrection.
+    CP.remove_repo("p", "p")
+    left = CP.get("p")
+    assert {r.name for r in left.repos} == {"p_ms"}
+    assert left.code_repo == "/r/p_ms"          # mirror re-pointed, not stale "/r/p"
+
+    # Errors: unknown repo, unknown project.
+    with pytest.raises(CP.CertProjectError, match="no repo named"):
+        CP.remove_repo("p", "nope")
+    with pytest.raises(CP.CertProjectError, match="no cert-project"):
+        CP.remove_repo("ghost", "x")
+
+
 def test_remote_primary_repo_mirrors_host():
     CP.upsert("rp", lab="lab_mh", code_repo="~/repos/rp", host="lab-server",
               remote_path="/srv/rp")

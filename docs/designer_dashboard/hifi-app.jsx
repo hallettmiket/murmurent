@@ -1907,29 +1907,23 @@ function ProjectMembersBlock({ proj: p }) {
   const addable = groupMembers.filter(
     m => !inProject.has(String(m).replace(/^@/, "").toLowerCase()));
 
-  const chip = (label, color, bg, title) => (
-    <span title={title} style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:0.5,
-          padding:"1px 5px", borderRadius:2, color, background:bg, marginLeft:4}}>
-      {label}
-    </span>
-  );
-
   return (
     <div style={{marginBottom:8, paddingBottom:8, borderBottom:"1px solid var(--rule)"}}>
       <div style={{display:"flex", alignItems:"center", gap:8, flexWrap:"wrap"}}>
         <span style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
               textTransform:"uppercase", color:"var(--muted)"}}>members</span>
-        {p.my_cert && p.my_cert !== "none" && chip(
-          "🔑 you: " + p.my_cert, "var(--green)", "rgba(58,138,95,0.10)",
-          "Your machine holds a verified " + p.my_cert + " certificate for this project.")}
+        {/* The viewer is shown once — as their own "@handle (you)" entry in the
+            cert list below — so there's no separate "you: <cert>" chip that
+            duplicated the same person (e.g. "you: lead" + "@the_pi · lead"). */}
         {certMembers.map(m => {
           const h = m.replace(/^@/, "");
+          const isMe = h.toLowerCase() === viewer;
           return (
             <span key={m} className="mono"
                   style={{fontSize:11, padding:"2px 6px", borderRadius:2,
                           background:"rgba(79,38,131,0.08)", color:"var(--purple)",
                           display:"inline-flex", alignItems:"center", gap:4}}>
-              🔑 @{h}{h.toLowerCase() === leadNorm ? " · lead" : ""}
+              🔑 @{h}{isMe ? " (you)" : ""}{h.toLowerCase() === leadNorm ? " · lead" : ""}
               {canManage && h.toLowerCase() !== leadNorm && (
                 <button type="button" disabled={busy === h}
                         onClick={() => removeMember(h)}
@@ -1997,21 +1991,38 @@ function ProjectReposBlock({ proj: p, isPI, userParam }) {
   const [f, setF] = React.useState({ repo_name: "", role: "manuscript", path: "",
                                      overleaf: true });
   const [busy, setBusy] = React.useState(false);
+  const [removing, setRemoving] = React.useState(null);  // repo name in flight
   const [err, setErr] = React.useState(null);
+  const q = userParam ? "?user=" + encodeURIComponent(userParam.replace(/^@/, "")) : "";
+  const refresh = async () => {
+    if (typeof window.__murmurentFetchData === "function") {
+      try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
+    }
+  };
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
-      const q = userParam ? "?user=" + encodeURIComponent(userParam.replace(/^@/, "")) : "";
       const r = await fetch("/api/project/" + encodeURIComponent(p.name) + "/repos" + q,
         { method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify(f) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error((typeof j.detail === "string" ? j.detail : null) || r.statusText);
       setShow(false); setF({ repo_name: "", role: "manuscript", path: "", overleaf: true });
-      if (typeof window.__murmurentFetchData === "function") {
-        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
-      }
+      await refresh();
     } catch (ex) { setErr(String(ex.message || ex)); } finally { setBusy(false); }
+  };
+  const removeRepo = async (name) => {
+    if (!window.confirm("Remove repo '" + name + "' from " + p.name + "?\n\n" +
+        "This only detaches it from the project — the clone on disk is left alone.")) return;
+    setRemoving(name); setErr(null);
+    try {
+      const r = await fetch("/api/project/" + encodeURIComponent(p.name) +
+                            "/repos/" + encodeURIComponent(name) + q,
+        { method: "DELETE", headers: { Accept: "application/json" } });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error((typeof j.detail === "string" ? j.detail : null) || r.statusText);
+      await refresh();
+    } catch (ex) { setErr(String(ex.message || ex)); } finally { setRemoving(null); }
   };
   return (
     <div style={{marginBottom:8, paddingBottom:8, borderBottom:"1px solid var(--rule)"}}>
@@ -2021,11 +2032,22 @@ function ProjectReposBlock({ proj: p, isPI, userParam }) {
         {repos.map((r, i) => (
           <span key={i} title={(r.host && r.host !== "local" ? r.host + ":" : "") + (r.path || "")}
                 style={{fontFamily:"var(--mono)", fontSize:11, padding:"1px 7px",
-                borderRadius:3, color:"#fff", background:REPO_ROLE_COLOUR[r.role] || "#555"}}>
+                borderRadius:3, color:"#fff", background:REPO_ROLE_COLOUR[r.role] || "#555",
+                display:"inline-flex", alignItems:"center", gap:4}}>
             {r.role}: {r.name}{r.overleaf ? " · OL" : ""}
+            {isPI && (
+              <button type="button" disabled={removing === r.name}
+                      onClick={() => removeRepo(r.name)}
+                      title={"Detach " + r.name + " from this project (leaves the clone on disk)"}
+                      style={{background:"none", border:0, cursor:"pointer",
+                              color:"#fff", opacity:0.85, fontSize:13, padding:0, lineHeight:1}}>
+                {removing === r.name ? "…" : "×"}
+              </button>
+            )}
           </span>
         ))}
         {repos.length === 0 && <span className="muted" style={{fontSize:11}}>none assigned</span>}
+        {err && <span style={{color:"var(--red)", fontSize:11}}>{err}</span>}
         {isPI && !show && (
           <button className="btn sm" onClick={() => setShow(true)}>+ add repo</button>
         )}

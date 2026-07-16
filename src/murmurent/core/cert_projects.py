@@ -391,6 +391,26 @@ def add_repo(name: str, *, role: str = "code", repo_name: str = "",
     return upsert(name, lab=cur.lab, repos=[*kept, ref], env=env)
 
 
+def remove_repo(name: str, repo_name: str, *, env: dict | None = None) -> CertProject:
+    """Detach the repo named ``repo_name`` from cert-project ``name``.
+
+    Only the project record changes — the working clone on disk is untouched;
+    this just says the repo is no longer part of the project. Removing the
+    primary code repo promotes the next remaining repo to primary (via
+    ``_normalize_repos``); removing the last repo leaves the project with none.
+    Raises if the project or the named repo doesn't exist."""
+    cur = get(name, env)
+    if cur is None:
+        raise CertProjectError(f"no cert-project named {name!r}")
+    rname = str(repo_name).strip()
+    kept = [r for r in cur.repos if r.name != rname]
+    if len(kept) == len(cur.repos):
+        raise CertProjectError(f"cert-project {name!r} has no repo named {rname!r}")
+    # Pass code_repo="" so a stale primary path can't resurrect the removed repo;
+    # _normalize_repos re-mirrors the new primary from ``kept`` when any remain.
+    return upsert(name, lab=cur.lab, repos=kept, code_repo="", env=env)
+
+
 def register_from_summary(summary, *, code_repo: str = "", host: str = "local",
                           remote_path: str = "", env: dict | None = None,
                           today: str | None = None) -> str:
@@ -480,6 +500,7 @@ def set_status(name: str, status: str, *, env: dict | None = None) -> CertProjec
 
 __all__ = ["CertProject", "RepoRef", "VALID_REPO_ROLES", "CertProjectError",
            "REGISTRY_DIR", "registry_dir", "project_path", "get", "iter_projects",
-           "projects_for_member", "upsert", "remove_member", "add_repo", "set_status",
+           "projects_for_member", "upsert", "remove_member", "add_repo", "remove_repo",
+           "set_status",
            "register_from_summary", "backfill_from_charter", "slack_channel_for",
            "project_name_for_cwd"]

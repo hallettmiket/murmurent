@@ -3445,6 +3445,25 @@ def create_app() -> FastAPI:
         return {"ok": True, "project": project, "overleaf_note": note_written,
                 "repos": [r.to_dict() for r in cp.repos]}
 
+    @app.delete("/api/project/{project}/repos/{repo_name}")
+    def remove_project_repo_endpoint(
+        project: str,
+        repo_name: str,
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """PI-only: detach a repo from a cert project. Only the project record
+        changes — the clone on disk is left alone. 404 if the project or the
+        named repo doesn't exist."""
+        from ..core import cert_projects as _cp
+
+        _require_pi(user)
+        try:
+            cp = _cp.remove_repo(project, repo_name)
+        except _cp.CertProjectError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+        return {"ok": True, "project": project,
+                "repos": [r.to_dict() for r in cp.repos]}
+
     @app.post("/api/project/{project}/reconcile")
     def reconcile_cert_project_endpoint(
         project: str,
