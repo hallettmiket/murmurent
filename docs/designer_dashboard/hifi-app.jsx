@@ -778,15 +778,11 @@ function AdoptCloneModal({ clone, onClose }) {
           Bootstraps <code className="mono">{clone.name}</code>
           {clone.host && clone.host !== "local" ? <> on <strong>{clone.host}</strong> (one SSH session)</> : null}
           {" "}— writes the readiness marker and symlinks the picked commons agents into
-          {" "}<code>.claude/agents/</code>. This does <strong>not</strong> create a project:
-          a project is a <em>set of repos + members</em>; attach ready repos via
-          {" "}<strong>New Project</strong> when you need one.
+          {" "}<code>.claude/agents/</code>.
         </p>
 
-        <div style={lbl}>
-          murmurent agents to symlink — click pills to deselect. New releases:
-          agent content updates automatically (symlinks); pick up NEW agents later
-          with <code>murmurent repo upgrade</code>.
+        <div className="muted" style={{fontSize:12, marginTop:8, marginBottom:2}}>
+          Click agents to de-select.
         </div>
         <div style={{display:"flex", flexWrap:"wrap", gap:6}}>
           {(window.DATA.agents || []).filter(a => !a.disabled).map(a => (
