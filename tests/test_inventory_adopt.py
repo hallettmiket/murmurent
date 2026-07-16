@@ -35,6 +35,10 @@ def world(monkeypatch, tmp_path):
     (commons / "agents" / "blacksmith.md").write_text("# blacksmith\n")
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("MURMURENT_REPO_ROOT", str(commons))
+    # conftest points MURMURENT_REPOS_ROOT at its own tmp dir; this fixture
+    # puts clones under <home>/repos. adopt resolves via repo.repos_root(),
+    # so point it here or the guard rejects this fixture's own clones.
+    monkeypatch.setenv("MURMURENT_REPOS_ROOT", str(home / "repos"))
     monkeypatch.setenv("MURMURENT_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
     return {"home": home, "repos": home / "repos", "commons": commons}
 

@@ -393,6 +393,24 @@ class AdoptCloneBody(BaseModel):
     host: str = "local"            # "local" or a registered SSH host name
 
 
+class UpgradeCloneBody(BaseModel):
+    """JSON body for ``POST /api/inventory/upgrade``.
+
+    Brings an ALREADY-ready repo up to the current murmurent release: converts a
+    legacy ``CHARTER.md`` bootstrap to the marker, migrates the marker schema,
+    re-links commons agents, re-stamps ``bootstrap_version``.
+
+    Agent *content* updates never need this — ``.claude/agents/*.md`` are
+    symlinks into the commons clone, so editing an agent there reaches every
+    ready repo already. This is for *structural* drift: a new agent shipped in a
+    release, or a marker-schema bump.
+    """
+
+    clone_path: str                # absolute path (local only — see the handler)
+    add_agents: list[str] = []     # commons agents to ADD to the existing links
+    all_agents: bool = False       # link every commons agent (new ones included)
+
+
 class LoginSelectBody(BaseModel):
     """JSON body for ``POST /api/login/select``.
 
@@ -2084,6 +2102,50 @@ def create_app() -> FastAPI:
                 detail=str(exc),
             ) from exc
         return outcome.to_dict()
+
+    @app.post("/api/inventory/upgrade")
+    def post_inventory_upgrade(
+        body: UpgradeCloneBody,
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Bring a murmurent-READY repo up to the current murmurent release.
+
+        HTTP twin of ``murmurent repo upgrade``, over the same
+        :func:`core.repo_ready.upgrade` chokepoint so the two surfaces can't
+        drift. Local only: ``repo_ready`` works on the filesystem, and the
+        remote bootstrap script still writes the legacy CHARTER shape, so
+        upgrading a remote clone needs the SSH path built first.
+        """
+        from pathlib import Path as _P
+
+        from ..core import adopt as _adopt
+        from ..core import repo_ready as _rr
+
+        clone = _P(body.clone_path).expanduser()
+        st = _adopt.adoption_status(str(clone))
+        if not st.ready:
+            # Upgrade is for repos that are ALREADY ready; a plain clone wants
+            # adopt instead. Say which, rather than a bare 4xx.
+            raise HTTPException(
+                status_code=409,
+                detail=(f"{clone} is not murmurent-ready ({st.verdict}) — "
+                        f"adopt it first, then upgrade."),
+            )
+        try:
+            probes = _rr.upgrade(
+                clone,
+                add_agents=list(body.add_agents or []) or None,
+                all_agents=bool(body.all_agents),
+            )
+        except Exception as exc:  # noqa: BLE001 — surface the reason, not a 500
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        after = _adopt.adoption_status(str(clone))
+        return {
+            "clone_path": str(clone),
+            "verdict": after.verdict,
+            "bootstrap_version": after.bootstrap_version,
+            "probes": [p.to_dict() for p in probes],
+        }
 
     # -----------------------------------------------------------------
     # Membership (PI-only roster mgmt)

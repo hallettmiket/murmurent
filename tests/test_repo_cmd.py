@@ -36,6 +36,10 @@ def world(monkeypatch, tmp_path):
     installations = home / ".murmurent" / "installations"
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("MURMURENT_REPO_ROOT", str(commons))
+    # conftest points MURMURENT_REPOS_ROOT at its own tmp dir; this fixture
+    # puts clones under <home>/repos. adopt resolves via repo.repos_root(),
+    # so point it here or the guard rejects this fixture's own clones.
+    monkeypatch.setenv("MURMURENT_REPOS_ROOT", str(home / "repos"))
     monkeypatch.setenv("MURMURENT_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
     monkeypatch.setattr(_proj, "INSTALLATIONS_DIR_DEFAULT", installations)
     return {"home": home, "repos": home / "repos", "installations": installations}

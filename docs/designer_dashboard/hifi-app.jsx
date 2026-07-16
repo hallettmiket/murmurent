@@ -388,6 +388,8 @@ function RepoInventoryPanel({ span = "c-12" }) {
   const [err, setErr] = useState(null);
   const [showAllGithub, setShowAllGithub] = useState(false);
   const [adoptCtx,   setAdoptCtx]   = useState(null);  // {name, path, origin}
+  const [upgrading,  setUpgrading]  = useState(null);  // clone_path being upgraded
+  const [upgraded,   setUpgraded]   = useState(null);  // {name, verdict, version}
   // Hosts the user has registered. Sourced once on mount so the table
   // columns are stable across refreshes. The inventory report also
   // returns hosts_scanned; we use the registered list (which includes
@@ -406,6 +408,27 @@ function RepoInventoryPanel({ span = "c-12" }) {
     } catch (ex) {
       setErr(String(ex.message || ex));
     } finally { setBusy(false); }
+  };
+
+  // Re-wire an already-ready repo against the current murmurent release. No
+  // modal: unlike adopt there's nothing to choose — the repo already records
+  // its lab + agents, and `all_agents` would silently widen that set.
+  const doUpgrade = async (ctx) => {
+    setUpgrading(ctx.path); setErr(null); setUpgraded(null);
+    try {
+      const r = await fetch("/api/inventory/upgrade", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clone_path: ctx.path }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+      setUpgraded({ name: ctx.name, verdict: j.verdict,
+                    version: j.bootstrap_version });
+      await load(true);
+    } catch (ex) {
+      setErr(String(ex.message || ex));
+    } finally { setUpgrading(null); }
   };
 
   useEffect(() => {
@@ -448,8 +471,9 @@ function RepoInventoryPanel({ span = "c-12" }) {
             </span>
           )}
           {report && report.generated_at && (
-            <span className="mono muted" style={{fontSize:10.5}}>
-              scanned {report.generated_at.slice(0, 16).replace("T", " ")}
+            <span className="mono muted" style={{fontSize:10.5}}
+                  title={`scan timestamp (${report.generated_at})`}>
+              scanned {_fmtLocalStamp(report.generated_at)}
               {report.from_cache ? " (cached)" : ""}
             </span>
           )}
@@ -470,28 +494,42 @@ function RepoInventoryPanel({ span = "c-12" }) {
           color:"var(--ink-2)",
         }}>
           <strong style={{fontFamily:"var(--mono)", color:"var(--purple-deep)"}}>
-            clone · adopt
-          </strong>{" — each host cell shows what's there now:"}
+            repo states
+          </strong>{" — each host cell says whether the repo is on that machine, and whether murmurent is wired into it:"}
           <ul style={{margin:"4px 0 0 18px", padding:0}}>
             <li>
-              <span className="mono" style={{color:"var(--muted)"}}>—</span>{" "}
-              <em>nothing here.</em> Repo isn't on this host and has no GitHub origin to clone from.
+              <span className="mono" style={{color:"var(--muted)"}}>Not cloned</span> — the repo
+              isn't on this machine.
             </li>
             <li>
-              <span className="mono">• clone</span> + <span className="mono">↑ adopt</span> — repo is on
-              this host but not yet murmurent-ready. <strong>Adopt</strong> writes the readiness
-              marker + bootstraps <code>.claude/agents/</code>. No project is created — attach
-              ready repos to a project via <strong>New Project</strong>.
+              <span className="mono">Cloned · not murmurent-ready</span> — the repo is here, but
+              murmurent isn't wired into it. <strong>Make ready</strong> writes the readiness
+              marker and links the commons agents into <code>.claude/agents/</code>.
             </li>
             <li>
-              <span className="mono" style={{color:"var(--green)"}}>✓ ready</span> — fully
-              murmurent-ready; attach it to a project when you need one.
+              <span className="mono" style={{color:"var(--green)"}}>Cloned · murmurent-ready</span>{" "}
+              — Claude Code sessions opened here have the murmurent agents + rules.{" "}
+              <strong>Upgrade</strong> re-wires it against the current murmurent release (a new
+              agent shipped, or the marker format changed). Agent *edits* arrive on their own —
+              the links point at your murmurent clone — so you only need this for structural changes.
             </li>
           </ul>
+          <div style={{marginTop:6}}>
+            Murmurent-ready is about <em>one repo</em>. A <strong>project</strong> is a different,
+            bigger thing — a named set of repos <em>and</em> members — created via{" "}
+            <strong>New Project</strong>, which attaches ready repos. Making a repo ready creates
+            no project.
+          </div>
         </div>
         {err && (
           <div style={{padding:"10px 14px", color:"var(--red)", fontSize:12}}>
             {err}
+          </div>
+        )}
+        {upgraded && (
+          <div style={{padding:"8px 14px", fontSize:11.5, color:"var(--green)"}}>
+            <strong>{upgraded.name}</strong> upgraded — {upgraded.verdict}
+            {upgraded.version ? ` (murmurent ${upgraded.version})` : ""}.
           </div>
         )}
         {report && report.errors && report.errors.length > 0 && (
@@ -522,6 +560,8 @@ function RepoInventoryPanel({ span = "c-12" }) {
                   row={r}
                   knownHosts={knownHosts}
                   onAdopt={(ctx) => setAdoptCtx(ctx)}
+                  onUpgrade={doUpgrade}
+                  upgrading={upgrading}
                 />
               ))}
             </tbody>
@@ -541,70 +581,100 @@ function RepoInventoryPanel({ span = "c-12" }) {
   );
 }
 
-function RepoInventoryRow({ row, knownHosts, onAdopt }) {
+// Server stamps are UTC ISO ("2026-07-15T21:35:40+00:00"). Render them in the
+// VIEWER's timezone — slicing the string printed UTC while labelling it like
+// local time, so an Eastern reader saw a clock four hours ahead of their own.
+function _fmtLocalStamp(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return String(iso).slice(0, 16).replace("T", " ");
+  return d.toLocaleString([], {
+    month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit",
+  });
+}
+
+function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
   const gh = row.github;
   const cloneByHost = {};
   for (const c of (row.clones || [])) cloneByHost[c.host] = c;
 
-  // GitHub cell: green link if visible, dash otherwise.
+  // GitHub cell: a link to the repo, labelled with its visibility.
+  // (Was "✓ {visibility[0]}" — the first letter of "public" and "private" is
+  // the same "p", so every repo rendered an identical, meaningless "✓ p".)
   const ghCell = gh ? (
     <a href={`https://github.com/${gh.full_name}`} target="_blank" rel="noopener"
-       className="mono" style={{fontSize:11}}>
-      ✓ {gh.visibility[0]}
+       className="mono" style={{fontSize:11}}
+       title={`Open ${gh.full_name} on GitHub (${gh.visibility})`}>
+      {gh.visibility === "private" ? "🔒 private" : "public"} ↗
     </a>
   ) : (
     <span className="muted" style={{fontSize:11}}>—</span>
   );
 
-  // Per-host cell. Four states:
-  //   ✓ murmurent — cloned + murmurent-ready (CHARTER + .claude/agents/)
-  //   • clone + ↑ adopt — cloned but not yet murmurent-ready.
-  //     Adopt works for both local and SSH hosts: local writes CHARTER
-  //     on the filesystem; SSH writes CHARTER + bootstraps over a
-  //     single batched SSH session.
-  //   + install — not cloned; clickable if a GitHub origin exists
-  //   — — not applicable (no github origin to clone from)
+  // Per-host cell. Three states, named the way the legend names them:
+  //   Cloned · murmurent-ready      + Upgrade    (re-wire to current release)
+  //   Cloned · not murmurent-ready  + Make ready (adopt; local or over SSH)
+  //   Not cloned
+  // "ready" is about THIS REPO only — it never implies a project.
   const hostCell = (host) => {
     const c = cloneByHost[host];
-    if (c) {
-      const wig = c.is_murmurent_ready;
-      if (wig) {
-        return (
-          <span title={c.path} style={{
-            fontSize:11, color:"var(--green)", fontFamily:"var(--mono)",
-          }}>
-            ✓ ready
-          </span>
-        );
-      }
-      // Cloned but not murmurent-ready — offer adopt regardless of host.
-      // The endpoint branches local vs SSH; the modal passes `host`
-      // through unchanged.
+    if (!c) {
+      return (
+        <span className="muted" style={{fontSize:11, fontFamily:"var(--mono)"}}>
+          Not cloned
+        </span>
+      );
+    }
+    if (c.is_murmurent_ready) {
       return (
         <span style={{display:"inline-flex", alignItems:"center", gap:5}}>
           <span title={c.path} style={{
-            fontSize:11, color:"var(--muted)", fontFamily:"var(--mono)",
+            fontSize:11, color:"var(--green)", fontFamily:"var(--mono)",
           }}>
-            • clone
+            Cloned · murmurent-ready
           </span>
-          {onAdopt && (
+          {/* Upgrade is local-only: repo_ready works on the filesystem, and the
+              remote bootstrap still writes the legacy CHARTER shape. */}
+          {onUpgrade && host === "local" && (
             <button className="btn sm" style={{fontSize:10.5, padding:"1px 5px"}}
-                    title={host === "local"
-                      ? "Promote this clone to a murmurent project"
-                      : `Promote this clone on ${host} to a murmurent project (over SSH)`}
-                    onClick={() => onAdopt({
-                      name: row.name,
-                      path: c.path,
-                      origin: c.origin_url || "",
-                      host: host,
+                    disabled={upgrading === c.path}
+                    title={"Re-wire this repo against the current murmurent release "
+                         + "(new agents, marker format). Agent edits arrive on their "
+                         + "own — this is for structural changes."}
+                    onClick={() => onUpgrade({
+                      name: row.name, path: c.path, host: host,
                     })}>
-              ↑ adopt
+              {upgrading === c.path ? "…" : "Upgrade"}
             </button>
           )}
         </span>
       );
     }
-    return <span className="muted" style={{fontSize:11}}>—</span>;
+    // Cloned but not murmurent-ready — offer it regardless of host. The
+    // endpoint branches local vs SSH; the modal passes `host` through.
+    return (
+      <span style={{display:"inline-flex", alignItems:"center", gap:5}}>
+        <span title={c.path} style={{
+          fontSize:11, color:"var(--muted)", fontFamily:"var(--mono)",
+        }}>
+          Cloned · not murmurent-ready
+        </span>
+        {onAdopt && (
+          <button className="btn sm" style={{fontSize:10.5, padding:"1px 5px"}}
+                  title={host === "local"
+                    ? "Wire murmurent into this repo (marker + commons agents). Creates no project."
+                    : `Wire murmurent into this repo on ${host}, over SSH. Creates no project.`}
+                  onClick={() => onAdopt({
+                    name: row.name,
+                    path: c.path,
+                    origin: c.origin_url || "",
+                    host: host,
+                  })}>
+            Make ready
+          </button>
+        )}
+      </span>
+    );
   };
 
   return (

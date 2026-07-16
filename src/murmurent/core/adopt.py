@@ -33,6 +33,7 @@ import yaml
 
 from . import hosts as _hosts
 from . import remote as _remote
+from . import repo as _repo
 from . import repo_ready as _rr
 
 # code → the HTTP status the dashboard endpoint responds with. Kept here
@@ -96,7 +97,10 @@ def adopt_clone(
                              agents=agents, host=host)
 
     clone = Path(clone_path).expanduser().resolve()
-    repos_root = (Path.home() / "repos").resolve()
+    # repo.repos_root() — NOT a local Path.home() / "repos": the latter reads the
+    # real home even when $MURMURENT_REPOS_ROOT redirects it, so the guard could
+    # only ever be exercised against the operator's live ~/repos.
+    repos_root = _repo.repos_root().resolve()
     try:
         clone.relative_to(repos_root)
     except ValueError:
