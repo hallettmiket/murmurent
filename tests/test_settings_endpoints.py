@@ -135,12 +135,25 @@ def test_machine_settings_preflight_creates_subdirs(world, tmp_path):
     body = res.json()
     assert body["overall"] in ("ok", "warn")
     names = {p["name"]: p for p in body["probes"]}
-    assert names["large-file location set"]["status"] == "ok"
-    assert names["not protected"]["status"] == "ok"
+    # One merged "large-file location" row (was set/not-protected/exists trio).
+    assert names["large-file location"]["status"] == "ok"
     for sub in ("raw", "refined", "lab_notebooks"):
         assert names[sub]["status"] == "ok", names[sub]
         assert (base / sub).is_dir()
     assert names["obsidian vault"]["status"] == "ok"
+
+
+def test_probe_tolerates_shell_escaped_vault_path(tmp_path):
+    """A path pasted from a terminal (backslash-escaped spaces, quotes) must
+    still resolve — otherwise a folder that exists reads as "does not exist"."""
+    from murmurent.core import preflight as P
+
+    real = tmp_path / "My Vault"
+    real.mkdir()
+    escaped = str(tmp_path) + "/My\\ Vault"
+    assert P.clean_pasted_path(escaped) == str(real)
+    assert P.probe_obsidian_vault(escaped).status == "ok"
+    assert P.probe_obsidian_vault(f'"{real}"').status == "ok"
 
 
 def test_machine_settings_obsidian_na_is_not_a_warning(world, tmp_path):

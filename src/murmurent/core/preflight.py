@@ -61,9 +61,23 @@ class Probe:
         return asdict(self)
 
 
+def clean_pasted_path(path: str | None) -> str:
+    """Undo shell-style decoration people paste in from a terminal.
+
+    A path copied from a shell often arrives backslash-escaped
+    (``Mobile\\ Documents``) or wrapped in quotes. Left as-is those don't match
+    the real directory, so a folder that exists reads as "does not exist".
+    Strips surrounding quotes and unescapes ``\\ `` / ``\\~``.
+    """
+    s = str(path or "").strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in ("'", '"'):
+        s = s[1:-1]
+    return s.replace("\\ ", " ").replace("\\~", "~")
+
+
 def _normalize(path: str) -> Path:
-    """Expand ``~`` + ``$ENV`` and collapse trailing slashes."""
-    expanded = os.path.expanduser(os.path.expandvars(path))
+    """Expand ``~`` + ``$ENV``, undo pasted shell-escaping, collapse trailing slashes."""
+    expanded = os.path.expanduser(os.path.expandvars(clean_pasted_path(path)))
     return Path(expanded.rstrip("/") or expanded)
 
 
@@ -109,23 +123,20 @@ def probe_wigamig_base(wigamig_base: str | None) -> list[Probe]:
     probes: list[Probe] = []
     if not wigamig_base or not str(wigamig_base).strip():
         probes.append(Probe(
-            name="large-file location set",
+            name="large-file location",
             status="fail",
-            detail="No large-file location set — enter one before saving.",
+            detail="Not set — enter a location before saving.",
             required=True,
         ))
         return probes
-    probes.append(Probe(
-        name="large-file location set",
-        status="ok",
-        detail=wigamig_base,
-        required=True,
-    ))
 
+    # A single "large-file location" row: it must not sit inside the lab's
+    # protected data area, and the folder must exist (created if missing). One
+    # row, not the old set/not-protected/exists trio that repeated the label.
     blocked = is_lab_vm_protected(wigamig_base)
     if blocked:
         probes.append(Probe(
-            name="not protected",
+            name="large-file location",
             status="fail",
             detail=(
                 f"{wigamig_base} sits under {blocked} — the lab's read-only / "
@@ -135,15 +146,9 @@ def probe_wigamig_base(wigamig_base: str | None) -> list[Probe]:
             required=True,
         ))
         return probes
-    probes.append(Probe(
-        name="not protected",
-        status="ok",
-        detail="not under /data/lab_vm/{raw,refined}",
-        required=True,
-    ))
 
     base = _normalize(str(wigamig_base))
-    probes.append(_ensure_dir(base, label="large-file location exists", required=True))
+    probes.append(_ensure_dir(base, label="large-file location", required=True))
 
     # If base couldn't be created, skip subfolders — they'll all fail
     # for the same reason and noise drowns the actual cause.

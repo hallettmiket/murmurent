@@ -1359,7 +1359,7 @@ function InstallModal({ initialProject, initialMachine, initialRepoUrl, onClose 
                   (✗ blocks; ! is a heads-up)
                 </span>
               </div>
-              {probes.map((p, i) => (
+              {probes.filter(p => p.name !== "raw" && p.name !== "refined").map((p, i) => (
                 <div key={p.name + i} style={{
                   fontSize:12, fontFamily:"var(--mono)",
                   display:"flex", gap:8, alignItems:"baseline", marginTop:2,
@@ -6980,7 +6980,9 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
               (checks that the folders murmurent needs exist; ✗ blocks the save, ! is just a heads-up)
             </span>
           </div>
-          {probes.map(p => (
+          {/* raw/ and refined/ are still created; they're just not worth a
+              row each in the checklist (data-storage detail, not a knob). */}
+          {probes.filter(p => p.name !== "raw" && p.name !== "refined").map(p => (
             <div key={p.name} style={{
               fontSize:12, fontFamily:"var(--mono)",
               display:"flex", gap:8, alignItems:"baseline", marginTop:2,

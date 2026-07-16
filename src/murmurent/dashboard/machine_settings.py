@@ -99,11 +99,16 @@ def write(settings: C.MachineSettings) -> Path:
     it's ignored.
     """
     MACHINE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    derived_name = _derive_vault_name(settings.obsidian_vault_path)
+    # Undo shell-escaping / quotes people paste from a terminal, so the stored
+    # path matches the real directory (and folder checks stop false-negativing).
+    from ..core.preflight import clean_pasted_path as _clean
+    vault_path = _clean(settings.obsidian_vault_path) or None
+    base_path = _clean(settings.wigamig_base) or None
+    derived_name = _derive_vault_name(vault_path)
     payload = {
         "machine_name": settings.machine_name,
-        "wigamig_base": settings.wigamig_base,
-        "obsidian_vault_path": settings.obsidian_vault_path,
+        "wigamig_base": base_path,
+        "obsidian_vault_path": vault_path,
         "obsidian_vault_name": derived_name,
         "notebook_subfolder": settings.notebook_subfolder,
         "oracle_subfolder": settings.oracle_subfolder,
