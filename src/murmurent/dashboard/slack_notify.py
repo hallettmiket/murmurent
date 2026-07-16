@@ -184,7 +184,7 @@ class SlackScopeError(RuntimeError):
         self.needed = needed
 
 
-def _lookup_channel_id_by_name(name: str) -> str | None:
+def _lookup_channel_id_by_name(name: str, *, token: str | None = None) -> str | None:
     """Look up an existing Slack channel ID by exact channel name.
 
     Pages through ``conversations.list`` (public + private). Returns the
@@ -193,8 +193,11 @@ def _lookup_channel_id_by_name(name: str) -> str | None:
     required to enumerate channels — that case can't be solved here
     (the user needs to either add the scope in Slack admin OR paste the
     channel ID manually).
+
+    ``token`` overrides the default resolution — a cert-project reuses its own
+    workspace's bot token, which may differ from this machine's default.
     """
-    tok = _token()
+    tok = token if token is not None else _token()
     if not tok:
         return None
     try:

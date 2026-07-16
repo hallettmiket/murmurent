@@ -90,6 +90,47 @@ def test_provision_is_idempotent_no_recreate():
     assert out["created"] is False and out["channel_id"] == "Cexisting"
 
 
+def test_provision_reuses_existing_channel_on_name_taken():
+    """A project named after an existing Slack channel (#murmurent) must ADOPT
+    that channel, not fail — Slack returns name_taken, and we recover the id."""
+    _seed_project_with_members()
+    calls = {"resolve": []}
+
+    def creator(name):
+        return SimpleNamespace(ok=False, channel_id="", error="name_taken",
+                               detail="a channel with that name already exists.")
+
+    def resolver(name):
+        calls["resolve"].append(name)
+        return "Cexisting"
+
+    def inviter(channel_id, handles, *, member_email_map):
+        return {"channel_id": channel_id, "invited": list(handles),
+                "already_in": [], "unresolved": [], "error": None}
+
+    out = CPROV.provision_slack("rna_atlas", creator=creator, inviter=inviter,
+                                resolver=resolver)
+    assert out["ok"] is True and out["created"] is False
+    assert out["channel_id"] == "Cexisting"
+    assert calls["resolve"] == ["rna_atlas"]              # looked up by channel name
+    assert CP.get("rna_atlas").slack_channel_id == "Cexisting"   # adopted + stamped
+
+
+def test_provision_name_taken_but_bot_cant_see_channel():
+    """name_taken + the bot can't resolve the channel (private, not a member) →
+    a clear error pointing at 'Link existing channel', not a silent failure."""
+    _seed_project_with_members()
+
+    def creator(name):
+        return SimpleNamespace(ok=False, channel_id="", error="name_taken", detail="")
+
+    out = CPROV.provision_slack("rna_atlas", creator=creator,
+                                resolver=lambda name: "")
+    assert out["ok"] is False and out["error"] == "name_taken_unresolved"
+    assert "Link existing channel" in out["detail"]
+    assert CP.get("rna_atlas").slack_channel_id == ""    # nothing stamped
+
+
 def test_provision_reports_missing_token_gracefully():
     _seed_project_with_members()
 

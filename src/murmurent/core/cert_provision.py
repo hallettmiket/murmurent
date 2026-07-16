@@ -107,8 +107,20 @@ def _default_inviter(channel_id: str, handles: list[str], *, member_email_map: d
                                          token=token)
 
 
+def _default_channel_resolver(name: str, *, token: str | None = None) -> str:
+    """Existing channel id for ``name`` (public or private the bot can see), or
+    ``""``. Used to REUSE a channel that already exists rather than failing —
+    a project named after an existing channel is a legitimate, common case."""
+    from ..dashboard import slack_notify as _sn
+    try:
+        return _sn._lookup_channel_id_by_name(name, token=token) or ""
+    except Exception:  # noqa: BLE001 — missing scope etc.: fall back to manual link
+        return ""
+
+
 def provision_slack(project: str, *, lab: str | None = None,
-                    env: dict | None = None, creator=None, inviter=None) -> dict:
+                    env: dict | None = None, creator=None, inviter=None,
+                    resolver=None) -> dict:
     """Ensure a private Slack channel for cert-project ``project`` and invite its
     certified members. Stamps ``slack_channel_id`` on the record the first time.
     Idempotent: an already-provisioned project re-syncs membership without
@@ -129,19 +141,43 @@ def provision_slack(project: str, *, lab: str | None = None,
     inviter = inviter or (lambda cid, hs, *, member_email_map:
                           _default_inviter(cid, hs, member_email_map=member_email_map,
                                            token=_tok or None))
+    resolver = resolver or (lambda name: _default_channel_resolver(name, token=_tok or None))
 
     channel_id = cp.slack_channel_id
     created = False
     if not channel_id:
-        res = creator(slack_channel_name(project))
+        chan = slack_channel_name(project)
+        res = creator(chan)
         if not getattr(res, "ok", False):
-            return {"ok": False, "channel_id": None, "created": False,
-                    "error": getattr(res, "error", "channel_create_failed"),
-                    "detail": getattr(res, "detail", ""),
-                    "invited": [], "already_in": [], "unresolved": []}
-        channel_id = res.channel_id
-        created = True
-        _cp.upsert(project, lab=(lab or cp.lab), slack_channel_id=channel_id, env=env)
+            err = getattr(res, "error", "channel_create_failed")
+            # A channel with this name already exists — REUSE it instead of
+            # failing. Naming a project after an existing channel (e.g. project
+            # "Murmurent" → #murmurent) is legitimate; Slack just won't let the
+            # bot re-create it. Look the existing one up and adopt its id.
+            if err == "name_taken":
+                existing = resolver(chan)
+                if existing:
+                    channel_id = existing
+                    _cp.upsert(project, lab=(lab or cp.lab),
+                               slack_channel_id=channel_id, env=env)
+                else:
+                    return {"ok": False, "channel_id": None, "created": False,
+                            "error": "name_taken_unresolved",
+                            "detail": (f"#{chan} already exists but the bot can't "
+                                       "see it to reuse it (it may be private and "
+                                       "the bot isn't a member, or the token lacks "
+                                       "channels:read/groups:read). Invite the bot "
+                                       "to the channel, or paste its ID via 'Link "
+                                       "existing channel'."),
+                            "invited": [], "already_in": [], "unresolved": []}
+            else:
+                return {"ok": False, "channel_id": None, "created": False,
+                        "error": err, "detail": getattr(res, "detail", ""),
+                        "invited": [], "already_in": [], "unresolved": []}
+        else:
+            channel_id = res.channel_id
+            created = True
+            _cp.upsert(project, lab=(lab or cp.lab), slack_channel_id=channel_id, env=env)
 
     handles = [m.lstrip("@") for m in cp.members]
     inv = inviter(channel_id, handles, member_email_map=member_email_map(handles))
