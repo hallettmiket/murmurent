@@ -2446,7 +2446,7 @@ function ProjectsPanel({ projects, span="c-5" }) {
         <h2>Projects</h2>
         <div className="row" style={{gap:6}}>
           <span className="meta">
-            {projects.length} active · {projects.reduce((a,p)=>a+p.open_seas,0)} open SEAs
+            {projects.length} active
             {pendingCreate.length > 0 && (
               <span> · <strong style={{color:"var(--tiger-deep)"}}>
                 {pendingCreate.length} pending
@@ -2471,7 +2471,7 @@ function ProjectsPanel({ projects, span="c-5" }) {
         <table className="dt">
           <thead><tr>
             <th>project</th><th style={{width:70}}>sens.</th><th style={{width:90}}>lead</th>
-            <th style={{width:60}} className="num">team</th><th style={{width:90}} className="num">open SEAs</th><th style={{width:80}}>activity</th>
+            <th style={{width:60}} className="num">team</th><th style={{width:80}}>activity</th>
             {isPI && <th style={{width:60}}></th>}
           </tr></thead>
           <tbody>
@@ -2516,7 +2516,6 @@ function ProjectsPanel({ projects, span="c-5" }) {
                   <td><Pill tone={p.sens==="clinical"?"red":""}>{p.sens}</Pill></td>
                   <td className="mono" style={{fontSize:12, paddingLeft:14}}>{p.lead}</td>
                   <td className="num">{p.members}</td>
-                  <td className="num"><strong>{p.open_seas}</strong></td>
                   <td className="muted" style={{fontSize:12}}>{p.last_activity}</td>
                   {isPI && (
                     <td style={{textAlign:"right", whiteSpace:"nowrap"}} onClick={(e) => e.stopPropagation()}>
@@ -2565,7 +2564,7 @@ function ProjectsPanel({ projects, span="c-5" }) {
                 </tr>
                 {openProj === p.name && (
                   <tr>
-                    <td colSpan={isPI ? 7 : 6} style={{
+                    <td colSpan={isPI ? 6 : 5} style={{
                       background:"var(--paper-2)",
                       padding:"10px 12px",
                       fontSize:12, fontFamily:"var(--mono)",
@@ -3146,7 +3145,6 @@ function LabMembersPanel({ peers, span="c-6" }) {
             )}
             <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", marginTop:5}}>
               <div className="mono muted" style={{fontSize:11, display:"flex", gap:14}}>
-                <span><strong style={{color:"var(--ink-2)"}}>{p.open_seas}</strong> open SEAs</span>
                 <span><strong style={{color:"var(--ink-2)"}}>{p.experiments}</strong> experiments</span>
               </div>
               {p.handle.toLowerCase() === myHandle && (
@@ -6883,63 +6881,49 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
     finally { setBusy(false); }
   };
 
-  const labelStyle = {
-    fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
-    textTransform:"uppercase", color:"var(--muted)", marginTop:8, marginBottom:2,
-  };
   const inputStyle = {
     padding:"5px 8px", border:"1px solid var(--rule-strong)",
     borderRadius:2, fontFamily:"var(--mono)", fontSize:12, width:"100%",
-    boxSizing:"border-box", background:"var(--paper)",
+    boxSizing:"border-box",
   };
-  const derivedStyle = {
-    padding:"5px 8px", border:"1px dashed var(--rule)",
-    borderRadius:2, fontFamily:"var(--mono)", fontSize:12,
-    background:"var(--paper-2)", color:"var(--ink-2)",
+  const labelStyle = {
+    fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+    textTransform:"uppercase", color:"var(--muted)", marginTop:6, marginBottom:2,
   };
 
   return (
     <form onSubmit={submit} style={{
-      border:"1px solid var(--purple-soft)", borderRadius:2, padding:14,
-      background:"var(--card)", marginBottom:10,
+      border:"1px solid var(--rule-strong)", borderRadius:2,
+      padding:"10px 14px", background:"var(--paper)",
     }}>
-      <h4 style={{margin:0, fontFamily:"var(--serif)", fontSize:15, color:"var(--purple-deep)"}}>
-        Edit: this machine
-      </h4>
-      <p className="muted" style={{fontSize:11, margin:"2px 0 4px"}}>
-        Saved to <code>~/.murmurent/machine.yaml</code>.
-      </p>
+      <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+        <strong style={{fontFamily:"var(--serif)"}}>Edit this machine</strong>
+        <button type="button" className="btn sm ghost" onClick={onCancel}>cancel</button>
+      </div>
 
-      <div style={labelStyle}>Files (data root — raw/ + refined/ + lab_notebooks/ live under it)</div>
+      <div style={labelStyle}>Files (data root — raw/ + refined/ live here)</div>
       <input style={inputStyle} value={form.wigamig_base}
              onChange={update("wigamig_base")} placeholder="~/wigamig" />
 
-      <div style={labelStyle}>Repo location (one path per line; where clones live)</div>
-      <textarea style={{...inputStyle, minHeight:56, resize:"vertical"}} value={repos}
-                onChange={e => setRepos(e.target.value)} placeholder={"repos\nwork/clones"} />
+      <div style={labelStyle}>Repo locations (one per line; where clones live)</div>
+      <textarea style={{...inputStyle, minHeight:54, resize:"vertical"}} value={repos}
+                onChange={e => setRepos(e.target.value)} placeholder={"~/repos\nwork/clones"} />
 
-      <div style={{borderTop:"1px solid var(--rule)", marginTop:10, paddingTop:6}}>
-        <div style={labelStyle}>Obsidian vault (full path)</div>
-        <input style={inputStyle} value={form.obsidian_vault_path}
-               onChange={update("obsidian_vault_path")}
-               placeholder="/Users/you/.../obsidian-lab" />
-        <div style={{fontSize:11, color:"var(--muted)", marginTop:3}}>
-          The vault name (used by <code>obsidian://</code> URLs) is derived
-          automatically from the last segment of the path. The Obsidian vault is
-          typically in iCloud Drive and lives separately from <code>wigamig_base</code>.
-          It hosts your personal oracle.
+      <div style={labelStyle}>Obsidian vault (full path)</div>
+      <input style={inputStyle} value={form.obsidian_vault_path}
+             onChange={update("obsidian_vault_path")}
+             placeholder="/Users/you/.../obsidian-lab" />
+
+      <div className="row" style={{gap:10, marginTop:4}}>
+        <div style={{flex:1}}>
+          <div style={labelStyle}>notebook subfolder</div>
+          <input style={inputStyle} value={form.notebook_subfolder}
+                 onChange={update("notebook_subfolder")} />
         </div>
-        <div className="row" style={{gap:10, marginTop:4}}>
-          <div style={{flex:1}}>
-            <div style={labelStyle}>notebook subfolder</div>
-            <input style={inputStyle} value={form.notebook_subfolder}
-                   onChange={update("notebook_subfolder")} />
-          </div>
-          <div style={{flex:1}}>
-            <div style={labelStyle}>oracle subfolder</div>
-            <input style={inputStyle} value={form.oracle_subfolder}
-                   onChange={update("oracle_subfolder")} />
-          </div>
+        <div style={{flex:1}}>
+          <div style={labelStyle}>oracle subfolder</div>
+          <input style={inputStyle} value={form.oracle_subfolder}
+                 onChange={update("oracle_subfolder")} />
         </div>
       </div>
 
@@ -6973,16 +6957,13 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
         </div>
       )}
 
-      <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:12, alignItems:"center"}}>
-        {msg && <span className="muted" style={{
+      <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:10, alignItems:"baseline"}}>
+        {msg && <span style={{
           fontSize:11, marginRight:"auto",
           color: msg === "saved" ? "var(--green)" : "var(--red)",
         }}>{msg}</span>}
-        <button type="button" className="btn sm ghost" onClick={onCancel}>
-          {overall === "ok" || !probes ? "cancel" : "close"}
-        </button>
         <button type="submit" className="btn sm primary" disabled={busy}>
-          {busy ? "…" : "save"}
+          {busy ? "…" : "save changes"}
         </button>
       </div>
     </form>
@@ -8200,20 +8181,6 @@ function App() {
           <MachinesPanel span="c-5" />
         </div>
 
-        {/* Daily action zone (Receptionist → All SEAs). Project-join requests
-            and the Collaborations window are gone — membership is
-            lead-controlled via certificates (project → Members), and
-            inter-group work is just a project spanning groups. */}
-        {persona === "pi" && (
-          <div className="grid" style={{marginBottom:14}}>
-            <ReceptionistPanel inbound={D.inbound_requests} span="c-12" />
-          </div>
-        )}
-
-        <div className="grid" style={{marginBottom:14}}>
-          <SeasPanel seas={D.seas} span="c-12" />
-        </div>
-
         <div className="grid" style={{marginBottom:14}}>
           <PersonalOraclePanel data={D.personal_oracle} span="c-3" />
           <NotebookPanel span="c-5" />
@@ -8234,6 +8201,21 @@ function App() {
         {/* Live subagent feed — the browser equivalent of the tmux BR pane. */}
         <div className="grid" style={{marginBottom:14}}>
           <AgentsActivityPanel activity={D.agents_activity} span="c-12" />
+        </div>
+
+        {/* Daily action zone (Receptionist → All SEAs), sits below the live
+            agent feed per PI preference. Project-join requests and the
+            Collaborations window are gone — membership is lead-controlled via
+            certificates (project → Members), and inter-group work is just a
+            project spanning groups. */}
+        {persona === "pi" && (
+          <div className="grid" style={{marginBottom:14}}>
+            <ReceptionistPanel inbound={D.inbound_requests} span="c-12" />
+          </div>
+        )}
+
+        <div className="grid" style={{marginBottom:14}}>
+          <SeasPanel seas={D.seas} span="c-12" />
         </div>
 
         {/* Inventory: things you check, but not every day. (Lab members moved
