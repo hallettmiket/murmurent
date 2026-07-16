@@ -1143,7 +1143,7 @@ Only when the squad chooses to promote does a deliberation produce a finding:
 
 - The squad lead extracts the agreed statement (claim + caveats + cross-references) into `<project repo>/findings/<scope>/<id>.md`.
 - A PR with this addition merges to `main`.
-- The merge Action auto-publishes to the group oracle (per [push mechanics](#push-mechanics--branches-prs-and-bots)).
+- The merge Action auto-publishes to the group oracle (per [push mechanics](#push-mechanics-branches-prs-and-bots)).
 - Each squad member's personal oracle receives a private copy at the same time.
 
 If no consensus is promoted, the deliberation document still exists as a citable artefact in the project repo. It may be revisited as part of a higher-scope deliberation later.

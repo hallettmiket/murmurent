@@ -60,7 +60,7 @@ Effects:
 
 ### Preferences
 
-Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (local; never committed to group repos). Sets standardised cross-cutting fields once across all installed `personal` agents. See [Tool preferences](group_level.md#tool-preferences-defaults--overrides) for the controlled vocabulary.
+Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (local; never committed to group repos). Sets standardised cross-cutting fields once across all installed `personal` agents. See [Tool preferences](group_level.md#tool-preferences-defaults-overrides) for the controlled vocabulary.
 
 | Command | Effect |
 |---|---|

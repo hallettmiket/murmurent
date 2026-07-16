@@ -127,7 +127,7 @@ in:
 
 That's the "village" idea: independent groups, shared commons, accumulating
 knowledge across every project. The full vision is in
-[`CLAUDE.md`](https://github.com/hallettmiket/murmurent/blob/main/CLAUDE.md) and the design docs under [`.`](.).
+[`CLAUDE.md`](https://github.com/hallettmiket/murmurent/blob/main/CLAUDE.md) and the design docs under [`docs/`](https://github.com/hallettmiket/murmurent/tree/main/docs).
 
 ---
 

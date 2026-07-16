@@ -2,7 +2,7 @@
 
 Maintainer-facing notes for the global `murmurent_public` repo. It does **not**
 live on the hub itself — the hub's own README
-([`docs/murmurent_public/README.md`](murmurent_public/README.md)) is kept trivially
+([`docs/murmurent_public/README.md`](https://github.com/hallettmiket/murmurent/blob/main/docs/murmurent_public/README.md)) is kept trivially
 simple for prospective members.
 
 ## What the hub is (and is NOT)
@@ -39,7 +39,7 @@ gh repo edit hallettmiket/murmurent_public --enable-issues=false   # no data col
 ## Listing a centre in the directory (each mayor, once)
 
 When an institution goes live, its mayor adds **one row** to the hub's
-[`README.md`](murmurent_public/README.md) table — institution, a short description
+[`README.md`](https://github.com/hallettmiket/murmurent_public/blob/main/README.md) table — institution, a short description
 (centre / department / group name), and the **join email** (`join_email` on the
 centre, set via `murmurent centre-init --join-email …` or the `/registrar` profile
 editor). Nothing else is published.
