@@ -6357,11 +6357,19 @@ function MemberProfileModal({ onClose }) {
     e.preventDefault();
     setBusy(true); setMsg(null); setProbes(null);
     try {
+      // The Handles-section "github handle" is the single source of truth for
+      // GitHub (issue #23 — the duplicate provider field was removed). Mirror
+      // it into git_logins.github before saving, else the backend's git_logins
+      // sync would overwrite contact.github with a stale value.
+      const gh = (form.github || "").trim().replace(/^@/, "");
+      const git_logins = { ...form.git_logins };
+      if (gh) git_logins.github = gh; else delete git_logins.github;
+      const payload = { ...form, github: gh, git_logins };
       const res = await fetch("/api/member/settings", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -6519,38 +6527,42 @@ function MemberProfileModal({ onClose }) {
           <input style={inputStyle} value={form.department} onChange={update("department")} />
         </div>
 
-        {/* Phase 3: Per-provider git logins. One input per provider the
-            lab has declared. If the lab list is empty (legacy state),
-            show only the GitHub field so existing users keep working. */}
-        <div style={sectionStyle}>
-          <h4 style={sectionHeader}>Git logins</h4>
-          <div style={{fontSize:11, color:"var(--muted)", marginTop:3, marginBottom:6, lineHeight:1.5}}>
-            Your username on each of the lab's git providers. The PI uses these
-            to add you as a collaborator when you join a project.
-          </div>
-          {(labProviders.length === 0
-            ? [{ id: "github", kind: "github", label: "GitHub", target: "" }]
-            : labProviders).map((p) => (
-            <div key={p.id} style={{marginTop:6}}>
-              <div style={labelStyle}>
-                {p.label || `${p.kind}${p.target ? " · " + p.target : ""}`}
-                <span style={{textTransform:"none", letterSpacing:0, color:"var(--muted)", marginLeft:6}}>
-                  ({p.id})
-                </span>
+        {/* Per-provider git logins for NON-github providers only. GitHub is
+            set once in the Handles section above (issue #23) — excluded here so
+            it isn't a duplicate field. The section hides entirely when the lab
+            has no other providers (the common github-only case). */}
+        {(() => {
+          const others = labProviders.filter(p => p.kind !== "github");
+          if (others.length === 0) return null;
+          return (
+            <div style={sectionStyle}>
+              <h4 style={sectionHeader}>Other git logins</h4>
+              <div style={{fontSize:11, color:"var(--muted)", marginTop:3, marginBottom:6, lineHeight:1.5}}>
+                Your username on the lab's other git providers. The PI uses these
+                to add you as a collaborator when you join a project.
               </div>
-              <input style={inputStyle}
-                     value={form.git_logins[p.id] || ""}
-                     placeholder={p.kind === "github" ? "your-github-username" :
-                                  p.kind === "gitea"  ? "your-gitea-username"  :
-                                                        "(local-bare: not needed)"}
-                     disabled={p.kind === "local-bare"}
-                     onChange={(e) => setForm(prev => ({
-                       ...prev,
-                       git_logins: { ...prev.git_logins, [p.id]: e.target.value },
-                     }))} />
+              {others.map((p) => (
+                <div key={p.id} style={{marginTop:6}}>
+                  <div style={labelStyle}>
+                    {p.label || `${p.kind}${p.target ? " · " + p.target : ""}`}
+                    <span style={{textTransform:"none", letterSpacing:0, color:"var(--muted)", marginLeft:6}}>
+                      ({p.id})
+                    </span>
+                  </div>
+                  <input style={inputStyle}
+                         value={form.git_logins[p.id] || ""}
+                         placeholder={p.kind === "gitea" ? "your-gitea-username" :
+                                      "(local-bare: not needed)"}
+                         disabled={p.kind === "local-bare"}
+                         onChange={(e) => setForm(prev => ({
+                           ...prev,
+                           git_logins: { ...prev.git_logins, [p.id]: e.target.value },
+                         }))} />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          );
+        })()}
 
         {probes && probes.length > 0 && (
           <div style={{
@@ -6781,12 +6793,18 @@ function HostsModal({ onClose }) {
 }
 
 function HostAddForm({ onCancel, onAdded }) {
-  /* Mirrors the machine cards: beyond the connection details (name,
-     SSH host, username), a machine is described by the same three fields
-     the cards show — Obsidian vault, Files, Repo locations. */
+  /* Mirrors the machine cards + ThisMachineEditor (issue #25): beyond the
+     connection details (name, SSH host, username), a machine declares WHERE
+     each vault's clone lives on it — the PERSONAL vault (path + oracle/
+     lab-notebook subfolders) and the LAB (group) vault (the lab-mgmt clone
+     path) — plus Files and Repo locations. These forms set *location*; the
+     vaults' *identity* (which GitHub repo) is machine-independent and set in
+     Profile / Lab Settings. */
   const [form, setForm] = useState({
     name: "", ssh_host: "", remote_user: "",
-    vault_root: "~/Obsidian", files_root: "~/lab_vm/data",
+    vault_root: "~/murmurent_vault", oracle_subfolder: "oracle",
+    notebook_subfolder: "lab-notebook", lab_vault_root: "",
+    files_root: "~/lab_vm/data",
     repos_text: "~/repos", description: "",
   });
   const [busy, setBusy] = useState(false);
@@ -6809,7 +6827,10 @@ function HostAddForm({ onCancel, onAdded }) {
           name: form.name.trim(),
           ssh_host: form.ssh_host.trim(),
           remote_user: form.remote_user.trim(),
-          vault_root: form.vault_root.trim() || "~/Obsidian",
+          vault_root: form.vault_root.trim() || "~/murmurent_vault",
+          oracle_subfolder: form.oracle_subfolder.trim() || "oracle",
+          notebook_subfolder: form.notebook_subfolder.trim() || "lab-notebook",
+          lab_vault_root: form.lab_vault_root.trim(),
           lab_vm_root: form.files_root.trim() || "~/lab_vm/data",
           // First repo location doubles as where new clones land.
           project_root: repos[0] || "~/repos",
@@ -6853,18 +6874,29 @@ function HostAddForm({ onCancel, onAdded }) {
                  placeholder="lab-server.example.edu" />
         </div>
       </div>
+      <div style={lbl}>username on host (optional)</div>
+      <input style={inp} value={form.remote_user} onChange={set("remote_user")}
+             placeholder="the_pi" />
+
+      <div style={{...lbl, marginTop:14, color:"var(--ink)", fontSize:11}}>Personal Vault</div>
+      <input style={inp} value={form.vault_root} onChange={set("vault_root")}
+             placeholder="/home/you/murmurent_vault" />
       <div className="row" style={{gap:10, marginTop:4}}>
         <div style={{flex:1}}>
-          <div style={lbl}>username on host (optional)</div>
-          <input style={inp} value={form.remote_user} onChange={set("remote_user")}
-                 placeholder="the_pi" />
+          <div style={lbl}>Oracle subfolder</div>
+          <input style={inp} value={form.oracle_subfolder} onChange={set("oracle_subfolder")} />
         </div>
-        <div style={{flex:2}}>
-          <div style={lbl}>Obsidian vault (full path)</div>
-          <input style={inp} value={form.vault_root} onChange={set("vault_root")} />
+        <div style={{flex:1}}>
+          <div style={lbl}>Lab-notebook Subfolder</div>
+          <input style={inp} value={form.notebook_subfolder} onChange={set("notebook_subfolder")} />
         </div>
       </div>
-      <div style={lbl}>Files (data root — raw/ + refined/ live here)</div>
+
+      <div style={{...lbl, marginTop:14, color:"var(--ink)", fontSize:11}}>Lab vault</div>
+      <input style={inp} value={form.lab_vault_root} onChange={set("lab_vault_root")}
+             placeholder="/home/you/murmurent_lab_mgmt_mh" />
+
+      <div style={{...lbl, marginTop:14}}>Files (data root — raw/ + refined/ live here)</div>
       <input style={inp} value={form.files_root} onChange={set("files_root")} />
       <div style={lbl}>Repo locations (one per line; the first is where new clones go)</div>
       <textarea style={{...inp, fontFamily:"var(--mono)", minHeight:54, resize:"vertical"}}
@@ -7328,6 +7360,11 @@ function MachinesModal({ onClose }) {
     wigamig_base: h.lab_vm_root || h.wigamig_base || "",
     obsidian_vault_path: h.vault_root || "",
     obsidian_vault_name: "",
+    // Issue #25: per-machine personal-vault subfolders + lab-mgmt clone path,
+    // so a remote card resolves both vaults' oracle/ + lab-notebook/ paths.
+    oracle_subfolder: h.oracle_subfolder || "oracle",
+    notebook_subfolder: h.notebook_subfolder || "lab-notebook",
+    lab_vault_path: h.lab_vault_root || "",
     description: h.description || "",
     scan_dirs: h.scan_dirs || [],
   }));
@@ -7417,6 +7454,9 @@ function HostEditForm({ host, onCancel, onSaved }) {
     ssh_host: host.ssh_host || "",
     remote_user: host.remote_user || "",
     vault_root: host.obsidian_vault_path || "",
+    oracle_subfolder: host.oracle_subfolder || "oracle",
+    notebook_subfolder: host.notebook_subfolder || "lab-notebook",
+    lab_vault_root: host.lab_vault_path || "",
     files_root: host.wigamig_base || "",
     repos_text: (host.scan_dirs || []).join("\n"),
     description: host.description || "",
@@ -7438,6 +7478,9 @@ function HostEditForm({ host, onCancel, onSaved }) {
           ssh_host: form.ssh_host.trim(),
           remote_user: form.remote_user.trim(),
           vault_root: form.vault_root.trim(),
+          oracle_subfolder: form.oracle_subfolder.trim(),
+          notebook_subfolder: form.notebook_subfolder.trim(),
+          lab_vault_root: form.lab_vault_root.trim(),
           lab_vm_root: form.files_root.trim(),
           description: form.description.trim(),
           scan_dirs: repos,
@@ -7475,18 +7518,29 @@ function HostEditForm({ host, onCancel, onSaved }) {
                  placeholder="lab-server.example.edu" />
         </div>
       </div>
+      <div style={lbl}>username on host (optional)</div>
+      <input style={inp} value={form.remote_user} onChange={set("remote_user")}
+             placeholder="the_pi" />
+
+      <div style={{...lbl, marginTop:14, color:"var(--ink)", fontSize:11}}>Personal Vault</div>
+      <input style={inp} value={form.vault_root} onChange={set("vault_root")}
+             placeholder="/home/you/murmurent_vault" />
       <div className="row" style={{gap:10, marginTop:4}}>
         <div style={{flex:1}}>
-          <div style={lbl}>username on host (optional)</div>
-          <input style={inp} value={form.remote_user} onChange={set("remote_user")}
-                 placeholder="the_pi" />
+          <div style={lbl}>Oracle subfolder</div>
+          <input style={inp} value={form.oracle_subfolder} onChange={set("oracle_subfolder")} />
         </div>
-        <div style={{flex:2}}>
-          <div style={lbl}>Obsidian vault (full path)</div>
-          <input style={inp} value={form.vault_root} onChange={set("vault_root")} />
+        <div style={{flex:1}}>
+          <div style={lbl}>Lab-notebook Subfolder</div>
+          <input style={inp} value={form.notebook_subfolder} onChange={set("notebook_subfolder")} />
         </div>
       </div>
-      <div style={lbl}>Files (data root — raw/ + refined/ live here)</div>
+
+      <div style={{...lbl, marginTop:14, color:"var(--ink)", fontSize:11}}>Lab vault</div>
+      <input style={inp} value={form.lab_vault_root} onChange={set("lab_vault_root")}
+             placeholder="/home/you/murmurent_lab_mgmt_mh" />
+
+      <div style={{...lbl, marginTop:14}}>Files (data root — raw/ + refined/ live here)</div>
       <input style={inp} value={form.files_root} onChange={set("files_root")}
              placeholder="/data/lab_vm/…" />
       <div style={lbl}>Repo locations (one per line; the first is where new clones go)</div>
@@ -7574,6 +7628,11 @@ function MachinesPanel({ span = "c-5" }) {
     wigamig_base: h.lab_vm_root || h.wigamig_base || "",
     obsidian_vault_path: h.vault_root || "",
     obsidian_vault_name: "",
+    // Issue #25: per-machine personal-vault subfolders + lab-mgmt clone path,
+    // so a remote card resolves both vaults' oracle/ + lab-notebook/ paths.
+    oracle_subfolder: h.oracle_subfolder || "oracle",
+    notebook_subfolder: h.notebook_subfolder || "lab-notebook",
+    lab_vault_path: h.lab_vault_root || "",
     description: h.description || "",
     scan_dirs: h.scan_dirs || [],
   }));
