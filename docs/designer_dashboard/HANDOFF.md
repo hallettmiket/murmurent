@@ -1,6 +1,6 @@
-# murmurent — hi-fi dashboard handoff
+# Murmurent — hi-fi dashboard handoff
 
-This package contains the design spec for the redesigned murmurent dashboard. It is intentionally framework-agnostic — your job is to wire it into the existing Streamlit (or successor) app. Tokens, components, and data shape are all explicit so a port to React/HTMX/Streamlit-with-custom-components is a 1-to-1 mapping.
+This package contains the design spec for the redesigned Murmurent dashboard. It is intentionally framework-agnostic — your job is to wire it into the existing Streamlit (or successor) app. Tokens, components, and data shape are all explicit so a port to React/HTMX/Streamlit-with-custom-components is a 1-to-1 mapping.
 
 ## Files in this handoff
 | file | role |

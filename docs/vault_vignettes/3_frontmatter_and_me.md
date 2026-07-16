@@ -24,14 +24,14 @@ I'm a first-year student — please explain any acronyms.
 My project is brca_er.
 ```
 
-## What murmurent does
+## What Murmurent does
 
 Murmurent doesn't parse `maps-legends/` itself. Instead, when Sam's
-vault was created, murmurent seeded a `CLAUDE.md` file at the vault
+vault was created, Murmurent seeded a `CLAUDE.md` file at the vault
 root that tells Claude to read `maps-legends/` for context. Claude
 Code automatically loads that `CLAUDE.md` whenever Sam opens a file
 in the vault — so the "me" file shapes how Claude talks to Sam
-indirectly, as context Claude reads, not a setting murmurent enforces.
+indirectly, as context Claude reads, not a setting Murmurent enforces.
 
 ```mermaid
 flowchart LR
@@ -51,7 +51,7 @@ acronyms like that going forward."
 ??? note "Under the hood"
     The frontmatter fields are defined by the
     [oracle entry schema](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md).
-    `maps-legends/` is yours to write — murmurent never writes there
+    `maps-legends/` is yours to write — Murmurent never writes there
     itself; see [the vault layout](../obsidian-layout.md) and
-    [what murmurent touches in your vault](../obsidian-usage.md) for
-    the full picture of which folders murmurent reads and writes.
+    [what Murmurent touches in your vault](../obsidian-usage.md) for
+    the full picture of which folders Murmurent reads and writes.

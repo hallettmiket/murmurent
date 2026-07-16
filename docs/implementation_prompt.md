@@ -5,7 +5,7 @@ tags: [murmurent, prompt]
 
 # Implementation prompt for Claude Code
 
-> Hand this to Claude Code in a session opened at `~/repos/murmurent/`. It is the v1 scope for a smoke-test tutorial of murmurent at the group level.
+> Hand this to Claude Code in a session opened at `~/repos/murmurent/`. It is the v1 scope for a smoke-test tutorial of Murmurent at the group level.
 
 ## Read first
 
@@ -19,7 +19,7 @@ The lab's global rules at `~/.claude/rules/` (code style, data storage, project 
 
 ## What we are building
 
-A working smoke-test of the murmurent group-level design. Two real students will use it to walk through fake projects, find issues, and validate the design. Everything is fake — no real PHI, no real cross-group communication, no real security infrastructure. The smoke test is a faithful exercise of the design's *shape*; it is not a regulated production system.
+A working smoke-test of the Murmurent group-level design. Two real students will use it to walk through fake projects, find issues, and validate the design. Everything is fake — no real PHI, no real cross-group communication, no real security infrastructure. The smoke test is a faithful exercise of the design's *shape*; it is not a regulated production system.
 
 ## Cast (fake)
 

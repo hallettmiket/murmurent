@@ -1,4 +1,4 @@
-# Slack setup for a murmurent centre (mayor guide)
+# Slack setup for a Murmurent centre (mayor guide)
 
 Murmurent uses Slack as its primary communication fabric: a private **mayor↔CC
 channel** (`#murmurent-ops`) where the code posts events, a private **channel per
@@ -21,7 +21,7 @@ In Slack, create a workspace named **`murmurent-<unique_name>`** (e.g.
 - **Create a channel named exactly `#general`.** Newer Slack workspaces **no
   longer ship with a `#general`** (you may see `#social` or a welcome channel
   instead) — so you almost certainly have to create it yourself: *+ → Create a
-  channel → name it `general` → Create*. murmurent broadcasts to *everyone* through
+  channel → name it `general` → Create*. Murmurent broadcasts to *everyone* through
   this channel, and `centre-slack-setup` looks it up by that exact name; if it's
   missing you'll get a `#general not found; create it in Slack` warning and
   broadcasts to `everyone` won't have a target.
@@ -30,7 +30,7 @@ In Slack, create a workspace named **`murmurent-<unique_name>`** (e.g.
 
 ## 2. Create a bot token  [manual]
 
-murmurent talks to Slack through a **bot user** on a Slack **app** you own. Create
+Murmurent talks to Slack through a **bot user** on a Slack **app** you own. Create
 it once — click by click:
 
 1. Go to <https://api.slack.com/apps> and sign in as the account that owns your
@@ -39,7 +39,7 @@ it once — click by click:
    `murmurent-<name>` workspace, **Create App**. Then open **App Home** (left
    sidebar) and set the bot's **Display Name** and **Default username** to
    `mayor`. This name is what PIs + members see as the *sender* of every DM
-   murmurent sends (onboarding steps, approvals) — so messages read as coming
+   Murmurent sends (onboarding steps, approvals) — so messages read as coming
    **from the mayor**, not a generic bot. (Already have an app? Rename it here.)
 3. In the app's left sidebar, open **OAuth & Permissions**.
 4. Scroll to **Scopes → Bot Token Scopes** (the *Bot* section, **not** "User
@@ -52,10 +52,10 @@ it once — click by click:
    | `chat:write` | post events + broadcasts |
    | `im:write` | open a real DM to a member (onboarding + decision DMs); without it, DMs land in the bot's *App messages* tab, not the member's Direct Messages |
    | `files:write` | attach signed bundles (e.g. `bundle.json`) to DMs as **downloadable files** instead of pasting them as plain text; without it, delivery falls back to inline text |
-   | `im:history` | read back the bot's **own** DM threads so murmurent can verify a delivery actually landed; without it, murmurent can send DMs but never check on them |
+   | `im:history` | read back the bot's **own** DM threads so Murmurent can verify a delivery actually landed; without it, Murmurent can send DMs but never check on them |
    | `users:read.email` | resolve a member's email → their Slack account |
    | `groups:read`, `channels:read` | look up channel ids by name (e.g. `#general`) |
-   | `channels:join` | let murmurent **auto-join a public channel** it needs to post to (e.g. `#claude-test`) instead of manually `/invite`-ing the bot. Public channels only — private channels still need a one-time manual invite. |
+   | `channels:join` | let Murmurent **auto-join a public channel** it needs to post to (e.g. `#claude-test`) instead of manually `/invite`-ing the bot. Public channels only — private channels still need a one-time manual invite. |
 
 5. Scroll back **up** to **OAuth Tokens for Your Workspace** → **Install to
    Workspace** → **Allow**.
@@ -75,7 +75,7 @@ it once — click by click:
    auto-added to any private channel it *creates*, but must be invited to
    pre-existing channels like `#general`.
 
-## 3. Give murmurent the token
+## 3. Give Murmurent the token
 
 Either export it, or store it in the token file (mode 0600):
 
@@ -127,7 +127,7 @@ account and are reported as `unresolved` until one is recorded.
 ## Notes
 
 - **Free/Pro Slack has no user-invite API**, so joining the workspace is the
-  invite-link step above; murmurent auto-adds people to *channels* once they're in
+  invite-link step above; Murmurent auto-adds people to *channels* once they're in
   the workspace. Full workspace-invite automation needs a paid admin token.
 - Channel names follow the group's own name normalized to Slack rules
   (lowercase, `[a-z0-9_-]`, ≤80): `lab_mh` → `#lab_mh`.

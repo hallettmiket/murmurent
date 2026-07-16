@@ -11,7 +11,7 @@ tags: [murmurent, design, diagrams]
 
 ## 1. Tier architecture
 
-The murmurent hierarchy: centre → group → project → squad → member.
+The Murmurent hierarchy: centre → group → project → squad → member.
 
 ```mermaid
 graph TB

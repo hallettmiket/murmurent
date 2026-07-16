@@ -1,6 +1,6 @@
 # Creating a project — two vignettes
 
-A murmurent **project** is three sets, not a folder:
+A Murmurent **project** is three sets, not a folder:
 
 - a set of **repos** — *existing* clones picked from your machines' repo
   folders (`~/repos` etc.; the folders themselves are configured on the
@@ -38,7 +38,7 @@ already has the two repos that make up the work — `dcis_code` and
 - *name*: `dcis_17`
 - *members*: `@allie`, `@bob` (from the lab roster dropdown)
 - *machines*: her laptop + `lab-server`
-- *repos*: `dcis_code` + `dcis_manuscript`, selected from the clones murmurent
+- *repos*: `dcis_code` + `dcis_manuscript`, selected from the clones Murmurent
   already found in her repo folders — code and paper grouped into one project.
   (No new repo is created here; if a repo doesn't exist yet, clone or
   `git init` it first and it appears in the picker.)
@@ -49,7 +49,7 @@ She submits; the request lands in the PI's approval queue.
 selected repos, creates the **private** Slack channel, and — because Allie is
 the creator — issues her the **project-lead card** and DMs it to her:
 
-> **Slack DM to @allie:** Your murmurent project LEAD card for 'dcis_17' is
+> **Slack DM to @allie:** Your Murmurent project LEAD card for 'dcis_17' is
 > ready. Save the JSON below as bundle.json, then run:
 > `murmurent import-card bundle.json`
 

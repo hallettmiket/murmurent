@@ -17,7 +17,7 @@ tags: [murmurent, manual]
 
 ## Overview
 
-The murmurent CLI manages the configuration that lets your local Claude Code instance act as a member of a murmurent-enabled group. It does **not** run agents — it manages agent installation, group membership, role assignments, projects, and the day-to-day verbs that touch group artefacts.
+The Murmurent CLI manages the configuration that lets your local Claude Code instance act as a member of a murmurent-enabled group. It does **not** run agents — it manages agent installation, group membership, role assignments, projects, and the day-to-day verbs that touch group artefacts.
 
 Design choice: a thin CLI is preferred over a GUI until a concrete onboarding pain demands one.
 
@@ -39,7 +39,7 @@ murmurent install
 ```
 
 Effects:
-- Clones or updates the murmurent repo (default `~/repos/murmurent`).
+- Clones or updates the Murmurent repo (default `~/repos/murmurent`).
 - Creates `~/.claude/agents/` if absent.
 - Symlinks `frozen` agents from the group registry; copies `personal` agents.
 - Configures `~/.claude/settings.json` with group-derived permissions and MCP servers.
@@ -136,7 +136,7 @@ obvious yet.
 | `murmurent repo list [--host <name>]` | Every git clone on every registered machine (local included), grouped by host, each with its readiness verdict (`✓ ready` / `± partial` / `• clone`) |
 | `murmurent repo status <path-or-name> [--host <name>]` | Is this repo murmurent-ready? A path is checked directly (local, or on `--host` over SSH); a bare name is searched on every registered machine. Reports the `.murmurent.yaml` marker (or legacy `CHARTER.md`) + `.claude/agents/` components. Exit 0 = ready, 1 = not ready, 2 = not found — scriptable |
 | `murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]` | Make an existing clone **murmurent-ready**: writes the `.murmurent.yaml` readiness marker and bootstraps `.claude/agents/`. Creates NO project, no lab_mgmt registry entry — a project is a set of repos + members, made via the dashboard's **New Project** flow (see [`project_creation.md`](project_creation.md)), which attaches already-ready repos |
-| `murmurent repo upgrade [<path> \| --all] [--add-agents a,b] [--all-agents]` | Bring ready repos up to the current murmurent release: converts legacy `CHARTER.md` bootstraps to the marker, migrates the marker schema, re-links commons agents, re-stamps `bootstrap_version`. Agent *content* updates never need this — symlinks track the commons clone automatically |
+| `murmurent repo upgrade [<path> \| --all] [--add-agents a,b] [--all-agents]` | Bring ready repos up to the current Murmurent release: converts legacy `CHARTER.md` bootstraps to the marker, migrates the marker schema, re-links commons agents, re-stamps `bootstrap_version`. Agent *content* updates never need this — symlinks track the commons clone automatically |
 
 ### Experiments
 
@@ -257,7 +257,7 @@ Choreographies are CC skills, not CLI subcommands. Invoke them inside Claude Cod
 
 | Command | Effect |
 |---|---|
-| `murmurent onboard <group> --profile <profile>` | One-shot setup for a new member: clone murmurent, install agents per profile, configure MCP, generate age key, push key + member profile via PR |
+| `murmurent onboard <group> --profile <profile>` | One-shot setup for a new member: clone Murmurent, install agents per profile, configure MCP, generate age key, push key + member profile via PR |
 | `murmurent doctor` | Verify local install is healthy: agents present, MCP servers reachable, age key registered, group memberships visible |
 | `murmurent offboard --member @<handle>` *PI* | Mirror of onboard: revoke roles, release from projects, archive age key, mark profile alumni |
 

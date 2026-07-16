@@ -15,7 +15,7 @@ Sam just says it, in plain English, to Claude Code:
 > worth checking against ER status once the pathology data comes in.
 > This is for my brca_er project."
 
-## What murmurent does
+## What Murmurent does
 
 1. Claude Code hands the fact to the **oracle** agent.
 2. The oracle agent checks it has everything it needs — what the fact
@@ -77,5 +77,5 @@ controls.
     links) so it shows up correctly in Obsidian's graph view. See the
     [oracle workflow](../oracle-workflow.md) for how saved entries can
     later be recalled or published to the lab, and
-    [what murmurent touches in your vault](../obsidian-usage.md) for
+    [what Murmurent touches in your vault](../obsidian-usage.md) for
     exactly which folders it reads and writes.

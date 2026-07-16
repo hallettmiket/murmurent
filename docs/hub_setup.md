@@ -17,7 +17,7 @@ netname, institution, role, PI, justification, etc. never touch GitHub. This is
 deliberate: we don't want a permanent, publicly-archived pile of "who wants to
 join what, where" across institutions.
 
-> The hub is **not** where the murmurent code lives — that's
+> The hub is **not** where the Murmurent code lives — that's
 > [`github.com/hallettmiket/murmurent`](https://github.com/hallettmiket/murmurent)
 > (public, cloned via `bootstrap.sh`). You don't need the hub to get the code;
 > you need it only to look up who to email.

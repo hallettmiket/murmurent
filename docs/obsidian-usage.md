@@ -1,13 +1,13 @@
-# Using your Obsidian vault with murmurent — what you can and can't do
+# Using your Obsidian vault with Murmurent — what you can and can't do
 
-A plain answer to "what can and can't murmurent do with my vault?" Everything
+A plain answer to "what can and can't Murmurent do with my vault?" Everything
 below is checked against the code that ships today
 (`src/murmurent/core/obsidian.py`, `src/murmurent/core/oracle_publish.py`,
 `src/murmurent/mcp/oracle_server.py`, `rules/oracle_schema.md`,
 `agents/oracle.md`). If a capability isn't demonstrable in that code, it's
 called out explicitly as *not shipped* rather than implied.
 
-## 1. What murmurent touches in your vault (and what it leaves alone)
+## 1. What Murmurent touches in your vault (and what it leaves alone)
 
 Murmurent does **not** read your whole
 vault. It only ever touches two subfolders, both configurable per machine
@@ -22,7 +22,7 @@ vault. It only ever touches two subfolders, both configurable per machine
 Everything else in the vault — `maps-legends/`, project notes, attachments,
 whatever else you keep there — is yours. Nothing in the current codebase
 walks the rest of the vault tree, and nothing writes there. If you keep
-`maps-legends/` or other folders next to `oracle/`, murmurent simply never
+`maps-legends/` or other folders next to `oracle/`, Murmurent simply never
 looks at them (see §4).
 
 ## 2. The three Oracle tiers
@@ -64,7 +64,7 @@ embeddings — the schema itself is the index.
 
 ### 2.2 Command-line equivalents
 
-- `murmurent oracle path` — print the personal Oracle dir murmurent has resolved
+- `murmurent oracle path` — print the personal Oracle dir Murmurent has resolved
   on this machine (useful to confirm it found the right vault).
 - `murmurent oracle doctor` — actually try to *read* a file in that dir and
   report OK / BLOCKED / MISSING / NO VAULT / empty. Use this whenever
@@ -145,14 +145,14 @@ Notebook-tier entries are exempt from this schema: frontmatter is optional,
 and when it's missing, date/project are inferred from the filename
 (`YYYY-MM-DD.md` or `YYYY-MM-DD_slug.md`) and the parent folder name.
 
-## 4. `maps-legends/` — the vault's own map, not murmurent's
+## 4. `maps-legends/` — the vault's own map, not Murmurent's
 
 `maps-legends/` (or whatever navigation scheme you keep at the vault root)
 is entirely your convention, documented in your vault's own `CLAUDE.md`,
 not in this repo. Murmurent's code has no special handling for it: it isn't
 one of the folders listed in §1, so nothing here reads, writes, or
 schema-checks it. Treat it as the authoritative human-readable guide to
-"where things live in my vault" — murmurent's Oracle tiers are a narrower,
+"where things live in my vault" — Murmurent's Oracle tiers are a narrower,
 structured slice (`oracle/`, `oracle/drafts/`, the notebook folder) that
 sits alongside whatever else `maps-legends/` organizes.
 
@@ -201,7 +201,7 @@ reports blocked access even after granting FDA, check whether the
 relevant files show the iCloud download icon in Finder and force a
 download by opening them there first.
 
-## 6. Per-machine setup — how murmurent finds your vault
+## 6. Per-machine setup — how Murmurent finds your vault
 
 The same vault path is **never** hardcoded — it's resolved fresh on every
 call, in this order (personal Oracle dir; the notebook dir uses the same
@@ -216,7 +216,7 @@ chain):
    Settings modal. It deliberately stays out of the git-synced lab-mgmt
    repo, because where Obsidian lives on *your* laptop has no reason to
    match anyone else's.
-3. **`obsidian.json` discovery** — if neither of the above resolves, murmurent
+3. **`obsidian.json` discovery** — if neither of the above resolves, Murmurent
    reads Obsidian's own vault registry
    (`~/Library/Application Support/obsidian/obsidian.json` on macOS,
    `~/.config/obsidian/obsidian.json` on Linux) and picks the
@@ -228,7 +228,7 @@ If none of these resolve, tools that need the personal tier raise a clear
 error rather than guessing; the notebook tier resolves via the same chain
 and returns no entries if nothing resolves.
 
-**To point murmurent at your vault:** either open the vault at least once in
+**To point Murmurent at your vault:** either open the vault at least once in
 the Obsidian app (so it lands in `obsidian.json`) and let discovery pick it
 up, or set `obsidian_vault_path` explicitly via the dashboard's Machine
 Settings (or hand-edit `~/.murmurent/machine.yaml`).
@@ -244,7 +244,7 @@ work, and don't let anything above be read as implying otherwise:
   `murmurent notebook ...`-style command that writes one for you.
 - **A vault-map command.** There is no command that inspects or reports on
   your vault's structure (e.g. a `murmurent vault map`). `maps-legends/`
-  (§4) is a manual, human-maintained convention, not something murmurent
+  (§4) is a manual, human-maintained convention, not something Murmurent
   generates or checks.
 
 If you see either described as available somewhere else, treat this

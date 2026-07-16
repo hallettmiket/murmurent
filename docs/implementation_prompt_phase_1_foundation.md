@@ -5,7 +5,7 @@ tags: [murmurent, prompt]
 
 # Phase 1 prompt: Foundation
 
-> Phase 1 of 5 in the murmurent smoke-test tutorial v1 build.
+> Phase 1 of 5 in the Murmurent smoke-test tutorial v1 build.
 >
 > Read first: `docs/implementation_prompt.md` (umbrella brief), `docs/group_level.md` (full design), `docs/cli_manual.md` (CLI surface).
 >

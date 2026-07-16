@@ -1,6 +1,6 @@
 # The centre root key — handling & rotation runbook
 
-The **centre root key** is the certificate-authority root of a murmurent centre.
+The **centre root key** is the certificate-authority root of a Murmurent centre.
 It is an ed25519 signing key, held **only by the mayor**, that signs PI identity
 cards (which in turn let PIs sign member cards) and the centre's revocation list
 (CRL). Its public half is the centre's `signing_recipient`, published in the

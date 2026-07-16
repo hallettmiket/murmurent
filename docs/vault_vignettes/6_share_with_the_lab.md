@@ -18,7 +18,7 @@ Then, in a terminal, Sam runs:
 murmurent oracle publish esr1-high-in-tumour-samples --push
 ```
 
-## What murmurent does
+## What Murmurent does
 
 1. The oracle writes a copy of the note into `oracle/drafts/` in
    Sam's vault. The oracle never pushes to the lab itself — staging

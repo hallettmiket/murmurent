@@ -21,7 +21,7 @@ plus a registrar-side approval gate (guest seats cost money). The
 existing `provision_lab_onboarding` is a clean place to extend.
 
 **First step.** Document the centre's Slack workspace plan + which
-PI's admin token murmurent should use, then add the helper.
+PI's admin token Murmurent should use, then add the helper.
 
 ---
 
@@ -120,9 +120,9 @@ The default location is `~/repos/lab_mgmt`, overrideable via
 
 **Rename recommendation.** **Do NOT rename to `murmurent-mgmt` or
 `murmurent-lab`.** The current name correctly signals that this is the
-*lab's own* repo, not part of the murmurent commons. It belongs to the
+*lab's own* repo, not part of the Murmurent commons. It belongs to the
 PI, lives under the lab's GitHub org (`<labpi>/lab_mgmt`), and is
-analogous to a department's filing cabinet — not a murmurent artifact.
+analogous to a department's filing cabinet — not a Murmurent artifact.
 Renaming would blur the boundary between centre-wide tooling
 (`murmurent/`) and group-scoped governance (`lab_mgmt/`).
 
@@ -137,7 +137,7 @@ shouldn't put here" table. Link it from `docs/setup.md`.
 ## 6. `~/repos` should be user-configurable, not defaulted
 
 **Problem.** `core/projects.py` defaults `DEFAULT_PROJECTS_ROOT` to
-`~/repos`. Every member is silently assumed to want their murmurent
+`~/repos`. Every member is silently assumed to want their Murmurent
 projects checked out there. The `$MURMURENT_PROJECTS_ROOT` env var
 overrides, but users have to know about it.
 

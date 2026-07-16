@@ -5,7 +5,7 @@ prospective members to be able to find and contact them. Joining is by **email**
 — the public directory just points people at your address. Western is the worked
 example; swap in your own values.
 
-## 1. Update the murmurent CLI
+## 1. Update the Murmurent CLI
 
 ```bash
 cd ~/repos/murmurent && git pull && uv tool install --reinstall .

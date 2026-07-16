@@ -1,6 +1,6 @@
 # Reconciliation routine
 
-`murmurent reconcile` compares murmurent's recorded state to on-disk
+`murmurent reconcile` compares Murmurent's recorded state to on-disk
 reality across every registered host and reports drift. Default is
 dry-run; `--apply` repairs the actionable subset.
 
@@ -17,7 +17,7 @@ a failure.
 |---|---|---|---|
 | `orphan_installation` | actionable | ✓ | Move `~/.murmurent/installations/<name>.yaml` into `installations/.archive/<name>_<date>.yaml` |
 | `orphan_registry` | actionable | ✓ | Set `status: archived` + `archived_at: <date>` in the lab_mgmt registry frontmatter (file preserved — lab history is shared) |
-| `missing_charter` | warn | ✗ | User decides: re-adopt the clone, or remove from murmurent |
+| `missing_charter` | warn | ✗ | User decides: re-adopt the clone, or remove from Murmurent |
 | `unadopted_clone` | info | ✗ | Click ↑ adopt in the Repos panel |
 | `lab_mgmt_uncommitted` | warn | ✗ | Review + commit + push lab_mgmt — local-only edits are invisible to the lab (roster writers auto-commit, so this usually means a hand-edit) |
 | `lab_mgmt_unpushed` | warn | ✗ | `git -C <lab-mgmt> push` — commits exist locally that members can't pull yet |

@@ -12,7 +12,7 @@ Sam asks the **oracle** agent in Claude Code, in plain English:
 
 > "What did I note about ESR1?"
 
-## What murmurent does
+## What Murmurent does
 
 1. Before searching anything, the oracle automatically pulls the
    latest version of Sam's vault from GitHub — so if Sam (or one of
@@ -45,8 +45,8 @@ lives or what it was called.
 
 ??? note "Under the hood"
     If a search comes back surprisingly empty, `murmurent oracle doctor`
-    checks that murmurent can actually read your vault. See
+    checks that Murmurent can actually read your vault. See
     [the oracle workflow](../oracle-workflow.md) for more on how
     recall and search work, and
-    [what murmurent touches in your vault](../obsidian-usage.md) for
+    [what Murmurent touches in your vault](../obsidian-usage.md) for
     the "looks empty" / Full Disk Access gotcha.

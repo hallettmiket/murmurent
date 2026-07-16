@@ -1,6 +1,6 @@
 # VSCode workflow
 
-The murmurent repo ships a launcher + workspace config so VSCode opens
+The Murmurent repo ships a launcher + workspace config so VSCode opens
 in a consistent 4-quadrant layout with live agent reporting.
 
 ## Opening a project

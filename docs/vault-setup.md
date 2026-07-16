@@ -1,7 +1,7 @@
 # Setting up your personal vault (`murmurent_vault`)
 
 Your **personal vault** is a private GitHub repo, `murmurent_vault`, on your own
-GitHub account. It backs your murmurent Tier-II notes — your `oracle/`,
+GitHub account. It backs your Murmurent Tier-II notes — your `oracle/`,
 `lab-notebook/`, and `maps-legends/` — so they're version-controlled, survive a
 lost laptop, and stay in sync across your machines. Murmurent creates the repo
 for you; you never make it by hand.
@@ -13,8 +13,8 @@ with notes in it** — you *adopt* your existing vault rather than starting fres
 ## Before you start
 
 - **Authenticate GitHub CLI:** `gh auth login` (the vault is created on *your*
-  GitHub, so murmurent acts as you).
-- Have murmurent installed and up to date (`murmurent --version`).
+  GitHub, so Murmurent acts as you).
+- Have Murmurent installed and up to date (`murmurent --version`).
 
 ## Two cases
 
@@ -36,7 +36,7 @@ murmurent vault init --adopt --dry-run --path "/path/to/your/obsidian-vault"
 ```
 
 The preview shows exactly what would go to GitHub vs stay local. By default —
-the **murmurent scope** — only `oracle/`, `lab-notebook/`, and `maps-legends/`
+the **Murmurent scope** — only `oracle/`, `lab-notebook/`, and `maps-legends/`
 (plus a `CLAUDE.md`) are tracked; **every other folder in your vault (health,
 journal, personal notes, …) stays local and is never pushed.** Read the list,
 then run it for real:
@@ -46,7 +46,7 @@ murmurent vault init --adopt --path "/path/to/your/obsidian-vault"
 ```
 
 That git-inits your vault, creates the private `murmurent_vault` repo, pushes
-only the murmurent folders, and points murmurent at it. Your dashboard's Oracle
+only the Murmurent folders, and points Murmurent at it. Your dashboard's Oracle
 and Notebook panels don't change — they just become git-backed.
 
 ## Important gotcha: symlinked folders
@@ -74,7 +74,7 @@ git -C "<VAULT>" add oracle/ && git -C "<VAULT>" commit -m "vault: add oracle" &
 
 ## Sensitive notes stay off GitHub
 
-The murmurent scope already keeps your personal folders local. On top of that, a
+The Murmurent scope already keeps your personal folders local. On top of that, a
 git pre-commit hook **refuses to commit any note tagged `sensitivity: clinical`**
 — clinical/PHI-tagged notes never reach GitHub, even a private repo. If you
 genuinely want your *whole* vault backed (minus clinical-tagged files), use

@@ -1,6 +1,6 @@
 # Oracle workflow
 
-Two tiers, one schema. The Oracle is murmurent's institutional memory.
+Two tiers, one schema. The Oracle is Murmurent's institutional memory.
 
 ## Why two tiers
 

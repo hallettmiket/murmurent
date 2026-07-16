@@ -58,7 +58,7 @@ murmurent whoami                                       # now shows your group ro
 fingerprint with the PI/mayor out-of-band the first time (see `centre-pin`
 below to fetch it from the public hub instead).
 
-**Sending `enroll.json` to your PI** is unauthenticated hand-off — murmurent
+**Sending `enroll.json` to your PI** is unauthenticated hand-off — Murmurent
 can't automate the member→PI leg, since the PI has to be the one who decides
 to trust you. `enroll` prints the concrete next step: **DM your PI the file
 directly on Slack** (you're already in your lab's workspace). Your PI needs
@@ -75,7 +75,7 @@ can verify the whole chain. You can only issue for a group you lead.
 
 **Sending the bundle back is where Slack *is* automated** — the leg from PI
 back to member goes through the group's own bot token, which you (the PI)
-control, so murmurent can safely send it for you. By default this command:
+control, so Murmurent can safely send it for you. By default this command:
 
 1. reads the member's email from their enrollment request,
 2. resolves it to a Slack user id in your lab's workspace (via

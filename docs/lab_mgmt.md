@@ -1,13 +1,13 @@
 # The lab_mgmt repository (`murmurent_lab_mgmt_<lab>`)
 
-The single most-confusing piece of murmurent's filesystem layout is what
+The single most-confusing piece of Murmurent's filesystem layout is what
 `lab_mgmt` is, who needs it, and how it differs from
 `~/.murmurent/lab_info/`. This document is the short answer.
 
 ## TL;DR
 
 `lab_mgmt` is the **per-group governance repo** — one per PI. It is
-NOT a murmurent commons artifact; it belongs to the lab. It holds the
+NOT a Murmurent commons artifact; it belongs to the lab. It holds the
 canonical roster, project registry, inventory, training records,
 audit log, and other day-to-day filing-cabinet contents for ONE
 research group.
@@ -227,10 +227,10 @@ lab specifics belong in `lab_mgmt`. Inter-lab relations belong in
 
 ## See also
 
-- [`docs/setup.md`](setup.md) — first-time murmurent install on a new
+- [`docs/setup.md`](setup.md) — first-time Murmurent install on a new
   machine, including the `~/repos/murmurent_lab_mgmt_<lab>` clone.
 - [`docs/group_level.md`](group_level.md) — the broader design
-  document for group-scope murmurent operations.
+  document for group-scope Murmurent operations.
 - [`docs/cores_plan.md`](https://github.com/hallettmiket/murmurent/blob/main/docs/cores_plan.md) §4 — how a core's own
   `lab_mgmt` (yes, cores have one too, parallel to labs) mounts
   inside `~/.murmurent/lab_info/cores/<core>/lab-mgmt/`.

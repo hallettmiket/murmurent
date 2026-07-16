@@ -1,6 +1,6 @@
 # Architecture diagrams
 
-Hand-tuned Graphviz sources for the murmurent system. Two diagrams live here:
+Hand-tuned Graphviz sources for the Murmurent system. Two diagrams live here:
 
 | File | What it shows |
 |---|---|

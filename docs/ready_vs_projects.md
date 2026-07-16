@@ -11,11 +11,11 @@ know the difference. This page is that explanation, in one place.
 A git clone under `~/repos/<name>` is **murmurent-ready** when it carries:
 
 1. a `.murmurent.yaml` marker at its root (schema version, owning lab,
-   the agents picked, and the murmurent version that last bootstrapped it), and
-2. a `.claude/agents/` directory — symlinks into the murmurent commons.
+   the agents picked, and the Murmurent version that last bootstrapped it), and
+2. a `.claude/agents/` directory — symlinks into the Murmurent commons.
 
 That's it. Readiness means "Claude Code sessions opened in this repo have
-the murmurent agents + rules wired in." It does **not** create a project, a
+the Murmurent agents + rules wired in." It does **not** create a project, a
 roster, a Slack channel, or a registry entry anywhere. A repo can be
 murmurent-ready and belong to zero projects — that's the normal state for,
 say, a personal scratch repo you just want the commons agents in.
@@ -67,7 +67,7 @@ on its dashboard row afterward.
 
 ## A project — a governance-level object
 
-A murmurent **project** is a very specific, bigger thing: a named set of
+A Murmurent **project** is a very specific, bigger thing: a named set of
 **repos** (existing clones — creating a project never creates a repo) plus a
 named set of cryptographically **certified members**, plus a lead,
 sensitivity tier, and (once provisioned) a private Slack channel. Projects
@@ -109,7 +109,7 @@ repo (git clone under ~/repos)
   record of which projects exist and who's in them is `cert_projects/` in
   lab_mgmt, never a `CHARTER.md` file.**
 
-## Upgrading after a new murmurent release
+## Upgrading after a new Murmurent release
 
 Agent *content* changes (an agent's prompt gets edited) reach every
 murmurent-ready repo automatically — `.claude/agents/<name>.md` is a

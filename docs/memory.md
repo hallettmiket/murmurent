@@ -1,4 +1,4 @@
-# How murmurent remembers: the three tiers
+# How Murmurent remembers: the three tiers
 
 Most agentic AI systems treat memory as undifferentiated: the model's
 prompt window holds the live conversation, and anything else is fetched
@@ -34,7 +34,7 @@ it:
 2. **Session-level audit logging** via the subagent-stop hook
    ([`scripts/murmurent_log_agent_event.sh`](https://github.com/hallettmiket/murmurent/blob/main/scripts/murmurent_log_agent_event.sh)),
    which captures each subagent's final message and feeds the
-   murmurent VSCode dashboard's live activity pane (see
+   Murmurent VSCode dashboard's live activity pane (see
    [`vscode-workflow.md`](vscode-workflow.md)).
 
 **Where it lives.** Nowhere durable — it's the CC session's own context

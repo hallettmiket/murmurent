@@ -14,7 +14,7 @@ Sam drops the PDF into a folder in the vault — Sam's own choice, say
 > "Can you read this paper and give me a one-line takeaway about
 > ESR1?"
 
-## What murmurent does
+## What Murmurent does
 
 1. Sam saves the PDF under `papers/` in the vault. Murmurent never
    touches folders outside `oracle/`, `oracle/drafts/`, and
@@ -35,7 +35,7 @@ flowchart LR
 
 ## What you get
 
-The PDF itself is never indexed or stored anywhere else by murmurent
+The PDF itself is never indexed or stored anywhere else by Murmurent
 — the durable memory is the short note Sam saves:
 
 ```markdown
@@ -56,10 +56,10 @@ endocrine therapy in ER-positive breast cancer.
 ```
 
 ??? note "Under the hood"
-    Claude reads PDFs on demand — murmurent does not index or store
+    Claude reads PDFs on demand — Murmurent does not index or store
     them. See the [bookworm agent](https://github.com/hallettmiket/murmurent/blob/main/agents/bookworm.md)
     for more on how literature gets read and summarised, and
-    [what murmurent touches in your vault](../obsidian-usage.md) for
-    exactly which folders murmurent reads and writes. The `url:`
+    [what Murmurent touches in your vault](../obsidian-usage.md) for
+    exactly which folders Murmurent reads and writes. The `url:`
     field is part of the
     [oracle entry schema](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md).

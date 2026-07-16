@@ -31,7 +31,7 @@ catalog are seeded, and the dashboard boots.
 
 The repo's `.venv` is on Python 3.11, but `pyproject.toml` now requires
 3.12+. Don't fight it — use a 3.12+ conda env (this dev box uses
-`my-rdkit-env`, which is on 3.13) and install the murmurent extras there:
+`my-rdkit-env`, which is on 3.13) and install the Murmurent extras there:
 
 ```bash
 conda activate my-rdkit-env
@@ -463,5 +463,5 @@ Issues hit: …
 Follow-ups: …
 ```
 
-Any ✗ row → file a murmurent issue with the failing curl/click + the
+Any ✗ row → file a Murmurent issue with the failing curl/click + the
 error text, then loop back here when the fix lands.

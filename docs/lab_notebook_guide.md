@@ -3,7 +3,7 @@
 > A concrete, opinionated guide for keeping a murmurent-compatible lab notebook
 > as a Hallett Lab member. Read this once. Bookmark it. Don't reinvent.
 
-There are **two distinct things** in murmurent that the word "notebook" can
+There are **two distinct things** in Murmurent that the word "notebook" can
 mean. Knowing which is which prevents 90 % of confusion:
 
 | Term | Where it lives | Who can read it | What goes there |

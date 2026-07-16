@@ -17,7 +17,7 @@ plain English (`Bookworm, find...`, `Adversary, review...`) and CC
 routes to it. Every agent's final reply leads with a single ≤200-character
 verdict line in a fixed vocabulary (see
 [`rules/headline_first.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/headline_first.md)),
-so the murmurent VSCode dashboard's live activity pane always shows a
+so the Murmurent VSCode dashboard's live activity pane always shows a
 scannable punchline instead of buried prose.
 
 Group and core toolkits are built **on top of** the commons, not instead
@@ -280,4 +280,4 @@ maintains identity-key hygiene alongside the Cable Guy.
 | Understand the memory each agent draws on | [`memory.md`](memory.md) |
 | See the personal ↔ lab Oracle publish flow in detail | [`oracle-workflow.md`](oracle-workflow.md) |
 | See the full commons roster in context | [`CLAUDE.md`](https://github.com/hallettmiket/murmurent/blob/main/CLAUDE.md#reference-agents-the-commons) |
-| Read the manuscript's framing of agents and choreography | the murmurent manuscript (private; Results § "Each user inherits a robust agentic AI operating system", Methods § "Reference agents and verdict vocabulary") |
+| Read the manuscript's framing of agents and choreography | the Murmurent manuscript (private; Results § "Each user inherits a robust agentic AI operating system", Methods § "Reference agents and verdict vocabulary") |

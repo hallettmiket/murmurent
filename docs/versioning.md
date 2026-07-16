@@ -1,6 +1,6 @@
 # Versioning
 
-murmurent uses **CalVer**: `YYYY.M.MICRO` (e.g. `2026.7.0`). This page is the
+Murmurent uses **CalVer**: `YYYY.M.MICRO` (e.g. `2026.7.0`). This page is the
 policy; the running record of releases is [`CHANGELOG.md`](https://github.com/hallettmiket/murmurent/blob/main/CHANGELOG.md).
 
 ## One number, one place
@@ -23,7 +23,7 @@ reads from there:
 
 ## Why CalVer, and when to bump
 
-murmurent isn't a library other packages pin against — it's installed by
+Murmurent isn't a library other packages pin against — it's installed by
 `git clone` + `uv tool install -e .`, and lab members track `main`. What they
 care about is "how stale is my install" and "do I need to run `repo upgrade`",
 not SemVer's API-compatibility promise. CalVer answers the first directly.

@@ -1,6 +1,6 @@
-# Cores in murmurent — comprehensive design plan
+# Cores in Murmurent — comprehensive design plan
 
-**Status:** draft for discussion. **Nothing implemented yet.** This document is the proposed strategy for adding cores (e.g. bioCore) to murmurent as first-class entities alongside labs. It answers items 0–8 from the user request, proposes architectural decisions, and ends with the open questions we need to resolve before any code lands.
+**Status:** draft for discussion. **Nothing implemented yet.** This document is the proposed strategy for adding cores (e.g. bioCore) to Murmurent as first-class entities alongside labs. It answers items 0–8 from the user request, proposes architectural decisions, and ends with the open questions we need to resolve before any code lands.
 
 Worked example throughout: **bioCore** (Western, Schulich, Department of Biochemistry — https://www.schulich.uwo.ca/biocore/). Three service modes (consultation / independent data collection / fee-for-service) — we focus on **independent data collection**. Three capability families (protein production & synthetic biology / structure-function-interaction / high-throughput molecular analysis) — we focus on **structure, function, and interaction**.
 
@@ -8,9 +8,9 @@ Worked example throughout: **bioCore** (Western, Schulich, Department of Biochem
 
 ## 1. Executive summary
 
-A **core** in murmurent is a peer of a lab. It has a leader (PI-equivalent), members (staff who run services), and lives under the centre's registrar. Where a lab does *open-ended research*, a core does *discrete repeatable services* with defined SLAs, fee schedules, training prerequisites, and equipment scheduling.
+A **core** in Murmurent is a peer of a lab. It has a leader (PI-equivalent), members (staff who run services), and lives under the centre's registrar. Where a lab does *open-ended research*, a core does *discrete repeatable services* with defined SLAs, fee schedules, training prerequisites, and equipment scheduling.
 
-Architecturally, **a core is a lab whose "projects" are durable service offerings rather than time-bounded research investigations.** Most murmurent plumbing — agents, security guard, lab_mgmt registry, MEMBERS files, certification tracking, Slack notifications, Tier 2 sudo dump, reconcile — applies to cores with minor schema additions.
+Architecturally, **a core is a lab whose "projects" are durable service offerings rather than time-bounded research investigations.** Most Murmurent plumbing — agents, security guard, lab_mgmt registry, MEMBERS files, certification tracking, Slack notifications, Tier 2 sudo dump, reconcile — applies to cores with minor schema additions.
 
 The genuinely new concepts are:
 
@@ -57,7 +57,7 @@ This shapes the implementation: we extend the existing entities rather than crea
                                                   └─────────────────┘
 ```
 
-A lab member of lab `hallett` who needs to use a bioCore centrifuge becomes a **service requester** at bioCore — murmurent should know they're affiliated with lab `hallett` (for billing + data delivery) without making them a *member* of bioCore.
+A lab member of lab `hallett` who needs to use a bioCore centrifuge becomes a **service requester** at bioCore — Murmurent should know they're affiliated with lab `hallett` (for billing + data delivery) without making them a *member* of bioCore.
 
 ---
 
@@ -91,9 +91,9 @@ Expected hits: many. Most fall into three categories:
 ### "HQP" vs "member"
 
 - **HQP** (Highly Qualified Personnel) is the term Canadian funding agencies (CIHR, NSERC, CFI) use in grant reporting and is what your TCPS_2 / chair-renewal materials use.
-- **Member** is the broader, friendlier term that works across academic / industry / government contexts and is what murmurent already uses internally.
+- **Member** is the broader, friendlier term that works across academic / industry / government contexts and is what Murmurent already uses internally.
 
-**Recommendation:** use **"member"** as murmurent's canonical word, and surface **"HQP"** only where it aligns with grant-reporting context (e.g., the training-compliance panel, certification reports). The two are not synonyms but the overlap is ~90%; collapsing them simplifies UX.
+**Recommendation:** use **"member"** as Murmurent's canonical word, and surface **"HQP"** only where it aligns with grant-reporting context (e.g., the training-compliance panel, certification reports). The two are not synonyms but the overlap is ~90%; collapsing them simplifies UX.
 
 ### PI vs Leader
 
@@ -113,7 +113,7 @@ Half a day of focused rename + grep verification + one back-compat shim per quer
 
 **Correction from the original v1 of this plan.** I initially proposed extending `~/repos/lab_mgmt/` (the Hallett lab's per-lab repo) with a `cores/` subdir. **That was wrong**: `lab_mgmt` is one *lab's* repo. Cores aren't part of any lab — they're centre-wide. Putting them under `lab_mgmt/cores/` is a category error (a core isn't a member of the Hallett lab).
 
-The right place was already wired up in murmurent:
+The right place was already wired up in Murmurent:
 
 - The **centre registrar** ([src/murmurent/core/registrar.py](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/registrar.py)) maintains `~/.murmurent/lab_info/` as the centre-wide registry. Index file `_registry.yaml` + per-entity directories under `labs/`, `cores/`, `collaborations/`.
 - Each core gets a **self-contained per-core mini-repo** at `~/.murmurent/lab_info/cores/<name>/lab-mgmt/` — a directory tree that mirrors the per-lab `lab_mgmt/` layout (members/, projects/, requests/, audit/) but owned by the centre's registrar, not by any one lab's PI.
@@ -126,7 +126,7 @@ The right place was already wired up in murmurent:
 - Cross-membership (a core staff member also in a lab) works via shared handles: both registries reference the same member handle string; the member's identity record lives in whichever lab they primarily belong to.
 - All Phase 1+ work — registrar CRUD, security audit, slack-notify, training-compliance — already runs over `~/.murmurent/lab_info/` because the registrar dashboard's snapshot pulls from there. Zero migration needed.
 
-**Practical consequence**: Phase 0c (originally "extend lab_mgmt") was reverted (murmurent `3da0aa8`, lab_mgmt `b0b3a5e`) and redone by calling the existing `core.registrar.create_core("biocore", ...)` API, which scaffolds at `~/.murmurent/lab_info/cores/biocore/`. The existing registrar dashboard renders bioCORE without code changes — Phase 0d collapses from "build a Cores panel" to "verify the existing Cores panel + add coverage tests."
+**Practical consequence**: Phase 0c (originally "extend lab_mgmt") was reverted (Murmurent `3da0aa8`, lab_mgmt `b0b3a5e`) and redone by calling the existing `core.registrar.create_core("biocore", ...)` API, which scaffolds at `~/.murmurent/lab_info/cores/biocore/`. The existing registrar dashboard renders bioCORE without code changes — Phase 0d collapses from "build a Cores panel" to "verify the existing Cores panel + add coverage tests."
 
 The §4b schema below describes the **per-core lab-mgmt** that the registrar scaffolds; the storage path is `~/.murmurent/lab_info/cores/<core>/lab-mgmt/` not `~/repos/lab_mgmt/cores/<core>/`. The rest of the plan stands.
 
@@ -321,7 +321,7 @@ notes: |
 
 The state machine matches existing SEAs so the dashboard UX is reusable: a panel listing pending/scheduled/completed requests, per-row actions to advance state.
 
-### 5c. Integration with the existing murmurent dashboard
+### 5c. Integration with the existing Murmurent dashboard
 
 - **Member dashboard**: new **Service requests (mine)** panel showing requests the logged-in user has filed across all cores, with state + links.
 - **Lab PI dashboard**: new **Lab service spend** panel showing requests filed by anyone in the PI's lab + monthly $ total.
@@ -345,8 +345,8 @@ This is the biggest decision. We don't want to build a calendar app from scratch
 - Murmurent MCP already wired in this environment.
 
 **Cons:**
-- No native pricing/tier logic — we layer it in murmurent.
-- No native training-prerequisite enforcement — murmurent must check before creating the calendar event.
+- No native pricing/tier logic — we layer it in Murmurent.
+- No native training-prerequisite enforcement — Murmurent must check before creating the calendar event.
 - Cross-org calendar sharing (a Hallett-lab member booking a bioCore calendar) needs the core to grant guest-write — once per calendar, manageable.
 - Privacy concern: booking metadata sits on Google.
 
@@ -365,7 +365,7 @@ Two open-source candidates:
 
 **Cons:**
 - One more thing to run, secure, back up, update.
-- Webhook integration with murmurent is bespoke.
+- Webhook integration with Murmurent is bespoke.
 - Authentication — needs to talk to Western SSO somehow, otherwise users juggle yet another login.
 
 ### Option C — Roll our own minimal booking layer
@@ -373,7 +373,7 @@ Two open-source candidates:
 A `core/scheduling.py` module + a sqlite-backed table (or files in `lab_mgmt/cores/<core>/calendar/`). Just enough to record `(service, slot, requester)` with conflict detection and a per-service availability config (weekdays X to Y, max one booking per slot, etc.).
 
 **Pros:**
-- Total integration with murmurent identity, training, billing.
+- Total integration with Murmurent identity, training, billing.
 - No third party.
 
 **Cons:**
@@ -463,7 +463,7 @@ The PDF format mirrors what Western accounting expects (line items, tax breakdow
 |---|---|---|
 | **1. Manual** (lab admin emails PDF to Western finance, mirrors current bioCore process) | None | 100% |
 | **2. Semi-automated** (lab admin uploads CSVs into Western's expense-report tool) | Low | Likely Western has a CSV upload format; can match it |
-| **3. API integration** (murmurent POSTs invoices to Western finance) | High; needs Western IT engagement, contracts | Low — Western IT is risk-averse with research-side automation |
+| **3. API integration** (Murmurent POSTs invoices to Western finance) | High; needs Western IT engagement, contracts | Low — Western IT is risk-averse with research-side automation |
 
 **Recommendation for v1:** ship Path 1, design the CSV/PDF to make Path 2 easy when the lab admin is ready. Defer Path 3 until there's a clear business case (e.g., bioCore wants real-time charge-back to lab fund balances).
 
@@ -471,14 +471,14 @@ The PDF format mirrors what Western accounting expects (line items, tax breakdow
 
 The "industry" tier in the fee schedule covers customers who aren't on a Western lab fund. Two sub-paths:
 
-- **Western invoice → external customer** (existing bioCore flow) — murmurent generates the invoice, Western's existing Accounts Receivable system bills the customer. No new integration.
-- **Direct Stripe/Square payment at booking** — murmurent generates a payment link, user pays before the slot is confirmed. Useful for one-off industry users who don't want to deal with Western AR. Stripe has a Python SDK; integration is ~half a day. Requires the core to have a merchant account.
+- **Western invoice → external customer** (existing bioCore flow) — Murmurent generates the invoice, Western's existing Accounts Receivable system bills the customer. No new integration.
+- **Direct Stripe/Square payment at booking** — Murmurent generates a payment link, user pays before the slot is confirmed. Useful for one-off industry users who don't want to deal with Western AR. Stripe has a Python SDK; integration is ~half a day. Requires the core to have a merchant account.
 
 **Recommendation:** ship the Western-invoice path for v1; flag Stripe as a Phase 5 add-on if bioCore actually has external customers who want it.
 
 ### Per-lab budget alerts (nice-to-have)
 
-A lab PI can set a monthly budget cap. When their lab's accumulated charges in a month hit 75% of cap, murmurent posts to the lab's Slack channel. At 100%, optionally block further bookings (configurable per lab — some PIs prefer the alert without the block).
+A lab PI can set a monthly budget cap. When their lab's accumulated charges in a month hit 75% of cap, Murmurent posts to the lab's Slack channel. At 100%, optionally block further bookings (configurable per lab — some PIs prefer the alert without the block).
 
 ---
 
@@ -512,7 +512,7 @@ The per-job dir has its own ACL: read-only for the requesting lab's group + read
 |---|---|---|---|
 | **1. Per-job NFSv4 ACL grants** | At job completion, `lab_sec_dump`-like script (running as root) sets an inheriting ACE granting `labgroup<labgroup>:rxtTcy` on the job dir | Native, no daemon, files visible in the lab's normal mount | Requires root ACL changes on every job — that's a lot of `nfs4_setfacl` calls. Auditing later is harder. |
 | **2. Murmurent MCP (`murmurent-core-data`)** | New MCP server that exposes `list_jobs(lab=)`, `get_job_status(job_id)`, `read_file(job_id, path)`, `bundle_job(job_id)`. The MCP runs as a service account, walks the job dir, returns content. Murmurent identity check at the request layer. | Clean access-control story (one place to enforce policy); easy auditing (MCP logs each access); works the same on every machine | Users get data via tooling (`claude` / dashboard download button), not as files in their lab's normal mount. They have to copy/move if they want files on disk. |
-| **3. Per-job signed URLs** | Murmurent HTTP server signs a short-lived (e.g. 72h) URL per file; user downloads via browser/curl | Familiar UX (one-click download); easy to email the link to a non-CC user | Files leave the lab_vm tree onto the murmurent host's disk during download; needs HTTPS + cert; sharing the link is a security hole if it leaks |
+| **3. Per-job signed URLs** | Murmurent HTTP server signs a short-lived (e.g. 72h) URL per file; user downloads via browser/curl | Familiar UX (one-click download); easy to email the link to a non-CC user | Files leave the lab_vm tree onto the Murmurent host's disk during download; needs HTTPS + cert; sharing the link is a security hole if it leaks |
 
 **Recommendation: Option 2 (MCP)** as the primary mechanism, with Option 1 as a *fallback* for users who absolutely need the files on the lab's NFS mount.
 
@@ -565,7 +565,7 @@ The agent-side wins are clear: a member of the Hallett lab can now have a conver
 
 ### Cores with existing data infrastructure
 
-Many established cores (genomics core with sequencers writing to BaseSpace, proteomics core with mass-spec data on a vendor server) will not migrate their data to `$MURMURENT_LAB_VM_ROOT/core/<core>/`. Murmurent needs to handle the "core stores its data elsewhere; murmurent is just the access layer" case:
+Many established cores (genomics core with sequencers writing to BaseSpace, proteomics core with mass-spec data on a vendor server) will not migrate their data to `$MURMURENT_LAB_VM_ROOT/core/<core>/`. Murmurent needs to handle the "core stores its data elsewhere; Murmurent is just the access layer" case:
 
 - The core's `data_root` field can be a URL (s3://, https://, sftp://) or a mount path on the lab server.
 - The `murmurent-core-data` MCP's `read_job_file` implementation per-core handles the backend (filesystem, s3, http GET, vendor API).
@@ -763,7 +763,7 @@ These need a decision from you before the plan goes further:
 
 To set expectations on what's out of scope and would be future work:
 
-- **Multi-centre federation** — murmurent assumes one centre. If Schulich grows into a multi-centre group (e.g., adding Robarts), we'd need a layer above the registrar.
+- **Multi-centre federation** — Murmurent assumes one centre. If Schulich grows into a multi-centre group (e.g., adding Robarts), we'd need a layer above the registrar.
 - **Public marketplace**. The plan assumes services are offered to centre-affiliated users only. A public-facing "bioCore is open to anyone with a credit card" mode is a separate effort.
 - **Time-and-motion analytics**. Tracking actual-vs-quoted duration over time is doable from the booking data, but I haven't sketched the dashboards for it.
 - **Equipment health / maintenance scheduling**. A core has a centrifuge that needs calibration every 6 months. Murmurent could track maintenance windows, but that's a separate scope (equipment registry, not service catalog).
@@ -776,10 +776,10 @@ To set expectations on what's out of scope and would be future work:
 bioCore is the right pilot because:
 
 - It's already established (real customers, real fee schedule, real workflows we can learn from).
-- The leader is in the existing murmurent ecosystem (the core lead is already in `lab_mgmt/members/`).
+- The leader is in the existing Murmurent ecosystem (the core lead is already in `lab_mgmt/members/`).
 - The capability range (centrifuge, ITC, CD, mass spec) spans the simple-to-complex spectrum, so we'll surface design issues early.
 - It's small enough to onboard end-to-end before we generalise to other cores.
-- The data is already on lab-server, where murmurent already runs.
+- The data is already on lab-server, where Murmurent already runs.
 
 Once Phase 0-4 are live for bioCore, **the second core** (genomics, proteomics, microscopy — your call) is mostly schema + service catalog + per-backend MCP adapter. The platform is built once.
 
@@ -797,7 +797,7 @@ Once Phase 0-4 are live for bioCore, **the second core** (genomics, proteomics, 
 | 5. Billing | 1-2 weeks | 7 weeks |
 | 6. Optional add-ons | as-needed | — |
 
-Total to a workable bioCore in murmurent: **~7 weeks** of focused work, with usable deliverables at each phase boundary. Phase 0+1 alone gives the registrar what they need to track cores; Phase 2 gives bioCore's leader the catalog editor; Phase 3 is where end-users see real value.
+Total to a workable bioCore in Murmurent: **~7 weeks** of focused work, with usable deliverables at each phase boundary. Phase 0+1 alone gives the registrar what they need to track cores; Phase 2 gives bioCore's leader the catalog editor; Phase 3 is where end-users see real value.
 
 ---
 

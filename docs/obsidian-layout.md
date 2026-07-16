@@ -1,8 +1,8 @@
-# Obsidian vault layout (murmurent side)
+# Obsidian vault layout (Murmurent side)
 
 Your personal Oracle, lab notebook, and cross-project knowledge live
 in your Obsidian vault. This doc covers the **murmurent-side**
-conventions — what subfolders murmurent writes to and reads from. For
+conventions — what subfolders Murmurent writes to and reads from. For
 **vault-side** organization (how *you* organize your notes overall,
 including the `maps-legends/` folder), see the `CLAUDE.md` at the
 root of your vault.
@@ -55,11 +55,11 @@ root** is its parent directory. The resolver reads Obsidian's
 `obsidian.json` registry (the most recently opened vault), or
 `$MURMURENT_OBSIDIAN_VAULT` if set.
 
-To check that murmurent can actually *read* the vault on this machine
+To check that Murmurent can actually *read* the vault on this machine
 (the common macOS Full Disk Access failure on iCloud-backed vaults),
 run `murmurent oracle doctor`.
 
-## Subfolders murmurent knows about
+## Subfolders Murmurent knows about
 
 | Subfolder | What lives there | Written by |
 |---|---|---|

@@ -128,7 +128,7 @@ surface citations and the Obsidian vault can navigate to them.
 ## Cadence (nightly cron)
 
 A scheduled job runs at **02:00 local time** on the lab VM (or
-wherever the murmurent server runs):
+wherever the Murmurent server runs):
 
 1. For each `[oracle:on]` channel:
    1. Pull yesterday's messages via the Slack web API.

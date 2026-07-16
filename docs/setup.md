@@ -1,6 +1,6 @@
 # Setup
 
-First-time murmurent installation on a new machine.
+First-time Murmurent installation on a new machine.
 
 ## Per-machine wiring
 
@@ -32,7 +32,7 @@ What each step does:
 - `setup.sh` symlinks every `agents/*.md` and `rules/*.md` into
   `~/.claude/agents/` and `~/.claude/rules/`. Preserves any
   user-authored files at the same paths.
-- `murmurent install --hooks` merges the murmurent hooks (raw_guard,
+- `murmurent install --hooks` merges the Murmurent hooks (raw_guard,
   protected_paths, phi_check, audit, agent reporter) and the MCP
   servers (`murmurent-inventory`, `murmurent-oracle`) into
   `~/.claude/settings.json`. Idempotent; preserves existing
@@ -69,7 +69,7 @@ which writes:
    repo is, who needs it, and how it differs from `~/.murmurent/lab_info/`.
 3. `~/.murmurent/installations/<name>.yaml` (this-machine manifest).
 4. `.claude/agents/` symlinks for the agents you picked.
-5. `.vscode/settings.json` (murmurent chrome — title, activity bar
+5. `.vscode/settings.json` (Murmurent chrome — title, activity bar
    right, terminals in editor area).
 6. `.gitignore` line for `.claude/settings.json` (machine-local
    permissions/grants don't escape to git).
@@ -78,7 +78,7 @@ Existing files are preserved on re-run, on both paths.
 
 ## Remote host setup
 
-If you also run murmurent on a remote (e.g. lab-server):
+If you also run Murmurent on a remote (e.g. lab-server):
 
 ```bash
 # Add the host to the local registry (dashboard Machines panel,

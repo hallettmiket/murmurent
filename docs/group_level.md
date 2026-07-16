@@ -9,7 +9,7 @@ tags: [murmurent, design]
 > Destined to become a Claude Code system prompt for group-level operations.
 > Re-read in full before every edit; keep the document internally consistent.
 > See companions: [[cli_manual]], [[diagrams]].
-> Origin notes: [[murmurent notes]].
+> Origin notes: [[Murmurent notes]].
 >
 > **⚠ Project model superseded (2026-07):** the project-birth flow described
 > below (PI approval scaffolds a fresh repo + charter) predates the
@@ -55,7 +55,7 @@ A group operates across three classes of repo. Each plays a distinct role; mixin
 
 ## Three layers within the group
 
-1. **Agent registry** — definitions for every agent the group recognises, version-controlled in the murmurent repo at `guilds/<group>/agents/`.
+1. **Agent registry** — definitions for every agent the group recognises, version-controlled in the Murmurent repo at `guilds/<group>/agents/`.
 2. **Role registry** — group-level roles, each with cardinality (singleton / quota / open) and current operator(s). Lives in the lab-management repo. Only the PI mutates assignments.
 3. **Workspaces** — each member's local Claude Code environment, with the agents they have chosen to install, free to evolve on their own machine (subject to the freeze cascade below).
 
@@ -201,13 +201,13 @@ For verbs not in this day-to-day table, see:
 - [Role transitions](#role-transitions) for `assign` / `revoke` / `transfer_role`.
 - [Project lifecycle](#project-lifecycle) for `birth` / `admit` / `release` / `pause` / `resume` / `end` / `archive_project`.
 - [Knowledge and continuity verbs](#knowledge-and-continuity-verbs) for `discuss` / `teach` / `freeze`.
-- `schedule` is intentionally not a murmurent verb — calendars and a `calendar` MCP cover it.
+- `schedule` is intentionally not a Murmurent verb — calendars and a `calendar` MCP cover it.
 
 ## Privacy and access
 
 - **Personal**: lives in the person's vault and `~/.claude/agent-memory/`. Never leaves their machine.
 - **Project-scoped**: lives in a private GitHub repo (one per project) with a checked-in `MEMBERS` file as the source of truth. Filesystem ACL on `$MURMURENT_LAB_VM_ROOT/refined/<project>/` is synced from MEMBERS.
-- **Group-shared**: agent definitions in the murmurent repo; curated findings in a group oracle; readable to all group members.
+- **Group-shared**: agent definitions in the Murmurent repo; curated findings in a group oracle; readable to all group members.
 - **Sensitive artefacts that must travel** (cloud, email, off-VM): wrap in `age` with MEMBERS as the recipient list. Re-encrypt on membership change.
 
 ## Inventory and shared resources
@@ -281,7 +281,7 @@ If the lab outgrows markdown (≥1000 items, multiple writers per day, complex q
 ### Why not SQL today
 
 - Schema rigidity: catalog photos, vendor links, prep notes don't fit cleanly.
-- Tooling separate from the rest of murmurent.
+- Tooling separate from the rest of Murmurent.
 - Adds a server to operate.
 - For lab-scale (hundreds of items, infrequent updates), the marginal benefit is small.
 
@@ -450,7 +450,7 @@ derived:
 ---
 ```
 
-`detect_marker` lets the CLI auto-detect the instrument when `--instrument` is not given. The murmurent repo ships starter profiles for common instruments (Zeiss confocal, Illumina sequencers, common mass-spec); labs add their own.
+`detect_marker` lets the CLI auto-detect the instrument when `--instrument` is not given. The Murmurent repo ships starter profiles for common instruments (Zeiss confocal, Illumina sequencers, common mass-spec); labs add their own.
 
 #### 2. Generic fallback patterns
 
@@ -665,7 +665,7 @@ murmurent onboard <group> --profile student
 ```
 
 This:
-- Clones the murmurent repo (default `~/repos/murmurent`).
+- Clones the Murmurent repo (default `~/repos/murmurent`).
 - Installs agents per the profile, applying the freeze cascade (symlinks for `frozen`, copies for `personal`).
 - Configures MCP servers (inventory, oracle, request board) in `~/.claude/settings.json`.
 - Generates a personal `age` key pair; pushes the public key to `lab-mgmt-repo/keys/<github-handle>.age`.
@@ -934,7 +934,7 @@ A project adopts a choreography by setting `choreography: <name>` in its `CHARTE
 
 Choreography is invoked as a CC skill:
 
-- `choreography:list` — show available choreographies in the murmurent repo and any guild-level additions.
+- `choreography:list` — show available choreographies in the Murmurent repo and any guild-level additions.
 - `choreography:apply <name> --to <project>` — scaffold a project against the recipe.
 - `choreography:status <project>` — report how far the project has progressed against the recipe's expected steps; flag missing artefacts.
 
@@ -1029,9 +1029,9 @@ Freezes are immutable. Re-freezing under the same purpose produces a new dated t
 
 **Performance note:** computing checksums on a project with many gigabytes of refined data takes time. The freeze command runs in the background by default and notifies on completion.
 
-### Verbs not added to murmurent
+### Verbs not added to Murmurent
 
-- **schedule** — not a murmurent verb. Calendars (Google Calendar, iCal) handle scheduling; a `calendar` MCP lets agents read events. The dashboard's "upcoming" panel pulls from notebook `status: planned` frontmatter, SEA deadlines, and the calendar MCP.
+- **schedule** — not a Murmurent verb. Calendars (Google Calendar, iCal) handle scheduling; a `calendar` MCP lets agents read events. The dashboard's "upcoming" panel pulls from notebook `status: planned` frontmatter, SEA deadlines, and the calendar MCP.
 - **transfer_role** — already designed in [Role transitions](#role-transitions). CLI: `murmurent role transfer`.
 - **archive_project** — already in [Project lifecycle](#project-lifecycle). CLI: `murmurent project archive`.
 
@@ -1258,11 +1258,11 @@ Plus a project-level sensitivity-tier framework that layers extra controls (`sta
 
 ## Claude Code hooks (gap #1, design)
 
-Seven hooks compose the murmurent protection layer. Each is a small script registered in `~/.claude/settings.json`. Hook scripts live in the murmurent repo at `murmurent/hooks/` and are symlinked into `~/.claude/hooks/` by `murmurent install`. The CC harness invokes them with the tool call (or prompt) on stdin as JSON; the hook responds with JSON declaring allow / deny / modify.
+Seven hooks compose the Murmurent protection layer. Each is a small script registered in `~/.claude/settings.json`. Hook scripts live in the Murmurent repo at `murmurent/hooks/` and are symlinked into `~/.claude/hooks/` by `murmurent install`. The CC harness invokes them with the tool call (or prompt) on stdin as JSON; the hook responds with JSON declaring allow / deny / modify.
 
 ### Active project context
 
-Several hooks need to know which murmurent project the member is currently working in. Resolution order:
+Several hooks need to know which Murmurent project the member is currently working in. Resolution order:
 
 1. `MURMURENT_PROJECT` environment variable, if set.
 2. Walk up from `cwd` until a `.murmurent-project` marker file (or `CHARTER.md`) is found; the project name is read from that file.
@@ -1310,7 +1310,7 @@ print(json.dumps({"decision": "allow"}))
 
 **Logic:**
 - Identify each path argument in the tool call.
-- For each path, check if it's inside another murmurent project's repo (`~/repos/<other>/`) or data dir (`/data/lab_vm/{raw,refined}/<other>/`).
+- For each path, check if it's inside another Murmurent project's repo (`~/repos/<other>/`) or data dir (`/data/lab_vm/{raw,refined}/<other>/`).
 - For each such "foreign" path, fetch the MEMBERS file of that project (cached locally for 5 min).
 - If the current member's GitHub handle isn't in MEMBERS, deny.
 - The active project itself is always allowed (no MEMBERS lookup needed; CC was started inside it).
@@ -1353,7 +1353,7 @@ print(json.dumps({"decision": "allow"}))
 
 ### Hook 5: Project context injection (`UserPromptSubmit`)
 
-**Purpose:** when a user prompt is submitted inside a murmurent project, inject relevant context as system reminders so the model has fresh awareness without the user having to re-explain.
+**Purpose:** when a user prompt is submitted inside a Murmurent project, inject relevant context as system reminders so the model has fresh awareness without the user having to re-explain.
 
 **Trigger:** every user prompt submission.
 
@@ -1400,7 +1400,7 @@ Active SEAs:
 
 ### Settings.json registration
 
-The murmurent install script writes the seven hooks into `~/.claude/settings.json`:
+The Murmurent install script writes the seven hooks into `~/.claude/settings.json`:
 
 ```json
 {
@@ -1480,7 +1480,7 @@ A bookworm should never need Bash; if a session is running bookworm and somehow 
 
 - **Agent definitions** — when copying or symlinking an agent into `~/.claude/agents/<name>.md`, ensures the file's `tools:` field is exactly `required_tools - denied_tools`. (For symlinks to frozen agents, the registry definition already has the right `tools:`; install verifies.)
 - **`~/.claude/settings.json` `permissions.allow`** — the union of all installed agents' `required_tools`. These tools are auto-allowed (no user prompt) globally, because some installed agent legitimately needs them.
-- **`~/.claude/settings.json` `permissions.deny`** — a baseline list of inherently risky patterns that no murmurent agent should ever invoke:
+- **`~/.claude/settings.json` `permissions.deny`** — a baseline list of inherently risky patterns that no Murmurent agent should ever invoke:
 
 ```json
 "deny": [
@@ -1554,7 +1554,7 @@ Three tiers, three storage strategies:
 - **Project-scoped** (project API keys, third-party tokens): in the project repo as `secrets/<name>.age`, encrypted to project MEMBERS. Rotated on member release.
 
 Enforcement:
-- A **git pre-commit hook** in every murmurent repo blocks plaintext secret patterns (extending the secret-leak hook in gap #1).
+- A **git pre-commit hook** in every Murmurent repo blocks plaintext secret patterns (extending the secret-leak hook in gap #1).
 - `murmurent secret rotate <scope> <name>` rotates and re-encrypts.
 - For `clinical` projects, any secret touching PHI requires PI sign-off (PR review on the encrypted blob) at creation and at every rotation.
 
@@ -1648,7 +1648,7 @@ Sending any PHI-containing prompt to the Claude API itself violates PHIPA unless
 - **Anthropic Enterprise tier with BAA / equivalent**, with verified residency.
 - **Keep data-touching analyses outside CC**: CC handles methods, code, deliberations, and writing; the actual PHI-touching analysis runs locally on the lab VM without LLM mediation.
 
-This is a constraint of using *any* LLM tool on regulated data, not a murmurent limitation.
+This is a constraint of using *any* LLM tool on regulated data, not a Murmurent limitation.
 
 ### Dashboard reflection: required vs elected
 

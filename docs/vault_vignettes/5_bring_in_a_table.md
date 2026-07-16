@@ -13,7 +13,7 @@ asks:
 
 > "Which of my tumour samples are ER-positive?"
 
-## What murmurent does
+## What Murmurent does
 
 1. A small table can live right inside a vault note as a plain
    markdown table — no special format needed.
