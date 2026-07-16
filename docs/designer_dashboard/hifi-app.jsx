@@ -550,10 +550,13 @@ function RepoInventoryPanel({ span = "c-12" }) {
           // (100% + fixed), so columns size to their content instead of the
           // repo column hogging all the slack and the host cells being crushed
           // to 120px (which shattered "Make ready" into vertical letters).
-          <table className="dt" style={{width:"auto", tableLayout:"auto", minWidth:"min(100%, 720px)"}}>
+          <table className="dt" style={{
+            width:"auto", tableLayout:"auto",
+            minWidth:"min(100%, 720px)", margin:"0 auto",
+          }}>
             <thead><tr>
-              <th style={{width:"1%", whiteSpace:"nowrap", paddingRight:28}}>repo</th>
-              <th style={{whiteSpace:"nowrap", paddingRight:28}}>github</th>
+              <th style={{minWidth:260, whiteSpace:"nowrap", paddingRight:32}}>repo</th>
+              <th style={{whiteSpace:"nowrap", paddingRight:32}}>github</th>
               {knownHosts.map(h => (
                 <th key={h} style={{textAlign:"left", whiteSpace:"nowrap"}}>{h}</th>
               ))}
