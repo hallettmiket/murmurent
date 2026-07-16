@@ -45,6 +45,20 @@ def member_email_map(handles=None) -> dict[str, str]:
     return out
 
 
+def member_slack_map(handles=None) -> dict[str, str]:
+    """``{bare-lowercased-handle: slack-user-id}`` from the lab roster, for members
+    with an explicit Slack id recorded (set for those onboarded before Slack
+    infra, or whose Slack email differs from their roster email). Preferred over
+    email lookup by the invite/DM paths."""
+    want = None if handles is None else {str(h).lstrip("@").lower() for h in handles}
+    out: dict[str, str] = {}
+    for m in _mem.iter_members():
+        h = m.handle.lstrip("@").lower()
+        if m.slack and (want is None or h in want):
+            out[h] = m.slack
+    return out
+
+
 def member_github_map(handles=None) -> dict[str, str]:
     """``{bare-lowercased-handle: github-login}`` from the lab roster, optionally
     limited to ``handles``. The roster is the source of truth for github login."""
@@ -104,6 +118,7 @@ def _default_inviter(channel_id: str, handles: list[str], *, member_email_map: d
     from ..dashboard import slack_notify as _sn
     return _sn.invite_members_to_channel(channel_id, handles,
                                          member_email_map=member_email_map,
+                                         member_slack_map=member_slack_map(handles),
                                          token=token)
 
 

@@ -63,3 +63,33 @@ def test_iter_lab_identities_active_only_by_default(lab):
     assert active == {"m1", "m2"}           # inactive excluded
     allh = {i["handle"] for i in LI.iter_lab_identities(slack_resolver=r, active_only=False)}
     assert "old" in allh
+
+
+def test_member_identity_prefers_explicit_slack_id(lab, monkeypatch):
+    """A member with an explicit Slack user id on the roster resolves to it
+    directly — no email lookup needed (the retroactive fix for members
+    onboarded before Slack infra, whose Slack email ≠ roster email)."""
+    import re
+    from pathlib import Path
+    root = Path(__import__("os").environ["MURMURENT_LAB_MGMT_REPO"])
+    (root / "members" / "vg.md").write_text(
+        "---\nhandle: '@vg'\nfull_name: VG\nrole: staff\nstatus: active\n"
+        "email: vg@x.edu\nslack: U03C7H09A48\n---\n", encoding="utf-8")
+
+    def _boom(_email):
+        raise AssertionError("email lookup must NOT run when an id is present")
+
+    ident = LI.member_identity("vg", slack_resolver=_boom)
+    assert ident["slack_uid"] == "U03C7H09A48" and ident["in_workspace"] is True
+
+
+def test_member_identity_non_id_slack_falls_back_to_email(lab):
+    """A non-id-shaped slack value (e.g. a bare username) is NOT trusted as a
+    uid — the resolver still runs against email."""
+    from pathlib import Path
+    root = Path(__import__("os").environ["MURMURENT_LAB_MGMT_REPO"])
+    (root / "members" / "vg2.md").write_text(
+        "---\nhandle: '@vg2'\nfull_name: VG2\nrole: staff\nstatus: active\n"
+        "email: vg2@x.edu\nslack: vaibhav\n---\n", encoding="utf-8")
+    ident = LI.member_identity("vg2", slack_resolver=_resolver({"vg2@x.edu": "U999"}))
+    assert ident["slack_uid"] == "U999"

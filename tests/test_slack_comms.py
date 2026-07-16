@@ -61,7 +61,7 @@ def test_ensure_group_channel_creates_and_invites(world, monkeypatch):
         seen["private"] = private
         return SlackChannelResult(ok=True, channel_id="C0NEW",
                                   channel_name=name, detail="created (HTTP 200)")
-    def inviter(cid, handles, *, member_email_map=None):
+    def inviter(cid, handles, *, member_email_map=None, member_slack_map=None):
         seen["invite"] = (cid, list(handles), member_email_map)
         return {"channel_id": cid, "invited": handles, "already_in": [],
                 "unresolved": [], "error": None}
@@ -85,7 +85,7 @@ def test_provision_creates_group_channel_and_persists_id(world, monkeypatch):
         created_with["ws"] = ws
         return "C0LABMH"
     invited_with = {}
-    def fake_inviter(cid, handles, *, member_email_map=None):
+    def fake_inviter(cid, handles, *, member_email_map=None, member_slack_map=None):
         invited_with["args"] = (cid, list(handles), member_email_map)
         return {"invited": list(handles), "already_in": [], "unresolved": [],
                 "error": None}
@@ -189,7 +189,7 @@ def test_provision_centre_slack_invites_the_mayor(world, monkeypatch):
     monkeypatch.setattr(CP, "slack_create_channel",
         lambda name, **k: CP.SlackChannelResult(ok=True, channel_id="C0OPS", channel_name=name))
     seen = {}
-    def fake_invite(cid, handles, *, member_email_map=None):
+    def fake_invite(cid, handles, *, member_email_map=None, member_slack_map=None):
         seen.update(cid=cid, handles=handles, map=member_email_map)
         return {"invited": handles, "already_in": [], "unresolved": []}
     monkeypatch.setattr("murmurent.dashboard.slack_notify.invite_members_to_channel", fake_invite)
@@ -208,7 +208,7 @@ def test_provision_centre_slack_mayor_email_override(world, monkeypatch):
     monkeypatch.setattr(CP, "slack_create_channel",
         lambda name, **k: CP.SlackChannelResult(ok=True, channel_id="C0OPS", channel_name=name))
     seen = {}
-    def fake_invite(cid, handles, *, member_email_map=None):
+    def fake_invite(cid, handles, *, member_email_map=None, member_slack_map=None):
         seen["map"] = member_email_map
         return {"invited": handles, "already_in": [], "unresolved": []}
     monkeypatch.setattr("murmurent.dashboard.slack_notify.invite_members_to_channel", fake_invite)
@@ -229,7 +229,7 @@ def test_provision_member_to_group_invites(world, monkeypatch):
     R.create_lab(name="dcis", display_name="dcis", pi_handle="@allie", pi_email="a@x")
     R.set_group_slack_channel("dcis", "C0DCIS")
     monkeypatch.setattr("murmurent.dashboard.slack_notify.invite_members_to_channel",
-        lambda cid, handles, *, member_email_map=None:
+        lambda cid, handles, *, member_email_map=None, member_slack_map=None:
             {"invited": handles, "already_in": [], "unresolved": []})
     probes = CP.provision_member_to_group("dcis", handle="@bob", email="bob@x", token="xoxb-x")
     assert probes[0].status == "ok" and "C0DCIS" in probes[0].detail
@@ -240,7 +240,7 @@ def test_provision_member_defers_with_invite_link_when_not_in_workspace(world, m
     R.set_group_slack_channel("dcis", "C0DCIS")
     CI.update_centre({"slack_invite_url": "https://join.slack/xyz"})
     monkeypatch.setattr("murmurent.dashboard.slack_notify.invite_members_to_channel",
-        lambda cid, handles, *, member_email_map=None:
+        lambda cid, handles, *, member_email_map=None, member_slack_map=None:
             {"invited": [], "already_in": [],
              "unresolved": [{"handle": handles[0], "reason": "no slack account"}]})
     probes = CP.provision_member_to_group("dcis", handle="@bob", email="bob@x", token="xoxb-x")

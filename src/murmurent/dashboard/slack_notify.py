@@ -1009,6 +1009,7 @@ def sync_project_channel_members(
     member_handles: list[str],
     *,
     member_email_map: dict[str, str] | None = None,
+    member_slack_map: dict[str, str] | None = None,
 ) -> dict:
     """Add every handle in ``member_handles`` to the project's Slack channel.
 
@@ -1045,8 +1046,17 @@ def sync_project_channel_members(
                                    for h in member_handles],
                     "error": f"no slack channel for project {project_slug!r}"}
 
+    # Roster Slack ids (preferred over email lookup) — build from the roster if
+    # the caller didn't supply a map.
+    if member_slack_map is None:
+        try:
+            from ..core.cert_provision import member_slack_map as _sm
+            member_slack_map = _sm(member_handles)
+        except Exception:  # noqa: BLE001
+            member_slack_map = {}
     return invite_members_to_channel(
-        channel_id, member_handles, member_email_map=member_email_map)
+        channel_id, member_handles, member_email_map=member_email_map,
+        member_slack_map=member_slack_map)
 
 
 def invite_members_to_channel(
@@ -1054,15 +1064,18 @@ def invite_members_to_channel(
     member_handles: list[str],
     *,
     member_email_map: dict[str, str] | None = None,
+    member_slack_map: dict[str, str] | None = None,
     token: str | None = None,
 ) -> dict:
     """Invite ``member_handles`` to an existing channel by id.
 
-    Resolves each handle→email→Slack user_id and batch-invites those not
-    already present. Same structured result + idempotency as
-    ``sync_project_channel_members`` (which now delegates here); reusable for
-    lab/core channels which have no CHARTER-derived slug. Best-effort.
-    ``token`` overrides the centre bot token (group/shared-workspace callers)."""
+    Resolves each handle to a Slack user id — preferring an explicit id from
+    ``member_slack_map`` (the roster's ``slack`` field, for members onboarded
+    before Slack infra) and falling back to handle→email→lookup — then
+    batch-invites those not already present. Same structured result +
+    idempotency as ``sync_project_channel_members`` (which now delegates here);
+    reusable for lab/core channels which have no CHARTER-derived slug.
+    Best-effort. ``token`` overrides the centre bot token."""
     tok = token or _token()
     if not tok:
         return {"channel_id": channel_id, "invited": [], "already_in": [],
@@ -1072,6 +1085,7 @@ def invite_members_to_channel(
 
     existing = _channel_member_ids(channel_id, token=tok)
     email_map = member_email_map or {}
+    slack_map = member_slack_map or {}
     invited: list[str] = []
     already_in: list[str] = []
     unresolved: list[dict] = []
@@ -1080,15 +1094,19 @@ def invite_members_to_channel(
 
     for handle in member_handles:
         norm = handle.lstrip("@").lower()
-        email = email_map.get(norm) or email_map.get(handle)
-        if not email:
-            unresolved.append({"handle": handle, "reason": "no email on record"})
-            continue
-        uid = _lookup_user_id_by_email(email, token=tok)
+        # Prefer an explicit roster Slack id; only fall back to email lookup.
+        explicit = (slack_map.get(norm) or slack_map.get(handle) or "").strip()
+        uid = explicit if re.match(r"^[UW][A-Z0-9]{6,}$", explicit) else None
         if not uid:
-            unresolved.append({"handle": handle,
-                               "reason": f"no slack account for {email}"})
-            continue
+            email = email_map.get(norm) or email_map.get(handle)
+            if not email:
+                unresolved.append({"handle": handle, "reason": "no email or slack id on record"})
+                continue
+            uid = _lookup_user_id_by_email(email, token=tok)
+            if not uid:
+                unresolved.append({"handle": handle,
+                                   "reason": f"no slack account for {email}"})
+                continue
         if uid in existing:
             already_in.append(handle)
             continue

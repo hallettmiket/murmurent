@@ -45,7 +45,16 @@ def member_identity(handle: str, *, slack_resolver=None) -> dict | None:
         return None
     rec = _m.parse_member(p)
     resolver = slack_resolver or _default_slack_resolver
-    slack_uid = resolver(rec.email) if rec.email else None
+    # Prefer an explicit Slack user id recorded on the roster — for members
+    # onboarded before the Slack infra, or whose Slack-account email differs
+    # from their roster email, the email lookup fails but the id is known.
+    # Fall back to resolving via email lookup.
+    import re as _re
+    explicit = (rec.slack or "").strip()
+    if _re.match(r"^[UW][A-Z0-9]{6,}$", explicit):
+        slack_uid = explicit
+    else:
+        slack_uid = resolver(rec.email) if rec.email else None
     return {
         "handle": rec.handle,
         "email": rec.email,

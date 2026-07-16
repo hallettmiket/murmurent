@@ -483,9 +483,11 @@ def provision_member_to_group(
         return probes
 
     from ..dashboard import slack_notify as _sn
+    from .cert_provision import member_slack_map as _slack_map
     norm = handle.lstrip("@").lower()
     inv = _sn.invite_members_to_channel(
-        channel_id, [handle], member_email_map={norm: email}) or {}
+        channel_id, [handle], member_email_map={norm: email},
+        member_slack_map=_slack_map([handle])) or {}
     if handle in inv.get("invited", []) or handle in inv.get("already_in", []):
         probes.append(Probe(name="member-channel", status="ok",
             detail=f"added @{norm} to the group's channel ({channel_id})"))
@@ -710,9 +712,11 @@ def provision_centre_slack(
         if mayor_handle and mayor_email and (token or _has_env_slack_token()):
             try:
                 from ..dashboard import slack_notify as _sn
+                from .cert_provision import member_slack_map as _slack_map
                 inv = _sn.invite_members_to_channel(
                     mayor_id, [mayor_handle],
-                    member_email_map={mayor_handle.lstrip("@").lower(): mayor_email})
+                    member_email_map={mayor_handle.lstrip("@").lower(): mayor_email},
+                    member_slack_map=_slack_map([mayor_handle]))
                 if mayor_handle in inv.get("invited", []):
                     probes.append(Probe(name="mayor-invite", status="ok",
                                         detail=f"added {mayor_handle} to #murmurent-ops"))
