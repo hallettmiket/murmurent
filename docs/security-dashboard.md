@@ -1,9 +1,8 @@
 # Security dashboard: per-lab posture audit
 
 Murmurent's per-lab security dashboard runs the `security_guard` agent
-periodically against a registered host (typically a shared lab server
-such as lab-server) and surfaces permission, hygiene, and policy
-findings in one screen.
+periodically against a registered host (typically a shared lab server)
+and surfaces permission, hygiene, and policy findings in one screen.
 
 Two tiers, two trust levels:
 
@@ -11,189 +10,69 @@ Two tiers, two trust levels:
   POSIX bits on filesystems where they're authoritative (`/home`,
   ext4), reads the user's own `~/.ssh/`, `~/.murmurent/`, `~/.claude*`,
   dotfiles, crontab, systemd user units, etc. Ships immediately.
-- **Tier 2**: root-owned ACL snapshot. Requires a sysadmin to install
-  a narrowly-scoped sudoers entry on the target host (see
-  [Tier 2 setup](#tier-2-setup)). Reads NFSv4 ACLs via the sudo-only
-  v4 mount + `sshd -T` + lab-wide `authorized_keys` summaries. The
-  dashboard consumes the snapshot if present and reports "ACL details
-  unavailable" rows if absent.
+- **Tier 2**: root-owned ACL snapshot. Requires a sysadmin to install a
+  narrowly-scoped sudoers entry on the target host (see
+  [Tier 2 setup](#tier-2-setup)). Reads the storage layer's real ACLs
+  plus `sshd -T` and lab-wide `authorized_keys` summaries. The dashboard
+  consumes the snapshot if present and reports "ACL details unavailable"
+  rows if absent.
 
-**Hard rule (carried over from the global Murmurent charter):**
-the security agent **never modifies or deletes any file under
-`/data/lab_vm/raw/` or `/data/lab_vm/refined/`**, even when its own
-findings recommend a fix. All `chmod`/`chown`/ACL adjustments in the
-dashboard are display-only: the PI runs them by hand after vetting.
+**Hard rule (from the global Murmurent data-storage policy):** the
+security agent **never modifies or deletes any file under the lab's
+`raw/` or `refined/` data trees**, even when its own findings recommend
+a fix. All `chmod`/`chown`/ACL adjustments in the dashboard are
+display-only: the PI runs them by hand after vetting.
+
+> **Site-specific configuration is kept privately.** The concrete server,
+> storage host, mount layout, ACL templates, and authorised operators for
+> a given lab are that lab's own operational record and are **not** part
+> of this public documentation. Each lab keeps them in its private
+> lab-management repo. This page describes only the general mechanism.
 
 ---
 
-## Why POSIX bits are not the whole story on the NAS
+## Storage where POSIX bits are not authoritative
 
-lab-server (and any Schulich storage tier mounted from
-`nas.example.edu:/nas-export/...`) exposes `/data` over **NFSv3**.
-the NAS speaks NTFS-style ACLs natively, and the v3 mount can only
-project them as synthesized POSIX bits. Those bits are **not
-authoritative**: `chmod` on the v3 mount may not flip the underlying
-ACE, and the bits you see don't reflect deny-ACE chains.
+Many enterprise NAS platforms store native (NTFS-style / NFSv4) ACLs and,
+when a directory is exported over **NFSv3**, can only project those ACLs
+as synthesized POSIX bits. Those bits are **not authoritative**: a
+`chmod` on the v3 mount may not flip the underlying ACE, and the bits you
+see don't reflect deny-ACE chains.
 
-There's a parallel **NFSv4.1 mount at `/srv/acl-view`** restricted to
-root that exposes the real ACLs (`nfs4_getfacl`). That's where the
-Tier 2 audit reads from.
+The usual remedy is a parallel **NFSv4 view restricted to root** that
+exposes the real ACLs (`nfs4_getfacl`). Tier 2 reads from that view.
 
 The Tier 1 scanner detects this situation automatically: if
-`nfs4_getfacl <lab_vm_root>` returns `Operation to request attribute
-not supported`, the scanner **skips the POSIX walks of `raw/` and
-`refined/`** (which would produce nothing but noise) and emits a
-single info-finding `POSIX-NOT-AUTHORITATIVE-01` pointing the PI at
-Tier 2.
+`nfs4_getfacl <lab_vm_root>` reports that the attribute isn't supported,
+the scanner **skips the POSIX walks of `raw/` and `refined/`** (which
+would produce nothing but noise) and emits a single info-finding
+`POSIX-NOT-AUTHORITATIVE-01` pointing the PI at Tier 2.
 
-`/home` on lab-server is local ext4 (`/dev/md0`), so POSIX ACLs there
-are real: the home-dir, ssh-key, and dotfile scanners stay valid.
+Local filesystems (a server's own `/home` on ext4, for example) have
+real POSIX ACLs, so the home-dir, ssh-key, and dotfile scanners stay
+valid there.
 
----
-
-## NFSv4 ACL primer
-
-(Adapted from notes by Dr. the core lead, who configured the the NAS
-ACL policy for the Hallett lab tree. Reproduced here so the dashboard
-+ any future PI reading a finding can interpret ACEs without
-reverse-engineering them.)
-
-Each ACE line is `type:flags:principal:perms`.
-
-| Field | Meaning |
-|---|---|
-| `A` / `D` | Allow / Deny |
-| `f` | inherit to new files |
-| `d` | inherit to new subdirs |
-| `i` | inherit-only: ACE does **not** apply to this object, only its children |
-| `n` | no-propagate: child loses inheritance flags after one hop |
-| `g` | principal is a group |
-
-Permission letters (only the ones that show up in our ACLs):
-
-| Letter | Meaning |
-|---|---|
-| `r` | read |
-| `w` | write |
-| `a` | append / create-subdir |
-| `x` | execute / traverse |
-| `d` | delete-self |
-| `D` | delete-child |
-| `t` | read-attrs |
-| `T` | write-attrs |
-| `n` | read-named-attrs (xattr) |
-| `N` | write-named-attrs |
-| `c` | read-ACL |
-| `C` | write-ACL |
-| `o` | write-owner |
-| `y` | synchronize |
-
-`rwaDdxtTnNcCoy` = full control.
-
-**Evaluation order:** ACEs are checked top-to-bottom per permission bit;
-the first ACE that mentions a bit wins.
-
-**Inheritance rule:** an ACE with `f`/`d` but without `i` applies to
-the directory itself AND is copied to new children. With `i`, it only
-seeds children.
-
----
-
-## Expected ACL templates (Tier 2 reference)
-
-These are the canonical patterns Core Lead set up for `/data/lab_vm/`.
-The Tier 2 audit diffs observed ACLs against these and flags
-deviations. The PI sorts out which deviations are intentional
-(exception patterns like `bc_brca/`) vs accidental drift.
-
-### `<lab_vm>/raw/`: immutable policy
-
-```
-D::OWNER@   : Dd                  # owner cannot delete THIS dir's contents or itself
-D::GROUP@   : Dd                  # group cannot either
-D:fdi:OWNER@: Dd                  # every child (file or dir) inherits Deny-delete
-D:fdi:GROUP@: Dd                  # same for the group
-A::OWNER@   : rwaDdxtTnNcCoy      # on this dir itself, owner is otherwise full
-A::GROUP@   : rwaxtTnNcy          # group can read/write/list, can't delete
-A:di:OWNER@ : rwaDdxtTnNcCoy      # new SUBDIRS: owner full
-A:di:GROUP@ : rwaxtTnNcy          # new SUBDIRS: group r/w/x but no delete
-A:fi:OWNER@ : rxtTcy              # new FILES: owner read-only (no w/a, no d)
-A:fi:GROUP@ : rxtTcy              # new FILES: group read-only
-```
-
-Net effect: files born under `raw/` are read-only and undeletable, even
-to their nominal owner. New subdirs are writable (to make ingest
-possible) but the files they hold inherit the immutability.
-
-### `<lab_vm>/refined/`: collaborative read-write
-
-```
-A::OWNER@                  : rwaDxtTnNcCy            # owner: nearly full on this dir
-A::GROUP@                  : rwaDxtTnNcy             # lab group: nearly full on this dir
-A::EVERYONE@               : tcy                     # everyone else: metadata only
-A:fdg:Administrators@example.edu: rwaDdxtTnNcCoy          # admins: full, inherited
-A::OWNER@                  : rwaDdxtTnNcCoy          # (duplicate owner-full)
-A:fdi:OWNER@               : rwaDdxtTnNcCoy          # future child OWNER: full (inherit-only)
-A:fdg:Users@example.edu         : rxtncy                  # UWO Users: READ everything, inherited
-A:dg:Users@example.edu          : way                     # UWO Users on subdirs only: write/append/sync
-```
-
-Net effect: the lab group has full control; the broader `Users@example.edu`
-group can list/read everything under refined and can add files in
-subdirs (but not at the refined/ root). Files (vs subdirs) end up
-read-only for UWO Users since the `dg:Users:way` ACE is dir-only.
-
-### `<lab_vm>/refined/<exception>/`: locked-down project (e.g. `bc_brca`)
-
-```
-A:fd:<named-user-1>@example.edu : rwaDdxtTnNcCoy   # explicit user: full, inherited
-A:fd:OWNER@                : rwaDdxtTnNcCoy   # owner: full, inherited
-A:fd:<named-user-2>@example.edu : rwaDdxtTnNcCoy   # second explicit user
-A:fdg:Administrators@example.edu: rwaDdxtTnNcCoy   # admins: full, inherited
-A::OWNER@                  : tcy              # bare OWNER@: metadata only
-A::GROUP@                  : tcy              # GROUP@ stripped to metadata-only
-A::EVERYONE@               : tcy              # everyone-else metadata-only
-```
-
-Net effect: the lab `labgroup` group is **deliberately locked out**;
-only the named principals and Administrators can enter. This is a
-named-exception pattern: the security dashboard flags it as
-`REFINED-EXCEPTION-DETECTED-01` (info) rather than drift, and **the
-PI vets which restricted dirs are intentional**.
-
-### `<lab_vm>/` (top level)
-
-```
-A:fdg:labgroup@example.edu : rwaDdxtTnNcCoy   # helpdesk: full, inherited everywhere
-A:fdg:Users@example.edu           : tcy              # all UWO users: read-attrs/ACL only, inherited
-A::OWNER@                    : rwaDdxtTnNcCoy   # owner: full
-A::GROUP@                    : rwaDxtTnNcy      # labgroup: full except delete-self & write-owner
-A:fdg:Administrators@example.edu  : rwaDdxtTnNcCoy   # admins: full, inherited
-A:fdi:OWNER@                 : rwaDdxtTnNcCoy   # whatever the future owner of a child is: full
-```
-
-Other labs (`/data/lab_*`) appear to use the **default** group-rwx with
-similar inheritance: Core Lead only configured the strict templates for
-`/data/lab_vm/raw` and `/data/lab_vm/refined/bc_brca`. The security
-dashboard scopes the Tier 2 audit to `<lab_vm>` for now; other lab
-trees aren't audited by us.
+The interpretation of the storage layer's ACL entries and the expected
+per-directory ACL templates a given lab audits against are lab-specific
+and are kept in that lab's private lab-management repo, not here.
 
 ---
 
 ## Rule catalog
 
-Every Tier 1 / Tier 2 finding carries a stable rule ID. Use the
-anchors below to deep-link from the dashboard rows.
+Every Tier 1 / Tier 2 finding carries a stable rule ID. Use the anchors
+below to deep-link from the dashboard rows. `<lab_vm_root>` stands for
+the lab's data root.
 
 ### Tier 1: unprivileged scanners
 
 | Rule | Severity | Description |
 |---|---|---|
-| <a id="POSIX-NOT-AUTHORITATIVE-01"></a>`POSIX-NOT-AUTHORITATIVE-01` | info | The `/data/lab_vm` mount synthesizes POSIX bits over NFSv4 ACLs. POSIX-bit walks of `raw/`/`refined/` were skipped to avoid noise. Run the Tier 2 sudo snapshot for the real picture. |
-| <a id="RAW-IMMUTABLE-01"></a>`RAW-IMMUTABLE-01` | block | File under `<lab_vm>/raw/<project>/` has a write bit set. **Only fires on filesystems where POSIX bits are authoritative**: see `POSIX-NOT-AUTHORITATIVE-01`. |
+| <a id="POSIX-NOT-AUTHORITATIVE-01"></a>`POSIX-NOT-AUTHORITATIVE-01` | info | The data mount synthesizes POSIX bits over native ACLs. POSIX-bit walks of `raw/`/`refined/` were skipped to avoid noise. Run the Tier 2 sudo snapshot for the real picture. |
+| <a id="RAW-IMMUTABLE-01"></a>`RAW-IMMUTABLE-01` | block | File under `<lab_vm_root>/raw/<project>/` has a write bit set. **Only fires on filesystems where POSIX bits are authoritative**: see `POSIX-NOT-AUTHORITATIVE-01`. |
 | <a id="RAW-LAB-ONLY-01"></a>`RAW-LAB-ONLY-01` | warn | File under `raw/` is world-readable. Same caveat. |
 | <a id="REFINED-LAB-WRITE-01"></a>`REFINED-LAB-WRITE-01` | warn / block | File in `refined/` is world-readable (warn) or world-writable (block). Same caveat. |
-| <a id="REFINED-NO-TOOLS-01"></a>`REFINED-NO-TOOLS-01` | info | Executable bit set on a `refined/` file: tools should live in `<lab_vm>/tools/` or `<lab_vm>/db/`, not refined. |
+| <a id="REFINED-NO-TOOLS-01"></a>`REFINED-NO-TOOLS-01` | info | Executable bit set on a `refined/` file: tools should live under a tools/ or db/ area, not refined. |
 | <a id="HOME-REPO-PRIVATE-01"></a>`HOME-REPO-PRIVATE-01` | warn | File in `~/repos/<project>/` is group/world-readable on a shared host. |
 | <a id="HOME-REPO-LARGE-01"></a>`HOME-REPO-LARGE-01` | warn | Tracked file > `--repo-large-mb` (default 50 MB) and not in `.gitignore`. |
 | <a id="HOME-REPO-GIT-SECRET-01"></a>`HOME-REPO-GIT-SECRET-01` | block | Tracked filename matches a secret pattern (`*.env`, `*.pem`, `*_rsa`, `*.key`, `id_*`, etc.). |
@@ -215,181 +94,105 @@ anchors below to deep-link from the dashboard rows.
 
 ### Tier 2: root-owned ACL snapshot
 
-The Tier 2 audit diffs observed NFSv4 ACEs against the expected
-templates above. Rules:
+The Tier 2 audit diffs observed ACLs against the lab's expected
+templates (kept privately). Rules:
 
 | Rule | Severity | Description |
 |---|---|---|
-| <a id="RAW-DENY-DELETE-MISSING-01"></a>`RAW-DENY-DELETE-MISSING-01` | block | A directory under `raw/` is missing the `D:fdi:OWNER@:Dd` or `D:fdi:GROUP@:Dd` ACE: files there COULD be deleted. |
-| <a id="RAW-FILE-WRITABLE-01"></a>`RAW-FILE-WRITABLE-01` | block | A file under `raw/` has an OWNER@ or GROUP@ allow-ACE granting `w` or `a` (the raw template caps these at `rxtTcy`). |
-| <a id="REFINED-PATTERN-DRIFT-01"></a>`REFINED-PATTERN-DRIFT-01` | warn | The `refined/` ACL drifts from the canonical pattern (missing UWO Users read, missing Administrators-full, etc.). |
-| <a id="REFINED-EXCEPTION-DETECTED-01"></a>`REFINED-EXCEPTION-DETECTED-01` | info | A subdir of `refined/` has the locked-down pattern (GROUP@ stripped, named principals only). Surfaced for PI to vet whether intentional, like `bc_brca/`. |
-| <a id="ACL-UNEXPECTED-PRINCIPAL-01"></a>`ACL-UNEXPECTED-PRINCIPAL-01` | info | An ACE names a principal not in the expected template's allowlist. Could be a legitimate access grant or drift. |
+| <a id="RAW-DENY-DELETE-MISSING-01"></a>`RAW-DENY-DELETE-MISSING-01` | block | A directory under `raw/` is missing its inherited Deny-delete ACE: files there COULD be deleted. |
+| <a id="RAW-FILE-WRITABLE-01"></a>`RAW-FILE-WRITABLE-01` | block | A file under `raw/` has an allow-ACE granting write/append (the raw template caps files at read-only). |
+| <a id="REFINED-PATTERN-DRIFT-01"></a>`REFINED-PATTERN-DRIFT-01` | warn | The `refined/` ACL drifts from the lab's canonical pattern. |
+| <a id="REFINED-EXCEPTION-DETECTED-01"></a>`REFINED-EXCEPTION-DETECTED-01` | info | A subdir of `refined/` has a locked-down pattern (group access stripped, named principals only). Surfaced for the PI to vet whether intentional. |
+| <a id="ACL-UNEXPECTED-PRINCIPAL-01"></a>`ACL-UNEXPECTED-PRINCIPAL-01` | info | An ACE names a principal not in the expected template's allowlist. Could be a legitimate grant or drift. |
 | <a id="SSHD-PWAUTH-01"></a>`SSHD-PWAUTH-01` | block | `sshd_config`'s `PasswordAuthentication` is not `no` (from `sshd -T`). |
 | <a id="SSHD-ROOTLOGIN-01"></a>`SSHD-ROOTLOGIN-01` | warn | `PermitRootLogin` is not `no` or `prohibit-password`. |
 | <a id="AUTH-PWD-ATTEMPTS-01"></a>`AUTH-PWD-ATTEMPTS-01` | warn | Any successful password-auth login in last 30 days (`auth.log` summary). |
 | <a id="AUTH-WEAK-KEYS-LAB-01"></a>`AUTH-WEAK-KEYS-LAB-01` | warn | Any lab member's `authorized_keys` contains `ssh-rsa` or `ssh-dss` (lab-wide view, requires root walk). |
 
-### Tier 2: per-core ACL diff (cores Phase 1c, script v7+)
+### Tier 2: per-core ACL diff (cores)
 
-The snapshot script's `acls_core_<core>_<kind>.txt` files are diffed
-against the same templates as the lab tree, but with `CORE-`-prefixed
-rule IDs so the dashboard can group findings per core. Each finding
-carries the core's short id in its `project` field. Categories:
-`core_raw` and `core_refined`.
+The snapshot script's per-core ACL files are diffed against the same
+templates as the lab tree, with `CORE-`-prefixed rule IDs so the
+dashboard can group findings per core. Each finding carries the core's
+short id in its `project` field. Categories: `core_raw` and
+`core_refined`.
 
 | Rule | Severity | Description |
 |---|---|---|
-| <a id="CORE-RAW-DENY-DELETE-MISSING-01"></a>`CORE-RAW-DENY-DELETE-MISSING-01` | block | A directory under a core's `raw/` is missing the inherited Deny-delete ACE. Files there could be deleted. |
-| <a id="CORE-RAW-FILE-WRITABLE-01"></a>`CORE-RAW-FILE-WRITABLE-01` | block | A file under a core's `raw/` has OWNER@/GROUP@ allow ACE granting `w`/`a`/`D`/`C`. |
-| <a id="CORE-RAW-UNEXPECTED-PRINCIPAL-01"></a>`CORE-RAW-UNEXPECTED-PRINCIPAL-01` | info | A directory under a core's `raw/` has a named-principal ACE outside the standard allowlist. For the registrar to vet. |
-| <a id="CORE-REFINED-PATTERN-DRIFT-01"></a>`CORE-REFINED-PATTERN-DRIFT-01` | warn | A core's `refined/` root drifts from the canonical template (missing OWNER+GROUP full, missing Users@example.edu read, etc.). |
-| <a id="CORE-REFINED-EXCEPTION-DETECTED-01"></a>`CORE-REFINED-EXCEPTION-DETECTED-01` | info | A subdir of a core's `refined/` has the `bc_brca`-style locked-down pattern (GROUP@ stripped). Surfaced for the core leader to vet. |
-| <a id="CORE-ACL-UNEXPECTED-PRINCIPAL-01"></a>`CORE-ACL-UNEXPECTED-PRINCIPAL-01` | info | A directory anywhere under a core's tree has a named-principal ACE outside the standard allowlist. |
+| <a id="CORE-RAW-DENY-DELETE-MISSING-01"></a>`CORE-RAW-DENY-DELETE-MISSING-01` | block | A directory under a core's `raw/` is missing the inherited Deny-delete ACE. |
+| <a id="CORE-RAW-FILE-WRITABLE-01"></a>`CORE-RAW-FILE-WRITABLE-01` | block | A file under a core's `raw/` has an allow-ACE granting write/append/delete/write-ACL. |
+| <a id="CORE-RAW-UNEXPECTED-PRINCIPAL-01"></a>`CORE-RAW-UNEXPECTED-PRINCIPAL-01` | info | A directory under a core's `raw/` names a principal outside the standard allowlist. For the registrar to vet. |
+| <a id="CORE-REFINED-PATTERN-DRIFT-01"></a>`CORE-REFINED-PATTERN-DRIFT-01` | warn | A core's `refined/` root drifts from the canonical template. |
+| <a id="CORE-REFINED-EXCEPTION-DETECTED-01"></a>`CORE-REFINED-EXCEPTION-DETECTED-01` | info | A subdir of a core's `refined/` has a locked-down pattern. Surfaced for the core leader to vet. |
+| <a id="CORE-ACL-UNEXPECTED-PRINCIPAL-01"></a>`CORE-ACL-UNEXPECTED-PRINCIPAL-01` | info | A directory under a core's tree names a principal outside the standard allowlist. |
 
 ---
 
 ## Tier 2 setup
 
-Murmurent ships [`scripts/lab_sec_dump.sh`](https://github.com/hallettmiket/murmurent/blob/main/scripts/lab_sec_dump.sh)
-(the root-owned snapshot script) and
-[`scripts/sudoers.d/murmurent_sec_dump`](https://github.com/hallettmiket/murmurent/blob/main/scripts/sudoers.d/murmurent_sec_dump)
-(the NOPASSWD grant template, currently authorising `the_pi` and
-`core_lead`). One-time install on the target host:
+Murmurent ships a root-owned snapshot script and a narrowly-scoped
+NOPASSWD sudoers grant template under `scripts/`. The general one-time
+install on the target host is:
 
-```bash
-# 1. SSH to the lab server.
-ssh lab-server
-cd ~/repos/murmurent
-git pull
+1. SSH to the lab server and update the commons clone (`git pull`).
+2. **Verify the shipped script's SHA256** against the recorded checksum
+   before running anything as root (detects in-flight tampering; a
+   mismatch means STOP, do not install).
+3. Install the snapshot script root-owned (`install -m 0755 -o root -g root`).
+4. Install the sudoers grant (`install -m 0440 -o root -g root`), after
+   editing it to list the operators your lab authorises.
+5. **Validate the sudoers file** with `visudo -c -f ...` before trusting
+   it (a bad sudoers file can lock everyone out of sudo).
+6. Smoke-test with `sudo -n <script>`: no password should be prompted.
+7. (Recommended) Periodically re-check the installed binary's hash
+   against the source, since anyone with root could later modify it.
 
-# 2. Verify the script's SHA256 matches what's recorded in the repo.
-#    Defence-in-depth: detects in-flight tampering before the script
-#    runs as root. Mismatch -> STOP, do not install.
-(cd scripts && shasum -a 256 -c lab_sec_dump.sh.sha256)
-(cd scripts/sudoers.d && shasum -a 256 -c murmurent_sec_dump.sha256)
-# Expected (both):
-#   lab_sec_dump.sh: OK
-#   murmurent_sec_dump: OK
+After that, the `/security` dashboard's **Run sudo dump** button SSHes to
+the host, runs the snapshot as root, ships the result back, and merges
+Tier 2 findings into the table.
 
-# 3. Install the root-owned snapshot script.
-sudo install -m 0755 -o root -g root \
-    scripts/lab_sec_dump.sh /opt/murmurent/lab_sec_dump.sh
+The host, mount paths, ACL templates, snapshot location, and the list of
+authorised operators are **lab-specific** and are configured in the
+script's constants and the sudoers grant on that host. A lab keeps those
+concrete values in its own private lab-management repo, not here.
 
-# 4. Install the sudoers grant. Edit scripts/sudoers.d/murmurent_sec_dump
-#    first if the authorised handles need to change.
-sudo install -m 0440 -o root -g root \
-    scripts/sudoers.d/murmurent_sec_dump /etc/sudoers.d/murmurent_sec_dump
+### What the snapshot writes
 
-# 5. Validate the sudoers file (REQUIRED — a bad sudoers file can lock
-#    everyone out of sudo).
-sudo visudo -c -f /etc/sudoers.d/murmurent_sec_dump
-# Expected:
-#   /etc/sudoers.d/murmurent_sec_dump: parsed OK
-
-# 6. Smoke test — no password should be prompted.
-sudo -n /opt/murmurent/lab_sec_dump.sh
-# Expected: "lab_sec_dump: snapshot written to /var/lib/murmurent/.snapshot/<UTC-date>"
-ls -la /var/lib/murmurent/.snapshot/latest/
-# Expected files: manifest.json, acls_raw.txt, acls_refined.txt,
-#                  sshd_runtime.txt, ssh_keys.jsonl, auth_summary.json
-
-# 7. (Optional but recommended) Confirm the installed binary's hash
-#    matches the source. Anyone with root could later modify
-#    /opt/murmurent/lab_sec_dump.sh; running this periodically detects it.
-sudo shasum -a 256 /opt/murmurent/lab_sec_dump.sh
-diff <(sudo shasum -a 256 /opt/murmurent/lab_sec_dump.sh | awk '{print $1}') \
-     <(awk '{print $1}' scripts/lab_sec_dump.sh.sha256) \
-  && echo "installed binary matches source" \
-  || echo "MISMATCH — investigate"
-```
-
-After step 5, the `/security` dashboard's **Run sudo dump** button works:
-it SSHes to the host, runs `sudo -n /opt/murmurent/lab_sec_dump.sh`, and
-the next live scan automatically ingests the snapshot (tarred + shipped
-back, parsed locally) and merges Tier 2 findings into the table.
-
-### What the script writes
-
-Per-run directory at `/var/lib/murmurent/.snapshot/<UTC-date>/` on the
-**local disk** of the host (NOT on the the NAS share: the NAS's NFSv4 ACLs
-deny `root@<host>` write access since root isn't an AD principal there).
-Owned by `root:labgroup`, mode 0750 (lab group reads; no one else).
-Files:
-
-| File | Contents |
-|---|---|
-| `manifest.json` | Script version, run timestamp, per-section status |
-| `acls_raw.txt` | `nfs4_getfacl -R /srv/acl-view/lab_vm/raw` |
-| `acls_refined.txt` | `nfs4_getfacl -R /srv/acl-view/lab_vm/refined` |
-| `sshd_runtime.txt` | `sshd -T` (effective config, drop-ins resolved) |
-| `ssh_keys.jsonl` | Per (member, key) row: type, comment, mtime, mode. **NO key bodies.** |
-| `auth_summary.json` | 30-day per-user counts of publickey / password / failed auth + **distinct /16 subnet count** (raw IPs deliberately redacted: file is lab-group readable, so home networks etc. must not leak). For raw-IP detail, read `auth.log` directly on the host. |
-
-The dashboard consumer parses each section independently: missing
-sections only suppress that section's findings, never the whole audit.
-
-A `latest` symlink in the same parent dir always points at the newest
-snapshot, so consumers don't need to date-arithmetic.
+A per-run directory on the host's **local disk** (not on a network share,
+since root is often not a valid principal on enterprise ACL storage),
+readable only by the lab group. It contains a manifest, the `raw/` and
+`refined/` ACL dumps, the effective `sshd -T` config, a per-member SSH
+key summary (**no key bodies**), and an auth summary. The auth summary
+records per-user counts of publickey / password / failed auth plus a
+**distinct-subnet count only** (raw IPs are deliberately redacted, since
+the file is lab-group readable). The dashboard parses each section
+independently: a missing section only suppresses that section's findings.
 
 ### Retention
 
-All snapshots are kept. Each is ~MB-scale, so a year of daily runs is
-≈400 MB, negligible against the data volumes the lab handles. The
-audit trail lets the PI answer "when did this ACL change?" by diffing
-two snapshot dates. If storage ever becomes an issue, add a simple
-cron to prune `.snapshot/` entries older than N months.
-
-### Authorising more people
-
-Edit `/etc/sudoers.d/murmurent_sec_dump` (via `sudo visudo -f`) and add a
-line in the same form:
-
-```
-new_handle  ALL=(root) NOPASSWD: /opt/murmurent/lab_sec_dump.sh
-```
-
-Then run `sudo visudo -c -f /etc/sudoers.d/murmurent_sec_dump` to validate.
-
-### Adjusting the lab tree being audited
-
-The script has hardcoded paths (deliberate: narrows the sudo grant's
-blast radius). To audit a different `<lab_vm>` root, edit the
-constants at the top of `scripts/lab_sec_dump.sh` (`SNAPSHOT_BASE`,
-`V4_ROOT`, `LAB_GROUP`), commit the change, re-pull on the host, and
-re-run the `install` from step 2 above. The sudoers grant doesn't need
-to change.
+All snapshots are kept (each is MB-scale). The audit trail lets the PI
+answer "when did this ACL change?" by diffing two snapshot dates. Prune
+with a simple cron if storage ever becomes an issue.
 
 ### When Tier 2 isn't available
 
-If your cluster admin can't grant sudo (e.g. Chris can't expose a
-non-sudo v4 mount or install the snippet), the dashboard runs in
-**Tier 1 only mode**: the Tier 2 rule rows render with a yellow "?"
-verdict and a one-line "ACL snapshot unavailable" note. POSIX-bit
-scanners on `/data/lab_vm` stay skipped (per
-`POSIX-NOT-AUTHORITATIVE-01`) to avoid noise. The dashboard remains
-useful for `/home`, SSH keys, dotfiles, repos, and GitHub
-visibility, just blind to the NAS ACLs.
+If the cluster admin can't grant sudo or expose a root-level ACL view,
+the dashboard runs in **Tier 1 only mode**: the Tier 2 rule rows render
+with a yellow "?" verdict and an "ACL snapshot unavailable" note.
+POSIX-bit scanners on the ACL-backed data mount stay skipped (per
+`POSIX-NOT-AUTHORITATIVE-01`). The dashboard remains useful for `/home`,
+SSH keys, dotfiles, repos, and GitHub visibility.
 
 ---
 
 ## What the dashboard does *not* do
 
-- **It never modifies any file on the target.** All suggested fixes
-  are display-only strings. Specifically, **never** writes under
-  `/data/lab_vm/raw/` or `/data/lab_vm/refined/`: even at the LLM
-  agent-review layer, the `security_guard` agent's prompt forbids it.
-- **It does not audit other labs' trees** (`/data/lab_*`). Scope is
-  this lab's slice of the box.
-- **It does not store credentials.** No SSH password prompts, no
-  sudo password prompts. Sudo is either NOPASSWD-on-one-script or not
+- **It never modifies any file on the target.** All suggested fixes are
+  display-only strings. It specifically never writes under the lab's
+  `raw/` or `refined/` data trees, enforced down to the
+  `security_guard` agent's own prompt.
+- **It does not audit other labs' trees.** Scope is this lab's slice of
+  the host.
+- **It does not store credentials.** No SSH password prompts, no sudo
+  password prompts. Sudo is either NOPASSWD-on-one-script or not
   available.
-
----
-
-## Credits
-
-The NFSv4 ACL primer and the per-directory template tables are based
-on notes from **Dr. the core lead**, who configured the the NAS ACL
-policy for the Hallett lab's `/data/lab_vm/` tree. Reproduced here
-with her permission.
