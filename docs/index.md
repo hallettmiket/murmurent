@@ -6,8 +6,10 @@ and house rules:
 - **Reference agents**: a bench of specialists (literature scout,
   computational workhorse, adversarial reviewer, security auditor, …) you
   delegate to by name.
-- **The Oracle**: persistent, structured memory that survives across
-  sessions and projects, personal *and* lab-shared.
+- **An Obsidian-based vault**: your private, git-backed knowledge base that
+  survives across sessions and projects. It holds your **Oracle** (personal
+  and lab-shared structured memory), your daily lab notebook, and your own
+  notes and maps.
 - **Hard rules + hooks**: data-governance guardrails enforced in software:
   raw data is immutable, refined data is append-only, secrets never reach a
   commit.
