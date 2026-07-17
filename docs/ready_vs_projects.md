@@ -1,12 +1,10 @@
 # "Murmurent-ready" vs. a project
 
-These two ideas used to be fused: adopting a repo used to *also* mint a
-project, and that fusion caused real confusion (five trial adoptions once
-masqueraded as projects on the dashboard). Since the 2026-07-15 split
-they're deliberately separate, and most of the rest of the docs assume you
-know the difference. This page is that explanation, in one place.
+Murmurent has two distinct levels of structure: a repo-level property
+called "murmurent-ready," and a governance-level object called a
+"project." This page explains each in turn, then how they relate.
 
-## Murmurent-ready: a repo-level property
+## Making a repo Murmurent-ready
 
 A git clone under `~/repos/<name>` is **murmurent-ready** when it carries:
 
@@ -14,11 +12,10 @@ A git clone under `~/repos/<name>` is **murmurent-ready** when it carries:
    the agents picked, and the Murmurent version that last bootstrapped it), and
 2. a `.claude/agents/` directory: symlinks into the Murmurent commons.
 
-That's it. Readiness means "Claude Code sessions opened in this repo have
-the Murmurent agents + rules wired in." It does **not** create a project, a
-roster, a Slack channel, or a registry entry anywhere. A repo can be
-murmurent-ready and belong to zero projects: that's the normal state for,
-say, a personal scratch repo you just want the commons agents in.
+Readiness means Claude Code sessions opened in that repo have the commons
+agents and rules wired in.
+
+### Adopting a repo
 
 You make a repo ready with:
 
@@ -26,60 +23,105 @@ You make a repo ready with:
 murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]
 ```
 
-(the CLI twin of the dashboard's Repos panel **↑ adopt** button.) Check
-readiness without changing anything with:
+This is the same action as the dashboard Repos panel's **↑ adopt** button.
+Parameters, for a naive reader:
+
+- `<path>`: the local path to the git clone (e.g. `~/repos/brca_wgs`).
+- `--lab <slug>`: the owning lab's short registry name (its "slug," e.g.
+  `mh` for the Hallett lab). Defaults to this machine's lab.
+- `--agents a,b`: a comma-separated list of which commons agents to wire
+  in (e.g. `bookworm,blacksmith`). Defaults to the standard set if
+  omitted.
+- `--host <name>`: which machine to act on. `local` (default) is this
+  laptop; any other value is a registered remote machine (see `murmurent
+  host list`), acted on over SSH.
+
+### Checking readiness
+
+Check readiness without changing anything:
 
 ```bash
-murmurent repo status <path-or-name> [--host <name>]
-murmurent repo list [--host <name>]
+murmurent repo status <path-or-name> [--host <name>]   # check one repo
+murmurent repo list [--host <name>]                    # list every clone + its verdict
 ```
 
-`repo list` / `repo status` report one of these verdicts (the same glyphs
-the Repos panel uses): `✓ ready`, `✓ ready (legacy)`, `± partial`,
-`• clone`, `✗ not a git repo`, `✗ missing`.
+Example `repo list` output:
 
-### Legacy CHARTER.md-only bootstraps
+```
+NAME       PATH                    VERDICT
+brca_wgs   ~/repos/brca_wgs        ready
+brca_sc    ~/repos/brca_sc         partial
+scratch    ~/repos/scratch         plain clone
+old_proj   ~/repos/old_proj        missing
+```
 
-Before the split, "ready" meant a `CHARTER.md` at the repo root (adopting a
-repo *wrote* one, as a project charter). Repos bootstrapped that way still
-count as ready (the verdict is **"ready (legacy)"**) but the marker shape
-is old. Convert with:
+Verdicts, defined for a naive reader:
+
+- **ready**: has both the `.murmurent.yaml` marker and `.claude/agents/`.
+  Good to go.
+- **partial**: has one but not the other (for example agents linked but
+  no marker yet). Run `murmurent repo adopt` (or the Upgrade button) to
+  finish.
+- **plain clone**: an ordinary git repo with neither. Not wired into
+  Murmurent.
+- **not a git repo** / **missing**: the path is not a git checkout, or
+  does not exist.
+
+### Upgrading after a new Murmurent release
+
+This applies to any ready repo, not just repos attached to a project.
+
+Agent *content* edits (an agent's prompt gets changed) reach every ready
+repo automatically: `.claude/agents/<name>.md` is a symlink into the
+commons clone, so a `git pull` on `~/repos/murmurent` updates every repo
+that links it, with nothing further to run.
+
+*Structural* changes don't flow through the symlink: a brand-new commons
+agent that didn't exist when a repo was adopted, or a bump to the
+`.murmurent.yaml` schema. Those need an explicit:
 
 ```bash
-murmurent repo upgrade <path>          # one repo
-murmurent repo upgrade --all           # every ready repo under ~/repos
+murmurent repo upgrade <path> [--add-agents a,b] [--all-agents]
+murmurent repo upgrade --all [--add-agents a,b] [--all-agents]
 ```
 
-This replaces the `CHARTER.md` bootstrap with `.murmurent.yaml` (lifting
-`lab:` and the existing agent picks out of the charter first), migrates the
-marker schema, and re-stamps `bootstrap_version`.
+`--add-agents` links specific new agents into an already-ready repo
+without touching the ones already linked; `--all-agents` links every
+commons agent (new releases included). `--all` applies the upgrade to
+every ready repo under `~/repos` instead of a single path. Neither flag
+is needed just to pick up prompt edits to agents already linked; that
+part is automatic.
 
-**Caution if the repo is also a project's primary code repo:** a project
-created through the dashboard's install/provision flow (below) still gets
-a `CHARTER.md`-shaped legacy bootstrap on its primary repo. `repo upgrade`
-deletes that `CHARTER.md` once it's converted. The project record itself is
-unaffected (it lives in the lab_mgmt registry, not in the file you just
-deleted) but a couple of dashboard display fields (the project row's Slack
-channel id, `repo_kind`, and remote URL) are read live off `CHARTER.md` and
-will go blank until the project is re-synced. Upgrading a project's primary
-repo is safe for readiness purposes; just expect to re-check those fields
-on its dashboard row afterward.
+## Projects
 
-## A project: a governance-level object
+A Murmurent **project** is a named, governed collaboration. It consists
+of:
 
-A Murmurent **project** is a very specific, bigger thing: a named set of
-**repos** (existing clones, creating a project never creates a repo) plus a
-named set of cryptographically **certified members**, plus a lead,
-sensitivity tier, and (once provisioned) a private Slack channel. Projects
-are recorded in the lab's lab_mgmt repo under `cert_projects/<name>.md`:
-that registry is the **only** source of truth the dashboard reads for "what
-projects exist." It no longer scans `~/repos` for `CHARTER.md` files; that
-old behaviour is exactly what let bare adoptions masquerade as projects.
+- a set of Murmurent-ready repos,
+- a set of cryptographically certified members,
+- a project lead,
+- a sensitivity tier (`standard` / `restricted` / `clinical`), and
+- once provisioned, a private Slack channel.
 
-Projects are created from the dashboard's **New Project** flow, which
-*attaches* existing repos (`attach_repos`) and can create + clone a fresh
-one for the project on approval, never the other way around: making a
-repo ready has never created a project. See
+**Lead**: the project lead is the member who holds the project-lead
+certificate; the lead signs other members into the project. It defaults
+to the first member at creation.
+
+**Repos**: the repos a project lists are existing, already-Murmurent-ready
+clones. Creating a project attaches existing repos, and can also create
+and clone one fresh repo for the project. Every repo a project lists is,
+or becomes, Murmurent-ready. Creating a project never turns a random
+directory into a repo.
+
+**Where projects are recorded**: the authoritative registry is
+`cert_projects/<name>.md` in the lab's governance repo,
+`murmurent_lab_mgmt_<lab>`. That registry is what the dashboard reads to
+know which projects exist.
+
+**How a project is created**: from the dashboard's **New Project** flow,
+which attaches existing ready repos and can create and clone a new one on
+approval. (A `murmurent project new` CLI exists but predates the current
+certificate-based model; the dashboard is the current path.) See
 [`project_creation.md`](project_creation.md) for the full walkthrough
 (intra- and inter-group vignettes, the certificate chain, the Slack
 channel).
@@ -89,7 +131,7 @@ channel).
 ```
 repo (git clone under ~/repos)
   │
-  ├─ murmurent-ready?  .murmurent.yaml (or legacy CHARTER.md) + .claude/agents/
+  ├─ murmurent-ready?  .murmurent.yaml + .claude/agents/
   │     "can I run murmurent agents here"        ← murmurent repo adopt / upgrade
   │
   └─ attached to a project?  cert_projects/<name>.md in lab_mgmt
@@ -97,38 +139,10 @@ repo (git clone under ~/repos)
               ← dashboard New Project flow
 ```
 
-- A repo can be ready and attached to **zero** projects (adopt it and stop
-  there, perfectly normal).
-- A project always has at least one repo, and every repo it lists is (or
-  becomes, at attach time) murmurent-ready: readiness is necessary
-  plumbing underneath a project, not the other way around.
-- `CHARTER.md`, where it still appears, is either (a) a legacy readiness
-  marker on a repo that predates the split (convert it with
-  `murmurent repo upgrade`) or (b) metadata written into a project's
-  primary repo at project-creation time. Either way, **the authoritative
-  record of which projects exist and who's in them is `cert_projects/` in
-  lab_mgmt, never a `CHARTER.md` file.**
-
-## Upgrading after a new Murmurent release
-
-Agent *content* changes (an agent's prompt gets edited) reach every
-murmurent-ready repo automatically: `.claude/agents/<name>.md` is a
-symlink into the commons clone, so a `git pull` on `~/repos/murmurent`
-updates every repo that links it, with nothing further to run.
-
-*Structural* changes don't flow through the symlink: a brand-new commons
-agent that didn't exist when a repo was adopted, or a bump to the
-`.murmurent.yaml` schema. Those need an explicit:
-
-```bash
-murmurent repo upgrade <path> [--add-agents <a,b>] [--all-agents]
-murmurent repo upgrade --all [--add-agents <a,b>] [--all-agents]
-```
-
-`--add-agents` links specific new agents into an already-ready repo without
-touching the ones already linked; `--all-agents` links every commons agent
-(new releases included). Neither flag is needed just to pick up prompt
-edits to agents already linked. That part is automatic.
+- A repo can be ready and attached to zero projects (adopt it and stop
+  there; that's a normal, common state).
+- A project's repos are all ready: readiness is the foundation a project
+  is built on.
 
 ## See also
 
@@ -137,5 +151,5 @@ edits to agents already linked. That part is automatic.
   gets created (the two vignettes, the certificate chain).
 - [`cli_manual.md`](cli_manual.md): full `murmurent repo …` command
   reference.
-- [`reconcile.md`](reconcile.md): the `missing_charter` / `unadopted_clone`
-  drift checks that watch readiness on a schedule.
+- [`reconcile.md`](reconcile.md): the readiness/adoption drift checks
+  that watch repos on a schedule.
