@@ -242,6 +242,114 @@ def test_backfill_from_charter(monkeypatch, tmp_path):
     assert list(CP.get("dcis_sc").members).count("@allie") == 1
 
 
+def test_enrichment_fields_stage1_round_trip():
+    """Stage 1: the fields migrated off CHARTER survive a write→read cycle."""
+    CP.upsert("p", lab="lab_mh", sensitivity="clinical",
+              reb_number="WREM-42", reb_expires="2027-01-01", data_residency="ca",
+              repo_kind="local", local_repo_root="/srv/repos",
+              remote_url="/srv/repos/p.git", slack_channel_name="proj-p",
+              github_repo="org/p", decommissioned_at="2026-07-01T00:00:00Z",
+              decommissioned_by="@mhallet")
+    p = CP.get("p")
+    assert p.reb_number == "WREM-42" and p.reb_expires == "2027-01-01"
+    assert p.data_residency == "ca"
+    assert p.repo_kind == "local" and p.local_repo_root == "/srv/repos"
+    assert p.remote_url == "/srv/repos/p.git"
+    assert p.slack_channel_name == "proj-p" and p.github_repo == "org/p"
+    assert p.decommissioned_at == "2026-07-01T00:00:00Z"
+    assert p.decommissioned_by == "@mhallet"
+    # to_dict carries them all
+    d = p.to_dict()
+    assert d["reb_number"] == "WREM-42" and d["repo_kind"] == "local"
+
+
+def test_membership_upsert_preserves_stage1_fields():
+    CP.upsert("p", lab="lab_mh", sensitivity="clinical", reb_number="R1",
+              reb_expires="2027-01-01", data_residency="ca", repo_kind="local")
+    CP.upsert("p", lab="lab_mh", member="@allie",
+              cert={"fingerprint": "f", "card_id": "c"})
+    p = CP.get("p")
+    assert p.reb_number == "R1" and p.data_residency == "ca"
+    assert p.repo_kind == "local" and "@allie" in p.members
+
+
+def test_validate_project_clinical_requires_reb():
+    CP.upsert("p", lab="lab_mh", sensitivity="clinical")
+    with pytest.raises(CP.CertProjectValidationError, match="reb_number"):
+        CP.validate_project(CP.get("p"))
+    CP.upsert("p", lab="lab_mh", sensitivity="clinical", reb_number="R1",
+              reb_expires="2027-01-01", data_residency="ca")
+    CP.validate_project(CP.get("p"))     # now valid — no raise
+
+
+def test_validate_project_rejects_bad_sensitivity_and_choreography():
+    CP.upsert("p", lab="lab_mh", sensitivity="standard", choreography="not_a_real_one")
+    with pytest.raises(CP.CertProjectValidationError, match="choreography"):
+        CP.validate_project(CP.get("p"))
+
+
+def test_backfill_copies_all_charter_fields(monkeypatch, tmp_path):
+    """Migration round-trip: every field on a CHARTER survives into the cert record."""
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    repo = tmp_path / "repos" / "dcis_sc"
+    repo.mkdir(parents=True)
+    (repo / "CHARTER.md").write_text(
+        "---\nproject: dcis_sc\nlab: hallett\nsensitivity: clinical\n"
+        "lead: '@allie'\nchoreography: clinical_cohort\n"
+        "reb_number: WREM-1\nreb_expires: '2027-01-01'\ndata_residency: ca\n"
+        "repo_kind: local\nlocal_repo_root: /srv/repos\n"
+        "remote_url: /srv/repos/dcis_sc.git\n"
+        "slack_channel_id: C99\nslack_channel_name: proj-dcis\n"
+        "github_repo: org/dcis_sc\n"
+        "members: ['@allie', '@bob']\n---\n\n# dcis_sc\n", encoding="utf-8")
+
+    touched = CP.backfill_from_charter()
+    assert "dcis_sc" in touched
+    p = CP.get("dcis_sc")
+    assert p.sensitivity == "clinical" and p.reb_number == "WREM-1"
+    assert p.reb_expires == "2027-01-01" and p.data_residency == "ca"
+    assert p.repo_kind == "local" and p.local_repo_root == "/srv/repos"
+    assert p.remote_url == "/srv/repos/dcis_sc.git"
+    assert p.slack_channel_id == "C99" and p.slack_channel_name == "proj-dcis"
+    assert p.github_repo == "org/dcis_sc"
+    assert p.choreography == "clinical_cohort"
+    assert set(p.members) == {"@allie", "@bob"}
+    CP.validate_project(p)               # a fully-migrated clinical project validates
+
+
+def test_migrate_charters_backfills_then_deletes(monkeypatch, tmp_path):
+    """migrate_charters copies every field, verifies it, then removes the CHARTER."""
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    repo = tmp_path / "repos" / "proj"
+    repo.mkdir(parents=True)
+    charter = repo / "CHARTER.md"
+    charter.write_text(
+        "---\nproject: proj\nlab: lab_mh\nsensitivity: restricted\n"
+        "lead: '@allie'\nmembers: ['@allie', '@bob']\nrepo_kind: local\n"
+        "---\n\n# proj\n", encoding="utf-8")
+
+    out = CP.migrate_charters()
+    assert out["migrated"] == ["proj"] and out["deleted"] == ["proj"]
+    assert not charter.exists()                       # CHARTER removed after verify
+    p = CP.get("proj")
+    assert p.sensitivity == "restricted" and p.repo_kind == "local"
+    assert set(p.members) == {"@allie", "@bob"}
+
+
+def test_migrate_charters_keep_leaves_files(monkeypatch, tmp_path):
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    repo = tmp_path / "repos" / "proj"
+    repo.mkdir(parents=True)
+    charter = repo / "CHARTER.md"
+    charter.write_text(
+        "---\nproject: proj\nlab: lab_mh\nsensitivity: standard\n"
+        "lead: '@allie'\nmembers: ['@allie']\n---\n\n# proj\n", encoding="utf-8")
+    out = CP.migrate_charters(delete=False)
+    assert out["migrated"] == ["proj"] and out["deleted"] == []
+    assert charter.exists()                           # left in place
+    assert CP.get("proj") is not None
+
+
 def test_remove_member_drops_member_and_cert():
     CP.upsert("p", lab="lab_mh", lead="@allie", member="@allie",
               cert={"fingerprint": "fa", "card_id": "cA"})

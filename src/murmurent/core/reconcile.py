@@ -24,10 +24,10 @@ What we detect (all enabled by default):
      remote_path) resolves to a tree that no longer exists. Repair flips
      ``status: archived`` in the cert-project frontmatter so the lab
      history is preserved (we don't hard-delete shared records).
-  3. **missing_charter** — working tree is present on a host
-     murmurent knows about, but ``CHARTER.md`` was deleted. Surfaces
-     as a warning; user decides whether to re-adopt (write a fresh
-     CHARTER) or remove from murmurent.
+  3. **missing_marker** — working tree is present on a host
+     murmurent knows about, but its ``.murmurent.yaml`` readiness marker
+     is gone. Surfaces as a warning; user decides whether to re-adopt
+     (`murmurent repo upgrade`) or remove from murmurent.
   4. **unadopted_clone** — git clone present in a scan dir but not
      yet murmurent-ready (no readiness marker + agent links). It is
      NOT about projects: readiness is a repo property, and a ready
@@ -410,7 +410,7 @@ def detect_orphan_registries() -> list[DriftFinding]:
     return findings
 
 
-def detect_missing_charters() -> list[DriftFinding]:
+def detect_missing_markers() -> list[DriftFinding]:
     """For each install manifest with a still-alive working tree, verify the
     ``.murmurent.yaml`` readiness marker is still present. Surfaces as ``warn``
     (no auto-fix; the user should either re-adopt / `murmurent repo upgrade`,
@@ -436,7 +436,7 @@ def detect_missing_charters() -> list[DriftFinding]:
         if (local_path.is_dir()
                 and not (local_path / ".murmurent.yaml").exists()):
             findings.append(DriftFinding(
-                kind="missing_charter",
+                kind="missing_marker",
                 severity="warn",
                 target=project,
                 host="local",
@@ -479,7 +479,7 @@ def detect_missing_charters() -> list[DriftFinding]:
             '  if [ -d "$p/.git" ]; then '
             '    if [ -f "$p/.murmurent.yaml" ]; '
             '    then printf "%s\\n" "OK:$p"; '
-            '    else printf "%s\\n" "NOCHARTER:$p"; fi; '
+            '    else printf "%s\\n" "NOMARKER:$p"; fi; '
             '  fi; '
             'done'
         )
@@ -487,14 +487,14 @@ def detect_missing_charters() -> list[DriftFinding]:
             res = _remote.Remote(host_obj).run(script, check=False, timeout=30)
         except _remote.RemoteError:
             continue
-        no_charter: set[str] = set()
+        no_marker: set[str] = set()
         for line in (res.stdout or "").splitlines():
-            if line.startswith("NOCHARTER:"):
-                no_charter.add(line[len("NOCHARTER:"):].strip())
+            if line.startswith("NOMARKER:"):
+                no_marker.add(line[len("NOMARKER:"):].strip())
         for project, remote_path in items:
-            if remote_path in no_charter:
+            if remote_path in no_marker:
                 findings.append(DriftFinding(
-                    kind="missing_charter",
+                    kind="missing_marker",
                     severity="warn",
                     target=project,
                     host=ssh_remote,
@@ -631,7 +631,7 @@ def reconcile(*, apply: bool = False) -> ReconcileReport:
     for detector in (
         detect_orphan_installations,
         detect_orphan_registries,
-        detect_missing_charters,
+        detect_missing_markers,
         detect_unadopted_clones,
         detect_lab_mgmt_unsynced,
     ):
@@ -659,7 +659,7 @@ def _apply_finding(finding: DriftFinding) -> bool:
         return _archive_manifest(Path(finding.artefact_path))
     if finding.kind == "orphan_registry":
         return _archive_registry(Path(finding.artefact_path))
-    # missing_charter + unadopted_clone aren't auto-repaired.
+    # missing_marker + unadopted_clone aren't auto-repaired.
     return False
 
 
@@ -711,7 +711,7 @@ __all__ = [
     "ReconcileReport",
     "detect_orphan_installations",
     "detect_orphan_registries",
-    "detect_missing_charters",
+    "detect_missing_markers",
     "detect_unadopted_clones",
     "reconcile",
 ]

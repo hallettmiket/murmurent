@@ -42,6 +42,20 @@ def _norm(handle: str) -> str:
 
 VALID_REPO_ROLES = ("code", "manuscript", "data", "infra")
 
+# ---------------------------------------------------------------------------
+# Governance validation — moved here from ``core/charter.py`` (which is being
+# retired). A cert-project record is now the single source of truth, so the
+# clinical-governance + choreography-catalog checks live where the record does.
+# ---------------------------------------------------------------------------
+VALID_SENSITIVITY_TIERS: tuple[str, ...] = ("standard", "restricted", "clinical")
+VALID_CHOREOGRAPHIES: tuple[str, ...] = (
+    "drug_discovery_litl",
+    "clinical_cohort",
+    "method_benchmarking",
+    "imaging_phenotyping",
+)
+CLINICAL_EXTRA_FIELDS: tuple[str, ...] = ("reb_number", "reb_expires", "data_residency")
+
 
 @dataclass
 class RepoRef:
@@ -58,6 +72,8 @@ class RepoRef:
     remote_path: str = ""                  # path on `host` when host != local
     remote_url: str = ""                   # git remote (optional)
     overleaf: bool = False                 # manuscript repo synced with Overleaf
+    repo_kind: str = "github"              # git origin kind: github | local (bare)
+    local_repo_root: str = ""              # bare-repo root when repo_kind == "local"
 
     def to_dict(self) -> dict:
         d: dict = {"name": self.name, "role": self.role, "host": self.host,
@@ -68,6 +84,10 @@ class RepoRef:
             d["remote_url"] = self.remote_url
         if self.overleaf:
             d["overleaf"] = True
+        if self.repo_kind and self.repo_kind != "github":
+            d["repo_kind"] = self.repo_kind
+        if self.local_repo_root:
+            d["local_repo_root"] = self.local_repo_root
         return d
 
     @staticmethod
@@ -79,7 +99,9 @@ class RepoRef:
             path=str(d.get("path") or ""),
             remote_path=str(d.get("remote_path") or ""),
             remote_url=str(d.get("remote_url") or ""),
-            overleaf=bool(d.get("overleaf")))
+            overleaf=bool(d.get("overleaf")),
+            repo_kind=str(d.get("repo_kind") or "github").strip().lower() or "github",
+            local_repo_root=str(d.get("local_repo_root") or ""))
 
 
 def _primary_repo(repos) -> "RepoRef | None":
@@ -137,6 +159,23 @@ class CertProject:
     # on a shared workspace before an inter-group project can exist.
     slack_workspace: str = ""
     github_repo: str = ""                  # provisioned in Phase C, e.g. "org/name"
+    # Slack channel display name (distinct from the resolved id above).
+    slack_channel_name: str = ""
+    # Primary repo's git origin (mirrors the CHARTER frontmatter that used to
+    # carry these): repo_kind is "github" (default) or "local" (a bare repo on
+    # the lab VM), local_repo_root is that bare-repo root, remote_url is the
+    # clone URL so a reader knows where to `git clone` without inspecting .git.
+    repo_kind: str = "github"
+    local_repo_root: str = ""
+    remote_url: str = ""
+    # Clinical-governance fields — REQUIRED when sensitivity == "clinical"
+    # (validated by :func:`validate_project`). Empty otherwise.
+    reb_number: str = ""
+    reb_expires: str = ""
+    data_residency: str = ""
+    # Lifecycle: set when the project is archived (soft-delete).
+    decommissioned_at: str = ""
+    decommissioned_by: str = ""
     members: tuple[str, ...] = ()          # certified member handles (@-prefixed)
     # One entry per issued project card: {handle, fingerprint, card_id}.
     certs: tuple[dict, ...] = ()
@@ -151,8 +190,17 @@ class CertProject:
                 "code_repo": self.code_repo, "host": self.host,
                 "remote_path": self.remote_path,
                 "slack_channel_id": self.slack_channel_id,
+                "slack_channel_name": self.slack_channel_name,
                 "slack_workspace": self.slack_workspace,
-                "github_repo": self.github_repo, "members": list(self.members),
+                "github_repo": self.github_repo,
+                "repo_kind": self.repo_kind,
+                "local_repo_root": self.local_repo_root,
+                "remote_url": self.remote_url,
+                "reb_number": self.reb_number, "reb_expires": self.reb_expires,
+                "data_residency": self.data_residency,
+                "decommissioned_at": self.decommissioned_at,
+                "decommissioned_by": self.decommissioned_by,
+                "members": list(self.members),
                 "certs": [dict(c) for c in self.certs],
                 "repos": [r.to_dict() for r in self.repos]}
 
@@ -160,6 +208,42 @@ class CertProject:
 class CertProjectError(RuntimeError):
     """A cert-project registry operation could not be completed (e.g. the
     lab-mgmt repo is missing or its path is a dangling symlink)."""
+
+
+class CertProjectValidationError(CertProjectError):
+    """A cert-project record fails governance validation (bad sensitivity tier,
+    a clinical project missing REB fields, or an unknown choreography)."""
+
+
+def validate_project(cp: "CertProject", *, context: str = "") -> None:
+    """Validate a cert-project record's governance fields — the check that used
+    to live in ``charter.validate_charter``. A cert-project record is now the
+    single source of truth, so the rules move with it:
+
+    - ``sensitivity`` must be one of :data:`VALID_SENSITIVITY_TIERS`;
+    - a ``clinical`` project must carry ``reb_number`` + ``reb_expires`` +
+      ``data_residency`` (:data:`CLINICAL_EXTRA_FIELDS`);
+    - an explicit ``choreography`` must be in :data:`VALID_CHOREOGRAPHIES`.
+
+    Called explicitly by governance-raising callers (``cmd_sensitivity``,
+    ``cmd_new``, the migration round-trip). Not called on every ``upsert`` so a
+    metadata-free membership upsert can never fail on an unrelated field.
+    """
+    suffix = f" in {context}" if context else ""
+    if cp.sensitivity not in VALID_SENSITIVITY_TIERS:
+        raise CertProjectValidationError(
+            f"cert-project sensitivity{suffix} must be one of "
+            f"{VALID_SENSITIVITY_TIERS!r}; got {cp.sensitivity!r}")
+    if cp.sensitivity == "clinical":
+        missing = [f for f in CLINICAL_EXTRA_FIELDS if not getattr(cp, f, "")]
+        if missing:
+            raise CertProjectValidationError(
+                f"clinical cert-project{suffix} missing field(s): "
+                f"{', '.join(missing)}")
+    if cp.choreography is not None and cp.choreography not in VALID_CHOREOGRAPHIES:
+        raise CertProjectValidationError(
+            f"cert-project choreography{suffix} {cp.choreography!r} is not in "
+            f"the known catalog {VALID_CHOREOGRAPHIES!r}")
 
 
 def registry_dir(env: dict | None = None) -> Path:
@@ -211,8 +295,17 @@ def _parse(path: Path) -> CertProject:
         choreography=str(chor) if chor else None,
         code_repo=code_repo, host=host, remote_path=remote_path,
         slack_channel_id=str(meta.get("slack_channel_id") or ""),
+        slack_channel_name=str(meta.get("slack_channel_name") or ""),
         slack_workspace=str(meta.get("slack_workspace") or ""),
         github_repo=str(meta.get("github_repo") or ""),
+        repo_kind=str(meta.get("repo_kind") or "github").strip().lower() or "github",
+        local_repo_root=str(meta.get("local_repo_root") or ""),
+        remote_url=str(meta.get("remote_url") or ""),
+        reb_number=str(meta.get("reb_number") or ""),
+        reb_expires=str(meta.get("reb_expires") or ""),
+        data_residency=str(meta.get("data_residency") or ""),
+        decommissioned_at=str(meta.get("decommissioned_at") or ""),
+        decommissioned_by=str(meta.get("decommissioned_by") or ""),
         members=members,
         certs=certs,
         repos=repos,
@@ -250,12 +343,34 @@ def _render(p: CertProject) -> str:
             "created": p.created, "lead": p.lead, "sensitivity": p.sensitivity}
     if p.choreography:
         meta["choreography"] = p.choreography
+    # Clinical-governance fields (only emitted when set — a standard project
+    # carries none of them).
+    if p.reb_number:
+        meta["reb_number"] = p.reb_number
+    if p.reb_expires:
+        meta["reb_expires"] = p.reb_expires
+    if p.data_residency:
+        meta["data_residency"] = p.data_residency
     if p.slack_channel_id:
         meta["slack_channel_id"] = p.slack_channel_id
+    if p.slack_channel_name:
+        meta["slack_channel_name"] = p.slack_channel_name
     if p.slack_workspace:
         meta["slack_workspace"] = p.slack_workspace
     if p.github_repo:
         meta["github_repo"] = p.github_repo
+    # Primary repo's git origin. repo_kind is emitted only when non-default so
+    # standard github projects stay terse; local_repo_root/remote_url when known.
+    if p.repo_kind and p.repo_kind != "github":
+        meta["repo_kind"] = p.repo_kind
+    if p.local_repo_root:
+        meta["local_repo_root"] = p.local_repo_root
+    if p.remote_url:
+        meta["remote_url"] = p.remote_url
+    if p.decommissioned_at:
+        meta["decommissioned_at"] = p.decommissioned_at
+    if p.decommissioned_by:
+        meta["decommissioned_by"] = p.decommissioned_by
     # The authoritative repo set (code + manuscript + …) is now the ONLY on-disk
     # representation — the legacy top-level code_repo/host/remote_path are no
     # longer written (stage 6). Old files that still carry them read fine: _parse
@@ -303,8 +418,17 @@ def upsert(name: str, *, lab: str, member: str | None = None,
            choreography: str | None = None, code_repo: str | None = None,
            host: str | None = None, remote_path: str | None = None,
            repos=None, slack_channel_id: str | None = None,
+           slack_channel_name: str | None = None,
            slack_workspace: str | None = None,
            github_repo: str | None = None,
+           repo_kind: str | None = None,
+           local_repo_root: str | None = None,
+           remote_url: str | None = None,
+           reb_number: str | None = None,
+           reb_expires: str | None = None,
+           data_residency: str | None = None,
+           decommissioned_at: str | None = None,
+           decommissioned_by: str | None = None,
            today: str | None = None, env: dict | None = None) -> CertProject:
     """Create or update a cert project. Optionally add a certified ``member``
     (with their ``cert`` = {handle, fingerprint, card_id}) and/or set project
@@ -358,8 +482,17 @@ def upsert(name: str, *, lab: str, member: str | None = None,
         choreography=_keep(choreography, cur.choreography),
         code_repo=n_code, host=n_host, remote_path=n_remote,
         slack_channel_id=_keep(slack_channel_id, cur.slack_channel_id),
+        slack_channel_name=_keep(slack_channel_name, cur.slack_channel_name),
         slack_workspace=_keep(slack_workspace, cur.slack_workspace),
         github_repo=_keep(github_repo, cur.github_repo),
+        repo_kind=(str(repo_kind).strip().lower() if repo_kind else cur.repo_kind),
+        local_repo_root=_keep(local_repo_root, cur.local_repo_root),
+        remote_url=_keep(remote_url, cur.remote_url),
+        reb_number=_keep(reb_number, cur.reb_number),
+        reb_expires=_keep(reb_expires, cur.reb_expires),
+        data_residency=_keep(data_residency, cur.data_residency),
+        decommissioned_at=_keep(decommissioned_at, cur.decommissioned_at),
+        decommissioned_by=_keep(decommissioned_by, cur.decommissioned_by),
         members=tuple(members), certs=tuple(certs), repos=new_repos)
     _write(updated, env)
     return updated
@@ -378,15 +511,10 @@ def remove_member(name: str, handle: str, *, env: dict | None = None) -> CertPro
         raise CertProjectError(
             f"@{at.lstrip('@')} is the project lead — delete the project (or "
             "transfer the lead) instead of removing them")
+    from dataclasses import replace
     members = tuple(m for m in cur.members if _norm(m) != at)
     certs = tuple(c for c in cur.certs if _norm(c.get("handle")) != at)
-    updated = CertProject(
-        name=cur.name, lab=cur.lab, status=cur.status, created=cur.created,
-        lead=cur.lead, sensitivity=cur.sensitivity,
-        choreography=cur.choreography, code_repo=cur.code_repo, host=cur.host,
-        remote_path=cur.remote_path, slack_channel_id=cur.slack_channel_id,
-        slack_workspace=cur.slack_workspace, github_repo=cur.github_repo,
-        members=members, certs=certs, repos=cur.repos)
+    updated = replace(cur, members=members, certs=certs)
     _write(updated, env)
     return updated
 
@@ -456,27 +584,138 @@ def backfill_from_charter(*, env: dict | None = None,
                           today: str | None = None) -> list[str]:
     """Populate the cert-project registry from existing CHARTER code-projects, so
     the authoritative store reflects projects that predate the cert model. For
-    each ``~/repos/<name>`` with a CHARTER.md, upsert a cert-project carrying its
-    name/lab/sensitivity/lead/members and a ``code_repo`` link. Idempotent — a
-    project already in the registry keeps its (authoritative) membership; only
-    absent metadata is filled. Returns the names touched."""
+    each ``~/repos/<name>`` with a CHARTER.md, upsert a cert-project carrying
+    **every** field the CHARTER recorded — name/lab/sensitivity/lead/choreography,
+    the clinical-governance block (reb_number/reb_expires/data_residency), the git
+    origin (repo_kind/remote_url/local_repo_root), the Slack + github pointers,
+    lifecycle flags, and a ``code_repo`` link — copied straight from the parsed
+    charter meta. Idempotent — a project already in the registry keeps its
+    (authoritative) membership; metadata is refreshed from the CHARTER. Returns
+    the names touched.
+
+    This is the migration source of truth (``murmurent project migrate-charters``):
+    nothing the CHARTER held may be dropped on the way into the cert record."""
     from . import projects as _proj                       # lazy: avoid import cycle
+    from .frontmatter import parse_file as _pf
     touched: list[str] = []
     for repo in _proj.iter_local_projects(env):
         try:
-            s = _proj.load_summary(repo)
+            meta = _pf(repo.charter_path).meta or {}
         except Exception:  # noqa: BLE001
             continue
+        name = str(meta.get("project") or repo.path.name)
         # A remote-pointer project's tree lives on another host; capture that so
         # reconcile can reach it. Local projects → host="local".
         host, remote_path = "local", ""
         pointer = _proj.read_remote_pointer(repo.path)
         if pointer is not None:
             host, remote_path = pointer
-        register_from_summary(s, code_repo=str(repo.path), host=host,
-                              remote_path=remote_path, env=env, today=today)
-        touched.append(s.name)
+        elif meta.get("host") and str(meta.get("host")).strip() != "local":
+            host = str(meta.get("host")).strip()
+            remote_path = str(meta.get("remote_path") or "").strip()
+
+        def _s(key: str) -> str | None:
+            v = meta.get(key)
+            return str(v) if v not in (None, "") else None
+
+        upsert(
+            name, lab=str(meta.get("lab") or ""),
+            status=str(meta.get("status") or "active"),
+            lead=str(meta.get("lead") or ""),
+            sensitivity=str(meta.get("sensitivity") or "standard"),
+            choreography=(str(meta["choreography"]) if meta.get("choreography") else None),
+            code_repo=str(repo.path), host=host, remote_path=remote_path,
+            repo_kind=_s("repo_kind"), local_repo_root=_s("local_repo_root"),
+            remote_url=_s("remote_url"),
+            slack_channel_id=_s("slack_channel_id"),
+            slack_channel_name=_s("slack_channel_name"),
+            slack_workspace=_s("slack_workspace"),
+            github_repo=_s("github_repo"),
+            reb_number=_s("reb_number"), reb_expires=_s("reb_expires"),
+            data_residency=_s("data_residency"),
+            decommissioned_at=_s("decommissioned_at"),
+            decommissioned_by=_s("decommissioned_by"),
+            env=env, today=today)
+        # Members recorded UNCERTIFIED (issuing project cards certifies them).
+        cur = get(name, env)
+        existing = {_norm(m) for m in (cur.members if cur else ())}
+        for m in (meta.get("members") or []):
+            if _norm(str(m)) not in existing:
+                upsert(name, lab=str(meta.get("lab") or ""), member=str(m),
+                       today=today, env=env)
+        touched.append(name)
     return touched
+
+
+def migrate_charters(*, delete: bool = True, env: dict | None = None,
+                     today: str | None = None) -> dict:
+    """One-shot CHARTER → cert_projects migration. Backfills every
+    ``~/repos/*/CHARTER.md`` into the registry (via :func:`backfill_from_charter`),
+    then — only for a project whose cert record *verifiably* carries the CHARTER's
+    core fields — deletes the CHARTER file. Never deletes a CHARTER whose record
+    can't be confirmed; those are reported under ``skipped`` for the operator.
+
+    Returns ``{"migrated": [...], "deleted": [...], "skipped": [(name, reason)]}``.
+    ``delete=False`` performs the backfill + verification but leaves the CHARTER
+    files in place (dry-run-ish preview of what would be removed)."""
+    from . import projects as _proj
+    from . import repo_ready as _rr
+    from .frontmatter import parse_file as _pf
+
+    migrated = backfill_from_charter(env=env, today=today)
+    deleted: list[str] = []
+    skipped: list[tuple[str, str]] = []
+    # Map project name → charter path, from the same scan the backfill used.
+    by_name: dict[str, Path] = {}
+    for repo in _proj.iter_local_projects(env):
+        try:
+            meta = _pf(repo.charter_path).meta or {}
+        except Exception:  # noqa: BLE001
+            continue
+        by_name[str(meta.get("project") or repo.path.name)] = repo.charter_path
+
+    for name in migrated:
+        charter_path = by_name.get(name)
+        if charter_path is None or not charter_path.is_file():
+            continue
+        rec = get(name, env)
+        if rec is None:
+            skipped.append((name, "no cert record after backfill"))
+            continue
+        try:
+            meta = _pf(charter_path).meta or {}
+        except Exception:  # noqa: BLE001
+            skipped.append((name, "charter unreadable for verification"))
+            continue
+        # Verify the load-bearing fields survived before we drop the source.
+        if str(meta.get("sensitivity") or "standard").strip().lower() != rec.sensitivity:
+            skipped.append((name, "sensitivity mismatch after backfill"))
+            continue
+        charter_members = {_norm(str(m)) for m in (meta.get("members") or [])}
+        rec_members = {_norm(m) for m in rec.members}
+        if not charter_members.issubset(rec_members):
+            skipped.append((name, "member set not fully carried over"))
+            continue
+        if not delete:
+            continue
+        # Before removing the CHARTER, make sure the repo stays discoverable as a
+        # murmurent project. ``find_project_repo`` keys on the ``.murmurent.yaml``
+        # readiness marker; a repo carrying only a CHARTER (never adopted/installed)
+        # would vanish from discovery the moment we delete it. Stamp the marker
+        # first — only then is CHARTER truly redundant.
+        repo_dir = charter_path.parent
+        if not (repo_dir / _rr.MARKER_FILENAME).is_file():
+            try:
+                _rr.ensure_marker(repo_dir, lab=(rec.lab or ""))
+            except Exception as exc:  # noqa: BLE001
+                skipped.append((name, f"could not stamp readiness marker: {exc}"))
+                continue
+        try:
+            charter_path.unlink()
+            deleted.append(name)
+        except OSError as exc:
+            skipped.append((name, f"delete failed: {exc}"))
+    return {"migrated": migrated, "deleted": deleted, "skipped": skipped}
 
 
 def project_name_for_cwd(start=None, env: dict | None = None) -> str | None:
@@ -517,8 +756,10 @@ def set_status(name: str, status: str, *, env: dict | None = None) -> CertProjec
 
 
 __all__ = ["CertProject", "RepoRef", "VALID_REPO_ROLES", "CertProjectError",
+           "CertProjectValidationError", "validate_project",
+           "VALID_SENSITIVITY_TIERS", "VALID_CHOREOGRAPHIES", "CLINICAL_EXTRA_FIELDS",
            "REGISTRY_DIR", "registry_dir", "project_path", "get", "iter_projects",
            "projects_for_member", "upsert", "remove_member", "add_repo", "remove_repo",
            "set_status",
-           "register_from_summary", "backfill_from_charter", "slack_channel_for",
-           "project_name_for_cwd"]
+           "register_from_summary", "backfill_from_charter", "migrate_charters",
+           "slack_channel_for", "project_name_for_cwd"]

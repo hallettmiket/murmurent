@@ -265,13 +265,14 @@ def test_orphan_installation_all_repos_gone_is_actionable(world):
     assert findings[0].target == "gone"
 
 
-def test_detect_missing_charter(world):
-    """Working tree present, CHARTER.md deleted — warn, no auto-fix."""
-    _make_clone(world["repos"], "charterless", with_charter=False)
-    _write_manifest(world["installations"], "charterless")
-    findings = _rec.detect_missing_charters()
+def test_detect_missing_marker(world):
+    """Working tree present, .murmurent.yaml readiness marker absent — warn,
+    no auto-fix."""
+    _make_clone(world["repos"], "markerless", with_charter=False)
+    _write_manifest(world["installations"], "markerless")
+    findings = _rec.detect_missing_markers()
     assert len(findings) == 1
-    assert findings[0].kind == "missing_charter"
+    assert findings[0].kind == "missing_marker"
     assert findings[0].severity == "warn"
     assert "readiness marker" in findings[0].detail
 

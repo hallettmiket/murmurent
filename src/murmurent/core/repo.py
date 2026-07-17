@@ -388,8 +388,18 @@ def use_lab_mgmt_root(path: str | Path | None):
         _thread_local.lab_mgmt_root = previous
 
 
+MARKER_FILENAME = ".murmurent.yaml"
+
+
 def find_project_repo(start: str | Path | None = None) -> ProjectRepo | None:
-    """Walk up from ``start`` to find the nearest ancestor containing ``CHARTER.md``.
+    """Walk up from ``start`` to find the nearest ancestor that is a murmurent
+    project repo.
+
+    A repo is identified by its ``.murmurent.yaml`` readiness marker — the
+    single on-disk "this is a murmurent project" signal (issue #28). A legacy
+    ``CHARTER.md`` is accepted as a fallback so pre-migration clones (which
+    predate the marker) still resolve; once ``murmurent project migrate-charters``
+    has run, only the marker remains.
 
     Parameters
     ----------
@@ -399,20 +409,21 @@ def find_project_repo(start: str | Path | None = None) -> ProjectRepo | None:
     Returns
     -------
     ProjectRepo | None
-        Discovered project repo, or ``None`` if no charter is found before the
-        filesystem root.
+        Discovered project repo, or ``None`` if neither the marker nor a legacy
+        charter is found before the filesystem root. ``charter_path`` always
+        points at ``<repo>/CHARTER.md`` (which may not exist post-migration) so
+        legacy readers keep a stable field to probe.
     """
     current = Path(start).resolve() if start is not None else Path.cwd().resolve()
     if current.is_file():
         current = current.parent
 
     for candidate in (current, *current.parents):
-        charter = candidate / CHARTER_FILENAME
-        if charter.is_file():
+        if (candidate / MARKER_FILENAME).is_file() or (candidate / CHARTER_FILENAME).is_file():
             members_path = candidate / MEMBERS_FILENAME
             return ProjectRepo(
                 path=candidate,
-                charter_path=charter,
+                charter_path=candidate / CHARTER_FILENAME,
                 members_path=members_path if members_path.is_file() else None,
             )
     return None
@@ -423,7 +434,8 @@ def require_project_repo(start: str | Path | None = None) -> ProjectRepo:
     repo = find_project_repo(start)
     if repo is None:
         raise RepoDiscoveryError(
-            "No murmurent project found. Run from inside a project repo " "(must contain CHARTER.md)."
+            "No murmurent project found. Run from inside a project repo "
+            "(must contain a .murmurent.yaml marker)."
         )
     return repo
 

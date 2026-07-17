@@ -23,7 +23,6 @@ import sys
 from pathlib import Path
 from typing import IO, Any
 
-from ..core.charter import validate_charter
 from ..core.frontmatter import parse_file
 from ..core.repo import find_project_repo
 
@@ -45,16 +44,76 @@ OUTBOUND_BASH_HEADS: frozenset[str] = frozenset(
 )
 
 
-def _is_clinical_project(start: str | None = None) -> bool:
-    repo = find_project_repo(start or os.getcwd())
-    if repo is None:
+def _project_name(repo) -> str:
+    """Resolve the project name for ``repo`` — from a legacy CHARTER's
+    ``project`` field if one is still on disk, else the repo directory name
+    (which is the cert-project registry key, per the project-structure rule)."""
+    try:
+        if repo.charter_path.is_file():
+            name = (parse_file(repo.charter_path).meta or {}).get("project")
+            if name:
+                return str(name)
+    except Exception:  # noqa: BLE001
+        pass
+    return repo.path.name
+
+
+def _lab_mgmt_records_readable() -> bool:
+    """True only when this machine can actually read the cert-project registry.
+
+    A dangling or absent lab-mgmt root means we CANNOT confirm a project's
+    sensitivity — and PHI enforcement must never silently weaken, so callers
+    treat "records unreadable" as clinical (fail closed)."""
+    try:
+        from ..core import cert_projects as _cp
+        root = _cp.registry_dir().parent
+    except Exception:  # noqa: BLE001
         return False
     try:
-        parsed = parse_file(repo.charter_path)
-        validate_charter(parsed.meta, context=str(repo.charter_path))
-    except Exception:
+        if root.is_symlink() and not root.exists():
+            return False
+        return root.exists()
+    except OSError:
         return False
-    return parsed.meta.get("sensitivity") == "clinical"
+
+
+def _is_clinical_project(start: str | None = None) -> bool:
+    """Whether the project rooted at ``start`` is clinical-tier.
+
+    Sensitivity now comes from the authoritative cert-project registry
+    (repo-name → ``cert_projects/<name>`` → ``sensitivity``), NOT a CHARTER.
+    The lookup FAILS CLOSED — treats the project as clinical / most-restrictive —
+    whenever the lab-mgmt records can't be read (registry access raises, or the
+    lab-mgmt root is dangling/absent). That way a broken records path can never
+    downgrade a clinical project to "not clinical" and leak PHI.
+    """
+    repo = find_project_repo(start or os.getcwd())
+    if repo is None:
+        return False  # not inside a project repo → no PHI context to guard
+    name = _project_name(repo)
+
+    # 1. Authoritative: the cert-project registry.
+    try:
+        from ..core import cert_projects as _cp
+        rec = _cp.get(name)
+    except Exception:  # noqa: BLE001 — records unreadable → fail closed
+        return True
+    if rec is not None:
+        return rec.sensitivity == "clinical"
+
+    # 2. No cert record. Legacy fallback: a CHARTER still on disk (pre-migration).
+    charter = repo.charter_path
+    if charter.is_file():
+        try:
+            meta = parse_file(charter).meta or {}
+        except Exception:  # noqa: BLE001 — charter present but unreadable → fail closed
+            return True
+        return str(meta.get("sensitivity") or "").strip().lower() == "clinical"
+
+    # 3. No record and no charter. If the registry itself isn't readable we
+    #    cannot rule out clinical → fail closed; otherwise there is genuinely
+    #    no clinical signal for this repo.
+    return not _lab_mgmt_records_readable()
 
 
 def _bash_is_outbound(command: str) -> bool:

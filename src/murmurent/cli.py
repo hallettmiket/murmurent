@@ -558,6 +558,32 @@ def project_backfill() -> None:
                f"registry: {', '.join(sorted(names))}")
 
 
+@project_group.command("migrate-charters",
+                       help="One-shot: backfill every ~/repos/*/CHARTER.md into the "
+                            "cert-project registry, then delete the CHARTER files "
+                            "whose migration is verified. --keep skips deletion.")
+@click.option("--keep", is_flag=True, default=False,
+              help="Backfill + verify but leave CHARTER files on disk.")
+def project_migrate_charters(keep: bool) -> None:
+    from .core import cert_projects as _cp
+    try:
+        out = _cp.migrate_charters(delete=not keep)
+    except _cp.CertProjectError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not out["migrated"]:
+        click.echo("No CHARTER projects found under ~/repos to migrate.")
+        return
+    click.echo(f"✓ migrated {len(out['migrated'])} project(s) into the "
+               f"cert-project registry: {', '.join(sorted(out['migrated']))}")
+    if out["deleted"]:
+        click.echo(f"✓ deleted {len(out['deleted'])} CHARTER file(s): "
+                   f"{', '.join(sorted(out['deleted']))}")
+    elif keep:
+        click.echo("  (--keep) CHARTER files left on disk.")
+    for name, reason in out["skipped"]:
+        click.echo(f"  ! {name}: kept CHARTER — {reason}")
+
+
 @project_group.command("provision-slack",
                        help="(PI) Create the cert-project's private Slack channel "
                             "and invite its certified members. Idempotent; needs a "
