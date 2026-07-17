@@ -28,7 +28,7 @@ Parameters, for a naive reader:
 
 - `<path>`: the local path to the git clone (e.g. `~/repos/brca_wgs`).
 - `--lab <slug>`: the owning lab's short registry name (its "slug," e.g.
-  `mh` for the Hallett lab). Defaults to this machine's lab.
+  e.g. `mh`). Defaults to this machine's lab.
 - `--agents a,b`: a comma-separated list of which commons agents to wire
   in (e.g. `bookworm,blacksmith`). Defaults to the standard set if
   omitted.

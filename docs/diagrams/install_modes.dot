@@ -90,7 +90,7 @@ digraph install_modes {
                  fillcolor="#E9DEFA", color="#6F4DA8"];
 
     // lab-server side
-    R_lab-server [label=<<B>lab-server.example.edu</B><BR/><FONT POINT-SIZE="9">Ubuntu &middot; 203.0.113.10</FONT>>,
+    R_labserver [label=<<B>lab-server.example.edu</B><BR/><FONT POINT-SIZE="9">Ubuntu &middot; 203.0.113.10</FONT>>,
                  shape=plaintext, fillcolor="transparent"];
     R_repo      [label="/home/&lt;user&gt;/repos/&lt;project&gt;\n(working tree)",
                  fillcolor="#FFFFFF"];
@@ -102,7 +102,7 @@ digraph install_modes {
                  fillcolor="#FFFFFF"];
 
     // Local-to-remote arrows that cross the SSH boundary
-    R_dashboard -> R_murmurent   [label="ssh lab-server  ", style=bold, color="#4F2683"];
+    R_dashboard -> R_murmurent   [label="ssh <my_server>  ", style=bold, color="#4F2683"];
     R_vscode_remote -> R_repo  [label="vscode-remote://", style=bold, color="#4F2683"];
     R_obs_local -> R_vault     [label="SSHFS mount",     style=bold, color="#4F2683"];
 

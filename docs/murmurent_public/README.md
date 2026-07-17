@@ -50,7 +50,7 @@ is the public key the join script encrypts to.
 
 | Institution | Installation | Email to join | age key (encrypt to this) |
 |---|---|---|---|
-| Western University | Western Test Centre | tbrowne5@example.edu | age1y43uxhv7dp50mw8qnrqwh4wvamp7adz4alxezpxang4wn9usuumqmneuat |
+| Example University | Example Test Centre | join@example.edu | age1exampleplaceholderreplacewithyourrealpublickeyxxxxxxxxxxxxx |
 
 **Don't see your institution?** It may not run murmurent yet — ask your PI or lab
 manager. (Registrars add their row here when they go live.)

@@ -1,8 +1,8 @@
 # Cores in Murmurent — comprehensive design plan
 
-**Status:** draft for discussion. **Nothing implemented yet.** This document is the proposed strategy for adding cores (e.g. bioCore) to Murmurent as first-class entities alongside labs. It answers items 0–8 from the user request, proposes architectural decisions, and ends with the open questions we need to resolve before any code lands.
+**Status:** draft for discussion. **Nothing implemented yet.** This document is the proposed strategy for adding cores (e.g. Example Core) to Murmurent as first-class entities alongside labs. It answers items 0–8 from the user request, proposes architectural decisions, and ends with the open questions we need to resolve before any code lands.
 
-Worked example throughout: **bioCore** (Western, Schulich, Department of Biochemistry — https://www.schulich.uwo.ca/biocore/). Three service modes (consultation / independent data collection / fee-for-service) — we focus on **independent data collection**. Three capability families (protein production & synthetic biology / structure-function-interaction / high-throughput molecular analysis) — we focus on **structure, function, and interaction**.
+Worked example throughout: **Example Core** (Example University, Department of Biology — https://example.edu/example_core). Three service modes (consultation / independent data collection / fee-for-service) — we focus on **independent data collection**. Three capability families (protein production & synthetic biology / structure-function-interaction / high-throughput molecular analysis) — we focus on **structure, function, and interaction**.
 
 ---
 
@@ -20,7 +20,7 @@ The genuinely new concepts are:
 | **Booking** | A user reserves a time slot on a piece of equipment | (none — new) |
 | **Training prerequisites** | A user must complete training before booking certain services | TCPS_2 cert pattern from membership |
 | **Pricing schedule** | Per-service fee tiers by time, user-class, and access | (none — new) |
-| **Cross-lab user pool** | Anyone with a Schulich identity can use a core service, not just core staff | Currently lab-scoped; needs expanding |
+| **Cross-lab user pool** | Anyone with a institutional identity can use a core service, not just core staff | Currently lab-scoped; needs expanding |
 | **Job → data deliverable** | Each booking produces files the requester needs to retrieve | Existing `raw/`/`refined/` model, scoped per-job |
 | **Invoicing** | Periodic per-lab statement of charges | (none — new) |
 
@@ -57,7 +57,7 @@ This shapes the implementation: we extend the existing entities rather than crea
                                                   └─────────────────┘
 ```
 
-A lab member of lab `hallett` who needs to use a bioCore centrifuge becomes a **service requester** at bioCore — Murmurent should know they're affiliated with lab `hallett` (for billing + data delivery) without making them a *member* of bioCore.
+A lab member of lab `lab_alpha` who needs to use a Example Core centrifuge becomes a **service requester** at Example Core — Murmurent should know they're affiliated with lab `lab_alpha` (for billing + data delivery) without making them a *member* of Example Core.
 
 ---
 
@@ -111,7 +111,7 @@ Half a day of focused rename + grep verification + one back-compat shim per quer
 
 ### 4a. Where the core registry lives — **STATUS UPDATE 2026-05-21**
 
-**Correction from the original v1 of this plan.** I initially proposed extending `~/repos/lab_mgmt/` (the Hallett lab's per-lab repo) with a `cores/` subdir. **That was wrong**: `lab_mgmt` is one *lab's* repo. Cores aren't part of any lab — they're centre-wide. Putting them under `lab_mgmt/cores/` is a category error (a core isn't a member of the Hallett lab).
+**Correction from the original v1 of this plan.** I initially proposed extending `~/repos/lab_mgmt/` (the host lab's per-lab repo) with a `cores/` subdir. **That was wrong**: `lab_mgmt` is one *lab's* repo. Cores aren't part of any lab — they're centre-wide. Putting them under `lab_mgmt/cores/` is a category error (a core isn't a member of the host lab).
 
 The right place was already wired up in Murmurent:
 
@@ -126,7 +126,7 @@ The right place was already wired up in Murmurent:
 - Cross-membership (a core staff member also in a lab) works via shared handles: both registries reference the same member handle string; the member's identity record lives in whichever lab they primarily belong to.
 - All Phase 1+ work — registrar CRUD, security audit, slack-notify, training-compliance — already runs over `~/.murmurent/lab_info/` because the registrar dashboard's snapshot pulls from there. Zero migration needed.
 
-**Practical consequence**: Phase 0c (originally "extend lab_mgmt") was reverted (Murmurent `3da0aa8`, lab_mgmt `b0b3a5e`) and redone by calling the existing `core.registrar.create_core("biocore", ...)` API, which scaffolds at `~/.murmurent/lab_info/cores/biocore/`. The existing registrar dashboard renders bioCORE without code changes — Phase 0d collapses from "build a Cores panel" to "verify the existing Cores panel + add coverage tests."
+**Practical consequence**: Phase 0c (originally "extend lab_mgmt") was reverted (Murmurent `3da0aa8`, lab_mgmt `b0b3a5e`) and redone by calling the existing `core.registrar.create_core("example_core", ...)` API, which scaffolds at `~/.murmurent/lab_info/cores/example_core/`. The existing registrar dashboard renders Example Core without code changes — Phase 0d collapses from "build a Cores panel" to "verify the existing Cores panel + add coverage tests."
 
 The §4b schema below describes the **per-core lab-mgmt** that the registrar scaffolds; the storage path is `~/.murmurent/lab_info/cores/<core>/lab-mgmt/` not `~/repos/lab_mgmt/cores/<core>/`. The rest of the plan stands.
 
@@ -134,13 +134,13 @@ The §4b schema below describes the **per-core lab-mgmt** that the registrar sca
 
 ```
 lab_mgmt/
-├── lab.md                          # the host lab (Hallett)
+├── lab.md                          # the host lab
 ├── members/                        # all centre members; lab + core overlap
 │   └── the_pi.md
 ├── projects/                       # lab research projects
 │   └── dcis_sc_tutorial.md
 └── cores/                          # NEW
-    └── biocore/
+    └── example_core/
         ├── core.md                 # leader, members, kind, capabilities, contact
         ├── services/               # one .md per service offering
         │   ├── centrifuge_avanti_jxn_30.md
@@ -151,27 +151,27 @@ lab_mgmt/
             └── DATA_LAYOUT.md      # describes how the core's data tree is organised
 ```
 
-**`cores/biocore/core.md`** frontmatter (mirrors `lab.md` shape):
+**`cores/example_core/core.md`** frontmatter (mirrors `lab.md` shape):
 
 ```yaml
 ---
-core: biocore                       # short id; matches dir name
-name: "BioCORE"                     # display name
+core: example_core                       # short id; matches dir name
+name: "Example Core"                     # display name
 kind: core                          # vs lab
 leader: '@core_lead'                 # (placeholder — actual leader handle TBD)
 members:                            # core staff; each has a member file too
   - '@core_lead'
   - '@<staff_1>'
 description: |
-  Western's biochemistry research core facility, offering protein
+  the university's biochemistry research core facility, offering protein
   production, structure/function/interaction analysis, and
   high-throughput molecular methods to investigators across the
-  Schulich school.
-website: https://www.schulich.uwo.ca/biocore/
+  medical school.
+website: https://example.edu/example_core
 contact:
-  email: BioCORE@example.edu
-  phone: "555-0100"
-  location: "Room 100, 1 Example Avereet, London, ON"
+  email: example_core@example.edu
+  phone: "555-0100 ext 000"
+  location: "Room 100, 1 Example Ave, Example City"
 capabilities:                       # broad capability families (matches website)
   - protein_production_synthetic_biology
   - structure_function_interaction
@@ -180,9 +180,9 @@ service_modes:                      # which modes murmurent wires up (for now: i
   - consultation                    # advisory; not bookable
   - independent_data_collection     # bookable; user runs the equipment
   - fee_for_service_data_collection # bookable; core staff runs the equipment
-data_root: $MURMURENT_LAB_VM_ROOT/core/biocore  # where job data lives
+data_root: $MURMURENT_LAB_VM_ROOT/core/example_core  # where job data lives
 billing:
-  cost_centre: "C2-12345"           # Western fund code; placeholder
+  cost_centre: "C2-12345"           # institutional fund code; placeholder
   invoice_period: monthly
   rate_tiers:                       # see §7
     - academic_internal
@@ -190,13 +190,13 @@ billing:
     - industry
 ---
 
-# BioCORE
+# Example Core
 
 Body: longer description, governance, calendar of upcoming training,
-links to the lab_mgmt/cores/biocore/services/ subdir.
+links to the lab_mgmt/cores/example_core/services/ subdir.
 ```
 
-**`cores/biocore/services/<service>.md`** schema in §6.
+**`cores/example_core/services/<service>.md`** schema in §6.
 
 ### 4c. Registrar workflows (CRUD)
 
@@ -225,7 +225,7 @@ The security guard's Tier 1 + Tier 2 audit currently scopes to `$MURMURENT_LAB_V
 Concretely:
 
 - `scripts/lab_sec_dump.sh` enumerates `$MURMURENT_LAB_VM_ROOT/core/*/` and `nfs4_getfacl -R` each. Per-core budget (mirror the per-project budget we added in v6 for refined).
-- The Tier 2 ACL template (the Core Lead reference in `docs/security-dashboard.md`) gets a parallel **CORE-RAW-IMMUTABLE-01**, **CORE-REFINED-LAB-WRITE-01**, **CORE-JOB-DELIVERY-01** rule family. Same patterns as raw/refined, just scoped to core paths.
+- The Tier 2 ACL template (the Tier 2 ACL template in `docs/security-dashboard.md`) gets a parallel **CORE-RAW-IMMUTABLE-01**, **CORE-REFINED-LAB-WRITE-01**, **CORE-JOB-DELIVERY-01** rule family. Same patterns as raw/refined, just scoped to core paths.
 - A new finding category **CORE-OVER-EXPOSED-DATA-01** (warn): job data dirs at `core/<core>/jobs/<job_id>/` should be readable by exactly the requesting lab's group + the core's group, nothing more.
 
 The security dashboard's per-host view stays the same UX; the rule catalog grows.
@@ -250,7 +250,7 @@ This is the **menu item** description. Static; doesn't change per booking.
 ---
 service: itc_microcal_peaq
 name: "Isothermal Titration Calorimetry (MicroCal PEAQ-ITC)"
-core: biocore
+core: example_core
 capability: structure_function_interaction
 mode: independent_data_collection   # user runs it themselves
 description: |
@@ -260,7 +260,7 @@ equipment:
   manufacturer: Malvern Panalytical
   model: MicroCal PEAQ-ITC
   serial: "12345"
-  location: "Room 100, room A"
+  location: "Room 100, bench A"
 training_required: itc_basic_training   # references training catalog entry
 prerequisites:
   - "Sample concentration ≥ 10 µM, volume ≥ 400 µL"
@@ -270,7 +270,7 @@ duration_max_min: 240
 fee:
   unit: per_run
   tiers:
-    academic_internal: 80.00          # CAD; bioCore example
+    academic_internal: 80.00          # CAD; Example Core example
     academic_external: 130.00
     industry: 260.00
   modifiers:
@@ -281,7 +281,7 @@ data_deliverable:
   format: "MicroCal .itc files + auto-generated PNG fit"
   delivery: per_job_acl              # murmurent grants requesting-lab read on job dir
 contact:
-  email: BioCORE@example.edu
+  email: example_core@example.edu
 status: active                        # active | maintenance | retired
 ---
 ```
@@ -294,9 +294,9 @@ Filed when a user books a service. Same state machine as a SEA but with extra fi
 ---
 request_id: 2026-05-21-001
 service: itc_microcal_peaq
-core: biocore
-requester: '@knabavil'                 # the user's handle (cross-lab — see §4)
-requester_lab: hallett                 # for billing + data delivery
+core: example_core
+requester: '@member_a'                 # the user's handle (cross-lab — see §4)
+requester_lab: lab_alpha                 # for billing + data delivery
 state: scheduled                       # requested | scheduled | in_progress | completed | cancelled
 booked_slot:
   start: 2026-05-23T10:00-04:00
@@ -313,7 +313,7 @@ fee_at_booking:                        # snapshot of pricing at request time
   modifiers_applied: []
   total: 80.00
   tier: academic_internal
-job_id: 2026-05-23-knabavil-itc-001    # used as the data-delivery dir name
+job_id: 2026-05-23-member_a-itc-001    # used as the data-delivery dir name
 notes: |
   Free-form notes from requester or core staff. Default empty.
 ---
@@ -335,10 +335,10 @@ This is the biggest decision. We don't want to build a calendar app from scratch
 
 ### Option A — Google Calendar via the existing Anthropic MCP
 
-`mcp__claude_ai_Google_Calendar__*` tools are already loaded in this environment. Each service gets its own dedicated Google Calendar (e.g. `biocore-itc-peaq@western.calendar`); the core leader owns it and grants the bioCore service account write access. Bookings are calendar events with a custom property bag (request_id, fee, prereqs).
+`mcp__claude_ai_Google_Calendar__*` tools are already loaded in this environment. Each service gets its own dedicated Google Calendar (e.g. `example_core-itc-peaq@example.calendar`); the core leader owns it and grants the Example Core service account write access. Bookings are calendar events with a custom property bag (request_id, fee, prereqs).
 
 **Pros:**
-- Zero new infrastructure. Users already use Google Calendar at Western.
+- Zero new infrastructure. Users already use Google Calendar institutionally.
 - Native iCal subscription means a user can see their bookings in their phone calendar without us doing anything.
 - Conflict detection is free (Google checks).
 - Cancellation, reschedule, reminder emails — all built in.
@@ -347,7 +347,7 @@ This is the biggest decision. We don't want to build a calendar app from scratch
 **Cons:**
 - No native pricing/tier logic — we layer it in Murmurent.
 - No native training-prerequisite enforcement — Murmurent must check before creating the calendar event.
-- Cross-org calendar sharing (a Hallett-lab member booking a bioCore calendar) needs the core to grant guest-write — once per calendar, manageable.
+- Cross-org calendar sharing (a host-lab member booking a Example Core calendar) needs the core to grant guest-write — once per calendar, manageable.
 - Privacy concern: booking metadata sits on Google.
 
 ### Option B — Self-hosted booking system
@@ -366,7 +366,7 @@ Two open-source candidates:
 **Cons:**
 - One more thing to run, secure, back up, update.
 - Webhook integration with Murmurent is bespoke.
-- Authentication — needs to talk to Western SSO somehow, otherwise users juggle yet another login.
+- Authentication — needs to talk to institutional SSO somehow, otherwise users juggle yet another login.
 
 ### Option C — Roll our own minimal booking layer
 
@@ -410,7 +410,7 @@ Per-member training records live in their existing `lab_mgmt/members/<handle>.md
 
 ```yaml
 ---
-handle: '@knabavil'
+handle: '@member_a'
 training:
   - name: itc_basic_training
     completed: 2025-11-15
@@ -430,7 +430,7 @@ This piggybacks on the existing certification UI; no new schema work in the dash
 
 ### Murmurent's role
 
-**Murmurent is not a billing system.** Murmurent is a *billing-data producer*. It captures every billable event (a completed service request, the tier, the time-of-day modifiers, the requester's lab + Western ID) and emits structured invoice artifacts. A human then routes those artifacts through Western's actual finance system.
+**Murmurent is not a billing system.** Murmurent is a *billing-data producer*. It captures every billable event (a completed service request, the tier, the time-of-day modifiers, the requester's lab + institutional ID) and emits structured invoice artifacts. A human then routes those artifacts through the institution's actual finance system.
 
 ### Data model
 
@@ -441,40 +441,40 @@ Each completed service request has `fee_at_booking` snapshotted (so retroactive 
 End-of-month CLI command (and scheduled via CC `/routine`):
 
 ```bash
-murmurent core invoice --core biocore --month 2026-05
+murmurent core invoice --core example_core --month 2026-05
 ```
 
 Produces, per requesting-lab, a CSV + PDF at:
 
 ```
-lab_mgmt/cores/biocore/invoices/2026-05/
-├── hallett.csv
-├── hallett.pdf
-├── castellani.csv
-├── castellani.pdf
+lab_mgmt/cores/example_core/invoices/2026-05/
+├── lab_alpha.csv
+├── lab_alpha.pdf
+├── lab_beta.csv
+├── lab_beta.pdf
 └── summary.md
 ```
 
-The PDF format mirrors what Western accounting expects (line items, tax breakdowns, cost-centre reference). The CSV is for the lab PI's records + machine-readable forwarding.
+The PDF format mirrors what institutional accounting expects (line items, tax breakdowns, cost-centre reference). The CSV is for the lab PI's records + machine-readable forwarding.
 
-### Western finance integration — three realistic paths
+### institutional finance integration — three realistic paths
 
 | Path | Effort | Probability of success |
 |---|---|---|
-| **1. Manual** (lab admin emails PDF to Western finance, mirrors current bioCore process) | None | 100% |
-| **2. Semi-automated** (lab admin uploads CSVs into Western's expense-report tool) | Low | Likely Western has a CSV upload format; can match it |
-| **3. API integration** (Murmurent POSTs invoices to Western finance) | High; needs Western IT engagement, contracts | Low — Western IT is risk-averse with research-side automation |
+| **1. Manual** (lab admin emails PDF to institutional finance, mirrors current Example Core process) | None | 100% |
+| **2. Semi-automated** (lab admin uploads CSVs into the institution's expense-report tool) | Low | Likely the institution has a CSV upload format; can match it |
+| **3. API integration** (Murmurent POSTs invoices to institutional finance) | High; needs institutional IT engagement, contracts | Low — institutional IT is risk-averse with research-side automation |
 
-**Recommendation for v1:** ship Path 1, design the CSV/PDF to make Path 2 easy when the lab admin is ready. Defer Path 3 until there's a clear business case (e.g., bioCore wants real-time charge-back to lab fund balances).
+**Recommendation for v1:** ship Path 1, design the CSV/PDF to make Path 2 easy when the lab admin is ready. Defer Path 3 until there's a clear business case (e.g., Example Core wants real-time charge-back to lab fund balances).
 
 ### Direct payment for industry / external collaborators
 
-The "industry" tier in the fee schedule covers customers who aren't on a Western lab fund. Two sub-paths:
+The "industry" tier in the fee schedule covers customers who aren't on a institutional lab fund. Two sub-paths:
 
-- **Western invoice → external customer** (existing bioCore flow) — Murmurent generates the invoice, Western's existing Accounts Receivable system bills the customer. No new integration.
-- **Direct Stripe/Square payment at booking** — Murmurent generates a payment link, user pays before the slot is confirmed. Useful for one-off industry users who don't want to deal with Western AR. Stripe has a Python SDK; integration is ~half a day. Requires the core to have a merchant account.
+- **Institutional invoice → external customer** (existing Example Core flow) — Murmurent generates the invoice, the institution's existing Accounts Receivable system bills the customer. No new integration.
+- **Direct Stripe/Square payment at booking** — Murmurent generates a payment link, user pays before the slot is confirmed. Useful for one-off industry users who don't want to deal with institutional AR. Stripe has a Python SDK; integration is ~half a day. Requires the core to have a merchant account.
 
-**Recommendation:** ship the Western-invoice path for v1; flag Stripe as a Phase 5 add-on if bioCore actually has external customers who want it.
+**Recommendation:** ship the institutional-invoice path for v1; flag Stripe as a Phase 5 add-on if Example Core actually has external customers who want it.
 
 ### Per-lab budget alerts (nice-to-have)
 
@@ -484,21 +484,21 @@ A lab PI can set a monthly budget cap. When their lab's accumulated charges in a
 
 ## 8. Item 8: Data delivery
 
-The use case: a Hallett-lab member books bioCore's ITC service. ITC produces ~10 MB of `.itc` files + a fit PNG. Those files need to land somewhere the Hallett lab can read, without bioCore's *other* customers being able to see them.
+The use case: a host-lab member books Example Core's ITC service. ITC produces ~10 MB of `.itc` files + a fit PNG. Those files need to land somewhere the host lab can read, without Example Core's *other* customers being able to see them.
 
 ### Storage layout
 
 ```
-$MURMURENT_LAB_VM_ROOT/core/biocore/
+$MURMURENT_LAB_VM_ROOT/core/example_core/
 ├── jobs/
-│   ├── 2026-05-23-knabavil-itc-001/
+│   ├── 2026-05-23-member_a-itc-001/
 │   │   ├── manifest.json                    # request_id, service, requester, lab, fee
 │   │   ├── raw/
 │   │   │   ├── sample1.itc
 │   │   │   └── sample2.itc
 │   │   └── refined/
 │   │       └── fit.png
-│   └── 2026-05-23-jdeloss4-cd-002/
+│   └── 2026-05-23-member_b-cd-002/
 │       └── ...
 ├── raw/                                     # core's own staging area (not per-job)
 └── refined/                                 # core's own derived data (not per-job)
@@ -510,7 +510,7 @@ The per-job dir has its own ACL: read-only for the requesting lab's group + read
 
 | Option | Mechanism | Pros | Cons |
 |---|---|---|---|
-| **1. Per-job NFSv4 ACL grants** | At job completion, `lab_sec_dump`-like script (running as root) sets an inheriting ACE granting `labgroup<labgroup>:rxtTcy` on the job dir | Native, no daemon, files visible in the lab's normal mount | Requires root ACL changes on every job — that's a lot of `nfs4_setfacl` calls. Auditing later is harder. |
+| **1. Per-job NFSv4 ACL grants** | At job completion, `lab_sec_dump`-like script (running as root) sets an inheriting ACE granting `<lab_group>:rxtTcy` on the job dir | Native, no daemon, files visible in the lab's normal mount | Requires root ACL changes on every job — that's a lot of `nfs4_setfacl` calls. Auditing later is harder. |
 | **2. Murmurent MCP (`murmurent-core-data`)** | New MCP server that exposes `list_jobs(lab=)`, `get_job_status(job_id)`, `read_file(job_id, path)`, `bundle_job(job_id)`. The MCP runs as a service account, walks the job dir, returns content. Murmurent identity check at the request layer. | Clean access-control story (one place to enforce policy); easy auditing (MCP logs each access); works the same on every machine | Users get data via tooling (`claude` / dashboard download button), not as files in their lab's normal mount. They have to copy/move if they want files on disk. |
 | **3. Per-job signed URLs** | Murmurent HTTP server signs a short-lived (e.g. 72h) URL per file; user downloads via browser/curl | Familiar UX (one-click download); easy to email the link to a non-CC user | Files leave the lab_vm tree onto the Murmurent host's disk during download; needs HTTPS + cert; sharing the link is a security hole if it leaks |
 
@@ -557,11 +557,11 @@ On the lab server (lab-server) close to the data. The user's local CC session co
 
 The user asked. Other MCP candidates for cores:
 
-- **`murmurent-core-services`** — list services, check availability, quote a fee, book a slot, cancel. Lets a researcher say "claude, find me an ITC slot tomorrow morning" and the agent does the conversation with bioCore via MCP. This is *exactly* what MCP is for.
+- **`murmurent-core-services`** — list services, check availability, quote a fee, book a slot, cancel. Lets a researcher say "claude, find me an ITC slot tomorrow morning" and the agent does the conversation with Example Core via MCP. This is *exactly* what MCP is for.
 - **`murmurent-core-billing`** — read-only access to a lab's spend in a period, for PI's monthly review.
 - **`murmurent-core-training`** — what training do I have, when does it expire, when's the next session.
 
-The agent-side wins are clear: a member of the Hallett lab can now have a conversation like "I have a sample at 8 µM, can I run ITC this week?" and the agent checks training, books the slot, and confirms — all via MCPs. That's a step change in UX.
+The agent-side wins are clear: a member of the host lab can now have a conversation like "I have a sample at 8 µM, can I run ITC this week?" and the agent checks training, books the slot, and confirms — all via MCPs. That's a step change in UX.
 
 ### Cores with existing data infrastructure
 
@@ -578,15 +578,15 @@ This keeps the abstraction stable while letting each core wire in whatever its e
 
 ## 9. Cross-lab user identity (a thing item 6 implies but isn't called out)
 
-bioCore's customers are Hallett-lab members, Castellani-lab members, industry collaborators — anyone with a Schulich identity. Murmurent today scopes users to one lab via `lab_mgmt/members/<handle>.md` + a `lab:` field. We need to handle "this user is *primarily* in lab X but is *currently requesting a service from* core Y."
+Example Core's customers are host-lab members, lab_beta members, industry collaborators — anyone with a institutional identity. Murmurent today scopes users to one lab via `lab_mgmt/members/<handle>.md` + a `lab:` field. We need to handle "this user is *primarily* in lab X but is *currently requesting a service from* core Y."
 
 Proposed model:
 
-- Every Schulich identity gets a `lab_mgmt/members/<handle>.md` whether or not they're affiliated with a lab. (For external industry customers, the `lab:` field becomes `external` or holds the company name.)
+- Every institutional identity gets a `lab_mgmt/members/<handle>.md` whether or not they're affiliated with a lab. (For external industry customers, the `lab:` field becomes `external` or holds the company name.)
 - A service request carries `requester` (the handle) and `requester_lab` (resolved at booking time from the member file).
 - Billing flows through `requester_lab` (the lab pays). Data delivery flows through `requester_lab` (the lab gets access).
 
-For non-Schulich industry users:
+For external industry users:
 - A `lab_mgmt/external_customers/<id>.md` file with billing contact, PO number, etc.
 - The MCP / dashboard treats them as a special-case lab for the purposes of request routing.
 
@@ -602,7 +602,7 @@ Three reasons:
 
 1. **Cognitive scope**: the lab PI cares about projects, SEAs, experiments. The core leader cares about service catalog, incoming requests, equipment calendar, monthly invoice run. The data on screen at any given moment shouldn't mix.
 2. **Permission model**: the core leader has admin rights inside the core (add/remove core members, edit service catalog, set fees, approve/cancel requests) but is just an ordinary lab member elsewhere. A separate route lets us gate one without polluting the other.
-3. **Multi-affiliation**: a person can lead bioCore AND be a member of the Hallett lab. They'd switch between `/core?core=biocore` and `/dashboard` via the cmd-bar `↺ switch` link, the same way registrar already does.
+3. **Multi-affiliation**: a person can lead Example Core AND be a member of the host lab. They'd switch between `/core?core=example_core` and `/dashboard` via the cmd-bar `↺ switch` link, the same way registrar already does.
 
 ### Panel inventory
 
@@ -610,7 +610,7 @@ The Core Dashboard reuses ~70% of the lab PI dashboard's panels. New panels for 
 
 | Panel | Source | New / Reused | Phase |
 |---|---|---|---|
-| Topbar (lab logo → "BioCORE", member chip, ↺ switch, ⚿ security if granted) | hifi-app.jsx topbar | Reused + relabelled | 1 |
+| Topbar (lab logo → "Example Core", member chip, ↺ switch, ⚿ security if granted) | hifi-app.jsx topbar | Reused + relabelled | 1 |
 | Cmd-bar (search) | hifi-app.jsx CmdBar | Reused; scope changes to search services + requests + member roster | 1 |
 | Identity block (leader + core contact info + capabilities list) | new | New (parallels lab identity block) | 1 |
 | **Core members panel** (analogue of LabMembersPanel — list staff, status, certifications, deactivate/reactivate) | LabMembersPanel | Reused as-is, scoped to core members | 1 |
@@ -660,10 +660,10 @@ Estimate: roughly +1 week distributed across Phases 1-5 (each phase's UI is +1-2
 
 - Rename "users" → "members" in user-facing copy (per §3).
 - Add `kind: lab | core` to `lab_mgmt/lab.md`; dashboard renders "Leader" vs "PI".
-- Add empty `lab_mgmt/cores/` directory + the `cores/biocore/core.md` example file (just the leader + members, no services yet).
+- Add empty `lab_mgmt/cores/` directory + the `cores/example_core/core.md` example file (just the leader + members, no services yet).
 - Registrar dashboard shows a "Cores" panel that lists registered cores. Empty until later phases.
 
-**Deliverable:** Registrar can see "BioCORE" as a registered entity. No services yet.
+**Deliverable:** Registrar can see "Example Core" as a registered entity. No services yet.
 
 ### Phase 1 — Core CRUD + security audit (≈ 1 week)
 
@@ -681,7 +681,7 @@ Estimate: roughly +1 week distributed across Phases 1-5 (each phase's UI is +1-2
 - Training prerequisites schema + per-member training records.
 - Fee schedule editor.
 
-**Deliverable:** bioCore staff can curate a service catalog visible to all centre members; no bookings yet.
+**Deliverable:** Example Core staff can curate a service catalog visible to all centre members; no bookings yet.
 
 ### Phase 3 — Booking (≈ 2 weeks; the largest phase)
 
@@ -691,7 +691,7 @@ Estimate: roughly +1 week distributed across Phases 1-5 (each phase's UI is +1-2
 - Member dashboard: "My bookings"; core leader dashboard: "Incoming requests."
 - Reminder Slack DMs to requester 24h before, 1h before.
 
-**Deliverable:** A Hallett-lab member can book ITC time; bioCore staff see the booking on their calendar; reminder sent.
+**Deliverable:** A host-lab member can book ITC time; Example Core staff see the booking on their calendar; reminder sent.
 
 ### Phase 4 — Data delivery MCP (≈ 1 week)
 
@@ -708,9 +708,9 @@ Estimate: roughly +1 week distributed across Phases 1-5 (each phase's UI is +1-2
 - Per-lab CSV + PDF invoices.
 - Monthly Slack summary to each PI.
 - Budget cap + alerts (optional).
-- *Defer* Western-finance API integration unless explicitly requested.
+- *Defer* institutional-finance API integration unless explicitly requested.
 
-**Deliverable:** End-of-month invoices generated automatically; lab admin can route to Western finance manually.
+**Deliverable:** End-of-month invoices generated automatically; lab admin can route to institutional finance manually.
 
 ### Phase 6 (optional / nice-to-have)
 
@@ -732,15 +732,15 @@ These need a decision from you before the plan goes further:
 
 ### Scheduling
 
-3. **Google Calendar vs Booked Scheduler.** §6 recommends Google Calendar via existing MCP for v1. Comfortable with Google holding bioCore booking metadata, or do you want a self-hosted booking layer from day one (longer build but full control)?
+3. **Google Calendar vs Booked Scheduler.** §6 recommends Google Calendar via existing MCP for v1. Comfortable with Google holding Example Core booking metadata, or do you want a self-hosted booking layer from day one (longer build but full control)?
 4. **Conflict semantics**: one ITC machine = one booking at a time, obvious. But the centrifuge in your spec has *multiple users running in parallel* (it's a shared piece of equipment with multiple rotors). Does each rotor become its own service? Or does the service have an `instances: N` field allowing N concurrent bookings?
 5. **Training requirements**: per-service or per-equipment family? E.g., does "centrifuge training" cover all rotors, or do users train per-model?
 
 ### Billing
 
-6. **Tier vocabulary**. §5a proposes `academic_internal / academic_external / industry`. Is that bioCore's actual structure, or do they have e.g. a "graduate trainee discount" tier?
-7. **Time-of-day modifiers**. §5a sketches `weekend / after_hours / overtime` modifiers. Is that bioCore's actual structure, or do they have a flat schedule?
-8. **Cost-centre / Western fund-code field**. Is the right level to attach this on the *request* (per-booking, member specifies their lab fund), on the *member profile* (their default fund), or on the *lab* (the lab's default fund)? Probably hierarchical: lab default → member override → request-time override.
+6. **Tier vocabulary**. §5a proposes `academic_internal / academic_external / industry`. Is that Example Core's actual structure, or do they have e.g. a "graduate trainee discount" tier?
+7. **Time-of-day modifiers**. §5a sketches `weekend / after_hours / overtime` modifiers. Is that Example Core's actual structure, or do they have a flat schedule?
+8. **Cost-centre / institutional fund-code field**. Is the right level to attach this on the *request* (per-booking, member specifies their lab fund), on the *member profile* (their default fund), or on the *lab* (the lab's default fund)? Probably hierarchical: lab default → member override → request-time override.
 
 ### Data delivery
 
@@ -749,13 +749,13 @@ These need a decision from you before the plan goes further:
 
 ### Cross-core concerns
 
-11. **Multiple cores at the centre.** Plan structures for "any number of cores." Once bioCore is wired, adding the next core (genomics, proteomics, …) is mostly schema + service catalog. Confirm: that's the intended scaling shape.
+11. **Multiple cores at the centre.** Plan structures for "any number of cores." Once Example Core is wired, adding the next core (genomics, proteomics, …) is mostly schema + service catalog. Confirm: that's the intended scaling shape.
 12. **Cores using existing data infrastructure** (genomics on BaseSpace, proteomics on vendor NAS). The MCP-per-backend approach in §8 handles this; but adopting an existing core means writing a per-backend adapter. Are there cores you want to onboard whose backends I should research now (e.g., would knowing the genomics-core's actual data system shape the MCP design)?
 
 ### Process
 
 13. **Who signs off on the leader for each core?** The registrar can set it; but is there a centre-level approval step before a person becomes a core's leader (e.g., a director's review)?
-14. **Audit trail of fee schedule changes**. If bioCore raises the ITC fee from $80 to $100, requests booked before the change must keep the old fee. The `fee_at_booking` snapshot in §5b handles this — confirm that satisfies your audit requirements.
+14. **Audit trail of fee schedule changes**. If Example Core raises the ITC fee from $80 to $100, requests booked before the change must keep the old fee. The `fee_at_booking` snapshot in §5b handles this — confirm that satisfies your audit requirements.
 
 ---
 
@@ -763,25 +763,25 @@ These need a decision from you before the plan goes further:
 
 To set expectations on what's out of scope and would be future work:
 
-- **Multi-centre federation** — Murmurent assumes one centre. If Schulich grows into a multi-centre group (e.g., adding Robarts), we'd need a layer above the registrar.
-- **Public marketplace**. The plan assumes services are offered to centre-affiliated users only. A public-facing "bioCore is open to anyone with a credit card" mode is a separate effort.
+- **Multi-centre federation** — Murmurent assumes one centre. If the centre grows into a multi-centre group (e.g., adding a second institute), we'd need a layer above the registrar.
+- **Public marketplace**. The plan assumes services are offered to centre-affiliated users only. A public-facing "Example Core is open to anyone with a credit card" mode is a separate effort.
 - **Time-and-motion analytics**. Tracking actual-vs-quoted duration over time is doable from the booking data, but I haven't sketched the dashboards for it.
 - **Equipment health / maintenance scheduling**. A core has a centrifuge that needs calibration every 6 months. Murmurent could track maintenance windows, but that's a separate scope (equipment registry, not service catalog).
-- **Sample tracking**. A user dropping off a tube for bioCore staff to run later (the fee_for_service mode) implies sample-tracking that we're explicitly out-of-scope for the focus on independent_data_collection.
+- **Sample tracking**. A user dropping off a tube for Example Core staff to run later (the fee_for_service mode) implies sample-tracking that we're explicitly out-of-scope for the focus on independent_data_collection.
 
 ---
 
-## 14. Why bioCore first
+## 14. Why Example Core first
 
-bioCore is the right pilot because:
+Example Core is the right pilot because:
 
 - It's already established (real customers, real fee schedule, real workflows we can learn from).
-- The leader is in the existing Murmurent ecosystem (the core lead is already in `lab_mgmt/members/`).
+- The leader is already in the existing Murmurent ecosystem (present in `lab_mgmt/members/`).
 - The capability range (centrifuge, ITC, CD, mass spec) spans the simple-to-complex spectrum, so we'll surface design issues early.
 - It's small enough to onboard end-to-end before we generalise to other cores.
 - The data is already on lab-server, where Murmurent already runs.
 
-Once Phase 0-4 are live for bioCore, **the second core** (genomics, proteomics, microscopy — your call) is mostly schema + service catalog + per-backend MCP adapter. The platform is built once.
+Once Phase 0-4 are live for Example Core, **the second core** (genomics, proteomics, microscopy — your call) is mostly schema + service catalog + per-backend MCP adapter. The platform is built once.
 
 ---
 
@@ -797,7 +797,7 @@ Once Phase 0-4 are live for bioCore, **the second core** (genomics, proteomics, 
 | 5. Billing | 1-2 weeks | 7 weeks |
 | 6. Optional add-ons | as-needed | — |
 
-Total to a workable bioCore in Murmurent: **~7 weeks** of focused work, with usable deliverables at each phase boundary. Phase 0+1 alone gives the registrar what they need to track cores; Phase 2 gives bioCore's leader the catalog editor; Phase 3 is where end-users see real value.
+Total to a workable Example Core in Murmurent: **~7 weeks** of focused work, with usable deliverables at each phase boundary. Phase 0+1 alone gives the registrar what they need to track cores; Phase 2 gives Example Core's leader the catalog editor; Phase 3 is where end-users see real value.
 
 ---
 
@@ -810,7 +810,7 @@ Before this plan turns into code, I need answers to the **open questions in §11
 3. MCP-first vs ACL-first data delivery (§11.9)
 4. Confirm the phasing in §10 — start with Phase 0 (terminology + scaffolding) and iterate?
 
-Plus a request: if you can grab from bioCore's actual fee schedule page, the **tier names and modifier structure** they actually use, that'll let me skip §11.6 and §11.7 with real data instead of placeholders.
+Plus a request: if you can grab from Example Core's actual fee schedule page, the **tier names and modifier structure** they actually use, that'll let me skip §11.6 and §11.7 with real data instead of placeholders.
 
 ---
 

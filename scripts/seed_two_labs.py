@@ -355,8 +355,8 @@ def render_core_lead_lab_md() -> str:
         "institution": "Western University",
         "department":
             "Schulich School of Dentristy and Medicine · Department of Biochemistry",
-        "website": "https://core_lead.science",
-        "lab_base": "lab-server.example.edu:/data/lab_vm/wigamig",
+        "website": "https://example.edu",
+        "lab_base": "lab-server.example.edu:/data/lab_vm/labdata",
         "github_org": "core_lead",
         "git_repos_subpath": "repos",
         "admins": [],

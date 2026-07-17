@@ -14,7 +14,7 @@ otherwise no per-project symlinks are created (Layer 1 — the
 machine-wide ``~/.claude/agents/`` — already covers everything, so the
 stub-only path is intentional).
 
-Idempotent. Re-running is safe: existing wigamig-commons symlinks are
+Idempotent. Re-running is safe: existing murmurent-commons symlinks are
 swept and re-created from the current pick; non-symlink files (a
 user-authored project-specific agent .md) are preserved.
 

@@ -274,9 +274,9 @@ scope.
 (shares Cable Guy's vocabulary; also emits `Reconciled — N deltas
 applied.` after a reconcile pass)
 
-> **You:** Centre Cable Guy, reconcile biocore × brca-imaging.
+> **You:** Centre Cable Guy, reconcile example_core × brca-imaging.
 >
-> **Centre Cable Guy:** "Reconciled biocore × brca-imaging: 2 ACL
+> **Centre Cable Guy:** "Reconciled example_core × brca-imaging: 2 ACL
 > grants, 1 Slack invite. 0 unresolved."
 
 ## Receptionist

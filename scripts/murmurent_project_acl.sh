@@ -13,27 +13,27 @@
 #        chmod 0440 /etc/sudoers.d/murmurent_project_acl
 #
 # Behavior:
-#   - Creates <LAB_VM_ROOT>/wigamig/{raw,refined}/<project>/ if missing.
-#   - Creates a murmurent project Unix group `wgm_<project>` if missing
+#   - Creates <LAB_VM_ROOT>/{raw,refined}/<project>/ if missing.
+#   - Creates a murmurent project Unix group `mur_<project>` if missing
 #     (capped at 16 chars; long project names truncated + suffixed).
-#   - Adds each named member (passed by Western netname / OS account)
+#   - Adds each named member (passed by OS account name)
 #     to that group via `usermod -aG`.
 #   - Sets a per-directory NFSv4 ACL that grants the project group
 #     `rxtTncy` on `refined/` and `rxtTncy` on `raw/` (read-only;
 #     the existing murmurent hooks enforce the "no write" rule at
 #     the application layer; this ACL is belt-and-suspenders).
-#   - Logs every invocation to /var/log/wigamig/project_acl.log.
+#   - Logs every invocation to /var/log/murmurent/project_acl.log.
 #
 # Safety:
 #   - Refuses to run unless invoked from sudo as root (UID == 0).
 #   - Refuses project names that don't match ^[a-z0-9][a-z0-9_]{1,30}$.
-#   - Refuses to touch any path outside <LAB_VM_ROOT>/wigamig/.
+#   - Refuses to touch any path outside <LAB_VM_ROOT>/{raw,refined}/.
 #   - Idempotent: re-running with the same args is a no-op.
 
 set -euo pipefail
 
 LAB_VM_ROOT="${MURMURENT_LAB_VM_ROOT:-/data/lab_vm}"
-LOG_FILE="${MURMURENT_PROJECT_ACL_LOG:-/var/log/wigamig/project_acl.log}"
+LOG_FILE="${MURMURENT_PROJECT_ACL_LOG:-/var/log/murmurent/project_acl.log}"
 SLUG_RE='^[a-z0-9][a-z0-9_]{1,30}$'
 
 log() {
@@ -61,7 +61,7 @@ Usage: $0 --project <name> --members <comma-separated-netnames>
   --members   Comma-separated list of OS accounts to grant access.
 
 Example:
-  sudo $0 --project dcis_imaging --members allie,didi,the_pi
+  sudo $0 --project brca_imaging --members alice,dave,the_pi
 EOF
   exit 64
 }
@@ -86,17 +86,17 @@ done
 
 require_root
 
-# Group name: wgm_<project>, truncated to 16 chars total for Linux.
-GROUP="wgm_${PROJECT}"
+# Group name: mur_<project>, truncated to 16 chars total for Linux.
+GROUP="mur_${PROJECT}"
 if (( ${#GROUP} > 16 )); then
   GROUP="${GROUP:0:13}_$(printf '%s' "$PROJECT" | md5sum | cut -c1-2)"
 fi
 
-RAW_DIR="${LAB_VM_ROOT}/wigamig/raw/${PROJECT}"
-REFINED_DIR="${LAB_VM_ROOT}/wigamig/refined/${PROJECT}"
+RAW_DIR="${LAB_VM_ROOT}/raw/${PROJECT}"
+REFINED_DIR="${LAB_VM_ROOT}/refined/${PROJECT}"
 
 # Defense: refuse if either path escapes the expected prefix.
-expected_prefix="${LAB_VM_ROOT}/wigamig/"
+expected_prefix="${LAB_VM_ROOT}/"
 [[ "$RAW_DIR"     != ${expected_prefix}* ]] && die "raw path escapes expected prefix"
 [[ "$REFINED_DIR" != ${expected_prefix}* ]] && die "refined path escapes expected prefix"
 

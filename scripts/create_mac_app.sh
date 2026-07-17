@@ -35,7 +35,7 @@ mkdir -p "${APP_PATH}/Contents/Resources"
 # avoids AppleScript permission prompts on macOS Ventura/Sequoia.
 # The script runs with the user's full zsh login environment.
 
-LAUNCHER="${APP_PATH}/Contents/MacOS/wigamig-launcher"
+LAUNCHER="${APP_PATH}/Contents/MacOS/murmurent-launcher"
 
 cat > "$LAUNCHER" << LAUNCHER_EOF
 #!/bin/zsh -l
@@ -98,11 +98,11 @@ cat > "${APP_PATH}/Contents/Info.plist" << 'PLIST_EOF'
 <plist version="1.0">
 <dict>
     <key>CFBundleExecutable</key>
-    <string>wigamig-launcher</string>
+    <string>murmurent-launcher</string>
     <key>CFBundleIconFile</key>
     <string>murmurent</string>
     <key>CFBundleIdentifier</key>
-    <string>ca.uwo.hallett.murmurent-dashboard</string>
+    <string>org.murmurent.dashboard</string>
     <key>CFBundleName</key>
     <string>Murmurent Dashboard</string>
     <key>CFBundleDisplayName</key>
@@ -132,7 +132,7 @@ apply_icon() {
     local png="$1"
     local app="$2"
     local iconset
-    iconset="$(mktemp -d /tmp/wigamig_iconset_XXXXXX)"
+    iconset="$(mktemp -d /tmp/murmurent_iconset_XXXXXX)"
     # Apple iconset valid logical sizes: 16 32 128 256 512 (no 64).
     # For each logical size sz, base file = sz×sz, @2x file = 2sz×2sz.
     local sizes=(16 32 128 256 512)

@@ -39,7 +39,7 @@ trail.
 
 ## The bot account
 
-A new Slack user account in the existing Hallett Lab workspace:
+A new Slack user account in the lab's existing Slack workspace:
 
 - Display name: **Murmurent Oracle Bot**
 - Handle: `@murmurent-oracle`
@@ -83,7 +83,7 @@ channel: proj_brca_sc_tutorial
 date: 2026-05-08
 message_count: 47
 participants: ['@allie', '@bob', '@cassie']
-slack_workspace: hallett-lab.slack.com
+slack_workspace: example-lab.slack.com
 ---
 
 ## 09:14 · @allie

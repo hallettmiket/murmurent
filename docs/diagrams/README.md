@@ -25,13 +25,13 @@ Requires Graphviz:
 
 ## Editing
 
-Diagrams use the Hallett-Lab palette:
+Diagrams use the house palette:
 
 | Use | Colour |
 |---|---|
-| Western purple (primary) | `#4F2683` |
-| Western purple (deep) | `#201436` |
-| Tiger orange (accent) | `#F0A757` |
+| Brand purple (primary) | `#4F2683` |
+| Brand purple (deep) | `#201436` |
+| Accent orange | `#F0A757` |
 | Paper / cream | `#FAF8F5` |
 | Cream-warm | `#F1ECE3` |
 | Ink | `#1A1A1A` |

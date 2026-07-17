@@ -18,7 +18,7 @@ digraph murmurent_system_map {
   nodesep=0.45;
   ranksep=0.55;
 
-  // Default node styling — squared-off, EB Garamond, Western purple/cream.
+  // Default node styling — squared-off, EB Garamond, brand purple/cream.
   node [
     shape=box,
     style="filled,rounded",

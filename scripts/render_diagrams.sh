@@ -7,7 +7,7 @@
 # Usage:   bash scripts/render_diagrams.sh
 #
 # Requires Graphviz (`brew install graphviz` on macOS;
-# `apt install graphviz` on lab-server/Ubuntu). The script exits with
+# `apt install graphviz` on the lab server / Ubuntu). The script exits with
 # a helpful message if `dot` is not on PATH.
 
 set -euo pipefail

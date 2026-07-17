@@ -19,7 +19,7 @@ graph TB
         WC[Murmurent commons]
         OR[Centre oracle]
     end
-    subgraph G1["Group g1 (Hallett)"]
+    subgraph G1["Group g1 (PI's lab)"]
         PI1[PI]
         LM1[lab_manager]
         BC1[bookworm_curator]

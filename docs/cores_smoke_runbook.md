@@ -1,9 +1,9 @@
 # Cores end-to-end smoke runbook
 
 A step-by-step validation that everything shipped in Phases 1–8 works
-against the **real** bioCORE on lab-server (not the unit-test fixtures).
+against the **real** Example Core on lab-server (not the unit-test fixtures).
 
-Audience: PI walking through it with Gary at the keyboard, or Gary
+Audience: PI walking through it with the core lead at the keyboard, or the core lead
 solo with `#claude-test` open to ping if anything looks off.
 
 **Time:** ~45 minutes if nothing breaks. ~2 hours including the
@@ -24,7 +24,7 @@ Section IDs (`§1`, `§2a`, …) map to the phases in
 ## §0 · Baseline check (10 min)
 
 ### Goal
-The local install is healthy, bioCORE is registered, services + training
+The local install is healthy, Example Core is registered, services + training
 catalog are seeded, and the dashboard boots.
 
 ### Pick the right Python env
@@ -42,8 +42,8 @@ which murmurent    # should print the rdkit-env path, not the .venv
 ### Steps
 
 ```bash
-# 1. Confirm bioCORE is in the centre registry.
-ls ~/.murmurent/lab_info/cores/biocore/lab-mgmt/
+# 1. Confirm Example Core is in the centre registry.
+ls ~/.murmurent/lab_info/cores/example_core/lab-mgmt/
 # Expect: lab.md, members/, services/, training/, training_roster/, requests/
 
 # 2. Tests pass on this checkout.
@@ -63,7 +63,7 @@ murmurent dashboard --hifi --port 8771
 # Open http://localhost:8771 in an INCOGNITO/private window
 # (guarantees no Babel cache from prior sessions).
 # Log in as @the_pi (PI).
-# Scroll to "Core services" panel → confirm bioCORE shows
+# Scroll to "Core services" panel → confirm Example Core shows
 # itc_microcal_peaq / cd_jasco_j815 / centrifuge_avanti_jxn30
 # with correct fees.
 ```
@@ -84,15 +84,15 @@ but you may need Cmd-Shift-R to bust the Babel cache.
 
 ---
 
-## §1 · Gary's one-time Google Calendar OAuth (20 min, one-off)
+## §1 · The core lead's one-time Google Calendar OAuth (20 min, one-off)
 
 ### Goal
-Gary's calendar holds every booking event going forward. Refresh token
-lands at `~/.murmurent/cores/biocore/google_calendar.json`.
+The core lead's calendar holds every booking event going forward. Refresh token
+lands at `~/.murmurent/cores/example_core/google_calendar.json`.
 
 ### Prereq
-- Gary has a Google account that will own the bioCORE calendar.
-- Gary has access to a Google Cloud project (create one if needed —
+- The core lead has a Google account that will own the Example Core calendar.
+- The core lead has access to a Google Cloud project (create one if needed —
   any free-tier project works).
 
 ### Steps
@@ -120,31 +120,31 @@ lands at `~/.murmurent/cores/biocore/google_calendar.json`.
      Application type **Desktop app** (NOT Web — InstalledAppFlow
      needs Desktop). Download the JSON.
 
-2. **Drop it on Gary's machine**
+2. **Drop it on the core lead's machine**
    ```bash
-   mkdir -p ~/.murmurent/cores/biocore
+   mkdir -p ~/.murmurent/cores/example_core
    mv ~/Downloads/client_secret_*.json \
-      ~/.murmurent/cores/biocore/google_oauth_client.json
-   chmod 600 ~/.murmurent/cores/biocore/google_oauth_client.json
+      ~/.murmurent/cores/example_core/google_oauth_client.json
+   chmod 600 ~/.murmurent/cores/example_core/google_oauth_client.json
    ```
 
 3. **Run the auth flow** (gcal extra already installed per §0)
    ```bash
-   murmurent core-calendar-auth --core biocore
+   murmurent core-calendar-auth --core example_core
    ```
-   A browser opens → Gary picks the bioCORE Google account → consent
+   A browser opens → the core lead picks the Example Core Google account → consent
    screen warns "Google hasn't verified this app" (expected in
    Testing mode) → click **Advanced** → **Go to … (unsafe)** → Allow
    → tab closes with "The authentication flow has completed."
 
 4. **Verify the token landed**
    ```bash
-   ls -l ~/.murmurent/cores/biocore/google_calendar.json
+   ls -l ~/.murmurent/cores/example_core/google_calendar.json
    # Expect: -rw------- (mode 0600), recent mtime.
    ```
 
 ### Expected
-- CLI prints: `Calendar connected for core='biocore': /Users/…/google_calendar.json`
+- CLI prints: `Calendar connected for core='example_core': /Users/…/google_calendar.json`
 - Token file has `scopes: ['https://www.googleapis.com/auth/calendar.events']`
   and a non-empty `refresh_token`.
 
@@ -163,21 +163,21 @@ lands at `~/.murmurent/cores/biocore/google_calendar.json`.
 
 ### Goal
 Demonstrate that training authority lives with the core (not the
-member's lab), then book a real bioCORE service slot and watch a real
-event land on Gary's calendar.
+member's lab), then book a real Example Core service slot and watch a real
+event land on the core lead's calendar.
 
 ### Prereq
-- §1 complete (Gary's calendar is connected).
+- §1 complete (the core lead's calendar is connected).
 - A test member exists in `lab-mgmt/members/` (use yourself: `@the_pi`).
 - Dashboard running on http://localhost:8771 in an incognito tab.
 
 ### Background — where training records live
 
-bioCORE owns its training roster at
-`~/.murmurent/lab_info/cores/biocore/lab-mgmt/training_roster/<handle>.md`.
-The core leader (Gary) writes here; the member's lab repo
+Example Core owns its training roster at
+`~/.murmurent/lab_info/cores/example_core/lab-mgmt/training_roster/<handle>.md`.
+The core leader writes here; the member's lab repo
 (`~/repos/lab_mgmt/members/<handle>.md`) is NOT consulted for booking
-prereqs. This mirrors real Western BioCORE policy.
+prereqs. This mirrors real institutional Example Core policy.
 
 ### Steps
 
@@ -189,12 +189,12 @@ prereqs. This mirrors real Western BioCORE policy.
 2. Click **Request training** on the ITC row. Enter an optional note
    ("afternoons work best"). OK.
 3. Switch to Slack → `#claude-test`. You should see:
-   > 🎓 *biocore* training request — @the_pi wants @gary to train
+   > 🎓 *example_core* training request — @the_pi wants @core_lead to train
    > them on `itc_basic_training` (**…**) (30 min, Room 100).
 
-**As @gary (the core leader):**
+**As @core_lead (the core leader):**
 
-4. Open `http://localhost:8771/core?core=biocore&user=gary` in a
+4. Open `http://localhost:8771/core?core=example_core&user=core_lead` in a
    separate window. Scroll to the new **Training roster** card.
 5. Click **＋ sign off**. Prompts in order:
    - Member: `@the_pi`
@@ -208,7 +208,7 @@ prereqs. This mirrors real Western BioCORE policy.
 **Back as @the_pi:**
 
 7. Reload the dashboard (Cmd-Shift-R). The ITC row's button is now
-   green **Book**. (CD + centrifuge are still beige — Gary hasn't
+   green **Book**. (CD + centrifuge are still beige — the core lead hasn't
    signed you off on those.)
 8. Click **Book**. The modal opens with native date+time pickers
    (start defaults to next round hour; end auto-bumps to
@@ -219,10 +219,10 @@ prereqs. This mirrors real Western BioCORE policy.
 
 ### Expected
 - Modal closes; "My bookings" row appears with state `scheduled`.
-- An event titled `MicroCal PEAQ-ITC … — @the_pi` lands on Gary's
+- An event titled `MicroCal PEAQ-ITC … — @the_pi` lands on the core lead's
   Google Calendar for the chosen time.
 - Slack `#claude-test` gets:
-  > 📅 Core *biocore*: @the_pi booked `itc_microcal_peaq` … — $80.00.
+  > 📅 Core *example_core*: @the_pi booked `itc_microcal_peaq` … — $80.00.
 - In the booking response (browser devtools → Network → the POST):
   `calendar.event_id` is non-empty and `calendar.warning` is empty.
 
@@ -247,10 +247,10 @@ prereqs. This mirrors real Western BioCORE policy.
 Advance → upload deliverable → confirm actual charge → cancel-style
 ledger entry all visible to leader and requester.
 
-### Steps (as `@gary` on `/core?core=biocore`)
+### Steps (as `@core_lead` on `/core?core=example_core`)
 
 ```bash
-# Open: http://localhost:8771/core?core=biocore&user=gary
+# Open: http://localhost:8771/core?core=example_core&user=core_lead
 ```
 
 In the **Requests inbox** card:
@@ -306,7 +306,7 @@ grep -A2 murmurent-core-data ~/.claude/settings.json
 #    In CC, ask:
 ```
 
-> "Use the murmurent-core-data MCP to list my jobs on biocore."
+> "Use the murmurent-core-data MCP to list my jobs on example_core."
 
 Then:
 
@@ -320,12 +320,12 @@ Then:
 - `list_my_jobs` returns the booked job from §2 (and only that one,
   unless you've booked more).
 - `get_job_manifest` returns the JSON manifest with
-  `requester_lab: hallett`, `state: completed`, `actual_charge.total: 120.0`.
+  `requester_lab: lab_alpha`, `state: completed`, `actual_charge.total: 120.0`.
 - `bundle_job` returns base64 tar.gz; CC can decode it for you.
 
 Audit log check:
 ```bash
-tail -5 ~/.murmurent/cores/biocore/access.log
+tail -5 ~/.murmurent/cores/example_core/access.log
 # Expect: one JSON line per MCP call, with caller="the_pi".
 ```
 
@@ -342,7 +342,7 @@ tail -5 ~/.murmurent/cores/biocore/access.log
 ## §5 · External customer + cross-lab billing (10 min)
 
 ### Goal
-Register a non-Schulich customer; book a slot for them; generate
+Register an external customer; book a slot for them; generate
 the monthly invoice and verify the external billing header lands.
 
 ### Steps (as `@the_pi`, the registrar)
@@ -370,17 +370,17 @@ curl -s "http://localhost:8771/api/lab_roster/resolve?lab=acme-bio" | jq .
 ```
 
 3. **Sign ACME's operator off on the instrument first.** External
-   customers go through the same training-roster as Schulich members
-   — bioCORE still owns the prereq, regardless of who's paying. From
+   customers go through the same training-roster as internal members
+   — Example Core still owns the prereq, regardless of who's paying. From
    the `/core` Training roster card click `＋ sign off`:
    - Member: `@external-acme`
    - Training slug: `itc_basic_training`
    - Completed: today; Valid until: blank (auto from `refresher_years`)
    - Notes: "ACME operator trained on instrument"
 
-4. **Book a slot for ACME** — proxy booking from Gary's account:
+4. **Book a slot for ACME** — proxy booking from the core lead's account:
    ```bash
-   curl -s -X POST "http://localhost:8771/api/core/biocore/services/itc_microcal_peaq/book?user=gary" \
+   curl -s -X POST "http://localhost:8771/api/core/example_core/services/itc_microcal_peaq/book?user=core_lead" \
      -H "Content-Type: application/json" \
      -d '{
        "slot": {"start": "2026-05-23T16:00-04:00",
@@ -392,30 +392,30 @@ curl -s "http://localhost:8771/api/lab_roster/resolve?lab=acme-bio" | jq .
    ```
    Expect: `{"ok": true, "lab_resolution": {"kind": "external", "warning": ""}, ...}`
 
-5. **Confirm + charge** through the inbox UI (as Gary). Pick `200` as
+5. **Confirm + charge** through the inbox UI (as the core lead). Pick `200` as
    actual_charge.
 
-6. **Generate the invoice** (still as Gary on `/core`):
+6. **Generate the invoice** (still as the core lead on `/core`):
    - Billing card → month input shows current month
-   - Click **preview** → see two rows: `hallett` (lab, $120) and
+   - Click **preview** → see two rows: `lab_alpha` (lab, $120) and
      `acme-bio` (external, $200), total $320
    - Click **generate** → confirm.
 
 ```bash
 # 7. Verify the artifact.
-ls ~/.murmurent/lab_info/cores/biocore/lab-mgmt/invoices/2026-05/
-# Expect: acme-bio.csv, acme-bio.md, hallett.csv, hallett.md, summary.md
+ls ~/.murmurent/lab_info/cores/example_core/lab-mgmt/invoices/2026-05/
+# Expect: acme-bio.csv, acme-bio.md, lab_alpha.csv, lab_alpha.md, summary.md
 
-cat ~/.murmurent/lab_info/cores/biocore/lab-mgmt/invoices/2026-05/acme-bio.md
+cat ~/.murmurent/lab_info/cores/example_core/lab-mgmt/invoices/2026-05/acme-bio.md
 # Expect: ## Bill to block with PO-2026-001, ap@acme.example.
 
-cat ~/.murmurent/lab_info/cores/biocore/lab-mgmt/invoices/2026-05/summary.md
+cat ~/.murmurent/lab_info/cores/example_core/lab-mgmt/invoices/2026-05/summary.md
 # Expect: "Breakdown by recipient kind: external: $200.00 (1), lab: $120.00 (1)"
 ```
 
 ### If it fails
-- Proxy booking 403: confirm Gary is the registered leader of bioCORE
-  (`grep leader ~/.murmurent/lab_info/cores/biocore/lab-mgmt/lab.md`).
+- Proxy booking 403: confirm the core lead is the registered leader of Example Core
+  (`grep leader ~/.murmurent/lab_info/cores/example_core/lab-mgmt/lab.md`).
   Non-leader/registrar can't book on behalf of someone else.
 - Invoice generate writes nothing: check the slot is in the right month
   (a 2026-05-22 slot won't appear in 2026-06 invoices).
@@ -431,9 +431,9 @@ The `/routine`-able reminder scanner sees upcoming bookings.
 
 ```bash
 # Book a slot ~1h from now, then:
-murmurent core-remind --core biocore
+murmurent core-remind --core example_core
 # Expect: at least one line like:
-#   [1h] biocore/<rid> @the_pi → itc_microcal_peaq in ~60 min
+#   [1h] example_core/<rid> @the_pi → itc_microcal_peaq in ~60 min
 # (no --apply: dry-run, doesn't post to Slack)
 ```
 

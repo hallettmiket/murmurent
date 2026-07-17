@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Purpose: Idempotent install of `uv` + murmurent on a remote SSH host so the
-#          centre's lab-server server (or any equivalent host) can run
+#          centre's lab server (any ssh-reachable host) can run
 #          `murmurent project new` etc. directly. The laptop dashboard then
 #          drives the remote host over SSH; this script just ensures the
 #          binaries are in place.
@@ -17,7 +17,7 @@
 #     true` doesn't succeed silently, fix the SSH config first).
 #   - git available on the remote host (Ubuntu: `apt install git`).
 #
-# Pre-reqs on the remote host (`lab-server`):
+# Pre-reqs on the remote host (`<ssh-host>`):
 #   - bash, curl, git available
 #   - /data/lab_vm/{raw,refined} mounted (warned-only if missing — murmurent
 #     project new will create them inside whatever exists).
@@ -26,7 +26,7 @@
 #   1. ssh true                        → fails fast if auth/host is wrong.
 #   2. Ensure ~/.local/bin/uv on host  → installs via the official one-liner
 #                                        if missing; skips otherwise.
-#   3. Clone (or pull) the murmurent repo into ~/repos/wigamig on host.
+#   3. Clone (or pull) the murmurent repo into ~/repos/murmurent on host.
 #   4. uv tool install --reinstall .   → registers `murmurent` on the host's
 #                                        PATH at ~/.local/bin/murmurent.
 #   5. Sanity probes: murmurent --version, ls /data/lab_vm/{raw,refined},
@@ -108,16 +108,16 @@ else
 fi
 
 # ── Step 3: clone or update the murmurent repo ─────────────────────────────────
-step "3/5 murmurent source at ~/repos/wigamig on ${HOST}"
+step "3/5 murmurent source at ~/repos/murmurent on ${HOST}"
 ssh_run 'mkdir -p ~/repos'
-if ssh_run 'test -d ~/repos/wigamig/.git'; then
-  ssh_run "cd ~/repos/wigamig && git fetch origin && git checkout ${BRANCH} && git pull --ff-only origin ${BRANCH}"
-  REMOTE_COMMIT="$(ssh_run 'cd ~/repos/wigamig && git rev-parse --short HEAD')"
+if ssh_run 'test -d ~/repos/murmurent/.git'; then
+  ssh_run "cd ~/repos/murmurent && git fetch origin && git checkout ${BRANCH} && git pull --ff-only origin ${BRANCH}"
+  REMOTE_COMMIT="$(ssh_run 'cd ~/repos/murmurent && git rev-parse --short HEAD')"
   ok "repo updated to ${REMOTE_COMMIT} (${BRANCH})"
 else
-  ssh_run "git clone --branch ${BRANCH} ${MURMURENT_REPO_URL} ~/repos/wigamig"
-  REMOTE_COMMIT="$(ssh_run 'cd ~/repos/wigamig && git rev-parse --short HEAD')"
-  ok "repo cloned to ~/repos/wigamig at ${REMOTE_COMMIT}"
+  ssh_run "git clone --branch ${BRANCH} ${MURMURENT_REPO_URL} ~/repos/murmurent"
+  REMOTE_COMMIT="$(ssh_run 'cd ~/repos/murmurent && git rev-parse --short HEAD')"
+  ok "repo cloned to ~/repos/murmurent at ${REMOTE_COMMIT}"
 fi
 
 # ── Step 4: `uv tool install` the murmurent CLI ────────────────────────────────
@@ -125,7 +125,7 @@ step "4/5 murmurent CLI installation on ${HOST}"
 # --reinstall is idempotent and makes upgrades behave the same as fresh installs.
 # -e (editable) + --python 3.12: a non-editable install relocates the package
 # away from the clone, breaking the dashboard's static assets; py3.12 is required.
-ssh_run 'export PATH=$HOME/.local/bin:$PATH; cd ~/repos/wigamig && uv tool install --reinstall --python 3.12 -e .'
+ssh_run 'export PATH=$HOME/.local/bin:$PATH; cd ~/repos/murmurent && uv tool install --reinstall --python 3.12 -e .'
 MURMURENT_VERSION="$(ssh_run 'export PATH=$HOME/.local/bin:$PATH; murmurent --version 2>/dev/null || true')"
 if [[ -z "$MURMURENT_VERSION" ]]; then
   fail "murmurent --version returned no output on the remote host"
@@ -137,7 +137,7 @@ ok "murmurent installed: ${MURMURENT_VERSION}"
 # murmurent commons, links ~/.claude/CLAUDE.md, runs `murmurent install
 # --hooks`. Idempotent. Preserves any user-authored agents (non-symlinks).
 step "4b/5 wiring ~/.claude/ on ${HOST}"
-ssh_run 'export PATH=$HOME/.local/bin:$PATH; bash ~/repos/wigamig/scripts/setup.sh' \
+ssh_run 'export PATH=$HOME/.local/bin:$PATH; bash ~/repos/murmurent/scripts/setup.sh' \
   && ok "~/.claude/ wired into murmurent commons on ${HOST}" \
   || warn "setup.sh on ${HOST} reported issues — inspect manually if needed"
 
@@ -147,7 +147,7 @@ ssh_run 'mkdir -p $HOME/.murmurent'
 ok "~/.murmurent present"
 
 # Lab-VM data directories — warn but don't fail.
-if ssh_run 'test -d /data/lab_vm/wigamig/raw && test -d /data/lab_vm/wigamig/refined'; then
+if ssh_run 'test -d /data/lab_vm/raw && test -d /data/lab_vm/refined'; then
   ok "/data/lab_vm/{raw,refined} present"
 else
   warn "/data/lab_vm/{raw,refined} not found on ${HOST}. murmurent will fall back"

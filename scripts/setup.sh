@@ -60,7 +60,7 @@ for src in "$AGENTS_SRC"/*.md; do
   name="$(basename "$src")"
   dest="$CC_DIR/agents/$name"
   # Three cases for the destination:
-  #   (a) symlink → already a wigamig/generic_cc commons link: replace
+  #   (a) symlink → already a murmurent/generic_cc commons link: replace
   #   (b) regular file → user-authored agent override: leave alone
   #   (c) absent → create symlink
   if [[ -L "$dest" ]]; then
@@ -127,12 +127,12 @@ if [[ ! -e "$CLAUDE_MD_SRC" ]]; then
   warn "$CLAUDE_MD_SRC is missing — skipping global CLAUDE.md link"
 elif [[ -L "$CC_DIR/CLAUDE.md" ]]; then
   ln -sfn "$CLAUDE_MD_SRC" "$CC_DIR/CLAUDE.md"
-  ok "re-pointed ~/.claude/CLAUDE.md → wigamig/CLAUDE.md"
+  ok "re-pointed ~/.claude/CLAUDE.md → murmurent CLAUDE.md"
 elif [[ -f "$CC_DIR/CLAUDE.md" ]]; then
   warn "~/.claude/CLAUDE.md is a regular file — preserved. Delete or rename it if you want murmurent's version."
 else
   ln -sfn "$CLAUDE_MD_SRC" "$CC_DIR/CLAUDE.md"
-  ok "created ~/.claude/CLAUDE.md → wigamig/CLAUDE.md"
+  ok "created ~/.claude/CLAUDE.md → murmurent CLAUDE.md"
 fi
 
 echo

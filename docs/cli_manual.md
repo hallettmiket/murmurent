@@ -284,7 +284,7 @@ Note: `provision` is no longer a CLI command; it is a tool on the `inventory` MC
 ### First-time setup
 
 ```
-$ murmurent onboard hallett --profile student
+$ murmurent onboard newmember --profile student
 Cloning murmurent... done.
 Installing agents (profile: student): bookworm, adversary, blacksmith, artist
   bookworm:    personal (copied)
@@ -365,23 +365,23 @@ OK:         3 items in stock and within shelf life
 
 ```
 $ murmurent publish notes/abcb1_finding.md --to group
-Published to hallett group oracle as findings/2026-05-05_abcb1.md
+Published to lab group oracle as findings/2026-05-05_abcb1.md
 Audit entry written to lab_mgmt/oracle-publish.log
 ```
 
 ### PI assigns a role
 
 ```
-$ murmurent role assign lab_manager @member_a
+$ murmurent role assign lab_manager @member_b
 Opened transition issue #42 in lab_mgmt
-Awaiting acknowledgement from @member_a and handoff from @prev_admin.
+Awaiting acknowledgement from @member_b and handoff from @prev_admin.
 ```
 
 ### Proposed operator acknowledges
 
 ```
 $ murmurent role ack 42
-Acknowledged role-transition #42 (lab_manager → @member_a)
+Acknowledged role-transition #42 (lab_manager → @member_b)
 ```
 
 ### Birth of a project
@@ -389,7 +389,7 @@ Acknowledged role-transition #42 (lab_manager → @member_a)
 ```
 $ murmurent project new brca_imaging \
     --charter charter.md \
-    --members @core_lead,@the_pi,@member_a
+    --members @member_a,@the_pi,@member_b
 Created repo hallettmiket/brca_imaging
 MEMBERS:    3
 Lab VM ACL synced.

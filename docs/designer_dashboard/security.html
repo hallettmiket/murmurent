@@ -167,9 +167,9 @@
         </header>
         <div class="body">
           <div class="tier2-banner" id="tier2-banner" style="display:none">
-            <strong>POSIX bits not authoritative on this host's <code>/data/lab_vm</code></strong> —
-            it's served over NFSv3 from the NAS, so the real ACLs live in
-            <code>/srv/acl-view</code> (sudo-only). The Tier 1 scanner skipped the
+            <strong>POSIX bits not authoritative on this host's data tree</strong> —
+            it's served over NFSv3 from an ACL-backed NAS, so the real ACLs live in
+            a root-only NFSv4 view. The Tier 1 scanner skipped the
             <code>raw/</code> and <code>refined/</code> permission walks to avoid noise.
             <div style="margin-top:8px">
               <button id="dump-btn" class="btn"
@@ -251,7 +251,7 @@
 
     <div class="footer">
       Rule reference: <a href="https://github.com/hallettmiket/murmurent/blob/main/docs/security-dashboard.md" target="_blank">docs/security-dashboard.md</a>.
-      NFSv4 ACL primer + per-directory templates credit Dr. the core lead.
+      Site-specific ACL templates are kept in the lab's private records.
     </div>
 
     <script>

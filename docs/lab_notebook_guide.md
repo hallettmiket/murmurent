@@ -1,7 +1,7 @@
 # Lab Notebook Guide
 
 > A concrete, opinionated guide for keeping a murmurent-compatible lab notebook
-> as a Hallett Lab member. Read this once. Bookmark it. Don't reinvent.
+> as a lab member. Read this once. Bookmark it. Don't reinvent.
 
 There are **two distinct things** in Murmurent that the word "notebook" can
 mean. Knowing which is which prevents 90 % of confusion:

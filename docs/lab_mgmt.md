@@ -14,8 +14,8 @@ research group.
 
 Different labs each have their own lab_mgmt repo under their own
 GitHub account/org. **The canonical name is `murmurent_lab_mgmt_<lab>`**
-(see "Naming: read this before creating the repo" below): the Hallett
-lab's lives at `hallettmiket/murmurent_lab_mgmt_mh`; a bioinformatics
+(see "Naming: read this before creating the repo" below): a given
+lab's lives at `<owner>/murmurent_lab_mgmt_<lab>`; a bioinformatics
 core's would be `<owner>/murmurent_lab_mgmt_bioinformatics`.
 
 The centre-wide registry (labs, cores, common SEAs, join requests)
@@ -147,7 +147,7 @@ using this order:
 2. **`$MURMURENT_LAB_MGMT_REPO` env var**: for tests + scripted use.
 3. **This machine's pinned pointer** (`~/.murmurent/lab_mgmt_path`):
    written by `murmurent pi-init <lab>`, and by discovery (step 5).
-4. **`~/repos/lab_mgmt`, then `~/repos/hallett-lab-mgmt`**: if either
+4. **`~/repos/lab_mgmt`, then `~/repos/<lab>-lab-mgmt`**: if either
    exists. Pre-convention names, kept working for clones made before
    `murmurent_lab_mgmt_<lab>` was settled; not what you should create.
 5. **Discovery**: scans `~/repos` for a directory with the lab_mgmt

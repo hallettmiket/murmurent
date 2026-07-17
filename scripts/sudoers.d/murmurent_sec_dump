@@ -1,17 +1,27 @@
-# /etc/sudoers.d/wigamig_sec_dump
+# /etc/sudoers.d/murmurent_sec_dump
+#
+# TEMPLATE — fill in your lab's authorised operators before installing.
 #
 # Grants NOPASSWD access to the murmurent Tier-2 security snapshot script
-# for the named Hallett lab PIs. The script is parameter-less and
-# refuses any args (see lab_sec_dump.sh) so this grant is exactly one
-# fixed command — no shell escape or arg injection surface.
+# for the named operators. The script is parameter-less and refuses any
+# args (see lab_sec_dump.sh) so this grant is exactly one fixed command —
+# no shell escape or arg injection surface.
 #
 # Install:
+#   # 1. Replace the <operatorN> placeholders below with the unix login
+#   #    names of the PI(s) / sysadmins your lab authorises to run the
+#   #    snapshot. Remove the unused placeholder line.
+#   # 2. lab_sec_dump.sh reads its site config from the environment
+#   #    (MURMURENT_ACL_ROOT, MURMURENT_LAB_GROUP, MURMURENT_SNAPSHOT_BASE,
+#   #    MURMURENT_LAB_VM_ROOT). Provide those to the sudo'd invocation via
+#   #    /etc/default/murmurent sourced by a wrapper, or a sudo env_keep,
+#   #    per your site's policy.
 #   sudo install -m 0440 -o root -g root \
-#       scripts/sudoers.d/wigamig_sec_dump /etc/sudoers.d/wigamig_sec_dump
-#   sudo visudo -c -f /etc/sudoers.d/wigamig_sec_dump
+#       scripts/sudoers.d/murmurent_sec_dump /etc/sudoers.d/murmurent_sec_dump
+#   sudo visudo -c -f /etc/sudoers.d/murmurent_sec_dump
 #
-# Add a new authorised PI by adding another line in the same form.
+# Add a new authorised operator by adding another line in the same form.
 # Revoke by deleting the line (or the whole file).
 
-the_pi  ALL=(root) NOPASSWD: /opt/murmurent/lab_sec_dump.sh
-core_lead ALL=(root) NOPASSWD: /opt/murmurent/lab_sec_dump.sh
+<operator1>  ALL=(root) NOPASSWD: /opt/murmurent/lab_sec_dump.sh
+<operator2>  ALL=(root) NOPASSWD: /opt/murmurent/lab_sec_dump.sh

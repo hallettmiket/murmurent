@@ -29,7 +29,7 @@ you're looking at.
 
 ## Vignette 1: An intra-group project (everyone is in your lab)
 
-Allie (a member of the Hallett lab) wants to start `brca_17` with Bob. She
+Allie (a member of the Rao lab) wants to start `brca_17` with Bob. She
 already has the two repos that make up the work (`brca_code` and
 `brca_manuscript`) cloned under `~/repos` on her laptop.
 
@@ -62,7 +62,7 @@ and can prove he belongs:
 
 ```bash
 murmurent project-whoami
-# ✓ hallett/brca_17 — member (@bob)
+# ✓ rao/brca_17 — member (@bob)
 ```
 
 *(When the PI is the one creating a project, steps 2–3 collapse: approval
@@ -92,7 +92,7 @@ This is deliberate: the shared workspace is where the project channel lives
 and where certificates are DM'd, so it must exist *before* the project does.
 
 **2. The groups decide.** The two PIs agree which of their labs' registered
-workspaces hosts the project (say the Hallett lab's): what matters is that
+workspaces hosts the project (say the Rao lab's): what matters is that
 the workspace's bot token is on file. (A dedicated stand-alone workspace works
 too, once it's registered as a group with the registrar: `group-slack-setup`
 refuses unregistered names.)

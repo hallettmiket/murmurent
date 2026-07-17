@@ -609,10 +609,10 @@ to mutate the inventory database. Authorised to spend up to $X without
 explicit PI approval.
 
 ## Current operators
-- @core_lead (since 2026-04-01)
+- @member_a (since 2026-04-01)
 
 ## Audit log
-- 2026-04-01: assigned @core_lead (PI: @the_pi, signed)
+- 2026-04-01: assigned @member_a (PI: @the_pi, signed)
 - 2026-01-15: revoked @prev_admin (handoff complete)
 - 2026-01-01: assigned @prev_admin (PI: @the_pi, signed)
 ```
@@ -795,7 +795,7 @@ expiry: 3_months_default      # required; renewable
 
 ### A note on cores and factories
 
-Core facilities (sequencing centres, mass-spec, imaging cores) are **not** modelled as a profile within a regular group. Each core is its own group: its own people, its own specialised agents, its own inventory, its own choreographies. Cross-group collaboration (a sequencing-core member working on a Hallett-group project) is handled by admitting them to that project as an external member, exactly as for any other cross-group case. The (deferred) centre-level design will spell out how groups and cores interconnect; nothing in the present group-level design needs a `core-staff` member type.
+Core facilities (sequencing centres, mass-spec, imaging cores) are **not** modelled as a profile within a regular group. Each core is its own group: its own people, its own specialised agents, its own inventory, its own choreographies. Cross-group collaboration (a sequencing-core member working on another group's project) is handled by admitting them to that project as an external member, exactly as for any other cross-group case. The (deferred) centre-level design will spell out how groups and cores interconnect; nothing in the present group-level design needs a `core-staff` member type.
 
 ### Layering
 
@@ -863,8 +863,8 @@ Each squad has a markdown file in the lab-management repo at `squads/<scope>/<na
 ---
 squad: brca_imaging
 scope: project
-lead: '@core_lead'
-members: ['@the_pi', '@member_a']
+lead: '@member_a'
+members: ['@the_pi', '@member_b']
 pi_present: true
 status: active
 parent: null
@@ -876,11 +876,11 @@ parent: null
 [link to project charter]
 
 ## Sub-squads
-- exp/3_titration (lead: @member_a)
+- exp/3_titration (lead: @member_b)
 
 ## Audit log
-- 2026-04-01: formed (PI: @the_pi, lead: @core_lead)
-- 2026-04-15: invited @member_a
+- 2026-04-01: formed (PI: @the_pi, lead: @member_a)
+- 2026-04-15: invited @member_b
 ```
 
 ## Choreographies
@@ -1101,7 +1101,7 @@ concluded_at: 2026-05-12
 ## Member reflections
 ### @the_pi
 ...
-### @core_lead
+### @member_a
 ...
 
 ## Group oracle context
@@ -1115,11 +1115,11 @@ concluded_at: 2026-05-12
 
 ## Caveats and dissent
 - adversary: controls failed in 2/8 replicates (recorded as caveat)
-- @member_a: dissents on the molecular interpretation; sees this as a phenocopy
+- @member_b: dissents on the molecular interpretation; sees this as a phenocopy
 
 ## Approval log
-- @core_lead: approved 2026-05-12
-- @member_a: approved with dissent 2026-05-12
+- @member_a: approved 2026-05-12
+- @member_b: approved with dissent 2026-05-12
 - @the_pi (PI): approved 2026-05-13
 ```
 
@@ -1366,12 +1366,12 @@ print(json.dumps({"decision": "allow"}))
 
 ```
 <system-reminder>
-Active project: brca_imaging (lead: @core_lead)
+Active project: brca_imaging (lead: @member_a)
 Your role: member
 Charter (excerpt): Integrate imaging features with clinical outcomes for breast cancer biopsies...
 Active SEAs:
 - incoming #43: segment 12 batch-3 slides (claimed, due 2026-05-12)
-- outgoing #41: clinical metadata join (assigned to @member_a, in progress)
+- outgoing #41: clinical metadata join (assigned to @member_b, in progress)
 </system-reminder>
 ```
 
@@ -1468,7 +1468,7 @@ denied_tools:
   - NotebookEdit
 defaults:
   citation_style: nature
-  zotero_collection: hallett
+  zotero_collection: my_lab
 ---
 ```
 
@@ -1565,7 +1565,7 @@ Enforcement:
 - **Nightly key sync** (Ansible-style script) deploys keys to the VM. Removal on offboard happens immediately, not on next sync.
 - **Time-bounded keys**: `pi-collab` and `visitor` profile keys carry an `expires_at` that the sync respects.
 - **2FA for sensitive projects**: any account with access to a `clinical` project's data dirs is forced to TOTP / YubiKey on top of the SSH key.
-- **VPN-only from outside Western**. The institutional VPN is the perimeter.
+- **VPN-only from outside the institution**. The institutional VPN is the perimeter.
 - **Connection log** on the VM, mirrored to the lab-management repo's audit area nightly (encrypted with `age`).
 
 ### Gap #7: Encryption at rest
@@ -1619,7 +1619,7 @@ A `clinical` charter must declare additional fields:
 ```yaml
 ---
 project: brca_clinical_imaging
-lead: '@core_lead'
+lead: '@member_a'
 sensitivity: clinical
 reb_number: WREM-2026-0142
 reb_expires: 2027-08-01

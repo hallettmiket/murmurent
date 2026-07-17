@@ -119,7 +119,7 @@ stacks, patient-cohort tables: artefacts too large for the oracle and
 too varied for a single index.
 
 **Default layout.** Murmurent ships a default layout for this tier,
-and it's how the Hallett lab organizes its own bulk data. A group is
+and it's how a lab organizes its own bulk data. A group is
 free to organize differently; the part that generalizes is the core
 idea the layout encodes: a hard distinction between immutable original
 inputs and append-only derived outputs.

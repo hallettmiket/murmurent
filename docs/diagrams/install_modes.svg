@@ -130,7 +130,7 @@
 <title>R_dashboard&#45;&gt;R_murmurent</title>
 <path fill="none" stroke="#4f2683" stroke-width="2" d="M203.62,-285.04C259.78,-294.31 341.04,-307.73 402.54,-317.88"/>
 <polygon fill="#4f2683" stroke="#4f2683" stroke-width="2" points="400.41,-320.02 407.71,-318.74 401.2,-315.18 400.41,-320.02"/>
-<text xml:space="preserve" text-anchor="middle" x="326.8" y="-311.3" font-family="Courier Prime" font-size="9.00" fill="#5b5b5b">ssh lab-server &#160;</text>
+<text xml:space="preserve" text-anchor="middle" x="326.8" y="-311.3" font-family="Courier Prime" font-size="9.00" fill="#5b5b5b">ssh &lt;my_server&gt; &#160;</text>
 </g>
 <!-- R_vscode_remote -->
 <g id="node10" class="node">
@@ -174,9 +174,9 @@
 <polygon fill="#4f2683" stroke="#4f2683" stroke-width="2" points="391.66,-163.84 398.24,-160.41 390.96,-158.99 391.66,-163.84"/>
 <text xml:space="preserve" text-anchor="middle" x="326.8" y="-175.43" font-family="Courier Prime" font-size="9.00" fill="#5b5b5b">SSHFS mount</text>
 </g>
-<!-- R_lab-server -->
+<!-- R_labserver -->
 <g id="node12" class="node">
-<title>R_lab-server</title>
+<title>R_labserver</title>
 <path fill="none" stroke="none" d="M205.42,-365.2C205.42,-365.2 68.5,-365.2 68.5,-365.2 62.5,-365.2 56.5,-359.2 56.5,-353.2 56.5,-353.2 56.5,-341.2 56.5,-341.2 56.5,-335.2 62.5,-329.2 68.5,-329.2 68.5,-329.2 205.42,-329.2 205.42,-329.2 211.42,-329.2 217.42,-335.2 217.42,-341.2 217.42,-341.2 217.42,-353.2 217.42,-353.2 217.42,-359.2 211.42,-365.2 205.42,-365.2"/>
 <text xml:space="preserve" text-anchor="start" x="69.46" y="-347.75" font-family="EB Garamond" font-weight="bold" font-size="11.00" fill="#1a1a1a">lab-server.example.edu</text>
 <text xml:space="preserve" text-anchor="start" x="86.34" y="-338.65" font-family="EB Garamond" font-size="9.00" fill="#1a1a1a">Ubuntu · 203.0.113.10</text>

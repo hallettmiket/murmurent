@@ -2,7 +2,7 @@
 
 A short runbook for a **mayor** whose centre is bootstrapped and who wants
 prospective members to be able to find and contact them. Joining is by **email**:
-the public directory just points people at your address. Western is the worked
+the public directory just points people at your address. Example University is the worked
 example; swap in your own values.
 
 ## 1. Update the Murmurent CLI
@@ -17,7 +17,7 @@ The address prospective members write to. Set it on the centre (hand-edit
 `~/.murmurent/lab_info/centre.md` frontmatter, or the `/registrar` profile editor):
 
 ```yaml
-join_email: murmurent-western@example.edu      # a shared/role address is ideal
+join_email: murmurent-join@example.edu      # a shared/role address is ideal
 ```
 
 ```bash

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Purpose: Unprivileged Tier-1 security scanner for a murmurent lab member's
-#          slice of a server (typically a shared lab box like lab-server).
+#          slice of a server (typically a shared lab server).
 #          Emits one JSONL finding per line on stdout, progress messages
 #          on stderr. Side-effect-free — pure read-only system calls.
 #
@@ -11,7 +11,7 @@
 # Usage:
 #   murmurent_sec_scan.sh [--lab-vm-root /data/lab_vm]
 #                       [--projects-root ~/repos]
-#                       [--lab-group labgroup]
+#                       [--lab-group <lab_unix_group>]
 #                       [--home-warn-gb 100]
 #                       [--repo-large-mb 50]
 #
@@ -69,8 +69,8 @@ else
 fi
 
 # Detect whether POSIX bits on ``$LAB_VM_ROOT`` are authoritative or
-# a synthesized projection over NFSv4 ACLs (the NAS-via-NFSv3, the
-# lab-server case). Used to decide whether to skip raw/refined POSIX
+# a synthesized projection over NFSv4 ACLs (the enterprise-NAS-over-NFSv3
+# case). Used to decide whether to skip raw/refined POSIX
 # walks — see POSIX-NOT-AUTHORITATIVE-01 in docs/security-dashboard.md.
 #
 # Returns one of:
@@ -537,8 +537,8 @@ scan_login_history() {
 
 progress "starting scan as $MY_HANDLE on $HOST_NAME at $NOW_ISO"
 
-# Detect whether POSIX bits are meaningful on $LAB_VM_ROOT. On the NAS
-# served over NFSv3 (lab-server's /data), they aren't — see
+# Detect whether POSIX bits are meaningful on $LAB_VM_ROOT. On an
+# enterprise NAS served over NFSv3, they aren't — see
 # POSIX-NOT-AUTHORITATIVE-01 in docs/security-dashboard.md. Skip the
 # raw/refined POSIX walks in that case to avoid a flood of
 # false-positive findings; the Tier 2 sudo dump is where the real
