@@ -7,6 +7,13 @@ repo_url: https://github.com/hallettmiket/murmurent
 repo_name: hallettmiket/murmurent
 edit_uri: edit/main/docs/
 
+copyright: >
+  Built by the <a href="https://mikehallett.science">Hallett Lab</a>, Department of Biochemistry,
+  <a href="https://www.schulich.uwo.ca/">Schulich School of Medicine &amp; Dentistry</a>,
+  <a href="https://www.uwo.ca/">Western University</a>, London, ON, Canada.
+  We acknowledge that Western University is located on the traditional lands of the
+  Anishinaabek, Haudenosaunee, L&#363;naap&#233;ewak and Attawandaron peoples.
+
 theme:
   name: material
   palette:
