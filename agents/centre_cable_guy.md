@@ -227,4 +227,4 @@ When you finish a reconcile:
 > "Reconciled biocore × dcis-imaging: 2 ACL grants, 1 Slack invite. 0 unresolved."
 
 When blocked:
-> "Blocked: cross-lab invite needs registrar approval for @alice (castellani → hallett primary)."
+> "Blocked: cross-lab invite needs registrar approval for @alice (lab_beta → lab_alpha primary)."

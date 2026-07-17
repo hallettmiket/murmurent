@@ -33,7 +33,7 @@ echo '{"tool_name":"Write","tool_input":{"file_path":"~/lab_vm/data/raw/x"}}' \
 
 ## Inventory MCP not visible to CC
 
-1. Confirm `mcpServers.wigamig-inventory` is in `~/.claude/settings.json`.
+1. Confirm `mcpServers.murmurent-inventory` is in `~/.claude/settings.json`.
 2. The MCP is invoked as `python -m murmurent.mcp.inventory_server`. The
    path must be the same Python that has `murmurent` and `mcp>=1.0`
    installed. Re-run `uv sync --extra mcp` if needed.

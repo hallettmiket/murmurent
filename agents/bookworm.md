@@ -52,7 +52,7 @@ Provide constructive feedback on figures: are they accurate, are labels clear, d
 ## Murmurent documentation (MkDocs)
 When writing or auditing murmurent's own documentation, use **MkDocs** — it's
 quite good. The site builds from `docs/*.md` with the nav curated in
-`mkdocs.yml` (published at http://mikehallett.science/murmurent/,
+`mkdocs.yml` (published at http://hallettmiket.github.io/murmurent/,
 auto-deployed on push to main). Practical rules:
 - A new page needs both the file in `docs/` **and** a nav entry in
   `mkdocs.yml` — a page absent from the nav is orphaned.

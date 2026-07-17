@@ -174,21 +174,21 @@ is optional and can be filled in later from the dashboard or with
 
 ```bash
 murmurent centre-init \
-  --name "Western Bioconvergence Centre" \
-  --institution "Western University" \
-  --mayor @tbrowne \
-  --unique-name western \
-  --join-email murmurent-western@example.edu \
-  --slack-workspace T0WESTERN \
-  --github-org centre-westernu \
-  --public-hub github.com/hallettmiket/murmurent_public#western \
+  --name "Example Bioconvergence Centre" \
+  --institution "Example University" \
+  --mayor @the_mayor \
+  --unique-name example \
+  --join-email murmurent-join@example.edu \
+  --slack-workspace T0EXAMPLE \
+  --github-org centre-example \
+  --public-hub github.com/hallettmiket/murmurent_public#example \
   --server-host lab-server.example.edu \
   --server-account murmurent \
   --cc-install-path /opt/claude \
-  --mayor-root /mayor/western \
+  --mayor-root /mayor/example \
   --obsidian-vault /mayor/obsidian \
-  --raw-root /data/western/raw \
-  --refined-root /data/western/refined
+  --raw-root /data/example/raw \
+  --refined-root /data/example/refined
 murmurent centre-status      # confirms you are the founding registrar
 ```
 
@@ -196,21 +196,21 @@ Each parameter, with an example:
 
 | Flag | What it is | Example |
 |---|---|---|
-| `--name` *(required)* | Display name of the centre | `"Western Bioconvergence Centre"` |
-| `--institution` *(required)* | Hosting institution | `"Western University"` |
-| `--mayor` | Your `@handle` (defaults to `$MURMURENT_USER`, then the OS user) | `@tbrowne` |
-| `--unique-name` | Short, institution-agnostic id — drives repo / Slack / group names | `western` |
-| `--join-email` | Public address PIs send join requests to (listed in the directory) | `murmurent-western@example.edu` |
-| `--slack-workspace` | Your Slack workspace / team id (the `T…` id) | `T0WESTERN` |
-| `--github-org` | The centre's GitHub org / dedicated account | `centre-westernu` |
-| `--public-hub` | Global onboarding hub + this centre's label | `github.com/hallettmiket/murmurent_public#western` |
+| `--name` *(required)* | Display name of the centre | `"Example Bioconvergence Centre"` |
+| `--institution` *(required)* | Hosting institution | `"Example University"` |
+| `--mayor` | Your `@handle` (defaults to `$MURMURENT_USER`, then the OS user) | `@the_mayor` |
+| `--unique-name` | Short, institution-agnostic id — drives repo / Slack / group names | `example` |
+| `--join-email` | Public address PIs send join requests to (listed in the directory) | `murmurent-join@example.edu` |
+| `--slack-workspace` | Your Slack workspace / team id (the `T…` id) | `T0EXAMPLE` |
+| `--github-org` | The centre's GitHub org / dedicated account | `centre-example` |
+| `--public-hub` | Global onboarding hub + this centre's label | `github.com/hallettmiket/murmurent_public#example` |
 | `--server-host` | The always-online, ssh-gated murmurent server | `lab-server.example.edu` |
 | `--server-account` | SSH login account on that server | `murmurent` |
 | `--cc-install-path` | Where Claude Code lives on the server | `/opt/claude` |
-| `--mayor-root` | High-level mayor dir (mirrorable to GitHub) | `/mayor/western` |
+| `--mayor-root` | High-level mayor dir (mirrorable to GitHub) | `/mayor/example` |
 | `--obsidian-vault` | Centre-level Obsidian / markdown pool | `/mayor/obsidian` |
-| `--raw-root` | Centre `raw/` root on the data server | `/data/western/raw` |
-| `--refined-root` | Centre `refined/` root on the data server | `/data/western/refined` |
+| `--raw-root` | Centre `raw/` root on the data server | `/data/example/raw` |
+| `--refined-root` | Centre `refined/` root on the data server | `/data/example/refined` |
 
 `--data-server` is a legacy alias of `--server-host`. Add `--no-prompt` for
 scripted / server runs, and `--no-sentinel` when running under `sudo` or in CI.

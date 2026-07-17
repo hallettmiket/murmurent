@@ -54,7 +54,7 @@ Open the live Streamlit view. Easiest path: in Finder, double-click
 from (in order) `$MURMURENT_USER` or `~/.murmurent/user`. If neither is set,
 the dashboard prompts you to type a handle in the sidebar (e.g. `the_pi`)
 and saves it for next time. There is no fallback to your Mac login name —
-that almost always disagrees with your Western username.
+that almost always disagrees with your institutional username.
 To run it as Bob for the tutorial, set the env var first:
 
 ```bash

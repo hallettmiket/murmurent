@@ -1,10 +1,10 @@
 """
-Purpose: Generate murmurent_app_icon.png — Western-purple app icon for the
+Purpose: Generate murmurent_app_icon.png — brand-purple app icon for the
          macOS dashboard launcher.
 Author:  Mike Hallett
 Date:    2026-05-11
 Input:   sys.argv[1] — output path for the PNG
-Output:  512x512 PNG with Western purple background and bold white "W"
+Output:  512x512 PNG with brand purple background and bold white monogram
 """
 
 import sys

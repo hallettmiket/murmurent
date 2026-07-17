@@ -84,7 +84,7 @@ Trigger: "register machine X" or called from the Install wizard.
 Steps:
 1. Read `<lab-mgmt>/machines/` — check if machine ID already exists.
 2. Collect: `hostname`, `machine_type` (lab_server | laptop), `username_convention`
-   (e.g. "Western username"), `lab_base` path, `access` (direct | ssh).
+   (e.g. "institutional username"), `lab_base` path, `access` (direct | ssh).
 3. Write `<lab-mgmt>/machines/<machine_id>.md`:
 
 ```markdown
@@ -92,7 +92,7 @@ Steps:
 machine_id: lab-server
 type: lab_server
 hostname: lab-server.example.edu
-username_convention: "Western username (e.g. jdoe123)"
+username_convention: "institutional username (e.g. jdoe123)"
 lab_base: /data/lab_vm
 raw_path: $MURMURENT_LAB_VM_ROOT/raw
 refined_path: $MURMURENT_LAB_VM_ROOT/refined
