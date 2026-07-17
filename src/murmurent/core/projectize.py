@@ -284,8 +284,23 @@ def make_wigamig_project(
 
     # ---- 4. Layer-2 CC bootstrap (local only) --------------------------
     # Remote installs run the equivalent on the remote host via
-    # core.remote_install.install — caller handles that separately.
+    # core.remote_install.install — caller handles that separately. The
+    # remote SSH branch (above) already stamped the .murmurent.yaml marker
+    # via remote_adopt's batched script.
     if not ssh_remote:
+        # Readiness marker: a project repo is marker-ready, not CHARTER-ready
+        # (issue #28). readiness keys on .murmurent.yaml only; the CHARTER.md
+        # written in step 1 is the project document, not a readiness signal.
+        try:
+            from . import repo_ready as _rr
+            mpath = _rr.ensure_marker(clone_path, agents=agents)
+            result.probes.append(_pf.Probe(
+                name="marker", status="ok",
+                detail=f"wrote {mpath}", required=False))
+        except Exception as exc:  # noqa: BLE001
+            result.probes.append(_pf.Probe(
+                name="marker", status="warn",
+                detail=f"skipped: {exc}", required=False))
         for p in _cci.bootstrap_local(
             clone_path, murmurent_repo_root(),
             agents=agents,

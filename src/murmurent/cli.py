@@ -292,10 +292,11 @@ def repo_adopt_cmd(path: str, lab: str | None, agents_csv: str | None,
 @repo_group.command(
     "upgrade",
     help="Bring a murmurent-ready repo up to the CURRENT murmurent release: "
-         "convert a legacy CHARTER.md bootstrap to the readiness marker, "
-         "migrate the marker schema, re-link commons agents, and re-stamp "
-         "bootstrap_version. Agent CONTENT updates never need this — the "
-         "symlinks track the commons clone automatically.",
+         "stamp the readiness marker on a legacy CHARTER.md bootstrap "
+         "(preserving the CHARTER.md), migrate the marker schema, re-link "
+         "commons agents, and re-stamp bootstrap_version. Agent CONTENT "
+         "updates never need this — the symlinks track the commons clone "
+         "automatically.",
 )
 @click.argument("path", required=False)
 @click.option("--all", "all_repos", is_flag=True,

@@ -52,7 +52,7 @@ class RepoOnHost:
     host: str                       # "local" / "lab-server"
     path: str                       # ``$HOME/repos/<name>`` absolute on the host
     origin_url: str                 # "" when the repo has no ``origin`` remote
-    has_marker: bool                # readiness marker (.murmurent.yaml OR legacy CHARTER.md)
+    has_marker: bool                # readiness marker (.murmurent.yaml)
     has_claude_dir: bool            # ``.claude/agents/`` exists
     is_murmurent_ready: bool        # marker + .claude/agents — the repo is murmurent-ready
 
@@ -186,9 +186,9 @@ def _scan_script(scan_dirs: tuple[str, ...]) -> str:
     ``/srv/projects`` in the same pass.
 
     Output format: ``<path>|<origin>|<has_marker>|<has_claude_agents>``
-    where ``has_marker`` (readiness marker: .murmurent.yaml, or the
-    legacy CHARTER.md bootstrap) and ``has_claude_agents`` are 1/0.
-    Uses ``|`` because git remote URLs can contain ``:`` (ssh form).
+    where ``has_marker`` (readiness marker: .murmurent.yaml — a legacy
+    CHARTER.md no longer counts, issue #28) and ``has_claude_agents`` are
+    1/0. Uses ``|`` because git remote URLs can contain ``:`` (ssh form).
     """
     quoted = " ".join(shlex.quote(d) for d in scan_dirs)
     return (
@@ -211,7 +211,6 @@ def _scan_script(scan_dirs: tuple[str, ...]) -> str:
         # ``origin`` remote.
         '    url=$(git -C "$repo" remote get-url origin 2>/dev/null); '
         '    marked=0; [ -f "$repo/.murmurent.yaml" ] && marked=1; '
-        '    [ -f "$repo/CHARTER.md" ] && marked=1; '
         '    claude=0; [ -d "$repo/.claude/agents" ] && claude=1; '
         '    echo "$repo|$url|$marked|$claude"; '
         '  done; '

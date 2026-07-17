@@ -72,14 +72,18 @@ def test_status_partial_then_ready(world):
     assert st.ready and st.verdict == "ready"
 
 
-def test_status_legacy_charter_counts_as_ready(world):
-    """Pre-split bootstraps (CHARTER.md) stay ready — other deployments
-    upgrade at their own pace via `murmurent repo upgrade`."""
+def test_status_legacy_charter_is_partial_until_upgraded(world):
+    """A pre-split bootstrap (CHARTER.md) no longer counts as ready (issue
+    #28): readiness keys on .murmurent.yaml only. It reads as ``partial``
+    (has .claude/agents, no marker) until `murmurent repo upgrade` stamps
+    the marker."""
     clone = _make_clone(world["repos"], "dcis_old")
     (clone / "CHARTER.md").write_text("---\nproject: dcis_old\n---\n")
     (clone / ".claude" / "agents").mkdir(parents=True)
     st = _adopt.adoption_status(str(clone))
-    assert st.ready and st.verdict == "ready (legacy)"
+    assert not st.ready
+    assert st.verdict == "partial"
+    assert st.legacy_charter          # still surfaced so the CLI can hint upgrade
 
 
 def test_status_missing_and_not_git(world):
@@ -141,19 +145,21 @@ def test_cli_adopt_then_status(world):
     assert "✓ ready" in res.output
 
 
-def test_cli_upgrade_converts_legacy_charter(world):
-    """`murmurent repo upgrade` converts a pre-split bootstrap: CHARTER.md
-    out, .murmurent.yaml in, agent links refreshed, version stamped."""
+def test_cli_upgrade_stamps_marker_and_preserves_charter(world):
+    """`murmurent repo upgrade` on a pre-split bootstrap stamps
+    .murmurent.yaml (lab lifted from the charter), refreshes agent links,
+    stamps the version — and PRESERVES the CHARTER.md (issue #28: it may be
+    a project document; readiness just stops keying on it)."""
     clone = _make_clone(world["repos"], "oldie")
     (clone / "CHARTER.md").write_text("---\nproject: oldie\nlab: mh\n---\n")
     (clone / ".claude" / "agents").mkdir(parents=True)
     res = CliRunner().invoke(cli, ["repo", "upgrade", str(clone)])
     assert res.exit_code == 0, res.output
-    assert not (clone / "CHARTER.md").exists()
+    assert (clone / "CHARTER.md").exists()          # preserved, not deleted
     marker = yaml.safe_load((clone / ".murmurent.yaml").read_text())
     assert marker["lab"] == "mh"
     assert marker["murmurent"] == 1 and marker["bootstrap_version"]
-    assert "converted legacy" in res.output
+    assert "preserved" in res.output
 
 
 def test_cli_status_exit_codes(world):
@@ -167,9 +173,13 @@ def test_cli_status_exit_codes(world):
     assert "not found" in res.output
 
 
-def test_cli_adopt_points_legacy_charter_at_upgrade(world):
+def test_cli_adopt_migrates_legacy_charter(world):
+    """Adopting a CHARTER-only repo migrates it (issue #28): stamps the
+    marker, preserves the CHARTER.md. No special refusal anymore."""
     clone = _make_clone(world["repos"], "dcis")
     (clone / "CHARTER.md").write_text("---\nproject: dcis\n---\n")
-    res = CliRunner().invoke(cli, ["repo", "adopt", str(clone)])
-    assert res.exit_code != 0
-    assert "murmurent repo upgrade" in res.output
+    res = CliRunner().invoke(cli, ["repo", "adopt", str(clone), "--lab", "mh"])
+    assert res.exit_code == 0, res.output
+    marker = yaml.safe_load((clone / ".murmurent.yaml").read_text())
+    assert marker["lab"] == "mh"
+    assert (clone / "CHARTER.md").exists()          # project doc preserved

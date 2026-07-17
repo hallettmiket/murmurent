@@ -6,7 +6,8 @@ What this endpoint must guarantee (post readiness/project split):
   - Runs the layer-2 CC bootstrap so ``.claude/agents/`` exists
   - Creates NO project (no CHARTER.md, no registry record, no manifest)
   - Refuses paths outside ``~/repos/`` and non-git dirs
-  - Points a legacy CHARTER.md bootstrap at `murmurent repo upgrade`
+  - Migrates a legacy CHARTER.md bootstrap by stamping the marker,
+    preserving the CHARTER.md (issue #28)
 """
 
 from __future__ import annotations
@@ -101,15 +102,19 @@ def test_adopt_refuses_non_git_dir(world):
     assert "not a git working tree" in res.json()["detail"]
 
 
-def test_adopt_points_legacy_charter_at_upgrade(world):
-    """A pre-split bootstrap (CHARTER.md) shouldn't be re-adopted over —
-    the conversion path is `murmurent repo upgrade`."""
+def test_adopt_migrates_legacy_charter_repo(world):
+    """A pre-split bootstrap (CHARTER.md) is no longer a readiness marker
+    (issue #28). Adopting it is the migration: it stamps the .murmurent.yaml
+    marker and PRESERVES the CHARTER.md (which may be a project document)."""
     clone = _make_git_clone(world["repos"], "already_a_project")
     (clone / "CHARTER.md").write_text("---\nproject: already\n---\n")
     client = TestClient(create_app())
     res = client.post("/api/inventory/adopt", json={"clone_path": str(clone)})
-    assert res.status_code == 409
-    assert "murmurent repo upgrade" in res.json()["detail"]
+    assert res.status_code == 200, res.text
+    import yaml as _yaml
+    marker = _yaml.safe_load((clone / ".murmurent.yaml").read_text())
+    assert marker["murmurent"] == 1
+    assert (clone / "CHARTER.md").exists()           # project doc preserved
 
 
 def test_adopt_is_idempotent_on_marker(world):

@@ -2164,9 +2164,9 @@ def create_app() -> FastAPI:
 
         HTTP twin of ``murmurent repo upgrade``, over the same
         :func:`core.repo_ready.upgrade` chokepoint so the two surfaces can't
-        drift. Local only: ``repo_ready`` works on the filesystem, and the
-        remote bootstrap script still writes the legacy CHARTER shape, so
-        upgrading a remote clone needs the SSH path built first.
+        drift. Local only: ``repo_ready`` works on the filesystem; upgrading a
+        remote clone would need the SSH path built first. (Remote adopts now
+        stamp the ``.murmurent.yaml`` marker directly, so they land ready.)
         """
         from pathlib import Path as _P
 
@@ -2175,9 +2175,10 @@ def create_app() -> FastAPI:
 
         clone = _P(body.clone_path).expanduser()
         st = _adopt.adoption_status(str(clone))
-        if not st.ready:
-            # Upgrade is for repos that are ALREADY ready; a plain clone wants
-            # adopt instead. Say which, rather than a bare 4xx.
+        # Upgrade is for repos that are ALREADY marker-ready OR carry a legacy
+        # CHARTER.md bootstrap that wants a one-time marker stamp (issue #28).
+        # A plain clone wants adopt instead. Say which, rather than a bare 4xx.
+        if not (st.ready or st.legacy_charter):
             raise HTTPException(
                 status_code=409,
                 detail=(f"{clone} is not murmurent-ready ({st.verdict}) — "

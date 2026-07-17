@@ -10,8 +10,8 @@ Terminology: adopting a repo makes it **murmurent-ready** (readiness
 marker + commons agent symlinks) — it does NOT create a project. A
 project is a set of repos + members, made via the New Project flow.
 ``upgrade`` re-runs the bootstrap against the current murmurent release
-(new commons agents, marker schema) and converts legacy CHARTER.md
-bootstraps to the marker.
+(new commons agents, marker schema) and stamps the marker on a legacy
+CHARTER.md bootstrap, preserving the CHARTER.md (issue #28).
 """
 
 from __future__ import annotations
@@ -27,7 +27,6 @@ from ..core import repo_inventory as _inv
 # Verdict → glyph, matching the Repos panel's cell vocabulary.
 _GLYPH = {
     "ready": "✓ ready",
-    "ready (legacy)": "✓ ready (legacy)",
     "partial": "± partial",
     "plain clone": "• clone",
     "not a git repo": "✗ not a git repo",
@@ -168,10 +167,10 @@ def cmd_adopt(*, path: str, lab: str | None, agents_csv: str | None,
 def cmd_upgrade(*, path: str | None, all_repos: bool,
                 add_agents_csv: str | None, all_agents: bool) -> int:
     """Re-run the readiness bootstrap against the current murmurent
-    release: converts legacy CHARTER.md bootstraps to the marker,
-    migrates the marker schema, re-links commons agents (content
-    updates never need this — symlinks track the commons clone), and
-    re-stamps bootstrap_version."""
+    release: stamps the marker on a legacy CHARTER.md bootstrap (the
+    CHARTER.md is preserved — issue #28), migrates the marker schema,
+    re-links commons agents (content updates never need this — symlinks
+    track the commons clone), and re-stamps bootstrap_version."""
     from ..core import repo_ready as _rr
 
     add_agents = ([a.strip() for a in add_agents_csv.split(",") if a.strip()]

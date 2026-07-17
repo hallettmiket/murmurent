@@ -73,6 +73,11 @@ def test_make_wigamig_project_writes_all_four_artefacts(world):
     assert (world["lab_mgmt"] / "cert_projects" / "hockey_stats.md").is_file()
     manifest_p = world["installations"] / "hockey_stats.yaml"
     assert manifest_p.is_file()
+    # A project repo is marker-ready (issue #28): readiness keys on the
+    # .murmurent.yaml marker, not the CHARTER.md project document.
+    import yaml as _yaml
+    marker = _yaml.safe_load((clone / ".murmurent.yaml").read_text())
+    assert marker["murmurent"] == 1 and marker["agents"] == ["blacksmith"]
     # bootstrap_local symlinked the requested agent.
     assert (clone / ".claude" / "agents" / "blacksmith.md").is_symlink()
     # And the response carries paths to every artefact for the UI.

@@ -15,13 +15,14 @@ Terminology (2026-07-15 split): adopting a repo makes it
 a named set of repos + members recorded in the lab_mgmt registry
 (``cert_projects/``), created via the New Project flow which attaches
 already-ready repos. Before the split, adopt minted a one-repo project
-(CHARTER.md + registry record + manifest) — repos bootstrapped that way
-still count as ready ("legacy") and ``murmurent repo upgrade`` converts
-them to the marker.
+(CHARTER.md + registry record + manifest). Readiness now keys on the
+``.murmurent.yaml`` marker ONLY (issue #28): a repo that only carries a
+legacy CHARTER.md is NOT ready — `murmurent repo upgrade` (or simply
+re-adopting) stamps the marker, preserving the CHARTER.md.
 
-Remote (SSH) adopts still write the legacy CHARTER-style bootstrap on
-the host (the batched script predates the marker); that is recognized
-as ready and upgraded in place later.
+Remote (SSH) adopts write the ``.murmurent.yaml`` marker on the host too
+(the batched script emits a ``marker`` step alongside the CHARTER write),
+so a remotely-adopted repo is marker-ready, same as a local one.
 """
 
 from __future__ import annotations
@@ -110,12 +111,10 @@ def adopt_clone(
         )
     if not (clone / ".git").exists():
         raise AdoptError(f"not a git working tree: {clone}", code="bad_request")
-    if (clone / _rr.LEGACY_MARKER).is_file():
-        raise AdoptError(
-            f"{clone} carries a legacy CHARTER.md bootstrap — run "
-            "`murmurent repo upgrade` to convert it instead of re-adopting",
-            code="conflict",
-        )
+    # A legacy CHARTER.md is no longer a readiness marker (issue #28), so a
+    # repo carrying one is NOT already-ready — adopting it is the migration:
+    # make_ready stamps .murmurent.yaml and leaves the CHARTER.md untouched
+    # (it may be a project document). No special refusal.
 
     if not lab:
         lab = _default_lab()
@@ -177,18 +176,15 @@ def _adopt_remote(*, clone_path: str, lab: str,
 
     from . import remote_adopt as _radopt
     name = Path(clone_path).name
-    charter_text = (
-        "---\n"
-        f"lab: {lab or _default_lab() or ''}\n"
-        "---\n\n"
-        f"# {name}\n\n"
-        "murmurent-ready marker (legacy shape written over SSH; run "
-        "`murmurent repo upgrade` on the host to convert).\n"
-    )
+    resolved_lab = lab or _default_lab() or ""
+    # Pure readiness adopt (no project): write ONLY the .murmurent.yaml marker
+    # on the host — no CHARTER. Passing charter_text="" makes the batched
+    # script skip the CHARTER block entirely (issue #28: CHARTER is a project
+    # document, not a readiness marker).
     try:
         probes = _radopt.adopt_remote_clone(
             host=host_obj, clone_path=clone_path, project=name,
-            charter_text=charter_text, agents=list(agents or []))
+            charter_text="", agents=list(agents or []), lab=resolved_lab)
     except Exception as exc:  # noqa: BLE001
         raise AdoptError(f"remote bootstrap failed: {exc}", code="internal") from exc
     _raise_if_required_failed(probes)
@@ -211,9 +207,11 @@ def _raise_if_required_failed(probes) -> None:
 class AdoptionStatus:
     """Readiness state of one clone on one host.
 
-    ``ready`` matches the Repos panel's ✓ signal: a readiness marker
-    (``.murmurent.yaml``, or a legacy ``CHARTER.md`` bootstrap) plus
-    ``.claude/agents/``.
+    ``ready`` matches the Repos panel's ✓ signal: the ``.murmurent.yaml``
+    readiness marker plus ``.claude/agents/``. ``legacy_charter`` is still
+    reported (a repo that only carries a CHARTER.md wants a one-time
+    `murmurent repo upgrade` to stamp the marker), but it no longer counts
+    toward readiness (issue #28).
     """
 
     host: str
@@ -228,19 +226,20 @@ class AdoptionStatus:
     @property
     def ready(self) -> bool:
         return (self.exists and self.is_git
-                and (self.has_marker or self.legacy_charter)
+                and self.has_marker
                 and self.has_claude_agents)
 
     @property
     def verdict(self) -> str:
-        """One-word-ish summary for tables + headlines."""
+        """One-word-ish summary for tables + headlines. The ``ready (legacy)``
+        verdict is gone (issue #28): a CHARTER-only repo reads as ``partial``
+        until `murmurent repo upgrade` stamps its marker."""
         if not self.exists:
             return "missing"
         if not self.is_git:
             return "not a git repo"
         if self.ready:
-            return "ready (legacy)" if (self.legacy_charter
-                                        and not self.has_marker) else "ready"
+            return "ready"
         if self.has_marker or self.legacy_charter or self.has_claude_agents:
             return "partial"
         return "plain clone"

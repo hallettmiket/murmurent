@@ -22,7 +22,9 @@ def test_upgrade_endpoint_converts_legacy_and_refuses_plain_clone(monkeypatch, t
 
     client = TestClient(create_app())
 
-    # A legacy CHARTER bootstrap upgrades to the marker.
+    # A legacy CHARTER bootstrap gets a stamped marker; the CHARTER.md is
+    # PRESERVED (it may be a project document — issue #28), and readiness now
+    # comes from the .murmurent.yaml marker.
     legacy = _clone(repos, "oldie")
     (legacy / "CHARTER.md").write_text("---\nproject: oldie\nlab: mh\n---\n")
     (legacy / ".claude" / "agents").mkdir(parents=True)
@@ -30,7 +32,7 @@ def test_upgrade_endpoint_converts_legacy_and_refuses_plain_clone(monkeypatch, t
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["verdict"] == "ready"
-    assert not (legacy / "CHARTER.md").exists()
+    assert (legacy / "CHARTER.md").exists()          # preserved, not deleted
     marker = yaml.safe_load((legacy / ".murmurent.yaml").read_text())
     assert marker["lab"] == "mh" and marker["murmurent"] == 1
 

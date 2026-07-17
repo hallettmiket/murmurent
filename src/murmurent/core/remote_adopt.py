@@ -1,8 +1,10 @@
 """
-Purpose: SSH-side helpers for adopting an existing remote clone as a
-         murmurent project — writes CHARTER.md on the host and runs the
-         layer-2 CC bootstrap (``.claude/agents/`` + ``CLAUDE.md``)
-         over a single batched SSH session.
+Purpose: SSH-side helpers for adopting an existing remote clone as
+         murmurent-ready — writes the ``.murmurent.yaml`` readiness marker
+         on the host (always), optionally a project CHARTER.md (only when a
+         charter body is supplied — the project flow), and runs the layer-2
+         CC bootstrap (``.claude/agents/`` + ``CLAUDE.md``) over a single
+         batched SSH session.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-17
 Input: A :class:`Host` (the remote where the clone lives) + the rendered
@@ -33,6 +35,7 @@ from dataclasses import dataclass
 from . import hosts as _hosts
 from . import preflight as _pf
 from . import remote as _remote
+from . import repo_ready as _rr
 
 
 # Agent names already get validated by :mod:`core.projectize` (and the
@@ -59,18 +62,42 @@ class RemoteAdoptError(Exception):
         return self.detail
 
 
+def _render_remote_marker(*, lab: str, agents_csv: str,
+                          bootstrap_version: str) -> str:
+    """Render the ``.murmurent.yaml`` readiness marker body written on the
+    host. Mirrors :func:`core.repo_ready._write_marker`'s fields. ``lab`` is
+    sanitized to a safe slug by the caller."""
+    import datetime as _dt
+    lines = [
+        f"murmurent: {_rr.MARKER_SCHEMA}",
+        f"lab: {lab}",
+        f"ready_since: {_dt.date.today().isoformat()}",
+        f"bootstrap_version: {bootstrap_version}",
+        "agents:",
+    ]
+    lines.extend(f"- {a}" for a in agents_csv.split())
+    return "\n".join(lines) + "\n"
+
+
 def build_remote_adopt_script(
     *,
     clone_path: str,
     project: str,
-    charter_text: str,
+    charter_text: str = "",
     agents: list[str],
+    lab: str = "",
+    bootstrap_version: str = "",
 ) -> str:
     """Render the batched bash that runs over SSH for a remote adopt.
 
     Emits records the install-wizard parser already understands
     (``<step>:<status>:<detail>``), in the order:
+      - ``marker:…`` — wrote ``.murmurent.yaml`` readiness marker, or
+        preserved an existing one (ALWAYS emitted — it is the readiness
+        signal, issue #28)
       - ``charter:…`` — wrote CHARTER.md, or preserved an existing one
+        (ONLY when ``charter_text`` is non-empty — i.e. the project flow;
+        a pure readiness adopt writes no CHARTER)
       - ``cc_agent: <name>:…`` — one per agent symlink attempt
       - ``cc_claude_md:…`` — wrote CLAUDE.md stub, or preserved existing
 
@@ -78,15 +105,17 @@ def build_remote_adopt_script(
       - ``clone_path`` is shell-quoted (``shlex.quote``).
       - Agent names are pre-filtered to ``[A-Za-z0-9_-]+`` so the
         ``for a in <names>`` loop is safe to interpolate.
-      - CHARTER body uses a *quoted* heredoc delimiter
-        (``<<'__WIGAMIG_CHARTER_EOF__'``) so ``$VAR`` references inside
-        the charter aren't expanded by the remote shell.
+      - Marker + CHARTER bodies use *quoted* heredoc delimiters so
+        ``$VAR`` references inside them aren't expanded by the remote shell.
     """
     if not _PROJECT_NAME_RE.match(project):
         raise RemoteAdoptError(f"unsafe project name: {project!r}")
     safe_agents = [a for a in agents if isinstance(a, str) and _AGENT_NAME_RE.match(a)]
     agents_csv = " ".join(safe_agents)
     dest_q = shlex.quote(clone_path)
+    safe_lab = "".join(c for c in str(lab or "") if c.isalnum() or c in "-_")
+    safe_ver = "".join(c for c in str(bootstrap_version or "")
+                       if c.isalnum() or c in ".-_")
 
     # The CHARTER body should never contain our delimiter, but defend
     # against the pathological case (and against future maintainers
@@ -96,27 +125,49 @@ def build_remote_adopt_script(
             "charter body contains the heredoc delimiter — refusing to write"
         )
 
-    # NOTE: we don't strictly *need* the ssh-side ``[ -f ".../CHARTER.md" ]``
-    # check (the endpoint layer already validates), but the script is the
-    # last line of defence: if the user races us by writing CHARTER between
-    # the endpoint's preflight and this run, we still preserve their file.
+    marker_text = _render_remote_marker(
+        lab=safe_lab, agents_csv=agents_csv, bootstrap_version=safe_ver)
+
+    # ---- Readiness marker (ALWAYS) -------------------------------------
     lines = [
         f'DEST={dest_q}',
-        # Charter step.
         'if [ ! -d "$DEST/.git" ]; then',
-        '  echo "charter:fail:not a git working tree: $DEST"',
-        'elif [ -f "$DEST/CHARTER.md" ]; then',
-        '  echo "charter:ok:already exists at $DEST/CHARTER.md (preserved)"',
+        '  echo "marker:fail:not a git working tree: $DEST"',
+        'elif [ -f "$DEST/.murmurent.yaml" ]; then',
+        '  echo "marker:ok:already exists at $DEST/.murmurent.yaml (preserved)"',
         'else',
-        "  cat > \"$DEST/CHARTER.md\" <<'__WIGAMIG_CHARTER_EOF__'",
-        charter_text.rstrip("\n"),
-        "__WIGAMIG_CHARTER_EOF__",
-        '  if [ -f "$DEST/CHARTER.md" ]; then',
-        '    echo "charter:ok:wrote $DEST/CHARTER.md"',
+        "  cat > \"$DEST/.murmurent.yaml\" <<'__MURMURENT_MARKER_EOF__'",
+        marker_text.rstrip("\n"),
+        "__MURMURENT_MARKER_EOF__",
+        '  if [ -f "$DEST/.murmurent.yaml" ]; then',
+        '    echo "marker:ok:wrote $DEST/.murmurent.yaml"',
         '  else',
-        '    echo "charter:fail:write returned no file at $DEST/CHARTER.md"',
+        '    echo "marker:fail:write returned no file at $DEST/.murmurent.yaml"',
         '  fi',
         'fi',
+    ]
+    # ---- CHARTER project document (ONLY when a body was supplied) -------
+    # A pure readiness adopt passes charter_text="" and writes NO CHARTER —
+    # CHARTER.md is a project document, not a readiness marker (issue #28).
+    # The project flow (projectize's SSH branch) passes a real charter body.
+    if charter_text.strip():
+        lines += [
+            'if [ ! -d "$DEST/.git" ]; then',
+            '  echo "charter:fail:not a git working tree: $DEST"',
+            'elif [ -f "$DEST/CHARTER.md" ]; then',
+            '  echo "charter:ok:already exists at $DEST/CHARTER.md (preserved)"',
+            'else',
+            "  cat > \"$DEST/CHARTER.md\" <<'__WIGAMIG_CHARTER_EOF__'",
+            charter_text.rstrip("\n"),
+            "__WIGAMIG_CHARTER_EOF__",
+            '  if [ -f "$DEST/CHARTER.md" ]; then',
+            '    echo "charter:ok:wrote $DEST/CHARTER.md"',
+            '  else',
+            '    echo "charter:fail:write returned no file at $DEST/CHARTER.md"',
+            '  fi',
+            'fi',
+        ]
+    lines += [
         # CC bootstrap — only runs when the clone is present AND the
         # murmurent commons is checked out on the host. Mirrors the
         # equivalent block in remote_install._build_script so behaviour
@@ -250,13 +301,13 @@ def _cc_settings_for_ssh_template() -> str:
 def parse_remote_adopt_output(stdout: str) -> list[_pf.Probe]:
     """Convert ``<step>:<status>:<detail>`` records into Probes.
 
-    Same parser shape as :func:`core.remote_install.parse_output`, but
-    the required-step set is just ``{charter}``: the install wizard
-    requires both ``murmurent`` and ``repo`` because it might need to
-    clone the repo first; adopt assumes the clone exists and only
-    needs CHARTER to land.
+    The required-step set is ``{marker, charter}``: the ``.murmurent.yaml``
+    marker is the readiness gate and must always land (issue #28); ``charter``
+    is required only when the project flow emitted it (a pure readiness adopt
+    emits no charter step, so its absence isn't a failure — ``required`` only
+    bites steps that actually appear).
     """
-    REQUIRED = {"charter"}
+    REQUIRED = {"marker", "charter"}
     out: list[_pf.Probe] = []
     for raw in (stdout or "").splitlines():
         line = raw.strip()
@@ -280,8 +331,10 @@ def adopt_remote_clone(
     host: _hosts.Host,
     clone_path: str,
     project: str,
-    charter_text: str,
+    charter_text: str = "",
     agents: list[str],
+    lab: str = "",
+    bootstrap_version: str = "",
     timeout: int = 90,
 ) -> list[_pf.Probe]:
     """Run the batched remote-adopt script on ``host`` and parse probes.
@@ -299,6 +352,8 @@ def adopt_remote_clone(
         project=project,
         charter_text=charter_text,
         agents=agents,
+        lab=lab,
+        bootstrap_version=bootstrap_version,
     )
     remote = _remote.Remote(host)
     try:

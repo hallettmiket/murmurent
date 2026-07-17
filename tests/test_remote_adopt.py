@@ -88,6 +88,31 @@ def test_script_uses_quoted_heredoc():
     assert "<<'__WIGAMIG_CHARTER_EOF__'" in s
 
 
+def test_script_writes_marker_and_skips_charter_when_empty():
+    """Pure readiness adopt (issue #28): charter_text="" ⇒ the script writes
+    the .murmurent.yaml marker and emits NO CHARTER block."""
+    s = _radopt.build_remote_adopt_script(
+        clone_path="/tmp/x", project="x", charter_text="",
+        agents=["blacksmith"], lab="mh", bootstrap_version="2026.7.0",
+    )
+    assert '.murmurent.yaml' in s
+    assert "marker:ok:wrote" in s
+    assert "lab: mh" in s
+    assert "CHARTER.md" not in s        # no project doc on a pure adopt
+
+
+def test_script_writes_both_marker_and_charter_for_project_flow():
+    """The project flow (projectize's SSH branch) passes a charter body ⇒
+    the script writes BOTH the marker and the CHARTER.md."""
+    s = _radopt.build_remote_adopt_script(
+        clone_path="/tmp/x", project="x",
+        charter_text="---\nproject: x\nlead: '@a'\n---\n# x\n",
+        agents=[], lab="mh",
+    )
+    assert '.murmurent.yaml' in s and "marker:ok:wrote" in s
+    assert "CHARTER.md" in s and "<<'__WIGAMIG_CHARTER_EOF__'" in s
+
+
 # ---------------------------------------------------------------------------
 # Output parsing
 # ---------------------------------------------------------------------------
@@ -179,9 +204,10 @@ def _mock_remote(monkeypatch, *, probe_verdict: str = "OK",
         if "[ -d" in command and "/.git" in command and "fi" in command and len(command) < 200:
             stdout = probe_verdict + "\n"
         else:
-            # The adopt script. Default success output if none provided.
+            # The adopt script. Default = the pure readiness-adopt path
+            # (issue #28): a .murmurent.yaml marker, NO CHARTER.
             stdout = adopt_stdout or "\n".join([
-                "charter:ok:wrote /home/UWO/the_pi/repos/demo/CHARTER.md",
+                "marker:ok:wrote /home/UWO/the_pi/repos/demo/.murmurent.yaml",
                 "cc_agent:ok:blacksmith -> wigamig/agents/blacksmith.md",
                 "cc_claude_md:ok:created /home/UWO/the_pi/repos/demo/CLAUDE.md",
             ]) + "\n"
@@ -213,9 +239,11 @@ def test_remote_adopt_happy_path(world, monkeypatch):
     # Adopt no longer mints a project: no registry record, no manifest.
     assert not (world["lab_mgmt"] / "cert_projects" / "demo.md").exists()
     assert not (world["home"] / ".murmurent" / "installations" / "demo.yaml").exists()
-    # Probes include the remote bootstrap records.
+    # Probes include the remote bootstrap records. Pure adopt writes the
+    # .murmurent.yaml marker (issue #28), NOT a CHARTER.
     probe_names = [p["name"] for p in body["probes"]]
-    assert "charter" in probe_names          # legacy-shape marker on the host
+    assert "marker" in probe_names
+    assert "charter" not in probe_names
     assert "cc_agent" in probe_names
     # We made at least two SSH calls: the path probe + the adopt script.
     assert len(calls) >= 2

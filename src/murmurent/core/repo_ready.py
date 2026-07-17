@@ -21,8 +21,9 @@ automatically (agents are symlinks into the commons clone), but
 structural changes — new commons agents, marker schema, refreshed
 stubs — are frozen at bootstrap time. ``upgrade()`` re-runs the
 bootstrap idempotently against the current commons and re-stamps
-``bootstrap_version``; it also converts legacy CHARTER.md-marked repos
-to the marker.
+``bootstrap_version``; for a legacy CHARTER.md bootstrap it stamps the
+marker while PRESERVING the CHARTER.md (which may be a project document —
+readiness just stops keying on it; issue #28).
 """
 
 from __future__ import annotations
@@ -63,16 +64,20 @@ class Readiness:
 
     @property
     def ready(self) -> bool:
-        return (self.marker is not None or self.legacy_charter) and self.has_agents_dir
+        # Readiness keys on the .murmurent.yaml marker ONLY (issue #28). A
+        # legacy CHARTER.md no longer signals readiness — it's a project
+        # document (project/lead/members), not a bootstrap marker. Repos that
+        # only carry a CHARTER migrate via `murmurent repo upgrade`, which
+        # stamps a marker and PRESERVES the CHARTER.
+        return self.marker is not None and self.has_agents_dir
 
     @property
     def needs_upgrade(self) -> bool:
-        """True when the repo is ready but bootstrapped by an older shape —
-        a legacy CHARTER marker, or a marker whose schema/version lags."""
-        if self.legacy_charter and self.marker is None:
-            return True
+        """True when a marker-ready repo was bootstrapped by an older marker
+        shape (schema/version lags), OR when a repo still carries only a legacy
+        CHARTER.md bootstrap and wants a one-time marker stamp."""
         if self.marker is None:
-            return False
+            return self.legacy_charter
         if int(self.marker.get("murmurent") or 0) < MARKER_SCHEMA:
             return True
         return str(self.marker.get("bootstrap_version") or "") != _version()
@@ -111,6 +116,28 @@ def _write_marker(repo: Path, *, lab: str, agents: list[str],
     f = Path(repo) / MARKER_FILENAME
     f.write_text(yaml.safe_dump(marker, sort_keys=False), encoding="utf-8")
     return f
+
+
+def ensure_marker(repo: Path, *, lab: str = "",
+                  agents: list[str] | None = None) -> Path:
+    """Idempotently write the ``.murmurent.yaml`` readiness marker.
+
+    Preserves an existing marker (keeps its recorded agent picks when
+    ``agents`` is None). Used by paths that make a repo ready but do their
+    own CC bootstrap — e.g. :mod:`core.projectize`, which writes a project's
+    CHARTER + registry + manifest and now also stamps the readiness marker so
+    a project repo is marker-ready (not CHARTER-ready). Returns the marker path.
+    """
+    repo = Path(repo).expanduser()
+    existing = read_marker(repo)
+    if existing is not None and agents is None:
+        return repo / MARKER_FILENAME
+    picked = list(agents) if agents is not None else list(
+        (existing or {}).get("agents") or [])
+    return _write_marker(
+        repo, lab=lab or str((existing or {}).get("lab") or ""),
+        agents=picked,
+        ready_since=str((existing or {}).get("ready_since") or "") or None)
 
 
 def make_ready(clone_path: Path, *, lab: str = "",
@@ -154,9 +181,11 @@ def upgrade(clone_path: Path, *, add_agents: list[str] | None = None,
             murmurent_root: Path | None = None) -> list[Probe]:
     """Bring a ready repo up to the current murmurent release.
 
-    - Legacy CHARTER.md bootstrap → converted to the marker (lab taken
-      from the charter; the CHARTER.md itself is removed — the project
-      record, if one exists, lives in the lab_mgmt registry).
+    - Legacy CHARTER.md bootstrap → a ``.murmurent.yaml`` marker is stamped
+      (lab lifted from the charter). The CHARTER.md is **preserved** — it may
+      be a project document (project/lead/members) still read by
+      :mod:`core.projects`; readiness simply stops keying on it (issue #28,
+      never drop project metadata during migration).
     - Marker schema migrated; ``bootstrap_version`` re-stamped.
     - Agent symlinks re-created against the current commons; new agents
       join via ``add_agents`` or ``all_agents=True`` (every commons
@@ -174,7 +203,12 @@ def upgrade(clone_path: Path, *, add_agents: list[str] | None = None,
     agents = list((r.marker or {}).get("agents") or [])
 
     if r.legacy_charter and r.marker is None:
-        # Convert: lift lab (+ existing agent links) out of the legacy shape.
+        # Stamp the marker from the legacy CHARTER bootstrap: lift the lab and
+        # any existing agent links out of it. The CHARTER.md is PRESERVED — it
+        # may be a project document still read by core.projects; readiness no
+        # longer keys on it, so it just stops being a bootstrap marker (issue
+        # #28). If it holds project metadata not yet in cert_projects, run
+        # `cert_projects.backfill_from_charter()` to register it.
         try:
             from .frontmatter import parse_file
             meta = parse_file(repo / LEGACY_MARKER).meta or {}
@@ -185,10 +219,10 @@ def upgrade(clone_path: Path, *, add_agents: list[str] | None = None,
         if agents_dir.is_dir():
             agents = sorted(p.stem for p in agents_dir.iterdir()
                             if p.suffix == ".md")
-        (repo / LEGACY_MARKER).unlink()
         probes.append(Probe(name="upgrade", status="ok",
-                            detail="converted legacy CHARTER.md bootstrap to "
-                                   f"{MARKER_FILENAME}", required=False))
+                            detail=f"stamped {MARKER_FILENAME} from legacy "
+                                   "CHARTER.md bootstrap (CHARTER.md preserved)",
+                            required=False))
 
     root = murmurent_root or murmurent_repo_root()
     if all_agents:

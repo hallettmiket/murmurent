@@ -411,10 +411,12 @@ def detect_orphan_registries() -> list[DriftFinding]:
 
 
 def detect_missing_charters() -> list[DriftFinding]:
-    """For each install manifest with a still-alive working tree,
-    verify the readiness marker is still present (.murmurent.yaml, or
-    the legacy CHARTER.md bootstrap). Surfaces as ``warn`` (no
-    auto-fix; the user should either re-adopt or remove)."""
+    """For each install manifest with a still-alive working tree, verify the
+    ``.murmurent.yaml`` readiness marker is still present. Surfaces as ``warn``
+    (no auto-fix; the user should either re-adopt / `murmurent repo upgrade`,
+    or remove). A legacy CHARTER.md no longer counts as a readiness marker
+    (issue #28), so a repo that only carries a CHARTER is flagged here until
+    its marker is stamped."""
     findings: list[DriftFinding] = []
     inst_dir = _installations_dir()
     if not inst_dir.is_dir():
@@ -432,21 +434,20 @@ def detect_missing_charters() -> list[DriftFinding]:
             continue  # handled below
         local_path = Path(f"~/repos/{project}").expanduser()
         if (local_path.is_dir()
-                and not (local_path / ".murmurent.yaml").exists()
-                and not (local_path / "CHARTER.md").exists()):
+                and not (local_path / ".murmurent.yaml").exists()):
             findings.append(DriftFinding(
                 kind="missing_charter",
                 severity="warn",
                 target=project,
                 host="local",
                 detail=(f"clone exists at {local_path} but its readiness "
-                        "marker (.murmurent.yaml / legacy CHARTER.md) is missing"),
+                        "marker (.murmurent.yaml) is missing"),
                 suggested_action="re-adopt or remove from murmurent",
                 artefact_path=str(manifest_path),
             ))
 
     # Remote: batch readiness-marker existence checks per host (same
-    # shape as the path-alive probe; marker or legacy CHARTER counts).
+    # shape as the path-alive probe; only .murmurent.yaml counts now).
     remote_groups: dict[str, list[tuple[str, str]]] = {}
     for manifest_path in sorted(inst_dir.glob("*.yaml")):
         if manifest_path.parent.name == ARCHIVE_SUBDIR:
@@ -471,12 +472,12 @@ def detect_missing_charters() -> list[DriftFinding]:
             host_obj = _hosts.resolve(ssh_remote)
         except _hosts.HostNotFound:
             continue
-        # One script: each path → "STATE:<path>:<alive>:<charter>"
+        # One script: each path → "STATE:<path>:<alive>:<marker>"
         quoted = " ".join(shlex.quote(p) for p, _ in [(p, p) for _, p in items])
         script = (
             f'for p in {quoted}; do '
             '  if [ -d "$p/.git" ]; then '
-            '    if [ -f "$p/.murmurent.yaml" ] || [ -f "$p/CHARTER.md" ]; '
+            '    if [ -f "$p/.murmurent.yaml" ]; '
             '    then printf "%s\\n" "OK:$p"; '
             '    else printf "%s\\n" "NOCHARTER:$p"; fi; '
             '  fi; '
@@ -497,7 +498,7 @@ def detect_missing_charters() -> list[DriftFinding]:
                     severity="warn",
                     target=project,
                     host=ssh_remote,
-                    detail=f"clone exists at {ssh_remote}:{remote_path} but CHARTER.md is missing",
+                    detail=f"clone exists at {ssh_remote}:{remote_path} but .murmurent.yaml is missing",
                     suggested_action="re-adopt or remove from murmurent",
                     artefact_path=str(_installations_dir() / f"{project}.yaml"),
                 ))
