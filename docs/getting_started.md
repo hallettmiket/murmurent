@@ -4,12 +4,13 @@ You've installed Murmurent and it runs locally on your machine. So what
 does it actually *do* that plain [Claude Code](https://claude.com/claude-code)
 (CC) doesn't?
 
-Short version: CC is a brilliant generalist that **forgets everything between
-sessions** and knows nothing about your lab. Murmurent turns it into a
-**research team with a memory and house rules**:
+Short version: Claude Code is a capable generalist that forgets everything
+between sessions and knows nothing about your lab. Murmurent turns that
+forgetful generalist into a **research team with a memory and house
+rules**:
 
 - a set of **reference agents** — specialists (a literature scout, a computational
-  workhorse, a skeptical reviewer, a security auditor, …) you delegate to by name;
+  workhorse, an adversarial reviewer, a security auditor, …) you delegate to by name;
 - an **Oracle** — persistent, structured memory of what you've learned, that
   survives across sessions *and* projects;
 - **hard rules + hooks** — data-governance guardrails that stop you (or the
@@ -17,9 +18,36 @@ sessions** and knows nothing about your lab. Murmurent turns it into a
 - and, when your lab or centre opts in, **shared infrastructure** so a whole
   group or collaboration accumulates knowledge together, not one laptop at a time.
 
+Murmurent is built on Claude Code today, but nothing in its design is
+specific to it: the same tiers, agents, and governance rules could sit on
+another agentic AI system.
+
 Everything below is something you can try today, on your own machine, with no PI
 and no centre. The agents are already wired into `~/.claude/agents/`, so in any CC
 session you invoke one just by asking for it in plain English.
+
+---
+
+## Where Murmurent lives on your machine
+
+For the curious, or for auditing what Murmurent touches, here is what it
+creates or modifies locally:
+
+- `~/.claude/agents/`, `~/.claude/rules/`, `~/.claude/skills/` — the
+  commons agents, rules, and skills, symlinked in by `scripts/setup.sh`.
+- `~/.claude/settings.json` — where Murmurent registers its hooks and MCP
+  servers.
+- `~/.claude/agent-memory/` — per-agent working memory.
+- `~/.claude/murmurent-preferences.yaml` — your personal preference
+  profile (see Vignette 2 below).
+- `~/.murmurent/` — this machine's Murmurent state: `machine.yaml`, your
+  identity + membership cards, `lab_info/` (the centre registry, on a
+  registrar's machine), `agents.log` (the activity log the dashboard
+  tails), `keys/`, and host/registry files.
+- `~/repos/murmurent` (the commons clone) and
+  `~/repos/murmurent_lab_mgmt_<lab>` (your lab's governance clone).
+- your Obsidian personal vault (the `murmurent_vault` clone) and, on the
+  lab server, the bulk-data root `$MURMURENT_LAB_VM_ROOT/{raw,refined}/`.
 
 ---
 
@@ -31,14 +59,15 @@ gene list, and last week's dead end every single time.
 With Murmurent, you tell the **Oracle** once:
 
 > **You:** Oracle, remember this: GRCh38.p14 fixes the chrM contig artefact we
-> hit with p13 on the DCIS cohort. We're standardising on p14 for run 17 — don't
-> switch references mid-cohort.
+> hit with p13 on the `brca_wgs` breast cancer cohort. We're standardising on
+> p14 for run 17 — don't switch references mid-cohort.
 
 The Oracle writes a structured entry into your Obsidian vault (`oracle/`), with
 frontmatter (`title`, `date`, `project`, `tags`, …) so it's findable later. Weeks
 later, in a *different* session on a *different* project:
 
-> **You:** Oracle, what did I decide about reference genomes for DCIS?
+> **You:** Oracle, what did I decide about reference genomes for breast
+> cancer sequencing?
 >
 > **Oracle:** Found — you standardised on GRCh38.p14 for run 17 (p14 patches the
 > chrM artefact from p13); switching references mid-cohort was explicitly ruled out.
@@ -51,8 +80,9 @@ leaks between projects unless you deliberately promote it. See
 
 ## Vignette 2 — Delegating to specialists (the agents)
 
-Instead of one general assistant, you have a bench of specialists. You don't
-configure them — you just address the right one:
+Instead of one general assistant, you have a bench of specialists. Each one
+ships with sensible defaults and is usable right away — you just address
+the right one by name:
 
 - **Bookworm** — literature + databases:
   > *Bookworm, find the three most-cited papers on MMP11 in breast cancer and
@@ -60,8 +90,8 @@ configure them — you just address the right one:
   It queries PubMed/bioRxiv, summarises, and curates a list you keep.
 
 - **Blacksmith** — the computational workhorse:
-  > *Blacksmith, load `refined/dcis/3_qc/counts.parquet`, train an XGBoost
-  > classifier on subtype, and report AUC with a train/test split.*
+  > *Blacksmith, load `refined/brca_wgs/3_qc/counts.parquet`, train an
+  > XGBoost classifier on subtype, and report AUC with a train/test split.*
   It writes clean, runnable Python, verifies it executes, and reports metrics.
 
 - **Artist** — figures + communication:
@@ -70,16 +100,20 @@ configure them — you just address the right one:
   It produces labelled, legible figures and keeps a rolling HTML report.
 
 Each agent leads its reply with a one-line verdict (so you see the punchline at a
-glance) and stays in its lane. Full roster (Oracle, Bookworm, Blacksmith,
-Adversary, Artist, Conscience, Lawyer, Security Guard, and more) in
+glance) and stays in its lane. If a default doesn't suit you, you can change
+it without editing the agent itself — per member, via
+`~/.claude/murmurent-preferences.yaml` (`murmurent preference set <field>
+<value>`), or per lab, through the lab's own toolkit. Full roster (Oracle,
+Bookworm, Blacksmith, Adversary, Artist, Conscience, Lawyer, Security Guard,
+and more) in
 [`CLAUDE.md`](https://github.com/hallettmiket/murmurent/blob/main/CLAUDE.md#reference-agents-the-commons).
 
 ---
 
-## Vignette 3 — A skeptic who reads your work before your reviewers do (the Adversary)
+## Vignette 3 — Adversarial methodological review (the Adversary)
 
 The failure mode of an eager AI assistant is confident, plausible, *wrong*.
-Murmurent ships a built-in critic:
+Murmurent ships an agent whose job is to check the other agents' work:
 
 > **You:** Adversary, review the classifier the Blacksmith just built.
 >
@@ -87,9 +121,16 @@ Murmurent ships a built-in critic:
 > patient appear in both folds, so the AUC is optimistic. Re-split by patient,
 > not by cell, and re-run before trusting this number.
 
-The Adversary hunts for data leakage, unstated assumptions, and results too good
-to be true. It's the cheapest peer review you'll ever get, and it happens *before*
-you write the paper, not after a reviewer catches it.
+The Adversary performs adversarial methodological review of other agents'
+outputs. It checks for data leakage, inappropriate train/test splitting
+(e.g. splitting by cell rather than by patient), missing or inadequate
+cross-validation, and results that are implausibly strong. It separates
+claims it verified itself — by running code or reading files — from claims
+it could not verify, and reports the two differently. It reviews other
+agents' work directly, for instance the Blacksmith's analyses or the
+Bookworm's literature claims, functioning as an internal check that runs
+before a result is relied on, rather than after a reviewer catches it
+later.
 
 ---
 
@@ -98,7 +139,7 @@ you write the paper, not after a reviewer catches it.
 Some rules you don't want to rely on remembering. Murmurent enforces them at the
 hook layer, so they hold even when you (or the model) get careless:
 
-> **You:** Delete the old raw FASTQs in `raw/dcis/` to free space.
+> **You:** Delete the old raw FASTQs in `raw/brca_wgs/` to free space.
 >
 > **Murmurent (raw_guard hook):** Blocked — `raw/` is immutable. No code may
 > modify or delete files under `raw/`. If a refined output is superseded, write
@@ -125,8 +166,10 @@ in:
   through a controlled interface, and **collaborations** let groups pool agents and
   data on shared projects without a central controller dictating every move.
 
-That's the "village" idea: independent groups, shared commons, accumulating
-knowledge across every project. The full vision is in
+Independent groups share a common set of agents, rules, and infrastructure
+(the commons), so knowledge accumulates across every project and every
+person who works on it, instead of being trapped on one machine. The full
+vision is in
 [`CLAUDE.md`](https://github.com/hallettmiket/murmurent/blob/main/CLAUDE.md) and the design docs under [`docs/`](https://github.com/hallettmiket/murmurent/tree/main/docs).
 
 ---

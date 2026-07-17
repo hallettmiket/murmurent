@@ -1,30 +1,35 @@
 # The reference agents
 
-The **commons** is the set of reference agents, hard rules, and baseline
-workflows every member of the centre draws on, regardless of lab. The
-manuscript frames it this way: *"Murmurent guarantees for each user a
-common set of reference agents, a robust computing environment and
-interfaces which are aware of available resources and tools"* — a
-shared operating system for research, not a shared research direction.
-Thirteen reference agents ship in [`agents/*.md`](https://github.com/hallettmiket/murmurent/tree/main/agents)
+The **commons** is a shared set of reference agents, hard rules, and
+baseline workflows every member of the centre draws on, regardless of
+lab — a common operating system for research, not a shared research
+direction. Thirteen reference agents ship in
+[`agents/*.md`](https://github.com/hallettmiket/murmurent/tree/main/agents)
 and are symlinked into `~/.claude/agents/` by `scripts/setup.sh`: twelve
 operate at the individual, group, or lab level, and a thirteenth,
 `centre_cable_guy`, is a centre-level singleton.
 
-You don't configure or invoke these specially — in any Claude Code
-session on a Murmurent-enabled machine, you address an agent by name in
-plain English (`Bookworm, find...`, `Adversary, review...`) and CC
-routes to it. Every agent's final reply leads with a single ≤200-character
-verdict line in a fixed vocabulary (see
+You invoke these by addressing an agent by name in plain English — for
+example, *"Bookworm, find all manuscripts related to MMP11 in breast
+cancer,"* or *"Adversary, review the findings of the Bookworm's
+literature review for overlooked or contradictory studies"* — in any
+Claude Code session on a Murmurent-enabled machine, and CC routes to it.
+Every agent ships pre-configured with sensible defaults and is usable
+immediately; you can override those defaults without editing the agent
+itself, per member via `~/.claude/murmurent-preferences.yaml`
+(`murmurent preference set <field> <value>`), or per lab through the
+lab's own toolkit. The sections below call out which defaults are worth
+knowing about for each agent. Every agent's final reply leads with a
+single ≤200-character verdict line in a fixed vocabulary (see
 [`rules/headline_first.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/headline_first.md)),
 so the Murmurent VSCode dashboard's live activity pane always shows a
-scannable punchline instead of buried prose.
+scannable punchline.
 
-Group and core toolkits are built **on top of** the commons, not instead
-of it: a lab adds discipline-specific agents (a medchem specialist, an
-image segmenter, a cohort curator, …) that compose against this same
-reference set, the same hard rules, and the same verdict protocol —
-what the manuscript calls the "commons-plus-toolkit" pattern.
+Group and core toolkits are built on top of the commons: a lab adds
+discipline-specific agents (a medchem specialist, an image segmenter, a
+cohort curator, …) that compose against this same reference set, the
+same hard rules, and the same verdict protocol. This corresponds to the
+so-called "commons-plus-toolkit" pattern described in the manuscript.
 
 ---
 
@@ -40,7 +45,8 @@ refuses to write an entry missing required schema fields. See
 
 **Verdict vocabulary:** `Found / Not found / Unsure — <one-line what>`
 
-> **You:** Oracle, what did I decide about reference genomes for DCIS?
+> **You:** Oracle, what did I decide about reference genomes for breast
+> cancer sequencing?
 >
 > **Oracle:** Found — you standardised on GRCh38.p14 for run 17 (patches
 > the chrM artefact from p13); switching references mid-cohort was
@@ -49,8 +55,9 @@ refuses to write an entry missing required schema fields. See
 ## Lab Oracle
 
 The lab-wide counterpart to the personal Oracle: curated, reviewed,
-group-readable institutional memory backed by the `lab_mgmt` repo.
-It is **read-only from the agent side** — its toolset deliberately
+group-readable institutional memory backed by the
+`murmurent_lab_mgmt_<lab>` repo. It is **read-only from the agent side**
+— its toolset deliberately
 excludes `Write` — because new lab knowledge only arrives through the
 `murmurent oracle publish` review flow, never by the agent writing
 directly. Useful for "what has the whole lab agreed to remember,"
@@ -66,14 +73,18 @@ distinct from any one member's working notes.
 ## Bookworm
 
 The team's connection to the outside world of published science and
-databases. It maintains a reading list, queries scientific databases
-to annotate data with published knowledge, retrieves and summarises
-literature, cross-references computational predictions against known
-validated results, and always cites a source (database name + accession
-or PubMed ID) — distinguishing validated results from predictions. The
-manuscript notes it "focuses on literature survey and harvesting of
-external, publicly available data" and is easily tailored per lab so a
-PI can onboard new HQP with relevant literature fast.
+databases, tailored for biomedical research. It maintains a reading
+list, queries biomedical databases and preprint servers — PubMed,
+bioRxiv/medRxiv, ClinicalTrials.gov — to annotate data with published
+knowledge, retrieves and summarises literature, and cross-references
+computational predictions against known validated results. It always
+cites a source (database name + accession or PubMed ID) and
+distinguishes validated results from predictions rather than blending
+them. When Zotero API credentials are configured
+(`$ZOTERO_USER_ID`/`$ZOTERO_API_KEY`), it can add papers straight to a
+member's Zotero library. Which databases it favours and which starter
+reading list it emphasizes are tunable per lab, so a PI can bring a new
+trainee up to speed on the relevant literature quickly.
 
 **Verdict vocabulary:** `Found N sources — <one-line summary>`
 
@@ -86,17 +97,18 @@ PI can onboard new HQP with relevant literature fast.
 ## Blacksmith
 
 The computational workhorse. It loads and preprocesses data, engineers
-features, trains and evaluates classifiers, and builds
-Streamlit/Dash dashboards for exploration — always verifying code
-actually runs before reporting completion. The manuscript describes it
-as the agent that "focuses on the management of data, development of
-software and statistical analyses," tailored per lab to domain-specific
-tools and protocols.
+features, trains and evaluates classifiers, and builds interactive
+interfaces — Streamlit or Dash — for exploration, always verifying code
+actually runs before reporting completion. It ships with defaults (for
+example `package_manager: uv`), and its tool and library preferences are
+configurable: a lab can standardize on, say, Streamlit over Dash, or a
+particular statistics stack, by changing the agent's defaults rather
+than re-instructing it every session.
 
 **Verdict vocabulary:** `Done / Failed / Partial — <one-line what>`
 
-> **You:** Blacksmith, load `refined/dcis/3_qc/counts.parquet`, train an
-> XGBoost classifier on subtype, and report AUC with a train/test split.
+> **You:** Blacksmith, load `refined/brca_wgs/3_qc/counts.parquet`, train
+> an XGBoost classifier on subtype, and report AUC with a train/test split.
 >
 > **Blacksmith:** Done — AUC 0.87 on held-out test set (20% split);
 > outputs in `./outputs/blacksmith/`.
@@ -108,10 +120,10 @@ splitting strategy respects structure in the data (not naive random
 splitting), demands proper cross-validation, and challenges any result
 that looks too good. It distinguishes `OBSERVED:` claims (verified by
 running code or reading files) from `SPECULATED:` ones, and never
-presents the latter as fact. Per the manuscript, adversarial critique
-between agents is intended to "reduce LLM hallucinations, improve
-factual validity and increase the depth of answers" — the Adversary is
-Murmurent's implementation of that idea, expected to evolve with use.
+presents the latter as fact. Adversarial critique between agents reduces
+hallucinations, improves factual validity, and increases the depth of
+answers — the Adversary is Murmurent's implementation of that idea, and
+it is expected to evolve with use.
 
 **Verdict vocabulary:** `Pass / Questions / Reject — <one-line why>`
 
@@ -126,9 +138,9 @@ Transforms data and findings into figures, plots, and presentation
 materials that communicate science clearly. It maintains a rolling
 project HTML report, produces ROC curves, confusion matrices, SHAP
 plots and more, and insists every figure is legible, labelled, and
-versioned. The manuscript frames the Artist as group-shared by design,
-giving a lab "a common look and feel" across outputs even as different
-HQP extend it with new plotting techniques over time.
+versioned. The Artist is shared across a group by design, giving a lab
+a common look and feel across outputs even as different HQP extend it
+with new plotting techniques over time.
 
 **Verdict vocabulary:** `Rendered / Skipped / Failed — <one-line what>`
 
@@ -140,15 +152,17 @@ HQP extend it with new plotting techniques over time.
 
 ## Conscience
 
-An equity, diversity, inclusion, and decolonization watchdog. It
-reviews experimental designs, text, and literature for sex/gender bias,
-colonial framing, exclusionary language, and narrow sampling, and
-recommends concrete revisions — grounded, for Indigenization/
-decolonization guidance specifically, in *Pulling Together: A Guide for
-Curriculum Developers* (BCcampus, 2018). The manuscript positions this
-as a first-class review step, not an afterthought: catching bias "on
-the fly" during workflow execution (e.g. flagging genes on sex
-chromosomes) rather than only after the fact.
+An equity, diversity, inclusion, and decolonization (EDID) reviewer. It
+performs sex- and gender-based analysis (SGBA) of experimental designs,
+text, and literature, and flags colonial framing, exclusionary language,
+and narrow sampling, recommending concrete revisions. Its Indigenization
+and decolonization guidance is grounded specifically in *Pulling
+Together: A Guide for Curriculum Developers* (BCcampus, 2018), a
+Canadian-context open resource, and it can draw on Tier-II oracle
+knowledge the lab has recorded about EDID and sex/gender-based-analysis
+practices. This is a first-class review step, not an afterthought:
+catching bias on the fly during workflow execution (e.g. flagging genes
+on sex chromosomes) rather than only after the fact.
 
 **Verdict vocabulary:** `OK / Flagged — <one-line concern>`
 
@@ -166,9 +180,9 @@ now `lawyer`). Searches global patent databases (Google Patents,
 Espacenet, USPTO, PatentScope, CIPO, DEPATISnet) for genes, proteins,
 molecules, and devices, determines patent status, flags freedom-to-operate
 concerns, and routes real FTO decisions through the Research &
-Innovation Office rather than deciding them itself. The manuscript
-frames this alongside the Conscience as bringing regulatory and IP
-concerns into decision-making during the work, not after.
+Innovation Office rather than deciding them itself. Alongside the
+Conscience, this brings regulatory and IP concerns into decision-making
+during the work, not after.
 
 **Verdict vocabulary:** `Clear / Conflict / Unknown — <one-line on patent landscape>`
 
@@ -184,18 +198,18 @@ It onboards new members (SSH keys, repo clone, CC config, Obsidian
 vault), scaffolds new projects (GitHub repo, Slack channel, `raw/` +
 `refined/` dirs), maintains the installations registry, and
 health-checks existing environments — always requesting PI sign-off
-before touching shared infrastructure, and defaulting to `dry_run`. The
-manuscript calls it the agent "dedicated to the installation and
-verification of all administrative protocols," periodically auditing
-that channels, repos, disk space, and membership stay correctly wired.
+before touching shared infrastructure, and defaulting to `dry_run`. It
+is dedicated to the installation and verification of all administrative
+protocols, periodically auditing that channels, repos, disk space, and
+membership stay correctly wired.
 
 **Verdict vocabulary:** `Provisioned / Skipped / Failed — <one-line on what>`
 
-> **You:** Cable Guy, provision @didi for dcis_imaging_genomics on
+> **You:** Cable Guy, provision @didi for brca_imaging_genomics on
 > lab-server.
 >
 > **Cable Guy:** "Wired. @didi is ready to connect on lab-server for
-> dcis_imaging_genomics."
+> brca_imaging_genomics."
 
 ## Centre Cable Guy
 
@@ -205,16 +219,16 @@ servers, cross-lab Slack/GitHub membership, and the drift-detection loop
 that diffs each project's declared membership against actual state and
 applies the deltas. It runs on the registrar's machine, not any PI's,
 and always requests registrar sign-off before writing to shared infra.
-Per the manuscript, this is the thirteenth reference agent — the one
-that operates at centre scope rather than individual/group/lab scope.
+This is the thirteenth reference agent — the one that operates at
+centre scope rather than individual/group/lab scope.
 
 **Verdict vocabulary:** `Provisioned / Skipped / Failed — <one-line on what>`
 (shares Cable Guy's vocabulary; also emits `Reconciled — N deltas
 applied.` after a reconcile pass)
 
-> **You:** Centre Cable Guy, reconcile biocore × dcis-imaging.
+> **You:** Centre Cable Guy, reconcile biocore × brca-imaging.
 >
-> **Centre Cable Guy:** "Reconciled biocore × dcis-imaging: 2 ACL
+> **Centre Cable Guy:** "Reconciled biocore × brca-imaging: 2 ACL
 > grants, 1 Slack invite. 0 unresolved."
 
 ## Receptionist
@@ -251,7 +265,8 @@ issuing PI cards signed with the centre root key and publishing the CRL.
 > **You:** Registrar, register a new core for the proteomics facility.
 >
 > **Registrar:** Recorded — `proteomics_core` added to `_registry.yaml`,
-> pointer to its `lab-mgmt` repo unresolved pending first push.
+> pointer to its `murmurent_lab_mgmt_<lab>` repo unresolved pending
+> first push.
 
 ## Security Guard
 
@@ -261,8 +276,8 @@ tokens, and key material; refuses any PR that touches `raw/`; for
 clinical-sensitivity projects, scans for PHI-shaped patterns (OHIP/MRN/
 SIN-like strings, DOB-near-name proximity); and treats
 `~/.murmurent/keys/**` as never-commit territory. Always invoked on PRs
-that touch shared code or data — and, per the manuscript, jointly
-maintains identity-key hygiene alongside the Cable Guy.
+that touch shared code or data, and jointly maintains identity-key
+hygiene alongside the Cable Guy.
 
 **Verdict vocabulary:** `Clear / Concerns / Blocked — <one-line why>`
 

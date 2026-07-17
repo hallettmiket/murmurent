@@ -86,13 +86,13 @@ sense (paper notebook → digital). One experiment = one folder under
 ### Create a new experiment
 
 ```bash
-murmurent experiment new --project dcis_sc_tutorial --name titration_v3
+murmurent experiment new --project brca_sc_tutorial --name titration_v3
 ```
 
 This scaffolds:
 
 ```
-~/repos/dcis_sc_tutorial/exp/3_titration_v3/
+~/repos/brca_sc_tutorial/exp/3_titration_v3/
   ├── README.md                ← purpose + parameters
   ├── run_all.py               ← entry point for the analysis
   ├── notebook.md              ← THE NOTEBOOK
@@ -104,8 +104,8 @@ This scaffolds:
 …and the corresponding lab-VM directories:
 
 ```
-$MURMURENT_LAB_VM_ROOT/raw/dcis_sc_tutorial/3_titration_v3/      (read-only after ingest)
-$MURMURENT_LAB_VM_ROOT/refined/dcis_sc_tutorial/3_titration_v3/  (analysis outputs)
+$MURMURENT_LAB_VM_ROOT/raw/brca_sc_tutorial/3_titration_v3/      (read-only after ingest)
+$MURMURENT_LAB_VM_ROOT/refined/brca_sc_tutorial/3_titration_v3/  (analysis outputs)
 ```
 
 ### `notebook.md` — what to write
@@ -117,7 +117,7 @@ Required frontmatter:
 experiment: 3_titration_v3
 date: 2026-05-08
 performer: ['@allie']
-project: '[[dcis_sc_tutorial]]'
+project: '[[brca_sc_tutorial]]'
 protocol: '[[src/protocols/qpcr_v2]]'
 equipment: ['BioRad CFX96', 'Eppendorf 5810R']
 reagents:
@@ -169,13 +169,13 @@ canonical store). Reference them by absolute path:
 ```markdown
 ## Raw data
 
-- Sequencing run: `$MURMURENT_LAB_VM_ROOT/raw/dcis_sc_tutorial/3_titration_v3/run_001.fastq.gz`
-- Clinical metadata: `$MURMURENT_LAB_VM_ROOT/raw/dcis_sc_tutorial/3_titration_v3/clin.csv`
+- Sequencing run: `$MURMURENT_LAB_VM_ROOT/raw/brca_sc_tutorial/3_titration_v3/run_001.fastq.gz`
+- Clinical metadata: `$MURMURENT_LAB_VM_ROOT/raw/brca_sc_tutorial/3_titration_v3/clin.csv`
 
 ## Refined outputs
 
-- Count matrix: `$MURMURENT_LAB_VM_ROOT/refined/dcis_sc_tutorial/3_titration_v3/counts.parquet`
-- QC report: `$MURMURENT_LAB_VM_ROOT/refined/dcis_sc_tutorial/3_titration_v3/qc_report.html`
+- Count matrix: `$MURMURENT_LAB_VM_ROOT/refined/brca_sc_tutorial/3_titration_v3/counts.parquet`
+- QC report: `$MURMURENT_LAB_VM_ROOT/refined/brca_sc_tutorial/3_titration_v3/qc_report.html`
 ```
 
 `murmurent push <project> --refined 3_titration_v3` walks the refined
@@ -189,15 +189,15 @@ The experimental notebook is **already in the project repo**, so it
 travels with normal git push:
 
 ```bash
-cd ~/repos/dcis_sc_tutorial
+cd ~/repos/brca_sc_tutorial
 git add exp/3_titration_v3/
-murmurent push dcis_sc_tutorial   # writes a personal branch + PR-friendly commit
+murmurent push brca_sc_tutorial   # writes a personal branch + PR-friendly commit
 ```
 
 Or, if you've also produced refined data on the lab VM:
 
 ```bash
-murmurent push dcis_sc_tutorial --refined 3_titration_v3
+murmurent push brca_sc_tutorial --refined 3_titration_v3
 ```
 
 The PI (and every project member) sees the new notebook on next pull.
@@ -207,8 +207,8 @@ their next refresh hits the API.
 ### When an experiment is finished
 
 ```bash
-murmurent experiment status dcis_sc_tutorial titration_v3 --set complete
-murmurent finalize experiment 3_titration_v3 --project dcis_sc_tutorial
+murmurent experiment status brca_sc_tutorial titration_v3 --set complete
+murmurent finalize experiment 3_titration_v3 --project brca_sc_tutorial
 ```
 
 `finalize` walks: examine → conclude. Examine creates a deliberation
@@ -241,18 +241,18 @@ sections are present and writes a final summary into the project's
 ~/lab-notebook/                                  ← daily journal (private)
 └── 2026-05-08.md
 
-~/repos/dcis_sc_tutorial/                        ← project repo (shared via git)
+~/repos/brca_sc_tutorial/                        ← project repo (shared via git)
 └── exp/3_titration_v3/
     ├── notebook.md                              ← experimental notebook
     ├── pages/                                   ← photos
     └── sketches/                                ← drawings
 
-$MURMURENT_LAB_VM_ROOT/raw/dcis_sc_tutorial/3_titration_v3/      ← raw data (read-only)
-$MURMURENT_LAB_VM_ROOT/refined/dcis_sc_tutorial/3_titration_v3/  ← analysis outputs
+$MURMURENT_LAB_VM_ROOT/raw/brca_sc_tutorial/3_titration_v3/      ← raw data (read-only)
+$MURMURENT_LAB_VM_ROOT/refined/brca_sc_tutorial/3_titration_v3/  ← analysis outputs
 
 ~/repos/murmurent_lab_mgmt_<lab>/        ← lab-mgmt repo (shared via git)
 └── oracle/
-    └── 2026-05-08_dcis_chrm_p14.md              ← curated findings (lab-wide)
+    └── 2026-05-08_brca_chrm_p14.md              ← curated findings (lab-wide)
 ```
 
 If you find yourself wanting to put something in a place not in this

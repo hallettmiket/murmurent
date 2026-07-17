@@ -345,7 +345,7 @@ This aligns with the lab's global rules: `~/.claude/rules/data-storage.md` and `
 ### Project repo layout
 
 ```
-<project_repo>/                 ← e.g. ~/repos/dcis_imaging/
+<project_repo>/                 ← e.g. ~/repos/brca_imaging/
 ├── CHARTER.md
 ├── MEMBERS
 ├── README.md
@@ -466,12 +466,12 @@ The fallback fires with a loud warning so the user knows the classification is h
 Before any copy or `chmod`, the CLI shows the proposed classification and waits for explicit acceptance:
 
 ```
-$ murmurent experiment ingest dcis_imaging 3_titration ~/Downloads/scope_export
+$ murmurent experiment ingest brca_imaging 3_titration ~/Downloads/scope_export
 Detected instrument: zeiss-confocal (from .czi files)
 Proposed classification:
-  → $MURMURENT_LAB_VM_ROOT/raw/dcis_imaging/3_titration/
+  → $MURMURENT_LAB_VM_ROOT/raw/brca_imaging/3_titration/
     scan_001.czi   scan_002.czi   scan_003.czi   metadata.xml
-  → $MURMURENT_LAB_VM_ROOT/refined/dcis_imaging/3_titration/instrument_outputs/
+  → $MURMURENT_LAB_VM_ROOT/refined/brca_imaging/3_titration/instrument_outputs/
     thumbnail_001.png   summary.pdf   qc_report.html
 [a]ccept  [r]eview file-by-file  [c]ancel ?
 ```
@@ -500,10 +500,10 @@ Review is non-negotiable. The cost of a misclassification — a derived file per
 
 ### Verb support
 
-`murmurent experiment new --project dcis_imaging --name titration` scaffolds:
+`murmurent experiment new --project brca_imaging --name titration` scaffolds:
 - `exp/<next-int>_titration/` in the project repo with `README.md`, `run_all.py` skeleton, `notebook.md` template (auto-filled `experiment`, `date`, `performer`), `pages/`, `sketches/`, `data/` subfolders.
-- `$MURMURENT_LAB_VM_ROOT/raw/dcis_imaging/<next-int>_titration/` (writeable until raw is loaded; then `chmod a-w`).
-- `$MURMURENT_LAB_VM_ROOT/refined/dcis_imaging/<next-int>_titration/`.
+- `$MURMURENT_LAB_VM_ROOT/raw/brca_imaging/<next-int>_titration/` (writeable until raw is loaded; then `chmod a-w`).
+- `$MURMURENT_LAB_VM_ROOT/refined/brca_imaging/<next-int>_titration/`.
 
 Then opens `notebook.md` in Obsidian.
 
@@ -861,7 +861,7 @@ Each squad has a markdown file in the lab-management repo at `squads/<scope>/<na
 
 ```markdown
 ---
-squad: dcis_imaging
+squad: brca_imaging
 scope: project
 lead: '@core_lead'
 members: ['@the_pi', '@member_a']
@@ -870,7 +870,7 @@ status: active
 parent: null
 ---
 
-# Squad: dcis_imaging
+# Squad: brca_imaging
 
 ## Charter
 [link to project charter]
@@ -1330,7 +1330,7 @@ print(json.dumps({"decision": "allow"}))
 - Append a single jsonl line to `~/.claude/murmurent-audit/YYYY-MM-DD.log`:
 
 ```json
-{"ts": "2026-05-06T10:14:22Z", "member": "@the_pi", "project": "dcis_imaging",
+{"ts": "2026-05-06T10:14:22Z", "member": "@the_pi", "project": "brca_imaging",
  "tool": "Bash", "args_summary": "git push origin member/...", "outcome": "ok",
  "duration_ms": 412}
 ```
@@ -1366,9 +1366,9 @@ print(json.dumps({"decision": "allow"}))
 
 ```
 <system-reminder>
-Active project: dcis_imaging (lead: @core_lead)
+Active project: brca_imaging (lead: @core_lead)
 Your role: member
-Charter (excerpt): Integrate imaging features with clinical outcomes for DCIS biopsies...
+Charter (excerpt): Integrate imaging features with clinical outcomes for breast cancer biopsies...
 Active SEAs:
 - incoming #43: segment 12 batch-3 slides (claimed, due 2026-05-12)
 - outgoing #41: clinical metadata join (assigned to @member_a, in progress)
@@ -1618,7 +1618,7 @@ A `clinical` charter must declare additional fields:
 
 ```yaml
 ---
-project: dcis_clinical_imaging
+project: brca_clinical_imaging
 lead: '@core_lead'
 sensitivity: clinical
 reb_number: WREM-2026-0142

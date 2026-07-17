@@ -29,7 +29,7 @@ graph TB
         ORG1[Group oracle]
         INV1[Inventory]
     end
-    subgraph PROJ["Project: dcis_imaging"]
+    subgraph PROJ["Project: brca_imaging"]
         LEAD[Project lead]
         EN1[Experiment squad: 1_titration]
         EN2[Experiment squad: 2_qpcr]
@@ -51,7 +51,7 @@ graph LR
     subgraph GH["GitHub"]
         WR["murmurent repo<br/>(agent registry,<br/>choreographies)"]
         LMR["lab-management repo<br/>(roles, inventory,<br/>members, audit, dashboards)"]
-        PR1["project repo: dcis_imaging<br/>(CHARTER, MEMBERS,<br/>exp/, src/, findings/)"]
+        PR1["project repo: brca_imaging<br/>(CHARTER, MEMBERS,<br/>exp/, src/, findings/)"]
         PR2["project repo: bbb_perm<br/>(CHARTER, MEMBERS,<br/>exp/, src/, findings/)"]
     end
     subgraph LV["Lab VM (/data/lab_vm/)"]

@@ -304,14 +304,14 @@ All checks passed.
 ### Daily flow on a project
 
 ```
-$ murmurent pull dcis_imaging
+$ murmurent pull brca_imaging
 # work in Claude Code on member/the_pi/qc-batch-3 ...
 $ murmurent audit src/qc.py
-$ murmurent push dcis_imaging --message "add QC for batch 3"
+$ murmurent push brca_imaging --message "add QC for batch 3"
 Pushed to member/the_pi/qc-batch-3 (direct; no review).
 
 # later, when ready to merge:
-$ murmurent push dcis_imaging --finalize
+$ murmurent push brca_imaging --finalize
 Opened PR #14: member/the_pi/qc-batch-3 → main
 Triggered: adversary (src/**), security_guard (always)
 ```
@@ -319,8 +319,8 @@ Triggered: adversary (src/**), security_guard (always)
 ### Updating refined data after a run
 
 ```
-$ murmurent push dcis_imaging --refined 3_titration
-Recomputed SHA-256 for 5 files in $MURMURENT_LAB_VM_ROOT/refined/dcis_imaging/3_titration/
+$ murmurent push brca_imaging --refined 3_titration
+Recomputed SHA-256 for 5 files in $MURMURENT_LAB_VM_ROOT/refined/brca_imaging/3_titration/
 Updated exp/3_titration/notebook.md (refined_data, checksums).
 Pushed to member/the_pi/3_titration-analysis (direct).
 ```
@@ -328,23 +328,23 @@ Pushed to member/the_pi/3_titration-analysis (direct).
 ### Scaffolding a new experiment
 
 ```
-$ murmurent experiment new --project dcis_imaging --name titration
+$ murmurent experiment new --project brca_imaging --name titration
 Created exp/3_titration/
   README.md, run_all.py, notebook.md
   pages/, sketches/, data/
   notebook.md frontmatter pre-filled: experiment=3_titration, date=2026-05-06, performer=@the_pi
-Created $MURMURENT_LAB_VM_ROOT/raw/dcis_imaging/3_titration/
-Created $MURMURENT_LAB_VM_ROOT/refined/dcis_imaging/3_titration/
+Created $MURMURENT_LAB_VM_ROOT/raw/brca_imaging/3_titration/
+Created $MURMURENT_LAB_VM_ROOT/refined/brca_imaging/3_titration/
 Opening notebook.md in Obsidian.
 ```
 
 ### Ingesting raw instrument data
 
 ```
-$ murmurent experiment ingest dcis_imaging 3_titration ~/Downloads/scope_export
-Copied 12 files to $MURMURENT_LAB_VM_ROOT/raw/dcis_imaging/3_titration/
+$ murmurent experiment ingest brca_imaging 3_titration ~/Downloads/scope_export
+Copied 12 files to $MURMURENT_LAB_VM_ROOT/raw/brca_imaging/3_titration/
 Computed SHA-256 checksums.
-Set $MURMURENT_LAB_VM_ROOT/raw/dcis_imaging/3_titration/ to chmod a-w (read-only).
+Set $MURMURENT_LAB_VM_ROOT/raw/brca_imaging/3_titration/ to chmod a-w (read-only).
 Updated raw_data and checksums in exp/3_titration/notebook.md.
 ```
 
@@ -387,13 +387,13 @@ Acknowledged role-transition #42 (lab_manager → @member_a)
 ### Birth of a project
 
 ```
-$ murmurent project new dcis_imaging \
+$ murmurent project new brca_imaging \
     --charter charter.md \
     --members @core_lead,@the_pi,@member_a
-Created repo hallettmiket/dcis_imaging
+Created repo hallettmiket/brca_imaging
 MEMBERS:    3
 Lab VM ACL synced.
-Registered in lab_mgmt/projects/dcis_imaging.md
+Registered in lab_mgmt/projects/brca_imaging.md
 ```
 
 ## Open

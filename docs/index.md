@@ -1,11 +1,13 @@
 # Murmurent
 
 **Shared agentic-AI infrastructure for research groups** — built on
-[Claude Code](https://claude.com/claude-code). Murmurent turns a brilliant
-but forgetful generalist into a research team with a memory and house rules:
+[Claude Code](https://claude.com/claude-code) today, though nothing in its
+design is specific to it: the same tiers, agents, and governance rules
+could sit on another agentic AI system. Murmurent turns a forgetful
+generalist into a research team with a memory and house rules:
 
 - **Reference agents** — a bench of specialists (literature scout,
-  computational workhorse, skeptical reviewer, security auditor, …) you
+  computational workhorse, adversarial reviewer, security auditor, …) you
   delegate to by name.
 - **The Oracle** — persistent, structured memory that survives across
   sessions and projects, personal *and* lab-shared.
@@ -15,9 +17,9 @@ but forgetful generalist into a research team with a memory and house rules:
 - **Cryptographic membership** — labs, cores, and projects are held together
   by signed identity certificates (centre root → PI → lead → member), not by
   lists someone forgot to update.
-- **The village** — independent groups sharing a commons: pooled agents,
-  cross-group projects, and institutional knowledge that accumulates instead
-  of evaporating.
+- **The commons** — independent groups sharing a common set of agents,
+  rules, and infrastructure, so institutional knowledge accumulates across
+  projects and personnel instead of being trapped on one machine.
 
 ## Where to start
 
@@ -44,5 +46,8 @@ the blast radius of any failure and preserves each group's autonomy.
 
 | Repo | Purpose |
 |---|---|
-| [`hallettmiket/murmurent`](https://github.com/hallettmiket/murmurent) | this codebase — agents, rules, hooks, MCP servers, CLI, dashboard |
+| [`hallettmiket/murmurent`](https://github.com/hallettmiket/murmurent) | the commons codebase — agents, rules, hooks, MCP servers, CLI, dashboard |
+| `<your-org>/murmurent_lab_mgmt_<lab>` | your lab's governance repo — roster, project registry, and the **lab oracle** |
+| `<you>/murmurent_vault` | your private personal vault repo — your **personal oracle**, lab notebook, and maps-legends |
 | [`hallettmiket/murmurent_public`](https://github.com/hallettmiket/murmurent_public) | the global onboarding hub — institution directory + join intake |
+| `hallettmiket/murmurent_manuscript` (private) | the paper describing Murmurent's design |

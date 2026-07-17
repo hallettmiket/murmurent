@@ -104,7 +104,7 @@ seeds children.
 These are the canonical patterns Core Lead set up for `/data/lab_vm/`.
 The Tier 2 audit diffs observed ACLs against these and flags
 deviations. The PI sorts out which deviations are intentional
-(exception patterns like `bc_dcis/`) vs accidental drift.
+(exception patterns like `bc_brca/`) vs accidental drift.
 
 ### `<lab_vm>/raw/` — immutable policy
 
@@ -143,7 +143,7 @@ group can list/read everything under refined and can add files in
 subdirs (but not at the refined/ root). Files (vs subdirs) end up
 read-only for UWO Users since the `dg:Users:way` ACE is dir-only.
 
-### `<lab_vm>/refined/<exception>/` — locked-down project (e.g. `bc_dcis`)
+### `<lab_vm>/refined/<exception>/` — locked-down project (e.g. `bc_brca`)
 
 ```
 A:fd:<named-user-1>@example.edu : rwaDdxtTnNcCoy   # explicit user: full, inherited
@@ -174,7 +174,7 @@ A:fdi:OWNER@                 : rwaDdxtTnNcCoy   # whatever the future owner of a
 
 Other labs (`/data/lab_*`) appear to use the **default** group-rwx with
 similar inheritance — Core Lead only configured the strict templates for
-`/data/lab_vm/raw` and `/data/lab_vm/refined/bc_dcis`. The security
+`/data/lab_vm/raw` and `/data/lab_vm/refined/bc_brca`. The security
 dashboard scopes the Tier 2 audit to `<lab_vm>` for now; other lab
 trees aren't audited by us.
 
@@ -223,7 +223,7 @@ templates above. Rules:
 | <a id="RAW-DENY-DELETE-MISSING-01"></a>`RAW-DENY-DELETE-MISSING-01` | block | A directory under `raw/` is missing the `D:fdi:OWNER@:Dd` or `D:fdi:GROUP@:Dd` ACE — files there COULD be deleted. |
 | <a id="RAW-FILE-WRITABLE-01"></a>`RAW-FILE-WRITABLE-01` | block | A file under `raw/` has an OWNER@ or GROUP@ allow-ACE granting `w` or `a` (the raw template caps these at `rxtTcy`). |
 | <a id="REFINED-PATTERN-DRIFT-01"></a>`REFINED-PATTERN-DRIFT-01` | warn | The `refined/` ACL drifts from the canonical pattern (missing UWO Users read, missing Administrators-full, etc.). |
-| <a id="REFINED-EXCEPTION-DETECTED-01"></a>`REFINED-EXCEPTION-DETECTED-01` | info | A subdir of `refined/` has the locked-down pattern (GROUP@ stripped, named principals only). Surfaced for PI to vet whether intentional, like `bc_dcis/`. |
+| <a id="REFINED-EXCEPTION-DETECTED-01"></a>`REFINED-EXCEPTION-DETECTED-01` | info | A subdir of `refined/` has the locked-down pattern (GROUP@ stripped, named principals only). Surfaced for PI to vet whether intentional, like `bc_brca/`. |
 | <a id="ACL-UNEXPECTED-PRINCIPAL-01"></a>`ACL-UNEXPECTED-PRINCIPAL-01` | info | An ACE names a principal not in the expected template's allowlist. Could be a legitimate access grant or drift. |
 | <a id="SSHD-PWAUTH-01"></a>`SSHD-PWAUTH-01` | block | `sshd_config`'s `PasswordAuthentication` is not `no` (from `sshd -T`). |
 | <a id="SSHD-ROOTLOGIN-01"></a>`SSHD-ROOTLOGIN-01` | warn | `PermitRootLogin` is not `no` or `prohibit-password`. |
@@ -244,7 +244,7 @@ carries the core's short id in its `project` field. Categories:
 | <a id="CORE-RAW-FILE-WRITABLE-01"></a>`CORE-RAW-FILE-WRITABLE-01` | block | A file under a core's `raw/` has OWNER@/GROUP@ allow ACE granting `w`/`a`/`D`/`C`. |
 | <a id="CORE-RAW-UNEXPECTED-PRINCIPAL-01"></a>`CORE-RAW-UNEXPECTED-PRINCIPAL-01` | info | A directory under a core's `raw/` has a named-principal ACE outside the standard allowlist. For the registrar to vet. |
 | <a id="CORE-REFINED-PATTERN-DRIFT-01"></a>`CORE-REFINED-PATTERN-DRIFT-01` | warn | A core's `refined/` root drifts from the canonical template (missing OWNER+GROUP full, missing Users@example.edu read, etc.). |
-| <a id="CORE-REFINED-EXCEPTION-DETECTED-01"></a>`CORE-REFINED-EXCEPTION-DETECTED-01` | info | A subdir of a core's `refined/` has the bc_dcis-style locked-down pattern (GROUP@ stripped). Surfaced for the core leader to vet. |
+| <a id="CORE-REFINED-EXCEPTION-DETECTED-01"></a>`CORE-REFINED-EXCEPTION-DETECTED-01` | info | A subdir of a core's `refined/` has the `bc_brca`-style locked-down pattern (GROUP@ stripped). Surfaced for the core leader to vet. |
 | <a id="CORE-ACL-UNEXPECTED-PRINCIPAL-01"></a>`CORE-ACL-UNEXPECTED-PRINCIPAL-01` | info | A directory anywhere under a core's tree has a named-principal ACE outside the standard allowlist. |
 
 ---

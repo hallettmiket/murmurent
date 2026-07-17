@@ -52,7 +52,7 @@ you can ask any session to invoke them on your behalf):
   (personal + lab); pass `kind="all"` to also include the notebook tier, or
   a single tier name (`"personal"`, `"lab"`, `"notebook"`) to search just one.
   An empty query with filters returns everything matching those filters
-  (e.g. "show me every `dcis_*` entry").
+  (e.g. "show me every `brca_*` entry").
 - `oracle_get(path)` — read one entry in full (with body) by its absolute
   path. Notebooks tolerate missing frontmatter; personal and lab entries
   are refused if they don't parse as valid frontmatter.
