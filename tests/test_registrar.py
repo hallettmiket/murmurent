@@ -92,7 +92,7 @@ def test_is_registrar_true_for_declared_handle(isolated):
     assert registrar.registrar_handle() == "the_pi"
     assert registrar.is_registrar("the_pi") is True
     assert registrar.is_registrar("@the_pi") is True
-    assert registrar.is_registrar("MHALLET") is True
+    assert registrar.is_registrar("THE_PI") is True
     assert registrar.is_registrar("bob") is False
 
 

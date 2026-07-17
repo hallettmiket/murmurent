@@ -91,7 +91,7 @@ def test_registrars_normalises_and_dedups(isolated):
     # @-prefixed, mixed case, duplicates → normalised list
     registrar.registry_path().parent.mkdir(parents=True)
     registrar.registry_path().write_text(
-        "version: 1\nregistrars: ['@MHallet', 'alice', '@the_pi']\nlabs: {}\n",
+        "version: 1\nregistrars: ['@The_pi', 'alice', '@the_pi']\nlabs: {}\n",
         encoding="utf-8",
     )
     assert registrar.registrars() == ["the_pi", "alice"]

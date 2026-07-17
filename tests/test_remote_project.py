@@ -74,7 +74,7 @@ def fake_ssh(monkeypatch):
 
 
 @pytest.fixture
-def lab-server(world):
+def lab_server(world):
     """Register a `lab-server` host so cmd_new_remote can resolve it."""
     _hosts.add(_hosts.Host(
         name="lab-server", kind="ssh", ssh_host="lab-server",
@@ -167,7 +167,7 @@ def test_read_remote_pointer_none_when_local_host(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_cmd_new_remote_writes_pointer_and_registry(world, lab-server, fake_ssh):
+def test_cmd_new_remote_writes_pointer_and_registry(world, lab_server, fake_ssh):
     remote_path = project_cmd.cmd_new_remote(
         "myproj",
         host_name="lab-server",
@@ -192,7 +192,7 @@ def test_cmd_new_remote_writes_pointer_and_registry(world, lab-server, fake_ssh)
     assert "remote_path: /home/the_pi/repos/myproj" in text
 
 
-def test_cmd_new_remote_sends_expected_command_over_ssh(world, lab-server, fake_ssh):
+def test_cmd_new_remote_sends_expected_command_over_ssh(world, lab_server, fake_ssh):
     project_cmd.cmd_new_remote(
         "myproj",
         host_name="lab-server",
@@ -231,7 +231,7 @@ def test_cmd_new_remote_local_host_refused(world):
     assert "local" in str(exc_info.value)
 
 
-def test_cmd_new_remote_needs_sensitivity(world, lab-server):
+def test_cmd_new_remote_needs_sensitivity(world, lab_server):
     with pytest.raises(click.ClickException) as exc_info:
         project_cmd.cmd_new_remote(
             "x", host_name="lab-server", members_csv="the_pi", sensitivity=None,
@@ -239,7 +239,7 @@ def test_cmd_new_remote_needs_sensitivity(world, lab-server):
     assert "sensitivity" in str(exc_info.value)
 
 
-def test_cmd_new_remote_ssh_unreachable_raises(world, lab-server, monkeypatch):
+def test_cmd_new_remote_ssh_unreachable_raises(world, lab_server, monkeypatch):
     """When the probe fails (e.g. ssh refuses connection), raise a clear error."""
     def fake_run(argv, **kwargs):
         return subprocess.CompletedProcess(argv, 255, stdout="", stderr="permission denied")
@@ -252,7 +252,7 @@ def test_cmd_new_remote_ssh_unreachable_raises(world, lab-server, monkeypatch):
     assert "cannot reach host" in str(exc_info.value)
 
 
-def test_cmd_new_remote_remote_failure_propagates(world, lab-server, monkeypatch):
+def test_cmd_new_remote_remote_failure_propagates(world, lab_server, monkeypatch):
     """When the remote murmurent project new fails, surface stderr to the user."""
     state = {"call": 0}
 
@@ -272,7 +272,7 @@ def test_cmd_new_remote_remote_failure_propagates(world, lab-server, monkeypatch
     assert "boom" in str(exc_info.value)
 
 
-def test_cmd_new_remote_refuses_to_overwrite_non_pointer(world, lab-server, fake_ssh):
+def test_cmd_new_remote_refuses_to_overwrite_non_pointer(world, lab_server, fake_ssh):
     """If ~/repos/<name>/ already exists without the marker, refuse."""
     existing = world["repos"] / "myproj"
     existing.mkdir(parents=True)
