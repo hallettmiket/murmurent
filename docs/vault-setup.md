@@ -4,16 +4,31 @@ Your **personal vault** is a private GitHub repo, `murmurent_vault`, on your own
 GitHub account. It backs your Murmurent Tier-II notes — your `oracle/`,
 `lab-notebook/`, and `maps-legends/` — so they're version-controlled, survive a
 lost laptop, and stay in sync across your machines. Murmurent creates the repo
-for you; you never make it by hand.
+for you.
 
-New members are offered this during `murmurent init`. **This page is for members
-who were onboarded before the vault feature and already have an Obsidian vault
-with notes in it** — you *adopt* your existing vault rather than starting fresh.
+New members are offered a vault during `murmurent init`. If you already have an
+Obsidian vault with notes in it, you *adopt* that existing vault rather than
+starting fresh (see the two cases below).
 
 ## Before you start
 
-- **Authenticate GitHub CLI:** `gh auth login` (the vault is created on *your*
-  GitHub, so Murmurent acts as you).
+- **Authenticate the GitHub CLI.** The vault is created on *your* GitHub
+  account, so Murmurent acts as you. Run `gh auth login` and answer the prompts:
+
+  ```text
+  ? What account do you want to log into?  GitHub.com
+  ? What is your preferred protocol for Git operations?  HTTPS
+  ? Authenticate Git with your GitHub credentials?  Yes
+  ? How would you like to authenticate GitHub CLI?  Login with a web browser
+  ! First copy your one-time code: XXXX-XXXX
+    Press Enter to open github.com in your browser...
+  ```
+
+  Confirm it worked:
+
+  ```bash
+  gh auth status   # should show: Logged in to github.com as <your-username>
+  ```
 - Have Murmurent installed and up to date (`murmurent --version`).
 
 ## Two cases

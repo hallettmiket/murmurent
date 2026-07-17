@@ -4,6 +4,18 @@ First-time Murmurent installation on a new machine.
 
 ## Per-machine wiring
 
+For most users, one command does all of this automatically — see the
+[README](https://github.com/hallettmiket/murmurent/blob/main/README.md):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts/bootstrap.sh | bash
+```
+
+This installs the `murmurent` command and wires the shared agents,
+rules, and skills into `~/.claude/`. The numbered steps below are
+what that script automates — shown here for transparency, and for
+anyone who wants to run them by hand.
+
 ```bash
 # 1. Clone the commons.
 git clone git@github.com:hallettmiket/murmurent.git ~/repos/murmurent
@@ -40,8 +52,13 @@ What each step does:
 
 ## Per-project wiring
 
-These are two different actions on the Repos panel — see
-[`ready_vs_projects.md`](ready_vs_projects.md) for the full picture.
+Per-machine wiring (above) installs the `murmurent` command and the
+commons once, on a given machine. Per-project wiring is a separate,
+repeatable step: once `murmurent` is installed, the dashboard's Repos
+panel offers two different actions for turning an individual repo
+clone into something Murmurent-aware. See
+[`ready_vs_projects.md`](ready_vs_projects.md) for the full picture
+on how "ready" and "project" differ.
 
 **↑ adopt** (existing clone, not yet part of a project) calls
 [`core.adopt`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/adopt.py)
@@ -76,20 +93,27 @@ which writes:
 
 Existing files are preserved on re-run, on both paths.
 
+Neither `CHARTER.md` nor "+ install" is deprecated or removed — both
+are current. `CHARTER.md` is a legacy-shaped bootstrap marker;
+`.murmurent.yaml` is the current one. `murmurent repo upgrade`
+converts a repo from the former to the latter without otherwise
+changing the project record, so a `CHARTER.md`-marked repo is
+legacy-but-fully-supported, not broken or out of date.
+
 ## Remote host setup
 
-If you also run Murmurent on a remote (e.g. lab-server):
+If you also run Murmurent on a remote (e.g. `<my_server>`):
 
 ```bash
 # Add the host to the local registry (dashboard Machines panel,
 # or ~/.murmurent/hosts.yaml directly).
-murmurent host add lab-server --ssh-host lab-server ...
+murmurent host add my-server --ssh-host <my_server> ...
 
 # Clone murmurent on the remote so the commons agents resolve there.
-scripts/install_remote.sh lab-server
+scripts/install_remote.sh my-server
 ```
 
-After that, `↑ adopt` works for `• clone` rows on lab-server in the
+After that, `↑ adopt` works for `• clone` rows on `<my_server>` in the
 Repos panel (writes CHARTER + bootstrap + chrome on the remote
 over a single batched SSH session). This is readiness only, same as a
 local adopt — no project is created; the remote script predates
@@ -105,13 +129,64 @@ grep murmurent-oracle ~/.claude/settings.json  # MCP registered
 murmurent --version
 ```
 
-## Deploying a centre on a dedicated Ubuntu server
+## Setting up a lab (for PIs)
+
+The steps above get one person, one repo, or one remote host wired
+into Murmurent. Standing up a whole lab's own governance and
+communication is a separate, one-time job for the PI:
+
+- `murmurent pi-init <lab>` scaffolds the lab's governance repo,
+  `murmurent_lab_mgmt_<lab>`, locally and pins it. The PI then
+  creates a private GitHub repo of the same name and pushes it. See
+  [`lab_mgmt.md`](lab_mgmt.md) for what this repo contains and who
+  needs access to it.
+- `murmurent group-slack-setup <lab>` creates the lab's Slack channel
+  and wires up the bot token. See
+  [`group_slack_setup.md`](group_slack_setup.md) for the OAuth scopes
+  and token details.
+- Registering the lab with an existing centre (rather than running
+  your own) is a join-request flow addressed to the centre's
+  mayor/registrar — see [`connect_to_hub.md`](connect_to_hub.md) and
+  the README's
+  ["\[PIs\] If you are a PI registering your lab or core with an existing centre"](https://github.com/hallettmiket/murmurent/blob/main/README.md)
+  section.
+
+## Resetting a machine
+
+The `/murmurent-reset` skill (run inside a Claude Code session) backs
+up `~/.murmurent` first — always — then resets this machine's
+Murmurent state to a fresh start, so `murmurent centre-init` runs as
+first-run again. Use it for a clean slate, or to start over from a
+fresh copy of the repo.
+
+It is tiered by how much it touches:
+
+- **`centre`** (default, least destructive) — resets only the centre
+  registry.
+- **`install`** — also reinstalls the `murmurent` tool and re-runs
+  setup.
+- **`full`** — also clears machine-local caches.
+- **`data`** — clears all data you entered, while keeping key
+  material.
+
+Every tier supports `--dry-run` to preview what would change, and
+credentials plus other projects' installs are protected behind
+explicit `--nuke`-style flags, so an ordinary reset can't accidentally
+wipe them.
+
+## Deploying a centre on a dedicated Linux server
 
 For a brand-new centre, the **mayor** typically runs `murmurent
 centre-init` on their laptop (the GUI wizard at `/registrar` collects
 the centre profile). Once bootstrap succeeds, the centre data lives
 under `~/.murmurent/lab_info/`. To move that centre to a permanent
-Ubuntu server so it can accept join requests around the clock:
+server so it can accept join requests around the clock:
+
+This deployment is not truly Ubuntu-specific — it assumes a
+systemd-based Linux host. The commands below (`adduser`, `apt`,
+`pipx`) are shown for Ubuntu/Debian as a concrete, copy-pasteable
+example; substitute the equivalent user-management and package
+commands for another distribution.
 
 ### 1. On the laptop — push lab_info to a private git remote
 
@@ -121,7 +196,7 @@ git remote add origin git@<your-git-host>:<your-org>/lab_info.git
 git push -u origin main
 ```
 
-### 2. On the Ubuntu server — clone + install
+### 2. On the server — clone + install
 
 Run as root (or via sudo). Replace placeholders to match your install.
 
@@ -185,8 +260,10 @@ credentials / GitHub OAuth are future upgrades.)
 
 ### 3. Pulling lab_info updates
 
-The centre data is a normal git repo. To sync edits made on the
-laptop (e.g. profile updates the registrar makes from `/registrar`):
+`~/.murmurent/lab_info/` is the centre registry — the same one
+`centre-init` creates in step 1 above — and it is a normal git repo.
+To sync edits made on the laptop (e.g. profile updates the registrar
+makes from `/registrar`):
 
 ```bash
 # On the laptop:

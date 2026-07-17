@@ -63,6 +63,7 @@ nav:
       - "Murmurent-ready vs. a project": ready_vs_projects.md
   - Working day to day:
       - Creating a project (intra & inter-group): project_creation.md
+      - Cross-group services (SEAs): seas.md
       - How Murmurent remembers (the three tiers): memory.md
       - The Oracle (personal & lab memory): oracle-workflow.md
       - Vault vignettes (step by step):

@@ -115,10 +115,17 @@ than re-instructing it every session.
 
 ## Adversary
 
-The team's internal critic. It checks for data leakage, verifies
-splitting strategy respects structure in the data (not naive random
-splitting), demands proper cross-validation, and challenges any result
-that looks too good. It distinguishes `OBSERVED:` claims (verified by
+The team's internal critic. It checks for data leakage and verifies that
+the train/test split respects structure in the data rather than
+splitting individual rows at random. Concretely: when a dataset has
+grouped structure — for example several cells or samples drawn from the
+same patient — splitting rows at random can place data from the same
+patient in both the training and test sets. That leaks information
+between the two sets and makes reported performance look better than it
+really is; the correct approach is to split by the grouping unit (by
+patient), not by row. The Adversary also demands proper cross-validation
+and challenges any result that looks too good. It distinguishes
+`OBSERVED:` claims (verified by
 running code or reading files) from `SPECULATED:` ones, and never
 presents the latter as fact. Adversarial critique between agents reduces
 hallucinations, improves factual validity, and increases the depth of
@@ -140,7 +147,12 @@ project HTML report, produces ROC curves, confusion matrices, SHAP
 plots and more, and insists every figure is legible, labelled, and
 versioned. The Artist is shared across a group by design, giving a lab
 a common look and feel across outputs even as different HQP extend it
-with new plotting techniques over time.
+with new plotting techniques over time. Its visual defaults — colour
+schemes, fonts, and figure/presentation conventions — are configurable,
+the same way every agent's defaults are (see the intro above): a lab can
+point the Artist at, say, a university's brand palette and fonts and its
+presentation best-practice guidelines, so every output the group
+produces carries a consistent look.
 
 **Verdict vocabulary:** `Rendered / Skipped / Failed — <one-line what>`
 
@@ -152,10 +164,11 @@ with new plotting techniques over time.
 
 ## Conscience
 
-An equity, diversity, inclusion, and decolonization (EDID) reviewer. It
-performs sex- and gender-based analysis (SGBA) of experimental designs,
-text, and literature, and flags colonial framing, exclusionary language,
-and narrow sampling, recommending concrete revisions. Its Indigenization
+The Conscience is both an equity, diversity, inclusion, and
+decolonization (EDID) reviewer and a sex- and gender-based analysis
+(SGBA) agent. It reviews experimental designs, text, and literature for
+both concerns, and flags colonial framing, exclusionary language, and
+narrow sampling, recommending concrete revisions. Its Indigenization
 and decolonization guidance is grounded specifically in *Pulling
 Together: A Guide for Curriculum Developers* (BCcampus, 2018), a
 Canadian-context open resource, and it can draw on Tier-II oracle
@@ -172,17 +185,42 @@ on sex chromosomes) rather than only after the fact.
 > phenotype from a single-ancestry sample; let's name the population
 > explicitly and note the generalisability limit.
 
+> **You:** Conscience, check the abstract before I submit the grant.
+>
+> **Conscience:** Flagged — "suffers from" and "confined to a
+> wheelchair" are exclusionary/ableist phrasing; use "has" and "uses a
+> wheelchair" instead.
+
+> **You:** Conscience, read the background section of this methods
+> paper.
+>
+> **Conscience:** Flagged — the background frames the sampled community
+> as a passive source of specimens rather than a partner; name the
+> community, credit their contribution, and note any data-sharing
+> agreement in place.
+
+> **You:** Conscience, does this analysis need SGBA?
+>
+> **Conscience:** Flagged — the differential-expression list includes
+> several X-linked genes but the model doesn't stratify or adjust by
+> sex; re-run stratified by sex or add sex as a covariate before
+> interpreting those hits.
+
+> **You:** Conscience, review this cohort table for the manuscript.
+>
+> **Conscience:** Flagged — the cohort table never reports a sex/gender
+> breakdown; add it so readers can judge whether the sample supports
+> sex-stratified conclusions.
+
 ## Lawyer
 
-Patent and IP counsel for the centre (agent body still speaks in the
-voice of its former name, Saul Goodman; the canonical agent name is
-now `lawyer`). Searches global patent databases (Google Patents,
-Espacenet, USPTO, PatentScope, CIPO, DEPATISnet) for genes, proteins,
-molecules, and devices, determines patent status, flags freedom-to-operate
-concerns, and routes real FTO decisions through the Research &
-Innovation Office rather than deciding them itself. Alongside the
-Conscience, this brings regulatory and IP concerns into decision-making
-during the work, not after.
+Patent and IP counsel for the centre. Searches global patent databases
+(Google Patents, Espacenet, USPTO, PatentScope, CIPO, DEPATISnet) for
+genes, proteins, molecules, and devices, determines patent status, flags
+freedom-to-operate concerns, and routes real FTO decisions through the
+Research & Innovation Office rather than deciding them itself. Alongside
+the Conscience, this brings regulatory and IP concerns into
+decision-making during the work, not after.
 
 **Verdict vocabulary:** `Clear / Conflict / Unknown — <one-line on patent landscape>`
 
@@ -198,10 +236,13 @@ It onboards new members (SSH keys, repo clone, CC config, Obsidian
 vault), scaffolds new projects (GitHub repo, Slack channel, `raw/` +
 `refined/` dirs), maintains the installations registry, and
 health-checks existing environments — always requesting PI sign-off
-before touching shared infrastructure, and defaulting to `dry_run`. It
-is dedicated to the installation and verification of all administrative
-protocols, periodically auditing that channels, repos, disk space, and
-membership stay correctly wired.
+before touching shared infrastructure. By default it first previews the
+actions it would take (creating a channel, cloning a repo, setting up
+directories) and waits for explicit confirmation before making any
+change, so nothing happens to shared infrastructure without a human
+approving it first. It is dedicated to the installation and
+verification of all administrative protocols, periodically auditing
+that channels, repos, disk space, and membership stay correctly wired.
 
 **Verdict vocabulary:** `Provisioned / Skipped / Failed — <one-line on what>`
 
@@ -213,14 +254,21 @@ membership stay correctly wired.
 
 ## Centre Cable Guy
 
-The centre-wide analogue of Cable Guy: a singleton that reconciles
-cross-lab infrastructure — per-project filesystem ACLs on shared
-servers, cross-lab Slack/GitHub membership, and the drift-detection loop
-that diffs each project's declared membership against actual state and
-applies the deltas. It runs on the registrar's machine, not any PI's,
-and always requests registrar sign-off before writing to shared infra.
-This is the thirteenth reference agent — the one that operates at
-centre scope rather than individual/group/lab scope.
+The centre-wide analogue of Cable Guy. Every lab runs its own copy of
+Cable Guy, but there is exactly one Centre Cable Guy for the whole
+centre — a **singleton** — running on the registrar's machine rather
+than any PI's. It reconciles cross-lab infrastructure: per-project
+filesystem ACLs on shared servers and cross-lab Slack/GitHub
+membership. It does this through a drift-detection loop: **drift** is
+the gap between a project's declared, intended membership and
+configuration and the actual state of Slack, GitHub, and the
+filesystem — for example a member who was removed from a project's
+roster but never removed from its Slack channel. The reconcile loop
+diffs declared state against actual state and applies the corrections
+needed to close that gap. It always requests registrar sign-off before
+writing to shared infra. This is the thirteenth reference agent — the
+one that operates at centre scope rather than individual/group/lab
+scope.
 
 **Verdict vocabulary:** `Provisioned / Skipped / Failed — <one-line on what>`
 (shares Cable Guy's vocabulary; also emits `Reconciled — N deltas
@@ -233,8 +281,8 @@ applied.` after a reconcile pass)
 
 ## Receptionist
 
-Routes inbound cross-group SEA (shareable experiments/assays) requests
-to the right member. It watches the lab's inbound queue, matches each
+Routes inbound cross-group [SEA](seas.md) (shareable experiments/assays)
+requests to the right member. It watches the lab's inbound queue, matches each
 request against the SEA catalog to confirm the offering still stands
 and pull the contact handle, and notifies that person on Slack — and
 re-notifies gently if a request sits pending more than 24 hours. It
@@ -259,6 +307,11 @@ administrative head. It never looks inside a lab's own projects,
 notebooks, SEAs, or personal Oracles: labs are opaque units from its
 vantage point. It also acts as the centre's certificate authority,
 issuing PI cards signed with the centre root key and publishing the CRL.
+Beyond the live registry, the Registrar also maintains centre-level
+institutional memory over time — for example, remembering which
+institutional datasets of lasting value the centre holds, who curates
+each one, and their provenance, so that knowledge persists across
+personnel changes rather than leaving with whoever originally set it up.
 
 **Verdict vocabulary:** `Recorded / Conflict / Skipped — <one-line on what>`
 
@@ -272,12 +325,17 @@ issuing PI cards signed with the centre root key and publishing the CRL.
 
 Scans diffs and outgoing artefacts for secrets, restricted paths, and
 PHI patterns before they leave the lab. It checks for credentials, API
-tokens, and key material; refuses any PR that touches `raw/`; for
-clinical-sensitivity projects, scans for PHI-shaped patterns (OHIP/MRN/
-SIN-like strings, DOB-near-name proximity); and treats
-`~/.murmurent/keys/**` as never-commit territory. Always invoked on PRs
-that touch shared code or data, and jointly maintains identity-key
-hygiene alongside the Cable Guy.
+tokens, and key material; for clinical-sensitivity projects, scans for
+PHI-shaped patterns (OHIP/MRN/SIN-like strings, DOB-near-name
+proximity); and treats `~/.murmurent/keys/**` as never-commit
+territory. Under Murmurent's default data layout (see
+[`memory.md`](memory.md)), `raw/` holds a project's original inputs and
+is immutable: nothing may modify or delete files there. The Security
+Guard helps enforce that rule at the data-folder level by refusing any
+PR that would modify `raw/`, complementing the `raw_guard` hook that
+blocks the same kind of change at the tool layer (before a write even
+reaches disk). Always invoked on PRs that touch shared code or data, and
+jointly maintains identity-key hygiene alongside the Cable Guy.
 
 **Verdict vocabulary:** `Clear / Concerns / Blocked — <one-line why>`
 
