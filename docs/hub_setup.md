@@ -1,23 +1,23 @@
-# The public directory hub — maintainer / mayor notes
+# The public directory hub: maintainer / mayor notes
 
 Maintainer-facing notes for the global `murmurent_public` repo. It does **not**
-live on the hub itself — the hub's own README
+live on the hub itself: the hub's own README
 ([`docs/murmurent_public/README.md`](https://github.com/hallettmiket/murmurent/blob/main/docs/murmurent_public/README.md)) is kept trivially
 simple for prospective members.
 
 ## What the hub is (and is NOT)
 
-A **single global repository** — `github.com/hallettmiket/murmurent_public` — that
+A **single global repository** (`github.com/hallettmiket/murmurent_public`) that
 is a **public directory only**: a list of participating institutions and, for
 each, the **registrar's contact email**. That's the entire function.
 
 **It collects nothing.** GitHub Issues are **disabled** on the repo, and there is
-no form. Joining is by **email to the registrar** — a prospective member's
+no form. Joining is by **email to the registrar**: a prospective member's
 netname, institution, role, PI, justification, etc. never touch GitHub. This is
 deliberate: we don't want a permanent, publicly-archived pile of "who wants to
 join what, where" across institutions.
 
-> The hub is **not** where the Murmurent code lives — that's
+> The hub is **not** where the Murmurent code lives: that's
 > [`github.com/hallettmiket/murmurent`](https://github.com/hallettmiket/murmurent)
 > (public, cloned via `bootstrap.sh`). You don't need the hub to get the code;
 > you need it only to look up who to email.
@@ -39,7 +39,7 @@ gh repo edit hallettmiket/murmurent_public --enable-issues=false   # no data col
 ## Listing a centre in the directory (each mayor, once)
 
 When an institution goes live, its mayor adds **one row** to the hub's
-[`README.md`](https://github.com/hallettmiket/murmurent_public/blob/main/README.md) table — institution, a short description
+[`README.md`](https://github.com/hallettmiket/murmurent_public/blob/main/README.md) table: institution, a short description
 (centre / department / group name), and the **join email** (`join_email` on the
 centre, set via `murmurent centre-init --join-email …` or the `/registrar` profile
 editor). Nothing else is published.
@@ -59,7 +59,7 @@ editor). Nothing else is published.
    the `/registrar` dashboard). Provisioning (Slack/GitHub/FS) fires on approval.
 
 Everything about the requester stays on the registrar's own machine + the
-centre's private `lab_info` — never on GitHub.
+centre's private `lab_info`: never on GitHub.
 
 See [`docs/setup.md`](setup.md) for the full centre deployment runbook and
 [`docs/slack_setup.md`](slack_setup.md) for the Slack fabric.

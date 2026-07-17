@@ -14,7 +14,7 @@ The launcher (macOS only) enumerates displays via
 `AppKit.NSScreen`. If a second monitor is attached, VSCode opens
 there; otherwise on the laptop screen. Either way the window is
 sized to 80% of the chosen display, centred. Subsequent opens
-restore VSCode's persisted layout — **arrange the quadrants once
+restore VSCode's persisted layout: **arrange the quadrants once
 and they stick**.
 
 The dashboard's *open workspace* button calls the same launcher
@@ -28,7 +28,7 @@ The dashboard's *open workspace* button calls the same launcher
 | TL | Claude Code (VSCode extension) |
 | TR | Editor area |
 | BL | tmux shell |
-| BR | `tail -F ~/.murmurent/agents.log` — live subagent reporter |
+| BR | `tail -F ~/.murmurent/agents.log`: live subagent reporter |
 
 One-time setup per project:
 

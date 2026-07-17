@@ -14,7 +14,7 @@ mean. Knowing which is which prevents 90 % of confusion:
 The dashboard's "Lab notebook · today" panel shows the **daily journal**.
 The PI sees your **experimental notebooks** the moment you `murmurent push`.
 
-## The daily journal — your vault's `lab-notebook/` folder
+## The daily journal: your vault's `lab-notebook/` folder
 
 ### Set up once
 
@@ -22,10 +22,10 @@ There's nothing to create by hand. The dashboard resolves where the daily
 journal lives, in this order:
 
 1. `$MURMURENT_NOTEBOOK_DIR` if you set it (power users / non-Obsidian setups).
-2. **`<your-Obsidian-vault>/lab-notebook/`** — the normal case once you have a
+2. **`<your-Obsidian-vault>/lab-notebook/`**: the normal case once you have a
    vault registered, so entries sit alongside the rest of your notes and the
    `obsidian://` link works.
-3. `~/lab-notebook/` — a fallback only when no vault is registered.
+3. `~/lab-notebook/`: a fallback only when no vault is registered.
 
 The first time it resolves to the vault path, any pre-existing
 `~/lab-notebook/*.md` files are migrated in for you (one-time, logged).
@@ -62,14 +62,14 @@ export MURMURENT_NOTEBOOK_EDITOR="vim {path}"
 
 ### Sharing daily journals
 
-The daily journal is **personal by default** — it never leaves your
+The daily journal is **personal by default**: it never leaves your
 laptop unless you explicitly publish from it. When you have a finding,
 decision, or note that the lab should see, copy that section into:
 
 - A **finding** in the project repo: `<project>/findings/YYYY-MM-DD_topic.md`,
-  then `murmurent push <project>` — visible to project members on next pull.
+  then `murmurent push <project>`, visible to project members on next pull.
 - An **oracle entry** for lab-wide knowledge: stage a draft with the
-  Oracle agent, then `murmurent oracle publish <slug>` — surfaces in the
+  Oracle agent, then `murmurent oracle publish <slug>`, surfaces in the
   dashboard's "Group oracle · recent" panel for everyone (see
   [oracle-workflow.md](oracle-workflow.md)).
 
@@ -77,7 +77,7 @@ Don't push your raw daily journal. It has half-formed thoughts.
 
 ---
 
-## The experimental notebook — `<project>/exp/<n>_<slug>/notebook.md`
+## The experimental notebook: `<project>/exp/<n>_<slug>/notebook.md`
 
 This is your **lab notebook for one experiment**, in the lab's classic
 sense (paper notebook → digital). One experiment = one folder under
@@ -108,7 +108,7 @@ $MURMURENT_LAB_VM_ROOT/raw/brca_sc_tutorial/3_titration_v3/      (read-only afte
 $MURMURENT_LAB_VM_ROOT/refined/brca_sc_tutorial/3_titration_v3/  (analysis outputs)
 ```
 
-### `notebook.md` — what to write
+### `notebook.md`: what to write
 
 Required frontmatter:
 
@@ -153,7 +153,7 @@ Export PNG/PDF to `sketches/`. Same embed syntax:
 **Screenshots (FACS plot, software output):**
 
 `sketches/` is fine. If it's instrument-derived, prefer `murmurent
-experiment ingest` — the file lands in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/instrument_outputs/`
+experiment ingest`: the file lands in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/instrument_outputs/`
 with checksums and the notebook's `instrument_outputs:` list updates
 automatically.
 
@@ -231,7 +231,7 @@ sections are present and writes a final summary into the project's
 | Add a screenshot of an instrument | `murmurent experiment ingest <project> <slug> <source-dir>` |
 | Update refined-data checksums | `murmurent push <project> --refined <slug>` |
 | Make my notebook visible to the PI | `murmurent push <project>` (or `--finalize` for a PR) |
-| Promote a finding lab-wide | `murmurent oracle publish <slug>` (stage the draft first — see [oracle-workflow.md](oracle-workflow.md)) |
+| Promote a finding lab-wide | `murmurent oracle publish <slug>` (stage the draft first, see [oracle-workflow.md](oracle-workflow.md)) |
 
 ---
 

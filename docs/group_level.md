@@ -3,7 +3,7 @@ date: 2026-05-05
 tags: [murmurent, design]
 ---
 
-# Murmurent — Group-Level Design
+# Murmurent: Group-Level Design
 
 > Working draft. Conversation between Mike Hallett and Claude Code, started 2026-05-05.
 > Destined to become a Claude Code system prompt for group-level operations.
@@ -14,18 +14,18 @@ tags: [murmurent, design]
 > **⚠ Project model superseded (2026-07):** the project-birth flow described
 > below (PI approval scaffolds a fresh repo + charter) predates the
 > certificate-based model. Projects are now a set of *existing* repos +
-> machines + cryptographically certified members, with the creator as lead —
+> machines + cryptographically certified members, with the creator as lead:
 > [project_creation.md](project_creation.md) is the source of truth.
 
 ## Taxonomy
 
 The four-level taxonomy used throughout this document:
 
-- **Project** — highest unit. Single **lead** (often the PI but removable). Spans one or more repos. Has a charter.
-- **Repo** — a lab-convention repository (`~/repos/<name>/` with `exp/<n>_<slug>/` inside). One or more per project.
-- **Experiment** — a unit of work in a repo (`exp/<n>_<slug>/`). Has a notebook entry.
-- **SEA** — atomic, callable unit of service (Skill, Experiment-as-event, or Analysis). Multiple per experiment; sometimes free-standing.
-- **Squad** — the subgroup that performs a project, experiment, or SEA. Has a lead and members. Nestable.
+- **Project**: highest unit. Single **lead** (often the PI but removable). Spans one or more repos. Has a charter.
+- **Repo**: a lab-convention repository (`~/repos/<name>/` with `exp/<n>_<slug>/` inside). One or more per project.
+- **Experiment**: a unit of work in a repo (`exp/<n>_<slug>/`). Has a notebook entry.
+- **SEA**: atomic, callable unit of service (Skill, Experiment-as-event, or Analysis). Multiple per experiment; sometimes free-standing.
+- **Squad**: the subgroup that performs a project, experiment, or SEA. Has a lead and members. Nestable.
 
 (History note: an earlier draft used "investigation" as the highest unit; that term has been replaced by "project". When reviewing older artefacts that still say "investigation", read it as "project".)
 
@@ -49,25 +49,25 @@ A **group** g consists of people p1...pn, usually with one PI. Members participa
 
 A group operates across three classes of repo. Each plays a distinct role; mixing scope across them is a smell.
 
-- **Murmurent repo** — center-wide; holds the agent registry under `guilds/<group>/agents/` and the install tooling.
-- **Lab-management repo** — group-scoped; holds the role registry (`roles/`), inventory (`inventory/`), audit logs, the project registry, and group-wide protocols. One per group.
-- **Project repos** — project-scoped; one per active project. Holds `CHARTER.md`, `MEMBERS`, `exp/`, `src/`, `findings/`, etc. (the lab's standard project layout). Private to MEMBERS.
+- **Murmurent repo**: center-wide; holds the agent registry under `guilds/<group>/agents/` and the install tooling.
+- **Lab-management repo**: group-scoped; holds the role registry (`roles/`), inventory (`inventory/`), audit logs, the project registry, and group-wide protocols. One per group.
+- **Project repos**: project-scoped; one per active project. Holds `CHARTER.md`, `MEMBERS`, `exp/`, `src/`, `findings/`, etc. (the lab's standard project layout). Private to MEMBERS.
 
 ## Three layers within the group
 
-1. **Agent registry** — definitions for every agent the group recognises, version-controlled in the Murmurent repo at `guilds/<group>/agents/`.
-2. **Role registry** — group-level roles, each with cardinality (singleton / quota / open) and current operator(s). Lives in the lab-management repo. Only the PI mutates assignments.
-3. **Workspaces** — each member's local Claude Code environment, with the agents they have chosen to install, free to evolve on their own machine (subject to the freeze cascade below).
+1. **Agent registry**: definitions for every agent the group recognises, version-controlled in the Murmurent repo at `guilds/<group>/agents/`.
+2. **Role registry**: group-level roles, each with cardinality (singleton / quota / open) and current operator(s). Lives in the lab-management repo. Only the PI mutates assignments.
+3. **Workspaces**: each member's local Claude Code environment, with the agents they have chosen to install, free to evolve on their own machine (subject to the freeze cascade below).
 
-## Agent classification — the freeze cascade
+## Agent classification: the freeze cascade
 
 Each agent has a **default freeze flag** in the registry. The effective flag for any given invocation cascades through three levels:
 
-1. **Registry default** — `frozen` or `personal`, set in the agent's frontmatter.
+1. **Registry default**: `frozen` or `personal`, set in the agent's frontmatter.
    - `frozen` for safety-critical agents whose drift would erode group consistency or compliance: `conscience`, `security_guard`, `adversary` when used in code review, anything that gates outgoing artefacts.
    - `personal` for stylistic agents where flavour is a feature: `artist`, often `bookworm`.
-2. **Role override** — when an agent is run as part of a role, the role can override the default. Example: `bookworm` is `personal` by default; the `bookworm_curator` role overrides to `frozen` because the curator's output is consumed by the rest of the group.
-3. **Bot pinning** — when the agent runs in a GitHub Actions context (or any other shared CI), it always runs `frozen`, regardless of the default or role flag. Bots write to shared artefacts; reproducibility forbids drift.
+2. **Role override**: when an agent is run as part of a role, the role can override the default. Example: `bookworm` is `personal` by default; the `bookworm_curator` role overrides to `frozen` because the curator's output is consumed by the rest of the group.
+3. **Bot pinning**: when the agent runs in a GitHub Actions context (or any other shared CI), it always runs `frozen`, regardless of the default or role flag. Bots write to shared artefacts; reproducibility forbids drift.
 
 Effective flag = bot pin (if applicable) ∨ role override (if applicable) ∨ registry default.
 
@@ -128,16 +128,16 @@ citation_style: nature
 audience: domain-experts
 ```
 
-The profile is **local** — never committed to the lab-management repo or any group artefact. It expresses individual taste, not group policy. The member's preferences travel with them across machines via whatever personal sync they prefer (dotfiles repo, manual copy).
+The profile is **local**: never committed to the lab-management repo or any group artefact. It expresses individual taste, not group policy. The member's preferences travel with them across machines via whatever personal sync they prefer (dotfiles repo, manual copy).
 
 #### Resolution order
 
 When an agent asks "what plotting library should I use?", the answer cascades:
 
-1. **Conversation override** ("use altair this time") — always wins.
-2. **Agent's local `defaults`** — set on the agent file directly.
-3. **Personal preferences profile** (`~/.claude/murmurent-preferences.yaml`) — fills in any standardised field not set in (2).
-4. **Registry default** (centre, optionally extended by guild) — `frozen` agents stop here; `personal` agents only fall through to here for fields not set in (2) or (3).
+1. **Conversation override** ("use altair this time"): always wins.
+2. **Agent's local `defaults`**: set on the agent file directly.
+3. **Personal preferences profile** (`~/.claude/murmurent-preferences.yaml`): fills in any standardised field not set in (2).
+4. **Registry default** (centre, optionally extended by guild): `frozen` agents stop here; `personal` agents only fall through to here for fields not set in (2) or (3).
 
 A member who sets `plotting: seaborn` once in their profile gets seaborn from every personal agent unprompted. To override for a single agent (e.g. `bookworm` uses pandoc-style citations regardless), they edit that agent's local copy.
 
@@ -153,7 +153,7 @@ All checks **warn rather than hard-reject**. The controlled vocabulary will lag 
 
 #### Why this layout
 
-A postdoc doing Bayesian work overrides `framework: pytorch` to `framework: pyro` in their personal `blacksmith.md` — agent-specific, free-form. They also set `prose_style: academic` once in their profile and every text-producing agent obeys — cross-cutting, standardised. The chemistry guild's `artist` may default to `plotnine` and add `mol_format: smiles` as a guild-level standardised field. None of these collide; each lives at the right scope.
+A postdoc doing Bayesian work overrides `framework: pytorch` to `framework: pyro` in their personal `blacksmith.md` (agent-specific, free-form). They also set `prose_style: academic` once in their profile and every text-producing agent obeys (cross-cutting, standardised). The chemistry guild's `artist` may default to `plotnine` and add `mol_format: smiles` as a guild-level standardised field. None of these collide; each lives at the right scope.
 
 ## Tier separation (recap)
 
@@ -167,18 +167,18 @@ We are explicitly NOT pursuing shared brains in this iteration.
 
 Six categories of member-to-member interaction:
 
-1. **Codev** — code development. Mediated by git and GitHub PR review. Already well-served by current practice; agents participate by reading/writing artefacts in the repo, not by talking to each other.
-2. **Experimentation** — wet or dry experiments produce data and observations.
-3. **Observation** — informal capture (transcripts, photos, voice memos), triaged from `inbox/` into project notes.
-4. **Literature** — papers read, summarised, cited. Lives in Zotero + bookworm.
-5. **Resource sharing** — reagents, equipment, datasets, lab inventory.
-6. **Discussion / mentoring** — Slack, meeting notes, instruction.
+1. **Codev**: code development. Mediated by git and GitHub PR review. Already well-served by current practice; agents participate by reading/writing artefacts in the repo, not by talking to each other.
+2. **Experimentation**: wet or dry experiments produce data and observations.
+3. **Observation**: informal capture (transcripts, photos, voice memos), triaged from `inbox/` into project notes.
+4. **Literature**: papers read, summarised, cited. Lives in Zotero + bookworm.
+5. **Resource sharing**: reagents, equipment, datasets, lab inventory.
+6. **Discussion / mentoring**: Slack, meeting notes, instruction.
 
-**Core insight:** agents do not need to talk to each other if they communicate through the artefacts they read and write. Git is the bus, the artefact is the message, the commit log is the audit trail. This generalises beyond codev — observations, literature notes, and SEA requests can all be artefact-mediated.
+**Core insight:** agents do not need to talk to each other if they communicate through the artefacts they read and write. Git is the bus, the artefact is the message, the commit log is the audit trail. This generalises beyond codev: observations, literature notes, and SEA requests can all be artefact-mediated.
 
 GitHub Actions bots are the natural mechanism for headless agent participation. The same agent definition that a member runs locally can be invoked by an Action on PR open / push / schedule, posting back through PR reviews, comments, or commits. No shared memory, no ad-hoc protocol, full audit trail for free.
 
-## Verb table — a typical day for a researcher
+## Verb table: a typical day for a researcher
 
 Verbs that touch the group (solo work in a personal vault is not listed). Initial set of 10; will grow. Each verb maps to a CLI command (see [[cli_manual]]).
 
@@ -201,7 +201,7 @@ For verbs not in this day-to-day table, see:
 - [Role transitions](#role-transitions) for `assign` / `revoke` / `transfer_role`.
 - [Project lifecycle](#project-lifecycle) for `birth` / `admit` / `release` / `pause` / `resume` / `end` / `archive_project`.
 - [Knowledge and continuity verbs](#knowledge-and-continuity-verbs) for `discuss` / `teach` / `freeze`.
-- `schedule` is intentionally not a Murmurent verb — calendars and a `calendar` MCP cover it.
+- `schedule` is intentionally not a Murmurent verb: calendars and a `calendar` MCP cover it.
 
 ## Privacy and access
 
@@ -212,9 +212,9 @@ For verbs not in this day-to-day table, see:
 
 ## Inventory and shared resources
 
-The reason inventory is hard in labs is not really structured-vs-unstructured — it's that nobody updates it. The tool that wins is the lowest-friction one to *update*. Obsidian-with-frontmatter is competitive with a spreadsheet on update friction and far better for: attaching catalog photos and vendor notes, versioning, grep-querying from CC, living in the same toolchain as everything else.
+The reason inventory is hard in labs is not really structured-vs-unstructured: it's that nobody updates it. The tool that wins is the lowest-friction one to *update*. Obsidian-with-frontmatter is competitive with a spreadsheet on update friction and far better for: attaching catalog photos and vendor notes, versioning, grep-querying from CC, living in the same toolchain as everything else.
 
-**Decision: inventory is semi-structured markdown in the lab-management repo.** Inventory is **group-scoped**, never project-scoped — every member needs access regardless of which project they are working on.
+**Decision: inventory is semi-structured markdown in the lab-management repo.** Inventory is **group-scoped**, never project-scoped: every member needs access regardless of which project they are working on.
 
 ### Layout
 
@@ -251,11 +251,11 @@ Body holds free-form notes: vendor link, MSDS, prep procedure, photos of label o
 
 The `provision` operation, and inventory access in general, are exposed as an **MCP server** (the `inventory` MCP), not as CLI subcommands. Any agent in any member's CC instance can call its tools:
 
-- `inventory_list(filter)` — list reagents matching a filter (e.g. `--low`, `--expiring 30`).
-- `inventory_show(name)` — return frontmatter + body of one reagent.
-- `inventory_provision(plan_path)` — compute `plan ∩ inventory`, report gaps and expiring lots.
-- `inventory_set(name, fields)` — *lab_manager only* — update fields, auto-bump `last_updated`.
-- `inventory_order(name)` — *lab_manager only* — open an order issue in the lab-management repo.
+- `inventory_list(filter)`: list reagents matching a filter (e.g. `--low`, `--expiring 30`).
+- `inventory_show(name)`: return frontmatter + body of one reagent.
+- `inventory_provision(plan_path)`: compute `plan ∩ inventory`, report gaps and expiring lots.
+- `inventory_set(name, fields)` (*lab_manager only*): update fields, auto-bump `last_updated`.
+- `inventory_order(name)` (*lab_manager only*): open an order issue in the lab-management repo.
 
 The MCP wraps the markdown files. Permissions are enforced by the MCP server (read = group, write = `lab_manager`); the lab-management repo's branch protection is the second line of defence for write paths that bypass the MCP.
 
@@ -287,7 +287,7 @@ If the lab outgrows markdown (≥1000 items, multiple writers per day, complex q
 
 ## Project lifecycle
 
-A project has a lifecycle of distinct events. Each event is auditable and produces specific artefacts. The lifecycle is intentionally short — it has just enough structure to make access, attribution, and archival unambiguous.
+A project has a lifecycle of distinct events. Each event is auditable and produces specific artefacts. The lifecycle is intentionally short: it has just enough structure to make access, attribution, and archival unambiguous.
 
 ### Birth
 
@@ -307,7 +307,7 @@ A project has a lifecycle of distinct events. Each event is auditable and produc
 
 ### Pause / Resume
 
-- A project can be marked **inactive** without ending — useful for waiting on data, an external collaborator, or a cycle gap.
+- A project can be marked **inactive** without ending: useful for waiting on data, an external collaborator, or a cycle gap.
 - Repo stays open, no new pushes expected, ACL unchanged. **resume** is a single audit event with no MEMBERS reset.
 
 ### End
@@ -382,7 +382,7 @@ Per the lab's data-storage rule, data does **not** live in the repo:
 
 The notebook entry links to data; it never holds it.
 
-### `notebook.md` — required frontmatter
+### `notebook.md`: required frontmatter
 
 | Field | Type | Notes |
 |---|---|---|
@@ -426,9 +426,9 @@ For raw instrument data: `murmurent experiment ingest <project> <exp> <source>` 
 
 Instrument export folders rarely contain only true raw data. They typically mix:
 
-- **True raw** — `scan_001.czi`, `run_001.fastq.gz`. Goes to `$MURMURENT_LAB_VM_ROOT/raw/<project>/<experiment>/`, immutable.
-- **Instrument-derived** — thumbnails, summary PDFs, QC HTML reports. Goes to `$MURMURENT_LAB_VM_ROOT/refined/<project>/<experiment>/instrument_outputs/`. Stays writable (regeneratable).
-- **Ambiguous** — metadata XML, software-aligned BAMs, instrument-software overlays. Depends on the instrument and the lab's convention.
+- **True raw**: `scan_001.czi`, `run_001.fastq.gz`. Goes to `$MURMURENT_LAB_VM_ROOT/raw/<project>/<experiment>/`, immutable.
+- **Instrument-derived**: thumbnails, summary PDFs, QC HTML reports. Goes to `$MURMURENT_LAB_VM_ROOT/refined/<project>/<experiment>/instrument_outputs/`. Stays writable (regeneratable).
+- **Ambiguous**: metadata XML, software-aligned BAMs, instrument-software overlays. Depends on the instrument and the lab's convention.
 
 Because raw is immutable once committed, classification has to happen *before* the `chmod a-w`. Three layers, in order:
 
@@ -476,7 +476,7 @@ Proposed classification:
 [a]ccept  [r]eview file-by-file  [c]ancel ?
 ```
 
-Review is non-negotiable. The cost of a misclassification — a derived file permanently stuck in raw, or a true-raw file landing somewhere mutable — outweighs the friction of one prompt per ingest.
+Review is non-negotiable. The cost of a misclassification (a derived file permanently stuck in raw, or a true-raw file landing somewhere mutable) outweighs the friction of one prompt per ingest.
 
 #### CLI flags
 
@@ -507,11 +507,11 @@ Review is non-negotiable. The cost of a misclassification — a derived file per
 
 Then opens `notebook.md` in Obsidian.
 
-## Push mechanics — branches, PRs, and bots
+## Push mechanics: branches, PRs, and bots
 
 The `push` verb covers a wide range of artefacts (notebook entries, code, photos, findings, charter amendments). Forcing PR review on all of them creates intolerable friction for in-progress work; allowing direct push to all of them undermines review where it matters.
 
-**Decision: branch protection by path.** Different artefacts get different rules. The boundary between "direct push" and "PR required" matches the social contract — nobody objects to a member writing in their own notebook; everyone has a stake in what gets published as a finding.
+**Decision: branch protection by path.** Different artefacts get different rules. The boundary between "direct push" and "PR required" matches the social contract: nobody objects to a member writing in their own notebook; everyone has a stake in what gets published as a finding.
 
 ### Default path: personal branch, PR to main
 
@@ -581,12 +581,12 @@ The PI maintains a **role registry**. Each role:
 
 Initial role examples:
 
-- **lab_manager** — singleton; typically the admin assistant. Owns inventory, supply orders, scheduling, reagent provisioning.
-- **sysadmin** — singleton or pair; permissions, repos, lab VM, backup integrity.
-- **bookworm_curator** — quota of 2; curates the group's Zotero library on behalf of all members.
-- **oracle_curator** — quota of 2; annual rotation. Facilitates finalisation choreographies (ensures all expected agents have weighed in, statements are well-formed, cross-references are correct) and handles periodic legacy maintenance of the group oracle.
-- **adversary_chair** — rotating; runs adversarial review on group-bound submissions (papers, grants).
-- **conscience_chair** — rotating or singleton; EDID review on outgoing artefacts.
+- **lab_manager**: singleton; typically the admin assistant. Owns inventory, supply orders, scheduling, reagent provisioning.
+- **sysadmin**: singleton or pair; permissions, repos, lab VM, backup integrity.
+- **bookworm_curator**: quota of 2; curates the group's Zotero library on behalf of all members.
+- **oracle_curator**: quota of 2; annual rotation. Facilitates finalisation choreographies (ensures all expected agents have weighed in, statements are well-formed, cross-references are correct) and handles periodic legacy maintenance of the group oracle.
+- **adversary_chair**: rotating; runs adversarial review on group-bound submissions (papers, grants).
+- **conscience_chair**: rotating or singleton; EDID review on outgoing artefacts.
 
 Only the PI may assign or revoke a role. Role transitions are first-class events with an audited handoff.
 
@@ -623,16 +623,16 @@ A role transition (assign / revoke / transfer) is a first-class auditable event.
 
 ### Steps
 
-1. **Initiate** — issue filed in the group's lab-management repo, labelled `role-transition`. Names: role, current operator (if any), proposed operator, effective date, reason.
-2. **Acknowledge** — proposed operator comments on the issue accepting the role and confirming they have read the charter.
-3. **Handoff checklist** — current operator works through:
+1. **Initiate**: issue filed in the group's lab-management repo, labelled `role-transition`. Names: role, current operator (if any), proposed operator, effective date, reason.
+2. **Acknowledge**: proposed operator comments on the issue accepting the role and confirming they have read the charter.
+3. **Handoff checklist**: current operator works through:
    - Document the current state of the role's responsibilities (open requests, pending orders, active reviews).
    - Rotate credentials where rotation is possible; share securely otherwise (1Password, age envelope).
    - Update permissions: filesystem ACLs, GitHub team membership, MCP server credentials, lab VM accounts.
    - Transfer or archive the agent's local memory if the role's continuity depends on it.
    - Update the role registry file: replace operator(s), append to audit log.
-4. **PI sign-off** — PI closes the issue with a signed approval comment (commit-signed where possible).
-5. **Audit entry** — appended to `roles/<role>.md` with previous operator, new operator, effective date, PI signature.
+4. **PI sign-off**: PI closes the issue with a signed approval comment (commit-signed where possible).
+5. **Audit entry**: appended to `roles/<role>.md` with previous operator, new operator, effective date, PI signature.
 
 ### Unilateral transitions
 
@@ -646,7 +646,7 @@ The CLI's `roles assign` command refuses to exceed cardinality without an explic
 
 Adding a new member to a group is a multi-stage choreography. Goals: low friction for the new user, auditable, revocable, with `age` keys handled correctly so encrypted artefacts remain accessible.
 
-### Stage 1 — Invitation
+### Stage 1: Invitation
 
 The PI files an issue in the lab-management repo titled `Onboard @<github-handle>`. The issue specifies:
 - Which **onboarding profile** to apply (e.g. `student`, `postdoc`, `pi-collab`, `core-staff`).
@@ -656,7 +656,7 @@ The PI files an issue in the lab-management repo titled `Onboard @<github-handle
 
 Reusable profiles live at `lab-mgmt-repo/onboarding/<profile>.md`. Each profile is a YAML+markdown spec listing: agents-to-install, default projects, default role, default permissions.
 
-### Stage 2 — Local setup
+### Stage 2: Local setup
 
 The new user runs:
 
@@ -672,13 +672,13 @@ This:
 - Creates `lab-mgmt-repo/members/<github-handle>.md` with a profile stub (interests, contact, current projects).
 - Opens a PR with the key + member profile.
 
-### Stage 3 — Approval
+### Stage 3: Approval
 
 - PI reviews the PR and approves the public key + profile.
 - For each project listed in the onboarding issue, PI runs `murmurent project admit <project> @<handle>`. Each admit is a normal admit event in the project lifecycle (audit entry, ACL re-sync, re-encryption of `age` bundles to include the new recipient).
 - PI assigns starting roles via `murmurent role assign`. Each is a normal role transition.
 
-### Stage 4 — Confirmation
+### Stage 4: Confirmation
 
 - New user verifies they can pull each project they were admitted to.
 - New user runs `murmurent doctor` to confirm install integrity.
@@ -696,7 +696,7 @@ This:
 
 ### Profile catalog
 
-Four profiles ship as centre defaults at `murmurent/onboarding/<profile>.md`. Each lab can override or extend at `lab-mgmt-repo/onboarding/<profile>.md` — lab-specific version wins when both exist. New lab-specific profiles (e.g. `clinical-fellow` for a translational lab) are just additional files.
+Four profiles ship as centre defaults at `murmurent/onboarding/<profile>.md`. Each lab can override or extend at `lab-mgmt-repo/onboarding/<profile>.md`: lab-specific version wins when both exist. New lab-specific profiles (e.g. `clinical-fellow` for a translational lab) are just additional files.
 
 #### `student`
 
@@ -722,7 +722,7 @@ lead_eligible: false
 expiry: null
 ```
 
-`lawyer` excluded by default — IP concerns rarely matter for students; can be added later via `murmurent agent add`.
+`lawyer` excluded by default: IP concerns rarely matter for students; can be added later via `murmurent agent add`.
 
 #### `postdoc`
 
@@ -771,7 +771,7 @@ lead_eligible: true
 expiry: 12_months_default     # renewable
 ```
 
-Scoped permissions matter — `pi-collab` cannot browse other group projects.
+Scoped permissions matter: `pi-collab` cannot browse other group projects.
 
 #### `visitor`
 
@@ -795,7 +795,7 @@ expiry: 3_months_default      # required; renewable
 
 ### A note on cores and factories
 
-Core facilities (sequencing centres, mass-spec, imaging cores) are **not** modelled as a profile within a regular group. Each core is its own group — its own people, its own specialised agents, its own inventory, its own choreographies. Cross-group collaboration (a sequencing-core member working on a Hallett-group project) is handled by admitting them to that project as an external member, exactly as for any other cross-group case. The (deferred) centre-level design will spell out how groups and cores interconnect; nothing in the present group-level design needs a `core-staff` member type.
+Core facilities (sequencing centres, mass-spec, imaging cores) are **not** modelled as a profile within a regular group. Each core is its own group: its own people, its own specialised agents, its own inventory, its own choreographies. Cross-group collaboration (a sequencing-core member working on a Hallett-group project) is handled by admitting them to that project as an external member, exactly as for any other cross-group case. The (deferred) centre-level design will spell out how groups and cores interconnect; nothing in the present group-level design needs a `core-staff` member type.
 
 ### Layering
 
@@ -814,13 +814,13 @@ Consistent with the warn-not-reject philosophy used elsewhere.
 
 Triggered by the PI when a member leaves:
 - Each project runs `release`; each role runs `revoke` or `transfer`.
-- Member age key is moved from `keys/` to `keys/archive/` — preserved for decrypting historical bundles, not used for new ones.
+- Member age key is moved from `keys/` to `keys/archive/`: preserved for decrypting historical bundles, not used for new ones.
 - Member profile note marked `status: alumni` with departure date; not deleted (preserves attribution on past work).
 - A final summary of contributions is appended to the member profile note.
 
 ## Squads (subgroups)
 
-A **squad** is the subgroup that actually performs a project, experiment, or SEA. It has a lead and members. Squads can be nested — a project squad has experiment squads inside, which have SEA squads inside.
+A **squad** is the subgroup that actually performs a project, experiment, or SEA. It has a lead and members. Squads can be nested: a project squad has experiment squads inside, which have SEA squads inside.
 
 Group membership ≠ squad membership. Not every group member is in every squad. The PI is default-present in every squad but can opt out (`--no-pi`) when their day-to-day involvement isn't useful.
 
@@ -934,9 +934,9 @@ A project adopts a choreography by setting `choreography: <name>` in its `CHARTE
 
 Choreography is invoked as a CC skill:
 
-- `choreography:list` — show available choreographies in the Murmurent repo and any guild-level additions.
-- `choreography:apply <name> --to <project>` — scaffold a project against the recipe.
-- `choreography:status <project>` — report how far the project has progressed against the recipe's expected steps; flag missing artefacts.
+- `choreography:list`: show available choreographies in the Murmurent repo and any guild-level additions.
+- `choreography:apply <name> --to <project>`: scaffold a project against the recipe.
+- `choreography:status <project>`: report how far the project has progressed against the recipe's expected steps; flag missing artefacts.
 
 ### Where choreographies live
 
@@ -946,15 +946,15 @@ Choreography is invoked as a CC skill:
 
 ## Knowledge and continuity verbs
 
-The day-to-day verbs handle moment-to-moment work. The verbs in this section produce **durable artefacts** that members will rely on later — discussions, transferable skills, and frozen states for citation.
+The day-to-day verbs handle moment-to-moment work. The verbs in this section produce **durable artefacts** that members will rely on later: discussions, transferable skills, and frozen states for citation.
 
-### `discuss` — record a discussion or decision
+### `discuss`: record a discussion or decision
 
 **Purpose:** Slack threads and lab meetings are ephemeral. Decisions made in them deserve a persistent, citable record.
 
 **Mechanism:** a discussion is a markdown file at `<project repo>/discussions/<date>_<topic>.md` (or `<lab-mgmt-repo>/discussions/...` for group-wide topics). Two flavours:
-- **Synchronous recap** — written after a meeting / Slack thread, summarising the conversation and recording any decision.
-- **Asynchronous thread** — written first; members add comments over time via PRs to the discussion file. Optionally mirrored as a GitHub Discussion on the project repo; the file remains the canonical record.
+- **Synchronous recap**: written after a meeting / Slack thread, summarising the conversation and recording any decision.
+- **Asynchronous thread**: written first; members add comments over time via PRs to the discussion file. Optionally mirrored as a GitHub Discussion on the project repo; the file remains the canonical record.
 
 **Required frontmatter:**
 
@@ -968,19 +968,19 @@ The day-to-day verbs handle moment-to-moment work. The verbs in this section pro
 | `links` | list[wikilink] | Related findings, charters, SEAs, experiments |
 
 **CLI:**
-- `murmurent discuss new --project <p> --topic <t> [--participants <list>]` — scaffold a file, open in editor.
-- `murmurent discuss list [--project <p>] [--open]` — browse.
-- `murmurent discuss close <id> --outcome <decided|open|blocked|tabled> [--decision <text>]` — set outcome.
+- `murmurent discuss new --project <p> --topic <t> [--participants <list>]`: scaffold a file, open in editor.
+- `murmurent discuss list [--project <p>] [--open]`: browse.
+- `murmurent discuss close <id> --outcome <decided|open|blocked|tabled> [--decision <text>]`: set outcome.
 
 **Authority:** any project member may file a discussion; only the project lead may close one with `outcome: decided`.
 
-### `teach` — codify a skill or protocol
+### `teach`: codify a skill or protocol
 
 **Purpose:** make knowledge transferable. Students leave; their methods leave with them unless captured.
 
 **Mechanism:** two artefact kinds, three scopes:
-- **Protocol** — a lab procedure (wet or dry). Lives at `<project repo>/src/protocols/<name>.md` (project-scoped), `<murmurent-repo>/guilds/<group>/protocols/<name>.md` (group-scoped), or `<murmurent-repo>/protocols/<name>.md` (centre-scoped).
-- **Skill** — a Claude Code-discoverable instruction set the model invokes by name. Lives at `<murmurent-repo>/guilds/<group>/skills/<name>.md` or `<murmurent-repo>/skills/<name>.md`.
+- **Protocol**: a lab procedure (wet or dry). Lives at `<project repo>/src/protocols/<name>.md` (project-scoped), `<murmurent-repo>/guilds/<group>/protocols/<name>.md` (group-scoped), or `<murmurent-repo>/protocols/<name>.md` (centre-scoped).
+- **Skill**: a Claude Code-discoverable instruction set the model invokes by name. Lives at `<murmurent-repo>/guilds/<group>/skills/<name>.md` or `<murmurent-repo>/skills/<name>.md`.
 
 Both share a templated body:
 
@@ -1003,27 +1003,27 @@ Both share a templated body:
 ```
 
 **CLI:**
-- `murmurent teach protocol --name <n> [--scope project|group|center] [--from-experiment <project> <experiment>]` — scaffold a protocol; with `--from-experiment`, extracts a draft from the experiment's notebook entry as a starting point.
-- `murmurent teach skill --name <n> [--scope group|center]` — scaffold a skill file.
-- `murmurent teach promote <name> --to <wider-scope>` — move an existing protocol or skill to a wider scope (project → group → centre).
+- `murmurent teach protocol --name <n> [--scope project|group|center] [--from-experiment <project> <experiment>]`: scaffold a protocol; with `--from-experiment`, extracts a draft from the experiment's notebook entry as a starting point.
+- `murmurent teach skill --name <n> [--scope group|center]`: scaffold a skill file.
+- `murmurent teach promote <name> --to <wider-scope>`: move an existing protocol or skill to a wider scope (project → group → centre).
 
 **Authority:** any member may author at project scope; group lead promotes to group; PI promotes to centre.
 
-### `freeze` — snapshot a project state
+### `freeze`: snapshot a project state
 
 **Purpose:** reproducibility and citation. When a paper is submitted, a thesis is defended, or a grant is reviewed, the project's exact state at that moment must remain pointable-to even as the project keeps evolving.
 
 **Mechanism:** a freeze creates an immutable snapshot consisting of three parts:
 - **Git tag** on the project repo: `freeze/<purpose>-<YYYY-MM-DD>` (e.g. `freeze/paper-submission-2026-05-06`).
 - **Manifest** at `<project repo>/freezes/<tag>.md`, recording: tag name, reason, repo SHA, project MEMBERS at the time, choreography in effect (if any), per-experiment list of `raw_data` and `refined_data` paths with SHA-256 per file.
-- **Encrypted bundle** at `$MURMURENT_LAB_VM_ROOT/refined/<project>/freezes/<tag>.tar.age` — refined data tarballed and encrypted with `age` to current MEMBERS plus the lab archive key. Optionally also `<tag>-raw.tar.age` for full archival (`--include-raw`).
+- **Encrypted bundle** at `$MURMURENT_LAB_VM_ROOT/refined/<project>/freezes/<tag>.tar.age`: refined data tarballed and encrypted with `age` to current MEMBERS plus the lab archive key. Optionally also `<tag>-raw.tar.age` for full archival (`--include-raw`).
 
 Freezes are immutable. Re-freezing under the same purpose produces a new dated tag, never overwrites.
 
 **CLI:**
-- `murmurent freeze <project> --purpose <text> [--include-raw]` — compute manifest, create tag, encrypt bundle.
-- `murmurent freeze list <project>` — list past freezes with their purposes and dates.
-- `murmurent freeze restore <project> <tag> [--to <path>]` — extract a freeze into a temp location for inspection. Never modifies the live project.
+- `murmurent freeze <project> --purpose <text> [--include-raw]`: compute manifest, create tag, encrypt bundle.
+- `murmurent freeze list <project>`: list past freezes with their purposes and dates.
+- `murmurent freeze restore <project> <tag> [--to <path>]`: extract a freeze into a temp location for inspection. Never modifies the live project.
 
 **Authority:** project lead initiates; PI approves via PR review on the manifest commit. The git tag is created only after PI approval (an `on: push` Action listens for `freeze/...` manifest merges and creates the tag).
 
@@ -1031,13 +1031,13 @@ Freezes are immutable. Re-freezing under the same purpose produces a new dated t
 
 ### Verbs not added to Murmurent
 
-- **schedule** — not a Murmurent verb. Calendars (Google Calendar, iCal) handle scheduling; a `calendar` MCP lets agents read events. The dashboard's "upcoming" panel pulls from notebook `status: planned` frontmatter, SEA deadlines, and the calendar MCP.
-- **transfer_role** — already designed in [Role transitions](#role-transitions). CLI: `murmurent role transfer`.
-- **archive_project** — already in [Project lifecycle](#project-lifecycle). CLI: `murmurent project archive`.
+- **schedule**: not a Murmurent verb. Calendars (Google Calendar, iCal) handle scheduling; a `calendar` MCP lets agents read events. The dashboard's "upcoming" panel pulls from notebook `status: planned` frontmatter, SEA deadlines, and the calendar MCP.
+- **transfer_role**: already designed in [Role transitions](#role-transitions). CLI: `murmurent role transfer`.
+- **archive_project**: already in [Project lifecycle](#project-lifecycle). CLI: `murmurent project archive`.
 
 ## The finalisation choreography
 
-After a SEA, experiment, or project's operational work is **complete**, the squad takes the result through a deliberation choreography — what we call "scientific therapy" — that produces a permanent record of what the result *means*. The choreography runs at each scope (SEA, experiment, project) with the same shape; what differs is what it integrates.
+After a SEA, experiment, or project's operational work is **complete**, the squad takes the result through a deliberation choreography (what we call "scientific therapy") that produces a permanent record of what the result *means*. The choreography runs at each scope (SEA, experiment, project) with the same shape; what differs is what it integrates.
 
 **Why this exists**: students often run experiments and move on without sitting with the result. The choreography is the structural pressure that makes "what does this mean?" a default step rather than an optional one. The dashboard makes outstanding finalisation visible and slightly uncomfortable.
 
@@ -1048,7 +1048,7 @@ A SEA, experiment, or project has two parallel state tracks:
 - **Operational** (`status:`): `planned` → `running` → `complete | failed | inconclusive`. The work itself.
 - **Analysis** (`analysis_status:`): `not_started` → `examined` → `concluded`. The deliberation about the work.
 
-A failed experiment can be analytically concluded — we examined the failure, decided what it means, and moved on with that knowledge. Both tracks are visible on the dashboard; outstanding work in the analysis track is what nags.
+A failed experiment can be analytically concluded: we examined the failure, decided what it means, and moved on with that knowledge. Both tracks are visible on the dashboard; outstanding work in the analysis track is what nags.
 
 ### Stages
 
@@ -1057,15 +1057,15 @@ A failed experiment can be analytically concluded — we examined the failure, d
 **2. Examine.** The squad's common agents weigh in on the result. Each produces a section in the deliberation document:
 
 - **Bookworm**: literature support / contradiction; relevant prior work; missing citations.
-- **Artist**: visualizations — tables of values with standard errors, comparisons to public datasets, figure drafts.
-- **Adversary**: methodological critique — controls, sample size, confounders, statistical assumptions, leakage, did the assay actually measure what we think.
+- **Artist**: visualizations (tables of values with standard errors, comparisons to public datasets, figure drafts).
+- **Adversary**: methodological critique (controls, sample size, confounders, statistical assumptions, leakage, did the assay actually measure what we think).
 - **Blacksmith**: computational comparison to public datasets, optional GUI for inspection, replication checks.
 - **Conscience**: framing concerns (EDID-relevant language, problematic categorisations).
 - **Lawyer**: any IP / patent angle.
 
 Bots run frozen versions for reproducibility. Triggered by `<scope> examine <id>`.
 
-**3. Conclude.** The squad members engage with the agent contributions, write their own reflections, attempt a statement. The statement is flexible — it can be a clean claim, a list of partial findings, an explicit "no consensus" with member positions, an artefact reference (the gel image *is* the finding), or a "next steps" if the question can't yet be resolved. Triggered by `<scope> conclude <id>`.
+**3. Conclude.** The squad members engage with the agent contributions, write their own reflections, attempt a statement. The statement is flexible: it can be a clean claim, a list of partial findings, an explicit "no consensus" with member positions, an artefact reference (the gel image *is* the finding), or a "next steps" if the question can't yet be resolved. Triggered by `<scope> conclude <id>`.
 
 The point is going through the ritual; the optional output is a finding.
 
@@ -1073,9 +1073,9 @@ The point is going through the ritual; the optional output is a finding.
 
 The always-produced artefact of the choreography lives at:
 
-- `<project repo>/deliberations/sea/<sea-id>.md` — SEA scope
-- `<project repo>/deliberations/exp/<experiment>.md` — experiment scope
-- `<project repo>/deliberations/project.md` — project scope (one per project)
+- `<project repo>/deliberations/sea/<sea-id>.md`: SEA scope
+- `<project repo>/deliberations/exp/<experiment>.md`: experiment scope
+- `<project repo>/deliberations/project.md`: project scope (one per project)
 
 Structure:
 
@@ -1123,7 +1123,7 @@ concluded_at: 2026-05-12
 - @the_pi (PI): approved 2026-05-13
 ```
 
-Dissenting agent contributions and member positions live in `Caveats and dissent` — they travel with the artefact into the oracle if the deliberation is promoted to a finding.
+Dissenting agent contributions and member positions live in `Caveats and dissent`: they travel with the artefact into the oracle if the deliberation is promoted to a finding.
 
 ### Multi-scope: same choreography, three levels
 
@@ -1133,7 +1133,7 @@ Dissenting agent contributions and member positions live in `Caveats and dissent
 | **Experiment** | All concluded SEAs under the experiment + notebook entry + data | Experiment deliberation document; optional experiment finding | Experiment squad lead (may differ from any SEA squad lead) |
 | **Project** | All concluded experiments + charter + choreography in effect | Project deliberation document; optional project findings | Project lead, with PI |
 
-At experiment scope, inputs include SEAs that did not reach consensus — unresolved SEAs feed forward as open questions for the experiment-level deliberation to integrate or set aside.
+At experiment scope, inputs include SEAs that did not reach consensus: unresolved SEAs feed forward as open questions for the experiment-level deliberation to integrate or set aside.
 
 At project scope, finalisation typically aligns with paper / freeze / grant-submission moments. The project deliberation document is often the basis for a paper's introduction, discussion, and limitations sections.
 
@@ -1163,16 +1163,16 @@ If no consensus is promoted, the deliberation document still exists as a citable
 
 - **SEA scope**: SEA squad initiates and concludes. PI present by default; may opt out with `--no-pi`.
 - **Experiment scope**: experiment squad lead initiates. All SEA leads under the experiment are members. PI present.
-- **Project scope**: project lead initiates. PI is always present — this is one of the defaults that does *not* allow `--no-pi`.
+- **Project scope**: project lead initiates. PI is always present: this is one of the defaults that does *not* allow `--no-pi`.
 
 ### Periodic curation shrinks
 
 With front-door curation handled by this choreography, the `oracle_curator` role's periodic work shrinks to:
 
-- **Cross-reference health** — when a new finding supersedes an old one, propagate the link.
-- **Citation rot** — detect oracle entries citing entries that have since been superseded.
-- **Tag drift** — re-tag entries as the group's tag vocabulary evolves.
-- **Stranded deliberations** — deliberations that didn't promote a finding may, over time, become inputs to higher-scope deliberations. Curator surfaces these to relevant squads.
+- **Cross-reference health**: when a new finding supersedes an old one, propagate the link.
+- **Citation rot**: detect oracle entries citing entries that have since been superseded.
+- **Tag drift**: re-tag entries as the group's tag vocabulary evolves.
+- **Stranded deliberations**: deliberations that didn't promote a finding may, over time, become inputs to higher-scope deliberations. Curator surfaces these to relevant squads.
 
 The weekly light touch becomes "review the cross-link health report" rather than "review every entry." Monthly deep cleans become rarer and shorter. The bulk of curation now happens by construction at each finalisation.
 
@@ -1182,7 +1182,7 @@ Each member has a dashboard. The PI gets an enhanced version of it. Two implemen
 
 ### Markdown snapshot
 
-`lab-mgmt-repo/dashboards/<github-handle>.md` — regenerated nightly by a GitHub Action and on relevant events (PR merge, role assignment, squad change). Grep-able, version-controlled, readable in Obsidian, consumable by CC. This is the canonical source of truth for what's in a member's view.
+`lab-mgmt-repo/dashboards/<github-handle>.md`: regenerated nightly by a GitHub Action and on relevant events (PR merge, role assignment, squad change). Grep-able, version-controlled, readable in Obsidian, consumable by CC. This is the canonical source of truth for what's in a member's view.
 
 ### Live local view
 
@@ -1194,9 +1194,9 @@ Each member has a dashboard. The PI gets an enhanced version of it. Two implemen
 - **Agents**: name, effective freeze flag, install type (symlink vs copy), last sync, drift status for personal copies.
 - **Squads**: project / experiment / SEA scope, role (lead vs member), status.
 - **SEAs**:
-  - Outgoing — requests you've made of others, with status.
-  - Incoming — assigned to you, with status and deadlines.
-- **Outstanding analysis**: SEAs / experiments / projects where you are a squad member or lead and `analysis_status != concluded`. Sorted by age since `complete`. Visual escalation: subtle yellow at >2 weeks unexamined; red and escalated to squad lead + PI dashboards at >2 months. The panel header reads "what does each result *mean*?" — pedagogical purpose stated explicitly.
+  - Outgoing: requests you've made of others, with status.
+  - Incoming: assigned to you, with status and deadlines.
+- **Outstanding analysis**: SEAs / experiments / projects where you are a squad member or lead and `analysis_status != concluded`. Sorted by age since `complete`. Visual escalation: subtle yellow at >2 weeks unexamined; red and escalated to squad lead + PI dashboards at >2 months. The panel header reads "what does each result *mean*?" (pedagogical purpose stated explicitly).
 - **Security and compliance**: per-project sensitivity badge (`standard` / `restricted` / `clinical`), the controls required for that tier, and your compliance status (TCPS 2 certified ✓, TOTP enrolled ✓, signing key registered ✓, etc.). Missing required controls render in red with a one-click action to resolve. Includes an **Elected upgrades** subsection where you toggle stricter-than-required controls (always-on 2FA, always age-encrypted off-VM transfers, etc.). Required and elected stay distinct: you can layer stricter controls but cannot opt out of required ones. See [Sensitivity tiers](#sensitivity-tiers-and-project-level-controls).
 - **Quick MCP queries**: inventory search bar (low / expiring shortcuts), oracle latest, request board.
 - **Recent activity**: your commits, your PRs, oracle publishes touching projects you're in.
@@ -1221,7 +1221,7 @@ Each member has a dashboard. The PI gets an enhanced version of it. Two implemen
 - A `dashboard` MCP exposes tools for the snapshot generator (`list_squads_for_member`, `recent_activity`, `compute_usage`) so other agents can query the same data without duplicating logic.
 - The snapshot generation script is a GitHub Action that the lab-management repo runs on a cron (nightly at 04:00 local) plus event triggers.
 
-## Hooks and permissions — current state and gaps
+## Hooks and permissions: current state and gaps
 
 We have several layers of access control designed but the assistant-level layer is missing. Listed honestly so we don't pretend the system is secure when it isn't.
 
@@ -1234,7 +1234,7 @@ We have several layers of access control designed but the assistant-level layer 
 - **Audit trail** via git commits (signed where possible) plus role-registry audit logs and oracle publish logs.
 - **Freeze cascade** for agents (registry default → role override → bot pinning).
 
-### What is missing — and important
+### What is missing (and important)
 
 - **Claude Code hooks** (`PreToolUse`, `PostToolUse`, `Stop`, `UserPromptSubmit`). The assistant-level gate. Not yet designed. Necessary for: refusing a Read of a file outside the current project's MEMBERS; refusing a Bash that touches `$MURMURENT_LAB_VM_ROOT/raw/`; logging every tool call to an audit stream; injecting current-project context on `UserPromptSubmit`.
 - **`settings.json` allowlists** per agent. We should specify the minimum tool set each agent needs and refuse the rest.
@@ -1254,7 +1254,7 @@ We have several layers of access control designed but the assistant-level layer 
 6. ~~Lab VM auth specifics.~~ **Designed below.**
 7. ~~Encryption-at-rest.~~ **Designed below.**
 
-Plus a project-level sensitivity-tier framework that layers extra controls (`standard` → `restricted` → `clinical`) — see [Sensitivity tiers and project-level controls](#sensitivity-tiers-and-project-level-controls).
+Plus a project-level sensitivity-tier framework that layers extra controls (`standard` → `restricted` → `clinical`): see [Sensitivity tiers and project-level controls](#sensitivity-tiers-and-project-level-controls).
 
 ## Claude Code hooks (gap #1, design)
 
@@ -1266,7 +1266,7 @@ Several hooks need to know which Murmurent project the member is currently worki
 
 1. `MURMURENT_PROJECT` environment variable, if set.
 2. Walk up from `cwd` until a `.murmurent-project` marker file (or `CHARTER.md`) is found; the project name is read from that file.
-3. Fall back to "no active project" — non-protected operations only.
+3. Fall back to "no active project": non-protected operations only.
 
 This is computed once per CC session and cached. Most hooks short-circuit when no active project is resolved.
 
@@ -1316,7 +1316,7 @@ print(json.dumps({"decision": "allow"}))
 - The active project itself is always allowed (no MEMBERS lookup needed; CC was started inside it).
 
 **Edge cases:**
-- A project with no MEMBERS file (legacy or external repo) is treated as "no access" — fail closed.
+- A project with no MEMBERS file (legacy or external repo) is treated as "no access": fail closed.
 - Symlinks are resolved before checking.
 - Paths inside `~/.claude/`, `~/.config/`, or other infrastructure dirs are exempt.
 
@@ -1385,7 +1385,7 @@ Active SEAs:
 - Compose a short summary: project worked on, files touched, tool calls counted, any errors or denied calls.
 - Append to `~/.claude/murmurent-audit/sessions.log`.
 - If the session touched files in an active SEA's delivery path, prompt the user (in CC's stop output) to consider marking the SEA `complete`.
-- Never auto-pushes to git — surfacing the suggestion to the user is enough.
+- Never auto-pushes to git: surfacing the suggestion to the user is enough.
 
 ### Hook 7: Frozen-agent integrity check (session-start, via first `UserPromptSubmit`)
 
@@ -1437,14 +1437,14 @@ The Murmurent install script writes the seven hooks into `~/.claude/settings.jso
 
 ## Tool allowlists per agent (gap #2, design)
 
-Each agent declares the tools it actually needs in frontmatter; the install tooling enforces this at two layers — the agent's own `tools:` field (which CC respects per-agent) and the global `~/.claude/settings.json` `permissions` (which is the user-prompt gate).
+Each agent declares the tools it actually needs in frontmatter; the install tooling enforces this at two layers: the agent's own `tools:` field (which CC respects per-agent) and the global `~/.claude/settings.json` `permissions` (which is the user-prompt gate).
 
 ### Agent frontmatter additions
 
 Two new fields:
 
-- `required_tools` — minimum set the agent needs to do its job. Translated to the CC `tools:` field on the installed agent.
-- `denied_tools` — tools this agent must never invoke, even if the global permissions allow them. Subtracted from `tools:`.
+- `required_tools`: minimum set the agent needs to do its job. Translated to the CC `tools:` field on the installed agent.
+- `denied_tools`: tools this agent must never invoke, even if the global permissions allow them. Subtracted from `tools:`.
 
 Example:
 
@@ -1478,9 +1478,9 @@ A bookworm should never need Bash; if a session is running bookworm and somehow 
 
 `murmurent install` reads `required_tools` and `denied_tools` for every installed agent and produces:
 
-- **Agent definitions** — when copying or symlinking an agent into `~/.claude/agents/<name>.md`, ensures the file's `tools:` field is exactly `required_tools - denied_tools`. (For symlinks to frozen agents, the registry definition already has the right `tools:`; install verifies.)
-- **`~/.claude/settings.json` `permissions.allow`** — the union of all installed agents' `required_tools`. These tools are auto-allowed (no user prompt) globally, because some installed agent legitimately needs them.
-- **`~/.claude/settings.json` `permissions.deny`** — a baseline list of inherently risky patterns that no Murmurent agent should ever invoke:
+- **Agent definitions**: when copying or symlinking an agent into `~/.claude/agents/<name>.md`, ensures the file's `tools:` field is exactly `required_tools - denied_tools`. (For symlinks to frozen agents, the registry definition already has the right `tools:`; install verifies.)
+- **`~/.claude/settings.json` `permissions.allow`**: the union of all installed agents' `required_tools`. These tools are auto-allowed (no user prompt) globally, because some installed agent legitimately needs them.
+- **`~/.claude/settings.json` `permissions.deny`**: a baseline list of inherently risky patterns that no Murmurent agent should ever invoke:
 
 ```json
 "deny": [
@@ -1507,7 +1507,7 @@ These deny rules trip *before* hooks fire, providing belt-and-braces against the
 
 ### Drift detection
 
-`murmurent doctor` compares the installed agents' actual `tools:` with the declared `required_tools - denied_tools`. Drift on a personal agent is reported (members may have intentionally edited). Drift on a frozen agent is a hard error — frozen agents must match the registry exactly.
+`murmurent doctor` compares the installed agents' actual `tools:` with the declared `required_tools - denied_tools`. Drift on a personal agent is reported (members may have intentionally edited). Drift on a frozen agent is a hard error: frozen agents must match the registry exactly.
 
 ### Why this layout
 
@@ -1522,7 +1522,7 @@ Layered together: static permission lists block the obvious; hooks block the con
 
 These five gaps cover the layers below the assistant: audit log integrity, authentication between members and MCP servers, secret handling, lab VM access, and at-rest encryption. Designed so ordinary projects pay a small overhead while sensitive projects can lock down further (see [Sensitivity tiers](#sensitivity-tiers-and-project-level-controls)).
 
-### Gap #3 — Audit log integrity
+### Gap #3: Audit log integrity
 
 The audit trail is only as good as our ability to prove it wasn't rewritten.
 
@@ -1533,19 +1533,19 @@ The audit trail is only as good as our ability to prove it wasn't rewritten.
 
 For non-sensitive projects: signed commits + branch protection are enough. The chain is overkill.
 
-### Gap #4 — Cross-MCP authentication
+### Gap #4: Cross-MCP authentication
 
 The inventory MCP "knows" the caller is `lab_manager` only because we said so. That needs teeth.
 
 - **Murmurent session token** at session start: a JWT-equivalent signed by the member's age private key. Issued by `murmurent install` / `murmurent onboard`; refreshed on session start.
 - **TTL by sensitivity**: 8 hours for `standard` projects; 4 hours for `restricted`; 15 minutes with explicit refresh for `clinical`.
-- **MCP-side verification**: each MCP server caches the public-key registry from `lab-mgmt-repo/keys/` and verifies the token's signature on every call. Role checks happen inside the MCP — `inventory_set` reads the caller's identity from the token, looks up the role registry, refuses if not `lab_manager`.
+- **MCP-side verification**: each MCP server caches the public-key registry from `lab-mgmt-repo/keys/` and verifies the token's signature on every call. Role checks happen inside the MCP: `inventory_set` reads the caller's identity from the token, looks up the role registry, refuses if not `lab_manager`.
 - **Server-side log** on every MCP host plus the existing per-member audit log.
 - **2FA on token issuance** for any project at `clinical` sensitivity: TOTP / YubiKey challenge before the token is issued.
 
 This makes "PI-only" enforced by the MCP, not just hinted by the CLI.
 
-### Gap #5 — Secret management
+### Gap #5: Secret management
 
 Three tiers, three storage strategies:
 
@@ -1558,7 +1558,7 @@ Enforcement:
 - `murmurent secret rotate <scope> <name>` rotates and re-encrypts.
 - For `clinical` projects, any secret touching PHI requires PI sign-off (PR review on the encrypted blob) at creation and at every rotation.
 
-### Gap #6 — Lab VM authentication
+### Gap #6: Lab VM authentication
 
 - **SSH keys only**, no passwords. Public keys at `lab-mgmt-repo/ssh_keys/<handle>.pub`.
 - **Per-member accounts** on the VM (no shared accounts); UID matches GitHub handle where possible.
@@ -1568,7 +1568,7 @@ Enforcement:
 - **VPN-only from outside Western**. The institutional VPN is the perimeter.
 - **Connection log** on the VM, mirrored to the lab-management repo's audit area nightly (encrypted with `age`).
 
-### Gap #7 — Encryption at rest
+### Gap #7: Encryption at rest
 
 - **Lab VM full-disk encryption** with LUKS. `/data/lab_vm/` partition unlocked at boot via TPM + admin passphrase.
 - **Per-project FS keys for `clinical` projects**: data lives in a dedicated encrypted volume `/data/lab_vm/clinical/<project>/`, mounted only when the project is active. Key held by PI plus one trustee.
@@ -1577,7 +1577,7 @@ Enforcement:
 
 ## Sensitivity tiers and project-level controls
 
-Each project declares a sensitivity tier in its `CHARTER.md` frontmatter. The tier is **project-level** — projects in the same group can be at different tiers. Tiers govern which controls apply to whom.
+Each project declares a sensitivity tier in its `CHARTER.md` frontmatter. The tier is **project-level**: projects in the same group can be at different tiers. Tiers govern which controls apply to whom.
 
 ### Tier definitions
 
@@ -1679,38 +1679,38 @@ The required-vs-elected distinction is enforced: a member cannot opt out of a co
 
 ## Glossary
 
-- **Project** — highest unit of work in the group. Has a single lead, a charter, and one or more repos. Multi-person, multi-experiment, accumulates semi-structured data. (Replaces the earlier term "investigation".)
-- **Repo** — a lab-convention repository (`~/repos/<name>/` with `exp/<n>_<slug>/` inside). One or more per project.
-- **Experiment** — a unit of work within a project repo. Lives in `exp/<integer>_<good_name>/` (per the lab's project-structure convention); date is in the notebook frontmatter. Has its own `notebook.md` entry.
-- **SEA** — Skill, Experiment, or Analysis. Atomic, callable unit of service exchanged between people, groups, factories. Multiple per experiment; sometimes free-standing.
-- **SEA verbs** — `request`, `claim`, `complete`, `decline`.
-- **Squad** — subgroup that performs a project, experiment, or SEA. Has a lead and members. Nestable.
-- **Lead** — the member responsible for a squad's progress. Distinct from PI.
-- **Notebook entry** — the `notebook.md` inside an experiment folder; markdown with required frontmatter and embedded media.
-- **Charter** — one-paragraph statement of purpose and scope, committed as `CHARTER.md` in a project repo.
-- **MEMBERS** — file in a project repo enumerating participants with access.
-- **Verb** — an action a member performs that touches group artefacts.
-- **Role** — a group-level agent assignment held by a specific member, with cardinality and audit.
-- **Operator** — the member currently running a role's agent.
-- **Codev** — code development via git / GitHub PR review.
-- **Frozen agent** — must run from the group-registry version (no per-member drift). Default for safety-critical agents; forced for bots.
-- **Personal agent** — members may copy and modify locally. Default for stylistic agents.
-- **Freeze cascade** — the resolution order for an agent's effective freeze flag: bot pin → role override → registry default.
-- **Lab-management repo** — the group-scoped repo that holds roles, inventory, audit logs, dashboards, squad registry, and the project registry. Distinct from per-project repos.
-- **Choreography** — a recurring multi-actor pattern with a documented recipe. Adopted by a project via `choreography:` in its CHARTER frontmatter.
-- **Finalisation choreography** — multi-scope deliberation ritual (SEA / experiment / project): `examine` → `conclude`. Always produces a deliberation document; optionally a finding.
-- **Deliberation document** — markdown artefact produced by the finalisation choreography. Contains agent contributions, member reflections, group-oracle context, an attempted statement (which may or may not be a clean consensus), caveats, dissent, and approval log.
-- **examine / conclude** — the two analysis-track stages following operational `complete`. `analysis_status: not_started → examined → concluded`.
-- **Operational status vs analysis status** — two parallel state tracks on every SEA / experiment / project. Operational tracks the work; analysis tracks the deliberation.
-- **Dashboard** — markdown snapshot + Streamlit app showing each member's agents, squads, SEAs, **outstanding analysis**, and (for PIs) group-wide audit/accounting/compute.
-- **Discussion** — persistent record of a meeting / Slack thread / async deliberation, filed at `discussions/<date>_<topic>.md` with outcome (decided / open / blocked / tabled).
-- **Protocol** — codified procedure for a wet or dry experiment. Project- / group- / centre-scoped.
-- **Skill** — a Claude Code-discoverable instruction set, invoked by name. Group- or centre-scoped.
-- **Freeze** — immutable snapshot of a project at a point in time: git tag + manifest + age-encrypted bundle. Used for paper / thesis / grant submission moments.
-- **oracle_curator** — group-level role responsible for facilitating finalisation choreographies and handling periodic legacy maintenance (cross-reference health, citation rot, tag drift). Quotaed to 2; annual rotation.
-- **Standardised vocabulary** — controlled list of cross-cutting `defaults` field names documented at `murmurent/preferences.md`; guilds extend via `murmurent/guilds/<group>/preferences.md`. Used for fields multiple agents share (plotting, citation_style, prose_style, etc.).
-- **Personal preferences profile** — `~/.claude/murmurent-preferences.yaml`, local to each member's machine, sets standardised fields once for all `personal` agents. Never committed to group repos.
-- **Onboarding profile** — YAML+markdown spec at `murmurent/onboarding/<profile>.md` (centre default) or `lab-mgmt-repo/onboarding/<profile>.md` (lab override) bundling agents-to-install, default permissions, lead eligibility, and expiry for a class of new member. Four centre defaults: `student`, `postdoc`, `pi-collab`, `visitor`. Cores are themselves groups, not profiles within a group.
-- **Sensitivity tier** — project-level property declared in `CHARTER.md` frontmatter: `standard` / `restricted` / `clinical`. Controls per tier defined in `murmurent/sensitivity-policy.yaml`. Projects in the same group can be at different tiers.
-- **PHIPA / TCPS 2 / REB** — Personal Health Information Protection Act (Ontario), Tri-Council Policy Statement on research ethics, Research Ethics Board. Together they govern `clinical` projects.
-- **Required vs elected controls** — required controls come from a project's sensitivity tier; elected controls are stricter-than-required preferences a member opts into. Members cannot opt out of required.
+- **Project**: highest unit of work in the group. Has a single lead, a charter, and one or more repos. Multi-person, multi-experiment, accumulates semi-structured data. (Replaces the earlier term "investigation".)
+- **Repo**: a lab-convention repository (`~/repos/<name>/` with `exp/<n>_<slug>/` inside). One or more per project.
+- **Experiment**: a unit of work within a project repo. Lives in `exp/<integer>_<good_name>/` (per the lab's project-structure convention); date is in the notebook frontmatter. Has its own `notebook.md` entry.
+- **SEA**: Skill, Experiment, or Analysis. Atomic, callable unit of service exchanged between people, groups, factories. Multiple per experiment; sometimes free-standing.
+- **SEA verbs**: `request`, `claim`, `complete`, `decline`.
+- **Squad**: subgroup that performs a project, experiment, or SEA. Has a lead and members. Nestable.
+- **Lead**: the member responsible for a squad's progress. Distinct from PI.
+- **Notebook entry**: the `notebook.md` inside an experiment folder; markdown with required frontmatter and embedded media.
+- **Charter**: one-paragraph statement of purpose and scope, committed as `CHARTER.md` in a project repo.
+- **MEMBERS**: file in a project repo enumerating participants with access.
+- **Verb**: an action a member performs that touches group artefacts.
+- **Role**: a group-level agent assignment held by a specific member, with cardinality and audit.
+- **Operator**: the member currently running a role's agent.
+- **Codev**: code development via git / GitHub PR review.
+- **Frozen agent**: must run from the group-registry version (no per-member drift). Default for safety-critical agents; forced for bots.
+- **Personal agent**: members may copy and modify locally. Default for stylistic agents.
+- **Freeze cascade**: the resolution order for an agent's effective freeze flag: bot pin → role override → registry default.
+- **Lab-management repo**: the group-scoped repo that holds roles, inventory, audit logs, dashboards, squad registry, and the project registry. Distinct from per-project repos.
+- **Choreography**: a recurring multi-actor pattern with a documented recipe. Adopted by a project via `choreography:` in its CHARTER frontmatter.
+- **Finalisation choreography**: multi-scope deliberation ritual (SEA / experiment / project): `examine` → `conclude`. Always produces a deliberation document; optionally a finding.
+- **Deliberation document**: markdown artefact produced by the finalisation choreography. Contains agent contributions, member reflections, group-oracle context, an attempted statement (which may or may not be a clean consensus), caveats, dissent, and approval log.
+- **examine / conclude**: the two analysis-track stages following operational `complete`. `analysis_status: not_started → examined → concluded`.
+- **Operational status vs analysis status**: two parallel state tracks on every SEA / experiment / project. Operational tracks the work; analysis tracks the deliberation.
+- **Dashboard**: markdown snapshot + Streamlit app showing each member's agents, squads, SEAs, **outstanding analysis**, and (for PIs) group-wide audit/accounting/compute.
+- **Discussion**: persistent record of a meeting / Slack thread / async deliberation, filed at `discussions/<date>_<topic>.md` with outcome (decided / open / blocked / tabled).
+- **Protocol**: codified procedure for a wet or dry experiment. Project- / group- / centre-scoped.
+- **Skill**: a Claude Code-discoverable instruction set, invoked by name. Group- or centre-scoped.
+- **Freeze**: immutable snapshot of a project at a point in time: git tag + manifest + age-encrypted bundle. Used for paper / thesis / grant submission moments.
+- **oracle_curator**: group-level role responsible for facilitating finalisation choreographies and handling periodic legacy maintenance (cross-reference health, citation rot, tag drift). Quotaed to 2; annual rotation.
+- **Standardised vocabulary**: controlled list of cross-cutting `defaults` field names documented at `murmurent/preferences.md`; guilds extend via `murmurent/guilds/<group>/preferences.md`. Used for fields multiple agents share (plotting, citation_style, prose_style, etc.).
+- **Personal preferences profile**: `~/.claude/murmurent-preferences.yaml`, local to each member's machine, sets standardised fields once for all `personal` agents. Never committed to group repos.
+- **Onboarding profile**: YAML+markdown spec at `murmurent/onboarding/<profile>.md` (centre default) or `lab-mgmt-repo/onboarding/<profile>.md` (lab override) bundling agents-to-install, default permissions, lead eligibility, and expiry for a class of new member. Four centre defaults: `student`, `postdoc`, `pi-collab`, `visitor`. Cores are themselves groups, not profiles within a group.
+- **Sensitivity tier**: project-level property declared in `CHARTER.md` frontmatter: `standard` / `restricted` / `clinical`. Controls per tier defined in `murmurent/sensitivity-policy.yaml`. Projects in the same group can be at different tiers.
+- **PHIPA / TCPS 2 / REB**: Personal Health Information Protection Act (Ontario), Tri-Council Policy Statement on research ethics, Research Ethics Board. Together they govern `clinical` projects.
+- **Required vs elected controls**: required controls come from a project's sensitivity tier; elected controls are stricter-than-required preferences a member opts into. Members cannot opt out of required.

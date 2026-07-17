@@ -1,4 +1,4 @@
-# Vignette 1 — save a fact to your oracle
+# Vignette 1: save a fact to your oracle
 
 ## The situation
 
@@ -11,14 +11,14 @@ moving on, so it isn't forgotten by next week.
 
 Sam just says it, in plain English, to Claude Code:
 
-> "Remember that ESR1 looks high in several of my tumour samples —
+> "Remember that ESR1 looks high in several of my tumour samples:
 > worth checking against ER status once the pathology data comes in.
 > This is for my brca_er project."
 
 ## What Murmurent does
 
 1. Claude Code hands the fact to the **oracle** agent.
-2. The oracle agent checks it has everything it needs — what the fact
+2. The oracle agent checks it has everything it needs: what the fact
    is, which project it belongs to, who observed it. If something is
    missing, it asks Sam instead of guessing.
 3. It writes a new note into Sam's vault, at
@@ -58,7 +58,7 @@ Worth checking against ER status when the pathology data arrives.
 ```
 
 It's already sitting in Sam's Obsidian vault, so Sam can open Obsidian
-right away and see it there — no extra step needed.
+right away and see it there, no extra step needed.
 
 To back it up to Sam's private GitHub vault, Sam runs one command in a
 terminal:
@@ -69,7 +69,7 @@ murmurent vault sync
 
 This commits and pushes the new note (best-effort), and prints
 something like `committed: yes · pushed: yes`. The oracle agent never
-runs git itself — syncing is a deliberate, separate step that Sam
+runs git itself: syncing is a deliberate, separate step that Sam
 controls.
 
 ??? note "Under the hood"

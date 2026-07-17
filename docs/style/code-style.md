@@ -1,4 +1,4 @@
-# Code style — Python & R
+# Code style: Python & R
 
 **Demoted from always-loaded:** CC writes code that already follows
 most of these defaults. This file is a reference: read it when a
@@ -40,9 +40,9 @@ question of style comes up, not on every session.
 ## Patterns to avoid
 
 - No hardcoded absolute paths.
-- No `print()` for logging — use the `logging` module.
+- No `print()` for logging: use the `logging` module.
 - No wildcard imports (`from x import *`).
-- No magic numbers — name them as constants.
+- No magic numbers: name them as constants.
 
 ## Formatting
 

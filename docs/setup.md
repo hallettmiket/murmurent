@@ -4,7 +4,7 @@ First-time Murmurent installation on a new machine.
 
 ## Per-machine wiring
 
-For most users, one command does all of this automatically — see the
+For most users, one command does all of this automatically: see the
 [README](https://github.com/hallettmiket/murmurent/blob/main/README.md):
 
 ```bash
@@ -13,7 +13,7 @@ curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts
 
 This installs the `murmurent` command and wires the shared agents,
 rules, and skills into `~/.claude/`. The numbered steps below are
-what that script automates — shown here for transparency, and for
+what that script automates, shown here for transparency, and for
 anyone who wants to run them by hand.
 
 ```bash
@@ -70,7 +70,7 @@ and only makes the repo **murmurent-ready**:
 2. `.claude/agents/` symlinks for the agents you picked.
 
 No project, no lab_mgmt registry entry, no installation manifest is
-written — attach the ready repo to a project separately when you need one.
+written. Attach the ready repo to a project separately when you need one.
 
 **+ install** (fresh clone, or an existing project onto an additional
 machine) calls
@@ -78,7 +78,7 @@ machine) calls
 which writes:
 
 1. `CHARTER.md` at the clone root, if missing (a project's primary repo
-   still gets this legacy-shaped bootstrap — `murmurent repo upgrade`
+   still gets this legacy-shaped bootstrap. `murmurent repo upgrade`
    converts it to `.murmurent.yaml` later without touching the project
    record).
 2. `lab_mgmt/cert_projects/<name>.md` (the authoritative project registry
@@ -86,14 +86,14 @@ which writes:
    repo is, who needs it, and how it differs from `~/.murmurent/lab_info/`.
 3. `~/.murmurent/installations/<name>.yaml` (this-machine manifest).
 4. `.claude/agents/` symlinks for the agents you picked.
-5. `.vscode/settings.json` (Murmurent chrome — title, activity bar
+5. `.vscode/settings.json` (Murmurent chrome: title, activity bar
    right, terminals in editor area).
 6. `.gitignore` line for `.claude/settings.json` (machine-local
    permissions/grants don't escape to git).
 
 Existing files are preserved on re-run, on both paths.
 
-Neither `CHARTER.md` nor "+ install" is deprecated or removed — both
+Neither `CHARTER.md` nor "+ install" is deprecated or removed. Both
 are current. `CHARTER.md` is a legacy-shaped bootstrap marker;
 `.murmurent.yaml` is the current one. `murmurent repo upgrade`
 converts a repo from the former to the latter without otherwise
@@ -116,7 +116,7 @@ scripts/install_remote.sh my-server
 After that, `↑ adopt` works for `• clone` rows on `<my_server>` in the
 Repos panel (writes CHARTER + bootstrap + chrome on the remote
 over a single batched SSH session). This is readiness only, same as a
-local adopt — no project is created; the remote script predates
+local adopt: no project is created; the remote script predates
 `.murmurent.yaml`, so the repo shows as `ready (legacy)` until someone
 runs `murmurent repo upgrade` against it later.
 
@@ -146,7 +146,7 @@ communication is a separate, one-time job for the PI:
   and token details.
 - Registering the lab with an existing centre (rather than running
   your own) is a join-request flow addressed to the centre's
-  mayor/registrar — see [`connect_to_hub.md`](connect_to_hub.md) and
+  mayor/registrar. See [`connect_to_hub.md`](connect_to_hub.md) and
   the README's
   ["\[PIs\] If you are a PI registering your lab or core with an existing centre"](https://github.com/hallettmiket/murmurent/blob/main/README.md)
   section.
@@ -154,19 +154,19 @@ communication is a separate, one-time job for the PI:
 ## Resetting a machine
 
 The `/murmurent-reset` skill (run inside a Claude Code session) backs
-up `~/.murmurent` first — always — then resets this machine's
+up `~/.murmurent` first (always) then resets this machine's
 Murmurent state to a fresh start, so `murmurent centre-init` runs as
 first-run again. Use it for a clean slate, or to start over from a
 fresh copy of the repo.
 
 It is tiered by how much it touches:
 
-- **`centre`** (default, least destructive) — resets only the centre
+- **`centre`** (default, least destructive): resets only the centre
   registry.
-- **`install`** — also reinstalls the `murmurent` tool and re-runs
+- **`install`**: also reinstalls the `murmurent` tool and re-runs
   setup.
-- **`full`** — also clears machine-local caches.
-- **`data`** — clears all data you entered, while keeping key
+- **`full`**: also clears machine-local caches.
+- **`data`**: clears all data you entered, while keeping key
   material.
 
 Every tier supports `--dry-run` to preview what would change, and
@@ -182,13 +182,13 @@ the centre profile). Once bootstrap succeeds, the centre data lives
 under `~/.murmurent/lab_info/`. To move that centre to a permanent
 server so it can accept join requests around the clock:
 
-This deployment is not truly Ubuntu-specific — it assumes a
+This deployment is not truly Ubuntu-specific: it assumes a
 systemd-based Linux host. The commands below (`adduser`, `apt`,
 `pipx`) are shown for Ubuntu/Debian as a concrete, copy-pasteable
 example; substitute the equivalent user-management and package
 commands for another distribution.
 
-### 1. On the laptop — push lab_info to a private git remote
+### 1. On the laptop: push lab_info to a private git remote
 
 ```bash
 cd ~/.murmurent/lab_info
@@ -196,7 +196,7 @@ git remote add origin git@<your-git-host>:<your-org>/lab_info.git
 git push -u origin main
 ```
 
-### 2. On the server — clone + install
+### 2. On the server: clone + install
 
 Run as root (or via sudo). Replace placeholders to match your install.
 
@@ -228,7 +228,7 @@ sudo systemctl status murmurent-dashboard
 ```
 
 The unit binds to `0.0.0.0:8771`. **Do not expose 8771 directly to
-the internet** — front it with TLS via Caddy or nginx. Minimal
+the internet**. Front it with TLS via Caddy or nginx. Minimal
 Caddyfile:
 
 ```
@@ -238,11 +238,11 @@ murmurent.<your-domain>.edu {
 ```
 
 **Require a dashboard login (do this before exposing it).** By default the
-dashboard trusts `?user=<handle>` — fine on a localhost laptop, but a hole
+dashboard trusts `?user=<handle>`: fine on a localhost laptop, but a hole
 once it's reachable off-machine. Set a **dashboard secret** and every
 mutating action (approve/decline, profile edits, provisioning, …) then
 requires a signed session cookie; the public join form and first-run
-bootstrap stay open. It's opt-in — with no secret set, behaviour is
+bootstrap stay open. It's opt-in: with no secret set, behaviour is
 unchanged.
 
 ```bash
@@ -260,8 +260,8 @@ credentials / GitHub OAuth are future upgrades.)
 
 ### 3. Pulling lab_info updates
 
-`~/.murmurent/lab_info/` is the centre registry — the same one
-`centre-init` creates in step 1 above — and it is a normal git repo.
+`~/.murmurent/lab_info/` is the centre registry (the same one
+`centre-init` creates in step 1 above), and it is a normal git repo.
 To sync edits made on the laptop (e.g. profile updates the registrar
 makes from `/registrar`):
 
@@ -282,7 +282,7 @@ cron is sufficient.
 
 The auto-provisioning path calls `conversations.create` against the
 centre's Slack workspace. If the bot token is misconfigured, the
-first real lab approval will fail mid-flight — the lab record is
+first real lab approval will fail mid-flight: the lab record is
 written, but the Slack channel + GitHub repo + FS ACLs all warn,
 and the registrar has to remediate by hand.
 
@@ -308,7 +308,7 @@ Bot token is healthy. Real join-approve provisioning will work.
 ```
 
 If the smoke fails it prints an actionable hint for the specific
-Slack error code (most commonly `missing_scope` — add
+Slack error code (most commonly `missing_scope`: add
 `groups:write` to the bot's OAuth scopes and reinstall the app to
 the workspace). Re-run until it passes.
 

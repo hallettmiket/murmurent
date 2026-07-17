@@ -6,7 +6,7 @@ Two tiers, one schema. The Oracle is Murmurent's institutional memory.
 
 - **Personal Oracle** (one per user) is your private research
   memory: genes you've flagged, hypotheses you're testing, methods
-  that worked for a project. Never auto-shared — it's *your*
+  that worked for a project. Never auto-shared: it's *your*
   working knowledge base.
 - **Lab Oracle** (one per lab) is what the lab has *agreed* to
   remember: a curated, version-controlled, group-readable record.
@@ -41,7 +41,7 @@ graph view in Obsidian resolves them.
 ## Lab Oracle
 
 Lives in `~/repos/murmurent_lab_mgmt_<lab>/oracle/` (the lab-mgmt git repo). The
-[`lab_oracle` agent](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md) is read-only — its
+[`lab_oracle` agent](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md) is read-only: its
 toolset excludes Write by design. Entries arrive only via the
 publish flow.
 
@@ -60,7 +60,7 @@ murmurent oracle publish 2026-05-16_chrm_p14 --push # commit + push in one shot
 
 `murmurent oracle publish` **refuses `sensitivity: clinical` /
 `restricted` entries** (those stay personal) and never overwrites an
-existing lab entry — see [obsidian-usage.md §2.4](obsidian-usage.md)
+existing lab entry. See [obsidian-usage.md §2.4](obsidian-usage.md)
 for the full mechanics (identity checks, and what happens to the draft
 afterward).
 
@@ -76,7 +76,7 @@ The `murmurent-oracle` MCP server (registered by `murmurent install
 
 Every `oracle_search` / `oracle_get` / `oracle_list` call on the personal
 tier first attempts a best-effort `git pull --ff-only` of your vault (once
-per process), so recall always reflects your latest synced notes — even
+per process), so recall always reflects your latest synced notes, even
 ones you saved on another machine.
 
 ### Three tiers, one query surface
@@ -91,7 +91,7 @@ ones you saved on another machine.
 | `both` | `personal + lab` (legacy default; preserved for back-compat) |
 | `all` | `personal + lab + notebook` |
 
-The **notebook tier** is permissive — daily lab notebook files
+The **notebook tier** is permissive: daily lab notebook files
 don't need to conform to the Oracle schema. Missing fields are
 derived from path conventions:
 
@@ -103,7 +103,7 @@ derived from path conventions:
 - `tags` / `sensitivity`: from frontmatter if present, else defaults
 
 This lets one MCP call (`kind=all`) return curated Oracle findings
-alongside the raw notebook mentions that surfaced them — useful for
+alongside the raw notebook mentions that surfaced them, useful for
 "what do I know about gene X?" queries that want both the distilled
 finding and the original context.
 
@@ -114,12 +114,12 @@ macOS may deny `ls`/`Read` on the notebook subdir even when Obsidian
 itself can see it. Grant Full Disk Access to your terminal app (and
 optionally the `claude` binary) in System Settings → Privacy & Security
 → Full Disk Access. The MCP server tolerates permission denials
-gracefully — it just returns no notebook entries when blocked, rather
+gracefully: it just returns no notebook entries when blocked, rather
 than crashing.
 
 ## See also
 
-- [`agents/oracle.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/oracle.md) — personal Oracle behavior + voice.
-- [`agents/lab_oracle.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md) — read-only lab tier.
-- [`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md) — required frontmatter.
-- [`docs/obsidian-layout.md`](obsidian-layout.md) — vault-side organization (your `maps-legends`, etc.).
+- [`agents/oracle.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/oracle.md): personal Oracle behavior + voice.
+- [`agents/lab_oracle.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md): read-only lab tier.
+- [`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md): required frontmatter.
+- [`docs/obsidian-layout.md`](obsidian-layout.md): vault-side organization (your `maps-legends`, etc.).

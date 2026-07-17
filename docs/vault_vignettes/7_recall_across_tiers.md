@@ -1,12 +1,12 @@
-# Vignette 7 — recall across all your notes
+# Vignette 7: recall across all your notes
 
 ## The situation
 
 Back on 2026-07-12, before Sam had written the polished ESR1 note from
 vignette 1, Sam was mid-analysis and dashed off a quick line in the
-**daily lab notebook** — a rough scratch journal, one file per day,
-that Sam types straight into the dashboard: "ESR1 numbers look off in
-s3 — check the panel." It was never turned into a proper note. Now Sam
+**daily lab notebook** (a rough scratch journal, one file per day,
+that Sam types straight into the dashboard): "ESR1 numbers look off in
+s3, check the panel." It was never turned into a proper note. Now Sam
 wants to know everything that's ever been said about ESR1, scratch
 notes included, not just the tidy ones.
 
@@ -14,7 +14,7 @@ notes included, not just the tidy ones.
 
 Sam asks the **oracle** agent in Claude Code, in plain English:
 
-> "What have I said about ESR1 anywhere — including my daily notes?"
+> "What have I said about ESR1 anywhere, including my daily notes?"
 
 ## What Murmurent does
 
@@ -39,19 +39,19 @@ flowchart LR
 
 Sam asks:
 
-> "What have I said about ESR1 anywhere — including my daily notes?"
+> "What have I said about ESR1 anywhere, including my daily notes?"
 
 The oracle answers, in plain English:
 
 > Two mentions of ESR1:
 >
 > - **Oracle note** (2026-07-16): ESR1 looks high in several tumour
->   samples — check against ER status.
-> - **Daily notebook** (2026-07-12): "ESR1 numbers look off in s3 —
+>   samples, check against ER status.
+> - **Daily notebook** (2026-07-12): "ESR1 numbers look off in s3,
 >   check the panel."
 
 Sam now sees the early scratch note that flagged the problem days
-before it became a proper observation — something a normal recall
+before it became a proper observation, something a normal recall
 alone would have missed.
 
 ??? note "Under the hood"

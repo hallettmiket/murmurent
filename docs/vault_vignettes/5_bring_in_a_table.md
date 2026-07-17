@@ -1,4 +1,4 @@
-# Vignette 5 — bring in a table
+# Vignette 5: bring in a table
 
 ## The situation
 
@@ -16,12 +16,12 @@ asks:
 ## What Murmurent does
 
 1. A small table can live right inside a vault note as a plain
-   markdown table — no special format needed.
+   markdown table, no special format needed.
 2. Claude reads the table straight out of the note and can answer
    questions about it directly.
 3. This demo table is made up, so `sensitivity: standard` is fine.
    But real clinicopathological or patient data must be marked
-   `sensitivity: clinical` — that keeps it in Sam's personal vault
+   `sensitivity: clinical`: that keeps it in Sam's personal vault
    only, and it can never be published to the lab (see vignette 6).
    Also, only tiny tables belong in the vault; large data files live
    in the lab's `refined/` storage, not the vault.
@@ -32,7 +32,7 @@ flowchart LR
     B --> C[Ask questions about your samples]
 ```
 
-Clinical data stays personal — it never leaves Sam's vault.
+Clinical data stays personal: it never leaves Sam's vault.
 
 ## What you get
 
@@ -60,9 +60,9 @@ Claude can now answer "which tumour samples are ER-positive?" with
 "s1 and s2" directly from this note.
 
 ??? note "Under the hood"
-    Sensitivity governs what can later be published — see the
+    Sensitivity governs what can later be published: see the
     [data storage rule](https://github.com/hallettmiket/murmurent/blob/main/rules/data-storage.md)
     and the [oracle entry schema](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md).
     For the difference between small notes like this one and bulk
-    data files, see [memory tiers](../memory.md) — tier-2 notes
+    data files, see [memory tiers](../memory.md): tier-2 notes
     versus tier-3 bulk data.

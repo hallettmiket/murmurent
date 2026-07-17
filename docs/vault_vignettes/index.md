@@ -1,4 +1,4 @@
-# Vault vignettes — start here
+# Vault vignettes: start here
 
 These short pages walk you through your **personal vault**, one small step
 at a time. They're for anyone new to Murmurent who wants to see, concretely,
@@ -7,8 +7,8 @@ what happens when Claude Code remembers something for you.
 ## Meet Sam
 
 Sam is a new grad student in a breast-cancer lab. Sam is looking at a small
-table of samples and keeps noticing that `ESR1` — the estrogen-receptor
-gene, usually just called "ER" — reads higher in some tumour samples than
+table of samples and keeps noticing that `ESR1` (the estrogen-receptor
+gene, usually just called "ER") reads higher in some tumour samples than
 others.
 
 | sample | type   | ER status | grade |

@@ -1,4 +1,4 @@
-# Vignette 4 — add a manuscript (PDF)
+# Vignette 4: add a manuscript (PDF)
 
 ## The situation
 
@@ -8,8 +8,8 @@ paper itself.
 
 ## What you type
 
-Sam drops the PDF into a folder in the vault — Sam's own choice, say
-`papers/`. Then Sam asks Claude, in plain English:
+Sam drops the PDF into a folder in the vault (Sam's own choice, say
+`papers/`). Then Sam asks Claude, in plain English:
 
 > "Can you read this paper and give me a one-line takeaway about
 > ESR1?"
@@ -23,7 +23,7 @@ Sam drops the PDF into a folder in the vault — Sam's own choice, say
    reading specialist. Claude reads the PDF directly and summarises
    it.
 3. Sam saves that one-line takeaway as a normal oracle note, the same
-   way as in vignette 1 — adding the paper's link in the optional
+   way as in vignette 1, adding the paper's link in the optional
    `url:` field so the note remembers where it came from.
 
 ```mermaid
@@ -35,8 +35,8 @@ flowchart LR
 
 ## What you get
 
-The PDF itself is never indexed or stored anywhere else by Murmurent
-— the durable memory is the short note Sam saves:
+The PDF itself is never indexed or stored anywhere else by Murmurent.
+The durable memory is the short note Sam saves:
 
 ```markdown
 ---
@@ -56,7 +56,7 @@ endocrine therapy in ER-positive breast cancer.
 ```
 
 ??? note "Under the hood"
-    Claude reads PDFs on demand — Murmurent does not index or store
+    Claude reads PDFs on demand: Murmurent does not index or store
     them. See the [bookworm agent](https://github.com/hallettmiket/murmurent/blob/main/agents/bookworm.md)
     for more on how literature gets read and summarised, and
     [what Murmurent touches in your vault](../obsidian-usage.md) for

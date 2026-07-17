@@ -1,8 +1,8 @@
 # List your centre in the public directory (mayor runbook)
 
 A short runbook for a **mayor** whose centre is bootstrapped and who wants
-prospective members to be able to find and contact them. Joining is by **email**
-— the public directory just points people at your address. Western is the worked
+prospective members to be able to find and contact them. Joining is by **email**:
+the public directory just points people at your address. Western is the worked
 example; swap in your own values.
 
 ## 1. Update the Murmurent CLI
@@ -48,15 +48,15 @@ murmurent centre-hub-publish --submit   # …and publishes it for you
 It clones the [`murmurent_public`](https://github.com/hallettmiket/murmurent_public)
 hub if you don't have it, writes your row (institution, centre name, join email,
 and your `age1...` public key) into both `join/directory.tsv` and the README
-table, and — with `--submit` — publishes it the right way for **you specifically**:
+table, and (with `--submit`) publishes it the right way for **you specifically**:
 
 - **You maintain the hub** (own/have write access): it commits and **pushes**.
 - **You're at any other institution** (the normal case): it **forks** the hub,
   pushes a branch to your fork, and **opens a pull request** against the hub. The
-  hub maintainer reviews and merges it — that merge is what lists you. (`--submit`
+  hub maintainer reviews and merges it: that merge is what lists you. (`--submit`
   needs the GitHub CLI: `gh` + `gh auth login`.)
 
-Either way, the directory row is the **only** thing published — institution,
+Either way, the directory row is the **only** thing published: institution,
 registrar email, age public key. **No member data, ever.**
 
 ## 5. Handle requests as they arrive
@@ -74,5 +74,5 @@ murmurent join-request approve 1                   # provisions Slack + GitHub +
 …` if someone emails you unencrypted.)
 
 Everything about the requester stays on your machine and the centre's private
-`lab_info` — nothing touches GitHub. See [`docs/hub_setup.md`](hub_setup.md) for
+`lab_info`: nothing touches GitHub. See [`docs/hub_setup.md`](hub_setup.md) for
 the wider model and [`docs/slack_setup.md`](slack_setup.md) for the Slack fabric.

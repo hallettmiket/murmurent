@@ -2,7 +2,7 @@
 
 Your personal Oracle, lab notebook, and cross-project knowledge live
 in your Obsidian vault. This doc covers the **murmurent-side**
-conventions — what subfolders Murmurent writes to and reads from. For
+conventions: what subfolders Murmurent writes to and reads from. For
 **vault-side** organization (how *you* organize your notes overall,
 including the `maps-legends/` folder), see the `CLAUDE.md` at the
 root of your vault.
@@ -15,12 +15,12 @@ machine-independent *identity* (a GitHub repo) and a per-machine
 
 | Vault | GitHub repo (identity) | Owned by | Set the clone path in | Everyone-can-clone? |
 |---|---|---|---|---|
-| **Personal** | `murmurent_vault` (private, on the **person's** GitHub) | the individual (incl. the PI) | Machine window · Personal vault | no — private to the person |
-| **Lab (group)** | `murmurent_lab_mgmt_<lab>` (private, on the **lab's** GitHub) | the lab / core | Machine window · Lab vault | yes — every member gets read access |
+| **Personal** | `murmurent_vault` (private, on the **person's** GitHub) | the individual (incl. the PI) | Machine window · Personal vault | no, private to the person |
+| **Lab (group)** | `murmurent_lab_mgmt_<lab>` (private, on the **lab's** GitHub) | the lab / core | Machine window · Lab vault | yes, every member gets read access |
 
 **The lab vault is the existing lab-management repo.** Per the PI's
 decision on issue #25 there is *no* separate `murmurent_vault_lab`
-repo — the group oracle, lab-notebook, and `maps-legends/` for the
+repo: the group oracle, lab-notebook, and `maps-legends/` for the
 group all live under `murmurent_lab_mgmt_<lab>`, which members already
 clone (read-only via `group_reconcile.grant_lab_mgmt_read`) and which
 `roster_sync` already keeps fresh (ff-only pull). The issue's proposed
@@ -28,10 +28,10 @@ clone (read-only via `group_reconcile.grant_lab_mgmt_read`) and which
 `murmurent_lab_mgmt_<lab>`.
 
 Identity vs location:
-- **Identity** (the GitHub repo) is machine-independent — the personal
+- **Identity** (the GitHub repo) is machine-independent: the personal
   repo is shown in the Profile window, the lab repo in Lab Settings.
 - **Location** (the clone path + oracle/lab-notebook subfolders) is
-  per-machine — set in the **Machine** window. The personal vault path
+  per-machine: set in the **Machine** window. The personal vault path
   is editable there; the lab vault path is the resolved lab-mgmt clone
   (read-only in the Machine window, managed at install / via the
   `lab_mgmt` pin), so there is a single source of truth for "where the
@@ -65,13 +65,13 @@ run `murmurent oracle doctor`.
 |---|---|---|
 | `oracle/` | Personal Oracle entries (per-entry .md files, `MEMORY.md` index) | `oracle` agent |
 | `oracle/drafts/` | Entries staged for `murmurent oracle publish` | `oracle` agent |
-| `lab-notebook/` (default — see your `~/.murmurent/machine.yaml` `notebook_subfolder`) | Daily lab-notebook entries | the dashboard's "Lab notebook · today" **edit** button (creates the day's file from a template) |
+| `lab-notebook/` (default, see your `~/.murmurent/machine.yaml` `notebook_subfolder`) | Daily lab-notebook entries | the dashboard's "Lab notebook · today" **edit** button (creates the day's file from a template) |
 
 The rest of the vault is yours. Murmurent never writes outside the
 folders listed here.
 
 **Path naming gotcha.** There are two superficially-similar
-directories at different layers — don't confuse them:
+directories at different layers; don't confuse them:
 
 | Path | Purpose |
 |---|---|
@@ -96,7 +96,7 @@ searched together by the `murmurent-oracle` MCP server.
 ## `maps-legends/` (vault-side)
 
 `maps-legends/` is your own convention for organizing the vault
-(categories, conventions, where things go) — Murmurent doesn't read or
+(categories, conventions, where things go): Murmurent doesn't read or
 write it. See [obsidian-usage.md §4](obsidian-usage.md) for the full
 picture of what Murmurent does and doesn't touch. Oracle entries may
 still reference it via `[[wikilinks]]` so Obsidian's graph view threads
@@ -116,10 +116,10 @@ tools. We decided against pulling one in because:
   over the vault's `oracle/` subfolder (and the lab tier), with
   filters for our specific frontmatter schema.
 - Adding a generic Obsidian MCP would search the whole vault
-  including notebooks + your personal notes — broader than
+  including notebooks + your personal notes, broader than
   Oracle's intent.
 - One less dependency to maintain.
 
 If you ever want generic vault search (not just Oracle), the path
 is to add a third-party Obsidian MCP alongside `murmurent-oracle`.
-The two won't collide — they expose differently-named tools.
+The two won't collide: they expose differently-named tools.

@@ -11,10 +11,10 @@
 
 Surface lab Slack conversations in two complementary ways:
 
-1. **Provenance** — every project channel mirrored verbatim into the
+1. **Provenance**: every project channel mirrored verbatim into the
    lab-mgmt repo as a daily markdown log, so we don't lose context if
    Slack data retention rolls over.
-2. **Distillation** — the Oracle agent reads each day's mirror, picks
+2. **Distillation**: the Oracle agent reads each day's mirror, picks
    out new knowledge / decisions / open questions, and writes oracle
    entries that surface in the dashboard's "Group oracle · recent"
    panel.
@@ -49,12 +49,12 @@ A new Slack user account in the existing Hallett Lab workspace:
   the bot uses to decide whether to read; channel membership is just
   to receive history).
 - App-level OAuth scopes (no user-OAuth):
-  - `channels:history` — read public-channel messages
-  - `groups:history` — read private-channel messages (only on channels
+  - `channels:history`: read public-channel messages
+  - `groups:history`: read private-channel messages (only on channels
     the bot is invited to)
-  - `users:read` — resolve user IDs → handles for citations
-  - `team:read` — workspace metadata (one-time, for `lab.md`)
-  - `chat:write` — **only used to post the daily summary back into
+  - `users:read`: resolve user IDs → handles for citations
+  - `team:read`: workspace metadata (one-time, for `lab.md`)
+  - `chat:write`: **only used to post the daily summary back into
     the channel** (see "Two-way?" below); not used for one-way phase
 
 The bot owner is the PI's Slack admin role; rotation is via the
@@ -119,7 +119,7 @@ p14. For run 17 we are aligning against p14, not p13.
 
 ## Provenance
 
-[[slack/proj_brca_sc_tutorial/2026-05-08]] — messages at 09:14, 09:18, 09:24.
+[[slack/proj_brca_sc_tutorial/2026-05-08]]: messages at 09:14, 09:18, 09:24.
 ```
 
 Linking the raw mirror as `[[slack/...]]` means the dashboard can
@@ -195,14 +195,14 @@ oracle file schema described in slack_integration.md.
 The cron + raw mirror is the simpler half; the distillation is the
 agentic half. Build in this order:
 
-1. **`murmurent slack mirror --channel <name> --date <yyyy-mm-dd>`** —
+1. **`murmurent slack mirror --channel <name> --date <yyyy-mm-dd>`**:
    manual one-shot fetch of one channel/day. Validates the Slack
    adapter, the Markdown serialisation, and the lab-mgmt write path.
-2. **`murmurent slack mirror --all --since <date>`** — bulk fetch.
+2. **`murmurent slack mirror --all --since <date>`**: bulk fetch.
    Hardens pagination and error handling.
-3. **Cron entry** — nightly + weekly. Uses `cron` or `launchd` agent;
+3. **Cron entry**: nightly + weekly. Uses `cron` or `launchd` agent;
    `crontab -e` line plus a `launchd` plist for macOS.
-4. **`murmurent slack distil --channel <name> --date <yyyy-mm-dd>`** —
+4. **`murmurent slack distil --channel <name> --date <yyyy-mm-dd>`**:
    manual distillation of one mirror file. PI validates output by
    eye against the prompt.
 5. **Distillation in the cron**, with the `status: draft` gate.
@@ -227,5 +227,5 @@ These are the questions I'd want answered as a PR comment on this doc:
    If the lab has trans-Atlantic collaborators (Barbados meetings?),
    should it be 06:00 UTC instead?
 4. Approval flow UI: dashboard panel, CLI, or both? My instinct is
-   both — `murmurent oracle approve` for terminals, plus an "Approve /
+   both: `murmurent oracle approve` for terminals, plus an "Approve /
    Decline" pair on draft entries in the Group Oracle panel.

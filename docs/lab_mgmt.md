@@ -6,7 +6,7 @@ The single most-confusing piece of Murmurent's filesystem layout is what
 
 ## TL;DR
 
-`lab_mgmt` is the **per-group governance repo** — one per PI. It is
+`lab_mgmt` is the **per-group governance repo**, one per PI. It is
 NOT a Murmurent commons artifact; it belongs to the lab. It holds the
 canonical roster, project registry, inventory, training records,
 audit log, and other day-to-day filing-cabinet contents for ONE
@@ -14,7 +14,7 @@ research group.
 
 Different labs each have their own lab_mgmt repo under their own
 GitHub account/org. **The canonical name is `murmurent_lab_mgmt_<lab>`**
-(see "Naming — read this before creating the repo" below): the Hallett
+(see "Naming: read this before creating the repo" below): the Hallett
 lab's lives at `hallettmiket/murmurent_lab_mgmt_mh`; a bioinformatics
 core's would be `<owner>/murmurent_lab_mgmt_bioinformatics`.
 
@@ -22,7 +22,7 @@ The centre-wide registry (labs, cores, common SEAs, join requests)
 lives in a separate, distinct tree at `~/.murmurent/lab_info/`. That
 one is owned by the registrar, not by any single lab.
 
-## Naming — read this before creating the repo
+## Naming: read this before creating the repo
 
 **The repo is named `murmurent_lab_mgmt_<lab>`, where `<lab>` is your
 group's registry slug** (e.g. `mh`, `bioinformatics`). Both the GitHub
@@ -33,7 +33,7 @@ GitHub:      <your-account-or-org>/murmurent_lab_mgmt_<lab>   (private)
 local clone: ~/repos/murmurent_lab_mgmt_<lab>
 ```
 
-You normally never create it by hand — **`murmurent pi-init <lab>`
+You normally never create it by hand: **`murmurent pi-init <lab>`
 scaffolds it at exactly this path** (`core.repo.lab_repo_path`), and
 pins the machine's lab_mgmt pointer to it. If you do create the GitHub
 repo manually (e.g. to push an existing local scaffold), use the same
@@ -52,9 +52,9 @@ suffix says whose. Machines that host several labs' clones (a
 registrar's laptop, a shared server) get collision-free directories
 for free.
 
-Deviant names still *work* — member-side resolution auto-discovers any
+Deviant names still *work* (member-side resolution auto-discovers any
 clone under `~/repos` that has the lab_mgmt shape (`lab.md` +
-`members/`) and pins it — but stick to the canonical name; discovery
+`members/`) and pins it), but stick to the canonical name; discovery
 refuses to guess when two candidate clones both match.
 
 The clean conceptual boundary is:
@@ -142,22 +142,22 @@ join-request approval flow.
 `core.repo.lab_mgmt_repo_root()` returns the active lab's repo path
 using this order:
 
-1. **Thread-local override** — the dashboard sets this per-request
+1. **Thread-local override**: the dashboard sets this per-request
    so the registrar can switch between viewing different labs.
-2. **`$MURMURENT_LAB_MGMT_REPO` env var** — for tests + scripted use.
-3. **This machine's pinned pointer** (`~/.murmurent/lab_mgmt_path`) —
+2. **`$MURMURENT_LAB_MGMT_REPO` env var**: for tests + scripted use.
+3. **This machine's pinned pointer** (`~/.murmurent/lab_mgmt_path`):
    written by `murmurent pi-init <lab>`, and by discovery (step 5).
-4. **`~/repos/lab_mgmt`, then `~/repos/hallett-lab-mgmt`** — if either
+4. **`~/repos/lab_mgmt`, then `~/repos/hallett-lab-mgmt`**: if either
    exists. Pre-convention names, kept working for clones made before
    `murmurent_lab_mgmt_<lab>` was settled; not what you should create.
-5. **Discovery** — scans `~/repos` for a directory with the lab_mgmt
+5. **Discovery**: scans `~/repos` for a directory with the lab_mgmt
    shape (`lab.md` + `members/`), preferring one whose roster contains
    your handle, and **pins** an unambiguous hit so this runs once. This
    is what finds `~/repos/murmurent_lab_mgmt_<lab>` on a member machine
    (they never run `pi-init`, so nothing pinned it). Two matching clones
    → it refuses to guess and the panels stay empty; set
    `MURMURENT_LAB_MGMT_REPO` to break the tie.
-6. **`~/repos/lab_mgmt`** — last-resort default if nothing above hit.
+6. **`~/repos/lab_mgmt`**: last-resort default if nothing above hit.
 
 So the canonical clone path needs no configuration: `pi-init` pins it
 for the PI, discovery pins it for members. The `MURMURENT_LAB_MGMT_REPO`
@@ -167,7 +167,7 @@ dev workstation where discovery is ambiguous by design).
 ## Backfilling access for pre-existing members
 
 Members added **before** the automatic lab_mgmt grant existed (or via
-any path that skipped it) can be granted access a posteriori — the
+any path that skipped it) can be granted access a posteriori. The
 grant pass works from the whole roster, not just new additions:
 
 ```bash
@@ -179,7 +179,7 @@ For every active roster member with a `github:` login this ensures
 already-granted members and the repo owner are no-ops). Members whose
 profile lacks a GitHub login are listed so the PI can collect them.
 Prerequisite: the lab_mgmt repo must be on GitHub (`git remote -v`
-shows an origin) — the reconcile output says so if it isn't.
+shows an origin). The reconcile output says so if it isn't.
 
 Each member then completes their side once: accept the GitHub
 invitation e-mail, and clone the repo under its own name
@@ -189,7 +189,7 @@ clone and pins it on the next dashboard load; `MURMURENT_LAB_MGMT_REPO`
 remains the explicit override. From then on their Lab Members panel
 and daily reconcile track what the PI pushes.
 
-## Reading + writing — who's allowed?
+## Reading + writing: who's allowed?
 
 | Path under `lab_mgmt/` | Read | Write |
 |---|---|---|
@@ -208,31 +208,31 @@ but the inventory MCP refuses to commit-publish their changes unless
 they hold the `lab_manager` role. The PI's review on incoming PRs is
 the final gate.
 
-## `lab_mgmt` vs `~/.murmurent/lab_info/` — the comparison
+## `lab_mgmt` vs `~/.murmurent/lab_info/`: the comparison
 
 | Aspect | `~/repos/lab_mgmt` | `~/.murmurent/lab_info/` |
 |---|---|---|
 | **Scope** | one lab | the whole centre |
 | **Owner** | the PI | the registrar |
 | **Members** | one PI + lab members | one or more registrars (mayors become first registrar) |
-| **GitHub home** | the lab's own org | a private centre org (or none — can stay local + git-push to a private remote) |
+| **GitHub home** | the lab's own org | a private centre org (or none, can stay local + git-push to a private remote) |
 | **First clone** | each lab member runs `git clone` once during onboarding | the mayor's machine creates it on `murmurent centre-init` |
-| **Cross-lab visibility** | no — one lab's repo, period | yes — the registry lists every lab and core in the centre |
+| **Cross-lab visibility** | no: one lab's repo, period | yes: the registry lists every lab and core in the centre |
 | **What writes here** | `cable_guy` (per-member onboarding), inventory MCP, oracle MCP, PI's hand-edits | `centre_cable_guy` (lab/core onboarding), `registrar.create_lab` / `create_core`, join-request approvals, common-SEA submissions |
 
-If you find yourself wondering "where does X go?" — ask "is X about
+If you find yourself wondering "where does X go?", ask "is X about
 one lab specifically, or about how labs relate to each other?" One-
 lab specifics belong in `lab_mgmt`. Inter-lab relations belong in
 `lab_info`.
 
 ## See also
 
-- [`docs/setup.md`](setup.md) — first-time Murmurent install on a new
+- [`docs/setup.md`](setup.md): first-time Murmurent install on a new
   machine, including the `~/repos/murmurent_lab_mgmt_<lab>` clone.
-- [`docs/group_level.md`](group_level.md) — the broader design
+- [`docs/group_level.md`](group_level.md): the broader design
   document for group-scope Murmurent operations.
-- [`docs/cores_plan.md`](https://github.com/hallettmiket/murmurent/blob/main/docs/cores_plan.md) §4 — how a core's own
+- [`docs/cores_plan.md`](https://github.com/hallettmiket/murmurent/blob/main/docs/cores_plan.md) §4: how a core's own
   `lab_mgmt` (yes, cores have one too, parallel to labs) mounts
   inside `~/.murmurent/lab_info/cores/<core>/lab-mgmt/`.
-- [`agents/cable_guy.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/cable_guy.md) — the per-lab
+- [`agents/cable_guy.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/cable_guy.md): the per-lab
   cable_guy that owns most of the read/write surface on this repo.

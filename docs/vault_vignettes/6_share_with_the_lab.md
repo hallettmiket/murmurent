@@ -1,9 +1,9 @@
-# Vignette 6 — share a fact with the lab
+# Vignette 6: share a fact with the lab
 
 ## The situation
 
 Sam's ESR1 finding from vignette 1 is now solid, checked against the
-pathology data, and worth sharing with the whole lab — not just
+pathology data, and worth sharing with the whole lab, not just
 sitting in Sam's personal vault.
 
 ## What you type
@@ -21,7 +21,7 @@ murmurent oracle publish esr1-high-in-tumour-samples --push
 ## What Murmurent does
 
 1. The oracle writes a copy of the note into `oracle/drafts/` in
-   Sam's vault. The oracle never pushes to the lab itself — staging
+   Sam's vault. The oracle never pushes to the lab itself: staging
    is as far as it goes.
 2. `murmurent oracle publish` validates the note, copies it into the
    lab vault (the lab-management repo,
@@ -30,7 +30,7 @@ murmurent oracle publish esr1-high-in-tumour-samples --push
 3. Now every lab member can recall Sam's finding through their own
    oracle.
 4. If the note were marked `sensitivity: clinical` or `restricted`,
-   `murmurent oracle publish` would refuse it outright — those notes
+   `murmurent oracle publish` would refuse it outright: those notes
    stay personal, tying back to vignettes 3 and 5.
 
 ```mermaid

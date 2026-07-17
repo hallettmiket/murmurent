@@ -2,17 +2,17 @@
 
 The **commons** is a shared set of reference agents, hard rules, and
 baseline workflows every member of the centre draws on, regardless of
-lab — a common operating system for research, not a shared research
+lab: a common operating system for research, not a shared research
 direction. Thirteen reference agents ship in
 [`agents/*.md`](https://github.com/hallettmiket/murmurent/tree/main/agents)
 and are symlinked into `~/.claude/agents/` by `scripts/setup.sh`: twelve
 operate at the individual, group, or lab level, and a thirteenth,
 `centre_cable_guy`, is a centre-level singleton.
 
-You invoke these by addressing an agent by name in plain English — for
+You invoke these by addressing an agent by name in plain English (for
 example, *"Bookworm, find all manuscripts related to MMP11 in breast
 cancer,"* or *"Adversary, review the findings of the Bookworm's
-literature review for overlooked or contradictory studies"* — in any
+literature review for overlooked or contradictory studies"*) in any
 Claude Code session on a Murmurent-enabled machine, and CC routes to it.
 Every agent ships pre-configured with sensible defaults and is usable
 immediately; you can override those defaults without editing the agent
@@ -35,8 +35,8 @@ so-called "commons-plus-toolkit" pattern described in the manuscript.
 
 ## Oracle
 
-Personal, per-member knowledge keeper. One Oracle per user — not per
-project — living in the member's own Obsidian vault under `oracle/`.
+Personal, per-member knowledge keeper. One Oracle per user (not per
+project) living in the member's own Obsidian vault under `oracle/`.
 It remembers genes, findings, hypotheses, and experimental context
 across *every* project the member works on, cross-referencing entries
 via `project:` frontmatter rather than separate stores per project. It
@@ -48,7 +48,7 @@ refuses to write an entry missing required schema fields. See
 > **You:** Oracle, what did I decide about reference genomes for breast
 > cancer sequencing?
 >
-> **Oracle:** Found — you standardised on GRCh38.p14 for run 17 (patches
+> **Oracle:** Found: you standardised on GRCh38.p14 for run 17 (patches
 > the chrM artefact from p13); switching references mid-cohort was
 > explicitly ruled out.
 
@@ -57,8 +57,8 @@ refuses to write an entry missing required schema fields. See
 The lab-wide counterpart to the personal Oracle: curated, reviewed,
 group-readable institutional memory backed by the
 `murmurent_lab_mgmt_<lab>` repo. It is **read-only from the agent side**
-— its toolset deliberately
-excludes `Write` — because new lab knowledge only arrives through the
+(its toolset deliberately
+excludes `Write`) because new lab knowledge only arrives through the
 `murmurent oracle publish` review flow, never by the agent writing
 directly. Useful for "what has the whole lab agreed to remember,"
 distinct from any one member's working notes.
@@ -67,15 +67,15 @@ distinct from any one member's working notes.
 
 > **You:** Lab Oracle, what does the lab know about chrM artefacts?
 >
-> **Lab Oracle:** Found 2 lab entries — both point to GRCh38.p14 as the
+> **Lab Oracle:** Found 2 lab entries: both point to GRCh38.p14 as the
 > fix; contributed by @allie and @bob, see `2026-05-08_chrm_p14.md`.
 
 ## Bookworm
 
 The team's connection to the outside world of published science and
 databases, tailored for biomedical research. It maintains a reading
-list, queries biomedical databases and preprint servers — PubMed,
-bioRxiv/medRxiv, ClinicalTrials.gov — to annotate data with published
+list, queries biomedical databases and preprint servers (PubMed,
+bioRxiv/medRxiv, ClinicalTrials.gov) to annotate data with published
 knowledge, retrieves and summarises literature, and cross-references
 computational predictions against known validated results. It always
 cites a source (database name + accession or PubMed ID) and
@@ -91,14 +91,14 @@ trainee up to speed on the relevant literature quickly.
 > **You:** Bookworm, find the three most-cited papers on MMP11 in breast
 > cancer and add them to my reading list.
 >
-> **Bookworm:** Found 3 sources — added to `./outputs/bookworm/`; two are
+> **Bookworm:** Found 3 sources: added to `./outputs/bookworm/`; two are
 > validated knockout studies, one is a computational prediction only.
 
 ## Blacksmith
 
 The computational workhorse. It loads and preprocesses data, engineers
 features, trains and evaluates classifiers, and builds interactive
-interfaces — Streamlit or Dash — for exploration, always verifying code
+interfaces (Streamlit or Dash) for exploration, always verifying code
 actually runs before reporting completion. It ships with defaults (for
 example `package_manager: uv`), and its tool and library preferences are
 configurable: a lab can standardize on, say, Streamlit over Dash, or a
@@ -110,7 +110,7 @@ than re-instructing it every session.
 > **You:** Blacksmith, load `refined/brca_wgs/3_qc/counts.parquet`, train
 > an XGBoost classifier on subtype, and report AUC with a train/test split.
 >
-> **Blacksmith:** Done — AUC 0.87 on held-out test set (20% split);
+> **Blacksmith:** Done: AUC 0.87 on held-out test set (20% split);
 > outputs in `./outputs/blacksmith/`.
 
 ## Adversary
@@ -118,8 +118,8 @@ than re-instructing it every session.
 The team's internal critic. It checks for data leakage and verifies that
 the train/test split respects structure in the data rather than
 splitting individual rows at random. Concretely: when a dataset has
-grouped structure — for example several cells or samples drawn from the
-same patient — splitting rows at random can place data from the same
+grouped structure (for example several cells or samples drawn from the
+same patient), splitting rows at random can place data from the same
 patient in both the training and test sets. That leaks information
 between the two sets and makes reported performance look better than it
 really is; the correct approach is to split by the grouping unit (by
@@ -129,14 +129,14 @@ and challenges any result that looks too good. It distinguishes
 running code or reading files) from `SPECULATED:` ones, and never
 presents the latter as fact. Adversarial critique between agents reduces
 hallucinations, improves factual validity, and increases the depth of
-answers — the Adversary is Murmurent's implementation of that idea, and
+answers. The Adversary is Murmurent's implementation of that idea, and
 it is expected to evolve with use.
 
 **Verdict vocabulary:** `Pass / Questions / Reject — <one-line why>`
 
 > **You:** Adversary, review the classifier the Blacksmith just built.
 >
-> **Adversary:** Questions — your train/test split leaks: samples from
+> **Adversary:** Questions: your train/test split leaks: samples from
 > the same patient appear in both folds, so the AUC is optimistic.
 
 ## Artist
@@ -147,8 +147,8 @@ project HTML report, produces ROC curves, confusion matrices, SHAP
 plots and more, and insists every figure is legible, labelled, and
 versioned. The Artist is shared across a group by design, giving a lab
 a common look and feel across outputs even as different HQP extend it
-with new plotting techniques over time. Its visual defaults — colour
-schemes, fonts, and figure/presentation conventions — are configurable,
+with new plotting techniques over time. Its visual defaults (colour
+schemes, fonts, and figure/presentation conventions) are configurable,
 the same way every agent's defaults are (see the intro above): a lab can
 point the Artist at, say, a university's brand palette and fonts and its
 presentation best-practice guidelines, so every output the group
@@ -159,7 +159,7 @@ produces carries a consistent look.
 > **You:** Artist, make a publication-quality ROC curve from the
 > Blacksmith's last run.
 >
-> **Artist:** Rendered — `roc_curve_xgboost.png` (300dpi) + `.pdf` saved
+> **Artist:** Rendered: `roc_curve_xgboost.png` (300dpi) + `.pdf` saved
 > to `./outputs/artist/figures/`.
 
 ## Conscience
@@ -181,34 +181,34 @@ on sex chromosomes) rather than only after the fact.
 
 > **You:** Conscience, review this cohort description for the grant.
 >
-> **Conscience:** Flagged — the cohort text implies a universal
+> **Conscience:** Flagged: the cohort text implies a universal
 > phenotype from a single-ancestry sample; let's name the population
 > explicitly and note the generalisability limit.
 
 > **You:** Conscience, check the abstract before I submit the grant.
 >
-> **Conscience:** Flagged — "suffers from" and "confined to a
+> **Conscience:** Flagged: "suffers from" and "confined to a
 > wheelchair" are exclusionary/ableist phrasing; use "has" and "uses a
 > wheelchair" instead.
 
 > **You:** Conscience, read the background section of this methods
 > paper.
 >
-> **Conscience:** Flagged — the background frames the sampled community
+> **Conscience:** Flagged: the background frames the sampled community
 > as a passive source of specimens rather than a partner; name the
 > community, credit their contribution, and note any data-sharing
 > agreement in place.
 
 > **You:** Conscience, does this analysis need SGBA?
 >
-> **Conscience:** Flagged — the differential-expression list includes
+> **Conscience:** Flagged: the differential-expression list includes
 > several X-linked genes but the model doesn't stratify or adjust by
 > sex; re-run stratified by sex or add sex as a covariate before
 > interpreting those hits.
 
 > **You:** Conscience, review this cohort table for the manuscript.
 >
-> **Conscience:** Flagged — the cohort table never reports a sex/gender
+> **Conscience:** Flagged: the cohort table never reports a sex/gender
 > breakdown; add it so readers can judge whether the sample supports
 > sex-stratified conclusions.
 
@@ -226,7 +226,7 @@ decision-making during the work, not after.
 
 > **You:** Lawyer, is MMP11 wide open for a biotherapeutic angle?
 >
-> **Lawyer:** Clear — no active composition-of-matter patents on MMP11
+> **Lawyer:** Clear: no active composition-of-matter patents on MMP11
 > inhibition found across USPTO/EPO/WIPO; nearest filing expired 2019.
 
 ## Cable Guy
@@ -235,7 +235,7 @@ Infrastructure provisioner and environment wrangler for a single lab.
 It onboards new members (SSH keys, repo clone, CC config, Obsidian
 vault), scaffolds new projects (GitHub repo, Slack channel, `raw/` +
 `refined/` dirs), maintains the installations registry, and
-health-checks existing environments — always requesting PI sign-off
+health-checks existing environments, always requesting PI sign-off
 before touching shared infrastructure. By default it first previews the
 actions it would take (creating a channel, cloning a repo, setting up
 directories) and waits for explicit confirmation before making any
@@ -256,17 +256,17 @@ that channels, repos, disk space, and membership stay correctly wired.
 
 The centre-wide analogue of Cable Guy. Every lab runs its own copy of
 Cable Guy, but there is exactly one Centre Cable Guy for the whole
-centre — a **singleton** — running on the registrar's machine rather
+centre (a **singleton**) running on the registrar's machine rather
 than any PI's. It reconciles cross-lab infrastructure: per-project
 filesystem ACLs on shared servers and cross-lab Slack/GitHub
 membership. It does this through a drift-detection loop: **drift** is
 the gap between a project's declared, intended membership and
 configuration and the actual state of Slack, GitHub, and the
-filesystem — for example a member who was removed from a project's
+filesystem: for example a member who was removed from a project's
 roster but never removed from its Slack channel. The reconcile loop
 diffs declared state against actual state and applies the corrections
 needed to close that gap. It always requests registrar sign-off before
-writing to shared infra. This is the thirteenth reference agent — the
+writing to shared infra. This is the thirteenth reference agent, the
 one that operates at centre scope rather than individual/group/lab
 scope.
 
@@ -284,7 +284,7 @@ applied.` after a reconcile pass)
 Routes inbound cross-group [SEA](seas.md) (shareable experiments/assays)
 requests to the right member. It watches the lab's inbound queue, matches each
 request against the SEA catalog to confirm the offering still stands
-and pull the contact handle, and notifies that person on Slack — and
+and pull the contact handle, and notifies that person on Slack, and
 re-notifies gently if a request sits pending more than 24 hours. It
 explicitly does **not** decide: approval or decline stays with the PI
 on the dashboard's Receptionist panel.
@@ -293,7 +293,7 @@ on the dashboard's Receptionist panel.
 
 > **You:** Receptionist, anything new in the inbound queue?
 >
-> **Receptionist:** Routed — SEA request #14 from @foreign_lab matched
+> **Receptionist:** Routed: SEA request #14 from @foreign_lab matched
 > to `qpcr_protocol_v2`; DM sent to @allie, PI review pending.
 
 ## Registrar
@@ -302,13 +302,13 @@ The administrative agent above any single lab. It tracks every lab,
 core, and collaboration in the centre's registry, enforces invariants
 (one PI leads at most one lab/core; collaboration member subsets must
 resolve against real lab rosters), and surfaces an institution-level
-view — including cross-group certification status — to the centre's
+view (including cross-group certification status) to the centre's
 administrative head. It never looks inside a lab's own projects,
 notebooks, SEAs, or personal Oracles: labs are opaque units from its
 vantage point. It also acts as the centre's certificate authority,
 issuing PI cards signed with the centre root key and publishing the CRL.
 Beyond the live registry, the Registrar also maintains centre-level
-institutional memory over time — for example, remembering which
+institutional memory over time, for example, remembering which
 institutional datasets of lasting value the centre holds, who curates
 each one, and their provenance, so that knowledge persists across
 personnel changes rather than leaving with whoever originally set it up.
@@ -317,7 +317,7 @@ personnel changes rather than leaving with whoever originally set it up.
 
 > **You:** Registrar, register a new core for the proteomics facility.
 >
-> **Registrar:** Recorded — `proteomics_core` added to `_registry.yaml`,
+> **Registrar:** Recorded: `proteomics_core` added to `_registry.yaml`,
 > pointer to its `murmurent_lab_mgmt_<lab>` repo unresolved pending
 > first push.
 
@@ -341,7 +341,7 @@ jointly maintains identity-key hygiene alongside the Cable Guy.
 
 > **You:** Security Guard, check this PR before I merge.
 >
-> **Security Guard:** Blocked — hardcoded API key at `src/foo.py:12`;
+> **Security Guard:** Blocked: hardcoded API key at `src/foo.py:12`;
 > load from env instead.
 
 ---

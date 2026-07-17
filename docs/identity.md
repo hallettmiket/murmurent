@@ -11,20 +11,20 @@ centre root key  ──signs──▶  PI card  ──(PI's key) signs──▶ 
 
 A card only verifies if it was signed by the group's **real** PI. So you cannot
 claim a group you're not in, and each person has a unique cryptographic ID (their
-public-key **fingerprint**). Projects extend this chain one more level — the
+public-key **fingerprint**). Projects extend this chain one more level: the
 creator gets a *project-lead* delegation card and signs project members in with
 their own key (see [Delegating a project lead](#delegating-a-project-lead-projects)).
 
-**A mayor is optional.** By default a PI is their **own root** — a lab runs
+**A mayor is optional.** By default a PI is their **own root**: a lab runs
 standalone (`murmurent pi-init`), the PI signs member cards, and members pin the
 PI's key. When a lab *joins* a centre, the mayor adds a higher root: the centre
 root signs the PI's card, so those same member cards also chain up to the centre
-(only the trust anchor changes — nothing is re-issued). Your **key** is the
+(only the trust anchor changes; nothing is re-issued). Your **key** is the
 constant across both.
 
 ## Two ideas kept separate
 
-- **A card attests *identity*** — "the centre root vouches that @yxia266 is a PI",
+- **A card attests *identity***: "the centre root vouches that @yxia266 is a PI",
   "PI @yxia266 vouches that @allie is in xia_lab". It is verifiable offline.
 - **Live *authorization* stays in the registry + Slack/GitHub ACLs.** Removing
   someone pulls their real access immediately; the card is corroborating identity,
@@ -42,7 +42,7 @@ murmurent whoami                 # your handle, key ID (fingerprint), and card s
 ```
 
 Losing the key means re-enrolling; leaking it means someone can act as you until
-the card is revoked — treat it like an SSH key.
+the card is revoked. Treat it like an SSH key.
 
 ## Joining a group (member)
 
@@ -58,7 +58,7 @@ murmurent whoami                                       # now shows your group ro
 fingerprint with the PI/mayor out-of-band the first time (see `centre-pin`
 below to fetch it from the public hub instead).
 
-**Sending `enroll.json` to your PI** is unauthenticated hand-off — Murmurent
+**Sending `enroll.json` to your PI** is unauthenticated hand-off: Murmurent
 can't automate the member→PI leg, since the PI has to be the one who decides
 to trust you. `enroll` prints the concrete next step: **DM your PI the file
 directly on Slack** (you're already in your lab's workspace). Your PI needs
@@ -73,7 +73,7 @@ murmurent issue-member-card enroll.json --group <group>
 Signs the member's card with **your** key and bundles your PI card so the member
 can verify the whole chain. You can only issue for a group you lead.
 
-**Sending the bundle back is where Slack *is* automated** — the leg from PI
+**Sending the bundle back is where Slack *is* automated**: the leg from PI
 back to member goes through the group's own bot token, which you (the PI)
 control, so Murmurent can safely send it for you. By default this command:
 
@@ -83,14 +83,14 @@ control, so Murmurent can safely send it for you. By default this command:
 3. DMs them the bundle + the exact `import-card` command to run.
 
 If your lab's Slack isn't connected, or the lookup fails, it falls back to
-printing the bundle for you to send by hand — nothing is lost, you just do
+printing the bundle for you to send by hand: nothing is lost, you just do
 that last step yourself. Pass `--dm <slack_user_id>` to target a known user
 id directly (skips the email lookup), or `--out bundle.json` to also write
 the bundle to disk, or `--no-dm` to always skip Slack.
 
 ## Run a lab standalone (PI, no mayor)
 
-You self-issue your own PI ID and become your lab's root — no centre needed:
+You self-issue your own PI ID and become your lab's root (no centre needed):
 
 ```bash
 murmurent pi-init <your-lab>      # prints a trust root; give it to your members
@@ -99,12 +99,12 @@ murmurent pi-init <your-lab>      # prints a trust root; give it to your members
 Now issue member cards as above; members import with
 `murmurent import-card <bundle> --trust-root <your-trust-root>`. If you later join a
 centre, the mayor issues you a **separate** centre PI card attesting the same key
-(see below) — your members keep working, they just gain a higher anchor.
+(see below). Your members keep working, they just gain a higher anchor.
 
 ## Delegating a project lead (projects)
 
 Project membership extends the chain one level. When a project is created,
-the PI signs its creator a **project-lead card** — a delegation credential
+the PI signs its creator a **project-lead card**: a delegation credential
 scoped to exactly that project. From then on the **lead's own key** signs each
 member's project card; the PI is not involved per join:
 
@@ -113,19 +113,19 @@ centre root ──▶ PI card ──▶ project-lead card ──(lead's key) sig
                               (the creator)                            (a project member)
 ```
 
-- `murmurent issue-project-lead-card <handle> --project <p>` — PI delegates
+- `murmurent issue-project-lead-card <handle> --project <p>`: PI delegates
   (done automatically when a project is approved from the dashboard; the
   bundle is DM'd to the lead).
-- `murmurent project-add-member <handle> --project <p>` — lead signs a
+- `murmurent project-add-member <handle> --project <p>`: lead signs a
   member in. One click when the member's key is already attested on the
   roster; external/keyless members first run
   `murmurent enroll --project <p>` and send the file (`--enrollment`).
-- `murmurent project-remove-member` — revokes the card (CRL) and kicks the
+- `murmurent project-remove-member`: revokes the card (CRL) and kicks the
   member from the project's private Slack channel.
-- `murmurent project-whoami` — prove which projects this machine's cards
+- `murmurent project-whoami`: prove which projects this machine's cards
   certify you for.
 
-Revoking the **lead card** invalidates every project card it signed — the
+Revoking the **lead card** invalidates every project card it signed: the
 verifier checks the delegation link against the fail-closed CRL. Deleting a
 project revokes lead + member cards in one CRL bump. The full walkthrough is
 [project_creation.md](project_creation.md).
@@ -157,7 +157,7 @@ murmurent centre-pin <unique-name> --fingerprint <SHA256:…>
 
 ## Revocation
 
-Cards have a 90-day TTL, so revocation is explicit and **fail-closed** — a
+Cards have a 90-day TTL, so revocation is explicit and **fail-closed**: a
 verifier with no fresh CRL refuses the card.
 
 ```bash

@@ -1,4 +1,4 @@
-# Vignette 2 — recall a fact
+# Vignette 2: recall a fact
 
 ## The situation
 
@@ -15,7 +15,7 @@ Sam asks the **oracle** agent in Claude Code, in plain English:
 ## What Murmurent does
 
 1. Before searching anything, the oracle automatically pulls the
-   latest version of Sam's vault from GitHub — so if Sam (or one of
+   latest version of Sam's vault from GitHub, so if Sam (or one of
    Sam's other machines) saved something new, it's already here. Sam
    doesn't run any command for this; it happens on every recall.
 2. The oracle searches Sam's saved notes for anything matching ESR1.

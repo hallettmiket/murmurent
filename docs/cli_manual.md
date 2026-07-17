@@ -3,7 +3,7 @@ date: 2026-05-05
 tags: [murmurent, manual]
 ---
 
-# Murmurent CLI — User Manual
+# Murmurent CLI: User Manual
 
 > Working draft. Companion to [[group_level]] design.
 > Updated as new commands emerge in the design conversation.
@@ -13,11 +13,11 @@ tags: [murmurent, manual]
 > release` flow below predates the certificate-based project model. Projects
 > are now a set of *existing* repos + machines + certified members, created
 > from the dashboard and managed with the identity commands in the next
-> section — see [project_creation.md](project_creation.md).
+> section: see [project_creation.md](project_creation.md).
 
 ## Overview
 
-The Murmurent CLI manages the configuration that lets your local Claude Code instance act as a member of a murmurent-enabled group. It does **not** run agents — it manages agent installation, group membership, role assignments, projects, and the day-to-day verbs that touch group artefacts.
+The Murmurent CLI manages the configuration that lets your local Claude Code instance act as a member of a murmurent-enabled group. It does **not** run agents: it manages agent installation, group membership, role assignments, projects, and the day-to-day verbs that touch group artefacts.
 
 Design choice: a thin CLI is preferred over a GUI until a concrete onboarding pain demands one.
 
@@ -26,11 +26,11 @@ Design choice: a thin CLI is preferred over a GUI until a concrete onboarding pa
 - All commands accept `--help`.
 - All mutating commands write an audit entry to the group's lab-management repo.
 - The CLI uses your GitHub identity for attribution; assignments and approvals are signed where possible.
-- Where a command is restricted (PI-only, lab_manager-only), this is enforced by the lab-management repo's branch-protection rules, not by the CLI alone — the CLI's check is a first line, not the final line.
+- Where a command is restricted (PI-only, lab_manager-only), this is enforced by the lab-management repo's branch-protection rules, not by the CLI alone: the CLI's check is a first line, not the final line.
 
 ## Installation
 
-For **first-time** setup as a new member, use `murmurent onboard` (see the Onboarding section below) — it does install plus key generation, profile push, and PR.
+For **first-time** setup as a new member, use `murmurent onboard` (see the Onboarding section below): it does install plus key generation, profile push, and PR.
 
 For **subsequent** installs (e.g. on a second machine, or after a fresh OS) where the member is already registered:
 
@@ -45,7 +45,7 @@ Effects:
 - Configures `~/.claude/settings.json` with group-derived permissions and MCP servers.
 - Initialises `~/.claude/agent-memory/` for the agents installed.
 
-`murmurent install` does **not** generate an age key or push a member profile — those are one-time onboarding events.
+`murmurent install` does **not** generate an age key or push a member profile: those are one-time onboarding events.
 
 ## Command reference
 
@@ -102,7 +102,7 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 | `murmurent project-add-member <handle> --project <p> [--enrollment <f>]` | lead | Sign a member into a project (cert + DM + channel invite) |
 | `murmurent project-remove-member <handle> --project <p>` | PI | Revoke a member's project card + kick from the channel |
 | `murmurent project-whoami` | anyone | Prove which projects this machine's cards certify you for |
-| `murmurent project-unarchive --project <p>` | PI | Bring a deleted project back (certs stay revoked — re-issue) |
+| `murmurent project-unarchive --project <p>` | PI | Bring a deleted project back (certs stay revoked; re-issue) |
 | `murmurent revoke-project --project <p>` | PI | Revoke every card issued for a project |
 | `murmurent member-audit` | PI | Check every roster member holds a valid certificate |
 | `murmurent crl` / `murmurent revoke` | PI/mayor | Inspect / extend the revocation list |
@@ -127,16 +127,16 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 Terminal twin of the dashboard's **Repos** panel. All three commands
 use the same core modules as the panel (`core.repo_inventory`,
 `core.adopt`), so the two surfaces can't drift. **"Murmurent-ready" and
-"a project" are two different things** — see
+"a project" are two different things**: see
 [`ready_vs_projects.md`](ready_vs_projects.md) if that split isn't
 obvious yet.
 
 | Command | Effect |
 |---|---|
 | `murmurent repo list [--host <name>]` | Every git clone on every registered machine (local included), grouped by host, each with its readiness verdict (`✓ ready` / `± partial` / `• clone`) |
-| `murmurent repo status <path-or-name> [--host <name>]` | Is this repo murmurent-ready? A path is checked directly (local, or on `--host` over SSH); a bare name is searched on every registered machine. Reports the `.murmurent.yaml` marker (or legacy `CHARTER.md`) + `.claude/agents/` components. Exit 0 = ready, 1 = not ready, 2 = not found — scriptable |
-| `murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]` | Make an existing clone **murmurent-ready**: writes the `.murmurent.yaml` readiness marker and bootstraps `.claude/agents/`. Creates NO project, no lab_mgmt registry entry — a project is a set of repos + members, made via the dashboard's **New Project** flow (see [`project_creation.md`](project_creation.md)), which attaches already-ready repos |
-| `murmurent repo upgrade [<path> \| --all] [--add-agents a,b] [--all-agents]` | Bring ready repos up to the current Murmurent release: converts legacy `CHARTER.md` bootstraps to the marker, migrates the marker schema, re-links commons agents, re-stamps `bootstrap_version`. Agent *content* updates never need this — symlinks track the commons clone automatically |
+| `murmurent repo status <path-or-name> [--host <name>]` | Is this repo murmurent-ready? A path is checked directly (local, or on `--host` over SSH); a bare name is searched on every registered machine. Reports the `.murmurent.yaml` marker (or legacy `CHARTER.md`) + `.claude/agents/` components. Exit 0 = ready, 1 = not ready, 2 = not found (scriptable) |
+| `murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]` | Make an existing clone **murmurent-ready**: writes the `.murmurent.yaml` readiness marker and bootstraps `.claude/agents/`. Creates NO project, no lab_mgmt registry entry: a project is a set of repos + members, made via the dashboard's **New Project** flow (see [`project_creation.md`](project_creation.md)), which attaches already-ready repos |
+| `murmurent repo upgrade [<path> \| --all] [--add-agents a,b] [--all-agents]` | Bring ready repos up to the current Murmurent release: converts legacy `CHARTER.md` bootstraps to the marker, migrates the marker schema, re-links commons agents, re-stamps `bootstrap_version`. Agent *content* updates never need this: symlinks track the commons clone automatically |
 
 ### Experiments
 
@@ -240,9 +240,9 @@ The finalisation choreography runs at SEA / experiment / project scope. `<scope>
 
 Choreographies are CC skills, not CLI subcommands. Invoke them inside Claude Code:
 
-- `choreography:list` — list available choreographies in centre, guild, and project scope.
-- `choreography:apply <name> --to <project>` — scaffold a project against a choreography recipe.
-- `choreography:status <project>` — report progress against the recipe.
+- `choreography:list`: list available choreographies in centre, guild, and project scope.
+- `choreography:apply <name> --to <project>`: scaffold a project against a choreography recipe.
+- `choreography:status <project>`: report progress against the recipe.
 
 ### Dashboard
 
@@ -399,6 +399,6 @@ Registered in lab_mgmt/projects/brca_imaging.md
 ## Open
 
 - Authentication / who-am-I (GitHub auth + lab VM SSH; SSO?).
-- MCP server configuration (Slack, inventory, Zotero) — should `install` configure these or a separate `murmurent mcp` subcommand?
+- MCP server configuration (Slack, inventory, Zotero): should `install` configure these or a separate `murmurent mcp` subcommand?
 - Offline mode (lab VM unreachable): which commands degrade gracefully, which fail closed?
 - How `murmurent` interacts with Claude Code's own `/install`-style flows.

@@ -10,7 +10,7 @@ get created and populated automatically.
 > setup)? See [`docs/group_slack_setup.md`](group_slack_setup.md) and
 > `murmurent group-slack-setup <group>`. This page is centre-wide only.
 
-Slack workspaces can't be created by API, so a few steps are manual — they're
+Slack workspaces can't be created by API, so a few steps are manual. They're
 marked **[manual]**.
 
 ## 1. Create the workspace  [manual]
@@ -20,7 +20,7 @@ In Slack, create a workspace named **`murmurent-<unique_name>`** (e.g.
 
 - **Create a channel named exactly `#general`.** Newer Slack workspaces **no
   longer ship with a `#general`** (you may see `#social` or a welcome channel
-  instead) — so you almost certainly have to create it yourself: *+ → Create a
+  instead), so you almost certainly have to create it yourself: *+ → Create a
   channel → name it `general` → Create*. Murmurent broadcasts to *everyone* through
   this channel, and `centre-slack-setup` looks it up by that exact name; if it's
   missing you'll get a `#general not found; create it in Slack` warning and
@@ -31,7 +31,7 @@ In Slack, create a workspace named **`murmurent-<unique_name>`** (e.g.
 ## 2. Create a bot token  [manual]
 
 Murmurent talks to Slack through a **bot user** on a Slack **app** you own. Create
-it once — click by click:
+it once, click by click:
 
 1. Go to <https://api.slack.com/apps> and sign in as the account that owns your
    `murmurent-<name>` workspace.
@@ -39,7 +39,7 @@ it once — click by click:
    `murmurent-<name>` workspace, **Create App**. Then open **App Home** (left
    sidebar) and set the bot's **Display Name** and **Default username** to
    `mayor`. This name is what PIs + members see as the *sender* of every DM
-   Murmurent sends (onboarding steps, approvals) — so messages read as coming
+   Murmurent sends (onboarding steps, approvals), so messages read as coming
    **from the mayor**, not a generic bot. (Already have an app? Rename it here.)
 3. In the app's left sidebar, open **OAuth & Permissions**.
 4. Scroll to **Scopes → Bot Token Scopes** (the *Bot* section, **not** "User
@@ -55,18 +55,18 @@ it once — click by click:
    | `im:history` | read back the bot's **own** DM threads so Murmurent can verify a delivery actually landed; without it, Murmurent can send DMs but never check on them |
    | `users:read.email` | resolve a member's email → their Slack account |
    | `groups:read`, `channels:read` | look up channel ids by name (e.g. `#general`) |
-   | `channels:join` | let Murmurent **auto-join a public channel** it needs to post to (e.g. `#claude-test`) instead of manually `/invite`-ing the bot. Public channels only — private channels still need a one-time manual invite. |
+   | `channels:join` | let Murmurent **auto-join a public channel** it needs to post to (e.g. `#claude-test`) instead of manually `/invite`-ing the bot. Public channels only. Private channels still need a one-time manual invite. |
 
 5. Scroll back **up** to **OAuth Tokens for Your Workspace** → **Install to
    Workspace** → **Allow**.
-6. Copy the **Bot User OAuth Token** — it starts with `xoxb-`.
+6. Copy the **Bot User OAuth Token**: it starts with `xoxb-`.
 
    > **Adding scopes later?** They do nothing until you **Reinstall to
    > Workspace**; the `xoxb-` token string usually stays the same, so
    > verify what's actually live via the `x-oauth-scopes` response header
    > (`curl -sI -X POST https://slack.com/api/auth.test -H "Authorization:
    > Bearer $TOKEN" | grep -i x-oauth-scopes`) rather than trusting the app
-   > config page. Missing scopes degrade quietly — e.g. no `channels:join`
+   > config page. Missing scopes degrade quietly: e.g. no `channels:join`
    > only surfaces as `not_in_channel` on public channels the bot was never
    > invited to. See docs/group_slack_setup.md → "Upgrading an existing
    > bot" for the symptom table.
@@ -91,7 +91,7 @@ umask 077; printf '%s\n' 'xoxb-...' > ~/.config/murmurent/slack-token
 
 Set the workspace id + invite link on the centre (via `murmurent centre-init
 --slack-workspace T… --slack-invite-url https://join…`, or the `/registrar`
-profile editor for an existing centre — `slack_workspace` and `slack_invite_url`
+profile editor for an existing centre: `slack_workspace` and `slack_invite_url`
 in `centre.md`).
 
 ## 5. Verify + provision the centre channels
@@ -109,7 +109,7 @@ channel, `everyone` → `#general`). Re-running is safe (idempotent).
 
 - **New lab/core** (created via a join approval or the registrar): a private
   channel **named after the group** is created, the PI/leader is invited, and the
-  channel id is stored on the group — as long as the token + `slack_workspace`
+  channel id is stored on the group, as long as the token + `slack_workspace`
   are set.
 - **Broadcasts**: `murmurent broadcast --audience everyone …` lands in `#general`;
   `--audience admin` reaches the mayor channel.
@@ -120,7 +120,7 @@ channel, `everyone` → `#general`). Re-running is safe (idempotent).
 
 Give a new member the **workspace invite link** (step 1). Once they've joined the
 workspace and their **email is on their member file** (`email:` frontmatter), the
-next provision/reconcile of their lab adds them to that lab's channel — and only
+next provision/reconcile of their lab adds them to that lab's channel, and only
 that lab's channel. Members without an email on file can't be resolved to a Slack
 account and are reported as `unresolved` until one is recorded.
 

@@ -3,7 +3,7 @@ date: 2026-05-06
 tags: [murmurent, design, diagrams]
 ---
 
-# Murmurent — Diagrams
+# Murmurent: Diagrams
 
 > Mermaid diagrams for the group-level design. Companion to [[group_level]] and [[cli_manual]].
 > Mermaid renders natively in Obsidian (with the official renderer) and on GitHub.
