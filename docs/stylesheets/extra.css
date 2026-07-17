@@ -1,0 +1,45 @@
+/* Branded footer — mirrors the Murmurent dashboard footer look and feel:
+   dark-purple bar, tiger top accent, Hallett Lab + Schulich + Western logos. */
+
+.mm-brand-footer {
+  width: 100%;
+  background: #201436;                 /* --purple-deep */
+  border-top: 3px solid #F0A757;       /* --tiger */
+  color: rgba(255, 255, 255, 0.85);
+  padding: 16px 24px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.mm-brand-bar {
+  max-width: 1220px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.mm-brand-bar a { border-bottom: 0; line-height: 0; }
+.mm-brand-bar img { display: block; }
+.mm-logo-lab      { height: 30px; border-radius: 2px; }
+.mm-logo-schulich { height: 22px; filter: brightness(0) invert(1); opacity: 0.85; }
+.mm-logo-western  { height: 18px; }
+
+.mm-dept {
+  color: rgba(255, 255, 255, 0.72);
+  flex-grow: 1;
+}
+
+.mm-ack {
+  max-width: 1220px;
+  margin: 10px auto 0;
+  font-style: italic;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Let the branded bar span the full footer-meta width. */
+.md-footer-meta__inner { flex-wrap: wrap; }
+.md-copyright { width: 100%; margin: 0; }
+.md-copyright__highlight { color: inherit; }

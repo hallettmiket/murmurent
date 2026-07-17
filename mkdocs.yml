@@ -14,8 +14,12 @@ copyright: >
   We acknowledge that Western University is located on the traditional lands of the
   Anishinaabek, Haudenosaunee, L&#363;naap&#233;ewak and Attawandaron peoples.
 
+extra_css:
+  - stylesheets/extra.css
+
 theme:
   name: material
+  custom_dir: overrides
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default

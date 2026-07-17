@@ -1,10 +1,7 @@
 # Murmurent
 
-**Shared agentic-AI infrastructure for research groups**: built on
-[Claude Code](https://claude.com/claude-code) today, though nothing in its
-design is specific to it: the same tiers, agents, and governance rules
-could sit on another agentic AI system. Murmurent turns a forgetful
-generalist into a research team with a memory and house rules:
+Murmurent turns a forgetful generalist into a research team with a memory
+and house rules:
 
 - **Reference agents**: a bench of specialists (literature scout,
   computational workhorse, adversarial reviewer, security auditor, …) you
@@ -15,11 +12,14 @@ generalist into a research team with a memory and house rules:
   raw data is immutable, refined data is append-only, secrets never reach a
   commit.
 - **Cryptographic membership**: labs, cores, and projects are held together
-  by signed identity certificates (centre root → PI → lead → member), not by
-  lists someone forgot to update.
+  by signed identity certificates (centre root → PI → lead → member).
 - **The commons**: independent groups sharing a common set of agents,
   rules, and infrastructure, so institutional knowledge accumulates across
   projects and personnel instead of being trapped on one machine.
+
+Murmurent is built on [Claude Code](https://claude.com/claude-code) today,
+although nothing in its design is tied to it: the same tiers, agents, and
+governance rules could run on another agentic AI system.
 
 ## Where to start
 
