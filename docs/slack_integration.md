@@ -63,7 +63,7 @@ Slack admin UI.
 ## Storage layout in lab-mgmt
 
 ```
-~/repos/lab_mgmt/
+~/repos/murmurent_lab_mgmt_<lab>/
 ├── slack/
 │   ├── proj_dcis_sc_tutorial/
 │   │   ├── 2026-05-08.md           ← raw mirror (one file per day)

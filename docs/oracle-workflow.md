@@ -40,7 +40,7 @@ graph view in Obsidian resolves them.
 
 ## Lab Oracle
 
-Lives in `~/repos/lab_mgmt/oracle/` (the lab-mgmt git repo). The
+Lives in `~/repos/murmurent_lab_mgmt_<lab>/oracle/` (the lab-mgmt git repo). The
 [`lab_oracle` agent](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md) is read-only — its
 toolset excludes Write by design. Entries arrive only via the
 publish flow.
@@ -86,7 +86,7 @@ ones you saved on another machine.
 | kind | Reads from |
 |---|---|
 | `personal` | `<vault>/oracle/` (curated frontmatter-required entries) |
-| `lab` | `~/repos/lab_mgmt/oracle/` (curated, lab-shared) |
+| `lab` | `~/repos/murmurent_lab_mgmt_<lab>/oracle/` (curated, lab-shared) |
 | `notebook` | `<vault>/<notebook_subfolder>/` (daily entries; frontmatter optional) |
 | `both` | `personal + lab` (legacy default; preserved for back-compat) |
 | `all` | `personal + lab + notebook` |

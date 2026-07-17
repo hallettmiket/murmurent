@@ -250,7 +250,7 @@ sections are present and writes a final summary into the project's
 $MURMURENT_LAB_VM_ROOT/raw/dcis_sc_tutorial/3_titration_v3/      ← raw data (read-only)
 $MURMURENT_LAB_VM_ROOT/refined/dcis_sc_tutorial/3_titration_v3/  ← analysis outputs
 
-~/repos/lab_mgmt/                        ← lab-mgmt repo (shared via git)
+~/repos/murmurent_lab_mgmt_<lab>/        ← lab-mgmt repo (shared via git)
 └── oracle/
     └── 2026-05-08_dcis_chrm_p14.md              ← curated findings (lab-wide)
 ```
