@@ -13,9 +13,40 @@ murmurent dashboard --hifi
 
 It opens in your browser at `http://127.0.0.1:8770/`. The dashboard is a
 local, read-mostly control surface for your Murmurent state: it shows what
-the CLI can show, and lets you act on it. (The mac and Linux desktop
-launchers and the server systemd unit all start it with this same
-command.)
+the CLI can show, and lets you act on it.
+
+## Installing a desktop launcher (menu icon)
+
+Rather than typing the command each time, you can install a desktop icon
+that starts the dashboard and opens it in your browser with one click. Run
+the script for your platform once, after cloning or reinstalling Murmurent.
+
+**macOS:**
+
+```bash
+bash scripts/create_mac_app.sh
+```
+
+This creates `~/Applications/Murmurent Dashboard.app`, which appears in
+Launchpad and Spotlight. Pass `--dest <dir>` to write the bundle
+elsewhere.
+
+**Linux:**
+
+```bash
+bash scripts/create_linux_launcher.sh
+```
+
+This writes a freedesktop `.desktop` entry to
+`~/.local/share/applications/murmurent-dashboard.desktop`, so "Murmurent
+Dashboard" appears in the applications menu. The entry follows the XDG
+specification and shows up on Cinnamon, GNOME, KDE, XFCE, and MATE.
+
+Both launchers start the dashboard on port 8770 (starting it only if it is
+not already running) and then open `http://127.0.0.1:8770/`. They run the
+same `murmurent dashboard --hifi` command shown above.
+
+## What the dashboard shows
 
 At a high level, it shows:
 
