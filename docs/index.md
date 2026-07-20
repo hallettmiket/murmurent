@@ -34,14 +34,25 @@ governance rules could run on another agentic AI system.
 | Wondering how the trust model works | [Membership IDs & the trust chain](identity.md) |
 | Looking for a command | [CLI manual](cli_manual.md) |
 
-## The five social units
+## How a centre is organized
 
-Murmurent models a bioconvergence centre as **individuals**, **groups**
-(PI + trainees), **collaborations** (groups working together),
-**cores** (shared facilities), and the **administration**. Each group runs
-its own documented pattern using shared agents and rules (*choreography,
-not orchestration*): no central controller decides every move, which limits
-the blast radius of any failure and preserves each group's autonomy.
+Murmurent models a research centre as four kinds of participant:
+
+- **Individual members** — each person has their own membership identity,
+  their own agents, and their own personal vault.
+- **Groups** — a group is either a **lab** (a research group) or a **core**
+  (a shared facility such as a proteomics or imaging centre). Every group is
+  led by a **PI** and owns its own members, data, and workflows.
+- **Projects** — a project is a unit of work that brings individual members
+  together around shared repositories and data. Its members can come from a
+  single group or from several groups at once.
+- **The administration** — the centre-level layer that maintains the
+  registry of groups and projects and issues the identity certificates that
+  bind members, groups, and projects together.
+
+Each group documents and runs its own workflows on top of the shared agents
+and rules, keeping authority over its own people and data, while the
+administration maintains the shared registry and trust chain.
 
 ## Repositories
 
@@ -50,5 +61,5 @@ the blast radius of any failure and preserves each group's autonomy.
 | [`hallettmiket/murmurent`](https://github.com/hallettmiket/murmurent) | the commons codebase: agents, rules, hooks, MCP servers, CLI, dashboard |
 | `<your-org>/murmurent_lab_mgmt_<lab>` | your lab's governance repo: roster, project registry, and the **lab oracle** |
 | `<you>/murmurent_vault` | your private personal vault repo: your **personal oracle**, lab notebook, and maps-legends |
-| [`hallettmiket/murmurent_public`](https://github.com/hallettmiket/murmurent_public) | the global onboarding hub: institution directory + join intake |
+| [`hallettmiket/murmurent_public`](https://github.com/hallettmiket/murmurent_public) | the global public directory: the institution registry + join intake |
 | `hallettmiket/murmurent_manuscript` (private) | the paper describing Murmurent's design |

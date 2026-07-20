@@ -13,7 +13,8 @@ Short version: Murmurent is an agentic AI operating system that provides:
 - **hard rules + hooks**: data-governance guardrails that stop you (or the
   model) from doing something you'll regret, like overwriting raw data;
 - and, when your lab or centre opts in, **shared infrastructure** so a whole
-  group or collaboration accumulates knowledge together, not one laptop at a time.
+  group or centre accumulates knowledge together, one shared memory rather than
+  one laptop at a time.
 
 Murmurent is built on Claude Code today, but nothing in its design is
 specific to it: the same tiers, agents, and governance rules could sit on
@@ -159,9 +160,11 @@ in:
 - The **Lab Oracle** becomes shared, curated memory: what the *whole lab* has
   agreed to remember, distinct from your personal notes, so a new student inherits
   years of institutional knowledge on day one instead of re-discovering it.
-- **Cores** (e.g. a proteomics facility) expose deliverables to member labs
-  through a controlled interface, and **collaborations** let groups pool agents and
-  data on shared projects without a central controller dictating every move.
+- **Cores** (a shared facility such as a proteomics or imaging centre) are
+  themselves groups, each led by a PI, that expose deliverables to member labs
+  through a controlled interface. **Projects** bring individual members
+  together around shared repositories and data, with members drawn from a
+  single group or from several groups at once.
 
 Independent groups share a common set of agents, rules, and infrastructure
 (the commons), so knowledge accumulates across every project and every

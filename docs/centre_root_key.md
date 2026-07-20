@@ -8,11 +8,11 @@ cards (which in turn let PIs sign member cards) and the centre's revocation list
 centre.
 
 > **This runbook exists on purpose before the key does.** Per the security
-> review, a key with this blast radius must not be generated until its recovery
+> review, a key with this much authority must not be generated until its recovery
 > and rotation story is written down. If you are reading this while about to run
 > `murmurent centre-root-keygen`, read to the end first.
 
-## Blast radius: why this key is special
+## Why this key is special
 
 - **Whoever holds the private key *is* the centre.** They can mint valid PI
   cards for anyone, hence valid member cards for anyone, and publish a CRL.
