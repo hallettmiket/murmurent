@@ -47,7 +47,7 @@ path out of Tier 1.
 
 ---
 
-## Tier 2: the oracle, human-readable institutional memory
+## Tier 2: the oracle, durable and human-readable memory
 
 **What it is.** Durable, qualitative knowledge (observations,
 decisions, near-miss results, literature summaries, methodological
@@ -61,8 +61,8 @@ an opaque vector index, rebuilt rather than accumulated, with limited
 visibility into provenance. The oracle instead returns schema-validated
 entries with explicit provenance, sensitivity, and an audit trail, and
 accumulates across personnel turnover by design. Entries are
-git-tracked and human-readable, so a PI can audit institutional memory
-by reading files, not by inspecting an index.
+git-tracked and human-readable, so the recorded knowledge can be
+audited by reading files rather than an opaque index.
 
 **Two tiers within Tier 2.** The oracle is itself two-tier: a per-user
 *personal* oracle in each researcher's Obsidian vault, and a per-lab

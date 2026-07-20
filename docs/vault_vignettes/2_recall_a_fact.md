@@ -49,4 +49,4 @@ lives or what it was called.
     [the oracle workflow](../oracle-workflow.md) for more on how
     recall and search work, and
     [what Murmurent touches in your vault](../obsidian-usage.md) for
-    the "looks empty" / Full Disk Access gotcha.
+    the Full Disk Access case where a vault can appear empty.

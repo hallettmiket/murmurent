@@ -81,9 +81,9 @@ Two commands help confirm the resolution worked:
 - `murmurent oracle path`: prints your personal Oracle dir
   (`<vault>/oracle`); the vault root is its parent directory.
 - `murmurent oracle doctor`: attempts an actual read and reports
-  whether Murmurent can access the vault on this machine. See "The
-  Full Disk Access gotcha" below for what its statuses mean and the
-  common macOS permission fix.
+  whether Murmurent can access the vault on this machine. See "Full
+  Disk Access and empty vault listings" below for what its statuses mean
+  and the common macOS permission fix.
 
 ## What Murmurent touches
 
@@ -159,8 +159,8 @@ schema itself is the index, rather than semantic embeddings.
   resolved on this machine (confirms it found the right vault).
 - `murmurent oracle doctor`: attempts to read a file in that dir and
   reports OK, BLOCKED, MISSING, NO VAULT, or empty. Use this whenever
-  search turns up thinner than expected (see "The Full Disk Access
-  gotcha").
+  search returns fewer results than expected (see "Full Disk Access and
+  empty vault listings").
 - `murmurent oracle vault-drafts`: list drafts waiting in
   `<vault>/oracle/drafts/`.
 - `murmurent oracle publish <slug> [--push] [--dry-run]`: promote a
@@ -275,7 +275,7 @@ Adding generic vault search alongside `murmurent-oracle` stays
 straightforward for later: the two tool sets use differently named
 tools, so they coexist cleanly.
 
-## The Full Disk Access gotcha (read this before assuming something is empty)
+## Full Disk Access and empty vault listings
 
 This is the single most common cause of "my Oracle looks empty"
 reports.

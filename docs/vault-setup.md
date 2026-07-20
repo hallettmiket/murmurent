@@ -64,7 +64,7 @@ That git-inits your vault, creates the private `murmurent_vault` repo, pushes
 only the Murmurent folders, and points Murmurent at it. Your dashboard's Oracle
 and Notebook panels do not change: they become git-backed.
 
-## Important gotcha: symlinked folders
+## Symlinked vault folders
 
 If your `oracle/` (or `lab-notebook/` / `maps-legends/`) is a **symbolic link**
 (e.g. Obsidian pointing at `~/.claude/agent-memory/oracle`), git can't follow
