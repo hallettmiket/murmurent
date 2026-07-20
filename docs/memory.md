@@ -7,7 +7,7 @@ vector index. Murmurent instead separates memory into three explicit
 tiers, each with its own representation, access pattern, and
 governance.
 
-Those three tiers, **conversation context**, **the oracle**, and
+Those three tiers, **conversation context**, **the vault**, and
 **bulk data**, map onto three different places on disk, three different
 audiences, and three different sets of rules about who can write what. This page walks
 through each tier, how information moves between them, and the
@@ -34,6 +34,14 @@ interface. Murmurent adds two things on top of it:
    Murmurent VSCode dashboard's live activity pane (see
    [`vscode-workflow.md`](vscode-workflow.md)).
 
+The injected `CLAUDE.md` and rules tell an agent a project's *conventions*;
+they do not tell it where your Tier-2 memory sits. An agent finds the vault
+a different way: your vault's path is pinned once per machine in
+`~/.murmurent/machine.yaml` (the `obsidian_vault_path` field), and the
+`murmurent-oracle` MCP server resolves the vault's recognized folders from
+that pin. Agents therefore reach Tier-2 memory through the Oracle MCP tools
+without being told the path in each session.
+
 **Where it lives.** Nowhere durable. It's the CC session's own context
 window, plus a line in `~/.murmurent/agents.log` for the audit trail.
 
@@ -47,27 +55,42 @@ path out of Tier 1.
 
 ---
 
-## Tier 2: the oracle, durable and human-readable memory
+## Tier 2: the Obsidian vault
 
-**What it is.** Durable, qualitative knowledge (observations,
-decisions, near-miss results, literature summaries, methodological
-choices) recorded as Markdown entries with mandatory frontmatter
-(`title`, `date`, `project`, `sensitivity`, `tags`, `sources`; full
-schema at
-[`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md)).
+**What it is.** Durable, human-readable knowledge, kept in your personal
+**Obsidian vault** (see [Your Obsidian vault](obsidian-usage.md)). The vault
+is the container for Tier-2 memory. It may also hold your own private,
+non-research notes; Murmurent reads and writes only the parts described
+here and leaves the rest of the vault alone.
 
-This is a deliberate contrast with RAG. RAG is a stateless lookup over
-an opaque vector index, rebuilt rather than accumulated, with limited
-visibility into provenance. The oracle instead returns schema-validated
-entries with explicit provenance, sensitivity, and an audit trail, and
-accumulates across personnel turnover by design. Entries are
-git-tracked and human-readable, so the recorded knowledge can be
-audited by reading files rather than an opaque index.
+Murmurent recognizes three kinds of content in the vault:
 
-**Two tiers within Tier 2.** The oracle is itself two-tier: a per-user
-*personal* oracle in each researcher's Obsidian vault, and a per-lab
-*group* oracle that ingests curated entries through a reviewed
-publication step.
+- **The Oracle** (`oracle/`): curated, structured findings, one Markdown
+  entry per fact, each carrying mandatory frontmatter (`title`, `date`,
+  `project`, `sensitivity`, `tags`, `sources`; full schema at
+  [`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md)).
+  This is the distilled, schema-checked core of your memory.
+- **The lab notebook** (`lab-notebook/`): your daily, less-structured
+  entries recording what you did and observed. Notebook entries do not
+  require the Oracle schema. See [The lab notebook](lab_notebook_guide.md).
+- **Source attachments**: the underlying documents a finding refers to,
+  such as PDFs of papers, spreadsheets, or images. Agents read these on
+  demand, and an entry references them (see "Bringing documents into the
+  vault" below).
+
+The Oracle and the lab notebook are **parallel** parts of the vault: the
+Oracle is the curated layer and the notebook is the raw daily layer;
+neither is contained in the other. A further folder, **`maps-legends/`**, is
+your own human-readable index of how the whole vault is organized.
+
+Recording knowledge as schema-validated Markdown entries, rather than as an
+opaque vector index rebuilt on each query, keeps explicit provenance,
+sensitivity, and an audit trail, and lets the memory accumulate across
+personnel turnover and be inspected by reading files.
+
+**Personal and lab Oracle.** The Oracle itself spans two tiers: a per-user
+*personal* Oracle in each researcher's vault, and a per-lab *group* Oracle
+that ingests curated entries through a reviewed publication step.
 
 | | Personal Oracle | Lab Oracle |
 |---|---|---|
@@ -94,20 +117,47 @@ oracle as the curated core, both schema-checked, and the notebook
 distilled findings. Full detail:
 [`oracle-workflow.md`](oracle-workflow.md).
 
-**Promotion: personal → lab.** Deliberate and reviewed, never
-automatic; see the worked example below for the exact commands. The
-intent, per `oracle-workflow.md`, is that findings from one
-collaboration don't accidentally cross-contaminate another.
+### Bringing documents into the vault (PDFs and spreadsheets)
 
-**Governance boundary.** `murmurent oracle publish` refuses any entry
-with `sensitivity: clinical` or `sensitivity: restricted`. Those stay
-in the personal vault, permanently. The personal Oracle agent enforces
-the same refusal before it will even stage a draft. This matches the
-schema rule in
+Not everything worth keeping is a short note. You will often want a specific
+document, a PDF of a paper, a spreadsheet of results, or an image, available
+to Murmurent. The convention is:
+
+1. Save the document in a folder of your choice inside the vault (for
+   example `papers/` or `attachments/`).
+2. Record a short Oracle or notebook entry that references it, either by its
+   path or, for a paper, its `url:` or DOI. That entry is the durable,
+   searchable memory; the document is the source it points to.
+
+An agent then reads the document directly on demand (Claude Code reads PDFs,
+spreadsheets, and images), and the referencing entry makes it findable in a
+later session. Murmurent does not index the document itself; the Markdown
+entry is what appears in Oracle search. A small table can instead be pasted
+into a note as Markdown, so its rows are searched along with the prose (see
+[vignette 5](vault_vignettes/5_bring_in_a_table.md)).
+
+For **clinical or otherwise sensitive** documents, mark the referencing
+entry `sensitivity: clinical` so it stays in your personal vault and is
+never published to the lab. Large bulk-data files (cohort tables, imaging
+stacks) belong in Tier 3, not the vault.
+
+### From the personal to the Lab Oracle
+
+Promotion from the personal Oracle to the Lab Oracle is deliberate and
+reviewed, never automatic; see the worked example below for the exact
+commands. The intent, per [`oracle-workflow.md`](oracle-workflow.md), is
+that findings from one collaboration do not accidentally cross-contaminate
+another.
+
+A governance boundary sits on this promotion. `murmurent oracle publish`
+refuses any entry with `sensitivity: clinical` or `sensitivity: restricted`;
+those stay in the personal vault permanently. The personal Oracle agent
+enforces the same refusal before it will even stage a draft. This matches
+the schema rule in
 [`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md),
-which states that a clinical entry must stay in the personal vault and
-is never published to the Lab Oracle, and it is enforced identically
-in the agent definitions of both `oracle` and `lab_oracle`.
+which states that a clinical entry must stay in the personal vault and is
+never published to the Lab Oracle, and it is enforced identically in the
+agent definitions of both `oracle` and `lab_oracle`.
 
 ---
 

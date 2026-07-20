@@ -11,7 +11,7 @@ For vault-side organization, meaning how you personally organize your
 notes overall (including the `maps-legends/` folder), see the
 `CLAUDE.md` at the root of your vault.
 
-## Two vaults: personal and lab (issue #25)
+## Two vaults: personal and lab
 
 Murmurent distinguishes two kinds of Obsidian vault. Each has a
 machine-independent identity (a GitHub repo) and a per-machine location
@@ -22,12 +22,11 @@ machine-independent identity (a GitHub repo) and a per-machine location
 | **Personal** | `murmurent_vault` (private, on the person's own GitHub) | the individual (including the PI) | Machine window, Personal vault | private to the person |
 | **Lab (group)** | `murmurent_lab_mgmt_<lab>` (private, on the lab's GitHub) | the lab or core | Machine window, Lab vault | yes, every member gets read access |
 
-The lab vault is the existing lab-management repo. Per the PI's decision
-on issue #25, the group Oracle, lab notebook, and `maps-legends/` for
-the group all live under `murmurent_lab_mgmt_<lab>`, which members
-already clone read-only (via `group_reconcile.grant_lab_mgmt_read`) and
-which `roster_sync` keeps fresh with a fast-forward-only pull. This repo
-supersedes the issue's originally proposed `murmurent_vault_lab` name.
+The lab vault is the existing lab-management repo. The group Oracle, lab
+notebook, and `maps-legends/` for the group all live under
+`murmurent_lab_mgmt_<lab>`, which members already clone read-only (via
+`group_reconcile.grant_lab_mgmt_read`) and which `roster_sync` keeps fresh
+with a fast-forward-only pull.
 
 Identity vs. location:
 

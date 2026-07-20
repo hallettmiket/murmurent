@@ -11,8 +11,9 @@ reads from there:
 
 - `pyproject.toml` declares `dynamic = ["version"]` and points
   `[tool.hatch.version]` at `__init__.py`, so the package metadata is never a
-  second hand-maintained copy (it used to be, and it drifted: see issue #24,
-  where `pyproject.toml` said `1.0.0` while `murmurent --version` said `0.1.0`).
+  second hand-maintained copy (it used to be maintained separately and
+  drifted, with `pyproject.toml` and `murmurent --version` reporting
+  different versions).
 - `murmurent --version` prints `__version__` (via `cli.py`).
 - `core.repo_ready` stamps `__version__` into every murmurent-ready repo's
   `.murmurent.yaml` as `bootstrap_version`.

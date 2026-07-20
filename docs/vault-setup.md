@@ -17,6 +17,13 @@ Within the vault, Murmurent recognizes three folders:
   human-readable guide to your vault; Murmurent's code leaves it entirely to
   you, and Oracle entries may reference it through `[[wikilinks]]`.
 
+You can also keep **source documents** in the vault, such as PDFs of papers
+or small spreadsheets, in a folder of your choice (for example `papers/`).
+An agent reads these on demand, and you reference them from an Oracle or
+notebook entry so they stay findable. See
+[How Murmurent remembers](memory.md#bringing-documents-into-the-vault-pdfs-and-spreadsheets)
+for the convention.
+
 Murmurent backs the vault as a private GitHub repository named
 `murmurent_vault` on your own GitHub account, so your notes are
 version-controlled, survive a lost laptop, and stay in sync across your

@@ -1,5 +1,9 @@
 # Making a repo Murmurent-ready
 
+A **repo** (repository) is a folder of code and files tracked by git,
+living under `~/repos/` on your machine. Your day-to-day research work
+happens inside repositories.
+
 A **Murmurent-ready** repo is a git clone that has the commons agents and
 rules wired in, so Claude Code sessions opened in it can use Murmurent.
 This page covers how to make a repo ready, check its status, and upgrade
