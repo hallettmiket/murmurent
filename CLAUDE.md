@@ -8,15 +8,18 @@ Full vision: [`assets/chair_renewal_1.3.pdf`](assets/chair_renewal_1.3.pdf)
 (§ "Proposed Research Program"). TL;DR:
 
 - **Choreography, not orchestration.** Each group runs its own
-  documented pattern using shared agents + rules; no central
-  controller decides every move. Limits the blast radius of any
-  failure and preserves each group's autonomy.
-- **Five social units**: individuals, groups (PI + HQP),
-  collaborations (sets of groups with projects), cores (e.g.
-  proteomics facility), administration (governance).
+  documented workflow using the shared agents and rules, and retains
+  authority over its own members and data. Distributing control this
+  way limits the scope of any single failure and preserves each
+  group's autonomy. ("Choreography" is the term used throughout the
+  code for a recurring multi-actor workflow recipe.)
+- **Four social units**: individual members; groups (each a lab or a
+  core, led by a PI); projects (units of work that bring members
+  together, potentially across groups); and the administration
+  (centre-level governance and registry).
 - **The commons** = centre-wide AI infrastructure every member draws
   on (reference agents + data-governance rules + baseline workflows).
-  Group/core *toolkits* are built on top.
+  Group/core toolkits are built on top.
 
 ## Reference agents (the commons)
 
