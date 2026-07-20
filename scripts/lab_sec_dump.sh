@@ -22,7 +22,8 @@
 #                           dir; the lab group that may read it.
 #   MURMURENT_SNAPSHOT_BASE Where snapshots are written (LOCAL disk).
 #                           Default: /var/lib/murmurent/.snapshot
-#   MURMURENT_LAB_VM_ROOT   Lab data root (for member-handle discovery).
+#   MURMURENT_DATA_ROOT     Lab data root (for member-handle discovery).
+#                           (legacy: MURMURENT_LAB_VM_ROOT, still honoured)
 #                           Default: /data/lab_vm
 #   MURMURENT_HOME_GLOBS    Space-separated globs of member home dirs for
 #                           the authorized_keys walk. Default: "/home/*"
@@ -66,7 +67,7 @@ READ_BASE="$WRITE_BASE"   # same path on local disk — no NFS view to map.
 # The sudo-only root ACL view that exposes the real NFSv4 ACLs (for ACL
 # reads). REQUIRED — site-specific, no safe generic default.
 V4_ROOT="${MURMURENT_ACL_ROOT:?set MURMURENT_ACL_ROOT to the sudo-only root ACL view (must contain raw/ and refined/)}"
-LAB_MEMBERS_DIR="${MURMURENT_LAB_VM_ROOT:-/data/lab_vm}"   # used for member-handle discovery
+LAB_MEMBERS_DIR="${MURMURENT_DATA_ROOT:-${MURMURENT_LAB_VM_ROOT:-/data/lab_vm}}"   # used for member-handle discovery
 SSHD_CONFIG="/etc/ssh/sshd_config"
 AUTH_LOG="/var/log/auth.log"
 TODAY_UTC="$(date -u +%Y-%m-%d)"

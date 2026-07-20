@@ -185,7 +185,7 @@ We are explicitly NOT pursuing shared brains in this iteration.
 ## Privacy and access
 
 - **Personal**: lives in the person's vault and `~/.claude/agent-memory/`. Never leaves their machine.
-- **Project-scoped**: lives in a private GitHub repo (one per project) with a checked-in `MEMBERS` file as the source of truth. Filesystem ACL on `$MURMURENT_LAB_VM_ROOT/refined/<project>/` is synced from MEMBERS.
+- **Project-scoped**: lives in a private GitHub repo (one per project) with a checked-in `MEMBERS` file as the source of truth. Filesystem ACL on `$MURMURENT_DATA_ROOT/append_only/<project>/` is synced from MEMBERS.
 - **Group-shared**: agent definitions in the Murmurent repo; curated findings in a group oracle; readable to all group members.
 - **Sensitive artefacts that must travel** (cloud, email, off-VM): wrap in `age` with MEMBERS as the recipient list. Re-encrypt on membership change.
 
@@ -239,11 +239,13 @@ When a PR merges to `main`, a merge Action runs:
 - `notebook.md` with `status: complete` → audit entry written to the project registry; refined-data checksums re-verified.
 - `MEMBERS` change → ACL re-sync on the lab VM; `age` re-encrypt of any encrypted bundles.
 
-### Refined-data updates
+### Append-only-data updates
 
-When an analysis produces new files in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/`, the notebook's `refined_data:` and `checksums:` fields need updating. This is a frequent operation; it should not require PR review.
+Bulk data lives under two directories whose names state the guarantee they carry: `immutable/` holds read-only source data by convention, and `append_only/` holds derived outputs. The legacy names `raw/` and `refined/`, along with the `MURMURENT_LAB_VM_ROOT` environment variable, remain recognized during a transition. `murmurent data migrate` renames an existing root to the new scheme.
 
-- `murmurent push <project> --refined <exp>` recomputes checksums for files in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/`, updates the notebook's `refined_data:` and `checksums:` fields, and pushes to the member's personal branch.
+When an analysis produces new files in `$MURMURENT_DATA_ROOT/append_only/<project>/<exp>/`, the notebook's `append_only_data:` and `checksums:` fields need updating. This is a frequent operation; it should not require PR review.
+
+- `murmurent push <project> --refined <exp>` recomputes checksums for files in `$MURMURENT_DATA_ROOT/append_only/<project>/<exp>/`, updates the notebook's `append_only_data:` and `checksums:` fields, and pushes to the member's personal branch.
 - The eventual `--finalize` PR rolls all those personal-branch updates into `main` along with the status flip to `complete`.
 
 ### Why path-based, not all-PR or all-direct
@@ -600,7 +602,7 @@ Each member has a dashboard. The PI gets an enhanced version of it. Two implemen
 - **Security and compliance**: per-project sensitivity badge (`standard` / `restricted` / `clinical`), the controls required for that tier, and your compliance status (TCPS 2 certified ✓, TOTP enrolled ✓, signing key registered ✓, etc.). Missing required controls render in red with a one-click action to resolve. Includes an **Elected upgrades** subsection where you toggle stricter-than-required controls (always-on 2FA, always age-encrypted off-VM transfers, etc.). Required and elected stay distinct: you can layer stricter controls but cannot opt out of required ones. See [Sensitivity tiers](#sensitivity-tiers-and-project-level-controls).
 - **Quick MCP queries**: inventory search bar (low / expiring shortcuts), oracle latest, request board.
 - **Recent activity**: your commits, your PRs, oracle publishes touching projects you're in.
-- **Storage / compute**: your workspace size, your share of `$MURMURENT_LAB_VM_ROOT/refined/`, GitHub Action minutes consumed.
+- **Storage / compute**: your workspace size, your share of `$MURMURENT_DATA_ROOT/append_only/`, GitHub Action minutes consumed.
 - **Notifications**: PR reviews waiting on you, SEAs assigned, role transitions to ack, oracle digests.
 - **Quick actions**: new experiment, push, request SEA, open a project repo.
 
@@ -679,7 +681,7 @@ data_residency: ca
 
 For `sensitivity: clinical`:
 
-- **No data in repo**: notebook frontmatter's `raw_data:` and `refined_data:` paths point only to lab VM locations. Checksums also stay on the VM, not in the repo. A pre-commit hook refuses commits that introduce data files into a clinical repo.
+- **No data in repo**: notebook frontmatter's `immutable_data:` and `append_only_data:` paths point only to lab VM locations. Checksums also stay on the VM, not in the repo. A pre-commit hook refuses commits that introduce data files into a clinical repo.
 - **Per-project encrypted volume** on lab VM. Mounted only while the project is active; unmounted on session end.
 - **PHI pattern detection** extends the secret-leak hook with patterns: OHIP (10-digit + 2-letter version code), MRN-style identifiers, SIN, DOB-near-name proximity. Outbound calls (WebFetch, mcp__slack, Anthropic API) refuse to send any prompt or argument matching these patterns.
 - **Member certifications**: each clinical-project member holds current TCPS 2 (CORE-2022) certification, recorded in `lab-mgmt-repo/members/<handle>.md` with expiry date. Auto-revocation on expiry.

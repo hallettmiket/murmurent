@@ -58,7 +58,7 @@ def test_push_refined_recomputes_checksums(project):
 
     notebook = project.path / "exp" / "1_alpha" / "notebook.md"
     parsed = parse_file(notebook)
-    refined_paths = parsed.meta.get("refined_data") or []
+    refined_paths = parsed.meta.get("append_only_data") or []
     checksums = parsed.meta.get("checksums") or {}
     assert any("out_v1.csv" in p for p in refined_paths)
     assert any("out_v2.csv" in p for p in refined_paths)

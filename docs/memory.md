@@ -177,12 +177,19 @@ free to organize differently; the part that generalizes is the core
 idea the layout encodes: a hard distinction between immutable original
 inputs and append-only derived outputs.
 
-- **`raw/<project>/`**: read-only. Original inputs from instruments,
+- **`immutable/<project>/`**: read-only. Original inputs from instruments,
   collaborators, or public repositories.
-- **`refined/<project>/<experiment>/`**: append-only. Outputs of
+- **`append_only/<project>/<experiment>/`**: append-only. Outputs of
   analyses, mirroring the structure of `exp/` in the project's git
   repo so the relationship between code and the data it produced is
   one `cd` away.
+
+The directory names now state the guarantee they carry: `immutable/`
+holds read-only source data by convention, and `append_only/` holds
+derived outputs. The legacy names `raw/` and `refined/`, along with the
+`MURMURENT_LAB_VM_ROOT` environment variable, remain recognized during a
+transition. `murmurent data migrate` renames an existing root to the new
+scheme.
 
 **How the invariant is enforced.** Murmurent installs two Claude Code
 hooks, registered by `murmurent install --hooks`, that make these
@@ -190,12 +197,12 @@ rules mechanical rather than a matter of convention:
 
 - [`raw_guard`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/hooks/raw_guard.py)
   blocks any write, edit, rename, truncate, chmod, or delete under
-  `raw/`, whether attempted through Write, Edit, NotebookEdit, or a
-  Bash command. This is what makes `raw/` immutable.
+  `immutable/`, whether attempted through Write, Edit, NotebookEdit, or a
+  Bash command. This is what keeps `immutable/` read-only.
 - [`protected_paths`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/hooks/protected_paths.py)
   blocks delete or overwrite of any file that already exists under
-  `refined/`, while still allowing brand-new files. This is what makes
-  `refined/` append-only.
+  `append_only/`, while still allowing brand-new files. This is what makes
+  `append_only/` append-only.
 
 To supersede a refined file, write a new integer-suffixed version
 (`file_2.csv`) instead of overwriting `file_1.csv`.
@@ -209,7 +216,7 @@ chemical-structure database), through a dedicated MCP server rather
 than by copying the data into a prompt.
 
 **A related, project-scoped artefact: the experimental notebook.**
-Alongside raw/refined data, each experiment carries a git-tracked
+Alongside immutable/append_only data, each experiment carries a git-tracked
 `notebook.md` at `<project_repo>/exp/<n>_<slug>/notebook.md`: protocol,
 run dates, instrument, data-file paths, and conclusions, visible to
 every project member on the next `git pull`. It sits structurally
@@ -237,7 +244,7 @@ coloured badge). There are three levels:
 | `clinical` | Stays in the personal vault. The underlying clinical records stay in Tier-3 storage with access logging (see below). | Refuses to publish it. |
 
 For `clinical` data, the records themselves live in Tier-3 storage
-(for example under `raw/<project>/clinical/`) with access logging.
+(for example under `immutable/<project>/clinical/`) with access logging.
 Agents reach them only through a de-identifying MCP boundary that
 returns structured summary slices, never the raw pathology reports or
 radiology notes. The records are never copied into an oracle entry, a
@@ -254,8 +261,8 @@ it never gets promoted to the Lab Oracle.
 |---|---|
 | `sensitivity: clinical` / `restricted` entries never leave the personal vault | `oracle` agent (refuses to stage a draft) and `murmurent oracle publish` CLI (refuses to commit) |
 | New Lab Oracle entries arrive only via reviewed `murmurent oracle publish` | `lab_oracle` agent has no `Write` tool; the CLI is the only write path |
-| `raw/` is immutable | `raw_guard` hook, blocks Write/Edit/NotebookEdit/Bash on `raw/` |
-| `refined/` is append-only | `protected_paths` hook, blocks delete/overwrite of existing files |
+| `immutable/` is read-only | `raw_guard` hook, blocks Write/Edit/NotebookEdit/Bash on `immutable/` |
+| `append_only/` is append-only | `protected_paths` hook, blocks delete/overwrite of existing files |
 | Clinical-cohort records never enter the oracle or a vector index | Tier-3 storage plus a de-identifying MCP boundary; only provenance/summary metadata reaches Tier 2 |
 
 ---
@@ -326,9 +333,9 @@ who joins the lab after @allie has moved on.
 **Tier 3: the data underneath the finding.** The oracle entry's
 `source_exp: 3_alignment_qc` points at the actual evidence: the
 aligned BAMs and QC report live at
-`$MURMURENT_LAB_VM_ROOT/refined/brca_wgs/3_alignment_qc/qc_report.html`,
+`$MURMURENT_DATA_ROOT/append_only/brca_wgs/3_alignment_qc/qc_report.html`,
 produced from immutable inputs at
-`$MURMURENT_LAB_VM_ROOT/raw/brca_wgs/3_alignment_qc/`, with provenance
+`$MURMURENT_DATA_ROOT/immutable/brca_wgs/3_alignment_qc/`, with provenance
 also recorded in the git-tracked `exp/3_alignment_qc/notebook.md`. The
 oracle entry is the durable, searchable pointer and summary. The
 multi-gigabyte alignment outputs themselves stay in Tier 3, which is
@@ -349,4 +356,4 @@ the oracle or a prompt.
 - [`agents.md`](agents.md): the `oracle` and `lab_oracle` agents in
   the context of the full reference-agent roster.
 - [`../rules/data-storage.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/data-storage.md):
-  the Tier-3 raw/refined invariants and the hooks that enforce them.
+  the Tier-3 immutable/append_only invariants and the hooks that enforce them.

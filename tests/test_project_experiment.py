@@ -109,7 +109,7 @@ def test_experiment_ingest_updates_notebook(isolated_env, tmp_path):
     assert exit_code == 0
     notebook = isolated_env / "repos" / "p" / "exp" / "1_alpha" / "notebook.md"
     parsed = parse_file(notebook)
-    raw = parsed.meta.get("raw_data") or []
+    raw = parsed.meta.get("immutable_data") or []
     instr = parsed.meta.get("instrument_outputs") or []
     checksums = parsed.meta.get("checksums") or {}
     assert any("S001.fastq.gz" in p for p in raw)

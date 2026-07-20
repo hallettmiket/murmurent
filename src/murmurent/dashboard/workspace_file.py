@@ -1,6 +1,6 @@
 """
 Purpose: Build a VSCode multi-root ``.code-workspace`` file for a project so
-         a non-IT-savvy user sees their repo, refined outputs, lab notebook,
+         a non-IT-savvy user sees their repo, append-only outputs, lab notebook,
          personal Oracle, and group Oracle in a single Explorer pane —
          without having to navigate the filesystem themselves.
 Author: Mike Hallett (with Claude Code)
@@ -60,7 +60,7 @@ def gather_folders(
 
     Order matters — VSCode shows roots in declared order in the Explorer.
     We lead with the project repo (the user's main edit surface), then
-    refined outputs (the data they care about), then the narrative /
+    append-only outputs (the data they care about), then the narrative /
     memory layers in increasing scope (personal → group).
     """
     folders: list[WorkspaceFolder] = []
@@ -69,9 +69,9 @@ def gather_folders(
     if repo_dir.is_dir():
         folders.append(WorkspaceFolder(name=f"Project: {project}", path=repo_dir))
 
-    refined = lab_vm.project_refined_dir(project, env=env)
+    refined = lab_vm.project_append_only_dir(project, env=env)
     if refined.is_dir():
-        folders.append(WorkspaceFolder(name="Refined outputs", path=refined))
+        folders.append(WorkspaceFolder(name="Append-only outputs", path=refined))
 
     vault: Path | None = None
     if obsidian_vault_path:

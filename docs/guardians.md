@@ -23,10 +23,10 @@ It has two separate ways of running:
    check this PR before I merge"). It scans the diff for credentials,
    API tokens, SSH keys, age keys, `.env`-style assignments, and known
    cloud key formats; scans touched paths for restricted prefixes
-   (`raw/`, `keys/`, `.env*`, `secrets/`); and, for
+   (`immutable/`, `keys/`, `.env*`, `secrets/`); and, for
    `sensitivity: clinical` projects, scans added text for PHI-shaped
    patterns (OHIP-like, MRN-like, SIN-like, DOB-near-name proximity).
-   It refuses any PR that touches `raw/`, and it treats
+   It refuses any PR that touches `immutable/`, and it treats
    `~/.murmurent/keys/**` and `~/.murmurent/age/**` as never-commit
    paths. Every finding carries a severity (`PASS`, `WARN`, `BLOCK`)
    and the report ends with an overall verdict.
@@ -39,7 +39,7 @@ It has two separate ways of running:
    [`security-dashboard.md`](security-dashboard.md). It runs in two
    tiers:
    - **Tier 1** (unprivileged, no extra setup): walks POSIX
-     permission bits under `raw/`, `refined/`, `~/repos/<project>/`,
+     permission bits under `immutable/`, `append_only/`, `~/repos/<project>/`,
      and the user's own `~/.ssh/`, `~/.murmurent/`, and dotfiles;
      flags world-readable or world-writable files, weak SSH key
      types, non-`0600` credential files, and secret-shaped tracked
@@ -59,7 +59,7 @@ It has two separate ways of running:
    In every mode, the Security Guard is hard-blocked (by its own
    prompt, by the scanner code, and by the `raw_guard` /
    `protected_paths` CC hooks) from ever modifying or deleting a file
-   under `raw/` or `refined/`. Even a finding that looks like it needs
+   under `immutable/` or `append_only/`. Even a finding that looks like it needs
    a `chmod` fix is reported as text only, for the PI to apply by
    hand.
 
@@ -90,7 +90,7 @@ the lab has the access they need, and no more:
   the PI. The member runs the checklist themselves; the Cable Guy
   never generates or transmits a private key on their behalf.
 - **Scaffolding.** `SCAFFOLD_PROJECT` creates the project's GitHub
-  repo, its Slack channel, and its `raw/`/`refined/` directories on
+  repo, its Slack channel, and its `immutable/`/`append_only/` directories on
   each registered lab server.
 - **Health checks.** `CHECK_HEALTH` walks every active installation
   record, confirms the member and the project are still active, and

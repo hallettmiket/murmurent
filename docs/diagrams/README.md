@@ -5,7 +5,7 @@ Hand-tuned Graphviz sources for the Murmurent system. Two diagrams live here:
 | File | What it shows |
 |---|---|
 | [`system_map.dot`](system_map.dot) | One-page system map: identity & launch, the three tiers (Commons / Guilds / Project namespaces), per-project data plane, and external services (GitHub, Slack, MCP). |
-| [`install_modes.dot`](install_modes.dot) | Local vs `lab-server` install side-by-side: where the Obsidian vault, project repo, and `/data/lab_vm/{raw,refined}` live in each mode, plus the SSH boundary. |
+| [`install_modes.dot`](install_modes.dot) | Local vs `lab-server` install side-by-side: where the Obsidian vault, project repo, and `/data/lab_vm/{immutable,append_only}` live in each mode, plus the SSH boundary. |
 
 ## Rendering
 

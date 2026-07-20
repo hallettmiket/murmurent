@@ -1,22 +1,27 @@
 """
 Purpose: Claude Code ``PreToolUse`` hook that refuses any tool call that would
-         mutate files under ``$MURMURENT_LAB_VM_ROOT/raw/``. Read / Glob / Grep
-         are explicitly allowed; the lab's data-storage rule is "raw is
-         read-only, ever."
+         mutate files under the immutable data tree — ``<data-root>/immutable/``
+         and the legacy ``<data-root>/raw/`` (dual-name transition). Read / Glob
+         / Grep are explicitly allowed; the lab's data-storage rule is
+         "immutable data is read-only, ever."
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-07
 Input: Tool-call JSON on stdin in the CC hook contract.
 Output: Decision JSON on stdout (``{"decision": "allow"|"deny", ...}``).
 
 Standalone script: invoked as ``python -m murmurent.hooks.raw_guard`` from
-``~/.claude/settings.json``. The full hook installer lands in phase 4; phase 2
-ships only this hook plus a harness for testing.
+``~/.claude/settings.json``.
+
+The data root is resolved from ``$MURMURENT_DATA_ROOT`` (new canonical name),
+falling back to the legacy ``$MURMURENT_LAB_VM_ROOT``. Both the new
+``immutable/`` and the legacy ``raw/`` sub-dirs are blocked so un-migrated
+deployments stay protected.
 
 The hook is permissive by design: it only refuses obvious mutations (Write /
-Edit / NotebookEdit targeting raw, plus Bash commands containing redirects or
-destructive operations on raw paths). Subtle attacks (a Python script that
-shells out to ``os.unlink``) are out of scope; this is a guardrail, not a
-security perimeter.
+Edit / NotebookEdit targeting immutable data, plus Bash commands containing
+redirects or destructive operations on those paths). Subtle attacks (a Python
+script that shells out to ``os.unlink``) are out of scope; this is a guardrail,
+not a security perimeter.
 """
 
 from __future__ import annotations
@@ -29,8 +34,9 @@ import sys
 from pathlib import Path
 from typing import IO, Any
 
-DEFAULT_RAW_ROOT = Path("~/wigamig/raw").expanduser()
-PRODUCTION_RAW_ROOT = Path("/data/lab_vm/wigamig/raw")
+DEFAULT_DATA_ROOT = Path("~/lab_vm/data").expanduser()
+IMMUTABLE_SUBDIR = "immutable"
+LEGACY_IMMUTABLE_SUBDIR = "raw"
 DESTRUCTIVE_COMMANDS: frozenset[str] = frozenset(
     {"rm", "mv", "tee", "dd", "chmod", "chown", "truncate", "shred"}
 )
@@ -38,19 +44,28 @@ COPY_COMMANDS: frozenset[str] = frozenset({"cp", "rsync", "install"})
 WRITE_TOOLS: frozenset[str] = frozenset({"Write", "Edit", "NotebookEdit"})
 
 
-def _raw_prefixes() -> tuple[str, ...]:
-    """Return the set of path prefixes that count as 'raw'.
+def _data_root() -> Path:
+    """Resolve the data root from the env, honouring both spellings.
 
-    Always honours ``$MURMURENT_LAB_VM_ROOT`` (so the smoke-test setup is covered)
-    and always also blocks the production ``/data/lab_vm/wigamig/raw/`` path even when
-    the env var points elsewhere — defense in depth.
+    Prefers ``$MURMURENT_DATA_ROOT``; falls back to the legacy
+    ``$MURMURENT_LAB_VM_ROOT``; then the dev default ``~/lab_vm/data``.
     """
-    prefixes: list[str] = [str(PRODUCTION_RAW_ROOT)]
-    env = os.environ.get("MURMURENT_LAB_VM_ROOT")
-    if env:
-        prefixes.append(str(Path(env).expanduser() / "raw"))
-    else:
-        prefixes.append(str(DEFAULT_RAW_ROOT))
+    env = os.environ.get("MURMURENT_DATA_ROOT") or os.environ.get("MURMURENT_LAB_VM_ROOT")
+    return Path(env).expanduser() if env else DEFAULT_DATA_ROOT
+
+
+def _raw_prefixes() -> tuple[str, ...]:
+    """Return the set of path prefixes that count as 'immutable'.
+
+    Covers both the new ``immutable/`` sub-dir and the legacy ``raw/`` sub-dir
+    of the configured data root, so a dual-name (partly-migrated) deployment
+    stays protected either way.
+    """
+    base = _data_root()
+    prefixes: list[str] = [
+        str(base / IMMUTABLE_SUBDIR),
+        str(base / LEGACY_IMMUTABLE_SUBDIR),
+    ]
     seen: set[str] = set()
     out: list[str] = []
     for p in prefixes:
@@ -129,14 +144,16 @@ def evaluate(call: dict[str, Any]) -> dict[str, Any]:
         if _is_raw_path(target):
             return {
                 "decision": "deny",
-                "reason": (f"raw data is read-only by lab policy; refusing {tool} on {target}"),
+                "reason": (
+                    f"immutable data is read-only by lab policy; refusing {tool} on {target}"
+                ),
             }
     elif tool == "Bash":
         violated, reason = _bash_targets_raw(args.get("command", ""))
         if violated:
             return {
                 "decision": "deny",
-                "reason": f"raw data is read-only by lab policy; {reason}",
+                "reason": f"immutable data is read-only by lab policy; {reason}",
             }
     return {"decision": "allow"}
 

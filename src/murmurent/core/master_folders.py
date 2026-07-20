@@ -7,8 +7,8 @@ Input: A ``lab_base`` string in ``host:/abs/path`` form (e.g.
 Output: ``[Probe]`` describing each subfolder check / mkdir.
 
 The lab_base subtree on lab-server is the central place every project on
-that server resolves its raw/, refined/, repos/, notebooks/, lab_oracle/
-underneath. Until a lab is first set up, those folders may not exist;
+that server resolves its immutable/, append_only/, repos/, notebooks/,
+lab_oracle/ underneath. Until a lab is first set up, those folders may not exist;
 this module probes for them over SSH and creates the missing ones on
 explicit request (never on a passive read — the user must press a
 button so directory-creation isn't a hidden side effect).
@@ -36,13 +36,13 @@ from . import hosts as _hosts
 from . import remote as _remote
 from .preflight import Probe
 
-# Order matters for display — raw + refined come first because they
-# hold the data; the rest are housekeeping. There used to be a ``repos``
+# Order matters for display — immutable + append_only come first because
+# they hold the data; the rest are housekeeping. There used to be a ``repos``
 # entry for "lab-local bare repos" (i.e. a self-hosted GitHub stand-in),
 # but the lab decided git origins are managed by external providers
 # (GitHub today, GITEA later) — not by a folder on the lab server.
 # Working clones live in each user's ``~/repos/``.
-MASTER_SUBDIRS: tuple[str, ...] = ("raw", "refined", "notebooks", "lab_oracle")
+MASTER_SUBDIRS: tuple[str, ...] = ("immutable", "append_only", "notebooks", "lab_oracle")
 
 CACHE_FILE = Path.home() / ".murmurent" / "master_folders.yaml"
 

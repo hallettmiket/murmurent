@@ -39,7 +39,8 @@ def _run(payload: dict, env: dict[str, str] | None = None) -> dict:
     return data   # unchanged for unfamiliar shapes
 
 
-def test_write_into_raw_denied(monkeypatch, tmp_path):
+def test_write_into_legacy_raw_denied(monkeypatch, tmp_path):
+    """Dual-name: the legacy raw/ tree is still blocked."""
     monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
     payload = {
         "tool_name": "Write",
@@ -47,7 +48,29 @@ def test_write_into_raw_denied(monkeypatch, tmp_path):
     }
     decision = _run(payload)
     assert decision["decision"] == "deny"
-    assert "raw" in decision["reason"].lower()
+    assert "immutable" in decision["reason"].lower()
+
+
+def test_write_into_immutable_denied(monkeypatch, tmp_path):
+    """The new immutable/ tree is blocked."""
+    monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
+    payload = {
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(tmp_path / "immutable" / "p" / "1_e" / "x.fastq.gz")},
+    }
+    assert _run(payload)["decision"] == "deny"
+
+
+def test_new_env_var_honored(monkeypatch, tmp_path):
+    """MURMURENT_DATA_ROOT resolves the immutable tree for the hook."""
+    monkeypatch.delenv("MURMURENT_LAB_VM_ROOT", raising=False)
+    monkeypatch.setenv("MURMURENT_DATA_ROOT", str(tmp_path))
+    for sub in ("immutable", "raw"):
+        payload = {
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(tmp_path / sub / "p" / "1_e" / "x.fastq.gz")},
+        }
+        assert _run(payload)["decision"] == "deny"
 
 
 def test_write_outside_raw_allowed(monkeypatch, tmp_path):
@@ -109,14 +132,16 @@ def test_read_tool_on_raw_allowed(monkeypatch, tmp_path):
     assert _run(payload)["decision"] == "allow"
 
 
-def test_production_path_blocked_even_with_env(monkeypatch, tmp_path):
-    """The production /data/lab_vm/wigamig/raw is always blocked, regardless of env."""
+def test_stale_wigamig_path_no_longer_hardcoded(monkeypatch, tmp_path):
+    """The stale ``/data/lab_vm/wigamig/raw`` branding was removed; protection now
+    follows the configured data root only, not a hardcoded lab-specific path."""
+    monkeypatch.delenv("MURMURENT_DATA_ROOT", raising=False)
     monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path))
     payload = {
         "tool_name": "Write",
         "tool_input": {"file_path": "/data/lab_vm/wigamig/raw/some_proj/exp/x.fastq.gz"},
     }
-    assert _run(payload)["decision"] == "deny"
+    assert _run(payload)["decision"] == "allow"
 
 
 def test_empty_stdin_allows():

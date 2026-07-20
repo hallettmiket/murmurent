@@ -32,7 +32,7 @@
 
 set -euo pipefail
 
-LAB_VM_ROOT="${MURMURENT_LAB_VM_ROOT:-/data/lab_vm}"
+LAB_VM_ROOT="${MURMURENT_DATA_ROOT:-${MURMURENT_LAB_VM_ROOT:-/data/lab_vm}}"
 LOG_FILE="${MURMURENT_PROJECT_ACL_LOG:-/var/log/murmurent/project_acl.log}"
 SLUG_RE='^[a-z0-9][a-z0-9_]{1,30}$'
 

@@ -126,7 +126,7 @@ digraph murmurent_system_map {
     lab_mgmt    [label="lab-mgmt repo\n(charter, MEMBERS, audit)",            fillcolor="#FFFFFF"];
     registry    [label="lab_info/_registry.yaml\n(centre registry, registrars:)", fillcolor="#FFFFFF"];
     proj_repo   [label="project repo\n(per-project, GH-hosted)",              fillcolor="#FFFFFF"];
-    lab_vm      [label="/data/lab_vm/{raw,refined}/&lt;project&gt;",         fillcolor="#FFFFFF"];
+    lab_vm      [label="/data/lab_vm/{immutable,append_only}/&lt;project&gt;",         fillcolor="#FFFFFF"];
     vault       [label="Obsidian vault\n(one per user)",                      fillcolor="#FFFFFF"];
   }
 
@@ -146,7 +146,7 @@ digraph murmurent_system_map {
 
   proj1 -> lab_mgmt   [label="charter"];
   proj1 -> proj_repo  [label="code/data"];
-  proj1 -> lab_vm     [label="raw / refined"];
+  proj1 -> lab_vm     [label="immutable / append_only"];
   proj1 -> vault      [label="lab notebook"];
   proj_repo -> github [label="push"];
 

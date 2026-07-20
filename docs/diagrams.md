@@ -55,8 +55,8 @@ graph LR
         PR2["project repo: bbb_perm<br/>(CHARTER, MEMBERS,<br/>exp/, src/, findings/)"]
     end
     subgraph LV["Lab VM (/data/lab_vm/)"]
-        RAW["raw/<br/>(read-only,<br/>per-project)"]
-        REF["refined/<br/>(analysis outputs,<br/>per-project)"]
+        RAW["immutable/<br/>(read-only,<br/>per-project)"]
+        REF["append_only/<br/>(analysis outputs,<br/>per-project)"]
     end
     subgraph LOCAL["Member machine"]
         CC["Claude Code +<br/>~/.claude/<br/>(agents, MCP servers)"]
@@ -104,7 +104,7 @@ State diagram of a project's life from charter to archive, with transitions and 
 ```mermaid
 stateDiagram-v2
     [*] --> Birth: PI approves<br/>charter
-    Birth --> Active: scaffold repo,<br/>create raw+refined dirs,<br/>register
+    Birth --> Active: scaffold repo,<br/>create immutable+append_only dirs,<br/>register
     Active --> Active: admit / release<br/>(MEMBERS, ACL,<br/>age re-encrypt)
     Active --> Paused: pause<br/>(audit entry)
     Paused --> Active: resume

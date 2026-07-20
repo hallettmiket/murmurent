@@ -3,8 +3,8 @@ Purpose: Implementations of ``murmurent experiment ...`` subcommands.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-07
 Input: CLI arguments forwarded from :mod:`murmurent.cli`.
-Output: Side effects on the project repo's ``exp/`` tree, the lab-VM raw +
-        refined dirs, and ``notebook.md`` frontmatter.
+Output: Side effects on the project repo's ``exp/`` tree, the data root's
+        immutable + append-only dirs, and ``notebook.md`` frontmatter.
 """
 
 from __future__ import annotations
@@ -129,8 +129,8 @@ def cmd_new(
         f"Purpose: Entry-point analysis script for experiment {exp_name}.\n"
         "Author: TBD\n"
         f"Date: {_today()}\n"
-        "Input: see notebook.md raw_data section.\n"
-        "Output: see notebook.md refined_data section.\n"
+        "Input: see notebook.md immutable_data section.\n"
+        "Output: see notebook.md append_only_data section.\n"
         '"""\n\n'
         "from __future__ import annotations\n\n\n"
         "def main() -> int:\n"
@@ -145,8 +145,8 @@ def cmd_new(
     lab_vm.ensure_experiment_dirs(project_name, exp_name)
     click.echo(f"Created {exp_dir}")
     click.echo(
-        f"Lab-VM raw:     {lab_vm.experiment_raw_dir(project_name, exp_name)}\n"
-        f"Lab-VM refined: {lab_vm.experiment_refined_dir(project_name, exp_name)}"
+        f"Data immutable:   {lab_vm.experiment_immutable_dir(project_name, exp_name)}\n"
+        f"Data append_only: {lab_vm.experiment_append_only_dir(project_name, exp_name)}"
     )
     return exp_dir
 

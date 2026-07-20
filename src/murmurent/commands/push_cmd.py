@@ -4,7 +4,7 @@ Author: Mike Hallett (with Claude Code)
 Date: 2026-05-07
 Input: CLI arguments forwarded from :mod:`murmurent.cli`.
 Output: Side effects on the project repo's git state, GitHub remote, and the
-        notebook's ``refined_data`` / ``checksums`` frontmatter.
+        notebook's ``append_only_data`` / ``checksums`` frontmatter.
 """
 
 from __future__ import annotations
@@ -170,9 +170,9 @@ def _push_refined(
     message: str | None,
 ) -> int:
     project_name = repo.path.name
-    refined_dir = lab_vm.experiment_refined_dir(project_name, exp_slug)
+    refined_dir = lab_vm.experiment_append_only_dir(project_name, exp_slug)
     if not refined_dir.is_dir():
-        raise click.ClickException(f"refined dir not found: {refined_dir}")
+        raise click.ClickException(f"append-only dir not found: {refined_dir}")
     files: list[Path] = []
     for root, _dirs, names in os.walk(refined_dir):
         for n in names:
@@ -190,7 +190,8 @@ def _push_refined(
     checksums = dict(parsed.meta.get("checksums") or {})
     for e in entries:
         checksums[str(e.path)] = e.sha256
-    parsed.meta["refined_data"] = refined_paths
+    parsed.meta["append_only_data"] = refined_paths
+    parsed.meta.pop("refined_data", None)  # migrate legacy field to the new name
     parsed.meta["checksums"] = checksums
     notebook_path.write_text(dump_document(parsed.meta, parsed.body), encoding="utf-8")
     click.echo(

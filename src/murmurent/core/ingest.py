@@ -121,16 +121,16 @@ def execute_ingest(
     *,
     env: dict[str, str] | None = None,
 ) -> IngestResult:
-    """Copy classified files into the lab-VM, chmod raw read-only, hash everything.
+    """Copy classified files into the data root, chmod immutable read-only, hash.
 
-    Raw files go to ``$MURMURENT_LAB_VM_ROOT/raw/<project>/<experiment>/``;
-    derived files to ``.../refined/<project>/<experiment>/instrument_outputs/``.
-    After copy, the raw directory tree is set ``a-w`` (owner can still ``rm`` since
-    parent perms are unchanged, but files inside are read-only — matches the
-    design's "raw is immutable" rule for code-driven mutation).
+    Immutable files go to ``<data-root>/immutable/<project>/<experiment>/``;
+    derived files to ``.../append_only/<project>/<experiment>/instrument_outputs/``.
+    After copy, the immutable directory tree is set ``a-w`` (owner can still
+    ``rm`` since parent perms are unchanged, but files inside are read-only —
+    matches the design's "immutable is immutable" rule for code-driven mutation).
     """
-    raw_dir = lab_vm.experiment_raw_dir(plan.project, plan.experiment, env=env)
-    refined_dir = lab_vm.experiment_refined_dir(plan.project, plan.experiment, env=env)
+    raw_dir = lab_vm.experiment_immutable_dir(plan.project, plan.experiment, env=env)
+    refined_dir = lab_vm.experiment_append_only_dir(plan.project, plan.experiment, env=env)
     instr_dir = lab_vm.experiment_instrument_outputs_dir(plan.project, plan.experiment, env=env)
     raw_dir.mkdir(parents=True, exist_ok=True)
     refined_dir.mkdir(parents=True, exist_ok=True)

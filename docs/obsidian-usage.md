@@ -105,7 +105,7 @@ different layers; keep them straight:
 | Path | Purpose |
 |---|---|
 | `<vault>/lab-notebook/` (hyphen, singular) | Obsidian-side daily notebook entries. Configured per machine via `~/.murmurent/machine.yaml: notebook_subfolder`. |
-| `$MURMURENT_LAB_VM_ROOT/lab_notebooks/` (underscore, plural) | Murmurent's data-storage layer notebook directory under the lab-VM root, part of the `raw/refined/lab_notebooks` triad. |
+| `$MURMURENT_DATA_ROOT/lab_notebooks/` (underscore, plural) | Murmurent's data-storage layer notebook directory under the data root, part of the `immutable/append_only/lab_notebooks` triad. |
 
 The Obsidian one is where humans browse and edit. The lab-VM one is the
 staging and aggregation tier for cross-user notebook collation (future

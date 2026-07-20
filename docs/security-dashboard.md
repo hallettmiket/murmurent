@@ -22,7 +22,7 @@ Two tiers, two trust levels:
 
 **Hard rule (from the global Murmurent data-storage policy):** the
 security agent **never modifies or deletes any file under the lab's
-`raw/` or `refined/` data trees**, even when its own findings recommend
+`immutable/` or `append_only/` data trees**, even when its own findings recommend
 a fix. All `chmod`/`chown`/ACL adjustments in the dashboard are
 display-only: the PI runs them by hand after vetting.
 
@@ -46,8 +46,8 @@ The usual remedy is a parallel **NFSv4 view restricted to root** that
 exposes the real ACLs (`nfs4_getfacl`). Tier 2 reads from that view.
 
 The Tier 1 scanner detects this situation automatically: if
-`nfs4_getfacl <lab_vm_root>` reports that the attribute isn't supported,
-the scanner **skips the POSIX walks of `raw/` and `refined/`** (which
+`nfs4_getfacl <data_root>` reports that the attribute isn't supported,
+the scanner **skips the POSIX walks of `immutable/` and `append_only/`** (which
 would produce nothing but noise) and emits a single info-finding
 `POSIX-NOT-AUTHORITATIVE-01` pointing the PI at Tier 2.
 
@@ -64,18 +64,18 @@ and are kept in that lab's private lab-management repo, not here.
 ## Rule catalog
 
 Every Tier 1 / Tier 2 finding carries a stable rule ID. Use the anchors
-below to deep-link from the dashboard rows. `<lab_vm_root>` stands for
+below to deep-link from the dashboard rows. `<data_root>` stands for
 the lab's data root.
 
 ### Tier 1: unprivileged scanners
 
 | Rule | Severity | Description |
 |---|---|---|
-| <a id="POSIX-NOT-AUTHORITATIVE-01"></a>`POSIX-NOT-AUTHORITATIVE-01` | info | The data mount synthesizes POSIX bits over native ACLs. POSIX-bit walks of `raw/`/`refined/` were skipped to avoid noise. Run the Tier 2 sudo snapshot for the real picture. |
-| <a id="RAW-IMMUTABLE-01"></a>`RAW-IMMUTABLE-01` | block | File under `<lab_vm_root>/raw/<project>/` has a write bit set. **Only fires on filesystems where POSIX bits are authoritative**: see `POSIX-NOT-AUTHORITATIVE-01`. |
-| <a id="RAW-LAB-ONLY-01"></a>`RAW-LAB-ONLY-01` | warn | File under `raw/` is world-readable. Same caveat. |
-| <a id="REFINED-LAB-WRITE-01"></a>`REFINED-LAB-WRITE-01` | warn / block | File in `refined/` is world-readable (warn) or world-writable (block). Same caveat. |
-| <a id="REFINED-NO-TOOLS-01"></a>`REFINED-NO-TOOLS-01` | info | Executable bit set on a `refined/` file: tools should live under a tools/ or db/ area, not refined. |
+| <a id="POSIX-NOT-AUTHORITATIVE-01"></a>`POSIX-NOT-AUTHORITATIVE-01` | info | The data mount synthesizes POSIX bits over native ACLs. POSIX-bit walks of `immutable/`/`append_only/` were skipped to avoid noise. Run the Tier 2 sudo snapshot for the real picture. |
+| <a id="RAW-IMMUTABLE-01"></a>`RAW-IMMUTABLE-01` | block | File under `<data_root>/immutable/<project>/` has a write bit set. **Only fires on filesystems where POSIX bits are authoritative**: see `POSIX-NOT-AUTHORITATIVE-01`. |
+| <a id="RAW-LAB-ONLY-01"></a>`RAW-LAB-ONLY-01` | warn | File under `immutable/` is world-readable. Same caveat. |
+| <a id="REFINED-LAB-WRITE-01"></a>`REFINED-LAB-WRITE-01` | warn / block | File in `append_only/` is world-readable (warn) or world-writable (block). Same caveat. |
+| <a id="REFINED-NO-TOOLS-01"></a>`REFINED-NO-TOOLS-01` | info | Executable bit set on an `append_only/` file: tools should live under a tools/ or db/ area, not `append_only/`. |
 | <a id="HOME-REPO-PRIVATE-01"></a>`HOME-REPO-PRIVATE-01` | warn | File in `~/repos/<project>/` is group/world-readable on a shared host. |
 | <a id="HOME-REPO-LARGE-01"></a>`HOME-REPO-LARGE-01` | warn | Tracked file > `--repo-large-mb` (default 50 MB) and not in `.gitignore`. |
 | <a id="HOME-REPO-GIT-SECRET-01"></a>`HOME-REPO-GIT-SECRET-01` | block | Tracked filename matches a secret pattern (`*.env`, `*.pem`, `*_rsa`, `*.key`, `id_*`, etc.). |
@@ -102,10 +102,10 @@ templates (kept privately). Rules:
 
 | Rule | Severity | Description |
 |---|---|---|
-| <a id="RAW-DENY-DELETE-MISSING-01"></a>`RAW-DENY-DELETE-MISSING-01` | block | A directory under `raw/` is missing its inherited Deny-delete ACE: files there COULD be deleted. |
-| <a id="RAW-FILE-WRITABLE-01"></a>`RAW-FILE-WRITABLE-01` | block | A file under `raw/` has an allow-ACE granting write/append (the raw template caps files at read-only). |
-| <a id="REFINED-PATTERN-DRIFT-01"></a>`REFINED-PATTERN-DRIFT-01` | warn | The `refined/` ACL drifts from the lab's canonical pattern. |
-| <a id="REFINED-EXCEPTION-DETECTED-01"></a>`REFINED-EXCEPTION-DETECTED-01` | info | A subdir of `refined/` has a locked-down pattern (group access stripped, named principals only). Surfaced for the PI to vet whether intentional. |
+| <a id="RAW-DENY-DELETE-MISSING-01"></a>`RAW-DENY-DELETE-MISSING-01` | block | A directory under `immutable/` is missing its inherited Deny-delete ACE: files there COULD be deleted. |
+| <a id="RAW-FILE-WRITABLE-01"></a>`RAW-FILE-WRITABLE-01` | block | A file under `immutable/` has an allow-ACE granting write/append (the immutable template caps files at read-only). |
+| <a id="REFINED-PATTERN-DRIFT-01"></a>`REFINED-PATTERN-DRIFT-01` | warn | The `append_only/` ACL drifts from the lab's canonical pattern. |
+| <a id="REFINED-EXCEPTION-DETECTED-01"></a>`REFINED-EXCEPTION-DETECTED-01` | info | A subdir of `append_only/` has a locked-down pattern (group access stripped, named principals only). Surfaced for the PI to vet whether intentional. |
 | <a id="ACL-UNEXPECTED-PRINCIPAL-01"></a>`ACL-UNEXPECTED-PRINCIPAL-01` | info | An ACE names a principal not in the expected template's allowlist. Could be a legitimate grant or drift. |
 | <a id="SSHD-PWAUTH-01"></a>`SSHD-PWAUTH-01` | block | `sshd_config`'s `PasswordAuthentication` is not `no` (from `sshd -T`). |
 | <a id="SSHD-ROOTLOGIN-01"></a>`SSHD-ROOTLOGIN-01` | warn | `PermitRootLogin` is not `no` or `prohibit-password`. |
@@ -122,11 +122,11 @@ short id in its `project` field. Categories: `core_raw` and
 
 | Rule | Severity | Description |
 |---|---|---|
-| <a id="CORE-RAW-DENY-DELETE-MISSING-01"></a>`CORE-RAW-DENY-DELETE-MISSING-01` | block | A directory under a core's `raw/` is missing the inherited Deny-delete ACE. |
-| <a id="CORE-RAW-FILE-WRITABLE-01"></a>`CORE-RAW-FILE-WRITABLE-01` | block | A file under a core's `raw/` has an allow-ACE granting write/append/delete/write-ACL. |
-| <a id="CORE-RAW-UNEXPECTED-PRINCIPAL-01"></a>`CORE-RAW-UNEXPECTED-PRINCIPAL-01` | info | A directory under a core's `raw/` names a principal outside the standard allowlist. For the registrar to vet. |
-| <a id="CORE-REFINED-PATTERN-DRIFT-01"></a>`CORE-REFINED-PATTERN-DRIFT-01` | warn | A core's `refined/` root drifts from the canonical template. |
-| <a id="CORE-REFINED-EXCEPTION-DETECTED-01"></a>`CORE-REFINED-EXCEPTION-DETECTED-01` | info | A subdir of a core's `refined/` has a locked-down pattern. Surfaced for the core leader to vet. |
+| <a id="CORE-RAW-DENY-DELETE-MISSING-01"></a>`CORE-RAW-DENY-DELETE-MISSING-01` | block | A directory under a core's `immutable/` is missing the inherited Deny-delete ACE. |
+| <a id="CORE-RAW-FILE-WRITABLE-01"></a>`CORE-RAW-FILE-WRITABLE-01` | block | A file under a core's `immutable/` has an allow-ACE granting write/append/delete/write-ACL. |
+| <a id="CORE-RAW-UNEXPECTED-PRINCIPAL-01"></a>`CORE-RAW-UNEXPECTED-PRINCIPAL-01` | info | A directory under a core's `immutable/` names a principal outside the standard allowlist. For the registrar to vet. |
+| <a id="CORE-REFINED-PATTERN-DRIFT-01"></a>`CORE-REFINED-PATTERN-DRIFT-01` | warn | A core's `append_only/` root drifts from the canonical template. |
+| <a id="CORE-REFINED-EXCEPTION-DETECTED-01"></a>`CORE-REFINED-EXCEPTION-DETECTED-01` | info | A subdir of a core's `append_only/` has a locked-down pattern. Surfaced for the core leader to vet. |
 | <a id="CORE-ACL-UNEXPECTED-PRINCIPAL-01"></a>`CORE-ACL-UNEXPECTED-PRINCIPAL-01` | info | A directory under a core's tree names a principal outside the standard allowlist. |
 
 ---
@@ -163,8 +163,8 @@ concrete values in its own private lab-management repo, not here.
 
 A per-run directory on the host's **local disk** (not on a network share,
 since root is often not a valid principal on enterprise ACL storage),
-readable only by the lab group. It contains a manifest, the `raw/` and
-`refined/` ACL dumps, the effective `sshd -T` config, a per-member SSH
+readable only by the lab group. It contains a manifest, the `immutable/` and
+`append_only/` ACL dumps, the effective `sshd -T` config, a per-member SSH
 key summary (**no key bodies**), and an auth summary. The auth summary
 records per-user counts of publickey / password / failed auth plus a
 **distinct-subnet count only** (raw IPs are deliberately redacted, since
@@ -192,7 +192,7 @@ SSH keys, dotfiles, repos, and GitHub visibility.
 
 - **It never modifies any file on the target.** All suggested fixes are
   display-only strings. It specifically never writes under the lab's
-  `raw/` or `refined/` data trees, enforced down to the
+  `immutable/` or `append_only/` data trees, enforced down to the
   `security_guard` agent's own prompt.
 - **It does not audit other labs' trees.** Scope is this lab's slice of
   the host.

@@ -107,7 +107,7 @@ than re-instructing it every session.
 
 **Verdict vocabulary:** `Done / Failed / Partial — <one-line what>`
 
-> **You:** Blacksmith, load `refined/brca_wgs/3_qc/counts.parquet`, train
+> **You:** Blacksmith, load `append_only/brca_wgs/3_qc/counts.parquet`, train
 > an XGBoost classifier on subtype, and report AUC with a train/test split.
 >
 > **Blacksmith:** Done: AUC 0.87 on held-out test set (20% split);
@@ -232,8 +232,8 @@ decision-making during the work, not after.
 
 Infrastructure provisioner and environment wrangler for a single lab.
 It onboards new members (SSH keys, repo clone, CC config, Obsidian
-vault), scaffolds new projects (GitHub repo, Slack channel, `raw/` +
-`refined/` dirs), maintains the installations registry, and
+vault), scaffolds new projects (GitHub repo, Slack channel, `immutable/` +
+`append_only/` dirs), maintains the installations registry, and
 health-checks existing environments, always requesting PI sign-off
 before touching shared infrastructure. By default it first previews the
 actions it would take (creating a channel, cloning a repo, setting up
@@ -328,10 +328,10 @@ tokens, and key material; for clinical-sensitivity projects, scans for
 PHI-shaped patterns (OHIP/MRN/SIN-like strings, DOB-near-name
 proximity); and treats `~/.murmurent/keys/**` as never-commit
 territory. Under Murmurent's default data layout (see
-[`memory.md`](memory.md)), `raw/` holds a project's original inputs and
-is immutable: nothing may modify or delete files there. The Security
+[`memory.md`](memory.md)), `immutable/` holds a project's original inputs and
+is read-only: nothing may modify or delete files there. The Security
 Guard helps enforce that rule at the data-folder level by refusing any
-PR that would modify `raw/`, complementing the `raw_guard` hook that
+PR that would modify `immutable/`, complementing the `raw_guard` hook that
 blocks the same kind of change at the tool layer (before a write even
 reaches disk). Always invoked on PRs that touch shared code or data, and
 jointly maintains identity-key hygiene alongside the Cable Guy.

@@ -58,7 +58,7 @@ digraph install_modes {
     L_repo      [label="~/repos/&lt;project&gt;\n(working tree)"];
     L_vault     [label="Obsidian vault\n~/Documents/Obsidian/&lt;vault&gt;",
                  fillcolor="#E9DEFA", color="#6F4DA8"];
-    L_lab_vm    [label="~/lab_vm/data/{raw,refined}\n(simulated)"];
+    L_lab_vm    [label="~/lab_vm/data/{immutable,append_only}\n(simulated)"];
     L_vscode    [label="VSCode + CC\n(local)",
                  shape=hexagon, fillcolor="#FFF1DB"];
 
@@ -94,7 +94,7 @@ digraph install_modes {
                  shape=plaintext, fillcolor="transparent"];
     R_repo      [label="/home/&lt;user&gt;/repos/&lt;project&gt;\n(working tree)",
                  fillcolor="#FFFFFF"];
-    R_lab_vm    [label="/data/lab_vm/{raw,refined}/&lt;project&gt;\n(real data plane)",
+    R_lab_vm    [label="/data/lab_vm/{immutable,append_only}/&lt;project&gt;\n(real data plane)",
                  fillcolor="#FFFFFF"];
     R_vault     [label="/home/&lt;user&gt;/Obsidian/&lt;vault&gt;\n(authoritative copy)",
                  fillcolor="#FFFFFF"];

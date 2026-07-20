@@ -1417,11 +1417,11 @@ def create_app() -> FastAPI:
         body: WorkspaceInitializeBody,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
-        """Provision a project on this machine: mkdir raw/refined + write manifest.
+        """Provision a project on this machine: mkdir immutable/append_only + manifest.
 
         Runs a preflight first — the user wanted to see green/yellow/red
         rows for "is the project here", "can I reach the SSH host", "are
-        raw/refined/notebook present (mkdir if not)", "any unresolved
+        immutable/append_only/notebook present (mkdir if not)", "any unresolved
         issues on the prior manifest". The manifest is **only** written
         when no required probe fails; otherwise the response carries the
         probes and a 422 so the UI can show what to fix.
@@ -1584,13 +1584,13 @@ def create_app() -> FastAPI:
             for p in _ri.install(host_obj, targets):
                 probes.append(p)
 
-        # Local raw + refined dirs. These exist either way (the dashboard
-        # writes the manifest locally even for SSH installs), but they're
-        # only the *user's* data dirs when has_direct_access=True.
+        # Local immutable + append-only dirs. These exist either way (the
+        # dashboard writes the manifest locally even for SSH installs), but
+        # they're only the *user's* data dirs when has_direct_access=True.
         raw_proj = Path(body.raw_path).expanduser() / body.project
         refined_proj = Path(body.refined_path).expanduser() / body.project
         if body.has_direct_access or not body.ssh_remote:
-            for label, path in (("raw", raw_proj), ("refined", refined_proj)):
+            for label, path in (("immutable", raw_proj), ("append_only", refined_proj)):
                 probes.append(_pf._ensure_dir(path, label=label, required=False))
 
         # NOTE: bootstrap + manifest + lab_mgmt registry are now all

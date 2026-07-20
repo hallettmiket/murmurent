@@ -23,7 +23,7 @@ Two boundaries:
 
 - **Size.** `murmurent_data/` is git-tracked and pushed to GitHub, so keep
   it to reference-sized files. Large or bulk data (cohort tables, imaging
-  stacks, sequencing outputs) belong in Tier 3 (`raw/` and `refined/` on the
+  stacks, sequencing outputs) belong in Tier 3 (`immutable/` and `append_only/` on the
   lab VM), not the vault.
 - **Sensitivity.** Because the vault is pushed to GitHub, genuinely
   sensitive clinical data files should not go here; keep them in Tier 3 on

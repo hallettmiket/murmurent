@@ -18,6 +18,7 @@ from rich.table import Table
 
 from . import __version__
 from .commands import dashboard_cmd as dashboard_impl
+from .commands import data_cmd
 from .commands import experiment_cmd, install_cmd, project_cmd
 from .commands import push_cmd as push_impl
 from .commands import reconcile_cmd as reconcile_impl
@@ -779,6 +780,26 @@ def experiment_attach(project_name: str, slug: str, file_path: str) -> None:
 # ---------------------------------------------------------------------------
 # squad
 # ---------------------------------------------------------------------------
+
+
+@cli.group("data", help="Data-root maintenance (migrate legacy dir names, …).")
+def data_group() -> None:
+    pass
+
+
+@data_group.command(
+    "migrate",
+    help="Rename legacy raw/->immutable/ and refined/->append_only/ under the data root.",
+)
+@click.option(
+    "--root",
+    "root",
+    default=None,
+    help="Data root to migrate (default: the resolved $MURMURENT_DATA_ROOT).",
+)
+@click.option("--dry-run", "dry_run", is_flag=True, help="Preview without renaming.")
+def data_migrate(root: str | None, dry_run: bool) -> None:
+    data_cmd.cmd_migrate(root, dry_run=dry_run)
 
 
 @cli.group("squad", help="Manage squads (subgroups).")

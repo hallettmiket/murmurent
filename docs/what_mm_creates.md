@@ -22,7 +22,7 @@ one lab, and some live only on your own machine.
 | `~/.murmurent/lab_info/` | your machine (a registrar's machine, if you run one) | the centre-wide registry: every lab, core, and common SEA in the centre | the registrar |
 | `~/.murmurent/agents.log` | your machine | the activity log the dashboard tails | you, per machine |
 | your Obsidian personal-vault clone | your machine (or a synced folder, e.g. iCloud) | the working copy of `murmurent_vault`, what you actually read and edit in Obsidian | you |
-| `$MURMURENT_LAB_VM_ROOT/raw/`, `$MURMURENT_LAB_VM_ROOT/refined/` | the lab server | bulk project data: `raw/` (immutable originals) and `refined/` (append-only analysis outputs) | the lab; shared by every member |
+| `$MURMURENT_DATA_ROOT/immutable/`, `$MURMURENT_DATA_ROOT/append_only/` | the lab server | bulk project data: `immutable/` (read-only source data by convention) and `append_only/` (append-only derived outputs); the legacy names `raw/` and `refined/` and the `MURMURENT_LAB_VM_ROOT` variable remain recognized, and `murmurent data migrate` renames an existing root | the lab; shared by every member |
 
 ## Public vs. private, per-machine vs. shared
 
@@ -37,7 +37,7 @@ single machine and gets set up fresh on each machine you use Murmurent from
 (see [`setup.md`](setup.md) for per-machine wiring). The GitHub repos are
 what carry your Oracle, notebook, and lab knowledge between machines: clone
 the same private repos on a second laptop and Murmurent has the same state
-available there. The lab server's `$MURMURENT_LAB_VM_ROOT/{raw,refined}/`
+available there. The lab server's `$MURMURENT_DATA_ROOT/{immutable,append_only}/`
 is shared infrastructure the whole lab points at, rather than something each
 machine keeps its own copy of.
 

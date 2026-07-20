@@ -104,8 +104,8 @@ This scaffolds:
 …and the corresponding lab-VM directories:
 
 ```
-$MURMURENT_LAB_VM_ROOT/raw/brca_sc_tutorial/3_titration_v3/      (read-only after ingest)
-$MURMURENT_LAB_VM_ROOT/refined/brca_sc_tutorial/3_titration_v3/  (analysis outputs)
+$MURMURENT_DATA_ROOT/immutable/brca_sc_tutorial/3_titration_v3/      (read-only after ingest)
+$MURMURENT_DATA_ROOT/append_only/brca_sc_tutorial/3_titration_v3/    (analysis outputs)
 ```
 
 ### `notebook.md`: what to write
@@ -153,12 +153,12 @@ Export PNG/PDF to `sketches/`. Same embed syntax:
 **Screenshots (FACS plot, software output):**
 
 `sketches/` is fine. If it's instrument-derived, prefer `murmurent
-experiment ingest`: the file lands in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/instrument_outputs/`
+experiment ingest`: the file lands in `$MURMURENT_DATA_ROOT/append_only/<project>/<exp>/instrument_outputs/`
 with checksums and the notebook's `instrument_outputs:` list updates
 automatically.
 
 Do not commit anything larger than ~2 MB to the repo. Large images
-go in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/` and you reference them
+go in `$MURMURENT_DATA_ROOT/append_only/<project>/<exp>/` and you reference them
 by path in the notebook body.
 
 ### Linking to data files on the lab VM
@@ -169,18 +169,18 @@ canonical store). Reference them by absolute path:
 ```markdown
 ## Raw data
 
-- Sequencing run: `$MURMURENT_LAB_VM_ROOT/raw/brca_sc_tutorial/3_titration_v3/run_001.fastq.gz`
-- Clinical metadata: `$MURMURENT_LAB_VM_ROOT/raw/brca_sc_tutorial/3_titration_v3/clin.csv`
+- Sequencing run: `$MURMURENT_DATA_ROOT/immutable/brca_sc_tutorial/3_titration_v3/run_001.fastq.gz`
+- Clinical metadata: `$MURMURENT_DATA_ROOT/immutable/brca_sc_tutorial/3_titration_v3/clin.csv`
 
 ## Refined outputs
 
-- Count matrix: `$MURMURENT_LAB_VM_ROOT/refined/brca_sc_tutorial/3_titration_v3/counts.parquet`
-- QC report: `$MURMURENT_LAB_VM_ROOT/refined/brca_sc_tutorial/3_titration_v3/qc_report.html`
+- Count matrix: `$MURMURENT_DATA_ROOT/append_only/brca_sc_tutorial/3_titration_v3/counts.parquet`
+- QC report: `$MURMURENT_DATA_ROOT/append_only/brca_sc_tutorial/3_titration_v3/qc_report.html`
 ```
 
-`murmurent push <project> --refined 3_titration_v3` walks the refined
+`murmurent push <project> --refined 3_titration_v3` walks the append_only
 dir, recomputes SHA-256 for every file, and updates the notebook's
-`refined_data:` and `checksums:` frontmatter automatically. Run this
+`append_only_data:` and `checksums:` frontmatter automatically. Run this
 when you've produced new outputs.
 
 ### Pushing the experimental notebook so the PI can see it
@@ -229,7 +229,7 @@ sections are present and writes a final summary into the project's
 | Start a new experiment | `murmurent experiment new --project <p> --name <slug>` |
 | Add a phone photo to an experiment | Drop into `<project>/exp/<n>/pages/`, embed with `![](pages/<file>)` |
 | Add a screenshot of an instrument | `murmurent experiment ingest <project> <slug> <source-dir>` |
-| Update refined-data checksums | `murmurent push <project> --refined <slug>` |
+| Update append-only-data checksums | `murmurent push <project> --refined <slug>` |
 | Make my notebook visible to the PI | `murmurent push <project>` (or `--finalize` for a PR) |
 | Promote a finding lab-wide | `murmurent oracle publish <slug>` (stage the draft first, see [oracle-workflow.md](oracle-workflow.md)) |
 
@@ -247,8 +247,8 @@ sections are present and writes a final summary into the project's
     ├── pages/                                   ← photos
     └── sketches/                                ← drawings
 
-$MURMURENT_LAB_VM_ROOT/raw/brca_sc_tutorial/3_titration_v3/      ← raw data (read-only)
-$MURMURENT_LAB_VM_ROOT/refined/brca_sc_tutorial/3_titration_v3/  ← analysis outputs
+$MURMURENT_DATA_ROOT/immutable/brca_sc_tutorial/3_titration_v3/      ← immutable source data (read-only)
+$MURMURENT_DATA_ROOT/append_only/brca_sc_tutorial/3_titration_v3/    ← analysis outputs
 
 ~/repos/murmurent_lab_mgmt_<lab>/        ← lab-mgmt repo (shared via git)
 └── oracle/

@@ -58,12 +58,22 @@ def test_repo_missing_is_dropped(world):
     assert folders == []
 
 
-def test_refined_added_when_present(world):
+def test_legacy_refined_added_when_present(world):
+    """Dual-name back-compat: a legacy refined/ dir still resolves."""
     _mkdir(world["repos"] / "proj_a")
     _mkdir(world["lab_vm"] / "refined" / "proj_a")
     folders = wf.gather_folders(project="proj_a", obsidian_vault_path=None)
     names = [f.name for f in folders]
-    assert names == ["Project: proj_a", "Refined outputs"]
+    assert names == ["Project: proj_a", "Append-only outputs"]
+
+
+def test_append_only_added_when_present(world):
+    """New name: an append_only/ dir resolves and is labelled accordingly."""
+    _mkdir(world["repos"] / "proj_a")
+    _mkdir(world["lab_vm"] / "append_only" / "proj_a")
+    folders = wf.gather_folders(project="proj_a", obsidian_vault_path=None)
+    names = [f.name for f in folders]
+    assert names == ["Project: proj_a", "Append-only outputs"]
 
 
 def test_full_layout(world):
@@ -81,7 +91,7 @@ def test_full_layout(world):
     names = [f.name for f in folders]
     assert names == [
         "Project: proj_a",
-        "Refined outputs",
+        "Append-only outputs",
         "Lab notebook",
         "My Oracle",
         "Group Oracle",

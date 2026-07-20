@@ -141,8 +141,8 @@ Both share a templated body:
 
 **Mechanism:** a freeze creates an immutable snapshot consisting of three parts:
 - **Git tag** on the project repo: `freeze/<purpose>-<YYYY-MM-DD>` (e.g. `freeze/paper-submission-2026-05-06`).
-- **Manifest** at `<project repo>/freezes/<tag>.md`, recording: tag name, reason, repo SHA, project MEMBERS at the time, choreography in effect (if any), per-experiment list of `raw_data` and `refined_data` paths with SHA-256 per file.
-- **Encrypted bundle** at `$MURMURENT_LAB_VM_ROOT/refined/<project>/freezes/<tag>.tar.age`: refined data tarballed and encrypted with `age` to current MEMBERS plus the lab archive key. Optionally also `<tag>-raw.tar.age` for full archival (`--include-raw`).
+- **Manifest** at `<project repo>/freezes/<tag>.md`, recording: tag name, reason, repo SHA, project MEMBERS at the time, choreography in effect (if any), per-experiment list of `immutable_data` and `append_only_data` paths with SHA-256 per file.
+- **Encrypted bundle** at `$MURMURENT_DATA_ROOT/append_only/<project>/freezes/<tag>.tar.age`: append-only data tarballed and encrypted with `age` to current MEMBERS plus the lab archive key. Optionally also `<tag>-raw.tar.age` for full archival (`--include-raw`).
 
 Freezes are immutable. Re-freezing under the same purpose produces a new dated tag, never overwrites.
 

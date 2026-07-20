@@ -31,7 +31,7 @@ vignette 4), where an agent reads it on demand.
    vault only, and it can never be published to the lab (see vignette 6).
    Only small tables belong inside a note; a full spreadsheet file goes
    in `murmurent_data/` (see vignette 4), and large data files live in the
-   lab's `refined/` storage.
+   lab's `append_only/` storage.
 
 ```mermaid
 flowchart LR

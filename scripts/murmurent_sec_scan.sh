@@ -30,7 +30,7 @@ set -u
 # NOT set -e: a denied directory read shouldn't abort the entire scan.
 
 # --- defaults --------------------------------------------------------------
-LAB_VM_ROOT="${MURMURENT_LAB_VM_ROOT:-/data/lab_vm}"
+LAB_VM_ROOT="${MURMURENT_DATA_ROOT:-${MURMURENT_LAB_VM_ROOT:-/data/lab_vm}}"
 PROJECTS_ROOT="${MURMURENT_PROJECTS_ROOT:-$HOME/repos}"
 LAB_GROUP="${MURMURENT_LAB_GROUP:-}"
 HOME_WARN_GB="${MURMURENT_HOME_WARN_GB:-100}"

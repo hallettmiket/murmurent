@@ -17,7 +17,7 @@ fakes and no ``gh repo create`` / real clone ever runs under test.
 
 Back-compat (memo §2): if the target clone already exists as a git repo with a
 DIFFERENT remote, refuse rather than clobber; a matching (or absent) remote is
-adopted in place. The clone is also refused inside ``$MURMURENT_LAB_VM_ROOT``
+adopted in place. The clone is also refused inside ``$MURMURENT_DATA_ROOT``
 (raw/refined hook territory).
 """
 
@@ -415,7 +415,7 @@ def _remote_owner_name(git_dir: Path) -> str | None:
 
 
 def _under_lab_vm(dest: Path, env: dict | None = None) -> bool:
-    """True when ``dest`` would land inside ``$MURMURENT_LAB_VM_ROOT`` — the
+    """True when ``dest`` would land inside ``$MURMURENT_DATA_ROOT`` — the
     raw/refined hook territory a vault must never occupy."""
     try:
         vm = _lab_vm.lab_vm_root(env).expanduser().resolve()
@@ -487,9 +487,9 @@ def init_personal_vault(
     dest = Path(path).expanduser() if path else _repo.personal_vault_path()
     if _under_lab_vm(dest, env):
         return {"ok": False, "error": "inside_lab_vm", "repo": expected, "path": str(dest),
-                "detail": f"refusing to place the vault inside $MURMURENT_LAB_VM_ROOT "
-                          f"({_lab_vm.lab_vm_root(env)}) — that is raw/refined hook "
-                          f"territory. Choose a --path outside it."}
+                "detail": f"refusing to place the vault inside $MURMURENT_DATA_ROOT "
+                          f"({_lab_vm.data_root(env)}) — that is immutable/append_only "
+                          f"hook territory. Choose a --path outside it."}
 
     created_repo = False
     adopted = False

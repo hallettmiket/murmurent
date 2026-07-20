@@ -1,19 +1,25 @@
 """
 Purpose: Claude Code ``PreToolUse`` hook that refuses any tool call that would
-         delete or overwrite an existing file under murmurent's protected roots
-         (``$MURMURENT_LAB_VM_ROOT/refined/`` + production ``/data/lab_vm/wigamig/refined/``
-         + every registered Obsidian vault). Creating NEW files and mkdir of
-         missing folders is allowed — the lab's versioning convention says
-         "make a new file_2.csv, never overwrite file.csv."
+         delete or overwrite an existing file under murmurent's append-only
+         roots — ``<data-root>/append_only/`` and the legacy
+         ``<data-root>/refined/`` (dual-name transition) — plus every
+         registered Obsidian notebook. Creating NEW files and mkdir of missing
+         folders is allowed — the lab's versioning convention says "make a new
+         file_2.csv, never overwrite file.csv."
 Author:  Mike Hallett (with Claude Code)
 Date:    2026-05-13
 Input:   Tool-call JSON on stdin in the CC hook contract.
 Output:  Decision JSON on stdout (``{"decision": "allow"|"deny", ...}``).
 
-Sister hook to :mod:`raw_guard` — that one blocks **all** writes under
-``raw/`` (raw data is strictly read-only). This hook is more nuanced:
-under ``refined/`` and the notebook vault, NEW files are allowed but
-overwrites and deletions are not.
+The data root is resolved from ``$MURMURENT_DATA_ROOT`` (new canonical name),
+falling back to the legacy ``$MURMURENT_LAB_VM_ROOT``. Both the new
+``append_only/`` and the legacy ``refined/`` sub-dirs are protected so
+un-migrated deployments stay covered.
+
+Sister hook to :mod:`raw_guard` — that one blocks **all** writes under the
+immutable tree (``immutable/`` / legacy ``raw/``; strictly read-only). This
+hook is more nuanced: under ``append_only/`` and the notebook vault, NEW files
+are allowed but overwrites and deletions are not.
 
 What gets blocked:
   - ``Write`` whose ``file_path`` already exists under a protected root
@@ -48,8 +54,9 @@ import sys
 from pathlib import Path
 from typing import IO, Any
 
-DEFAULT_LAB_VM_ROOT = Path("~/wigamig").expanduser()
-PRODUCTION_REFINED_ROOT = Path("/data/lab_vm/wigamig/refined")
+DEFAULT_DATA_ROOT = Path("~/lab_vm/data").expanduser()
+APPEND_ONLY_SUBDIR = "append_only"
+LEGACY_APPEND_ONLY_SUBDIR = "refined"
 WRITE_TOOLS: frozenset[str] = frozenset({"Write", "Edit", "NotebookEdit"})
 DESTRUCTIVE_COMMANDS: frozenset[str] = frozenset(
     {"rm", "rmdir", "truncate", "shred", "dd", "chmod", "chown"}
@@ -63,17 +70,20 @@ COPY_LIKE_COMMANDS: frozenset[str] = frozenset({"cp", "rsync", "install"})
 
 
 def _refined_prefixes() -> list[str]:
-    """Return refined/ prefixes covered by this hook.
+    """Return append-only prefixes covered by this hook.
 
-    Always includes ``/data/lab_vm/wigamig/refined/`` (production) plus the
-    refined subdir of ``$MURMURENT_LAB_VM_ROOT`` if set (or the dev
-    default ``~/wigamig/refined/``). Defense in depth: even if the env
-    var points elsewhere, production is still blocked.
+    Covers both the new ``append_only/`` sub-dir and the legacy ``refined/``
+    sub-dir of the configured data root, so a dual-name (partly-migrated)
+    deployment stays protected either way. The data root is resolved from
+    ``$MURMURENT_DATA_ROOT`` (new), falling back to the legacy
+    ``$MURMURENT_LAB_VM_ROOT`` (or the dev default ``~/lab_vm/data``).
     """
-    prefixes: list[str] = [str(PRODUCTION_REFINED_ROOT)]
-    env = os.environ.get("MURMURENT_LAB_VM_ROOT")
-    base = Path(env).expanduser() if env else DEFAULT_LAB_VM_ROOT
-    prefixes.append(str(base / "refined"))
+    env = os.environ.get("MURMURENT_DATA_ROOT") or os.environ.get("MURMURENT_LAB_VM_ROOT")
+    base = Path(env).expanduser() if env else DEFAULT_DATA_ROOT
+    prefixes: list[str] = [
+        str(base / APPEND_ONLY_SUBDIR),
+        str(base / LEGACY_APPEND_ONLY_SUBDIR),
+    ]
     return _dedup_prefixes(prefixes)
 
 

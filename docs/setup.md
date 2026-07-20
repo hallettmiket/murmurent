@@ -80,7 +80,7 @@ creates or modifies locally:
 - `~/repos/murmurent` (the commons clone) and
   `~/repos/murmurent_lab_mgmt_<lab>` (your lab's governance clone).
 - your Obsidian personal vault (the `murmurent_vault` clone) and, on the lab
-  server, the bulk-data root `$MURMURENT_LAB_VM_ROOT/{raw,refined}/`.
+  server, the bulk-data root `$MURMURENT_DATA_ROOT/{immutable,append_only}/`.
 
 ## Making a repository Murmurent-aware
 

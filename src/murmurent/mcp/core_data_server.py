@@ -14,7 +14,7 @@ Run as a server::
 
 Design (Phase 5d of the cores rollout, plan §8):
 
-  - The MCP runs on the lab server, close to ``$MURMURENT_LAB_VM_ROOT``.
+  - The MCP runs on the lab server, close to ``$MURMURENT_DATA_ROOT``.
     Members' Claude Code sessions connect via stdio over SSH (same
     pattern as the existing ``murmurent-oracle`` server).
   - Identity comes from ``$MURMURENT_USER`` set by the murmurent shell

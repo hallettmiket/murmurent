@@ -90,8 +90,8 @@ def render_notebook(
         f"{protocol_line}"
         f"equipment: [{equipment_yaml}]\n"
         f"reagents: [{reagents_yaml}]\n"
-        "raw_data: []\n"
-        "refined_data: []\n"
+        "immutable_data: []\n"
+        "append_only_data: []\n"
         "instrument_outputs: []\n"
         "checksums: {}\n"
         f"status: {status}\n"
@@ -115,21 +115,25 @@ def update_with_ingest(
     raw_files: Iterable[ChecksumEntry],
     instrument_files: Iterable[ChecksumEntry],
 ) -> dict[str, Any]:
-    """Return a copy of ``meta`` with raw / instrument / checksum fields populated.
+    """Return a copy of ``meta`` with immutable / instrument / checksum fields set.
 
     Existing entries are merged: paths are deduplicated and the checksums map is
     extended (new digests overwrite old ones for the same path, which is the
     desired behaviour after a re-ingest).
+
+    Dual-name transition: writes the new ``immutable_data`` field but still reads
+    a legacy ``raw_data`` field if present (migrating it to the new name).
     """
     updated = dict(meta)
-    raw_paths = list(updated.get("raw_data") or [])
+    # Read new name first; fall back to the legacy ``raw_data`` for back-compat.
+    immutable_paths = list(updated.get("immutable_data") or updated.get("raw_data") or [])
     instr_paths = list(updated.get("instrument_outputs") or [])
     checksums = dict(updated.get("checksums") or {})
 
     for entry in raw_files:
         s = str(entry.path)
-        if s not in raw_paths:
-            raw_paths.append(s)
+        if s not in immutable_paths:
+            immutable_paths.append(s)
         checksums[s] = entry.sha256
     for entry in instrument_files:
         s = str(entry.path)
@@ -137,7 +141,8 @@ def update_with_ingest(
             instr_paths.append(s)
         checksums[s] = entry.sha256
 
-    updated["raw_data"] = raw_paths
+    updated["immutable_data"] = immutable_paths
+    updated.pop("raw_data", None)  # migrate legacy field to the new name
     updated["instrument_outputs"] = instr_paths
     updated["checksums"] = checksums
     return updated

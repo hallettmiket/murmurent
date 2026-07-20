@@ -50,7 +50,7 @@ agent).
   It queries PubMed/bioRxiv, summarises, and curates a list you keep.
 
 - **Blacksmith**: the computational agent:
-  > *Blacksmith, load `refined/brca_wgs/3_qc/counts.parquet`, train an
+  > *Blacksmith, load `append_only/brca_wgs/3_qc/counts.parquet`, train an
   > XGBoost classifier on subtype, and report AUC with a train/test split.*
   It writes clean, runnable Python, verifies it executes, and reports metrics.
 
@@ -98,17 +98,21 @@ unsupported literature claim) reach the researcher.
 
 ## Vignette 4: Data-governance rules enforced in software (rules + hooks)
 
-Murmurent recognizes two special directories: **`raw/`**, whose contents
-are immutable (they can be read but never modified or deleted), and
-**`refined/`**, which is append-only (new analysis outputs can be added,
-but existing ones are never overwritten). These rules are enforced
-automatically by Claude Code hooks, which intercept an operation before
-it executes and reject it if it would violate a rule:
+Murmurent recognizes two special directories whose names state the
+guarantee they carry: **`immutable/`**, whose contents are read-only
+source data (they can be read but never modified or deleted), and
+**`append_only/`**, which holds derived outputs (new analysis outputs can
+be added, but existing ones are never overwritten). The legacy names
+`raw/` and `refined/`, along with the `MURMURENT_LAB_VM_ROOT` environment
+variable, remain recognized during a transition, and `murmurent data
+migrate` renames an existing root to the new scheme. These rules are
+enforced automatically by Claude Code hooks, which intercept an operation
+before it executes and reject it if it would violate a rule:
 
-> **You:** Delete the old raw FASTQs in `raw/brca_wgs/` to free space.
+> **You:** Delete the old raw FASTQs in `immutable/brca_wgs/` to free space.
 >
-> **Murmurent (raw_guard hook):** Blocked: `raw/` is immutable. No code may
-> modify or delete files under `raw/`. If a refined output is superseded, write
+> **Murmurent (raw_guard hook):** Blocked: `immutable/` is read-only. No code may
+> modify or delete files under `immutable/`. If a derived output is superseded, write
 > `file_2.csv` alongside it instead of overwriting `file_1.csv`.
 
 The same hook layer also screens candidate commits for sensitive data,

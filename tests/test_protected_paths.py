@@ -11,7 +11,8 @@ Contract this hook must enforce:
   - Bash `> path` redirect into an EXISTING protected file → DENY
   - Bash `>> path` append to a protected file → DENY (modifies)
   - Reads / Glob / Grep / outside-of-protected calls → ALLOW
-  - The production ``/data/lab_vm/wigamig/refined/`` is protected regardless of env
+  - Both the new ``append_only/`` and legacy ``refined/`` sub-dirs of the
+    configured data root are protected (dual-name transition)
 """
 
 from __future__ import annotations
@@ -353,16 +354,38 @@ def test_glob_on_protected_allowed(refined):
 # ---------------------------------------------------------------------------
 
 
-def test_production_refined_blocked_even_with_env(monkeypatch, tmp_path):
-    """A Write to /data/lab_vm/wigamig/refined/<existing>/ would deny IF that file
-    actually exists. The path can't reliably exist on a CI box, so we
-    instead verify that the lexical protection is in place (Write to a
-    well-known production subpath that has no special status today still
-    routes through this hook; only the existence check stops the deny)."""
+def test_prefixes_cover_both_names_and_drop_stale_branding(monkeypatch, tmp_path):
+    """Dual-name: both append_only/ and legacy refined/ under the configured
+    data root are protected, and the stale ``/data/lab_vm/wigamig/refined``
+    branding is gone."""
+    monkeypatch.delenv("MURMURENT_DATA_ROOT", raising=False)
     monkeypatch.setenv("MURMURENT_LAB_VM_ROOT", str(tmp_path / "alt"))
     monkeypatch.delenv("MURMURENT_NOTEBOOK_ROOT", raising=False)
     prefixes = pp._refined_prefixes()
-    assert "/data/lab_vm/wigamig/refined" in prefixes  # always present
+    assert str(tmp_path / "alt" / "append_only") in prefixes
+    assert str(tmp_path / "alt" / "refined") in prefixes
+    assert "/data/lab_vm/wigamig/refined" not in prefixes
+
+
+def test_append_only_overwrite_denied_new_env(monkeypatch, tmp_path):
+    """New append_only/ tree is write-once, resolved via MURMURENT_DATA_ROOT."""
+    monkeypatch.delenv("MURMURENT_LAB_VM_ROOT", raising=False)
+    monkeypatch.setenv("MURMURENT_DATA_ROOT", str(tmp_path))
+    monkeypatch.delenv("MURMURENT_NOTEBOOK_ROOT", raising=False)
+    ao_dir = tmp_path / "append_only" / "proj" / "exp"
+    ao_dir.mkdir(parents=True)
+    existing = ao_dir / "results.csv"
+    existing.write_text("a,b\n1,2\n", encoding="utf-8")
+    # New file → allow
+    assert _run({
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(ao_dir / "results_2.csv")},
+    })["decision"] == "allow"
+    # Overwrite existing → deny
+    assert _run({
+        "tool_name": "Write",
+        "tool_input": {"file_path": str(existing)},
+    })["decision"] == "deny"
 
 
 # ---------------------------------------------------------------------------

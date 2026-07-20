@@ -342,13 +342,13 @@ def archive_project(
             note="GitHub repo (if you published it). Consider archiving the repo on github.com.",
         ),
         CleanupItem(
-            path=f"lab_base/raw/{name}",
-            note="Raw data on the lab server. Usually retained per data-storage policy; review before deleting.",
+            path=f"lab_base/immutable/{name}",
+            note="Immutable data on the lab server. Usually retained per data-storage policy; review before deleting.",
             severity="private",
         ),
         CleanupItem(
-            path=f"lab_base/refined/{name}",
-            note="Refined outputs on the lab server. May contain analyses you want to keep or move aside.",
+            path=f"lab_base/append_only/{name}",
+            note="Append-only outputs on the lab server. May contain analyses you want to keep or move aside.",
             severity="private",
         ),
         CleanupItem(
