@@ -1,7 +1,6 @@
 # Murmurent
 
-Murmurent turns a forgetful generalist into a research team with a memory
-and house rules:
+Murmurent is an agentic AI operating system that provides:
 
 - **Reference agents**: a bench of specialists (literature scout,
   computational workhorse, adversarial reviewer, security auditor, …) you

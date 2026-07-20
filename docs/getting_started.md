@@ -4,10 +4,7 @@ You've installed Murmurent and it runs locally on your machine. So what
 does it actually *do* that plain [Claude Code](https://claude.com/claude-code)
 (CC) doesn't?
 
-Short version: Claude Code is a capable generalist that forgets everything
-between sessions and knows nothing about your lab. Murmurent turns that
-forgetful generalist into a **research team with a memory and house
-rules**:
+Short version: Murmurent is an agentic AI operating system that provides:
 
 - a set of **reference agents**: specialists (a literature scout, a computational
   workhorse, an adversarial reviewer, a security auditor, …) you delegate to by name;
