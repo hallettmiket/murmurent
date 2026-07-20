@@ -23,9 +23,6 @@ from .commands import push_cmd as push_impl
 from .commands import reconcile_cmd as reconcile_impl
 from .commands import sea_cmd
 from .commands import security_cmd as security_impl
-from .core.agents import load_registry
-from .core.repo import murmurent_repo_root
-
 NOT_IMPLEMENTED_MSG = "not yet implemented in v1"
 
 
@@ -99,42 +96,43 @@ def agent_group() -> None:
     pass
 
 
-@agent_group.command("list", help="List available agents in the registry.")
-@click.option("--group", "group_name", default=None, help="Filter to a specific guild.")
-def agent_list(group_name: str | None) -> None:
-    """Print agent name + freeze flag + short description."""
-    registry_dir = murmurent_repo_root() / "agents"
-    agents = load_registry(registry_dir)
-    if not agents:
-        click.echo(f"No agents found in {registry_dir}.")
-        return
-
-    console = Console()
-    table = Table(title="Agents")
-    table.add_column("name", style="bold")
-    table.add_column("freeze")
-    table.add_column("description", overflow="fold")
-    for record in agents:
-        table.add_row(record.name, record.freeze, record.description)
-    console.print(table)
+@agent_group.command("list", help="List installed agents with linked/forked + drift status.")
+def agent_list() -> None:
+    """List every agent in ~/.claude/agents/ (linked vs forked, + drift)."""
+    from .commands import agent_cmd as _agent_cmd
+    _agent_cmd.cmd_list()
 
 
-@agent_group.command("add", help="Install an agent locally.")
+@agent_group.command(
+    "fork",
+    help="Replace an agent's commons symlink with a personal copy that survives "
+         "commons upgrades. Records provenance for drift detection.",
+)
 @click.argument("name")
-def agent_add(name: str) -> None:
-    _stub()
+@click.option("--force", is_flag=True,
+              help="Overwrite an existing real file / re-snapshot from the current commons.")
+def agent_fork(name: str, force: bool) -> None:
+    from .commands import agent_cmd as _agent_cmd
+    _agent_cmd.cmd_fork(name, force=force)
 
 
-@agent_group.command("remove", help="Uninstall an agent locally.")
+@agent_group.command(
+    "drift",
+    help="Merge indicator: compare each fork against the current commons agent "
+         "and report which have upstream and/or local changes.",
+)
+@click.argument("name", required=False)
+def agent_drift(name: str | None) -> None:
+    from .commands import agent_cmd as _agent_cmd
+    _agent_cmd.cmd_drift(name)
+
+
+@agent_group.command("unfork", help="Restore the commons symlink, dropping the personal copy.")
 @click.argument("name")
-@click.option("--purge", is_flag=True, help="Also delete agent memory.")
-def agent_remove(name: str, purge: bool) -> None:
-    _stub()
-
-
-@agent_group.command("update", help="Pull the latest agent registry; relink frozen.")
-def agent_update() -> None:
-    _stub()
+@click.option("--force", is_flag=True, help="Skip the confirmation prompt.")
+def agent_unfork(name: str, force: bool) -> None:
+    from .commands import agent_cmd as _agent_cmd
+    _agent_cmd.cmd_unfork(name, force=force)
 
 
 # ---------------------------------------------------------------------------
