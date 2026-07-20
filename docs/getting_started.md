@@ -1,54 +1,15 @@
 # Getting started: what Murmurent adds to Claude Code
 
 Murmurent is an agentic AI operating system for biomedical and basic
-life-science research. It runs on top of
-[Claude Code](https://claude.com/claude-code) (CC) and provides:
+life-science research, built on top of
+[Claude Code](https://claude.com/claude-code) (CC). The [home page](index.md)
+summarizes what it provides; this page shows, through five short vignettes,
+what Murmurent gives you over plain Claude Code.
 
-- **Reference agents**: specialist agents (a literature scout, a
-  computational workhorse, an adversarial reviewer, a security auditor,
-  and others) invoked by name. The reference agents are part of the
-  **commons** and are designed to address common tasks in day-to-day
-  biomedical and basic life-science research.
-- **An Obsidian-based vault**: a private, git-backed knowledge base that
-  persists across sessions and projects. It holds your **Oracle**
-  (structured, queryable memory), your daily lab notebook, and your own
-  notes and maps.
-- **Hard rules and hooks**: data-governance guardrails enforced in
-  software, so that raw data cannot be modified and refined data cannot
-  be overwritten.
-- **Shared infrastructure**: when a lab or centre opts in, a group or
-  centre accumulates knowledge collectively rather than on individual
-  machines.
-
-Murmurent is built on Claude Code today; its design is not specific to
-it, and the same memory tiers, agents, and governance rules could run on
-another agentic AI system.
-
-The remainder of this page demonstrates each capability on a single
-machine, with no PI and no centre required. The reference agents are
-wired into `~/.claude/agents/`, so any CC session can invoke one by name.
-
----
-
-## Where Murmurent lives on your machine
-
-Murmurent creates or modifies several objects on the local machine:
-
-- `~/.claude/agents/`, `~/.claude/rules/`, `~/.claude/skills/`: the
-  commons agents, rules, and skills, symlinked in by `scripts/setup.sh`.
-- `~/.claude/settings.json`: where Murmurent registers its hooks and MCP
-  servers.
-- `~/.claude/agent-memory/`: per-agent working memory.
-- `~/.claude/murmurent-preferences.yaml`: your personal preference
-  profile (see Vignette 2 below).
-- `~/.murmurent/`, this machine's Murmurent state: `machine.yaml`, your
-  identity + membership cards, `lab_info/` (the centre registry, on a
-  registrar's machine), `agents.log` (the activity log the dashboard
-  tails), `keys/`, and host/registry files.
-- `~/repos/murmurent` (the commons clone) and
-  `~/repos/murmurent_lab_mgmt_<lab>` (your lab's governance clone).
-- your Obsidian personal vault (the `murmurent_vault` clone) and, on the
-  lab server, the bulk-data root `$MURMURENT_LAB_VM_ROOT/{raw,refined}/`.
+Each vignette works on a single machine, with no PI and no centre required.
+The reference agents are already wired into `~/.claude/agents/`, so any CC
+session can invoke one by name. For the full list of what Murmurent installs
+or modifies on your machine, see [Install & setup](setup.md).
 
 ---
 

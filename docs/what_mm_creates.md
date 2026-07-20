@@ -42,5 +42,5 @@ is shared infrastructure the whole lab points at, rather than something each
 machine keeps its own copy of.
 
 This page consolidates what was previously split across
-[`getting_started.md`](getting_started.md)'s "Where Murmurent lives on your
-machine" section and [`index.md`](index.md)'s Repositories table.
+[`setup.md`](setup.md)'s "What Murmurent installs on your machine" section
+and [`index.md`](index.md)'s Repositories table.

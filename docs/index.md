@@ -22,6 +22,11 @@ Murmurent is built on [Claude Code](https://claude.com/claude-code) today,
 although nothing in its design is tied to it: the same tiers, agents, and
 governance rules could run on another agentic AI system.
 
+You can use Murmurent on your own. You do not need a lab or a centre to
+participate: the reference agents, the vault, and the governance rules all
+work for a single researcher on one machine. A lab or centre adds shared
+memory and infrastructure on top, when you want it.
+
 ## Where to start
 
 | You are… | Start here |

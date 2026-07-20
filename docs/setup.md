@@ -6,16 +6,21 @@ a lab; a mayor additionally sets up a centre.
 
 ## Installing the CLI and commons (all users)
 
-For most users, a single command performs the entire installation (see
-the [README](https://github.com/hallettmiket/murmurent/blob/main/README.md)):
+**For almost everyone, installation is a single command.** Copy and paste
+this one line into your terminal and press Enter:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts/bootstrap.sh | bash
 ```
 
-This installs the `murmurent` command and symlinks the shared agents,
-rules, and skills into `~/.claude/`. For most users it is the only
-installation step required.
+That is the entire installation. It installs the `murmurent` command and
+symlinks the shared agents, rules, and skills into `~/.claude/`.
+
+!!! note "You are finished after the command above"
+    You do **not** need to run any of the steps that follow. They are shown
+    only for transparency, and for the rare case of installing by hand. If
+    you ran the command above, skip ahead to
+    [Verify the installation](#verify-the-installation).
 
 The bootstrap script automates four steps, which can also be run by hand:
 
@@ -57,20 +62,49 @@ grep murmurent-oracle ~/.claude/settings.json   # MCP server registered
 murmurent --version
 ```
 
+## What Murmurent installs on your machine
+
+For reference, or for auditing what Murmurent touches, here is what it
+creates or modifies locally:
+
+- `~/.claude/agents/`, `~/.claude/rules/`, `~/.claude/skills/`: the commons
+  agents, rules, and skills, symlinked in by `scripts/setup.sh`.
+- `~/.claude/settings.json`: where Murmurent registers its hooks and MCP
+  servers.
+- `~/.claude/agent-memory/`: per-agent working memory.
+- `~/.claude/murmurent-preferences.yaml`: your personal preference profile.
+- `~/.murmurent/`, this machine's Murmurent state: `machine.yaml`, your
+  identity and membership cards, `lab_info/` (the centre registry, on a
+  registrar's machine), `agents.log` (the activity log the dashboard tails),
+  `keys/`, and host/registry files.
+- `~/repos/murmurent` (the commons clone) and
+  `~/repos/murmurent_lab_mgmt_<lab>` (your lab's governance clone).
+- your Obsidian personal vault (the `murmurent_vault` clone) and, on the lab
+  server, the bulk-data root `$MURMURENT_LAB_VM_ROOT/{raw,refined}/`.
+
 ## Making a repository Murmurent-aware
 
-Installing Murmurent wires up one machine. Turning an individual
-repository into something Murmurent-aware is a separate, repeatable step,
-with two levels: making a repository **Murmurent-ready**, so that Claude
-Code sessions opened in it can use the commons agents, and attaching a
-ready repository to a **project**. Both are documented separately:
+A **repository** (or "repo") is a folder of code and files tracked by git,
+living under `~/repos/` on your machine (for example, `~/repos/brca_wgs`).
+Your day-to-day research work happens inside repositories.
 
-- [`ready_vs_projects.md`](ready_vs_projects.md): making a repository
-  ready.
-- [`project_intra.md`](project_intra.md): what a project is and how one
-  is created.
+Installing Murmurent (above) prepares your machine. The next step is to make
+each repository you want to use with Murmurent **ready**: this wires the
+commons agents and rules into that repository, so Claude Code sessions opened
+in it can use them. A ready repository can then be attached to a **project**.
+Both steps have their own pages:
+
+- [`ready_vs_projects.md`](ready_vs_projects.md): making a repository ready.
+- [`project_intra.md`](project_intra.md): what a project is and how one is
+  created.
 
 ## For PIs: setting up a lab
+
+!!! info "The step-by-step commands are in the README"
+    The
+    [murmurent repo README](https://github.com/hallettmiket/murmurent/blob/main/README.md)
+    gives the exact, copy-pasteable, step-by-step commands for a PI setting up
+    a lab. The summary below explains what those steps do.
 
 The steps above install Murmurent for one person on one machine. A PI
 additionally stands up the lab's own governance and communication, which
@@ -92,9 +126,20 @@ is a one-time task:
 
 ## For mayors: setting up a centre
 
-A **centre** is one institution's own Murmurent installation. A mayor
-initializes it and, for a production deployment, moves it to a dedicated
-server so that it can accept join requests continuously.
+!!! info "The step-by-step commands are in the READMEs"
+    The
+    [murmurent repo README](https://github.com/hallettmiket/murmurent/blob/main/README.md)
+    and the
+    [murmurent_public README](https://github.com/hallettmiket/murmurent_public/blob/main/README.md)
+    give the exact, step-by-step commands for a Mayor bootstrapping a centre
+    and listing it in the public directory. The summary below explains what
+    those steps do.
+
+A **centre** is a collection of labs and cores (a research centre, a
+department, or another federation of labs and units with shared scientific
+goals). An institution can run more than one centre. A Mayor initializes a
+centre and, for a production deployment, moves it to a dedicated server so
+that it can accept join requests continuously.
 
 To initialize a centre, the mayor runs `murmurent centre-init` on their
 laptop; the wizard at `/registrar` collects the centre profile. After

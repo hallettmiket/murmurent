@@ -7,8 +7,9 @@ which is kept simple for prospective members.
 
 ## What the public directory is
 
-A centre is one institution's own Murmurent installation. The public
-directory is separate: a **single global repository**
+A centre is a collection of labs and cores at an institution (an institution
+can run more than one). The public directory is separate: a **single global
+repository**
 (`github.com/hallettmiket/murmurent_public`) that serves as a directory
 only, listing participating institutions and, for each, the
 **registrar's contact email**. That is its entire function.
