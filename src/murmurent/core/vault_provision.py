@@ -32,8 +32,11 @@ from . import repo as _repo
 # ``lab-notebook`` are the murmurent-managed tiers (resolved by the oracle MCP);
 # ``maps-legends`` holds the vault's own taxonomy that agents consult before
 # writing (issue #25 §5). ``oracle/drafts`` is where publish-to-lab candidates
-# sit before ``murmurent oracle publish`` promotes them.
-VAULT_SUBDIRS: tuple[str, ...] = ("oracle", "oracle/drafts", "lab-notebook", "maps-legends")
+# sit before ``murmurent oracle publish`` promotes them. ``murmurent_data``
+# holds arbitrary reference files (PDFs, spreadsheets, protocols, images) that
+# agents Glob/Read on demand — resolved by the murmurent-data MCP.
+VAULT_SUBDIRS: tuple[str, ...] = (
+    "oracle", "oracle/drafts", "lab-notebook", "maps-legends", "murmurent_data")
 
 GITKEEP = ".gitkeep"
 CLAUDE_MD = "CLAUDE.md"
@@ -71,7 +74,10 @@ def seed_claude_md() -> str:
         "`notebook` tier).\n"
         "- `maps-legends/` — this vault's own taxonomy (maps of content, tag "
         "legends). **Read this before writing a new entry** so tags + structure "
-        "stay consistent.\n\n"
+        "stay consistent.\n"
+        "- `murmurent_data/` — arbitrary reference files (PDFs, spreadsheets, "
+        "protocols, images) that agents may read on demand; not schema-validated "
+        "like the Oracle.\n\n"
         "## Sync\n\n"
         "This vault is git-backed. After writing entries, run `murmurent vault "
         "sync` to commit + push (best-effort). Pull the latest from another "
@@ -79,10 +85,11 @@ def seed_claude_md() -> str:
         "**update** button.\n\n"
         "## Agents\n\n"
         "Any agent (oracle, bookworm, lab_oracle, …) can resolve this vault's "
-        "location and the `maps-legends/` folder — for both the personal and lab "
-        "vaults — by running `murmurent vault paths` (prints JSON). The lab "
-        "(group) vault is the lab-mgmt repo; its `oracle/`, `lab-notebook/`, and "
-        "`maps-legends/` live there.\n"
+        "location, the `maps-legends/` folder, and the `murmurent_data/` folder "
+        "— for both the personal and lab vaults — by running `murmurent vault "
+        "paths` (prints JSON). The lab (group) vault is the lab-mgmt repo; its "
+        "`oracle/`, `lab-notebook/`, `maps-legends/`, and `murmurent_data/` live "
+        "there.\n"
     )
 
 
@@ -228,7 +235,8 @@ DEFAULT_EXCLUDED_SENSITIVITIES: tuple[str, ...] = ("clinical",)
 # default adopt scope is "murmurent" — an ALLOWLIST that tracks just these +
 # CLAUDE.md and leaves everything else local (off GitHub). This is safer than a
 # clinical denylist, which would push untagged personal notes.
-MURMURENT_TRACKED_FOLDERS: tuple[str, ...] = ("oracle", "lab-notebook", "maps-legends")
+MURMURENT_TRACKED_FOLDERS: tuple[str, ...] = (
+    "oracle", "lab-notebook", "maps-legends", "murmurent_data")
 
 
 def _allowlist_gitignore_lines() -> list[str]:
@@ -563,7 +571,8 @@ def init_personal_vault(
     if commit:
         res = syncer(dest, message=(
             "vault: scaffold murmurent personal vault "
-            "(oracle/, oracle/drafts/, lab-notebook/, maps-legends/, CLAUDE.md)"))
+            "(oracle/, oracle/drafts/, lab-notebook/, maps-legends/, "
+            "murmurent_data/, CLAUDE.md)"))
         committed = getattr(res, "committed", False)
         pushed = getattr(res, "pushed", False)
         sync_detail = getattr(res, "detail", "")
@@ -587,7 +596,8 @@ def init_lab_vault(*, env: dict | None = None) -> dict:
                 "detail": f"no lab-mgmt clone at {root} — clone it per docs/lab_mgmt.md "
                           f"first (the lab vault is the lab-mgmt repo)."}
     created: list[str] = []
-    for sub in ("oracle", "oracle/drafts", "lab-notebook", "maps-legends"):
+    for sub in ("oracle", "oracle/drafts", "lab-notebook", "maps-legends",
+                "murmurent_data"):
         d = root / sub
         if not d.is_dir():
             d.mkdir(parents=True, exist_ok=True)
@@ -633,10 +643,11 @@ def resolve_vault_paths() -> dict:
             "oracle": str(personal / oracle_sub),
             "notebook": str(personal / notebook_sub),
             "maps_legends": str(personal / "maps-legends"),
+            "murmurent_data": str(personal / "murmurent_data"),
         }
     else:
         personal_block = {"root": None, "oracle": None, "notebook": None,
-                          "maps_legends": None}
+                          "maps_legends": None, "murmurent_data": None}
 
     lab = _repo.lab_mgmt_repo_root()
     lab_block = {
@@ -644,6 +655,7 @@ def resolve_vault_paths() -> dict:
         "oracle": str(lab / "oracle"),
         "notebook": str(lab / "lab-notebook"),
         "maps_legends": str(lab / "maps-legends"),
+        "murmurent_data": str(lab / "murmurent_data"),
         "exists": lab.is_dir(),
     }
     return {"personal": personal_block, "lab": lab_block}

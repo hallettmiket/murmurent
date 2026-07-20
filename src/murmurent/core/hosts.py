@@ -83,6 +83,7 @@ class Host:
     vault_root: str = "~/Documents/Obsidian"
     oracle_subfolder: str = "oracle"          # personal vault oracle subfolder
     notebook_subfolder: str = "lab-notebook"  # personal vault lab-notebook subfolder
+    data_subfolder: str = "murmurent_data"    # personal vault reference-files subfolder
     # LAB (group) vault (issue #25): where the lab-mgmt clone
     # (``murmurent_lab_mgmt_<lab>``) lives on THIS machine. On the *local*
     # machine the dashboard reads this read-only from
@@ -158,6 +159,7 @@ def _coerce_host(name: str, raw: dict[str, Any]) -> Host:
         vault_root=_str(raw.get("vault_root"), "~/Documents/Obsidian") or "~/Documents/Obsidian",
         oracle_subfolder=_str(raw.get("oracle_subfolder"), "oracle") or "oracle",
         notebook_subfolder=_str(raw.get("notebook_subfolder"), "lab-notebook") or "lab-notebook",
+        data_subfolder=_str(raw.get("data_subfolder"), "murmurent_data") or "murmurent_data",
         lab_vault_root=_str(raw.get("lab_vault_root")),
         mount_point=_str(raw.get("mount_point")),
         description=_str(raw.get("description")),
@@ -245,6 +247,8 @@ def write(hosts: dict[str, Host], env: dict[str, str] | None = None) -> Path:
             row["oracle_subfolder"] = host.oracle_subfolder
         if host.notebook_subfolder and host.notebook_subfolder != "lab-notebook":
             row["notebook_subfolder"] = host.notebook_subfolder
+        if host.data_subfolder and host.data_subfolder != "murmurent_data":
+            row["data_subfolder"] = host.data_subfolder
         if host.lab_vault_root: row["lab_vault_root"] = host.lab_vault_root
         if host.mount_point: row["mount_point"] = host.mount_point
         if host.description: row["description"] = host.description
@@ -307,6 +311,7 @@ def update_scan_dirs(
         vault_root=current.vault_root,
         oracle_subfolder=current.oracle_subfolder,
         notebook_subfolder=current.notebook_subfolder,
+        data_subfolder=current.data_subfolder,
         lab_vault_root=current.lab_vault_root,
         mount_point=current.mount_point,
         description=current.description,
@@ -326,6 +331,7 @@ def update_host(
     vault_root: str | None = None,
     oracle_subfolder: str | None = None,
     notebook_subfolder: str | None = None,
+    data_subfolder: str | None = None,
     lab_vault_root: str | None = None,
     description: str | None = None,
     scan_dirs: tuple[str, ...] | list[str] | None = None,
@@ -337,11 +343,11 @@ def update_host(
     editor now edits the same field set as the Add form: connection
     (``ssh_host``, ``remote_user``), ``lab_vm_root`` (Files root), the
     PERSONAL vault (``vault_root`` + ``oracle_subfolder`` /
-    ``notebook_subfolder``), the LAB vault clone (``lab_vault_root``),
-    ``description``, and ``scan_dirs`` (Repo locations). ``name`` and ``kind``
-    are identity and are never changed here.
+    ``notebook_subfolder`` / ``data_subfolder``), the LAB vault clone
+    (``lab_vault_root``), ``description``, and ``scan_dirs`` (Repo locations).
+    ``name`` and ``kind`` are identity and are never changed here.
 
-    Blanking rules differ by field: ``ssh_host``, ``vault_root``, and the two
+    Blanking rules differ by field: ``ssh_host``, ``vault_root``, and the three
     subfolders fall back to the current value when cleared (an ssh host must
     keep a host; the vault + its subfolders keep their convention), while
     ``remote_user``, ``lab_vault_root``, and ``description`` accept an empty
@@ -369,6 +375,7 @@ def update_host(
         vault_root=_keep_if_blank(vault_root, current.vault_root),
         oracle_subfolder=_keep_if_blank(oracle_subfolder, current.oracle_subfolder),
         notebook_subfolder=_keep_if_blank(notebook_subfolder, current.notebook_subfolder),
+        data_subfolder=_keep_if_blank(data_subfolder, current.data_subfolder),
         lab_vault_root=_allow_clear(lab_vault_root, current.lab_vault_root),
         mount_point=current.mount_point,
         description=_allow_clear(description, current.description),

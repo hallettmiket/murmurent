@@ -109,6 +109,14 @@ MCP_REGISTRATIONS: dict[str, dict[str, Any]] = {
         "args": ["-m", "murmurent.mcp.core_data_server"],
         "env": {},
     },
+    # Arbitrary reference files (PDFs, spreadsheets, protocols, images,
+    # text) under a vault's murmurent_data/ folder — list + read on
+    # demand. Distinct from the Oracle (schema-validated markdown facts).
+    "murmurent-data": {
+        "command": sys.executable,
+        "args": ["-m", "murmurent.mcp.data_server"],
+        "env": {},
+    },
 }
 
 

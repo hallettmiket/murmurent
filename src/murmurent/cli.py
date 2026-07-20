@@ -1598,7 +1598,8 @@ def vault_group() -> None:
 @click.option("--adopt", is_flag=True,
               help="Back an EXISTING (non-git) Obsidian vault at --path: git-init it "
                    "and push to a new private repo. By default tracks ONLY the "
-                   "murmurent folders (oracle/, lab-notebook/, maps-legends/) and "
+                   "murmurent folders (oracle/, lab-notebook/, maps-legends/, "
+                   "murmurent_data/) and "
                    "keeps everything else local. Use for already-onboarded members.")
 @click.option("--include-all", is_flag=True,
               help="With --adopt: back the WHOLE vault (minus files tagged "
@@ -1665,11 +1666,13 @@ def vault_init_cmd(clone_path: str | None, owner: str | None, lab_vault: bool,
                f"{'yes' if out['pinned'] else 'no'}")
 
 
-@vault_group.command("paths", help="Print JSON with the personal + lab vault roots + maps-legends.")
+@vault_group.command("paths",
+                     help="Print JSON with the personal + lab vault roots + "
+                          "maps-legends/ + murmurent_data/.")
 def vault_paths_cmd() -> None:
     """For agents (oracle, bookworm, lab_oracle, …) whose session starts OUTSIDE
-    the vault, so they can locate both vaults + each maps-legends/ without a
-    hardcoded per-machine path or an env var."""
+    the vault, so they can locate both vaults + each maps-legends/ and
+    murmurent_data/ without a hardcoded per-machine path or an env var."""
     import json as _json
     from .core import vault_provision as _vp
 
