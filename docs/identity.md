@@ -126,6 +126,47 @@ murmurent whoami                 # your handle, key ID (fingerprint), and card s
 Losing the key means re-enrolling; leaking it means someone can act as you
 until the card is revoked. Treat it like an SSH key.
 
+## Identifiers a member has, and why each is needed
+
+The `murmurent init` transcript above asks for several distinct pieces of
+information: a handle, a full name, an email, an official handle, a GitHub
+username, and a Slack handle. Onboarding rarely explains why so many are
+collected, or what each one unlocks later. Every field maps to a concrete,
+later step in the system, drawn directly from the roster schema
+(`core/membership.py`), the identity-card mechanism (`core/identity_card.py`),
+and the join-request flow (`core/join_requests.py`, `core/join_ingest.py`).
+
+| Identifier | What it is | Why Murmurent needs it | Where it is used |
+|---|---|---|---|
+| **Murmurent handle** (`@member_a`) | The short username chosen at `murmurent init`; the primary internal name for a person. | It is the subject named in every signed card, the filename key for the roster record (`members/<handle>.md`), and the token every command and every other person uses to address that person unambiguously. | `MemberRecord.handle` and `member_path()` (membership.py); the `netname` field written into every issued card (identity_card.py); `proposed_pi` on a join request (join_requests.py); the `pi_handle` field parsed from a hub-submitted join issue (join_ingest.py). |
+| **Official / institutional handle** | A second handle tied to the person's institution (for example, a university netname), which may differ from the Murmurent handle. | Institutions already assign their own accounts; recording this alongside the Murmurent handle lets the roster carry that cross-reference for record-keeping, kept separate from the identity used to sign or verify anything. | `MemberRecord.official_handle`, documented in membership.py as display/record only. |
+| **Full name** | The person's name in prose. | Cards, roster entries, and audit trails need to read as human-legible records, not just handles. | `MemberRecord.full_name`. |
+| **Email** | The contact address supplied at join. | Resolves the person's Slack account (`users.lookupByEmail`) when no Slack handle is on file, and is the channel through which join-request decisions and provisioning invitations reach the requester. | `MemberRecord.email` (membership.py); `JoinRequest.requester_email`, passed on as `pi_email` / `leader_email` when approving a lab or core request (join_requests.py). |
+| **GitHub username** | The person's GitHub login. | The lab-mgmt roster repo and project repos live on GitHub; with no GitHub login on file, the person cannot be added as a collaborator, and so cannot clone the roster or push a signed change to it. | `MemberRecord.github`, "GitHub login, for repo collaborator management". |
+| **Slack handle / member ID** | The person's Slack username or workspace member ID. | Signed cards are delivered as a direct message through the group's own Slack bot; recording this lets `issue-member-card` DM the card straight back to the person instead of falling back to a slower email lookup. It also determines who gets added to a group's or project's Slack channel. | `MemberRecord.slack`, "shown in the Lab members list"; the DM-first, email-fallback lookup order described earlier on this page. |
+| **Cryptographic keypair (ed25519) and attested public key** | A keypair minted locally the first time `murmurent` runs; the public half is attested when a card is issued. | This is the identifier that lets Murmurent prove a person's claim to a role without contacting any server: the private key signs and verifies cards offline, and recording the attested public key on the roster enables reissuing a project card without repeating proof-of-possession. | `MemberRecord.pubkey` (membership.py). |
+| **Card fingerprint and card ID** | A short hash of the attested public key (fingerprint), and the identifier of the specific signed card issued to the person (card ID). | Both function as revocation indices: the fingerprint lets a PI or mayor revoke every card tied to a compromised key, and the card ID lets them revoke one specific card, without touching the rest of the person's roster history. | `MemberRecord.card_fingerprint`, `MemberRecord.card_id` (membership.py). |
+| **Age key file** (`keys/<handle>.age`) | A per-member signing key file stored in the lab-mgmt repo. | Retained after deactivation so historical signatures made with it continue to verify; rotated only if compromised. | Listed as a decommission cleanup item in `set_status()` (membership.py). |
+
+Two points are worth making plain, since the roster deliberately keeps these
+identifiers separate rather than collapsing them into one:
+
+- **Each identifier gates a different resource.** The GitHub username gates
+  repository access; the Slack handle gates channel membership and card
+  delivery; the email gates account resolution and decision notices; the
+  keypair and its fingerprint gate cryptographic verification and
+  revocation. Losing or omitting one blocks only the specific step it
+  governs: a member with no GitHub username on file can still hold a valid
+  card and appear on the roster, but cannot yet clone the lab-mgmt repo.
+- **"Handle" and "netname" name the same value from two vantage points.**
+  The identity card written by `build_card()` stores the Murmurent handle
+  under the field name `netname`, and importing that card stamps the same
+  value into `~/.murmurent/user` so the local dashboard can refuse to open
+  under a different person's identity. This is the same Murmurent handle,
+  restamped for a single machine, and is unrelated to the official /
+  institutional handle described above, which is a separate field carried
+  purely for cross-reference.
+
 ## [Members] Join a group
 
 > Diagram: the [onboarding sequence](diagrams.md#5-onboarding-sequence) shows the complete flow.

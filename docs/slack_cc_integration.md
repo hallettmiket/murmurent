@@ -1,11 +1,12 @@
-# Plan: Slack ↔ Claude Code integration for a Murmurent lab
+# Slack and Claude Code integration
 
-**This is a design and roadmap doc.** It lays out phased work (see
-"Phases" below) toward letting lab members drive Claude Code and
-Murmurent from inside Slack, with each member's Slack identity mapped to
-their Murmurent handle. Everything described here is intended work;
-check the codebase and each phase's status marker before assuming a
-given piece has shipped.
+!!! warning "Work in progress"
+    This is a design and roadmap document. It lays out phased work (see
+    "Phases" below) toward letting lab members drive Claude Code and
+    Murmurent from inside Slack, with each member's Slack identity mapped to
+    their Murmurent handle. Everything described here is intended work;
+    check the codebase and each phase's status marker before assuming a
+    given piece has shipped.
 
 ## Intent
 

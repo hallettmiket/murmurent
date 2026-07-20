@@ -8,7 +8,11 @@ The remaining pages in this section describe each in detail.
 - **Member.** An individual researcher, one of a group's **highly
   qualified personnel (HQP)**, identified by a handle (for example
   `@member_a`). Each member has their own agents, their own personal
-  vault, and their own machine state.
+  vault, and their own machine state. A member is also known by several
+  other identifiers (a GitHub username, a Slack handle, cryptographic
+  keys); see
+  [Membership IDs and the trust chain](identity.md) for what each is and
+  why Murmurent needs it.
 - **PI.** The principal investigator who leads a group. A PI issues
   membership identities to the group's members and owns the group's
   governance repository.
@@ -55,9 +59,9 @@ flowchart TB
 
 ## How repos and projects combine
 
-A member's work lives in **repositories** (git clones under `~/repos/`). A
-Murmurent-ready repository has the commons agents and rules wired in; see
-[Making a repo Murmurent-ready](ready_vs_projects.md).
+A member's work lives in **repositories** (for example, git clones under
+`~/repos/`). A Murmurent-ready repository has the commons agents and rules
+wired in; see [Making a repo Murmurent-ready](ready_vs_projects.md).
 
 A **project** is a higher-level construct: a set of existing repositories,
 the machines they run on, and cryptographically certified members, with the
@@ -66,8 +70,10 @@ members can be drawn from more than one group. How a project is created is
 described in [Creating a project](project_intra.md) (within one group) and
 [Creating a project across labs](project_inter.md) (across groups).
 
-A group operates across three classes of repository, each with a distinct
-role:
+GitHub is central to Murmurent: it hosts the shared code, each group's
+governance records, and each member's personal vault, and Murmurent uses
+different classes of repository for different purposes. A group operates
+across three classes of repository, each with a distinct role:
 
 - the **commons** (`hallettmiket/murmurent`): the shared agents, rules,
   hooks, and CLI, cloned by everyone;
@@ -79,12 +85,3 @@ role:
 
 The full inventory of what Murmurent creates, on GitHub and on each
 machine, is in [What Murmurent creates](what_mm_creates.md).
-
-## Cross-group services (SEAs)
-
-Members sometimes need something from a member of another group: a piece of
-analysis, a reusable skill, or an experiment run on a shared instrument.
-Murmurent models these requests as **SEAs** (Skills, Experiments-as-events,
-and Analyses): atomic, callable units of service that one member requests
-and another fulfils, mediated through a request board and an audit trail.
-SEAs are described in [Cross-group services (SEAs)](seas.md).

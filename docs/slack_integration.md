@@ -1,9 +1,10 @@
 # Slack integration design
 
-**This is a design doc for an in-progress feature.** It describes the
-target design and records what's built so far against it. Treat every
-claim below as design intent unless the status line for that piece says
-otherwise.
+!!! warning "Work in progress"
+    This is a design document for an in-progress feature. It describes the
+    target design and records what is built so far against it. Treat every
+    claim below as design intent unless the status line for that piece says
+    otherwise.
 
 **Status (2026-05-08):** `murmurent slack mirror` / `slack distil` and the
 `oracle drafts / approve / decline` review loop are built and live

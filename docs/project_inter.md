@@ -1,5 +1,11 @@
 # Inter-group (cross-lab) projects
 
+!!! warning "Work in progress"
+    Cross-lab project creation is still maturing. The certificate and
+    enrollment flow below is implemented, but the surrounding tooling (in
+    particular the shared-workspace and multi-org repository handling) is
+    under active development.
+
 A project's basics (the definition, the certificate model, and the full
 command reference) live on [`project_intra.md`](project_intra.md). This page
 covers what's different when project members span labs.

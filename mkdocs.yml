@@ -99,20 +99,23 @@ nav:
   - Labs & cores:
       - "Overview: members, groups, projects": overview.md
       - Group-level architecture: group_level.md
+      - "Choreographies 🚧": choreography.md
+      - "Security Guard & Cable Guy (lab)": guardians.md
       - What Murmurent creates: what_mm_creates.md
       - The lab-mgmt repo: lab_mgmt.md
-      - Cross-group services (SEAs) (work in progress): seas.md
-      - Inventory and shared resources (work in progress): inventory.md
-      - Creating a project across labs: project_inter.md
+      - "Cross-group services (SEAs) 🚧": seas.md
+      - "Inventory and shared resources 🚧": inventory.md
+      - "Creating a project across labs 🚧": project_inter.md
       - Group Slack setup (PI): group_slack_setup.md
   - Centres:
       - What a centre is: centre_overview.md
       - Membership IDs & the trust chain: identity.md
       - The centre root key: centre_root_key.md
+      - "Security Guard & Cable Guy (centre)": centre_guardians.md
       - Slack:
           - Centre Slack setup (mayor): slack_setup.md
-          - Slack integration: slack_integration.md
-          - Slack ↔ Claude Code: slack_cc_integration.md
+          - "Slack integration 🚧": slack_integration.md
+          - "Slack ↔ Claude Code 🚧": slack_cc_integration.md
       - The public directory:
           - Public directory setup (mayor): hub_setup.md
           - Connecting to the public directory: connect_to_hub.md
