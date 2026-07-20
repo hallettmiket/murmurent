@@ -9,7 +9,7 @@ one lab, and some live only on your own machine.
 | [`hallettmiket/murmurent`](https://github.com/hallettmiket/murmurent) | GitHub (public) | the commons: agents, rules, hooks, MCP servers, CLI, dashboard, shared across the centre | the centre; everyone clones it |
 | [`hallettmiket/murmurent_public`](https://github.com/hallettmiket/murmurent_public) | GitHub (public) | the global directory of institutions running Murmurent, plus registrar contacts for join requests | the centre; public |
 | `<your-org>/murmurent_lab_mgmt_<lab>` | GitHub (private) | your lab or core's governance repo: roster, project registry (`cert_projects/`), inventory, the lab oracle (curated shared findings), audit records | the PI; members get read access |
-| `<you>/murmurent_vault` | GitHub (private) | your personal vault: `oracle/` (your findings), `lab-notebook/` (daily notes), `maps-legends/` | you, alone |
+| `<you>/murmurent_vault` | GitHub (private) | your personal vault: `oracle/` (your findings), `lab-notebook/` (daily notes), `murmurent_data/` (reference files: PDFs, spreadsheets), `maps-legends/` (your vault index) | you, alone |
 | `~/repos/murmurent` | your machine | the working clone of the commons; `~/.claude/agents` and `~/.claude/rules` symlink into it | you, per machine |
 | `~/repos/murmurent_lab_mgmt_<lab>` | your machine | the working clone of your lab's governance repo | you, per machine |
 | `~/.claude/agents/`, `~/.claude/rules/`, `~/.claude/skills/` | your machine | symlinks into the commons clone, put there by `scripts/setup.sh` | you, per machine |

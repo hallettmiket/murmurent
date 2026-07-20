@@ -94,10 +94,10 @@ each configurable per machine (`~/.murmurent/machine.yaml`):
 | `oracle/` | Personal Oracle entries: one markdown file per finding, schema-checked, plus the `MEMORY.md` index | `murmurent-oracle` MCP server, the `oracle` agent | the `oracle` agent |
 | `oracle/drafts/` | Entries staged for `murmurent oracle publish`, promotion to the lab tier | same | the `oracle` agent |
 | `lab-notebook/` (the `notebook_subfolder` setting, default name) | Daily, free-form lab-notebook entries | `murmurent-oracle` MCP server, as the `notebook` tier | you, by hand, via the dashboard's "Lab notebook, today" edit button, which creates the day's file from a template on first use |
+| `murmurent_data/` (the `data_subfolder` setting, default name) | Arbitrary reference files (PDFs, spreadsheets, protocols, images) that agents read on demand; not schema-validated | the `murmurent-data` MCP server (`data_list` / `data_read`), and agents reading files directly | you, by placing files in it |
 
-Every other folder in the vault, including `maps-legends/`, project
-notes, and attachments, is entirely yours to organize (see
-"`maps-legends/`" below).
+Every other folder in the vault, including `maps-legends/` and your own
+project notes, is entirely yours to organize (see "`maps-legends/`" below).
 
 **Path naming.** Two superficially similar directories sit at
 different layers; keep them straight:

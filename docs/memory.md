@@ -73,10 +73,10 @@ Murmurent recognizes three kinds of content in the vault:
 - **The lab notebook** (`lab-notebook/`): your daily, less-structured
   entries recording what you did and observed. Notebook entries do not
   require the Oracle schema. See [The lab notebook](lab_notebook_guide.md).
-- **Source attachments**: the underlying documents a finding refers to,
-  such as PDFs of papers, spreadsheets, or images. Agents read these on
-  demand, and an entry references them (see "Bringing documents into the
-  vault" below).
+- **`murmurent_data/`**: arbitrary reference files, such as PDFs of papers,
+  spreadsheets, protocols, or images, that agents read on demand to inform
+  their work. Unlike the Oracle, this folder is not schema-validated (see
+  "Bringing documents into the vault" below).
 
 The Oracle and the lab notebook are **parallel** parts of the vault: the
 Oracle is the curated layer and the notebook is the raw daily layer;
@@ -117,29 +117,33 @@ oracle as the curated core, both schema-checked, and the notebook
 distilled findings. Full detail:
 [`oracle-workflow.md`](oracle-workflow.md).
 
-### Bringing documents into the vault (PDFs and spreadsheets)
+### Bringing documents into the vault (`murmurent_data/`)
 
 Not everything worth keeping is a short note. You will often want a specific
-document, a PDF of a paper, a spreadsheet of results, or an image, available
-to Murmurent. The convention is:
+document, a PDF of a paper, a spreadsheet of metadata, or an image, available
+to Murmurent. Murmurent recognizes a dedicated folder for exactly this:
+**`murmurent_data/`**. Unlike the Oracle, it holds arbitrary file types and
+is not schema-validated; it is where you place reference material used to
+condition the agents' work.
 
-1. Save the document in a folder of your choice inside the vault (for
-   example `papers/` or `attachments/`).
-2. Record a short Oracle or notebook entry that references it, either by its
-   path or, for a paper, its `url:` or DOI. That entry is the durable,
-   searchable memory; the document is the source it points to.
+1. Save the document in `murmurent_data/` in your vault.
+2. Optionally, record a short Oracle or notebook entry that references it, by
+   its path or, for a paper, its `url:` or DOI, so the finding it supports
+   stays searchable.
 
-An agent then reads the document directly on demand (Claude Code reads PDFs,
-spreadsheets, and images), and the referencing entry makes it findable in a
-later session. Murmurent does not index the document itself; the Markdown
-entry is what appears in Oracle search. A small table can instead be pasted
-into a note as Markdown, so its rows are searched along with the prose (see
-[vignette 5](vault_vignettes/5_bring_in_a_table.md)).
+Agents reach `murmurent_data/` two ways. They can read its files directly
+(Claude Code reads PDFs, spreadsheets, and images), and the **`murmurent-data`
+MCP server** exposes `data_list` (list the files) and `data_read` (return the
+text of a text file, or the path of a binary file to read directly). A small
+table can instead be pasted into a note as Markdown, so its rows are searched
+along with the prose (see [vignette 5](vault_vignettes/5_bring_in_a_table.md));
+a full spreadsheet or PDF belongs in `murmurent_data/` (see
+[vignette 4](vault_vignettes/4_add_a_manuscript.md)).
 
-For **clinical or otherwise sensitive** documents, mark the referencing
-entry `sensitivity: clinical` so it stays in your personal vault and is
-never published to the lab. Large bulk-data files (cohort tables, imaging
-stacks) belong in Tier 3, not the vault.
+For **clinical or otherwise sensitive** documents, mark any referencing entry
+`sensitivity: clinical` so it stays in your personal vault and is never
+published to the lab. Large bulk-data files (cohort tables, imaging stacks)
+belong in Tier 3, not `murmurent_data/`.
 
 ### From the personal to the Lab Oracle
 

@@ -23,8 +23,9 @@ asks:
    is appropriate. Real clinicopathological or patient data must be
    marked `sensitivity: clinical`: that keeps it in Sam's personal
    vault only, and it can never be published to the lab (see vignette 6).
-   Only small tables belong in the vault; large data files live
-   in the lab's `refined/` storage.
+   Only small tables belong inside a note; a full spreadsheet file goes
+   in `murmurent_data/` (see vignette 4), and large data files live in the
+   lab's `refined/` storage.
 
 ```mermaid
 flowchart LR
