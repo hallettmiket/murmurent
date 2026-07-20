@@ -184,7 +184,7 @@ For verbs not in this day-to-day table, see:
 - [Squads](#squads-subgroups) for `form` / `invite` / `release` / `transfer_lead` / `dissolve` / `promote`.
 - [SEAs](#sea-verbs) for `request` / `claim` / `complete` / `decline`.
 - [Role transitions](#role-transitions) for `assign` / `revoke` / `transfer_role`.
-- [Project creation and lifecycle](#project-creation-and-lifecycle) for `admit` / `release` / `end` / `archive_project`, with creation covered in [project_intra.md](project_intra.md).
+- Project verbs (`admit` / `release` / `end` / `archive_project`) and project creation are covered in [project_intra.md](project_intra.md).
 - [Knowledge and continuity verbs](#knowledge-and-continuity-verbs) for `discuss` / `teach` / `freeze`.
 - `schedule` is intentionally not a Murmurent verb: calendars and a `calendar` MCP cover it.
 
@@ -258,25 +258,6 @@ The field is reliable regardless of the editing tool.
 
 - Read: every group member.
 - Write: `lab_manager` role only (enforced by the inventory MCP and by branch protection on the lab-management repo).
-
-### Migration path
-
-If the lab outgrows markdown (≥1000 items, multiple writers per day, complex queries), keep the same frontmatter schema and migrate to SQLite + an inventory MCP server. The schema transfers; the editing UX changes only for the `lab_manager`. New fields can be added in either model.
-
-### Why not SQL today
-
-- Schema rigidity: catalog photos, vendor links, prep notes don't fit cleanly.
-- Tooling separate from the rest of Murmurent.
-- Adds a server to operate.
-- For lab-scale (hundreds of items, infrequent updates), the marginal benefit is small.
-
-## Project creation and lifecycle
-
-A project is a set of existing repositories, machines, and
-cryptographically certified members, with the creator as its lead. How a
-project is created, and how members are admitted or released, is
-documented in [project_intra.md](project_intra.md) (intra-group) and
-[project_inter.md](project_inter.md) (cross-group).
 
 ## Experiments and lab notebooks
 
