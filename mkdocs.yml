@@ -103,11 +103,11 @@ nav:
       - The lab-mgmt repo: lab_mgmt.md
       - Drift detection (reconcile): reconcile.md
       - Group-level architecture: group_level.md
+      - Architecture diagrams: diagrams.md
       - Hub setup (mayor): hub_setup.md
       - Connecting to the hub: connect_to_hub.md
   - Reference:
       - CLI manual: cli_manual.md
       - Versioning: versioning.md
-      - Diagrams: diagrams.md
       - Code style: style/code-style.md
       - Documentation conventions: style/documentation.md

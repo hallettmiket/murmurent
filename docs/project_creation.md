@@ -1,14 +1,19 @@
 # Creating a project: two vignettes
 
-A Murmurent **project** is three sets, not a folder:
+> Diagram: [project lifecycle](diagrams.md#4-project-lifecycle) shows a project's states from creation to archive.
+
+A Murmurent **project** is three coordinated sets:
 
 - a set of **repos**: *existing* clones picked from your machines' repo
   folders (`~/repos` etc.; the folders themselves are configured on the
-  Machines panel under *Repo location*). Creating a project never creates a
-  repo: clone or `git init` it first, then group it into a project;
+  Machines panel under *Repo location*). Creating a project attaches
+  existing clones: clone or `git init` the repo first, then group it into
+  a project;
 - a set of **machines** (your laptop, the lab VM, …),
 - a set of **members**, and membership is *cryptographic*: each member holds
-  a signed **project certificate** they can prove, not just a name on a list.
+  a signed **project certificate**, a credential that cryptographically
+  proves their membership and can be verified (offline) against the
+  project lead's key.
 
 The person who creates the project is its **lead**. At creation the PI signs
 the lead a one-time *delegation card*; from then on the lead (and only the
@@ -21,7 +26,7 @@ through Slack, members are invited when they join and removed when they leave.
 A project is a different, bigger thing than a repo simply being
 **murmurent-ready** (having the commons agents wired in via `murmurent repo
 adopt`): readiness is plumbing a repo needs before it's useful in a
-project, not a project itself. See
+project. See
 [`ready_vs_projects.md`](ready_vs_projects.md) if you're not sure which one
 you're looking at.
 
@@ -56,8 +61,8 @@ the creator) issues her the **project-lead card** and DMs it to her:
 **3. Allie certifies her members.** After importing her lead card, her
 dashboard shows the project with Bob listed as *no cert* and an **issue**
 button. One click: Bob's project card is signed *with Allie's key* (his public
-key is already on the roster from when he joined the lab: no ceremony
-needed), DM'd to him, and he's invited to the private channel. Bob imports it
+key is already on the roster from when he joined the lab, so signing is
+immediate), DM'd to him, and he's invited to the private channel. Bob imports it
 and can prove he belongs:
 
 ```bash
@@ -81,9 +86,9 @@ revoked certs stay revoked: re-issue).
 Allie now wants `spatial_atlas` with Carlos, who is in the **Xia lab**, a
 different group, a different Slack workspace.
 
-**1. The gate.** She adds `@carlos` to the member list. He isn't on her lab's
-roster, so the form demands one more thing, and if she skips it, creation
-**halts**:
+**1. The gate.** She adds `@carlos` to the member list. His key lives on the
+Xia lab's roster instead of hers, so the form demands one more thing, and if
+she skips it, creation **halts**:
 
 > project members span multiple groups: the groups must decide on a shared
 > Slack workspace before an inter-group project can be created.
@@ -107,8 +112,9 @@ Allie enters the workspace id in the form and the proposal goes through.
 (The check re-runs at approval, so it fails closed even if rosters changed
 in between.)
 
-**3. Certifying an outside member.** Carlos isn't on Allie's roster, so there
-is no recorded key for him. He runs, on his own machine:
+**3. Certifying an outside member.** Carlos's key lives only on the Xia
+lab's roster, so Allie has none for him on record. He runs, on his own
+machine:
 
 ```bash
 murmurent enroll --project spatial_atlas
@@ -129,16 +135,23 @@ primary repo; extra-org repos are managed by hand for now.)
 
 ## The commands, in one table
 
-| You want to… | Do |
-|---|---|
-| Create a project | dashboard → **＋ new project** (PI approves) |
-| Import your lead / member card | `murmurent import-card bundle.json` |
-| Add a member (lead) | project → Members → **＋ add member** or `murmurent project-add-member` |
-| Add an outside member | they run `murmurent enroll --project <p>`, you issue with `--enrollment` |
-| Remove a member | project → Members → **×** or `murmurent project-remove-member` |
-| Prove your membership | `murmurent project-whoami` |
-| Delete a project (PI) | project row → **delete** |
-| Recover a deleted project | `murmurent project-unarchive --project <p>` (then re-issue certs) |
+Project **creation and deletion** happen only through the dashboard under
+the current certificate-based model. (A legacy `murmurent project new`
+CLI command predates certificates; dashboard creation is the current
+path.) **Membership and certificate** operations, by contrast, run as CLI
+commands, some of which are mirrored by a dashboard button that runs the
+same command underneath.
+
+| You want to… | Do | Where |
+|---|---|---|
+| Create a project | dashboard → **＋ new project** (PI approves) | Dashboard |
+| Delete a project (PI) | project row → **delete** | Dashboard |
+| Recover a deleted project | `murmurent project-unarchive --project <p>` (then re-issue certs) | CLI |
+| Import your lead / member card | `murmurent import-card bundle.json` | CLI |
+| Add a member (lead) | project → Members → **＋ add member**, or `murmurent project-add-member` | Dashboard or CLI |
+| Add an outside member | they run `murmurent enroll --project <p>`, you issue with `--enrollment` | CLI |
+| Remove a member | project → Members → **×**, or `murmurent project-remove-member` | Dashboard or CLI |
+| Prove your membership | `murmurent project-whoami` | CLI |
 
 Deeper background: the certificate chain and trust model are in
 [`identity.md`](identity.md); the full command reference is in

@@ -1,8 +1,10 @@
 # Security dashboard: per-lab posture audit
 
 Murmurent's per-lab security dashboard runs the `security_guard` agent
-periodically against a registered host (typically a shared lab server)
-and surfaces permission, hygiene, and policy findings in one screen.
+periodically against a registered host (a machine you have added to
+Murmurent with `murmurent host add`, or from the dashboard's Machines
+panel; typically a shared lab server) and surfaces permission, hygiene,
+and policy findings in one screen.
 
 Two tiers, two trust levels:
 

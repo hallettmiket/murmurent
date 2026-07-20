@@ -62,14 +62,15 @@ Verdicts, defined for a naive reader:
 - **partial**: has one but not the other (for example agents linked but
   no marker yet). Run `murmurent repo adopt` (or the Upgrade button) to
   finish.
-- **plain clone**: an ordinary git repo with neither. Not wired into
-  Murmurent.
+- **plain clone**: an ordinary git repo with neither marker, sitting
+  outside Murmurent's plumbing.
 - **not a git repo** / **missing**: the path is not a git checkout, or
   does not exist.
 
 ### Upgrading after a new Murmurent release
 
-This applies to any ready repo, not just repos attached to a project.
+This applies to every ready repo, whether or not it's attached to a
+project.
 
 Agent *content* edits (an agent's prompt gets changed) reach every ready
 repo automatically: `.claude/agents/<name>.md` is a symlink into the
@@ -94,37 +95,12 @@ part is automatic.
 
 ## Projects
 
-A Murmurent **project** is a named, governed collaboration. It consists
-of:
-
-- a set of Murmurent-ready repos,
-- a set of cryptographically certified members,
-- a project lead,
-- a sensitivity tier (`standard` / `restricted` / `clinical`), and
-- once provisioned, a private Slack channel.
-
-**Lead**: the project lead is the member who holds the project-lead
-certificate; the lead signs other members into the project. It defaults
-to the first member at creation.
-
-**Repos**: the repos a project lists are existing, already-Murmurent-ready
-clones. Creating a project attaches existing repos, and can also create
-and clone one fresh repo for the project. Every repo a project lists is,
-or becomes, Murmurent-ready. Creating a project never turns a random
-directory into a repo.
-
-**Where projects are recorded**: the authoritative registry is
-`cert_projects/<name>.md` in the lab's governance repo,
-`murmurent_lab_mgmt_<lab>`. That registry is what the dashboard reads to
-know which projects exist.
-
-**How a project is created**: from the dashboard's **New Project** flow,
-which attaches existing ready repos and can create and clone a new one on
-approval. (A `murmurent project new` CLI exists but predates the current
-certificate-based model; the dashboard is the current path.) See
-[`project_creation.md`](project_creation.md) for the full walkthrough
-(intra- and inter-group vignettes, the certificate chain, the Slack
-channel).
+A Murmurent **project** is a named, governed collaboration: a set of
+Murmurent-ready repos, a set of cryptographically certified members, a
+project lead, a sensitivity tier (`standard` / `restricted` /
+`clinical`), and, once provisioned, a private Slack channel. See
+[`project_creation.md`](project_creation.md) for the full definition,
+how one is created, and the intra- and inter-group vignettes.
 
 ## The relationship, in one picture
 

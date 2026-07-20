@@ -1,27 +1,47 @@
 # Slack integration design
 
-> Status: design (2026-05-08), **partially implemented** (Phase 11):
-> `murmurent slack mirror` / `slack distil` and the
-> `oracle drafts / approve / decline` review loop are live
-> (`core/slack_mirror.py`, `core/slack_distill.py`). Bulk fetch
-> (`--all/--since`), cron, redaction, and the weekly digest are not yet
-> built. PRs against this doc are how we change the remaining design.
+**This is a design doc for an in-progress feature.** It describes the
+target design and records what's built so far against it. Treat every
+claim below as design intent unless the status line for that piece says
+otherwise.
 
-## Goal
+**Status (2026-05-08):** `murmurent slack mirror` / `slack distil` and the
+`oracle drafts / approve / decline` review loop are built and live
+(`core/slack_mirror.py`, `core/slack_distill.py`). Bulk fetch
+(`--all/--since`), cron scheduling, redaction, and the weekly digest are
+still planned. Propose changes to the remaining design as a PR against
+this doc.
 
-Surface lab Slack conversations in two complementary ways:
+## The problem this addresses
 
-1. **Provenance**: every project channel mirrored verbatim into the
-   lab-mgmt repo as a daily markdown log, so we don't lose context if
-   Slack data retention rolls over.
-2. **Distillation**: the Oracle agent reads each day's mirror, picks
-   out new knowledge / decisions / open questions, and writes oracle
-   entries that surface in the dashboard's "Group oracle · recent"
-   panel.
+Lab knowledge accumulates in Slack conversations, and most of it stays
+there, hard to search later and disconnected from the lab's oracle
+(its searchable institutional memory). This feature lets Murmurent
+monitor designated Slack channels and distill their content into oracle
+entries, so lab conversations become searchable institutional memory
+alongside manually written entries. The raw messages are mirrored
+verbatim alongside the distilled entries, so every oracle entry this
+process produces carries its provenance back to the exact messages it
+came from.
+
+Concretely, that involves three pieces:
+
+1. **Mirror the channel.** Every monitored project channel is copied
+   verbatim into the lab-mgmt repo as a daily markdown log. This is the
+   provenance layer: the citation trail for anything distilled from it,
+   and a durable copy in case Slack's own data retention rolls over.
+2. **Distill with the Oracle agent.** The Oracle agent reads each day's
+   mirror, picks out new knowledge, decisions, and open questions, and
+   writes oracle entries in the standard oracle schema
+   ([`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md)).
+3. **Surface in the dashboard.** Distilled entries appear in the
+   dashboard's "Group oracle · recent" panel alongside entries from
+   manual `murmurent publish`, each one linked back to its source
+   mirror file for provenance.
 
 Today the dashboard shows oracle entries that came from manual
-`murmurent publish`. After this phase, oracle entries also come from
-nightly Slack distillation, with the raw mirror as their citation
+`murmurent publish`. This feature adds a second source: oracle entries
+distilled nightly from Slack, with the raw mirror as their citation
 trail.
 
 ## Channel convention
@@ -29,8 +49,8 @@ trail.
 - One channel per project, named `#proj_<project_slug>` (e.g.
   `#proj_brca_sc_tutorial`). The convention matches the project repo's
   directory name so a glance at the sidebar is unambiguous.
-- Lab-wide channels (`#general`, `#random`, journal clubs, etc.) are
-  not auto-monitored.
+- Lab-wide channels (`#general`, `#random`, journal clubs, etc.) stay
+  outside monitoring by default.
 - A channel becomes monitored when its **topic line contains the
   marker** `[oracle:on]`. This is the opt-in (per the resolved decision
   in HANDOFF.md / Phase-7 conversation): channels say so explicitly,
@@ -48,14 +68,15 @@ A new Slack user account in the lab's existing Slack workspace:
 - Member of every monitored channel (the channel's topic flag is what
   the bot uses to decide whether to read; channel membership is just
   to receive history).
-- App-level OAuth scopes (no user-OAuth):
+- App-level, bot-token OAuth scopes only:
   - `channels:history`: read public-channel messages
   - `groups:history`: read private-channel messages (only on channels
     the bot is invited to)
   - `users:read`: resolve user IDs → handles for citations
   - `team:read`: workspace metadata (one-time, for `lab.md`)
-  - `chat:write`: **only used to post the daily summary back into
-    the channel** (see "Two-way?" below); not used for one-way phase
+  - `chat:write`: reserved for posting the daily summary back into the
+    channel (see "Two-way?" below); the one-way phase leaves this scope
+    unused
 
 The bot owner is the PI's Slack admin role; rotation is via the
 Slack admin UI.
@@ -82,18 +103,18 @@ Each raw mirror file is markdown with frontmatter:
 channel: proj_brca_sc_tutorial
 date: 2026-05-08
 message_count: 47
-participants: ['@allie', '@bob', '@cassie']
+participants: ['@member_a', '@member_b', '@member_c']
 slack_workspace: example-lab.slack.com
 ---
 
-## 09:14 · @allie
+## 09:14 · @member_a
 Q30 above 92% across the lane on run 17. Re-checking the chrM
 contig issue.
 
-## 09:18 · @bob
-Confirmed — same chrM artefact as before. Patched in p14.
+## 09:18 · @member_b
+Confirmed, same chrM artefact as before. Patched in p14.
 
-## 09:24 · @allie  (thread reply to 09:18)
+## 09:24 · @member_a  (thread reply to 09:18)
 Switching reference build for run 17. Documenting in CHANGELOG.
 ```
 
@@ -108,14 +129,14 @@ project: brca_sc_tutorial
 source_channel: proj_brca_sc_tutorial
 source_date: 2026-05-08
 source_messages: ['09:14', '09:18', '09:24']
-participants: ['@allie', '@bob']
+participants: ['@member_a', '@member_b']
 tags: [reference-genome, chrm, brca]
 ---
 
 # GRCh38.p14 fixes the chrM contig issue
 
 The chrM artefact we hit in February with GRCh38.p13 is patched in
-p14. For run 17 we are aligning against p14, not p13.
+p14. For run 17 we are aligning against p14 instead.
 
 ## Provenance
 
@@ -178,13 +199,15 @@ oracle file schema described in slack_integration.md.
 - **Visibility of mirrors:** lab-mgmt is private; only group members
   with read access to the repo see Slack mirrors. This matches Slack's
   own visibility (channel members ↔ workspace members).
-- **DMs and private channels not invited to the bot:** never touched.
+- **Scope of reach:** this feature reaches only channels the bot belongs
+  to. DMs and any private channel stay outside its scope until someone
+  invites the bot to it.
 - **Edit/delete of raw mirrors** is allowed via PR (e.g. someone
   posts a personal anecdote and asks to redact). The git history
   remains; PR review is the audit trail.
 - **Right to be forgotten:** if a member leaves the lab and asks for
   their messages to be redacted from mirrors, the lab admin runs
-  `murmurent slack redact --member @<handle>` (not yet built; tracked).
+  `murmurent slack redact --member @<handle>` (planned; tracked).
 - **Distillation review window:** for the first month, all oracle
   entries from the bot land with `status: draft` and only show in
   the dashboard once the PI confirms via `murmurent oracle approve`.
