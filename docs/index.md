@@ -29,9 +29,9 @@ governance rules could run on another agentic AI system.
 |---|---|
 | New: what does this add over plain Claude Code? | [Getting started](getting_started.md) |
 | Installing on your machine | [Install & setup](setup.md) |
-| Starting a project (in your lab, or across labs) | [Creating a project](project_creation.md) |
+| Starting a project (in your lab, or across labs) | [Creating a project](project_intra.md) |
 | A PI setting up your lab | [Group Slack setup](group_slack_setup.md) · [The lab-mgmt repo](lab_mgmt.md) |
-| A mayor bootstrapping a centre | [Centre Slack setup](slack_setup.md) · [Hub setup](hub_setup.md) |
+| A mayor bootstrapping a centre | [Centre Slack setup](slack_setup.md) · [Public directory setup](hub_setup.md) |
 | Wondering how the trust model works | [Membership IDs & the trust chain](identity.md) |
 | Looking for a command | [CLI manual](cli_manual.md) |
 

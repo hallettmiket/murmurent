@@ -68,14 +68,16 @@ nav:
   - Home: index.md
   - Getting started:
       - Why Murmurent? (five vignettes): getting_started.md
-      - The reference agents: agents.md
       - Install & setup: setup.md
-      - Personal vault setup: vault-setup.md
-      - "Murmurent-ready vs. a project": ready_vs_projects.md
+      - Preparing GitHub: github_setup.md
+      - Firing up the dashboard: dashboard.md
+      - The VSCode workflow: vscode-workflow.md
+      - Your personal vault: vault-setup.md
   - Working day to day:
-      - Creating a project (intra & inter-group): project_creation.md
-      - Cross-group services (SEAs): seas.md
+      - The reference agents: agents.md
+      - Making a repo Murmurent-ready: ready_vs_projects.md
       - How Murmurent remembers (the three tiers): memory.md
+      - The lab notebook: lab_notebook_guide.md
       - The Oracle (personal & lab memory): oracle-workflow.md
       - Vault vignettes (step by step):
           - Start here: vault_vignettes/index.md
@@ -86,26 +88,27 @@ nav:
           - 5 · Bring in a table: vault_vignettes/5_bring_in_a_table.md
           - 6 · Share a fact with the lab: vault_vignettes/6_share_with_the_lab.md
           - 7 · Recall across all your notes: vault_vignettes/7_recall_across_tiers.md
-      - Obsidian layout: obsidian-layout.md
-      - Obsidian usage: obsidian-usage.md
-      - The lab notebook: lab_notebook_guide.md
-      - The VSCode workflow: vscode-workflow.md
-  - Identity & trust:
+      - Your Obsidian vault: obsidian-usage.md
+      - Creating a project (in your lab): project_intra.md
+  - Labs, cores & centres:
+      - Group-level architecture: group_level.md
+      - What Murmurent creates: what_mm_creates.md
+      - The lab-mgmt repo: lab_mgmt.md
       - Membership IDs & the trust chain: identity.md
       - The centre root key: centre_root_key.md
-      - Security dashboard: security-dashboard.md
-  - Slack:
-      - Centre Slack setup (mayor): slack_setup.md
-      - Group Slack setup (PI): group_slack_setup.md
-      - Slack integration: slack_integration.md
-      - Slack ↔ Claude Code: slack_cc_integration.md
-  - Labs, cores & centres:
-      - The lab-mgmt repo: lab_mgmt.md
+      - Cross-group services (SEAs): seas.md
+      - Creating a project across labs: project_inter.md
+      - Slack:
+          - Centre Slack setup (mayor): slack_setup.md
+          - Group Slack setup (PI): group_slack_setup.md
+          - Slack integration: slack_integration.md
+          - Slack ↔ Claude Code: slack_cc_integration.md
+      - The public directory:
+          - Public directory setup (mayor): hub_setup.md
+          - Connecting to the public directory: connect_to_hub.md
       - Drift detection (reconcile): reconcile.md
-      - Group-level architecture: group_level.md
+      - Security dashboard: security-dashboard.md
       - Architecture diagrams: diagrams.md
-      - Hub setup (mayor): hub_setup.md
-      - Connecting to the hub: connect_to_hub.md
   - Reference:
       - CLI manual: cli_manual.md
       - Versioning: versioning.md

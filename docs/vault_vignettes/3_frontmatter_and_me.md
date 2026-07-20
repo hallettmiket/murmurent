@@ -52,6 +52,6 @@ acronyms like that going forward."
     The frontmatter fields are defined by the
     [oracle entry schema](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md).
     `maps-legends/` is yours to write: Murmurent never writes there
-    itself; see [the vault layout](../obsidian-layout.md) and
+    itself; see [your Obsidian vault](../obsidian-usage.md) and
     [what Murmurent touches in your vault](../obsidian-usage.md) for
     the full picture of which folders Murmurent reads and writes.

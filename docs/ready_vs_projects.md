@@ -1,10 +1,10 @@
-# "Murmurent-ready" vs. a project
+# Making a repo Murmurent-ready
 
-Murmurent has two distinct levels of structure: a repo-level property
-called "murmurent-ready," and a governance-level object called a
-"project." This page explains each in turn, then how they relate.
-
-## Making a repo Murmurent-ready
+A **Murmurent-ready** repo is a git clone that has the commons agents and
+rules wired in, so Claude Code sessions opened in it can use Murmurent.
+This page covers how to make a repo ready, check its status, and upgrade
+it after a release. A project is a separate, higher-level thing built on
+top of ready repos; see [`project_intra.md`](project_intra.md).
 
 A git clone under `~/repos/<name>` is **murmurent-ready** when it carries:
 
@@ -15,7 +15,7 @@ A git clone under `~/repos/<name>` is **murmurent-ready** when it carries:
 Readiness means Claude Code sessions opened in that repo have the commons
 agents and rules wired in.
 
-### Adopting a repo
+## Adopting a repo
 
 You make a repo ready with:
 
@@ -27,8 +27,8 @@ This is the same action as the dashboard Repos panel's **↑ adopt** button.
 Parameters, for a naive reader:
 
 - `<path>`: the local path to the git clone (e.g. `~/repos/brca_wgs`).
-- `--lab <slug>`: the owning lab's short registry name (its "slug," e.g.
-  e.g. `mh`). Defaults to this machine's lab.
+- `--lab <slug>`: the owning lab's short registry name (its "slug,"
+  e.g. `example_lab`). Defaults to this machine's lab.
 - `--agents a,b`: a comma-separated list of which commons agents to wire
   in (e.g. `bookworm,blacksmith`). Defaults to the standard set if
   omitted.
@@ -36,7 +36,7 @@ Parameters, for a naive reader:
   laptop; any other value is a registered remote machine (see `murmurent
   host list`), acted on over SSH.
 
-### Checking readiness
+## Checking readiness
 
 Check readiness without changing anything:
 
@@ -67,7 +67,7 @@ Verdicts, defined for a naive reader:
 - **not a git repo** / **missing**: the path is not a git checkout, or
   does not exist.
 
-### Upgrading after a new Murmurent release
+## Upgrading after a new Murmurent release
 
 This applies to every ready repo, whether or not it's attached to a
 project.
@@ -93,38 +93,11 @@ every ready repo under `~/repos` instead of a single path. Neither flag
 is needed just to pick up prompt edits to agents already linked; that
 part is automatic.
 
-## Projects
-
-A Murmurent **project** is a named, governed collaboration: a set of
-Murmurent-ready repos, a set of cryptographically certified members, a
-project lead, a sensitivity tier (`standard` / `restricted` /
-`clinical`), and, once provisioned, a private Slack channel. See
-[`project_creation.md`](project_creation.md) for the full definition,
-how one is created, and the intra- and inter-group vignettes.
-
-## The relationship, in one picture
-
-```
-repo (git clone under ~/repos)
-  │
-  ├─ murmurent-ready?  .murmurent.yaml + .claude/agents/
-  │     "can I run murmurent agents here"        ← murmurent repo adopt / upgrade
-  │
-  └─ attached to a project?  cert_projects/<name>.md in lab_mgmt
-        "is this repo part of a named, governed collaboration"
-              ← dashboard New Project flow
-```
-
-- A repo can be ready and attached to zero projects (adopt it and stop
-  there; that's a normal, common state).
-- A project's repos are all ready: readiness is the foundation a project
-  is built on.
-
 ## See also
 
 - [`setup.md`](setup.md): per-machine + per-project install steps.
-- [`project_creation.md`](project_creation.md): how a project actually
-  gets created (the two vignettes, the certificate chain).
+- [`project_intra.md`](project_intra.md): what a project is and how one
+  gets created.
 - [`cli_manual.md`](cli_manual.md): full `murmurent repo …` command
   reference.
 - [`reconcile.md`](reconcile.md): the readiness/adoption drift checks

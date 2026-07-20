@@ -1,120 +1,214 @@
-# Using your Obsidian vault with Murmurent: what you can and can't do
+# Your Obsidian vault: layout and what Murmurent touches
 
-A plain answer to "what can and can't Murmurent do with my vault?" Everything
-below is checked against the code that ships today
+A plain answer to two related questions: how your vault is organized on
+the Murmurent side, and exactly what Murmurent reads and writes there.
+Everything below is checked against the code that ships today
 (`src/murmurent/core/obsidian.py`, `src/murmurent/core/oracle_publish.py`,
 `src/murmurent/mcp/oracle_server.py`, `rules/oracle_schema.md`,
-`agents/oracle.md`). If a capability isn't demonstrable in that code, it's
-called out explicitly as *not shipped* rather than implied.
+`agents/oracle.md`).
 
-## 1. What Murmurent touches in your vault (and what it leaves alone)
+For vault-side organization, meaning how you personally organize your
+notes overall (including the `maps-legends/` folder), see the
+`CLAUDE.md` at the root of your vault.
 
-Murmurent does **not** read your whole
-vault. It only ever touches two subfolders, both configurable per machine
-(`~/.murmurent/machine.yaml`, see §6):
+## Two vaults: personal and lab (issue #25)
 
-| Subfolder (default name) | What it's for | Read by | Written by |
+Murmurent distinguishes two kinds of Obsidian vault. Each has a
+machine-independent identity (a GitHub repo) and a per-machine location
+(where the clone lives on this laptop or server):
+
+| Vault | GitHub repo (identity) | Owned by | Set the clone path in | Everyone can clone? |
+|---|---|---|---|---|
+| **Personal** | `murmurent_vault` (private, on the person's own GitHub) | the individual (including the PI) | Machine window, Personal vault | private to the person |
+| **Lab (group)** | `murmurent_lab_mgmt_<lab>` (private, on the lab's GitHub) | the lab or core | Machine window, Lab vault | yes, every member gets read access |
+
+The lab vault is the existing lab-management repo. Per the PI's decision
+on issue #25, the group Oracle, lab notebook, and `maps-legends/` for
+the group all live under `murmurent_lab_mgmt_<lab>`, which members
+already clone read-only (via `group_reconcile.grant_lab_mgmt_read`) and
+which `roster_sync` keeps fresh with a fast-forward-only pull. This repo
+supersedes the issue's originally proposed `murmurent_vault_lab` name.
+
+Identity vs. location:
+
+- **Identity** (the GitHub repo) is machine-independent: the personal
+  repo appears in the Profile window, the lab repo in Lab Settings.
+- **Location** (the clone path plus the Oracle/lab-notebook subfolders)
+  is per-machine, set in the Machine window. The personal vault path is
+  editable there; the lab vault path is the resolved lab-mgmt clone,
+  read-only in the Machine window and managed at install time or via
+  the `lab_mgmt` pin, giving a single source of truth for where the lab
+  vault clone lives.
+
+Naming helpers live in `core/repo.py`: `personal_vault_repo_name()`
+(`murmurent_vault`), `lab_vault_repo_name(<lab>)`
+(`murmurent_lab_mgmt_<lab>`), plus `personal_vault_path()` and
+`lab_vault_path(<lab>)` for the canonical clone locations.
+
+## Where the vault lives
+
+The vault path resolves fresh on every call, in this order (shown for
+the personal Oracle dir; the notebook dir uses the same chain):
+
+1. **Env override**: `$MURMURENT_PERSONAL_ORACLE_DIR` (personal tier) or
+   `$MURMURENT_NOTEBOOK_DIR` (notebook tier). Points straight at the
+   directory; mainly useful for tests and power users.
+2. **`~/.murmurent/machine.yaml`**: `obsidian_vault_path` (plus
+   `oracle_subfolder`, default `oracle`, and `notebook_subfolder`,
+   default `lab-notebook`). This is the normal per-machine
+   configuration, written by the dashboard's Machine Settings modal. It
+   lives here rather than in the git-synced lab-mgmt repo, since where
+   Obsidian lives on your laptop is specific to this machine.
+3. **`obsidian.json` discovery**: when neither of the above resolves,
+   Murmurent reads Obsidian's own vault registry
+   (`~/Library/Application Support/obsidian/obsidian.json` on macOS,
+   `~/.config/obsidian/obsidian.json` on Linux) and picks the
+   most-recently-opened vault. Pin a specific vault by name with
+   `$MURMURENT_OBSIDIAN_VAULT` when more than one vault is registered
+   and the most recent one isn't the right one.
+
+Tools that need the personal tier raise a clear error when none of
+these resolve; the notebook tier resolves via the same chain and comes
+back empty when nothing resolves.
+
+**To point Murmurent at your vault:** open the vault at least once in
+the Obsidian app so it lands in `obsidian.json` and discovery can pick
+it up, or set `obsidian_vault_path` explicitly via the dashboard's
+Machine Settings (or by hand-editing `~/.murmurent/machine.yaml`).
+
+Two commands help confirm the resolution worked:
+
+- `murmurent oracle path`: prints your personal Oracle dir
+  (`<vault>/oracle`); the vault root is its parent directory.
+- `murmurent oracle doctor`: attempts an actual read and reports
+  whether Murmurent can access the vault on this machine. See "The
+  Full Disk Access gotcha" below for what its statuses mean and the
+  common macOS permission fix.
+
+## What Murmurent touches
+
+Murmurent's reach into your vault is limited to a few named subfolders,
+each configurable per machine (`~/.murmurent/machine.yaml`):
+
+| Subfolder (default name) | What lives there | Read by | Written by |
 |---|---|---|---|
-| `oracle/` | Your personal Oracle: one markdown file per finding, schema-checked | `murmurent-oracle` MCP server, the `oracle` agent | the `oracle` agent, `murmurent oracle publish` |
-| `oracle/drafts/` | Entries staged for promotion to the lab, not yet committed anywhere else | same | the `oracle` agent |
-| `lab-notebook/` (the `notebook_subfolder` setting) | Daily, free-form notebook entries | `murmurent-oracle` MCP server (as the `notebook` tier) | you, by hand |
+| `oracle/` | Personal Oracle entries: one markdown file per finding, schema-checked, plus the `MEMORY.md` index | `murmurent-oracle` MCP server, the `oracle` agent | the `oracle` agent |
+| `oracle/drafts/` | Entries staged for `murmurent oracle publish`, promotion to the lab tier | same | the `oracle` agent |
+| `lab-notebook/` (the `notebook_subfolder` setting, default name) | Daily, free-form lab-notebook entries | `murmurent-oracle` MCP server, as the `notebook` tier | you, by hand, via the dashboard's "Lab notebook, today" edit button, which creates the day's file from a template on first use |
 
-Everything else in the vault (`maps-legends/`, project notes, attachments,
-whatever else you keep there) is yours. Nothing in the current codebase
-walks the rest of the vault tree, and nothing writes there. If you keep
-`maps-legends/` or other folders next to `oracle/`, Murmurent simply never
-looks at them (see §4).
+Every other folder in the vault, including `maps-legends/`, project
+notes, and attachments, is entirely yours to organize (see
+"`maps-legends/`" below).
 
-## 2. The three Oracle tiers
+**Path naming gotcha.** Two superficially similar directories sit at
+different layers; keep them straight:
 
-The `murmurent-oracle` MCP server (`src/murmurent/mcp/oracle_server.py`) exposes
-three tiers, queryable separately or together:
+| Path | Purpose |
+|---|---|
+| `<vault>/lab-notebook/` (hyphen, singular) | Obsidian-side daily notebook entries. Configured per machine via `~/.murmurent/machine.yaml: notebook_subfolder`. |
+| `$MURMURENT_LAB_VM_ROOT/lab_notebooks/` (underscore, plural) | Murmurent's data-storage layer notebook directory under the lab-VM root, part of the `raw/refined/lab_notebooks` triad. |
 
-- **`personal`**: your vault's `oracle/` folder. Yours alone; nothing here
-  is shared with the lab unless you explicitly publish it (§2.4).
-- **`lab`**: the Lab Oracle, `<lab-mgmt>/oracle/` in the lab-mgmt repo.
-  Read-only from the agent side; entries land there only via the publish
-  flow, gated by PI review.
-- **`notebook`**: your vault's daily notebook folder
-  (`<vault>/<notebook_subfolder>/`, default `lab-notebook/`). Entries here
-  don't need the Oracle frontmatter (§3): they're free-form daily notes,
-  parsed permissively (date/project inferred from filename and folder if
-  missing).
+The Obsidian one is where humans browse and edit. The lab-VM one is the
+staging and aggregation tier for cross-user notebook collation (future
+work).
 
-### 2.1 Searching and browsing
+## The three Oracle tiers
 
-These are MCP tools any Claude Code session with the `murmurent-oracle` server
-registered can call (they're what the `oracle` agent uses internally, and
-you can ask any session to invoke them on your behalf):
+The `murmurent-oracle` MCP server (`src/murmurent/mcp/oracle_server.py`)
+exposes three tiers, queryable separately or together:
+
+| Tier | Path | Writable by |
+|---|---|---|
+| **`personal`** | `<personal-vault>/oracle/<YYYY-MM-DD>_<slug>.md` | the `oracle` agent, on your machine. Yours alone until you explicitly publish (see below). |
+| **`lab`** | `~/repos/murmurent_lab_mgmt_<lab>/oracle/<YYYY-MM-DD>_<slug>.md` | `murmurent oracle publish` only, gated by PI review |
+| **`notebook`** | `<vault>/<notebook_subfolder>/`, default `lab-notebook/` | you, by hand |
+
+Notebook entries skip the Oracle frontmatter (see "The entry schema"
+below): they're free-form daily notes, parsed permissively, with
+date/project inferred from the filename and folder when frontmatter is
+missing.
+
+Both structured tiers share the same frontmatter schema
+([`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md))
+and are searched together by the `murmurent-oracle` MCP server.
+
+### Searching and browsing
+
+These are MCP tools any Claude Code session with the `murmurent-oracle`
+server registered can call (they're what the `oracle` agent uses
+internally, and you can ask any session to invoke them on your behalf):
 
 - `oracle_search(query, kind=..., project=..., tags=..., sensitivity=..., source=...)`:
-  keyword + frontmatter-filtered search. `kind` defaults to `"both"`
-  (personal + lab); pass `kind="all"` to also include the notebook tier, or
-  a single tier name (`"personal"`, `"lab"`, `"notebook"`) to search just one.
-  An empty query with filters returns everything matching those filters
-  (e.g. "show me every `brca_*` entry").
-- `oracle_get(path)`: read one entry in full (with body) by its absolute
-  path. Notebooks tolerate missing frontmatter; personal and lab entries
-  are refused if they don't parse as valid frontmatter.
+  keyword and frontmatter-filtered search. `kind` defaults to `"both"`
+  (personal plus lab); pass `kind="all"` to include the notebook tier
+  too, or a single tier name (`"personal"`, `"lab"`, `"notebook"`) to
+  search just one. An empty query with filters returns everything
+  matching those filters (for example, every `brca_*` entry).
+- `oracle_get(path)`: read one entry in full, with body, by its
+  absolute path. Notebooks tolerate missing frontmatter; personal and
+  lab entries must parse as valid frontmatter to be returned.
 - `oracle_list(kind=...)`: a one-line summary of every entry in the
   requested tier(s), newest first.
 
-Search today is keyword + explicit frontmatter filters, not semantic
-embeddings: the schema itself is the index.
+Search today works by keyword plus explicit frontmatter filters; the
+schema itself is the index, rather than semantic embeddings.
 
-### 2.2 Command-line equivalents
+### Command-line equivalents
 
-- `murmurent oracle path`: print the personal Oracle dir Murmurent has resolved
-  on this machine (useful to confirm it found the right vault).
-- `murmurent oracle doctor`: actually try to *read* a file in that dir and
-  report OK / BLOCKED / MISSING / NO VAULT / empty. Use this whenever
-  search looks emptier than it should (§5).
+- `murmurent oracle path`: print the personal Oracle dir Murmurent has
+  resolved on this machine (confirms it found the right vault).
+- `murmurent oracle doctor`: attempts to read a file in that dir and
+  reports OK, BLOCKED, MISSING, NO VAULT, or empty. Use this whenever
+  search turns up thinner than expected (see "The Full Disk Access
+  gotcha").
 - `murmurent oracle vault-drafts`: list drafts waiting in
   `<vault>/oracle/drafts/`.
-- `murmurent oracle publish <slug> [--push] [--dry-run]`: promote a draft
-  (§2.4).
+- `murmurent oracle publish <slug> [--push] [--dry-run]`: promote a
+  draft (see "Publishing personal to lab" below).
 
-### 2.3 What writes to the personal tier
+### What writes to the personal tier
 
 The `oracle` agent is the intended writer of `oracle/`: it creates one
-file per entry and maintains a `MEMORY.md` index. The daily notebook
-entries under `lab-notebook/` are created by the dashboard's "Lab
-notebook · today" **edit** button: the first click of the day writes the
-file from a small template, then opens it in your editor: the *content*
-is yours to write. There is no `murmurent notebook` CLI (see §7).
+file per entry and maintains the `MEMORY.md` index. Daily notebook
+entries under `lab-notebook/` come from the dashboard's "Lab notebook,
+today" edit button: the first click of the day writes the file from a
+small template and opens it in your editor, and the content from there
+is yours to write. A dedicated `murmurent notebook` CLI is on the
+roadmap (see "What's in progress" below).
 
-### 2.4 Publishing personal → lab
+### Publishing personal to lab
 
-Promotion is a two-step, explicit action, never automatic:
+Promotion is a two-step, explicit action:
 
-1. The `oracle` agent copies the entry to `<vault>/oracle/drafts/<slug>.md`
-   (the original stays untouched).
+1. The `oracle` agent copies the entry to
+   `<vault>/oracle/drafts/<slug>.md` (the original stays untouched).
 2. You run `murmurent oracle publish <slug>` (or call the MCP tool
-   `oracle_publish_draft(slug, push=...)`, which wraps the same code path
-   and resolves your identity so you can't publish as someone else).
+   `oracle_publish_draft(slug, push=...)`, which wraps the same code
+   path and resolves your identity so publishing always attributes to
+   you).
 
 Publish enforces, mechanically, in `core/oracle_publish.py`:
 
 - The draft must have complete frontmatter: `title`, `date`, `project`,
   `sensitivity`, non-empty `tags`, non-empty `sources`.
-- **Both `sensitivity: clinical` and `sensitivity: restricted` entries are
-  refused outright** and must stay in your personal vault. (`rules/oracle_schema.md`
-  only calls out `clinical` explicitly; the code also blocks `restricted`:
-  treat both as non-publishable.)
-- The target filename (`<lab-mgmt>/oracle/<YYYY-MM-DD>_<slug>.md`) must not
-  already exist: publish never silently overwrites a lab entry.
-- On success the draft commits to the lab-mgmt repo (and pushes, if you
-  asked for `--push`) and the source draft is deleted from your vault so
-  the same entry doesn't live in two places at once.
+- Entries with `sensitivity: clinical` or `sensitivity: restricted` are
+  refused and stay in your personal vault. (`rules/oracle_schema.md`
+  calls out `clinical` explicitly; the code also blocks `restricted`,
+  so treat both as personal-vault-only.)
+- The target filename (`<lab-mgmt>/oracle/<YYYY-MM-DD>_<slug>.md`) must
+  be new: publish refuses to overwrite an existing lab entry.
+- On success, the draft commits to the lab-mgmt repo (and pushes, if
+  you asked for `--push`), and the source draft is removed from your
+  vault so the entry lives in exactly one place.
 
-Publish does **not** decide whether the lab *should* accept the entry:
-that's a PI-review question handled separately from these mechanics.
+Publish handles the mechanics only; whether the lab *should* accept the
+entry is a PI-review question handled separately.
 
-## 3. The entry schema
+## The entry schema
 
 Personal and lab entries (not notebook entries) must start with YAML
-frontmatter conforming to `rules/oracle_schema.md`, or the Oracle tools
-will refuse to parse them:
+frontmatter conforming to `rules/oracle_schema.md` for the Oracle tools
+to parse them:
 
 ```yaml
 ---
@@ -127,128 +221,120 @@ sources:      ['@handle']
 ---
 ```
 
-Optional fields: `related` (a list of `[[wikilink]]`s to other entries),
-`source_sea`, `source_exp`, `url`.
+Optional fields: `related` (a list of `[[wikilink]]`s to other
+entries), `source_sea`, `source_exp`, `url`.
 
 Conventions:
 
 - **One entry per file**, named `<YYYY-MM-DD>_<slug>.md`. Older
-  "topic file with `### Heading` anchors" style files are still readable
-  by the tools but are no longer the recommended shape for new writes.
-- **`MEMORY.md`** at the root of `oracle/` is the master index the `oracle`
-  agent reads first and updates with a one-line, wikilinked pointer to
-  every new entry (`- [[<YYYY-MM-DD>_<slug>]] — one-line description`).
-  `oracle_search`/`oracle_list` skip `MEMORY.md` itself (and `README.md`)
-  when returning entries: it's an index, not an entry.
+  "topic file with `### Heading` anchors" style files remain readable
+  by the tools; the per-entry shape is the recommended one for new
+  writes.
+- **`MEMORY.md`** at the root of `oracle/` is the master index the
+  `oracle` agent reads first and updates with a one-line, wikilinked
+  pointer to every new entry
+  (`- [[<YYYY-MM-DD>_<slug>]]: one-line description`). `oracle_search`
+  and `oracle_list` treat `MEMORY.md` (and `README.md`) as the index,
+  skipping them when returning entries.
 - **`[[wikilinks]]`**, not markdown links, for cross-references: that's
   what lets Obsidian's own graph view resolve them.
 
-Notebook-tier entries are exempt from this schema: frontmatter is optional,
-and when it's missing, date/project are inferred from the filename
-(`YYYY-MM-DD.md` or `YYYY-MM-DD_slug.md`) and the parent folder name.
+## `maps-legends/`
 
-## 4. `maps-legends/`: the vault's own map, not Murmurent's
+`maps-legends/` is your own convention for organizing the vault
+(categories, conventions, where things go), documented in your vault's
+own `CLAUDE.md` rather than in this repo. It sits outside the folders
+listed in "What Murmurent touches" above, so Murmurent's code treats it
+like any other part of the vault: entirely yours to read, write, and
+organize. Treat it as the authoritative human-readable guide to where
+things live in your vault; Murmurent's Oracle tiers are a narrower,
+structured slice (`oracle/`, `oracle/drafts/`, the notebook folder)
+that sits alongside whatever else `maps-legends/` organizes. Oracle
+entries may still reference it via `[[wikilinks]]` so Obsidian's graph
+view threads them together.
 
-`maps-legends/` (or whatever navigation scheme you keep at the vault root)
-is entirely your convention, documented in your vault's own `CLAUDE.md`,
-not in this repo. Murmurent's code has no special handling for it: it isn't
-one of the folders listed in §1, so nothing here reads, writes, or
-schema-checks it. Treat it as the authoritative human-readable guide to
-"where things live in my vault": Murmurent's Oracle tiers are a narrower,
-structured slice (`oracle/`, `oracle/drafts/`, the notebook folder) that
-sits alongside whatever else `maps-legends/` organizes.
+If your vault's `CLAUDE.md` exists at the vault root, Claude Code picks
+it up automatically the next time it opens a file in the vault, per the
+standard CLAUDE.md discovery walk.
 
-## 5. The Full Disk Access gotcha (read this before assuming something is "empty")
+## Why we didn't add a third-party Obsidian MCP
 
-**This is the single most common cause of "my Oracle looks empty" reports.**
+Community Obsidian MCP servers (for example `obsidian-mcp-server`,
+`mcp-obsidian`) exist and would give Claude Code `search_notes` /
+`get_note` tools. We held off on pulling one in because:
 
-If your vault lives under iCloud Drive (`~/Library/Mobile Documents/...`,
-which is where Obsidian puts vaults by default on macOS when you use
-iCloud sync), that path is protected by macOS's Full Disk Access (FDA)
-permission (TCC). Obsidian itself can read it because it's been granted
-access; your terminal and the `claude` process usually have **not**.
+- The `murmurent-oracle` MCP already exposes search, get, and list over
+  the vault's `oracle/` subfolder (and the lab tier), with filters for
+  our specific frontmatter schema.
+- A generic Obsidian MCP would search the whole vault, including
+  notebooks and personal notes, a broader scope than the Oracle's own
+  intent.
+- Keeping the dependency list smaller stays easier to maintain.
 
-The dangerous part: when access is denied, the personal and notebook tiers
-degrade **silently to empty** rather than erroring: `oracle_search` and
-`oracle_list` will just return nothing, and it looks exactly like "no
+Adding generic vault search alongside `murmurent-oracle` stays
+straightforward for later: the two tool sets use differently named
+tools, so they coexist cleanly.
+
+## The Full Disk Access gotcha (read this before assuming something is empty)
+
+**This is the single most common cause of "my Oracle looks empty"
+reports.**
+
+If your vault lives under iCloud Drive (`~/Library/Mobile
+Documents/...`, where Obsidian puts vaults by default on macOS when you
+use iCloud sync), that path is protected by macOS's Full Disk Access
+(FDA) permission (TCC, the framework macOS uses to gate access to
+protected user data). Obsidian itself can read it because it's been
+granted access; your terminal and the `claude` process typically
+haven't been granted the same.
+
+The tricky part: when access is denied, the personal and notebook tiers
+degrade silently to empty, rather than raising an error. `oracle_search`
+and `oracle_list` come back with nothing, which looks identical to "no
 entries yet" instead of "can't read the vault." This is a deliberate
-design choice (a sandbox denial shouldn't crash the MCP server), but it
-means you cannot tell the difference between "empty" and "blocked" from
-search results alone.
+design choice (a sandbox denial shouldn't crash the MCP server), and it
+means search results alone leave "empty" and "blocked" indistinguishable.
 
-**Always confirm with `murmurent oracle doctor`** if search results look
-thinner than expected. It actually attempts a read (not just a path
-resolution: `murmurent oracle path` only resolves a path, it never touches
-the vault) and reports one of:
+**Confirm with `murmurent oracle doctor`** whenever search results look
+thinner than expected. It attempts an actual read, unlike `murmurent
+oracle path`, which only resolves a path, and reports one of:
 
 - `OK`: read succeeded, the vault is genuinely accessible.
 - `OK (empty)`: readable, but no `.md` entries yet.
 - `MISSING`: the resolved path doesn't exist yet.
-- `NO VAULT`: no Obsidian vault registered on this machine at all.
-- `BLOCKED`: the dir resolved but a read was denied. This is the FDA case.
+- `NO VAULT`: no Obsidian vault registered on this machine.
+- `BLOCKED`: the dir resolved but a read was denied, the FDA case.
 
-**Fix for `BLOCKED`:** System Settings → Privacy & Security → Full Disk
-Access → add your terminal app (Terminal.app, iTerm, whichever you use)
-**and** the `claude` binary itself, then retry. Both need access: the
-terminal running the process and the process's own binary are checked
-separately by macOS.
+**Fix for `BLOCKED`:** System Settings, Privacy & Security, Full Disk
+Access, add your terminal app (Terminal.app, iTerm, whichever you use)
+and the `claude` binary itself, then retry. Both need access since
+macOS checks the terminal running the process and the process's own
+binary separately.
 
 **iCloud placeholder caveat:** files under iCloud Drive can exist as
-`.icloud` placeholder stubs that haven't been downloaded to disk yet (the
+`.icloud` placeholder stubs that haven't downloaded to disk yet (the
 cloud-only "optimize storage" state). A placeholder can list in a
-directory enumeration but fail to actually read, which will also surface
-as `BLOCKED` (or as an unreadable individual file even when the directory
-itself is accessible) rather than as its own separate status. If `doctor`
-reports blocked access even after granting FDA, check whether the
-relevant files show the iCloud download icon in Finder and force a
-download by opening them there first.
+directory enumeration while failing an actual read, surfacing as
+`BLOCKED` too (or as an unreadable individual file even when the
+directory itself is accessible). If `doctor` reports blocked access
+even after granting FDA, check whether the relevant files show the
+iCloud download icon in Finder and force a download by opening them
+there first.
 
-## 6. Per-machine setup: how Murmurent finds your vault
+## What's in progress
 
-The same vault path is **never** hardcoded: it's resolved fresh on every
-call, in this order (personal Oracle dir; the notebook dir uses the same
-chain):
+Two capabilities are still being built:
 
-1. **Env override**: `$MURMURENT_PERSONAL_ORACLE_DIR` (personal tier) /
-   `$MURMURENT_NOTEBOOK_DIR` (notebook tier). Points straight at the
-   directory; mainly for tests and power users.
-2. **`~/.murmurent/machine.yaml`**: `obsidian_vault_path` (+ `oracle_subfolder`,
-   default `oracle`; `notebook_subfolder`, default `lab-notebook`). This is
-   the normal per-machine configuration, written by the dashboard's Machine
-   Settings modal. It deliberately stays out of the git-synced lab-mgmt
-   repo, because where Obsidian lives on *your* laptop has no reason to
-   match anyone else's.
-3. **`obsidian.json` discovery**: if neither of the above resolves, Murmurent
-   reads Obsidian's own vault registry
-   (`~/Library/Application Support/obsidian/obsidian.json` on macOS,
-   `~/.config/obsidian/obsidian.json` on Linux) and picks the
-   most-recently-opened vault. You can pin a specific vault by name with
-   `$MURMURENT_OBSIDIAN_VAULT` if you have more than one registered and the
-   most-recent isn't the right one.
+- **A CLI for writing daily notebook entries.** Today, notebook entries
+  under `<vault>/<notebook_subfolder>/` are plain files you create and
+  edit yourself, in Obsidian, an editor, or whatever you like. A
+  `murmurent notebook ...`-style command that writes one for you is
+  planned.
+- **A vault-map command.** `maps-legends/` (see above) stays a manual,
+  human-maintained convention for now; a `murmurent vault map` command
+  that inspects or reports on your vault's structure is planned but not
+  yet built.
 
-If none of these resolve, tools that need the personal tier raise a clear
-error rather than guessing; the notebook tier resolves via the same chain
-and returns no entries if nothing resolves.
-
-**To point Murmurent at your vault:** either open the vault at least once in
-the Obsidian app (so it lands in `obsidian.json`) and let discovery pick it
-up, or set `obsidian_vault_path` explicitly via the dashboard's Machine
-Settings (or hand-edit `~/.murmurent/machine.yaml`).
-
-## 7. What you can't do yet
-
-Two things are in progress but **not shipped**. Don't expect them to
-work, and don't let anything above be read as implying otherwise:
-
-- **A CLI to write daily notebook entries.** Today, notebook entries under
-  `<vault>/<notebook_subfolder>/` are plain files you create and edit
-  yourself (in Obsidian, an editor, whatever you like); there is no
-  `murmurent notebook ...`-style command that writes one for you.
-- **A vault-map command.** There is no command that inspects or reports on
-  your vault's structure (e.g. a `murmurent vault map`). `maps-legends/`
-  (§4) is a manual, human-maintained convention, not something Murmurent
-  generates or checks.
-
-If you see either described as available somewhere else, treat this
-document (checked directly against the code above) as the more current
-answer.
+Treat this document, checked directly against the code referenced
+above, as the current answer if you see either capability described as
+available elsewhere.

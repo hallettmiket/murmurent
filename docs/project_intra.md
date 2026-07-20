@@ -1,4 +1,4 @@
-# Creating a project: two vignettes
+# Creating a project (intra-group)
 
 > Diagram: [project lifecycle](diagrams.md#4-project-lifecycle) shows a project's states from creation to archive.
 
@@ -26,13 +26,12 @@ through Slack, members are invited when they join and removed when they leave.
 A project is a different, bigger thing than a repo simply being
 **murmurent-ready** (having the commons agents wired in via `murmurent repo
 adopt`): readiness is plumbing a repo needs before it's useful in a
-project. See
-[`ready_vs_projects.md`](ready_vs_projects.md) if you're not sure which one
-you're looking at.
+project. See [`ready_vs_projects.md`](ready_vs_projects.md) to tell the two
+apart.
 
 ---
 
-## Vignette 1: An intra-group project (everyone is in your lab)
+## An intra-group project (everyone is in your lab)
 
 Allie (a member of the Rao lab) wants to start `brca_17` with Bob. She
 already has the two repos that make up the work (`brca_code` and
@@ -45,8 +44,8 @@ already has the two repos that make up the work (`brca_code` and
 - *machines*: her laptop + `lab-server`
 - *repos*: `brca_code` + `brca_manuscript`, selected from the clones Murmurent
   already found in her repo folders: code and paper grouped into one project.
-  (No new repo is created here; if a repo doesn't exist yet, clone or
-  `git init` it first and it appears in the picker.)
+  (Only existing clones are offered in the picker: clone or `git init` a
+  repo first and it appears there.)
 
 She submits; the request lands in the PI's approval queue.
 
@@ -78,58 +77,6 @@ they're kicked from the channel. The PI deletes the project → every
 certificate is revoked, the channel is archived, and the project vanishes
 from the dashboard (recovery is CLI-only: `murmurent project-unarchive`;
 revoked certs stay revoked: re-issue).
-
----
-
-## Vignette 2: An inter-group project (members span labs)
-
-Allie now wants `spatial_atlas` with Carlos, who is in the **Xia lab**, a
-different group, a different Slack workspace.
-
-**1. The gate.** She adds `@carlos` to the member list. His key lives on the
-Xia lab's roster instead of hers, so the form demands one more thing, and if
-she skips it, creation **halts**:
-
-> project members span multiple groups: the groups must decide on a shared
-> Slack workspace before an inter-group project can be created.
-
-This is deliberate: the shared workspace is where the project channel lives
-and where certificates are DM'd, so it must exist *before* the project does.
-
-**2. The groups decide.** The two PIs agree which of their labs' registered
-workspaces hosts the project (say the Rao lab's): what matters is that
-the workspace's bot token is on file. (A dedicated stand-alone workspace works
-too, once it's registered as a group with the registrar: `group-slack-setup`
-refuses unregistered names.)
-
-```bash
-# one-time, on the machine that will provision the project:
-murmurent group-slack-setup <workspace>
-# token lands at ~/.config/murmurent/groups/<workspace>/slack-token
-```
-
-Allie enters the workspace id in the form and the proposal goes through.
-(The check re-runs at approval, so it fails closed even if rosters changed
-in between.)
-
-**3. Certifying an outside member.** Carlos's key lives only on the Xia
-lab's roster, so Allie has none for him on record. He runs, on his own
-machine:
-
-```bash
-murmurent enroll --project spatial_atlas
-```
-
-and DMs Allie the JSON it prints. She pastes it into the **issue** dialog
-(or runs `murmurent project-add-member @carlos --project spatial_atlas
---enrollment carlos.json`). His card is signed by Allie, chained to *her*
-lab's root (anyone in the centre can verify it) and DM'd back through the
-shared workspace. Next time is one click: his key is now on record.
-
-**4. Repos in two places?** Fine. Each repo in the project carries its own
-remote, so the code repo can push to `hallettmiket/...` while the analysis
-repo pushes to the Xia lab's org. (Automatic collaborator sync covers the
-primary repo; extra-org repos are managed by hand for now.)
 
 ---
 

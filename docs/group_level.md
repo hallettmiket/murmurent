@@ -15,7 +15,7 @@ tags: [murmurent, design]
 > below (PI approval scaffolds a fresh repo + charter) predates the
 > certificate-based model. Projects are now a set of *existing* repos +
 > machines + cryptographically certified members, with the creator as lead:
-> [project_creation.md](project_creation.md) is the source of truth.
+> [project_intra.md](project_intra.md) is the source of truth.
 
 ## Taxonomy
 

@@ -122,4 +122,4 @@ than crashing.
 - [`agents/oracle.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/oracle.md): personal Oracle behavior + voice.
 - [`agents/lab_oracle.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md): read-only lab tier.
 - [`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md): required frontmatter.
-- [`docs/obsidian-layout.md`](obsidian-layout.md): vault-side organization (your `maps-legends`, etc.).
+- [`docs/obsidian-usage.md`](obsidian-usage.md): your Obsidian vault layout and what Murmurent touches (your `maps-legends`, etc.).

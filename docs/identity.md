@@ -357,7 +357,7 @@ See Delegating a project lead, below, for the full command set.
 Revoking the lead card invalidates every project card it signed: the
 verifier checks the delegation link against the CRL, which is fail-closed
 (see Revocation, below). Deleting a project revokes the lead card and every
-member card in one CRL update. The full walkthrough: [project_creation.md](project_creation.md).
+member card in one CRL update. The full walkthrough: [project_intra.md](project_intra.md).
 
 ## Publish and fetch trust material
 
