@@ -1186,7 +1186,7 @@ Each member has a dashboard. The PI gets an enhanced version of it. Two implemen
 
 ### Live local view
 
-`murmurent dashboard` opens a local Streamlit app that reads the snapshot plus live MCP queries (inventory, oracle, request board) plus local git state. Member-level by default; PI sees additional sections automatically (based on identity).
+`murmurent dashboard --hifi` opens a local FastAPI web application that reads the snapshot plus live MCP queries (inventory, oracle, request board) plus local git state. Member-level by default; PI sees additional sections automatically (based on identity).
 
 ### Member dashboard contents
 

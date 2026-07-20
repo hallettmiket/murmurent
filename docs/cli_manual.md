@@ -247,7 +247,7 @@ Choreographies are CC skills, not CLI subcommands. Invoke them inside Claude Cod
 
 | Command | Effect |
 |---|---|
-| `murmurent dashboard` | Open the local Streamlit dashboard (includes the Outstanding analysis panel) |
+| `murmurent dashboard --hifi` | Open the local dashboard (the FastAPI web UI) in your browser |
 | `murmurent dashboard --pi` | Open the PI view (rejected if you're not a PI); adds escalated-from-members nags |
 | `murmurent dashboard --snapshot` | Print the latest markdown snapshot from the lab-management repo |
 | `murmurent dashboard --outstanding` | Print only the Outstanding analysis panel (terminal-friendly summary) |

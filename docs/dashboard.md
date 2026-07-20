@@ -8,12 +8,14 @@ interface rather than by typing a command.
 Launch it with:
 
 ```bash
-murmurent dashboard
+murmurent dashboard --hifi
 ```
 
-It opens in your browser. The dashboard is a local, read-mostly control
-surface for your Murmurent state: it shows what the CLI can show, and lets
-you act on it.
+It opens in your browser at `http://127.0.0.1:8770/`. The dashboard is a
+local, read-mostly control surface for your Murmurent state: it shows what
+the CLI can show, and lets you act on it. (The mac and Linux desktop
+launchers and the server systemd unit all start it with this same
+command.)
 
 At a high level, it shows:
 
