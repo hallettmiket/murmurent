@@ -1,10 +1,28 @@
-# Setting up your personal vault (`murmurent_vault`)
+# Setting up your personal vault
 
-Your **personal vault** is a private GitHub repo, `murmurent_vault`, on your own
-GitHub account. It backs your Murmurent Tier-II notes (your `oracle/`,
-`lab-notebook/`, and `maps-legends/`), so they're version-controlled, survive a
-lost laptop, and stay in sync across your machines. Murmurent creates the repo
-for you.
+Your **personal vault** is a knowledge base of markdown notes that lives in a
+folder on your machine. Murmurent uses the [Obsidian](https://obsidian.md)
+application as the basis for the vault: Obsidian is a free note-taking program
+that reads and edits a folder of markdown files and provides linking, search,
+and a graph view over your notes.
+
+Within the vault, Murmurent recognizes three folders:
+
+- **`oracle/`**: your personal Oracle, the structured findings and decisions
+  that the Oracle agent records and retrieves (see
+  [The Oracle](oracle-workflow.md)).
+- **`lab-notebook/`**: your daily lab-notebook entries.
+- **`maps-legends/`**: your own index of the vault, documenting your
+  categories and conventions and where things live. It is the
+  human-readable guide to your vault; Murmurent's code leaves it entirely to
+  you, and Oracle entries may reference it through `[[wikilinks]]`.
+
+Murmurent backs the vault as a private GitHub repository named
+`murmurent_vault` on your own GitHub account, so your notes are
+version-controlled, survive a lost laptop, and stay in sync across your
+machines. The vault folder lives on your machine, where you edit it in
+Obsidian, and is pushed to this repository; `murmurent vault init` creates the
+repository and the initial folders for you.
 
 New members are offered a vault during `murmurent init`. If you already have an
 Obsidian vault with notes in it, you adopt that existing vault rather than
@@ -12,8 +30,13 @@ starting fresh (see the two cases below).
 
 ## Before you start
 
-- **Authenticate the GitHub CLI.** The vault is created on *your* GitHub
-  account, so Murmurent acts as you. Run `gh auth login` and answer the prompts:
+- **Install Obsidian.** Murmurent does not install Obsidian for you.
+  Download and install it first from [obsidian.md](https://obsidian.md).
+  `murmurent vault init` creates the vault folder and its GitHub repository,
+  but you open and edit the vault in Obsidian.
+- **Authenticate the GitHub CLI.** The vault repository is created on *your*
+  GitHub account, so Murmurent acts as you. Run `gh auth login` and answer the
+  prompts:
 
   ```text
   ? What account do you want to log into?  GitHub.com

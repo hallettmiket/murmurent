@@ -4,12 +4,8 @@ Murmurent is an agentic AI operating system for biomedical and basic
 life-science research, built on top of
 [Claude Code](https://claude.com/claude-code) (CC). The [home page](index.md)
 summarizes what it provides; this page shows, through five short vignettes,
-what Murmurent gives you over plain Claude Code.
-
-Each vignette works on a single machine, with no PI and no centre required.
-The reference agents are already wired into `~/.claude/agents/`, so any CC
-session can invoke one by name. For the full list of what Murmurent installs
-or modifies on your machine, see [Install & setup](setup.md).
+what Murmurent gives you over plain Claude Code. Each vignette works on a
+single machine, with no PI and no centre required.
 
 ---
 
@@ -34,24 +30,26 @@ later, in a *different* session on a *different* project:
 > **Oracle:** Found: you standardised on GRCh38.p14 for run 17 (p14 patches the
 > chrM artefact from p13); switching references mid-cohort was explicitly ruled out.
 
-That memory is **yours**, per-user, and spans every project you work on. Nothing
-leaks between projects unless you deliberately promote it. See
-[`oracle-workflow.md`](oracle-workflow.md) for the personal → lab publish flow.
+That memory is yours, per-user, and spans every project you work on.
 
 ---
 
 ## Vignette 2: Delegating to specialists (the agents)
 
-Instead of one general assistant, you have a bench of specialists. Each one
-ships with sensible defaults and is usable right away. You just address
-the right one by name:
+Instead of a single general assistant, Murmurent gives you a set of
+specialist agents, each addressed by name. The agents are designed for
+biomedical and basic life-science research: they are initialized to be
+aware of the resources, databases, and protocols common to these fields
+(for example, PubMed and bioRxiv for the literature scout, and standard
+reference genomes and quality-control conventions for the computational
+agent).
 
 - **Bookworm**: literature + databases:
   > *Bookworm, find the three most-cited papers on MMP11 in breast cancer and
   > add them to my reading list.*
   It queries PubMed/bioRxiv, summarises, and curates a list you keep.
 
-- **Blacksmith**: the computational workhorse:
+- **Blacksmith**: the computational agent:
   > *Blacksmith, load `refined/brca_wgs/3_qc/counts.parquet`, train an
   > XGBoost classifier on subtype, and report AUC with a train/test split.*
   It writes clean, runnable Python, verifies it executes, and reports metrics.
@@ -61,22 +59,23 @@ the right one by name:
   > Blacksmith's last run.*
   It produces labelled, legible figures and keeps a rolling HTML report.
 
-Each agent leads its reply with a one-line verdict (so you see the punchline at a
-glance) and stays in its lane. If a default doesn't suit you, you can change
-it without editing the agent itself, per member, via
-`~/.claude/murmurent-preferences.yaml` (`murmurent preference set <field>
-<value>`), or per lab, through the lab's own toolkit. Full roster (Oracle,
-Bookworm, Blacksmith, Adversary, Artist, Conscience, Lawyer, Security Guard,
-and more) in
+You can adapt these agents to your own research area. Each agent's
+defaults (its preferred tools, libraries, databases, and conventions) can
+be changed per member, without editing the shared agent definition, so
+that the Bookworm searches the databases you use and the Artist follows
+your plotting conventions. The full roster (Oracle, Bookworm, Blacksmith,
+Adversary, Artist, Conscience, Lawyer, Security Guard, and others) is in
 [`CLAUDE.md`](https://github.com/hallettmiket/murmurent/blob/main/CLAUDE.md#reference-agents-the-commons).
 
 ---
 
 ## Vignette 3: Adversarial methodological review (the Adversary)
 
-An AI agent can make mistakes. To address this, Murmurent employs an
-adversarial agent, the **Adversary**, which performs methodological
-review of other agents' outputs:
+Adversarial evaluation is a well-studied approach to improving the
+reliability of AI systems. Murmurent includes an **Adversary** agent
+whose role is to evaluate the outputs of the other agents and raise
+questionable issues. The other reference agents are instructed to respond
+to the Adversary's comments and to revise their work accordingly:
 
 > **You:** Adversary, review the classifier the Blacksmith just built.
 >
@@ -84,23 +83,27 @@ review of other agents' outputs:
 > patient appear in both folds, so the AUC is optimistic. Re-split by patient,
 > not by cell, and re-run before trusting this number.
 
-The Adversary checks for data leakage, inappropriate train/test
-splitting (for example, splitting by cell rather than by patient),
-missing or inadequate cross-validation, and results that are
+The Adversary checks for problems such as data leakage, inappropriate
+train/test splitting (for example, splitting by cell rather than by
+patient), missing or inadequate cross-validation, and results that are
 implausibly strong. It distinguishes claims it verified itself, by
-running code or reading files, from claims it could not verify, and
-reports the two separately. It reviews other agents' work directly, for
-instance the Blacksmith's analyses or the Bookworm's literature claims,
-providing an internal check applied before a result is relied upon.
+running code or reading files, from claims it could not verify. When it
+identifies a problem, the finding is returned to the originating agent,
+which revises its output before the result is relied upon. This
+adversarial loop reduces the rate at which plausible but incorrect
+results (a hallucinated citation, an optimistic performance metric, an
+unsupported literature claim) reach the researcher.
 
 ---
 
 ## Vignette 4: Data-governance rules enforced in software (rules + hooks)
 
-Certain data-governance rules are enforced in software rather than left
-to convention. Murmurent implements them as Claude Code hooks, which
-intercept an operation before it executes and reject it if it violates a
-rule:
+Murmurent recognizes two special directories: **`raw/`**, whose contents
+are immutable (they can be read but never modified or deleted), and
+**`refined/`**, which is append-only (new analysis outputs can be added,
+but existing ones are never overwritten). These rules are enforced
+automatically by Claude Code hooks, which intercept an operation before
+it executes and reject it if it would violate a rule:
 
 > **You:** Delete the old raw FASTQs in `raw/brca_wgs/` to free space.
 >
@@ -108,11 +111,14 @@ rule:
 > modify or delete files under `raw/`. If a refined output is superseded, write
 > `file_2.csv` alongside it instead of overwriting `file_1.csv`.
 
-Raw data is immutable and refined data is append-only; candidate commits
-are screened for secrets and personal health information (PHI) before
-they are recorded, which is the role of the **Security Guard**. Enforcing
-these constraints at the hook layer is what makes it safe to grant an
-agent access to real laboratory data. See
+The same hook layer also screens candidate commits for sensitive data,
+such as passwords, API keys, and clinical data, before they are recorded.
+These hooks act automatically on every operation. In addition, Murmurent
+provides a **Security Guard** agent that you can invoke to audit a change
+or an outgoing artefact for the same problems: the hooks enforce the rules
+without being asked, while the Security Guard agent performs a deeper,
+on-demand review. Enforcing these constraints in software is what makes it
+safe to grant an agent access to real laboratory data. See
 [`../rules/data-storage.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/data-storage.md).
 
 ---
@@ -122,17 +128,16 @@ agent access to real laboratory data. See
 Everything above works standalone. The payoff compounds when a lab or centre opts
 in:
 
-- Your PI issues you a **membership ID** so agents know which lab or core
-  you belong to (see the README sections for members and PIs).
-- Murmurent provides a second, lab-level Oracle, distinct from your
-  personal one. The **Lab Oracle** is shared, curated memory: what the
-  whole lab has agreed to record. A new member inherits the lab's
-  accumulated knowledge on their first day rather than rediscovering it.
-- **Cores** (a shared facility such as a proteomics or imaging centre) are
-  themselves groups, each led by a PI, that expose deliverables to member labs
-  through a controlled interface. **Projects** bring individual members
-  together around shared repositories and data, with members drawn from a
-  single group or from several groups at once.
+- Your PI issues you a **membership ID**, so agents know which lab or core
+  you belong to.
+- Murmurent adds a second, lab-level Oracle. In Vignette 1, the Oracle we
+  used was your **personal** Oracle, private to you. The **Lab Oracle** is
+  a separate, shared tier: curated memory that the whole lab has agreed to
+  record. You continue to work in your personal Oracle as before, and when
+  a finding is worth sharing, you deliberately push a selected entry to the
+  Lab Oracle. Only what you choose to share leaves your personal vault. A
+  new member then inherits the lab's accumulated knowledge from their first
+  day rather than rediscovering it.
 
 Independent groups share a common set of agents, rules, and infrastructure
 (the commons), so knowledge accumulates across every project and every

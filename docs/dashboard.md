@@ -16,9 +16,10 @@ Launch it with:
 murmurent dashboard --hifi
 ```
 
-It opens in your browser at `http://127.0.0.1:8770/`. The dashboard is a
-local, read-mostly control surface for your Murmurent state: it shows what
-the CLI can show, and lets you act on it.
+It opens in your browser at `http://127.0.0.1:8770/`. The dashboard is
+read-mostly: most panels display state, and a few offer buttons for common
+actions (such as adopting a repository or adding a machine), each of which
+has an equivalent `murmurent` command.
 
 ## Installing a desktop launcher (menu icon)
 

@@ -2,16 +2,19 @@
 
 Murmurent is an agentic AI operating system that provides:
 
-- **Reference agents**: a set of specialized agents (literature search,
-  computation, adversarial review, security audit, …) you
+- **Reference agents**: a set of specialist agents (literature search,
+  computation, adversarial review, security audit, and others), designed
+  and initialized for biomedical and basic life-science research, that you
   delegate to by name.
 - **An Obsidian-based vault**: your private, git-backed knowledge base that
   survives across sessions and projects. It holds your **Oracle** (personal
   and lab-shared structured memory), your daily lab notebook, and your own
   notes and maps.
-- **Hard rules + hooks**: data-governance guardrails enforced in software:
-  raw data is immutable, refined data is append-only, secrets never reach a
-  commit.
+- **Hard rules and hooks**: data-governance guardrails enforced in
+  software. Directories can be marked immutable (to protect sensitive raw
+  data) or append-only (to accumulate analyses without overwriting them),
+  and there are guardrails against committing sensitive data such as
+  passwords and clinical records.
 - **Cryptographic membership**: labs, cores, and projects are held together
   by signed identity certificates (centre root → PI → lead → member).
 - **The commons**: independent groups sharing a common set of agents,
@@ -41,7 +44,7 @@ memory and infrastructure on top, when you want it.
 
 ## How a centre is organized
 
-Murmurent models a research centre as four kinds of participant:
+Murmurent is structured around four types of entities:
 
 - **Individual members**: each person has their own membership identity,
   their own agents, and their own personal vault.
@@ -59,12 +62,5 @@ Each group documents and runs its own workflows on top of the shared agents
 and rules, keeping authority over its own people and data, while the
 administration maintains the shared registry and trust chain.
 
-## Repositories
-
-| Repo | Purpose |
-|---|---|
-| [`hallettmiket/murmurent`](https://github.com/hallettmiket/murmurent) | the commons codebase: agents, rules, hooks, MCP servers, CLI, dashboard |
-| `<your-org>/murmurent_lab_mgmt_<lab>` | your lab's governance repo: roster, project registry, and the **lab oracle** |
-| `<you>/murmurent_vault` | your private personal vault repo: your **personal oracle**, lab notebook, and maps-legends |
-| [`hallettmiket/murmurent_public`](https://github.com/hallettmiket/murmurent_public) | the global public directory: the institution registry + join intake |
-| `hallettmiket/murmurent_manuscript` (private) | the paper describing Murmurent's design |
+For the full list of the repositories and local files Murmurent uses, see
+[What Murmurent creates](what_mm_creates.md).
