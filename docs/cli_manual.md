@@ -53,10 +53,10 @@ Effects:
 
 | Command | Effect | Notes |
 |---|---|---|
-| `murmurent agent list [--group <g>]` | List available agents in the registry | Shows freeze flag |
-| `murmurent agent add <name>` | Install an agent locally | Symlink if `frozen`, copy if `personal` |
-| `murmurent agent remove <name>` | Uninstall an agent | Memory is preserved unless `--purge` |
-| `murmurent agent update` | Pull latest registry; re-link frozen, leave personal alone | Reports drift on personal copies |
+| `murmurent agent list` | List installed agents in `~/.claude/agents/` | Each shown as **linked** (commons symlink), **forked** (personal copy), or **user-file**; forks also show upstream/local drift status |
+| `murmurent agent fork <name> [--force]` | Replace a commons agent's symlink with an editable personal copy | Preserved across commons upgrades; canonical copy under `~/.murmurent/agent_forks/` (git-trackable), hardlinked into `~/.claude/agents/`. `--force` re-snapshots from the current commons |
+| `murmurent agent drift [<name>]` | Merge indicator for forks | Per fork: `UP-TO-DATE` / `LOCAL-ONLY` / `UPSTREAM` / `DIVERGED` / `ORPHANED`, plus a summary of forks needing review |
+| `murmurent agent unfork <name> [--force]` | Restore the commons symlink, dropping the personal copy | Prompts if local edits would be lost, unless `--force` |
 
 ### Preferences
 

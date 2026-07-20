@@ -147,18 +147,32 @@ clone, so a `git pull` on the commons updates them automatically. If you
 edit a symlinked agent file directly, you are editing the shared clone, and
 a later pull can conflict with or overwrite your change.
 
-To customize an agent and keep the change, replace the symlink with a real
-file (a personal copy). `scripts/setup.sh` preserves any file in
-`~/.claude/agents/` that is not a symlink, and warns that it did so, so your
-personal version is retained across upgrades rather than overwritten.
+To customize an agent and keep the change, **fork it**:
 
-!!! warning "Work in progress"
-    Several enhancements are planned to make this smoother: a command to
-    fork a commons agent into a personal copy in one step; a version-tracked
-    location to keep personal agent copies (so they are a permanent,
-    pushable record for a member or PI); and a drift indicator that flags
-    when the commons version of a forked agent has changed since you copied
-    it, so you can review upstream updates rather than silently diverge.
+```bash
+murmurent agent fork <name>
+```
+
+This replaces the symlink with a personal copy you can edit freely. The copy
+is a non-symlink, so `scripts/setup.sh` preserves it across commons upgrades
+rather than overwriting it. The canonical copy lives under
+`~/.murmurent/agent_forks/` (a directory you can `git init` and push, giving
+you a permanent, version-controlled record), and is hardlinked into
+`~/.claude/agents/` so Claude Code loads it with no extra sync step.
+
+Because the commons keeps evolving, Murmurent records the commons version
+you forked from and provides a merge-style drift indicator:
+
+```bash
+murmurent agent list     # each agent: linked vs forked, with drift status
+murmurent agent drift    # which forks have upstream changes to review
+```
+
+`murmurent agent drift` reports, per fork, whether the commons version has
+changed since you forked (`UPSTREAM`), whether your copy has local edits
+(`LOCAL-ONLY`), both (`DIVERGED`, the case to reconcile), or that the commons
+no longer ships the agent (`ORPHANED`). To return to the shared version,
+`murmurent agent unfork <name>` restores the symlink.
 
 ## Tier separation (recap)
 
