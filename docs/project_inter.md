@@ -4,6 +4,12 @@ A project's basics (the definition, the certificate model, and the full
 command reference) live on [`project_intra.md`](project_intra.md). This page
 covers what's different when project members span labs.
 
+The simplest way to create a project, whether intra- or inter-group, is the
+dashboard's **New Project** flow: it walks through the steps below in a form,
+and it enforces the shared-workspace requirement for cross-lab projects for
+you. The command-line walkthrough here shows what the dashboard does
+underneath. See [Firing up the dashboard](dashboard.md).
+
 ## An inter-group project (members span labs)
 
 Allie now wants `spatial_atlas` with Carlos, who is in the **Xia lab**, a

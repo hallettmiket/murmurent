@@ -5,9 +5,10 @@ The remaining pages in this section describe each in detail.
 
 ## The units
 
-- **Member.** An individual researcher, identified by a handle (for
-  example `@member_a`). Each member has their own agents, their own
-  personal vault, and their own machine state.
+- **Member.** An individual researcher, one of a group's **highly
+  qualified personnel (HQP)**, identified by a handle (for example
+  `@member_a`). Each member has their own agents, their own personal
+  vault, and their own machine state.
 - **PI.** The principal investigator who leads a group. A PI issues
   membership identities to the group's members and owns the group's
   governance repository.
@@ -19,21 +20,37 @@ The remaining pages in this section describe each in detail.
   repositories and data. A project has a single **lead** (often, but not
   necessarily, the PI). Its members can come from a single group or from
   several groups at once.
-- **Centre.** One institution's Murmurent installation, run by an
-  administration (a Mayor and a registrar). The centre maintains the
+- **Centre.** A collection of labs and cores. In an academic setting a
+  centre corresponds to a research centre, a department, or another
+  federation of labs and units with shared scientific goals. A centre is
+  run by an administration (a Mayor and a registrar), which maintains the
   registry of groups and projects and issues the identity certificates
-  that bind members, groups, and projects together. Centres are covered in
-  their own section.
+  that bind members, groups, and projects together. An institution can run
+  more than one centre. Centres are covered in their own section.
+
+A centre contains many labs and cores; each group contains many members
+(its HQP); and a project draws its members from one or more groups:
 
 ```mermaid
-flowchart TD
-    C["Centre: one institution's Murmurent<br/>(administration: Mayor, registrar)"]
-    C --> L["Lab<br/>(a group, led by a PI)"]
-    C --> K["Core<br/>(a group, led by a PI)"]
-    L --> LM["Members<br/>(PI + trainees)"]
-    K --> KM["Members<br/>(core staff)"]
-    LM --> P["Project<br/>existing repos + data + certified members,<br/>with a lead"]
-    KM --> P
+flowchart TB
+    subgraph Centre["A centre: a research centre, department, or federation of labs and cores (an institution may run several)"]
+        subgraph Lab1["Lab · PI-led"]
+            a1["HQP"]
+            a2["HQP"]
+            a3["HQP"]
+        end
+        subgraph Core["Core · PI-led"]
+            b1["HQP"]
+            b2["HQP"]
+        end
+        subgraph Lab2["Lab · PI-led"]
+            c1["HQP"]
+            c2["HQP"]
+        end
+    end
+    Lab1 --> P["Project: existing repos + data + certified members, with a lead (may span several groups)"]
+    Core --> P
+    Lab2 --> P
 ```
 
 ## How repos and projects combine

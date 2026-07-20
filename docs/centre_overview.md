@@ -1,11 +1,11 @@
 # What a centre is
 
-A **centre** is one institution's own Murmurent installation: the set of
-labs and cores at that institution, the projects that run across them, and
-the administration that governs them. A university department, a research
-institute, or a bioconvergence centre each runs its own centre. Centres are
-independent of one another; a centre drives every deployment from its own
-`unique_name`, with no shared server between institutions.
+A **centre** is a collection of labs and cores, together with the projects
+that run across them and the administration that governs them. In an
+academic setting a centre corresponds to a research centre, a department,
+or another federation of labs and units with shared scientific goals. An
+institution can run more than one centre. Each centre is independent and
+drives its deployment from its own `unique_name`.
 
 The purpose of the centre layer is to let independent groups share a common
 set of agents, rules, and infrastructure (the commons) while each group

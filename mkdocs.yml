@@ -99,7 +99,7 @@ nav:
       - Group-level architecture: group_level.md
       - What Murmurent creates: what_mm_creates.md
       - The lab-mgmt repo: lab_mgmt.md
-      - Cross-group services (SEAs): seas.md
+      - Cross-group services (SEAs) (work in progress): seas.md
       - Inventory and shared resources (work in progress): inventory.md
       - Creating a project across labs: project_inter.md
       - Group Slack setup (PI): group_slack_setup.md

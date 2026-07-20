@@ -5,37 +5,13 @@ tags: [murmurent, design]
 
 # Murmurent: Group-Level Design
 
-## Terms
-
-The terms used throughout this page (member, group, project, repo,
-experiment, and SEA) are defined in
-[Overview: members, groups, projects](overview.md). In brief: a **project**
-is the highest unit of work, has a single **lead**, and spans one or more
-**repos**; a **repo** contains **experiments** (`exp/<n>_<slug>/`); and a
-**SEA** is an atomic, callable unit of service (Skill, Experiment-as-event,
-or Analysis).
-
-## Scope
-
-Group-level only: one PI, multiple members. Center- and factory-level concerns are noted only where they constrain the group; they are not designed here.
-
-Explicitly out of scope for this iteration:
-- Shared agent brains (shared memory). Agents are defined once at the group level, but each person runs their own instance with their own memory.
-- A full GUI. A thin CLI is sufficient until a concrete onboarding pain exists.
-
 ## Repos used by a group
 
 A group operates across three classes of repo. Each plays a distinct role; scope should not be mixed across them.
 
-- **Murmurent repo**: center-wide; holds the agent registry under `guilds/<group>/agents/` and the install tooling.
+- **Murmurent repo**: center-wide; holds the shared agent definitions and the install tooling.
 - **Lab-management repo**: group-scoped; holds the role registry (`roles/`), inventory (`inventory/`), audit logs, the project registry, and group-wide protocols. One per group.
 - **Project repos**: project-scoped; one per active project. Holds `CHARTER.md`, `MEMBERS`, `exp/`, `src/`, `findings/`, etc. (the lab's standard project layout). Private to MEMBERS.
-
-## Three layers within the group
-
-1. **Agent registry**: definitions for every agent the group recognises, version-controlled in the Murmurent repo at `guilds/<group>/agents/`.
-2. **Role registry**: group-level roles, each with cardinality (singleton / quota / open) and current operator(s). Lives in the lab-management repo. Only the PI mutates assignments.
-3. **Workspaces**: each member's local Claude Code environment, with the agents they have chosen to install, free to evolve on their own machine (subject to the freeze cascade below).
 
 ## Agent classification: the freeze cascade
 
@@ -98,8 +74,6 @@ Some preferences are cross-cutting (multiple agents care): plotting library, fig
 
 **Agent-specific fields** stay free-form; the agent picks its own field names. Examples: `bookworm.zotero_collection`, `lawyer.jurisdictions`, `blacksmith.gpu_id`.
 
-**Guild-level extensions to the vocabulary** are supported. The chemistry guild may add `mol_format: smiles | inchi | mol2` as a standardised field for its agents at `murmurent/guilds/chemistry/preferences.md`. The centre vocabulary is the base; guilds extend it.
-
 #### Personal preferences profile
 
 A member can set the cross-cutting fields once, applied across all their installed `personal` agents:
@@ -124,23 +98,19 @@ When an agent asks "what plotting library should I use?", the answer cascades:
 1. **Conversation override** ("use altair this time"): always wins.
 2. **Agent's local `defaults`**: set on the agent file directly.
 3. **Personal preferences profile** (`~/.claude/murmurent-preferences.yaml`): fills in any standardised field not set in (2).
-4. **Registry default** (centre, optionally extended by guild): `frozen` agents stop here; `personal` agents only fall through to here for fields not set in (2) or (3).
+4. **Registry default** (centre): `frozen` agents stop here; `personal` agents only fall through to here for fields not set in (2) or (3).
 
 A member who sets `plotting: seaborn` once in their profile gets seaborn from every personal agent unprompted. To override for a single agent (e.g. `bookworm` uses pandoc-style citations regardless), they edit that agent's local copy.
 
 #### Validation
 
-`murmurent install` checks each installed agent's `defaults` against the centre + guild vocabulary:
+`murmurent install` checks each installed agent's `defaults` against the centre vocabulary:
 
 - **Standard fields**: validate type / enum. Unknown enum values are flagged.
 - **Possible misspellings**: free-form fields with Levenshtein distance < 3 to a standardised field name produce a warning ("did you mean `figure_size`?").
 - **Missing-but-expected**: an agent that produces figures without `plotting` or `figure_size` produces a warning.
 
 All checks **warn rather than hard-reject**. The controlled vocabulary will lag actual practice; rejection would bottleneck adding new fields. Members fix warnings either by aligning to the vocabulary or by extending the vocabulary via PR to `murmurent/preferences.md`.
-
-#### Why this layout
-
-A postdoc doing Bayesian work overrides `framework: pytorch` to `framework: pyro` in their personal `blacksmith.md` (agent-specific, free-form). They also set `prose_style: academic` once in their profile and every text-producing agent obeys (cross-cutting, standardised). The chemistry guild's `artist` may default to `plotnine` and add `mol_format: smiles` as a guild-level standardised field. None of these collide; each lives at the right scope.
 
 **Worked example.** A member who prefers seaborn for plots and APA for
 citations sets two cross-cutting fields once in their personal preferences
@@ -152,62 +122,10 @@ edit to either agent's definition.
 ## Tier separation (recap)
 
 - **Personal agent:** definition copied to the person's `~/.claude/agents/`. Per-person memory. Evolution allowed if `personal`.
-- **Group-registered agent:** definition in `guilds/<group>/agents/`. Members install on demand.
+- **Group-registered agent:** definition in the group's agent registry. Members install on demand.
 - **Group-role agent:** registered agent + a role assignment held by a specific member. The agent runs in that member's CC environment but its charter and permissions belong to the role.
 
 We are explicitly NOT pursuing shared brains in this iteration.
-
-## Interactions inside a group
-
-Six categories of member-to-member interaction:
-
-1. **Codev**: code development. Mediated by git and GitHub PR review. Already well-served by current practice; agents participate by reading/writing artefacts in the repo, not by talking to each other.
-2. **Experimentation**: wet or dry experiments produce data and observations.
-3. **Observation**: informal capture (transcripts, photos, voice memos), triaged from `inbox/` into project notes.
-4. **Literature**: papers read, summarised, cited. Lives in Zotero + bookworm.
-5. **Resource sharing**: reagents, equipment, datasets, lab inventory.
-6. **Discussion / mentoring**: Slack, meeting notes, instruction.
-
-**Core insight:** agents do not need to talk to each other if they communicate through the artefacts they read and write. Git is the transport layer, the artefact is the message, and the commit log is the audit trail. This generalises beyond codev: observations, literature notes, and SEA requests can all be artefact-mediated.
-
-GitHub Actions bots are the natural mechanism for headless agent participation. The same agent definition that a member runs locally can be invoked by an Action on PR open / push / schedule, posting back through PR reviews, comments, or commits. No shared memory, no ad-hoc protocol, and a full audit trail at no additional cost.
-
-## Verb table: a typical day for a researcher
-
-A researcher's day is a sequence of recurring actions: capturing a note,
-pushing a result, requesting an analysis from a colleague, ordering a
-reagent. Murmurent names each of these actions a **verb**, and each verb
-maps to one CLI command (and, where useful, an agent request). The table
-below lists the verbs that touch the group; work done alone in a personal
-vault is not listed.
-
-For example, the **push** verb: after finishing an analysis, a member runs
-`murmurent push <project>`, which commits the result to the project repo
-and pushes it, making it visible to that project's MEMBERS. The other
-verbs follow the same pattern of one action mapped to one command.
-
-Verbs that touch the group (solo work in a personal vault is not listed). Initial set of 10; will grow. Each verb maps to a CLI command (see [[cli_manual]]).
-
-| Verb | What it does | Touches | Scope / visibility |
-|---|---|---|---|
-| capture | drop a raw transcript/note in `inbox/` | personal vault | private until triaged |
-| triage | process inbox into a structured note | vault → project repo | project MEMBERS |
-| push | submit a result/observation to a project | project repo (commit + push) | project MEMBERS only |
-| pull | fetch latest project state | project repo | project MEMBERS |
-| cite | reference a paper or prior finding | Zotero, group oracle | as source allows |
-| request_sea | ask another member for a Skill / Experiment / Analysis | group request board | group |
-| audit | invoke adversary on a piece of work | local + project repo | scope of work |
-| publish | promote a finding from project → group | group oracle (curated) | group |
-| provision | check / order reagents or equipment | `inventory/` in lab-management repo (served by the inventory MCP) | group |
-| review | comment on / approve a PR | project repo | project MEMBERS |
-
-For verbs not in this day-to-day table, see:
-- [Squads](#squads-work-in-progress) for `form` / `invite` / `release` / `transfer_lead` / `dissolve` / `promote`.
-- [SEAs](#sea-verbs) for `request` / `claim` / `complete` / `decline`.
-- [Role transitions](#role-transitions) for `assign` / `revoke` / `transfer_role`.
-- Project verbs (`admit` / `release` / `end` / `archive_project`) and project creation are covered in [project_intra.md](project_intra.md).
-- [Knowledge and continuity verbs](#knowledge-and-continuity-verbs) for `discuss` / `teach` / `freeze`.
-- `schedule` is intentionally not a Murmurent verb: calendars and a `calendar` MCP cover it.
 
 ## Privacy and access
 
@@ -215,194 +133,6 @@ For verbs not in this day-to-day table, see:
 - **Project-scoped**: lives in a private GitHub repo (one per project) with a checked-in `MEMBERS` file as the source of truth. Filesystem ACL on `$MURMURENT_LAB_VM_ROOT/refined/<project>/` is synced from MEMBERS.
 - **Group-shared**: agent definitions in the Murmurent repo; curated findings in a group oracle; readable to all group members.
 - **Sensitive artefacts that must travel** (cloud, email, off-VM): wrap in `age` with MEMBERS as the recipient list. Re-encrypt on membership change.
-
-## Inventory and shared resources
-
-Inventory is group-scoped: every member needs access regardless of which
-project they work on. It is stored as semi-structured markdown (one file
-per reagent or kit) in the lab-management repo, and served to agents by
-the inventory MCP (read for the whole group, write restricted to the
-`lab_manager` role). Full details, schema, and MCP tools are in
-[Inventory and shared resources](inventory.md).
-
-## Experiments and lab notebooks
-
-Lab notebooks contain photos, drawings, sketches, numbers, text, and small data files. All experiments performed in a project must sit together, accessible to every MEMBER, with no platform lock-in (no Notion) and no schema rigidity (no SQL).
-
-**Decision: each experiment is a folder inside the project repo, following the lab's standard project structure.** Data files (raw measurements, large outputs) live on the lab VM under `$MURMURENT_LAB_VM_ROOT/raw/` and `$MURMURENT_LAB_VM_ROOT/refined/`, never in the repo. The notebook entry **links** to data files; it does not embed them.
-
-This aligns with the lab's global rules: `~/.claude/rules/data-storage.md` and `~/.claude/rules/project-structure.md`.
-
-### Project repo layout
-
-```
-<project_repo>/                 ← e.g. ~/repos/brca_imaging/
-├── CHARTER.md
-├── MEMBERS
-├── README.md
-├── exp/
-│   ├── 1_titration/
-│   │   ├── README.md                 ← per lab convention
-│   │   ├── run_all.py                ← entry point for the experiment's analysis
-│   │   ├── notebook.md               ← lab notebook entry: frontmatter + text + image embeds
-│   │   ├── pages/                    ← photos of paper notebook pages (downsampled)
-│   │   ├── sketches/                 ← drawings (PNG/PDF)
-│   │   ├── data/                     ← very small committed data only
-│   │   └── ...                       ← scripts
-│   └── 2_qpcr/
-├── src/
-│   ├── protocols/                    ← reusable protocols cited by experiments
-│   ├── literature/                   ← Zotero exports
-│   ├── ready_to_delete.md            ← per lab convention; tracks refined files safe to delete
-│   └── ...                           ← shared code
-├── findings/                         ← curated outputs promoted at project level
-├── obsolete/                         ← deprecated code/data not yet ready to delete
-└── data/                             ← group-shared very small data (per lab convention)
-```
-
-Experiment folders follow the lab's `<integer>_<good_name>/` convention; date lives in the notebook frontmatter.
-
-### Data locations (raw / refined)
-
-Per the lab's data-storage rule, data does **not** live in the repo:
-
-- **Raw data:** `$MURMURENT_LAB_VM_ROOT/raw/<project>/<experiment>/...`. Read-only. Never modified by code; only copied from instrument/collaborator. Names preserved verbatim.
-- **Refined data:** `$MURMURENT_LAB_VM_ROOT/refined/<project>/<experiment>/...`. Outputs of `run_all` and other analyses. Mirrors the repo's `exp/` layout one-to-one.
-- **Versioning:** integer suffix on filenames; largest = newest (per lab convention).
-- **`src/ready_to_delete.md`:** tracks refined files safe to delete; checked when refined storage gets tight.
-
-The notebook entry links to data; it never holds it.
-
-The `raw/` and `refined/` layout under `$MURMURENT_LAB_VM_ROOT` is the
-default convention (used by the Hallett lab). Another lab can point
-`$MURMURENT_LAB_VM_ROOT` at a different root and adopt its own directory
-conventions; the requirement Murmurent enforces is that raw data is
-immutable and refined data is append-only, not the specific path layout.
-
-### `notebook.md`: required frontmatter
-
-| Field | Type | Notes |
-|---|---|---|
-| `experiment` | str | Experiment slug (e.g. `1_titration`) |
-| `date` | ISO date | When the experiment was performed |
-| `performer` | list[str] | GitHub handles of who ran it |
-| `project` | wikilink | Parent project |
-| `protocol` | wikilink | Protocol used (`src/protocols/<name>.md`) |
-| `equipment` | list[str] | Instruments used |
-| `reagents` | list | Names from `inventory/`; matched by the inventory MCP |
-| `raw_data` | list[path] | Files in `$MURMURENT_LAB_VM_ROOT/raw/...` consumed by this experiment |
-| `refined_data` | list[path] | Files in `$MURMURENT_LAB_VM_ROOT/refined/...` produced by this experiment's analyses |
-| `instrument_outputs` | list[path] | Instrument-derived files (thumbnails, PDFs, QC reports) in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<experiment>/instrument_outputs/`. Populated by `experiment ingest`. |
-| `checksums` | dict | SHA-256 for each file in `raw_data`, `refined_data`, `instrument_outputs` (auto-computed) |
-| `status` | enum | Operational: `planned` / `running` / `complete` / `failed` / `inconclusive` |
-| `analysis_status` | enum | Intellectual: `not_started` / `examined` / `concluded`. See [The finalisation choreography](#the-finalisation-choreography). |
-| `examined_at` | ISO date | When the examine stage completed (if reached) |
-| `concluded_at` | ISO date | When the conclude stage completed (if reached) |
-| `tags` | list[str] | Kebab-case |
-
-Body: free-form. Embed photos with `![](pages/p1.jpg)`. Reference data files by absolute path. Cross-reference findings with `[[findings/...]]`.
-
-### What stays in the repo (and what doesn't)
-
-- **In the repo:** notebook entry, photos of paper notebook pages (downsampled), sketches, very small data, code, protocols, charter, MEMBERS, README, `ready_to_delete.md`.
-- **Not in the repo:** raw measurements, large refined outputs (figures > a few MB, processed arrays, image stacks). These live under `/data/lab_vm/`.
-- **No git LFS.** LFS would either break the read-only-raw rule, couple data lifetime to GitHub billing, or duplicate what the lab VM already provides. The lab VM is the canonical data store; the repo holds documentation and code.
-
-### Capture tooling
-
-Use what you already have:
-- iPhone Files / AirDrop → drag into the experiment's `pages/`, `sketches/`, or `data/`.
-- Scanbot or Genius Scan → paper notebook pages → JPG, downsampled.
-- Apple Pencil → PNG.
-- Spreadsheets → CSV in `data/`.
-- Obsidian opens the project repo as a vault.
-
-For raw instrument data: `murmurent experiment ingest <project> <exp> <source>` copies the instrument files, computes checksums, sets the raw directory `chmod a-w`, and updates the notebook's `raw_data` and `checksums` fields. Classification of raw vs derived files is described below.
-
-### Ingest classification (raw vs derived)
-
-Instrument export folders rarely contain only true raw data. They typically mix:
-
-- **True raw**: `scan_001.czi`, `run_001.fastq.gz`. Goes to `$MURMURENT_LAB_VM_ROOT/raw/<project>/<experiment>/`, immutable.
-- **Instrument-derived**: thumbnails, summary PDFs, QC HTML reports. Goes to `$MURMURENT_LAB_VM_ROOT/refined/<project>/<experiment>/instrument_outputs/`. Stays writable (regeneratable).
-- **Ambiguous**: metadata XML, software-aligned BAMs, instrument-software overlays. Depends on the instrument and the lab's convention.
-
-Because raw is immutable once committed, classification has to happen before the `chmod a-w`. Three layers, in order:
-
-#### 1. Instrument profiles
-
-A YAML file per known instrument at `murmurent/instruments/<type>.yaml` (centre default) or `lab-mgmt-repo/instruments/<type>.yaml` (lab override) declares which extensions and patterns are raw vs derived. Example:
-
-```yaml
----
-instrument: zeiss-confocal
-description: Zeiss LSM confocal microscope
-detect_marker: '*.czi'
-raw:
-  extensions: [czi, lsm]
-  patterns: ['metadata*.xml']
-derived:
-  extensions: [pdf, html, png]
-  patterns: ['*thumbnail*', '*preview*', '*_qc.*']
----
-```
-
-`detect_marker` lets the CLI auto-detect the instrument when `--instrument` is not given. The Murmurent repo ships starter profiles for common instruments (Zeiss confocal, Illumina sequencers, common mass-spec); labs add their own.
-
-#### 2. Generic fallback patterns
-
-When no instrument profile matches, files matching these patterns default to derived; everything else defaults to raw:
-
-- Extensions: `.pdf`, `.html`
-- Filename patterns: `*thumbnail*`, `*preview*`, `*summary*`, `*report*`, `*_qc.*`
-
-The fallback fires with an explicit warning so the user knows the classification is heuristic and should be reviewed.
-
-#### 3. Mandatory review
-
-Before any copy or `chmod`, the CLI shows the proposed classification and waits for explicit acceptance:
-
-```
-$ murmurent experiment ingest brca_imaging 3_titration ~/Downloads/scope_export
-Detected instrument: zeiss-confocal (from .czi files)
-Proposed classification:
-  → $MURMURENT_LAB_VM_ROOT/raw/brca_imaging/3_titration/
-    scan_001.czi   scan_002.czi   scan_003.czi   metadata.xml
-  → $MURMURENT_LAB_VM_ROOT/refined/brca_imaging/3_titration/instrument_outputs/
-    thumbnail_001.png   summary.pdf   qc_report.html
-[a]ccept  [r]eview file-by-file  [c]ancel ?
-```
-
-Review is mandatory. The cost of a misclassification (a derived file permanently stuck in raw, or a true-raw file landing somewhere mutable) outweighs the friction of one prompt per ingest.
-
-#### CLI flags
-
-| Flag | Effect |
-|---|---|
-| `--instrument <type>` | Explicit profile selection; overrides auto-detect |
-| `--accept` | Skip the interactive prompt (for scripting). Warns that review is recommended |
-| `--dry-run` | Show classification without copying anything |
-
-#### After acceptance
-
-- Raw files → `$MURMURENT_LAB_VM_ROOT/raw/<project>/<experiment>/`; directory then `chmod a-w`.
-- Derived files → `$MURMURENT_LAB_VM_ROOT/refined/<project>/<experiment>/instrument_outputs/`; remain writable.
-- SHA-256 computed for both groups.
-- `notebook.md` updated: `raw_data:` lists raw files, new `instrument_outputs:` field lists the derived files, `checksums:` covers both.
-
-### Why not eLabFTW or shared-filesystem alternatives
-
-- **eLabFTW** (open source ELN): richer UI, electronic signatures, search, audit. The right answer if regulatory compliance (e.g. 21 CFR Part 11) is required. For academic biology day-to-day, folder-in-repo + lab VM is enough.
-- **Shared filesystem** (Nextcloud, Syncthing): handles large binaries without LFS, but loses PR-based review, branch isolation, and the artefact-as-message model agents rely on. Not needed once data lives on the lab VM.
-
-### Verb support
-
-`murmurent experiment new --project brca_imaging --name titration` scaffolds:
-- `exp/<next-int>_titration/` in the project repo with `README.md`, `run_all.py` skeleton, `notebook.md` template (auto-filled `experiment`, `date`, `performer`), `pages/`, `sketches/`, `data/` subfolders.
-- `$MURMURENT_LAB_VM_ROOT/raw/brca_imaging/<next-int>_titration/` (writeable until raw is loaded; then `chmod a-w`).
-- `$MURMURENT_LAB_VM_ROOT/refined/brca_imaging/<next-int>_titration/`.
-
-Then opens `notebook.md` in Obsidian.
 
 ## Push mechanics: branches, PRs, and bots
 
@@ -836,14 +566,14 @@ A project adopts a choreography by setting `choreography: <name>` in its `CHARTE
 
 Choreography is invoked as a CC skill:
 
-- `choreography:list`: show available choreographies in the Murmurent repo and any guild-level additions.
+- `choreography:list`: show available choreographies in the Murmurent repo and any group-level additions.
 - `choreography:apply <name> --to <project>`: scaffold a project against the recipe.
 - `choreography:status <project>`: report how far the project has progressed against the recipe's expected steps; flag missing artefacts.
 
 ### Where choreographies live
 
 - **Centre-level**: `murmurent/choreographies/*.md`. Available to every group.
-- **Guild-level**: `murmurent/guilds/<group>/choreographies/*.md`. Group-specific patterns.
+- **Group-level**: group-specific patterns maintained by the group.
 - **Project-level**: a project may declare a one-off choreography in its repo at `CHOREOGRAPHY.md`, useful for unique work.
 
 ## Knowledge and continuity verbs
@@ -881,8 +611,8 @@ The day-to-day verbs handle moment-to-moment work. The verbs in this section pro
 **Purpose:** make knowledge transferable. Students leave; their methods leave with them unless captured.
 
 **Mechanism:** two artefact kinds, three scopes:
-- **Protocol**: a lab procedure (wet or dry). Lives at `<project repo>/src/protocols/<name>.md` (project-scoped), `<murmurent-repo>/guilds/<group>/protocols/<name>.md` (group-scoped), or `<murmurent-repo>/protocols/<name>.md` (centre-scoped).
-- **Skill**: a Claude Code-discoverable instruction set the model invokes by name. Lives at `<murmurent-repo>/guilds/<group>/skills/<name>.md` or `<murmurent-repo>/skills/<name>.md`.
+- **Protocol**: a lab procedure (wet or dry). Lives at `<project repo>/src/protocols/<name>.md` (project-scoped), `<murmurent-repo>/<group>/protocols/<name>.md` (group-scoped), or `<murmurent-repo>/protocols/<name>.md` (centre-scoped).
+- **Skill**: a Claude Code-discoverable instruction set the model invokes by name. Lives at `<murmurent-repo>/<group>/skills/<name>.md` or `<murmurent-repo>/skills/<name>.md`.
 
 Both share a templated body:
 
@@ -1251,7 +981,7 @@ The required-vs-elected distinction is enforced: a member cannot opt out of a co
 - **Skill**: a Claude Code-discoverable instruction set, invoked by name. Group- or centre-scoped.
 - **Freeze**: immutable snapshot of a project at a point in time: git tag + manifest + age-encrypted bundle. Used for paper / thesis / grant submission moments.
 - **oracle_curator**: group-level role responsible for facilitating finalisation choreographies and handling periodic legacy maintenance (cross-reference health, citation rot, tag drift). Quotaed to 2; annual rotation.
-- **Standardised vocabulary**: controlled list of cross-cutting `defaults` field names documented at `murmurent/preferences.md`; guilds extend via `murmurent/guilds/<group>/preferences.md`. Used for fields multiple agents share (plotting, citation_style, prose_style, etc.).
+- **Standardised vocabulary**: controlled list of cross-cutting `defaults` field names documented at `murmurent/preferences.md`; groups extend via `murmurent/<group>/preferences.md`. Used for fields multiple agents share (plotting, citation_style, prose_style, etc.).
 - **Personal preferences profile**: `~/.claude/murmurent-preferences.yaml`, local to each member's machine, sets standardised fields once for all `personal` agents. Never committed to group repos.
 - **Onboarding profile**: YAML+markdown spec at `murmurent/onboarding/<profile>.md` (centre default) or `lab-mgmt-repo/onboarding/<profile>.md` (lab override) bundling agents-to-install, default permissions, lead eligibility, and expiry for a class of new member. Four centre defaults: `student`, `postdoc`, `pi-collab`, `visitor`. Cores are themselves groups, not profiles within a group.
 - **Sensitivity tier**: project-level property declared in `CHARTER.md` frontmatter: `standard` / `restricted` / `clinical`. Controls per tier defined in `murmurent/sensitivity-policy.yaml`. Projects in the same group can be at different tiers.
