@@ -5,15 +5,16 @@ tags: [murmurent, design]
 
 # Murmurent: Group-Level Design
 
-## Taxonomy
+## Terms
 
-The four-level taxonomy used throughout this document:
+The terms used throughout this page (member, group, project, repo,
+experiment, and SEA) are defined in
+[Overview: members, groups, projects](overview.md). In brief: a **project**
+is the highest unit of work, has a single **lead**, and spans one or more
+**repos**; a **repo** contains **experiments** (`exp/<n>_<slug>/`); and a
+**SEA** is an atomic, callable unit of service (Skill, Experiment-as-event,
+or Analysis).
 
-- **Project**: highest unit. Single **lead** (often the PI but removable). Spans one or more repos. Has a charter.
-- **Repo**: a lab-convention repository (`~/repos/<name>/` with `exp/<n>_<slug>/` inside). One or more per project.
-- **Experiment**: a unit of work in a repo (`exp/<n>_<slug>/`). Has a notebook entry.
-- **SEA**: atomic, callable unit of service (Skill, Experiment-as-event, or Analysis). Multiple per experiment; sometimes free-standing.
-- **Squad**: the subgroup that performs a project, experiment, or SEA. Has a lead and members. Nestable.
 ## Scope
 
 Group-level only: one PI, multiple members. Center- and factory-level concerns are noted only where they constrain the group; they are not designed here.
@@ -21,14 +22,6 @@ Group-level only: one PI, multiple members. Center- and factory-level concerns a
 Explicitly out of scope for this iteration:
 - Shared agent brains (shared memory). Agents are defined once at the group level, but each person runs their own instance with their own memory.
 - A full GUI. A thin CLI is sufficient until a concrete onboarding pain exists.
-
-## Mental model
-
-A **group** g consists of people p1...pn, usually with one PI. Members participate in **projects**. Each project:
-
-- has a participant subset of the group (its MEMBERS)
-- is supported by experiments (wet or dry), literature, observations, and other artefacts
-- accumulates predominantly semi-structured data: markdown + YAML frontmatter, with structured DBs (e.g. SQLite) where schemas are hard
 
 ## Repos used by a group
 
@@ -59,6 +52,15 @@ Effective flag = bot pin (if applicable) ∨ role override (if applicable) ∨ r
 The cascade is enforced by the install tooling and by the bot's workflow file (which references the registry version explicitly).
 
 ### Tool preferences (defaults + overrides)
+
+Every reference agent ships with sensible defaults so it is useful
+immediately: the Artist plots with matplotlib and the viridis colormap,
+the Bookworm formats citations in a default style, and so on. A member who
+prefers different defaults can override them per member, without editing
+the shared agent definition. Preferences that several agents care about
+(the plotting library, the citation style, the prose language) use a
+shared, controlled vocabulary, so that setting one value applies it across
+every agent that honours it.
 
 Each agent's frontmatter may declare a `defaults` block listing the tools, libraries, formats, or styles the agent uses unless told otherwise:
 
@@ -140,6 +142,13 @@ All checks **warn rather than hard-reject**. The controlled vocabulary will lag 
 
 A postdoc doing Bayesian work overrides `framework: pytorch` to `framework: pyro` in their personal `blacksmith.md` (agent-specific, free-form). They also set `prose_style: academic` once in their profile and every text-producing agent obeys (cross-cutting, standardised). The chemistry guild's `artist` may default to `plotnine` and add `mol_format: smiles` as a guild-level standardised field. None of these collide; each lives at the right scope.
 
+**Worked example.** A member who prefers seaborn for plots and APA for
+citations sets two cross-cutting fields once in their personal preferences
+profile: `plotting: seaborn` and `citation_style: apa`. From then on, the
+Artist produces seaborn figures and the Bookworm formats references in APA
+in every session, on every project, with no per-task instruction and no
+edit to either agent's definition.
+
 ## Tier separation (recap)
 
 - **Personal agent:** definition copied to the person's `~/.claude/agents/`. Per-person memory. Evolution allowed if `personal`.
@@ -165,6 +174,18 @@ GitHub Actions bots are the natural mechanism for headless agent participation. 
 
 ## Verb table: a typical day for a researcher
 
+A researcher's day is a sequence of recurring actions: capturing a note,
+pushing a result, requesting an analysis from a colleague, ordering a
+reagent. Murmurent names each of these actions a **verb**, and each verb
+maps to one CLI command (and, where useful, an agent request). The table
+below lists the verbs that touch the group; work done alone in a personal
+vault is not listed.
+
+For example, the **push** verb: after finishing an analysis, a member runs
+`murmurent push <project>`, which commits the result to the project repo
+and pushes it, making it visible to that project's MEMBERS. The other
+verbs follow the same pattern of one action mapped to one command.
+
 Verbs that touch the group (solo work in a personal vault is not listed). Initial set of 10; will grow. Each verb maps to a CLI command (see [[cli_manual]]).
 
 | Verb | What it does | Touches | Scope / visibility |
@@ -181,7 +202,7 @@ Verbs that touch the group (solo work in a personal vault is not listed). Initia
 | review | comment on / approve a PR | project repo | project MEMBERS |
 
 For verbs not in this day-to-day table, see:
-- [Squads](#squads-subgroups) for `form` / `invite` / `release` / `transfer_lead` / `dissolve` / `promote`.
+- [Squads](#squads-work-in-progress) for `form` / `invite` / `release` / `transfer_lead` / `dissolve` / `promote`.
 - [SEAs](#sea-verbs) for `request` / `claim` / `complete` / `decline`.
 - [Role transitions](#role-transitions) for `assign` / `revoke` / `transfer_role`.
 - Project verbs (`admit` / `release` / `end` / `archive_project`) and project creation are covered in [project_intra.md](project_intra.md).
@@ -197,67 +218,12 @@ For verbs not in this day-to-day table, see:
 
 ## Inventory and shared resources
 
-Inventory is hard in labs chiefly because nobody updates it, rather than because of a structured-versus-unstructured data question. The tool most likely to be maintained is the one with the lowest update friction. Obsidian-with-frontmatter is competitive with a spreadsheet on update friction and far better for: attaching catalog photos and vendor notes, versioning, grep-querying from CC, living in the same toolchain as everything else.
-
-**Decision: inventory is semi-structured markdown in the lab-management repo.** Inventory is **group-scoped**, never project-scoped: every member needs access regardless of which project they are working on.
-
-### Layout
-
-One markdown file per reagent or kit:
-
-```
-<lab-mgmt-repo>/
-├── inventory/
-│   ├── anti_cd31.md
-│   ├── 4_oht.md
-│   └── ...
-└── ...
-```
-
-### Schema (frontmatter)
-
-| Field | Type | Notes |
-|---|---|---|
-| `name` | str | Canonical name |
-| `lot` | str | Current lot number |
-| `qty` | number | Current quantity |
-| `unit` | str | mg, mL, units, vials |
-| `expiry` | ISO date | YYYY-MM-DD |
-| `location` | str | Freezer / shelf / box |
-| `vendor` | str | |
-| `catalog_no` | str | |
-| `last_updated` | ISO date | Auto-set on edit |
-| `status` | enum | `in_stock` / `low` / `out` / `expired` / `on_order` |
-| `protocols` | list[wikilink] | Protocols that consume this reagent |
-
-Body holds free-form notes: vendor link, MSDS, prep procedure, photos of label or catalog page.
-
-### Inventory MCP
-
-The `provision` operation, and inventory access in general, are exposed as an **MCP server** (the `inventory` MCP), not as CLI subcommands. Any agent in any member's CC instance can call its tools:
-
-- `inventory_list(filter)`: list reagents matching a filter (e.g. `--low`, `--expiring 30`).
-- `inventory_show(name)`: return frontmatter + body of one reagent.
-- `inventory_provision(plan_path)`: compute `plan ∩ inventory`, report gaps and expiring lots.
-- `inventory_set(name, fields)` (*lab_manager only*): update fields, auto-bump `last_updated`.
-- `inventory_order(name)` (*lab_manager only*): open an order issue in the lab-management repo.
-
-The MCP wraps the markdown files. Permissions are enforced by the MCP server (read = group, write = `lab_manager`); the lab-management repo's branch protection is the second line of defence for write paths that bypass the MCP.
-
-### `last_updated` mechanism
-
-`last_updated` must be auto-set regardless of how the file was edited. Three redundant layers:
-
-1. **Inventory MCP** sets it on every write (primary path; covers programmatic edits by agents).
-2. **Pre-commit hook** in the lab-management repo updates `last_updated` for any `inventory/*.md` file in the staged set (covers direct edits via Obsidian, vim, IDE).
-3. **GitHub Action on push** does the same as the hook (backstop for edits via the GitHub web UI, which doesn't run pre-commit hooks).
-
-The field is reliable regardless of the editing tool.
-
-### Permissions
-
-- Read: every group member.
-- Write: `lab_manager` role only (enforced by the inventory MCP and by branch protection on the lab-management repo).
+Inventory is group-scoped: every member needs access regardless of which
+project they work on. It is stored as semi-structured markdown (one file
+per reagent or kit) in the lab-management repo, and served to agents by
+the inventory MCP (read for the whole group, write restricted to the
+`lab_manager` role). Full details, schema, and MCP tools are in
+[Inventory and shared resources](inventory.md).
 
 ## Experiments and lab notebooks
 
@@ -306,6 +272,12 @@ Per the lab's data-storage rule, data does **not** live in the repo:
 - **`src/ready_to_delete.md`:** tracks refined files safe to delete; checked when refined storage gets tight.
 
 The notebook entry links to data; it never holds it.
+
+The `raw/` and `refined/` layout under `$MURMURENT_LAB_VM_ROOT` is the
+default convention (used by the Hallett lab). Another lab can point
+`$MURMURENT_LAB_VM_ROOT` at a different root and adopt its own directory
+conventions; the requirement Murmurent enforces is that raw data is
+immutable and refined data is append-only, not the specific path layout.
 
 ### `notebook.md`: required frontmatter
 
@@ -743,7 +715,12 @@ Triggered by the PI when a member leaves:
 - Member profile note marked `status: alumni` with departure date; not deleted (preserves attribution on past work).
 - A final summary of contributions is appended to the member profile note.
 
-## Squads (subgroups)
+## Squads (work in progress)
+
+!!! warning "Work in progress"
+    The squad model (subgroups within a project) is a design that is not
+    yet implemented. This section documents the intended shape; the CLI
+    verbs and registry described here are not available yet.
 
 A **squad** is the subgroup that actually performs a project, experiment, or SEA. It has a lead and members. Squads can be nested: a project squad has experiment squads inside, which have SEA squads inside.
 

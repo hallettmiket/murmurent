@@ -45,3 +45,27 @@
 .md-footer-meta__inner { flex-wrap: wrap; }
 .md-copyright { width: 100%; margin: 0; }
 .md-copyright__highlight { color: inherit; }
+
+/* ── Sidebar: visually separate the top-level nav sections ──────────────────
+   The theme uses navigation.sections, so each top-level group (Getting
+   started, Working day to day, Labs & cores, Centres, Reference) renders as a
+   section label. Give each one a coloured, ruled header so the sections read
+   as distinct blocks. Direct-child combinators keep this to top-level
+   sections only, leaving nested groups (Slack, vignettes, ...) untouched. */
+.md-nav--primary > .md-nav__list > .md-nav__item--section > .md-nav__link {
+  margin-top: 1.1rem;
+  padding-top: 0.7rem;
+  border-top: 2px solid rgba(79, 38, 131, 0.25);   /* Western purple, faint */
+  color: #4F2683;                                   /* Western purple */
+  font-weight: 700;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Dark scheme: lighter accent so the labels stay legible. */
+[data-md-color-scheme="slate"]
+  .md-nav--primary > .md-nav__list > .md-nav__item--section > .md-nav__link {
+  color: #C9A6F0;
+  border-top-color: rgba(201, 166, 240, 0.28);
+}

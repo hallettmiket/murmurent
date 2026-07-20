@@ -51,7 +51,11 @@ markdown_extensions:
   - toc:
       permalink: true
   - pymdownx.highlight
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.details
 
 # Internal working documents that shouldn't render on the public site.
@@ -90,17 +94,21 @@ nav:
       - The lab notebook: lab_notebook_guide.md
       - The Oracle (personal & lab memory): oracle-workflow.md
       - Creating a project (in your lab): project_intra.md
-  - Labs, cores & centres:
+  - Labs & cores:
+      - "Overview: members, groups, projects": overview.md
       - Group-level architecture: group_level.md
       - What Murmurent creates: what_mm_creates.md
       - The lab-mgmt repo: lab_mgmt.md
+      - Cross-group services (SEAs): seas.md
+      - Inventory and shared resources (work in progress): inventory.md
+      - Creating a project across labs: project_inter.md
+      - Group Slack setup (PI): group_slack_setup.md
+  - Centres:
+      - What a centre is: centre_overview.md
       - Membership IDs & the trust chain: identity.md
       - The centre root key: centre_root_key.md
-      - Cross-group services (SEAs): seas.md
-      - Creating a project across labs: project_inter.md
       - Slack:
           - Centre Slack setup (mayor): slack_setup.md
-          - Group Slack setup (PI): group_slack_setup.md
           - Slack integration: slack_integration.md
           - Slack ↔ Claude Code: slack_cc_integration.md
       - The public directory:
@@ -108,9 +116,9 @@ nav:
           - Connecting to the public directory: connect_to_hub.md
       - Drift detection (reconcile): reconcile.md
       - Security dashboard: security-dashboard.md
-      - Architecture diagrams: diagrams.md
   - Reference:
       - CLI manual: cli_manual.md
+      - Architecture diagrams: diagrams.md
       - Versioning: versioning.md
       - Code style: style/code-style.md
       - Documentation conventions: style/documentation.md
