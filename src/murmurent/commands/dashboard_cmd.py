@@ -114,50 +114,26 @@ def _launch_hifi(*, host: str, port: int) -> int:
 
 
 def _launch_streamlit(handle: str) -> int:
-    """Launch the Streamlit app.
-
-    Streamlit is invoked through the same interpreter that is running this
-    CLI (``sys.executable``) whenever that interpreter can import Streamlit.
-    This guarantees the Streamlit subprocess can also import the
-    ``murmurent`` package, since the CLI is itself running under that
-    interpreter. A bare ``streamlit`` on PATH may belong to a different
-    environment in which ``murmurent`` is not importable, which raises
-    ``ModuleNotFoundError: No module named 'murmurent'`` when ``app.py``
-    imports ``murmurent.core``. If Streamlit is only available as a PATH
-    executable, fall back to it but add this package's source root to
-    ``PYTHONPATH`` so the subprocess can still import ``murmurent``.
-    """
-    import importlib.util
-    import os
-
+    """Launch the Streamlit app via ``streamlit run``."""
+    if shutil.which("streamlit") is None:
+        raise click.ClickException(
+            "streamlit is not installed. `uv pip install streamlit` (already in "
+            "the project's optional 'dashboard' extras) or run with --snapshot."
+        )
     app_path = Path(__file__).resolve().parent.parent / "dashboard" / "app.py"
     if not app_path.is_file():
         raise click.ClickException(f"streamlit app not found at {app_path}")
-
-    streamlit_importable = importlib.util.find_spec("streamlit") is not None
-    env: dict[str, str] | None = None
-
-    if streamlit_importable:
-        cmd = [sys.executable, "-m", "streamlit", "run", str(app_path)]
-    elif shutil.which("streamlit") is not None:
-        cmd = ["streamlit", "run", str(app_path)]
-        # The PATH streamlit may run under an interpreter that cannot import
-        # murmurent; put this package's source root on PYTHONPATH so it can.
-        env = os.environ.copy()
-        src_root = str(Path(__file__).resolve().parents[2])  # .../src
-        existing = env.get("PYTHONPATH", "")
-        env["PYTHONPATH"] = src_root + (os.pathsep + existing if existing else "")
-    else:
-        raise click.ClickException(
-            "streamlit is not installed in the murmurent environment. Install it "
-            "into the same environment as the CLI:\n"
-            f"    {sys.executable} -m pip install streamlit\n"
-            "or run the FastAPI dashboard instead: `murmurent dashboard --hifi`."
-        )
-
-    cmd += ["--server.headless", "false", "--", f"--user={handle}"]
+    cmd = [
+        "streamlit",
+        "run",
+        str(app_path),
+        "--server.headless",
+        "false",
+        "--",
+        f"--user={handle}",
+    ]
     click.echo(f"Launching: {' '.join(cmd)}")
-    return subprocess.call(cmd, env=env)
+    return subprocess.call(cmd)
 
 
 def cmd_generate_all() -> list[Path]:
