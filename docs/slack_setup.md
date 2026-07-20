@@ -1,10 +1,10 @@
 # Slack setup for a Murmurent centre (mayor guide)
 
-Murmurent treats messaging as a pluggable layer. This deployment plugs in
-Slack because the lab and centre already communicate there day to day; a
+Murmurent treats messaging as a pluggable layer. This deployment uses
+Slack because the lab and centre already communicate there; a
 different messaging system could fill the same role with an equivalent
-integration. Slack is today's chosen fabric, kept in place because it works
-and is already where people are.
+integration. Slack is the current choice because it is already in
+routine use.
 
 Murmurent uses Slack as its communication fabric in this deployment: a
 private **mayor↔CC channel** (`#murmurent-ops`) where the code posts events,
@@ -18,7 +18,7 @@ and **`#general`** for broadcasts. This guide is the one-time setup a
 
 ## Slack terms used in this guide
 
-Two Slack concepts come up throughout this guide, worth defining plainly
+Two Slack concepts recur throughout this guide and are defined here,
 since Slack experience varies across readers:
 
 - **Workspace**: an organization's whole Slack instance, with its own
@@ -47,13 +47,13 @@ In Slack, create a workspace named **`murmurent-<unique_name>`** (e.g.
   name; if it's missing, `centre-slack-setup` reports `#general not found;
   create it in Slack`, and broadcasts to `everyone` have nowhere to land
   until the channel exists.
-- Grab the **workspace invite link**: *Invite people → Copy invite link*. You'll
-  give this to new members during onboarding.
+- Obtain the **workspace invite link**: *Invite people → Copy invite link*. Give
+  this to new members during onboarding.
 
 ## 2. Create a bot token  [manual]
 
-Murmurent talks to Slack through a **bot user** on a Slack **app** you own. Create
-it once, click by click:
+Murmurent connects to Slack through a **bot user** on a Slack **app** you own.
+Create it once:
 
 1. Go to <https://api.slack.com/apps> and sign in as the account that owns your
    `murmurent-<name>` workspace.

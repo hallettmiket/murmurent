@@ -36,8 +36,8 @@ Everything under `~/repos/`, `~/.claude/`, and `~/.murmurent/` lives on a
 single machine and gets set up fresh on each machine you use Murmurent from
 (see [`setup.md`](setup.md) for per-machine wiring). The GitHub repos are
 what carry your Oracle, notebook, and lab knowledge between machines: clone
-the same private repos on a second laptop and Murmurent picks up where you
-left off there too. The lab server's `$MURMURENT_LAB_VM_ROOT/{raw,refined}/`
+the same private repos on a second laptop and Murmurent has the same state
+available there. The lab server's `$MURMURENT_LAB_VM_ROOT/{raw,refined}/`
 is shared infrastructure the whole lab points at, rather than something each
 machine keeps its own copy of.
 

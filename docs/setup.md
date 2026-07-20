@@ -1,192 +1,110 @@
 # Setup
 
-First-time Murmurent installation on a new machine.
+This page covers first-time Murmurent installation. It is organized by
+role: every user installs the CLI and commons; a PI additionally sets up
+a lab; a mayor additionally sets up a centre.
 
-## Per-machine wiring
+## Installing the CLI and commons (all users)
 
-For most users, one command does all of this automatically: see the
-[README](https://github.com/hallettmiket/murmurent/blob/main/README.md):
+For most users, a single command performs the entire installation (see
+the [README](https://github.com/hallettmiket/murmurent/blob/main/README.md)):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts/bootstrap.sh | bash
 ```
 
-This installs the `murmurent` command and wires the shared agents,
-rules, and skills into `~/.claude/`. The numbered steps below are
-what that script automates, shown here for transparency, and for
-anyone who wants to run them by hand.
+This installs the `murmurent` command and symlinks the shared agents,
+rules, and skills into `~/.claude/`. For most users it is the only
+installation step required.
+
+The bootstrap script automates four steps, which can also be run by hand:
 
 ```bash
-# 1. Clone the commons.
 git clone git@github.com:hallettmiket/murmurent.git ~/repos/murmurent
 cd ~/repos/murmurent
-
-# 2. Install the CLI (editable, pinned to Python 3.12).
-#    -e (editable): keeps the package in this clone so the dashboard's static
-#    assets (docs/designer_dashboard/) resolve — a non-editable install
-#    relocates it into site-packages and the hi-fi dashboard 500s.
-#    --python 3.12: murmurent needs >=3.12; avoids inheriting an older
-#    system/conda default (uv fetches a managed 3.12 if needed).
-#    The dashboard (fastapi/uvicorn), Slack, and MCP deps are HARD deps in
-#    pyproject, so they come along automatically — no extras to drop. (Only the
-#    low-fi streamlit dashboard is optional: `uv tool install ... -e '.[dashboard]'`.)
 uv tool install --python 3.12 -e .
-
-# 3. Symlink agents + rules into ~/.claude/.
 bash scripts/setup.sh
-
-# 4. Register hooks + MCP servers in ~/.claude/settings.json.
 murmurent install --hooks
 ```
 
-What each step does:
+Each step, in order:
 
-- `setup.sh` symlinks every `agents/*.md` and `rules/*.md` into
-  `~/.claude/agents/` and `~/.claude/rules/`. Preserves any
-  user-authored files at the same paths.
-- `murmurent install --hooks` merges the Murmurent hooks (raw_guard,
-  protected_paths, phi_check, audit, agent reporter) and the MCP
-  servers (`murmurent-inventory`, `murmurent-oracle`) into
-  `~/.claude/settings.json`. Idempotent; preserves existing
-  hooks/servers.
+1. **Clone the commons** into `~/repos/murmurent`.
+2. **Install the CLI** as an editable install pinned to Python 3.12. The
+   editable install keeps the package in this clone so that the
+   dashboard's static assets resolve correctly; the Python 3.12 pin
+   prevents an older system or conda interpreter from being used
+   (Murmurent requires Python 3.12 or later). The dashboard, Slack, and
+   MCP dependencies are declared as hard dependencies and are installed
+   automatically.
+3. **Symlink the commons into Claude Code** with `scripts/setup.sh`,
+   which links every `agents/*.md` and `rules/*.md` into
+   `~/.claude/agents/` and `~/.claude/rules/`. User-authored files at the
+   same paths are preserved.
+4. **Register the hooks and MCP servers** with `murmurent install
+   --hooks`, which merges the Murmurent hooks (`raw_guard`,
+   `protected_paths`, `phi_check`, audit, and agent reporter) and the MCP
+   servers (`murmurent-inventory`, `murmurent-oracle`) into
+   `~/.claude/settings.json`. The command is idempotent and preserves
+   existing entries.
 
-## Per-project wiring
-
-Per-machine wiring (above) installs the `murmurent` command and the
-commons once, on a given machine. Per-project wiring is a separate,
-repeatable step: once `murmurent` is installed, the dashboard's Repos
-panel offers two different actions for turning an individual repo
-clone into something Murmurent-aware. See
-[`ready_vs_projects.md`](ready_vs_projects.md) for the full picture
-on how "ready" and "project" differ.
-
-**↑ adopt** (existing clone, not yet part of a project) calls
-[`core.adopt`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/adopt.py)
-/ [`core.repo_ready`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/repo_ready.py)
-and only makes the repo **murmurent-ready**:
-
-1. `.murmurent.yaml` readiness marker at the clone root (legacy repos
-   carry `CHARTER.md` instead, until `murmurent repo upgrade` converts it).
-2. `.claude/agents/` symlinks for the agents you picked.
-
-No project, no lab_mgmt registry entry, no installation manifest is
-written. Attach the ready repo to a project separately when you need one.
-
-**+ install** (fresh clone, or an existing project onto an additional
-machine) calls
-[`core.projectize`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/projectize.py),
-which writes:
-
-1. `CHARTER.md` at the clone root, if missing (a project's primary repo
-   still gets this legacy-shaped bootstrap. `murmurent repo upgrade`
-   converts it to `.murmurent.yaml` later without touching the project
-   record).
-2. `lab_mgmt/cert_projects/<name>.md` (the authoritative project registry
-   entry, if missing). See [`lab_mgmt.md`](lab_mgmt.md) for what this
-   repo is, who needs it, and how it differs from `~/.murmurent/lab_info/`.
-3. `~/.murmurent/installations/<name>.yaml` (this-machine manifest).
-4. `.claude/agents/` symlinks for the agents you picked.
-5. `.vscode/settings.json` (Murmurent chrome: title, activity bar
-   right, terminals in editor area).
-6. `.gitignore` line for `.claude/settings.json` (machine-local
-   permissions/grants don't escape to git).
-
-Existing files are preserved on re-run, on both paths.
-
-Neither `CHARTER.md` nor "+ install" is deprecated or removed. Both
-are current. `CHARTER.md` is a legacy-shaped bootstrap marker;
-`.murmurent.yaml` is the current one. `murmurent repo upgrade`
-converts a repo from the former to the latter without otherwise
-changing the project record, so a `CHARTER.md`-marked repo is
-legacy-but-fully-supported, not broken or out of date.
-
-## Remote host setup
-
-If you also run Murmurent on a remote (e.g. `<my_server>`):
+### Verify the installation
 
 ```bash
-# Add the host to the local registry (dashboard Machines panel,
-# or ~/.murmurent/hosts.yaml directly).
-murmurent host add my-server --ssh-host <my_server> ...
-
-# Clone murmurent on the remote so the commons agents resolve there.
-scripts/install_remote.sh my-server
-```
-
-After that, `↑ adopt` works for `• clone` rows on `<my_server>` in the
-Repos panel (writes CHARTER + bootstrap + chrome on the remote
-over a single batched SSH session). This is readiness only, same as a
-local adopt: no project is created; the remote script predates
-`.murmurent.yaml`, so the repo shows as `ready (legacy)` until someone
-runs `murmurent repo upgrade` against it later.
-
-## Verify
-
-```bash
-ls -la ~/.claude/agents/   # should be symlinks into ~/repos/murmurent/agents/
-ls -la ~/.claude/rules/    # should be symlinks into ~/repos/murmurent/rules/
-grep murmurent-oracle ~/.claude/settings.json  # MCP registered
+ls -la ~/.claude/agents/   # symlinks into ~/repos/murmurent/agents/
+ls -la ~/.claude/rules/    # symlinks into ~/repos/murmurent/rules/
+grep murmurent-oracle ~/.claude/settings.json   # MCP server registered
 murmurent --version
 ```
 
-## Setting up a lab (for PIs)
+## Making a repository Murmurent-aware
 
-The steps above get one person, one repo, or one remote host wired
-into Murmurent. Standing up a whole lab's own governance and
-communication is a separate, one-time job for the PI:
+Installing Murmurent wires up one machine. Turning an individual
+repository into something Murmurent-aware is a separate, repeatable step,
+with two levels: making a repository **Murmurent-ready**, so that Claude
+Code sessions opened in it can use the commons agents, and attaching a
+ready repository to a **project**. Both are documented separately:
 
-- `murmurent pi-init <lab>` scaffolds the lab's governance repo,
-  `murmurent_lab_mgmt_<lab>`, locally and pins it. The PI then
-  creates a private GitHub repo of the same name and pushes it. See
-  [`lab_mgmt.md`](lab_mgmt.md) for what this repo contains and who
-  needs access to it.
-- `murmurent group-slack-setup <lab>` creates the lab's Slack channel
-  and wires up the bot token. See
-  [`group_slack_setup.md`](group_slack_setup.md) for the OAuth scopes
-  and token details.
-- Registering the lab with an existing centre (rather than running
-  your own) is a join-request flow addressed to the centre's
-  mayor/registrar. See [`connect_to_hub.md`](connect_to_hub.md) and
-  the README's
-  ["\[PIs\] If you are a PI registering your lab or core with an existing centre"](https://github.com/hallettmiket/murmurent/blob/main/README.md)
-  section.
+- [`ready_vs_projects.md`](ready_vs_projects.md): making a repository
+  ready.
+- [`project_intra.md`](project_intra.md): what a project is and how one
+  is created.
 
-## Resetting a machine
+## For PIs: setting up a lab
 
-The `/murmurent-reset` skill (run inside a Claude Code session) backs
-up `~/.murmurent` first (always) then resets this machine's
-Murmurent state to a fresh start, so `murmurent centre-init` runs as
-first-run again. Use it for a clean slate, or to start over from a
-fresh copy of the repo.
+The steps above install Murmurent for one person on one machine. A PI
+additionally stands up the lab's own governance and communication, which
+is a one-time task:
 
-It is tiered by how much it touches:
+- `murmurent pi-init <lab>` scaffolds the lab's governance repository,
+  `murmurent_lab_mgmt_<lab>`, and pins it locally. The PI then creates a
+  private GitHub repository of the same name and pushes it. See
+  [`lab_mgmt.md`](lab_mgmt.md) for the repository's contents and access
+  model.
+- `murmurent group-slack-setup <lab>` creates the lab's Slack channel and
+  configures the bot token. See
+  [`group_slack_setup.md`](group_slack_setup.md) for the required OAuth
+  scopes.
+- To register the lab with an existing centre rather than running your
+  own, submit a join request to the centre's mayor or registrar. See
+  [`connect_to_hub.md`](connect_to_hub.md) and the README's section for
+  PIs registering a lab or core with an existing centre.
 
-- **`centre`** (default, least destructive): resets only the centre
-  registry.
-- **`install`**: also reinstalls the `murmurent` tool and re-runs
-  setup.
-- **`full`**: also clears machine-local caches.
-- **`data`**: clears all data you entered, while keeping key
-  material.
+## For mayors: setting up a centre
 
-Every tier supports `--dry-run` to preview what would change, and
-credentials plus other projects' installs are protected behind
-explicit `--nuke`-style flags, so an ordinary reset can't accidentally
-wipe them.
+A **centre** is one institution's own Murmurent installation. A mayor
+initializes it and, for a production deployment, moves it to a dedicated
+server so that it can accept join requests continuously.
 
-## Deploying a centre on a dedicated Linux server
+To initialize a centre, the mayor runs `murmurent centre-init` on their
+laptop; the wizard at `/registrar` collects the centre profile. After
+bootstrap, the centre data lives under `~/.murmurent/lab_info/`. The
+remaining steps move that centre to a permanent server.
 
-For a brand-new centre, the **mayor** typically runs `murmurent
-centre-init` on their laptop (the GUI wizard at `/registrar` collects
-the centre profile). Once bootstrap succeeds, the centre data lives
-under `~/.murmurent/lab_info/`. To move that centre to a permanent
-server so it can accept join requests around the clock:
-
-This deployment is not truly Ubuntu-specific: it assumes a
-systemd-based Linux host. The commands below (`adduser`, `apt`,
-`pipx`) are shown for Ubuntu/Debian as a concrete, copy-pasteable
-example; substitute the equivalent user-management and package
-commands for another distribution.
+The deployment below assumes a systemd-based Linux host. The commands are
+shown for Ubuntu/Debian (`adduser`, `apt`, `pipx`) as a concrete,
+copy-pasteable example; substitute the equivalent user-management and
+package commands for another distribution.
 
 ### 1. On the laptop: push lab_info to a private git remote
 
@@ -196,7 +114,7 @@ git remote add origin git@<your-git-host>:<your-org>/lab_info.git
 git push -u origin main
 ```
 
-### 2. On the server: clone + install
+### 2. On the server: clone and install
 
 Run as root (or via sudo). Replace placeholders to match your install.
 
@@ -210,7 +128,7 @@ sudo -u murmurent git clone git@<your-git-host>:<your-org>/lab_info.git \
 # murmurent itself — via pipx / uv tool (whichever you use in production).
 sudo -u murmurent pipx install murmurent
 
-# Project ACL script (item 0c) + sudoers fragment.
+# Project ACL script + sudoers fragment.
 sudo install -m 0755 \
   ~murmurent/.../scripts/murmurent_project_acl.sh \
   /opt/murmurent/murmurent_project_acl.sh
@@ -227,9 +145,8 @@ sudo systemctl enable --now murmurent-dashboard
 sudo systemctl status murmurent-dashboard
 ```
 
-The unit binds to `0.0.0.0:8771`. **Do not expose 8771 directly to
-the internet**. Front it with TLS via Caddy or nginx. Minimal
-Caddyfile:
+The unit binds to `0.0.0.0:8771`. **Do not expose 8771 directly to the
+internet**. Front it with TLS via Caddy or nginx. Minimal Caddyfile:
 
 ```
 murmurent.<your-domain>.edu {
@@ -237,12 +154,13 @@ murmurent.<your-domain>.edu {
 }
 ```
 
-**Require a dashboard login (do this before exposing it).** By default the
-dashboard trusts `?user=<handle>`: fine on a localhost laptop, but a hole
-once it's reachable off-machine. Set a **dashboard secret** and every
-mutating action (approve/decline, profile edits, provisioning, …) then
-requires a signed session cookie; the public join form and first-run
-bootstrap stay open. It's opt-in: with no secret set, behaviour is
+**Require a dashboard login before exposing it.** By default the
+dashboard trusts `?user=<handle>`, which is acceptable on a localhost
+laptop but is a security hole once the dashboard is reachable off-machine.
+Set a **dashboard secret**, after which every mutating action
+(approve/decline, profile edits, provisioning, and so on) requires a
+signed session cookie; the public join form and first-run bootstrap
+remain open. The feature is opt-in: with no secret set, behaviour is
 unchanged.
 
 ```bash
@@ -253,17 +171,17 @@ sudo -u murmurent sh -c 'umask 077; openssl rand -hex 32 > ~murmurent/.murmurent
 
 Operators then log in once per session: `POST /api/login/authenticate`
 with `{handle, secret}` sets the cookie (the dashboard shows a prompt).
-`murmurent dashboard` warns loudly if it's bound to a non-loopback address
-with no secret configured. Shared-secret model: the secret proves you're a
-trusted operator; per-user accountability is via the audit log. (Per-user
-credentials / GitHub OAuth are future upgrades.)
+`murmurent dashboard` warns if it is bound to a non-loopback address with
+no secret configured. This is a shared-secret model: the secret proves
+the operator is trusted, and per-user accountability is provided by the
+audit log. (Per-user credentials and GitHub OAuth are future upgrades.)
 
 ### 3. Pulling lab_info updates
 
 `~/.murmurent/lab_info/` is the centre registry (the same one
-`centre-init` creates in step 1 above), and it is a normal git repo.
-To sync edits made on the laptop (e.g. profile updates the registrar
-makes from `/registrar`):
+`centre-init` creates in step 1 above), and it is a normal git
+repository. To sync edits made on the laptop (for example, profile
+updates the registrar makes from `/registrar`):
 
 ```bash
 # On the laptop:
@@ -274,17 +192,17 @@ sudo -u murmurent git -C /var/lib/murmurent/lab_info pull
 sudo systemctl reload murmurent-dashboard
 ```
 
-For larger centres a webhook → systemd-path-triggered pull avoids
-the manual step. For our small-scale deployment, a daily pull via
-cron is sufficient.
+For larger centres, a webhook that triggers a systemd-path pull avoids
+the manual step. For a small-scale deployment, a daily pull via cron is
+sufficient.
 
-### 4. Smoke-test the Slack token BEFORE accepting real join requests
+### 4. Smoke-test the Slack token before accepting join requests
 
 The auto-provisioning path calls `conversations.create` against the
-centre's Slack workspace. If the bot token is misconfigured, the
-first real lab approval will fail mid-flight: the lab record is
-written, but the Slack channel + GitHub repo + FS ACLs all warn,
-and the registrar has to remediate by hand.
+centre's Slack workspace. If the bot token is misconfigured, the first
+real lab approval fails mid-flight: the lab record is written, but the
+Slack channel, GitHub repository, and filesystem ACLs all warn, and the
+registrar must remediate by hand.
 
 Run this once before the first real approval:
 
@@ -307,16 +225,55 @@ keep:          False
 Bot token is healthy. Real join-approve provisioning will work.
 ```
 
-If the smoke fails it prints an actionable hint for the specific
-Slack error code (most commonly `missing_scope`: add
-`groups:write` to the bot's OAuth scopes and reinstall the app to
-the workspace). Re-run until it passes.
+If the smoke test fails, it prints an actionable hint for the specific
+Slack error code (most commonly `missing_scope`: add `groups:write` to
+the bot's OAuth scopes and reinstall the app to the workspace). Re-run
+until it passes.
 
 ### 5. Member onboarding
 
 Once the centre is live, anyone at the institution visits
 `https://murmurent.<your-domain>.edu/join` and submits a request. The
-registrar reviews from `/registrar`'s "Pending join requests" panel
-and approves; `centre_cable_guy` auto-provisions Slack + GitHub +
-filesystem ACLs. Per-member onboarding inside an approved lab
-remains the per-lab `cable_guy` agent's job.
+registrar reviews it from the "Pending join requests" panel at
+`/registrar` and approves it; `centre_cable_guy` auto-provisions Slack,
+GitHub, and filesystem ACLs. Per-member onboarding inside an approved lab
+remains the responsibility of the per-lab `cable_guy` agent.
+
+## Remote host setup
+
+To run Murmurent on a remote host as well (for example, a shared lab
+server):
+
+```bash
+# Add the host to the local registry (dashboard Machines panel,
+# or ~/.murmurent/hosts.yaml directly).
+murmurent host add my-server --ssh-host <my_server> ...
+
+# Clone murmurent on the remote so the commons agents resolve there.
+scripts/install_remote.sh my-server
+```
+
+After that, the Repos panel's **↑ adopt** action works for `• clone`
+rows on the remote host, over a single batched SSH session. See
+[`ready_vs_projects.md`](ready_vs_projects.md) for what adoption does.
+
+## Resetting a machine
+
+The `/murmurent-reset` skill (run inside a Claude Code session) backs up
+`~/.murmurent` first (always), then resets this machine's Murmurent state
+to a fresh start, so that `murmurent centre-init` runs as first-run
+again. Use it for a clean slate, or to start over from a fresh copy of
+the repository.
+
+It is tiered by how much it touches:
+
+- **`centre`** (default, least destructive): resets only the centre
+  registry.
+- **`install`**: also reinstalls the `murmurent` tool and re-runs setup.
+- **`full`**: also clears machine-local caches.
+- **`data`**: clears all data you entered, while retaining key material.
+
+Every tier supports `--dry-run` to preview what would change, and
+credentials and other projects' installs are protected behind explicit
+`--nuke`-style flags, so an ordinary reset cannot accidentally remove
+them.

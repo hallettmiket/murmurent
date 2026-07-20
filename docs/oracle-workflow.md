@@ -6,9 +6,9 @@ Two tiers, one schema. The Oracle is Murmurent's institutional memory.
 
 - **Personal Oracle** (one per user) is your private research
   memory: genes you've flagged, hypotheses you're testing, methods
-  that worked for a project. Never auto-shared: it's *your*
+  that worked for a project. Never auto-shared: it is your own
   working knowledge base.
-- **Lab Oracle** (one per lab) is what the lab has *agreed* to
+- **Lab Oracle** (one per lab) is what the lab has agreed to
   remember: a curated, version-controlled, group-readable record.
   Read-only at the agent level; new entries land via explicit
   publish.

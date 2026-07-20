@@ -18,7 +18,7 @@ Sam drops the PDF into a folder in the vault (Sam's own choice, say
 
 1. Sam saves the PDF under `papers/` in the vault. Murmurent never
    touches folders outside `oracle/`, `oracle/drafts/`, and
-   `lab-notebook/`, so the PDF just sits there safely.
+   `lab-notebook/`, so the PDF remains untouched there.
 2. Claude Code hands the request to the **bookworm** agent, the
    reading specialist. Claude reads the PDF directly and summarises
    it.

@@ -2,8 +2,8 @@
 
 The **commons** is a shared set of reference agents, hard rules, and
 baseline workflows every member of the centre draws on, regardless of
-lab: a common operating system for research, not a shared research
-direction. Thirteen reference agents ship in
+lab: a common operating system for research, while each lab keeps its
+own research direction. Thirteen reference agents ship in
 [`agents/*.md`](https://github.com/hallettmiket/murmurent/tree/main/agents)
 and are symlinked into `~/.claude/agents/` by `scripts/setup.sh`: twelve
 operate at the individual, group, or lab level, and a thirteenth,
@@ -23,7 +23,7 @@ knowing about for each agent. Every agent's final reply leads with a
 single ≤200-character verdict line in a fixed vocabulary (see
 [`rules/headline_first.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/headline_first.md)),
 so the Murmurent VSCode dashboard's live activity pane always shows a
-scannable punchline.
+scannable verdict.
 
 Group and core toolkits are built on top of the commons: a lab adds
 discipline-specific agents (a medchem specialist, an image segmenter, a
@@ -38,7 +38,7 @@ so-called "commons-plus-toolkit" pattern described in the manuscript.
 Personal, per-member knowledge keeper. One Oracle per user (not per
 project) living in the member's own Obsidian vault under `oracle/`.
 It remembers genes, findings, hypotheses, and experimental context
-across *every* project the member works on, cross-referencing entries
+across every project the member works on, cross-referencing entries
 via `project:` frontmatter rather than separate stores per project. It
 refuses to write an entry missing required schema fields. See
 [`memory.md`](memory.md) for how it fits the three-tier model.
@@ -56,7 +56,7 @@ refuses to write an entry missing required schema fields. See
 
 The lab-wide counterpart to the personal Oracle: curated, reviewed,
 group-readable institutional memory backed by the
-`murmurent_lab_mgmt_<lab>` repo. It is **read-only from the agent side**
+`murmurent_lab_mgmt_<lab>` repo. It is read-only from the agent side
 (its toolset deliberately
 excludes `Write`) because new lab knowledge only arrives through the
 `murmurent oracle publish` review flow, never by the agent writing
@@ -96,7 +96,7 @@ trainee up to speed on the relevant literature quickly.
 
 ## Blacksmith
 
-The computational workhorse. It loads and preprocesses data, engineers
+The primary computational agent. It loads and preprocesses data, engineers
 features, trains and evaluates classifiers, and builds interactive
 interfaces (Streamlit or Dash) for exploration, always verifying code
 actually runs before reporting completion. It ships with defaults (for
@@ -115,7 +115,7 @@ than re-instructing it every session.
 
 ## Adversary
 
-The team's internal critic. It checks for data leakage and verifies that
+The internal methodological reviewer. It checks for data leakage and verifies that
 the train/test split respects structure in the data rather than
 splitting individual rows at random. Concretely: when a dataset has
 grouped structure (for example several cells or samples drawn from the
@@ -173,9 +173,8 @@ and decolonization guidance is grounded specifically in *Pulling
 Together: A Guide for Curriculum Developers* (BCcampus, 2018), a
 Canadian-context open resource, and it can draw on Tier-II oracle
 knowledge the lab has recorded about EDID and sex/gender-based-analysis
-practices. This is a first-class review step, not an afterthought:
-catching bias on the fly during workflow execution (e.g. flagging genes
-on sex chromosomes) rather than only after the fact.
+practices. This review runs during workflow execution (for example,
+flagging genes on sex chromosomes) rather than only after the fact.
 
 **Verdict vocabulary:** `OK / Flagged — <one-line concern>`
 
@@ -286,7 +285,7 @@ requests to the right member. It watches the lab's inbound queue, matches each
 request against the SEA catalog to confirm the offering still stands
 and pull the contact handle, and notifies that person on Slack, and
 re-notifies gently if a request sits pending more than 24 hours. It
-explicitly does **not** decide: approval or decline stays with the PI
+explicitly does not decide: approval or decline stays with the PI
 on the dashboard's Receptionist panel.
 
 **Verdict vocabulary:** `Routed / Held / Bounced — <one-line on who/why>`

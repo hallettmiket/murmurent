@@ -6,11 +6,10 @@ The single most-confusing piece of Murmurent's filesystem layout is what
 
 ## TL;DR
 
-`lab_mgmt` is the **per-group governance repo**, one per PI. It is
-NOT a Murmurent commons artifact; it belongs to the lab. It holds the
+`lab_mgmt` is the **per-group governance repo**, one per PI. It is owned
+by the lab and is not a Murmurent commons artifact. It holds the
 canonical roster, project registry, inventory, training records,
-audit log, and other day-to-day filing-cabinet contents for ONE
-research group.
+audit log, and other governance records for a single research group.
 
 Different labs each have their own lab_mgmt repo under their own
 GitHub account/org. **The canonical name is `murmurent_lab_mgmt_<lab>`**
@@ -20,7 +19,7 @@ core's would be `<owner>/murmurent_lab_mgmt_bioinformatics`.
 
 The centre-wide registry (labs, cores, common SEAs, join requests)
 lives in a separate, distinct tree at `~/.murmurent/lab_info/`. That
-one is owned by the registrar, not by any single lab.
+tree is owned by the registrar; it is not the property of any single lab.
 
 ## Naming: read this before creating the repo
 
@@ -52,7 +51,7 @@ suffix says whose. Machines that host several labs' clones (a
 registrar's laptop, a shared server) get collision-free directories
 for free.
 
-Deviant names still *work* (member-side resolution auto-discovers any
+Deviant names still work (member-side resolution auto-discovers any
 clone under `~/repos` that has the lab_mgmt shape (`lab.md` +
 `members/`) and pins it), but stick to the canonical name; discovery
 refuses to guess when two candidate clones both match.
@@ -154,8 +153,8 @@ using this order:
    shape (`lab.md` + `members/`), preferring one whose roster contains
    your handle, and **pins** an unambiguous hit so this runs once. This
    is what finds `~/repos/murmurent_lab_mgmt_<lab>` on a member machine
-   (they never run `pi-init`, so nothing pinned it). Two matching clones
-   → it refuses to guess and the panels stay empty; set
+   (they never run `pi-init`, so nothing pinned it). If two clones match,
+   it refuses to guess and the panels stay empty; set
    `MURMURENT_LAB_MGMT_REPO` to break the tie.
 6. **`~/repos/lab_mgmt`**: last-resort default if nothing above hit.
 
@@ -220,10 +219,9 @@ the final gate.
 | **Cross-lab visibility** | no: one lab's repo, period | yes: the registry lists every lab and core in the centre |
 | **What writes here** | `cable_guy` (per-member onboarding), inventory MCP, oracle MCP, PI's hand-edits | `centre_cable_guy` (lab/core onboarding), `registrar.create_lab` / `create_core`, join-request approvals, common-SEA submissions |
 
-If you find yourself wondering "where does X go?", ask "is X about
-one lab specifically, or about how labs relate to each other?" One-
-lab specifics belong in `lab_mgmt`. Inter-lab relations belong in
-`lab_info`.
+To decide where something belongs, ask whether it concerns one lab
+specifically or how labs relate to each other. One-lab specifics
+belong in `lab_mgmt`. Inter-lab relations belong in `lab_info`.
 
 ## See also
 

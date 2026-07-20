@@ -24,7 +24,7 @@ murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]
 ```
 
 This is the same action as the dashboard Repos panel's **↑ adopt** button.
-Parameters, for a naive reader:
+Parameters:
 
 - `<path>`: the local path to the git clone (e.g. `~/repos/brca_wgs`).
 - `--lab <slug>`: the owning lab's short registry name (its "slug,"
@@ -55,15 +55,14 @@ scratch    ~/repos/scratch         plain clone
 old_proj   ~/repos/old_proj        missing
 ```
 
-Verdicts, defined for a naive reader:
+Verdicts:
 
 - **ready**: has both the `.murmurent.yaml` marker and `.claude/agents/`.
-  Good to go.
 - **partial**: has one but not the other (for example agents linked but
   no marker yet). Run `murmurent repo adopt` (or the Upgrade button) to
   finish.
-- **plain clone**: an ordinary git repo with neither marker, sitting
-  outside Murmurent's plumbing.
+- **plain clone**: an ordinary git repo with neither marker, outside
+  Murmurent's configuration.
 - **not a git repo** / **missing**: the path is not a git checkout, or
   does not exist.
 
@@ -72,12 +71,12 @@ Verdicts, defined for a naive reader:
 This applies to every ready repo, whether or not it's attached to a
 project.
 
-Agent *content* edits (an agent's prompt gets changed) reach every ready
+Agent content edits (an agent's prompt gets changed) reach every ready
 repo automatically: `.claude/agents/<name>.md` is a symlink into the
 commons clone, so a `git pull` on `~/repos/murmurent` updates every repo
 that links it, with nothing further to run.
 
-*Structural* changes don't flow through the symlink: a brand-new commons
+Structural changes do not flow through the symlink: a brand-new commons
 agent that didn't exist when a repo was adopted, or a bump to the
 `.murmurent.yaml` schema. Those need an explicit:
 

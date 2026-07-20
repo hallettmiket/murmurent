@@ -1,8 +1,8 @@
 # Vault vignettes: start here
 
-These short pages walk you through your **personal vault**, one small step
-at a time. They're for anyone new to Murmurent who wants to see, concretely,
-what happens when Claude Code remembers something for you.
+These short pages walk through your **personal vault**, one step
+at a time. They are for anyone new to Murmurent who wants to see, concretely,
+what happens when Claude Code records something for you.
 
 ## Meet Sam
 

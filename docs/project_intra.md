@@ -23,11 +23,11 @@ project should exist; the lead controls who's in it.
 Every project also gets a **private Slack channel**: certificates are DM'd
 through Slack, members are invited when they join and removed when they leave.
 
-A project is a different, bigger thing than a repo simply being
+A project is a higher-level construct than a repo being
 **murmurent-ready** (having the commons agents wired in via `murmurent repo
-adopt`): readiness is plumbing a repo needs before it's useful in a
-project. See [`ready_vs_projects.md`](ready_vs_projects.md) to tell the two
-apart.
+adopt`): readiness is the configuration a repo needs before it can be used
+in a project. See [`ready_vs_projects.md`](ready_vs_projects.md) for the
+distinction between the two.
 
 ---
 
@@ -49,7 +49,8 @@ already has the two repos that make up the work (`brca_code` and
 
 She submits; the request lands in the PI's approval queue.
 
-**2. PI approves.** One click. Murmurent registers the project over the
+**2. PI approves.** The PI approves the request from the dashboard.
+Murmurent registers the project over the
 selected repos, creates the **private** Slack channel, and (because Allie is
 the creator) issues her the **project-lead card** and DMs it to her:
 
@@ -59,8 +60,8 @@ the creator) issues her the **project-lead card** and DMs it to her:
 
 **3. Allie certifies her members.** After importing her lead card, her
 dashboard shows the project with Bob listed as *no cert* and an **issue**
-button. One click: Bob's project card is signed *with Allie's key* (his public
-key is already on the roster from when he joined the lab, so signing is
+button. When she uses it, Bob's project card is signed with Allie's key (his
+public key is already on the roster from when he joined the lab, so signing is
 immediate), DM'd to him, and he's invited to the private channel. Bob imports it
 and can prove he belongs:
 
@@ -69,12 +70,12 @@ murmurent project-whoami
 # ✓ rao/brca_17 — member (@bob)
 ```
 
-*(When the PI is the one creating a project, steps 2–3 collapse: approval
-self-delegates and cards every member in one shot.)*
+(When the PI is the one creating a project, steps 2–3 collapse: approval
+self-delegates and cards every member in a single step.)
 
-**Later.** Allie removes a member → their certificate is revoked (CRL) and
-they're kicked from the channel. The PI deletes the project → every
-certificate is revoked, the channel is archived, and the project vanishes
+**Later.** When Allie removes a member, their certificate is revoked (CRL) and
+they are removed from the channel. When the PI deletes the project, every
+certificate is revoked, the channel is archived, and the project is removed
 from the dashboard (recovery is CLI-only: `murmurent project-unarchive`;
 revoked certs stay revoked: re-issue).
 

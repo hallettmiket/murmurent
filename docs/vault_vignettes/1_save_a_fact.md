@@ -9,7 +9,7 @@ moving on, so it isn't forgotten by next week.
 
 ## What you type
 
-Sam just says it, in plain English, to Claude Code:
+Sam states it in plain English to Claude Code:
 
 > "Remember that ESR1 looks high in several of my tumour samples:
 > worth checking against ER status once the pathology data comes in.
@@ -57,8 +57,8 @@ read noticeably higher in the tumour samples than the normal ones.
 Worth checking against ER status when the pathology data arrives.
 ```
 
-It's already sitting in Sam's Obsidian vault, so Sam can open Obsidian
-right away and see it there, no extra step needed.
+It is already in Sam's Obsidian vault, so Sam can open Obsidian
+and see it there with no additional step.
 
 To back it up to Sam's private GitHub vault, Sam runs one command in a
 terminal:

@@ -3,8 +3,7 @@
 ## The situation
 
 Sam's ESR1 finding from vignette 1 is now solid, checked against the
-pathology data, and worth sharing with the whole lab, not just
-sitting in Sam's personal vault.
+pathology data, and worth sharing with the whole lab.
 
 ## What you type
 
@@ -21,8 +20,8 @@ murmurent oracle publish esr1-high-in-tumour-samples --push
 ## What Murmurent does
 
 1. The oracle writes a copy of the note into `oracle/drafts/` in
-   Sam's vault. The oracle never pushes to the lab itself: staging
-   is as far as it goes.
+   Sam's vault. The oracle never pushes to the lab itself; it only
+   stages the draft.
 2. `murmurent oracle publish` validates the note, copies it into the
    lab vault (the lab-management repo,
    `murmurent_lab_mgmt_<lab>`), and commits it. Adding `--push`

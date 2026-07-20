@@ -2,8 +2,8 @@
 
 A short runbook for a **mayor** whose centre is bootstrapped and who
 wants prospective members to be able to find and contact them. Joining
-is by **email**: the public directory just points people at your
-address. Example University is the worked example; swap in your own
+is by **email**: the public directory points prospective members at your
+address. Example University is the worked example; substitute your own
 values.
 
 ## 1. Update the Murmurent CLI

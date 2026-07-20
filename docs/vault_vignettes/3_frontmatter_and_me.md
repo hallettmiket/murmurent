@@ -31,7 +31,8 @@ vault was created, Murmurent seeded a `CLAUDE.md` file at the vault
 root that tells Claude to read `maps-legends/` for context. Claude
 Code automatically loads that `CLAUDE.md` whenever Sam opens a file
 in the vault, so the "me" file shapes how Claude talks to Sam
-indirectly, as context Claude reads, not a setting Murmurent enforces.
+indirectly, as context Claude reads; Murmurent does not enforce it as
+a setting.
 
 ```mermaid
 flowchart LR

@@ -3,7 +3,7 @@
 ## The situation
 
 Weeks later, Sam has forgotten the details of that ESR1 observation
-from vignette 1. Sam just remembers it was something about tumour
+from vignette 1. Sam remembers only that it concerned tumour
 samples, and wants to check it before writing up a lab meeting slide.
 
 ## What you type

@@ -3,15 +3,15 @@
 Maintainer-facing notes for the global `murmurent_public` repo. These
 notes live here, separate from the public directory's own README
 ([`docs/murmurent_public/README.md`](https://github.com/hallettmiket/murmurent/blob/main/docs/murmurent_public/README.md)),
-which stays trivially simple for prospective members.
+which is kept simple for prospective members.
 
 ## What the public directory is
 
 A centre is one institution's own Murmurent installation. The public
-directory is a different thing entirely: a **single global repository**
-(`github.com/hallettmiket/murmurent_public`) that works as a public
-directory only, a list of participating institutions and, for each, the
-**registrar's contact email**. That's the entire function.
+directory is separate: a **single global repository**
+(`github.com/hallettmiket/murmurent_public`) that serves as a directory
+only, listing participating institutions and, for each, the
+**registrar's contact email**. That is its entire function.
 
 The repository holds only the institution list. GitHub Issues stay
 **disabled**, and joining runs by **email to the registrar** rather

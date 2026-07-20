@@ -100,7 +100,7 @@ Every other folder in the vault, including `maps-legends/`, project
 notes, and attachments, is entirely yours to organize (see
 "`maps-legends/`" below).
 
-**Path naming gotcha.** Two superficially similar directories sit at
+**Path naming.** Two superficially similar directories sit at
 different layers; keep them straight:
 
 | Path | Purpose |
@@ -261,7 +261,7 @@ standard CLAUDE.md discovery walk.
 
 Community Obsidian MCP servers (for example `obsidian-mcp-server`,
 `mcp-obsidian`) exist and would give Claude Code `search_notes` /
-`get_note` tools. We held off on pulling one in because:
+`get_note` tools. We did not adopt one because:
 
 - The `murmurent-oracle` MCP already exposes search, get, and list over
   the vault's `oracle/` subfolder (and the lab tier), with filters for
@@ -277,8 +277,8 @@ tools, so they coexist cleanly.
 
 ## The Full Disk Access gotcha (read this before assuming something is empty)
 
-**This is the single most common cause of "my Oracle looks empty"
-reports.**
+This is the single most common cause of "my Oracle looks empty"
+reports.
 
 If your vault lives under iCloud Drive (`~/Library/Mobile
 Documents/...`, where Obsidian puts vaults by default on macOS when you

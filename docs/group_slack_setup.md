@@ -29,14 +29,14 @@ normal Slack workspace, separate from the centre's.
 
 Grab the **workspace invite link**: *Invite people → Copy invite link*. This
 is what you give new members so they can join your lab's workspace. On the
-free/Pro Slack plan this invite-link step is the whole of it, since that
+free/Pro Slack plan this invite-link step is the only step required, since that
 tier supports invite links only, without a bulk invite API; see
 [Notes](#notes).
 
 ## 2. Create a bot token  [manual]
 
-Murmurent talks to your lab's Slack through a **bot user** on a Slack **app**
-you own. Create it once, click by click:
+Murmurent connects to your lab's Slack through a **bot user** on a Slack **app**
+you own. Create it once:
 
 1. Go to <https://api.slack.com/apps> and sign in as the account that owns
    your lab's workspace.
@@ -88,7 +88,7 @@ people actually hit):
 
 | Missing scope | What you'll see |
 |---|---|
-| `channels:join` | posting to a public channel the bot has yet to join fails with `not_in_channel` (posting to channels it already belongs to still works, which hides the gap for a long time) |
+| `channels:join` | posting to a public channel the bot has yet to join fails with `not_in_channel` (posting to channels it already belongs to still works, which can leave the missing scope unnoticed for a long time) |
 | `files:write` | card bundles arrive as inline fenced text rather than a downloadable `bundle.json` |
 | `im:history` | DMs send fine; reading back the bot's own threads to verify a delivery landed needs this scope |
 
@@ -103,9 +103,8 @@ invite link from step 1, then:
 
 - validates the token **live** against Slack (`auth.test`): a bad or
   under-scoped token is rejected here, before anything is written;
-- auto-detects your workspace id from the token, saving you the trouble of
-  hunting for the `T…` id yourself (override with `--workspace` if you ever
-  need to);
+- auto-detects your workspace id from the token, so you need not locate the
+  `T…` id manually (override with `--workspace` if required);
 - stores the token at `~/.config/murmurent/groups/<group>/slack-token`
   (mode 0600, readable only by you);
 - saves `slack_workspace` and `slack_invite_url` to your lab's `lab.md`.

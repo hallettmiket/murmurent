@@ -47,7 +47,7 @@ A **group** g consists of people p1...pn, usually with one PI. Members participa
 
 ## Repos used by a group
 
-A group operates across three classes of repo. Each plays a distinct role; mixing scope across them is a smell.
+A group operates across three classes of repo. Each plays a distinct role; scope should not be mixed across them.
 
 - **Murmurent repo**: center-wide; holds the agent registry under `guilds/<group>/agents/` and the install tooling.
 - **Lab-management repo**: group-scoped; holds the role registry (`roles/`), inventory (`inventory/`), audit logs, the project registry, and group-wide protocols. One per group.
@@ -65,7 +65,7 @@ Each agent has a **default freeze flag** in the registry. The effective flag for
 
 1. **Registry default**: `frozen` or `personal`, set in the agent's frontmatter.
    - `frozen` for safety-critical agents whose drift would erode group consistency or compliance: `conscience`, `security_guard`, `adversary` when used in code review, anything that gates outgoing artefacts.
-   - `personal` for stylistic agents where flavour is a feature: `artist`, often `bookworm`.
+   - `personal` for stylistic agents where individual variation is acceptable: `artist`, often `bookworm`.
 2. **Role override**: when an agent is run as part of a role, the role can override the default. Example: `bookworm` is `personal` by default; the `bookworm_curator` role overrides to `frozen` because the curator's output is consumed by the rest of the group.
 3. **Bot pinning**: when the agent runs in a GitHub Actions context (or any other shared CI), it always runs `frozen`, regardless of the default or role flag. Bots write to shared artefacts; reproducibility forbids drift.
 
@@ -128,7 +128,7 @@ citation_style: nature
 audience: domain-experts
 ```
 
-The profile is **local**: never committed to the lab-management repo or any group artefact. It expresses individual taste, not group policy. The member's preferences travel with them across machines via whatever personal sync they prefer (dotfiles repo, manual copy).
+The profile is **local**: never committed to the lab-management repo or any group artefact. It expresses individual preference rather than group policy. The member's preferences travel with them across machines via whatever personal sync they prefer (dotfiles repo, manual copy).
 
 #### Resolution order
 
@@ -174,9 +174,9 @@ Six categories of member-to-member interaction:
 5. **Resource sharing**: reagents, equipment, datasets, lab inventory.
 6. **Discussion / mentoring**: Slack, meeting notes, instruction.
 
-**Core insight:** agents do not need to talk to each other if they communicate through the artefacts they read and write. Git is the bus, the artefact is the message, the commit log is the audit trail. This generalises beyond codev: observations, literature notes, and SEA requests can all be artefact-mediated.
+**Core insight:** agents do not need to talk to each other if they communicate through the artefacts they read and write. Git is the transport layer, the artefact is the message, and the commit log is the audit trail. This generalises beyond codev: observations, literature notes, and SEA requests can all be artefact-mediated.
 
-GitHub Actions bots are the natural mechanism for headless agent participation. The same agent definition that a member runs locally can be invoked by an Action on PR open / push / schedule, posting back through PR reviews, comments, or commits. No shared memory, no ad-hoc protocol, full audit trail for free.
+GitHub Actions bots are the natural mechanism for headless agent participation. The same agent definition that a member runs locally can be invoked by an Action on PR open / push / schedule, posting back through PR reviews, comments, or commits. No shared memory, no ad-hoc protocol, and a full audit trail at no additional cost.
 
 ## Verb table: a typical day for a researcher
 
@@ -212,7 +212,7 @@ For verbs not in this day-to-day table, see:
 
 ## Inventory and shared resources
 
-The reason inventory is hard in labs is not really structured-vs-unstructured: it's that nobody updates it. The tool that wins is the lowest-friction one to *update*. Obsidian-with-frontmatter is competitive with a spreadsheet on update friction and far better for: attaching catalog photos and vendor notes, versioning, grep-querying from CC, living in the same toolchain as everything else.
+Inventory is hard in labs chiefly because nobody updates it, rather than because of a structured-versus-unstructured data question. The tool most likely to be maintained is the one with the lowest update friction. Obsidian-with-frontmatter is competitive with a spreadsheet on update friction and far better for: attaching catalog photos and vendor notes, versioning, grep-querying from CC, living in the same toolchain as everything else.
 
 **Decision: inventory is semi-structured markdown in the lab-management repo.** Inventory is **group-scoped**, never project-scoped: every member needs access regardless of which project they are working on.
 
@@ -261,7 +261,7 @@ The MCP wraps the markdown files. Permissions are enforced by the MCP server (re
 
 ### `last_updated` mechanism
 
-`last_updated` must be auto-set regardless of how the file was edited. Three layers, belt and braces:
+`last_updated` must be auto-set regardless of how the file was edited. Three redundant layers:
 
 1. **Inventory MCP** sets it on every write (primary path; covers programmatic edits by agents).
 2. **Pre-commit hook** in the lab-management repo updates `last_updated` for any `inventory/*.md` file in the staged set (covers direct edits via Obsidian, vim, IDE).
@@ -409,7 +409,7 @@ Body: free-form. Embed photos with `![](pages/p1.jpg)`. Reference data files by 
 
 - **In the repo:** notebook entry, photos of paper notebook pages (downsampled), sketches, very small data, code, protocols, charter, MEMBERS, README, `ready_to_delete.md`.
 - **Not in the repo:** raw measurements, large refined outputs (figures > a few MB, processed arrays, image stacks). These live under `/data/lab_vm/`.
-- **No git LFS.** LFS would either break the read-only-raw rule, couple data lifetime to GitHub billing, or duplicate what the lab VM does for free. The lab VM is the canonical data store; the repo holds documentation and code.
+- **No git LFS.** LFS would either break the read-only-raw rule, couple data lifetime to GitHub billing, or duplicate what the lab VM already provides. The lab VM is the canonical data store; the repo holds documentation and code.
 
 ### Capture tooling
 
@@ -430,7 +430,7 @@ Instrument export folders rarely contain only true raw data. They typically mix:
 - **Instrument-derived**: thumbnails, summary PDFs, QC HTML reports. Goes to `$MURMURENT_LAB_VM_ROOT/refined/<project>/<experiment>/instrument_outputs/`. Stays writable (regeneratable).
 - **Ambiguous**: metadata XML, software-aligned BAMs, instrument-software overlays. Depends on the instrument and the lab's convention.
 
-Because raw is immutable once committed, classification has to happen *before* the `chmod a-w`. Three layers, in order:
+Because raw is immutable once committed, classification has to happen before the `chmod a-w`. Three layers, in order:
 
 #### 1. Instrument profiles
 
@@ -459,7 +459,7 @@ When no instrument profile matches, files matching these patterns default to der
 - Extensions: `.pdf`, `.html`
 - Filename patterns: `*thumbnail*`, `*preview*`, `*summary*`, `*report*`, `*_qc.*`
 
-The fallback fires with a loud warning so the user knows the classification is heuristic, not authoritative.
+The fallback fires with an explicit warning so the user knows the classification is heuristic and should be reviewed.
 
 #### 3. Mandatory review
 
@@ -476,7 +476,7 @@ Proposed classification:
 [a]ccept  [r]eview file-by-file  [c]ancel ?
 ```
 
-Review is non-negotiable. The cost of a misclassification (a derived file permanently stuck in raw, or a true-raw file landing somewhere mutable) outweighs the friction of one prompt per ingest.
+Review is mandatory. The cost of a misclassification (a derived file permanently stuck in raw, or a true-raw file landing somewhere mutable) outweighs the friction of one prompt per ingest.
 
 #### CLI flags
 
@@ -566,7 +566,7 @@ When an analysis produces new files in `$MURMURENT_LAB_VM_ROOT/refined/<project>
 
 ### Why path-based, not all-PR or all-direct
 
-- **All-PR** creates a paper-cut of friction on every notebook keystroke. Members stop using the tool, or push less, and the artefact-as-message model breaks.
+- **All-PR** creates friction on every notebook keystroke. Members stop using the tool, or push less, and the artefact-as-message model breaks.
 - **All-direct** removes review where review is the point (charter changes, findings, completed experiments).
 - **Path-based** puts the review boundary at the artefact-type boundary. The rule is legible: "what gets reviewed is what others depend on."
 
@@ -1037,9 +1037,9 @@ Freezes are immutable. Re-freezing under the same purpose produces a new dated t
 
 ## The finalisation choreography
 
-After a SEA, experiment, or project's operational work is **complete**, the squad takes the result through a deliberation choreography (what we call "scientific therapy") that produces a permanent record of what the result *means*. The choreography runs at each scope (SEA, experiment, project) with the same shape; what differs is what it integrates.
+After a SEA, experiment, or project's operational work is **complete**, the squad takes the result through the finalisation choreography, a deliberation choreography that produces a permanent record of what the result means. The choreography runs at each scope (SEA, experiment, project) with the same shape; what differs is what it integrates.
 
-**Why this exists**: students often run experiments and move on without sitting with the result. The choreography is the structural pressure that makes "what does this mean?" a default step rather than an optional one. The dashboard makes outstanding finalisation visible and slightly uncomfortable.
+**Why this exists**: students often run experiments and move on without interpreting the result. The choreography is the structural pressure that makes "what does this mean?" a default step rather than an optional one. The dashboard makes outstanding finalisation visible.
 
 ### Two parallel tracks
 
@@ -1048,7 +1048,7 @@ A SEA, experiment, or project has two parallel state tracks:
 - **Operational** (`status:`): `planned` → `running` → `complete | failed | inconclusive`. The work itself.
 - **Analysis** (`analysis_status:`): `not_started` → `examined` → `concluded`. The deliberation about the work.
 
-A failed experiment can be analytically concluded: we examined the failure, decided what it means, and moved on with that knowledge. Both tracks are visible on the dashboard; outstanding work in the analysis track is what nags.
+A failed experiment can be analytically concluded: we examined the failure, decided what it means, and moved on with that knowledge. Both tracks are visible on the dashboard; outstanding work in the analysis track is what the dashboard surfaces.
 
 ### Stages
 
@@ -1065,7 +1065,7 @@ A failed experiment can be analytically concluded: we examined the failure, deci
 
 Bots run frozen versions for reproducibility. Triggered by `<scope> examine <id>`.
 
-**3. Conclude.** The squad members engage with the agent contributions, write their own reflections, attempt a statement. The statement is flexible: it can be a clean claim, a list of partial findings, an explicit "no consensus" with member positions, an artefact reference (the gel image *is* the finding), or a "next steps" if the question can't yet be resolved. Triggered by `<scope> conclude <id>`.
+**3. Conclude.** The squad members engage with the agent contributions, write their own reflections, attempt a statement. The statement is flexible: it can be a clean claim, a list of partial findings, an explicit "no consensus" with member positions, an artefact reference (the gel image is the finding), or a "next steps" if the question can't yet be resolved. Triggered by `<scope> conclude <id>`.
 
 The point is going through the ritual; the optional output is a finding.
 
@@ -1163,7 +1163,7 @@ If no consensus is promoted, the deliberation document still exists as a citable
 
 - **SEA scope**: SEA squad initiates and concludes. PI present by default; may opt out with `--no-pi`.
 - **Experiment scope**: experiment squad lead initiates. All SEA leads under the experiment are members. PI present.
-- **Project scope**: project lead initiates. PI is always present: this is one of the defaults that does *not* allow `--no-pi`.
+- **Project scope**: project lead initiates. PI is always present: this is one of the defaults that does not allow `--no-pi`.
 
 ### Periodic curation shrinks
 
@@ -1196,7 +1196,7 @@ Each member has a dashboard. The PI gets an enhanced version of it. Two implemen
 - **SEAs**:
   - Outgoing: requests you've made of others, with status.
   - Incoming: assigned to you, with status and deadlines.
-- **Outstanding analysis**: SEAs / experiments / projects where you are a squad member or lead and `analysis_status != concluded`. Sorted by age since `complete`. Visual escalation: subtle yellow at >2 weeks unexamined; red and escalated to squad lead + PI dashboards at >2 months. The panel header reads "what does each result *mean*?" (pedagogical purpose stated explicitly).
+- **Outstanding analysis**: SEAs / experiments / projects where you are a squad member or lead and `analysis_status != concluded`. Sorted by age since `complete`. Visual escalation: subtle yellow at >2 weeks unexamined; red and escalated to squad lead + PI dashboards at >2 months. The panel header reads "what does each result mean?" (pedagogical purpose stated explicitly).
 - **Security and compliance**: per-project sensitivity badge (`standard` / `restricted` / `clinical`), the controls required for that tier, and your compliance status (TCPS 2 certified ✓, TOTP enrolled ✓, signing key registered ✓, etc.). Missing required controls render in red with a one-click action to resolve. Includes an **Elected upgrades** subsection where you toggle stricter-than-required controls (always-on 2FA, always age-encrypted off-VM transfers, etc.). Required and elected stay distinct: you can layer stricter controls but cannot opt out of required ones. See [Sensitivity tiers](#sensitivity-tiers-and-project-level-controls).
 - **Quick MCP queries**: inventory search bar (low / expiring shortcuts), oracle latest, request board.
 - **Recent activity**: your commits, your PRs, oracle publishes touching projects you're in.
@@ -1223,7 +1223,7 @@ Each member has a dashboard. The PI gets an enhanced version of it. Two implemen
 
 ## Hooks and permissions: current state and gaps
 
-We have several layers of access control designed but the assistant-level layer is missing. Listed honestly so we don't pretend the system is secure when it isn't.
+We have several layers of access control designed but the assistant-level layer is missing. Listed explicitly to avoid overstating the system's security.
 
 ### What is designed
 
@@ -1472,7 +1472,7 @@ defaults:
 ---
 ```
 
-A bookworm should never need Bash; if a session is running bookworm and somehow invokes Bash, that's a bug.
+A bookworm should never need Bash; if a session is running bookworm and somehow invokes Bash, that indicates a bug.
 
 ### Generation of settings.json
 
@@ -1495,7 +1495,7 @@ A bookworm should never need Bash; if a session is running bookworm and somehow 
 ]
 ```
 
-These deny rules trip *before* hooks fire, providing belt-and-braces against the most consequential cases.
+These deny rules trip before hooks fire, providing a redundant safeguard against the most consequential cases.
 
 ### Audit during install
 
@@ -1528,14 +1528,14 @@ The audit trail is only as good as our ability to prove it wasn't rewritten.
 
 - **Signed commits** required on the lab-management repo and every project repo (gpg or sigstore). Branch protection rejects unsigned commits to `main`.
 - **Branch protection**: no force-push, no history rewrite, no merge without review on `main` of any murmurent-managed repo.
-- **Tamper-evident chain** for sensitive projects: each audit-log entry includes the SHA-256 of the previous entry. `murmurent audit verify <repo>` walks the chain and validates both signatures and hashes; breaks are loud.
+- **Tamper-evident chain** for sensitive projects: each audit-log entry includes the SHA-256 of the previous entry. `murmurent audit verify <repo>` walks the chain and validates both signatures and hashes; breaks are reported explicitly.
 - **Retention** controlled by REB approval. Default 10 years post-publication (Tri-Council guidance), longer if the REB requires. Archive-encrypted bundles outlive the project repo.
 
-For non-sensitive projects: signed commits + branch protection are enough. The chain is overkill.
+For non-sensitive projects: signed commits + branch protection are enough. The chain is unnecessary.
 
 ### Gap #4: Cross-MCP authentication
 
-The inventory MCP "knows" the caller is `lab_manager` only because we said so. That needs teeth.
+The inventory MCP treats the caller as `lab_manager` only by assertion. That needs enforcement.
 
 - **Murmurent session token** at session start: a JWT-equivalent signed by the member's age private key. Issued by `murmurent install` / `murmurent onboard`; refreshed on session start.
 - **TTL by sensitivity**: 8 hours for `standard` projects; 4 hours for `restricted`; 15 minutes with explicit refresh for `clinical`.
@@ -1543,7 +1543,7 @@ The inventory MCP "knows" the caller is `lab_manager` only because we said so. T
 - **Server-side log** on every MCP host plus the existing per-member audit log.
 - **2FA on token issuance** for any project at `clinical` sensitivity: TOTP / YubiKey challenge before the token is issued.
 
-This makes "PI-only" enforced by the MCP, not just hinted by the CLI.
+This makes "PI-only" enforced by the MCP rather than only advised by the CLI.
 
 ### Gap #5: Secret management
 
@@ -1648,7 +1648,7 @@ Sending any PHI-containing prompt to the Claude API itself violates PHIPA unless
 - **Anthropic Enterprise tier with BAA / equivalent**, with verified residency.
 - **Keep data-touching analyses outside CC**: CC handles methods, code, deliberations, and writing; the actual PHI-touching analysis runs locally on the lab VM without LLM mediation.
 
-This is a constraint of using *any* LLM tool on regulated data, not a Murmurent limitation.
+This is a constraint of using any LLM tool on regulated data rather than a Murmurent limitation.
 
 ### Dashboard reflection: required vs elected
 

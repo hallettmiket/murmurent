@@ -3,12 +3,12 @@
 ## The situation
 
 Back on 2026-07-12, before Sam had written the polished ESR1 note from
-vignette 1, Sam was mid-analysis and dashed off a quick line in the
-**daily lab notebook** (a rough scratch journal, one file per day,
-that Sam types straight into the dashboard): "ESR1 numbers look off in
+vignette 1, Sam was mid-analysis and wrote a quick line in the
+**daily lab notebook** (an informal journal, one file per day,
+that Sam types directly into the dashboard): "ESR1 numbers look off in
 s3, check the panel." It was never turned into a proper note. Now Sam
-wants to know everything that's ever been said about ESR1, scratch
-notes included, not just the tidy ones.
+wants to know everything that has been recorded about ESR1, scratch
+notes included.
 
 ## What you type
 
@@ -23,10 +23,10 @@ Sam asks the **oracle** agent in Claude Code, in plain English:
    oracle to widen the search to **all three tiers at once**: Sam's
    personal oracle notes, the lab's shared oracle, and Sam's daily
    lab-notebook entries.
-2. It finds two hits: the polished oracle note from vignette 1, and
-   the rough daily-notebook line from days earlier.
-3. It reads both back to Sam, **labeled by where each came from**, so
-   Sam can tell the careful note from the quick jotting.
+2. It finds two matches: the oracle note from vignette 1 and the
+   daily-notebook line from days earlier.
+3. It reads both back to Sam, labeled by where each came from, so
+   Sam can distinguish the curated note from the informal one.
 
 ```mermaid
 flowchart LR

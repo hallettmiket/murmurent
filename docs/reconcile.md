@@ -58,8 +58,8 @@ Set up once:
 ```
 
 Why dry-run on the cron and `--apply` is manual: a false positive
-auto-archiving an installation manifest is a bad surprise. The
-routine surfaces drift in Slack; you decide whether to run
+that auto-archives an active installation manifest is disruptive and
+easily missed. The routine surfaces drift in Slack; you decide whether to run
 `murmurent reconcile --apply` from a terminal.
 
 ## Recovery from auto-archive

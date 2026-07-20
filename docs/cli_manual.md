@@ -19,14 +19,14 @@ tags: [murmurent, manual]
 
 The Murmurent CLI manages the configuration that lets your local Claude Code instance act as a member of a murmurent-enabled group. It does **not** run agents: it manages agent installation, group membership, role assignments, projects, and the day-to-day verbs that touch group artefacts.
 
-Design choice: a thin CLI is preferred over a GUI until a concrete onboarding pain demands one.
+Design choice: a thin CLI is preferred over a GUI until a concrete onboarding need demands one.
 
 ## Conventions
 
 - All commands accept `--help`.
 - All mutating commands write an audit entry to the group's lab-management repo.
 - The CLI uses your GitHub identity for attribution; assignments and approvals are signed where possible.
-- Where a command is restricted (PI-only, lab_manager-only), this is enforced by the lab-management repo's branch-protection rules, not by the CLI alone: the CLI's check is a first line, not the final line.
+- Where a command is restricted (PI-only, lab_manager-only), this is enforced by the lab-management repo's branch-protection rules, not by the CLI alone: the CLI's check is a first line of enforcement only.
 
 ## Installation
 
@@ -128,8 +128,7 @@ Terminal twin of the dashboard's **Repos** panel. All three commands
 use the same core modules as the panel (`core.repo_inventory`,
 `core.adopt`), so the two surfaces can't drift. **"Murmurent-ready" and
 "a project" are two different things**: see
-[`ready_vs_projects.md`](ready_vs_projects.md) if that split isn't
-obvious yet.
+[`ready_vs_projects.md`](ready_vs_projects.md) for that distinction.
 
 | Command | Effect |
 |---|---|

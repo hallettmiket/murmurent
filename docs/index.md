@@ -2,8 +2,8 @@
 
 Murmurent is an agentic AI operating system that provides:
 
-- **Reference agents**: a bench of specialists (literature scout,
-  computational workhorse, adversarial reviewer, security auditor, …) you
+- **Reference agents**: a set of specialized agents (literature search,
+  computation, adversarial review, security audit, …) you
   delegate to by name.
 - **An Obsidian-based vault**: your private, git-backed knowledge base that
   survives across sessions and projects. It holds your **Oracle** (personal
@@ -38,15 +38,15 @@ governance rules could run on another agentic AI system.
 
 Murmurent models a research centre as four kinds of participant:
 
-- **Individual members** — each person has their own membership identity,
+- **Individual members**: each person has their own membership identity,
   their own agents, and their own personal vault.
-- **Groups** — a group is either a **lab** (a research group) or a **core**
+- **Groups**: a group is either a **lab** (a research group) or a **core**
   (a shared facility such as a proteomics or imaging centre). Every group is
   led by a **PI** and owns its own members, data, and workflows.
-- **Projects** — a project is a unit of work that brings individual members
+- **Projects**: a project is a unit of work that brings individual members
   together around shared repositories and data. Its members can come from a
   single group or from several groups at once.
-- **The administration** — the centre-level layer that maintains the
+- **The administration**: the centre-level layer that maintains the
   registry of groups and projects and issues the identity certificates that
   bind members, groups, and projects together.
 

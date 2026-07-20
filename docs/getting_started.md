@@ -1,35 +1,38 @@
-# Getting started: what Murmurent gives you on top of Claude Code
+# Getting started: what Murmurent adds to Claude Code
 
-You've installed Murmurent and it runs locally on your machine. So what
-does it actually *do* that plain [Claude Code](https://claude.com/claude-code)
-(CC) doesn't?
+Murmurent is an agentic AI operating system for biomedical and basic
+life-science research. It runs on top of
+[Claude Code](https://claude.com/claude-code) (CC) and provides:
 
-Short version: Murmurent is an agentic AI operating system that provides:
+- **Reference agents**: specialist agents (a literature scout, a
+  computational workhorse, an adversarial reviewer, a security auditor,
+  and others) invoked by name. The reference agents are part of the
+  **commons** and are designed to address common tasks in day-to-day
+  biomedical and basic life-science research.
+- **An Obsidian-based vault**: a private, git-backed knowledge base that
+  persists across sessions and projects. It holds your **Oracle**
+  (structured, queryable memory), your daily lab notebook, and your own
+  notes and maps.
+- **Hard rules and hooks**: data-governance guardrails enforced in
+  software, so that raw data cannot be modified and refined data cannot
+  be overwritten.
+- **Shared infrastructure**: when a lab or centre opts in, a group or
+  centre accumulates knowledge collectively rather than on individual
+  machines.
 
-- a set of **reference agents**: specialists (a literature scout, a computational
-  workhorse, an adversarial reviewer, a security auditor, …) you delegate to by name;
-- an **Oracle**: persistent, structured memory of what you've learned, that
-  survives across sessions *and* projects;
-- **hard rules + hooks**: data-governance guardrails that stop you (or the
-  model) from doing something you'll regret, like overwriting raw data;
-- and, when your lab or centre opts in, **shared infrastructure** so a whole
-  group or centre accumulates knowledge together, one shared memory rather than
-  one laptop at a time.
-
-Murmurent is built on Claude Code today, but nothing in its design is
-specific to it: the same tiers, agents, and governance rules could sit on
+Murmurent is built on Claude Code today; its design is not specific to
+it, and the same memory tiers, agents, and governance rules could run on
 another agentic AI system.
 
-Everything below is something you can try today, on your own machine, with no PI
-and no centre. The agents are already wired into `~/.claude/agents/`, so in any CC
-session you invoke one just by asking for it in plain English.
+The remainder of this page demonstrates each capability on a single
+machine, with no PI and no centre required. The reference agents are
+wired into `~/.claude/agents/`, so any CC session can invoke one by name.
 
 ---
 
 ## Where Murmurent lives on your machine
 
-For the curious, or for auditing what Murmurent touches, here is what it
-creates or modifies locally:
+Murmurent creates or modifies several objects on the local machine:
 
 - `~/.claude/agents/`, `~/.claude/rules/`, `~/.claude/skills/`: the
   commons agents, rules, and skills, symlinked in by `scripts/setup.sh`.
@@ -110,8 +113,9 @@ and more) in
 
 ## Vignette 3: Adversarial methodological review (the Adversary)
 
-The failure mode of an eager AI assistant is confident, plausible, *wrong*.
-Murmurent ships an agent whose job is to check the other agents' work:
+An AI agent can make mistakes. To address this, Murmurent employs an
+adversarial agent, the **Adversary**, which performs methodological
+review of other agents' outputs:
 
 > **You:** Adversary, review the classifier the Blacksmith just built.
 >
@@ -119,23 +123,23 @@ Murmurent ships an agent whose job is to check the other agents' work:
 > patient appear in both folds, so the AUC is optimistic. Re-split by patient,
 > not by cell, and re-run before trusting this number.
 
-The Adversary performs adversarial methodological review of other agents'
-outputs. It checks for data leakage, inappropriate train/test splitting
-(e.g. splitting by cell rather than by patient), missing or inadequate
-cross-validation, and results that are implausibly strong. It separates
-claims it verified itself (by running code or reading files) from claims
-it could not verify, and reports the two differently. It reviews other
-agents' work directly, for instance the Blacksmith's analyses or the
-Bookworm's literature claims, functioning as an internal check that runs
-before a result is relied on, rather than after a reviewer catches it
-later.
+The Adversary checks for data leakage, inappropriate train/test
+splitting (for example, splitting by cell rather than by patient),
+missing or inadequate cross-validation, and results that are
+implausibly strong. It distinguishes claims it verified itself, by
+running code or reading files, from claims it could not verify, and
+reports the two separately. It reviews other agents' work directly, for
+instance the Blacksmith's analyses or the Bookworm's literature claims,
+providing an internal check applied before a result is relied upon.
 
 ---
 
-## Vignette 4: Guardrails that stop mistakes before they happen (rules + hooks)
+## Vignette 4: Data-governance rules enforced in software (rules + hooks)
 
-Some rules you don't want to rely on remembering. Murmurent enforces them at the
-hook layer, so they hold even when you (or the model) get careless:
+Certain data-governance rules are enforced in software rather than left
+to convention. Murmurent implements them as Claude Code hooks, which
+intercept an operation before it executes and reject it if it violates a
+rule:
 
 > **You:** Delete the old raw FASTQs in `raw/brca_wgs/` to free space.
 >
@@ -143,9 +147,11 @@ hook layer, so they hold even when you (or the model) get careless:
 > modify or delete files under `raw/`. If a refined output is superseded, write
 > `file_2.csv` alongside it instead of overwriting `file_1.csv`.
 
-Raw data stays immutable; refined data stays append-only; secrets and PHI get
-caught before they reach a commit (that's the **Security Guard**'s job). These
-guardrails are what make it safe to let an agent loose on real lab data. See
+Raw data is immutable and refined data is append-only; candidate commits
+are screened for secrets and personal health information (PHI) before
+they are recorded, which is the role of the **Security Guard**. Enforcing
+these constraints at the hook layer is what makes it safe to grant an
+agent access to real laboratory data. See
 [`../rules/data-storage.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/data-storage.md).
 
 ---
@@ -155,11 +161,12 @@ guardrails are what make it safe to let an agent loose on real lab data. See
 Everything above works standalone. The payoff compounds when a lab or centre opts
 in:
 
-- Your PI issues you a **membership ID** so agents know which lab/core you're in
-  (see the README sections for members and PIs).
-- The **Lab Oracle** becomes shared, curated memory: what the *whole lab* has
-  agreed to remember, distinct from your personal notes, so a new student inherits
-  years of institutional knowledge on day one instead of re-discovering it.
+- Your PI issues you a **membership ID** so agents know which lab or core
+  you belong to (see the README sections for members and PIs).
+- Murmurent provides a second, lab-level Oracle, distinct from your
+  personal one. The **Lab Oracle** is shared, curated memory: what the
+  whole lab has agreed to record. A new member inherits the lab's
+  accumulated knowledge on their first day rather than rediscovering it.
 - **Cores** (a shared facility such as a proteomics or imaging centre) are
   themselves groups, each led by a PI, that expose deliverables to member labs
   through a controlled interface. **Projects** bring individual members

@@ -9,18 +9,18 @@ centre.
 
 > **This runbook exists on purpose before the key does.** Per the security
 > review, a key with this much authority must not be generated until its recovery
-> and rotation story is written down. If you are reading this while about to run
+> and rotation procedure is written down. If you are reading this while about to run
 > `murmurent centre-root-keygen`, read to the end first.
 
 ## Why this key is special
 
-- **Whoever holds the private key *is* the centre.** They can mint valid PI
+- **Whoever holds the private key is the centre.** They can mint valid PI
   cards for anyone, hence valid member cards for anyone, and publish a CRL.
 - **If it is lost**, you cannot issue or revoke cards, and you cannot sign a new
   installations-table entry: the centre's identity layer is frozen until you
   rotate to a new root (see below).
 - **If it leaks**, an attacker can impersonate the whole centre. Treat a
-  suspected leak as a full compromise → rotate immediately.
+  suspected leak as a full compromise and rotate immediately.
 
 Because of this, the root key is **used rarely** (only PI-card issuance and CRL
 signing) and must be kept as close to offline as your workflow allows.
@@ -36,7 +36,7 @@ signing) and must be kept as close to offline as your workflow allows.
 
 ## MUST-do at generation time
 
-1. **Back it up immediately, offline, encrypted, OFF this laptop.**
+1. **Back it up immediately, offline, encrypted, off this laptop.**
    - Encrypt the private key before it leaves the machine, e.g.
      `age -p ~/.murmurent/keys/centre_root_ed25519 > centre_root.age` (passphrase),
      or to a hardware/paper backup.
@@ -59,12 +59,12 @@ signing) and must be kept as close to offline as your workflow allows.
 
 Rotation replaces the root key. **Every card and CRL signed by the old key
 becomes stale** (they no longer chain to the new root), so this is a coordinated
-operation, not a quiet swap.
+operation.
 
 1. `murmurent centre-root-keygen --rotate`: mints a new root key, re-pins the
    anchor locally, and updates `signing_recipient` in `centre.md`.
 2. **Publish the new signing pubkey** in the installations table. Because a
-   pubkey *change* on an existing centre is indistinguishable from an attack, the
+   pubkey change on an existing centre is indistinguishable from an attack, the
    change must be confirmed out-of-band: the new entry should be signed by the
    **outgoing** key where possible (self-attested rotation), and the mayor must
    announce the new fingerprint to members through a trusted channel (Slack DM /

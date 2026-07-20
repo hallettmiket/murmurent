@@ -1,15 +1,15 @@
 # Lab Notebook Guide
 
-> A concrete, opinionated guide for keeping a murmurent-compatible lab notebook
-> as a lab member. Read this once. Bookmark it. Don't reinvent.
+> A concrete guide for keeping a murmurent-compatible lab notebook
+> as a lab member.
 
 There are **two distinct things** in Murmurent that the word "notebook" can
-mean. Knowing which is which prevents 90 % of confusion:
+mean. Distinguishing them prevents most of the common confusion:
 
 | Term | Where it lives | Who can read it | What goes there |
 |---|---|---|---|
 | **Daily journal** | your Obsidian vault's `lab-notebook/YYYY-MM-DD.md` (or `~/lab-notebook/` if you have no vault registered) | You only | Today's plan, decisions, scratch reasoning, links to SEAs you're touching. |
-| **Experimental notebook** | `<project_repo>/exp/<n>_<slug>/notebook.md` | Every project member (via git) | The lab notebook *for that experiment*: protocol, run dates, instrument, data file paths, raw results, conclusion. |
+| **Experimental notebook** | `<project_repo>/exp/<n>_<slug>/notebook.md` | Every project member (via git) | The lab notebook for that experiment: protocol, run dates, instrument, data file paths, raw results, conclusion. |
 
 The dashboard's "Lab notebook · today" panel shows the **daily journal**.
 The PI sees your **experimental notebooks** the moment you `murmurent push`.
@@ -73,7 +73,7 @@ decision, or note that the lab should see, copy that section into:
   dashboard's "Group oracle · recent" panel for everyone (see
   [oracle-workflow.md](oracle-workflow.md)).
 
-Don't push your raw daily journal. It has half-formed thoughts.
+Do not push your raw daily journal; it contains half-formed thoughts.
 
 ---
 
@@ -129,8 +129,8 @@ analysis_status: not_started
 ```
 
 Body: free-form. Markdown. Embed photos, link to data files, capture
-your reasoning. The body always ends up in the project repo so write
-it for your future self **and** for someone catching up next week.
+your reasoning. The body always ends up in the project repo, so write
+it for your future self and for a colleague reviewing the work later.
 
 ### Adding pictures
 
@@ -157,7 +157,7 @@ experiment ingest`: the file lands in `$MURMURENT_LAB_VM_ROOT/refined/<project>/
 with checksums and the notebook's `instrument_outputs:` list updates
 automatically.
 
-**Don't** commit anything bigger than ~2 MB to the repo. Big images
+Do not commit anything larger than ~2 MB to the repo. Large images
 go in `$MURMURENT_LAB_VM_ROOT/refined/<project>/<exp>/` and you reference them
 by path in the notebook body.
 

@@ -9,15 +9,15 @@ covers what's different when project members span labs.
 Allie now wants `spatial_atlas` with Carlos, who is in the **Xia lab**, a
 different group, a different Slack workspace.
 
-**1. The gate.** She adds `@carlos` to the member list. His key lives on the
-Xia lab's roster instead of hers, so the form demands one more thing, and if
-she skips it, creation **halts**:
+**1. The prerequisite.** She adds `@carlos` to the member list. His key lives
+on the Xia lab's roster instead of hers, so the form requires one additional
+field, and if she omits it, creation halts:
 
 > project members span multiple groups: the groups must decide on a shared
 > Slack workspace before an inter-group project can be created.
 
 This is deliberate: the shared workspace is where the project channel lives
-and where certificates are DM'd, so it must exist *before* the project does.
+and where certificates are DM'd, so it must exist before the project does.
 
 **2. The groups decide.** The two PIs agree which of their labs' registered
 workspaces hosts the project (say the Rao lab's): what matters is that
@@ -47,9 +47,10 @@ and DMs Allie the JSON it prints. She pastes it into the **issue** dialog
 (or runs `murmurent project-add-member @carlos --project spatial_atlas
 --enrollment carlos.json`). His card is signed by Allie, chained to *her*
 lab's root (anyone in the centre can verify it) and DM'd back through the
-shared workspace. Next time is one click: his key is now on record.
+shared workspace. Subsequent additions take a single action: his key is now on
+record.
 
-**4. Repos in two places?** Fine. Each repo in the project carries its own
-remote, so the code repo can push to `hallettmiket/...` while the analysis
-repo pushes to the Xia lab's org. (Automatic collaborator sync covers the
-primary repo; extra-org repos are managed by hand for now.)
+**4. Repos in two places.** This is supported. Each repo in the project
+carries its own remote, so the code repo can push to `hallettmiket/...` while
+the analysis repo pushes to the Xia lab's org. (Automatic collaborator sync
+covers the primary repo; extra-org repos are managed manually for now.)

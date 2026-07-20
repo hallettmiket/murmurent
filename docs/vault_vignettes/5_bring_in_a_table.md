@@ -15,16 +15,16 @@ asks:
 
 ## What Murmurent does
 
-1. A small table can live right inside a vault note as a plain
-   markdown table, no special format needed.
-2. Claude reads the table straight out of the note and can answer
-   questions about it directly.
-3. This demo table is made up, so `sensitivity: standard` is fine.
-   But real clinicopathological or patient data must be marked
-   `sensitivity: clinical`: that keeps it in Sam's personal vault
-   only, and it can never be published to the lab (see vignette 6).
-   Also, only tiny tables belong in the vault; large data files live
-   in the lab's `refined/` storage, not the vault.
+1. A small table can live inside a vault note as a plain
+   markdown table, with no special format required.
+2. Claude reads the table directly from the note and can answer
+   questions about it.
+3. This illustrative table is fabricated, so `sensitivity: standard`
+   is appropriate. Real clinicopathological or patient data must be
+   marked `sensitivity: clinical`: that keeps it in Sam's personal
+   vault only, and it can never be published to the lab (see vignette 6).
+   Only small tables belong in the vault; large data files live
+   in the lab's `refined/` storage.
 
 ```mermaid
 flowchart LR

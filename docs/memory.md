@@ -8,9 +8,8 @@ tiers, each with its own representation, access pattern, and
 governance.
 
 Those three tiers, **conversation context**, **the oracle**, and
-**bulk data**, are not just a conceptual model: they map onto three
-different places on disk, three different audiences, and three
-different sets of rules about who can write what. This page walks
+**bulk data**, map onto three different places on disk, three different
+audiences, and three different sets of rules about who can write what. This page walks
 through each tier, how information moves between them, and the
 governance boundary that stops the wrong thing from moving.
 

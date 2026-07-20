@@ -2,8 +2,8 @@
 
 Everything Murmurent does is available from the command line and from
 plain-English requests to an agent. Murmurent also ships a local dashboard
-that gives you the same picture at a glance, and a way to act on it with a
-click instead of a command.
+that presents the same information and lets you act on it through the
+interface rather than by typing a command.
 
 Launch it with:
 

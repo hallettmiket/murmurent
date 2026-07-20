@@ -48,7 +48,7 @@ trail.
 
 - One channel per project, named `#proj_<project_slug>` (e.g.
   `#proj_brca_sc_tutorial`). The convention matches the project repo's
-  directory name so a glance at the sidebar is unambiguous.
+  directory name so the sidebar mapping is unambiguous.
 - Lab-wide channels (`#general`, `#random`, journal clubs, etc.) stay
   outside monitoring by default.
 - A channel becomes monitored when its **topic line contains the

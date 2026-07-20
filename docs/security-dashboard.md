@@ -11,7 +11,8 @@ Two tiers, two trust levels:
 - **Tier 1**: unprivileged. Runs as the invoking user over SSH. Walks
   POSIX bits on filesystems where they're authoritative (`/home`,
   ext4), reads the user's own `~/.ssh/`, `~/.murmurent/`, `~/.claude*`,
-  dotfiles, crontab, systemd user units, etc. Ships immediately.
+  dotfiles, crontab, systemd user units, etc. Available without
+  additional setup.
 - **Tier 2**: root-owned ACL snapshot. Requires a sysadmin to install a
   narrowly-scoped sudoers entry on the target host (see
   [Tier 2 setup](#tier-2-setup)). Reads the storage layer's real ACLs

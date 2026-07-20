@@ -14,8 +14,8 @@ The launcher (macOS only) enumerates displays via
 `AppKit.NSScreen`. If a second monitor is attached, VSCode opens
 there; otherwise on the laptop screen. Either way the window is
 sized to 80% of the chosen display, centred. Subsequent opens
-restore VSCode's persisted layout: **arrange the quadrants once
-and they stick**.
+restore VSCode's persisted layout: arrange the quadrants once
+and they persist across opens.
 
 The dashboard's *open workspace* button calls the same launcher
 (see [`src/murmurent/dashboard/server.py`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/dashboard/server.py)
@@ -49,8 +49,8 @@ Each project's `.vscode/settings.json` (written by
 - `workbench.sideBar.location` → `right`
 - `terminal.integrated.defaultLocation` → `editor`
 
-VSCode has no native bold/large title font (that's OS chrome); the
-text is what we can control.
+VSCode has no native bold/large title font (that is controlled by the
+operating system's window chrome); only the text can be configured.
 
 ## Live agent reporter (BR pane)
 
@@ -67,10 +67,10 @@ BR pane runs `tail -F ~/.murmurent/agents.log`. Same log across every
 project on this machine, so you see all subagent activity in one
 place.
 
-**Known limit**: CC subagents return *one final message*, not a
+**Known limit**: CC subagents return one final message rather than a
 live stream of their thinking. The reporter shows agent start/end
-boundaries with the verdict line, not granular progress. That's a
-CC architecture constraint, not a missing feature.
+boundaries with the verdict line rather than granular progress. This
+is a constraint of the CC architecture.
 
 ## Tmux copy-paste
 

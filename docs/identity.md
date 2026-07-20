@@ -4,7 +4,7 @@
 
 > Diagram: [tier architecture](diagrams.md#1-tier-architecture) sketches centre → group → project → member.
 
-Before any cryptography: the shape. A **centre** is the top-level Murmurent
+Before the cryptography, the organizational structure. A **centre** is the top-level Murmurent
 installation for an institution (or a standalone lab that never joins one). A
 centre contains one or more **groups**, which are **labs** and **cores**, each
 led by a PI or core leader. A group runs one or more **projects**, and a
@@ -114,7 +114,7 @@ Done. Re-run `murmurent init` any time to change your role or info.
 ```
 
 If you ever need to mint or replace the key on its own, without the full
-session setup, `murmurent identity-init` does just that (idempotent;
+session setup, `murmurent identity-init` performs exactly that (idempotent;
 `--rotate` replaces an existing key, which then needs a freshly re-issued
 card):
 
@@ -128,7 +128,7 @@ until the card is revoked. Treat it like an SSH key.
 
 ## [Members] Join a group
 
-> Diagram: the [onboarding sequence](diagrams.md#5-onboarding-sequence) shows this whole flow at a glance.
+> Diagram: the [onboarding sequence](diagrams.md#5-onboarding-sequence) shows the complete flow.
 
 ```
 $ murmurent enroll --group example_lab --out enroll.json

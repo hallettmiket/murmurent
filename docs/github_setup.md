@@ -1,9 +1,9 @@
 # Preparing GitHub
 
 Murmurent stores almost everything it manages in git repositories on GitHub:
-the shared code, your own notes, and (if you're part of a lab) that lab's
-shared filing cabinet. This page gets a brand-new member ready to work with
-all three, before joining a group.
+the shared code, your own notes, and, for members of a lab, the lab's
+governance repository. This page prepares a new member to work with all three
+before joining a group.
 
 ## Why Murmurent uses GitHub
 
@@ -19,11 +19,11 @@ Three kinds of repo matter to you:
   private repo the PI owns, holding the lab's roster, project registry, and
   shared findings. Members get read access to it.
 
-GitHub is also the mechanism for getting read access to a repo someone else
-owns, which is how you end up reading your lab's governance repo without
-owning it yourself. See [`what_mm_creates.md`](what_mm_creates.md) for the
-complete, authoritative list of everything Murmurent creates, on GitHub and
-on your machine.
+GitHub is also the mechanism by which you are granted read access to a
+repository owned by someone else, which is how you read your lab's governance
+repository without owning it. See [`what_mm_creates.md`](what_mm_creates.md)
+for the complete, authoritative list of everything Murmurent creates, on
+GitHub and on your machine.
 
 ## Authenticate the GitHub CLI
 
@@ -77,11 +77,11 @@ Once `gh auth status` shows you logged in, two things get you fully set up:
    the dashboard, so no further configuration is needed. Details on what
    this repo contains: [`lab_mgmt.md`](lab_mgmt.md).
 
-That's it: `gh auth login` plus being added by your PI covers everything a
-member needs from GitHub. Murmurent handles cloning, pinning, and syncing
-from there.
+In summary, `gh auth login` together with being added by your PI covers
+everything a member needs from GitHub; Murmurent handles cloning, pinning, and
+syncing thereafter.
 
-## For a PI (brief)
+## For a PI
 
 Standing up your lab's presence on GitHub is a one-time job, done after your
 own `gh auth login`:
