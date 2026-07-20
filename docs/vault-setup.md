@@ -6,17 +6,12 @@ application as the basis for the vault: Obsidian is a free note-taking program
 that reads and edits a folder of markdown files and provides linking, search,
 and a graph view over your notes.
 
-Within the vault, Murmurent recognizes three folders:
+Within the vault, Murmurent recognizes four folders:
 
 - **`oracle/`**: your personal Oracle, the structured findings and decisions
   that the Oracle agent records and retrieves (see
   [The Oracle](oracle-workflow.md)).
 - **`lab-notebook/`**: your daily lab-notebook entries.
-- **`maps-legends/`**: your own index of the vault, documenting your
-  categories and conventions and where things live. It is the
-  human-readable guide to your vault; Murmurent's code leaves it entirely to
-  you, and Oracle entries may reference it through `[[wikilinks]]`.
-
 - **`murmurent_data/`**: arbitrary reference documents, such as PDFs of
   papers, spreadsheets, protocols, or images, that agents read on demand to
   inform their work. Unlike the Oracle, this folder is not schema-validated.
@@ -24,13 +19,22 @@ Within the vault, Murmurent recognizes three folders:
   server; see
   [How Murmurent remembers](memory.md#bringing-documents-into-the-vault-murmurent_data)
   for the convention.
+- **`maps-legends/`**: your own index of the vault, documenting your
+  categories and conventions and where things live. It is the
+  human-readable guide to your vault; Murmurent's code leaves it entirely to
+  you, and Oracle entries may reference it through `[[wikilinks]]`.
+
+**You do not create these folders by hand.** `murmurent vault init` creates
+all four for you (each with a `.gitkeep`), along with a vault-root
+`CLAUDE.md` that describes them. The command is idempotent: if you adopt an
+existing Obsidian vault, it adds any of the recognized folders that are
+missing and leaves everything else in your vault untouched.
 
 Murmurent backs the vault as a private GitHub repository named
 `murmurent_vault` on your own GitHub account, so your notes are
 version-controlled, survive a lost laptop, and stay in sync across your
 machines. The vault folder lives on your machine, where you edit it in
-Obsidian, and is pushed to this repository; `murmurent vault init` creates the
-repository and the initial folders for you.
+Obsidian, and is pushed to this repository.
 
 New members are offered a vault during `murmurent init`. If you already have an
 Obsidian vault with notes in it, you adopt that existing vault rather than
@@ -70,7 +74,7 @@ starting fresh (see the two cases below).
 murmurent vault init
 ```
 
-It creates `murmurent_vault`, scaffolds `oracle/ lab-notebook/ maps-legends/`,
+It creates `murmurent_vault`, scaffolds `oracle/ lab-notebook/ murmurent_data/ maps-legends/`,
 clones it (default `~/repos/murmurent_vault`, or pass `--path` for an iCloud
 folder), and pins it.
 
