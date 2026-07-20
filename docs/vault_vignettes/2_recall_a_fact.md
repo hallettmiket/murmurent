@@ -43,6 +43,13 @@ The oracle answers, in plain English:
 Sam now has the answer without having to remember where the note
 lives or what it was called.
 
+Why the Oracle and not `murmurent_data/`? Sam asked about a *recorded
+fact*, so the agent searched the Oracle (short, curated entries). A
+request to *read a document* ("read the ESR1 paper in my data folder")
+would instead reach for `murmurent_data/`. The agent chooses based on the
+request; see
+[Oracle or murmurent_data?](../murmurent_data.md#how-murmurent-decides-oracle-or-murmurent_data).
+
 ??? note "Under the hood"
     If a search comes back surprisingly empty, `murmurent oracle doctor`
     checks that Murmurent can actually read your vault. See

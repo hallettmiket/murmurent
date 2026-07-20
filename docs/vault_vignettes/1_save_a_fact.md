@@ -1,4 +1,4 @@
-# Vignette 1: save a fact to your oracle
+# Vignette 1: save a fact to your personal Oracle
 
 ## The situation
 

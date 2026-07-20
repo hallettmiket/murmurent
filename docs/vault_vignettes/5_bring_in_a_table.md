@@ -13,9 +13,15 @@ asks:
 
 > "Which of my tumour samples are ER-positive?"
 
+This uses the **Oracle**, not `murmurent_data/`. The table is small and
+*is* the fact Sam wants to keep and search, so it belongs inside an Oracle
+note, where Claude reads it during an ordinary recall. A full spreadsheet
+file that you would not paste inline goes in `murmurent_data/` instead (see
+vignette 4), where an agent reads it on demand.
+
 ## What Murmurent does
 
-1. A small table can live inside a vault note as a plain
+1. A small table can live inside an Oracle note as a plain
    markdown table, with no special format required.
 2. Claude reads the table directly from the note and can answer
    questions about it.

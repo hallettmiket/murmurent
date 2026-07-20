@@ -20,7 +20,7 @@ Sam asks the **oracle** agent in Claude Code, in plain English:
 
 1. A normal recall (vignette 2) only searches Sam's saved oracle
    notes. Asking for "anywhere, including daily notes" tells the
-   oracle to widen the search to **all three tiers at once**: Sam's
+   oracle to widen the search to **all three text tiers at once**: Sam's
    personal oracle notes, the lab's shared oracle, and Sam's daily
    lab-notebook entries.
 2. It finds two matches: the oracle note from vignette 1 and the
@@ -28,11 +28,19 @@ Sam asks the **oracle** agent in Claude Code, in plain English:
 3. It reads both back to Sam, labeled by where each came from, so
    Sam can distinguish the curated note from the informal one.
 
+These three are the *text-searched* tiers. Reference documents in
+`murmurent_data/` (vignette 4) are not part of this text sweep: their
+contents are not indexed. They are reached when a matched entry references
+one, or when Sam asks an agent to read a specific document. So if the ESR1
+oracle note had cited a PDF in `murmurent_data/`, the recall would surface
+the note, and Sam could then have the agent open that PDF for detail.
+
 ```mermaid
 flowchart LR
-    A["You ask '...anywhere?'"] --> B[Oracle searches all tiers]
-    B --> C["{oracle notes, lab notes, daily notebook}"]
+    A["You ask '...anywhere?'"] --> B[Oracle searches the text tiers]
+    B --> C["{personal oracle, lab oracle, daily notebook}"]
     C --> D[Combined, labeled answer]
+    C -. "an entry may reference" .-> E["murmurent_data/<br/>(read on demand)"]
 ```
 
 ## What you get
@@ -58,6 +66,8 @@ alone would have missed.
     See [the daily lab notebook guide](../lab_notebook_guide.md) for
     what it is and where it lives, [the oracle workflow](../oracle-workflow.md)
     for how a normal recall covers only your saved notes while asking
-    for "everything" also sweeps the daily notebook, and
+    for "everything" also sweeps the daily notebook,
     [the memory tiers](../memory.md) for how personal, lab, and
-    notebook memory fit together.
+    notebook memory fit together, and
+    [reference files](../murmurent_data.md) for how documents in
+    `murmurent_data/` are reached (read on demand, not text-searched).

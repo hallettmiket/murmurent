@@ -81,18 +81,20 @@ nav:
       - Making a repo Murmurent-ready: ready_vs_projects.md
       - The reference agents: agents.md
       - How Murmurent remembers (the three tiers): memory.md
-      - Your Obsidian vault: obsidian-usage.md
-      - Vault vignettes (step by step):
-          - Start here: vault_vignettes/index.md
-          - 1 · Save a fact: vault_vignettes/1_save_a_fact.md
-          - 2 · Recall a fact: vault_vignettes/2_recall_a_fact.md
-          - 3 · Frontmatter & the "me" file: vault_vignettes/3_frontmatter_and_me.md
-          - 4 · Reference files (murmurent_data/): vault_vignettes/4_add_a_manuscript.md
-          - 5 · Bring in a table: vault_vignettes/5_bring_in_a_table.md
-          - 6 · Share a fact with the lab: vault_vignettes/6_share_with_the_lab.md
-          - 7 · Recall across all your notes: vault_vignettes/7_recall_across_tiers.md
-      - The lab notebook: lab_notebook_guide.md
-      - The Oracle (personal & lab memory): oracle-workflow.md
+      - Your Obsidian vault:
+          - Layout & what Murmurent touches: obsidian-usage.md
+          - The Oracle (personal & lab memory): oracle-workflow.md
+          - The lab notebook: lab_notebook_guide.md
+          - Reference files (murmurent_data/): murmurent_data.md
+          - Vault vignettes (step by step):
+              - Start here: vault_vignettes/index.md
+              - 1 · Save a fact (personal Oracle): vault_vignettes/1_save_a_fact.md
+              - 2 · Recall a fact: vault_vignettes/2_recall_a_fact.md
+              - 3 · Frontmatter & the "me" file: vault_vignettes/3_frontmatter_and_me.md
+              - 4 · Reference files (murmurent_data/): vault_vignettes/4_add_a_manuscript.md
+              - 5 · Bring in a table: vault_vignettes/5_bring_in_a_table.md
+              - 6 · Share a fact with the lab: vault_vignettes/6_share_with_the_lab.md
+              - 7 · Recall across all your notes: vault_vignettes/7_recall_across_tiers.md
       - Creating a project (in your lab): project_intra.md
   - Labs & cores:
       - "Overview: members, groups, projects": overview.md
