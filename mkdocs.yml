@@ -103,7 +103,7 @@ nav:
       - "Security Guard & Cable Guy (lab)": guardians.md
       - What Murmurent creates: what_mm_creates.md
       - The lab-mgmt repo: lab_mgmt.md
-      - "Cross-group services (SEAs) 🚧": seas.md
+      - "Phrases 🚧": phrases.md
       - "Inventory and shared resources 🚧": inventory.md
       - "Creating a project across labs 🚧": project_inter.md
       - Group Slack setup (PI): group_slack_setup.md

@@ -280,10 +280,11 @@ applied.` after a reconcile pass)
 
 ## Receptionist
 
-Routes inbound cross-group [SEA](seas.md) (shareable experiments/assays)
-requests to the right member. It watches the lab's inbound queue, matches each
-request against the SEA catalog to confirm the offering still stands
-and pull the contact handle, and notifies that person on Slack, and
+Routes inbound cross-group [service-phrase](phrases.md) requests to the right
+member (a service phrase is one that requires the offering group to act on
+its own instrument or private data). It watches the lab's inbound queue,
+matches each request against the phrase catalog to confirm the offering still
+stands and pull the contact handle, and notifies that person on Slack, and
 re-notifies gently if a request sits pending more than 24 hours. It
 explicitly does not decide: approval or decline stays with the PI
 on the dashboard's Receptionist panel.
