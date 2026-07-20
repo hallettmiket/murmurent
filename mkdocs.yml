@@ -74,11 +74,10 @@ nav:
       - The VSCode workflow: vscode-workflow.md
       - Your personal vault: vault-setup.md
   - Working day to day:
-      - The reference agents: agents.md
       - Making a repo Murmurent-ready: ready_vs_projects.md
+      - The reference agents: agents.md
       - How Murmurent remembers (the three tiers): memory.md
-      - The lab notebook: lab_notebook_guide.md
-      - The Oracle (personal & lab memory): oracle-workflow.md
+      - Your Obsidian vault: obsidian-usage.md
       - Vault vignettes (step by step):
           - Start here: vault_vignettes/index.md
           - 1 · Save a fact: vault_vignettes/1_save_a_fact.md
@@ -88,7 +87,8 @@ nav:
           - 5 · Bring in a table: vault_vignettes/5_bring_in_a_table.md
           - 6 · Share a fact with the lab: vault_vignettes/6_share_with_the_lab.md
           - 7 · Recall across all your notes: vault_vignettes/7_recall_across_tiers.md
-      - Your Obsidian vault: obsidian-usage.md
+      - The lab notebook: lab_notebook_guide.md
+      - The Oracle (personal & lab memory): oracle-workflow.md
       - Creating a project (in your lab): project_intra.md
   - Labs, cores & centres:
       - Group-level architecture: group_level.md

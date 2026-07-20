@@ -1,9 +1,14 @@
 # The dashboard
 
-Everything Murmurent does is available from the command line and from
-plain-English requests to an agent. Murmurent also ships a local dashboard
-that presents the same information and lets you act on it through the
-interface rather than by typing a command.
+The dashboard is Murmurent's local visual control surface. It provides a
+single overview at three levels: your **session on this machine** (your
+repositories and their readiness, your registered machines, and your
+outstanding work), your **lab** (its members, its projects, the Oracle,
+and the daily lab notebook), and, for a registrar, your **centre** (its
+registered labs and cores and any pending join requests). Everything the
+dashboard shows is also available from the command line and from
+plain-English requests to an agent; the dashboard presents it together and
+lets you act on it through the interface rather than by typing a command.
 
 Launch it with:
 
