@@ -114,3 +114,47 @@ def test_pinned_pointer_still_wins_over_discovery(member_machine, tmp_path):
     _repo.set_lab_mgmt_path(already)  # e.g. a prior pi-init or discovery run
 
     assert _repo.lab_mgmt_repo_root() == already
+
+
+def test_resolver_net_resolves_via_registry_when_discovery_ambiguous(
+    member_machine, monkeypatch,
+):
+    """Fix #1 (issue #33): the registry-based resolver net resolves the owner's
+    OWN clone deterministically even when shape-discovery is ambiguous.
+
+    Two lab_mgmt-shaped clones both list the owner -> `_discover_lab_mgmt_clone`
+    refuses (ambiguous) and would fall through to the missing default. The
+    resolver net, which runs BEFORE that default, consults the registry and
+    returns the right clone -- then pins it so the next call short-circuits.
+    """
+    from murmurent.core import registrar as _reg
+
+    _make_clone(member_machine, "murmurent_lab_mgmt_alpha", members=["bob"])
+    beta = _make_clone(member_machine, "murmurent_lab_mgmt_beta", members=["bob"])
+    # Registry says bob belongs to 'beta'.
+    monkeypatch.setattr(
+        _reg, "resolve_viewer_lab_mgmt",
+        lambda h, env=None: ("beta", str(beta))
+        if h.strip().lstrip("@") == "bob" else None,
+    )
+
+    assert _repo._pinned_lab_mgmt_path() is None
+    assert _repo.lab_mgmt_repo_root() == beta          # resolver net wins
+    assert _repo._pinned_lab_mgmt_path() == beta       # and pinned for next time
+
+
+def test_resolver_net_ignores_registry_path_that_is_missing(
+    member_machine, monkeypatch, tmp_path,
+):
+    """A registry entry pointing at a non-existent clone must NOT be returned --
+    the net falls through to discovery/default rather than handing back a bad
+    path."""
+    from murmurent.core import registrar as _reg
+
+    ghost = tmp_path / "repos" / "murmurent_lab_mgmt_ghost"  # never created
+    monkeypatch.setattr(
+        _reg, "resolve_viewer_lab_mgmt",
+        lambda h, env=None: ("ghost", str(ghost)),
+    )
+    # No real clone on disk either -> default (which the fixture forced missing).
+    assert _repo._viewer_registry_lab_mgmt() is None

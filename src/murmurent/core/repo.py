@@ -89,6 +89,15 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
     pinned = _pinned_lab_mgmt_path()          # persistent pointer (set by pi-init)
     if pinned is not None:
         return pinned
+    # Deterministic per-owner resolution via the registry, ahead of the fragile
+    # ``~/repos/lab_mgmt`` default + shape-based discovery below. A bare
+    # ``lab_mgmt_repo_root()`` acts on behalf of this machine's owner, so their
+    # lab is whatever the registry says they belong to — reliable even when the
+    # clone is ``~/repos/murmurent_lab_mgmt_<lab>`` and the default chain would
+    # otherwise land on a missing ``~/repos/lab_mgmt`` (issue #33 root cause).
+    viewer = _viewer_registry_lab_mgmt()
+    if viewer is not None:
+        return viewer
     if DEFAULT_LAB_MGMT_REPO.exists():
         return DEFAULT_LAB_MGMT_REPO
     if LEGACY_LAB_MGMT_REPO.exists():
@@ -159,6 +168,41 @@ def _discover_lab_mgmt_clone() -> Path | None:
         # Couldn't persist the pointer; still return the live hit for this call.
         pass
     return found
+
+
+def _viewer_registry_lab_mgmt() -> Path | None:
+    """This machine owner's own lab_mgmt clone, resolved via the registry.
+
+    A deterministic stand-in for the fragile ``~/repos/lab_mgmt`` default +
+    shape-based ``_discover_lab_mgmt_clone`` (which refuses on ambiguity and can
+    fall through to the missing default). ``registrar.resolve_viewer_lab_mgmt``
+    reads the registry entry for the current handle and heals a card-import stub
+    to the real clone when one exists.
+
+    Returns the clone only when it exists on disk — and PINS it so this runs
+    once — else ``None`` to fall through. Never raises. Safe from recursion:
+    ``registrar`` never calls back into :func:`lab_mgmt_repo_root` (it reads the
+    ``lab_info`` registry directly), and ``_current_handle`` is already used by
+    :func:`_discover_lab_mgmt_clone` in this same branch.
+    """
+    handle = _current_handle()
+    if not handle:
+        return None
+    try:
+        from . import registrar as _registrar
+        match = _registrar.resolve_viewer_lab_mgmt(handle)
+    except Exception:  # noqa: BLE001
+        return None
+    if not match:
+        return None
+    path = Path(match[1]).expanduser()
+    if not path.exists():
+        return None
+    try:
+        set_lab_mgmt_path(path)
+    except OSError:
+        pass
+    return path
 
 
 def discover_lab_mgmt_clone_for_group(
