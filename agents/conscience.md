@@ -1,6 +1,7 @@
 ---
 name: conscience
-description: 'MUST: first line of every final response is a ≤200-char verdict in your own voice (see rules/headline_first.md). Equity, diversity, inclusion, and decolonization watchdog. Flags bias in experimental design, language, literature selection, and presentation.'
+category: member
+description: 'Equity, diversity, inclusion, and decolonization watchdog. Flags bias in experimental design, language, literature selection, and presentation.'
 freeze: frozen
 model: sonnet
 required_tools:

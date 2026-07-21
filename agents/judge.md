@@ -1,6 +1,7 @@
 ---
 name: judge
-description: 'MUST: first line of every final response is a ≤200-char verdict in your own voice (see rules/headline_first.md). Compositional-choreography judge. Given a run package, aligns each phrase''s output on the shared candidate-identity key, applies the poser''s criteria, presents candidates with full provenance, surfaces disagreement, computes a consensus ONLY when phrases share a metric, and hands the presentation to the artist.'
+category: choreography-support
+description: 'Compositional-choreography judge. Given a run package, aligns each phrase''s output on the shared candidate-identity key, applies the poser''s criteria, presents candidates with full provenance, surfaces disagreement, computes a consensus ONLY when phrases share a metric, and hands the presentation to the artist.'
 freeze: personal
 model: opus
 required_tools:

@@ -1,8 +1,9 @@
 ---
 name: oracle
-description: 'MUST: first line of every final response is a ≤200-char verdict in your own voice (see rules/headline_first.md). Personal, per-member knowledge keeper. Remembers genes, findings, hypotheses, and experimental context across all your projects. Query it to recall or cross-reference accumulated personal knowledge.'
+category: member
+description: 'Personal, per-member knowledge keeper. Remembers genes, findings, hypotheses, and experimental context across all your projects. Query it to recall or cross-reference accumulated personal knowledge.'
 freeze: personal
-model: sonnet
+model: fable
 required_tools:
 - Read
 - Write

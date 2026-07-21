@@ -3,11 +3,25 @@
 The **commons** is a shared set of reference agents, hard rules, and
 baseline workflows every member of the centre draws on, regardless of
 lab: a common operating system for research, while each lab keeps its
-own research direction. Thirteen reference agents ship in
+own research direction. The reference agents ship in
 [`agents/*.md`](https://github.com/hallettmiket/murmurent/tree/main/agents)
-and are symlinked into `~/.claude/agents/` by `scripts/setup.sh`: twelve
-operate at the individual, group, or lab level, and a thirteenth,
-`centre_cable_guy`, is a centre-level singleton.
+and are symlinked into `~/.claude/agents/` by `scripts/setup.sh`. They
+fall into three categories:
+
+- **Member** — the per-member/per-lab science toolkit (Oracle, Lab
+  Oracle, Bookworm, Blacksmith, Adversary, Artist, Conscience, Lawyer,
+  Cable Guy, Security Guard).
+- **Administrative** — centre-level singletons that act above any single
+  lab (`registrar`, `centre_cable_guy`; a centre security guard will
+  join them).
+- **Choreography-support** — agents that specifically support building
+  compositional choreographies (`judge`, plus data-shaping / filtering /
+  chaining agents to come).
+
+Alongside the commons, a member can create **personal agents** for their
+own work: ad-hoc agents kept in their own environment
+(`~/.murmurent/agent_forks/`, git-trackable → their GitHub), present in
+their village only and not shared with others.
 
 You invoke these by addressing an agent by name in plain English (for
 example, *"Bookworm, find all manuscripts related to MMP11 in breast
@@ -277,24 +291,6 @@ applied.` after a reconcile pass)
 >
 > **Centre Cable Guy:** "Reconciled example_core × brca-imaging: 2 ACL
 > grants, 1 Slack invite. 0 unresolved."
-
-## Receptionist
-
-Routes inbound cross-group [service-phrase](phrases.md) requests to the right
-member (a service phrase is one that requires the offering group to act on
-its own instrument or private data). It watches the lab's inbound queue,
-matches each request against the phrase catalog to confirm the offering still
-stands and pull the contact handle, and notifies that person on Slack, and
-re-notifies gently if a request sits pending more than 24 hours. It
-explicitly does not decide: approval or decline stays with the PI
-on the dashboard's Receptionist panel.
-
-**Verdict vocabulary:** `Routed / Held / Bounced — <one-line on who/why>`
-
-> **You:** Receptionist, anything new in the inbound queue?
->
-> **Receptionist:** Routed: SEA request #14 from @foreign_lab matched
-> to `qpcr_protocol_v2`; DM sent to @allie, PI review pending.
 
 ## Registrar
 

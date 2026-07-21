@@ -1590,219 +1590,6 @@ function Strip({ persona }) {
    are already surfaced by Compliance, Inventory, and the SEAs in-tray.) */
 
 /* SEA detail modal: GET /api/sea/{project}/{id} -> body + frontmatter. */
-function SeaDetailModal({ project, id, onClose }) {
-  const [data, setData] = useState(null);
-  const [err, setErr]   = useState(null);
-  useEffect(() => {
-    fetch("/api/sea/" + encodeURIComponent(project) + "/" + encodeURIComponent(id))
-      .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-      .then(setData)
-      .catch(ex => setErr(String(ex.message || ex)));
-  }, [project, id]);
-  return (
-    <div onClick={onClose} style={{
-      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
-      display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background:"var(--card)", border:"1px solid var(--rule-strong)",
-        borderRadius:2, padding:0, width:"min(720px, 92vw)", maxHeight:"86vh",
-        display:"flex", flexDirection:"column",
-      }}>
-        <div style={{
-          padding:"12px 18px", borderBottom:"1px solid var(--rule)",
-          display:"flex", justifyContent:"space-between", alignItems:"baseline",
-        }}>
-          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
-            SEA #{id} · {project}
-          </h2>
-          <button className="btn sm ghost" onClick={onClose}>✕ close</button>
-        </div>
-        <div style={{padding:"14px 18px", overflowY:"auto", flex:1}}>
-          {err && <div style={{color:"var(--red)"}}>{err}</div>}
-          {!data && !err && <div className="muted">Loading…</div>}
-          {data && (
-            <>
-              <div className="mono muted" style={{fontSize:11, marginBottom:10}}>
-                {data.from} → {data.to} · kind <strong>{data.kind}</strong> · state <strong>{data.state}</strong>
-                {data.delivery && <span> · delivery <code>{data.delivery}</code></span>}
-              </div>
-              <p style={{fontSize:14, lineHeight:1.5}}>{data.description}</p>
-              <pre style={{
-                fontSize:12, fontFamily:"var(--mono)", whiteSpace:"pre-wrap",
-                background:"var(--paper-2)", padding:12, borderRadius:2,
-                border:"1px solid var(--rule)", overflowX:"auto",
-              }}>{data.body || "(no body)"}</pre>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* New SEA form modal: POST /api/sea/{project}/new */
-function NewSeaModal({ projects, onClose }) {
-  const [project, setProject]         = useState(projects[0]?.name || "");
-  const [toTarget, setToTarget]       = useState("");
-  const [kind, setKind]               = useState("analysis");
-  const [description, setDescription] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr]   = useState(null);
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!toTarget.trim() || !description.trim()) {
-      setErr("to: and description are required"); return;
-    }
-    setBusy(true); setErr(null);
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const userParam = params.get("user");
-      const url = "/api/sea/" + encodeURIComponent(project) + "/new"
-        + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
-      const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ to_target: toTarget.trim(), kind, description: description.trim() }),
-      });
-      if (!res.ok) {
-        let detail = "HTTP " + res.status;
-        try { detail = (await res.json()).detail || detail; } catch (_) {}
-        throw new Error(detail);
-      }
-      if (typeof window.__murmurentFetchData === "function") {
-        await window.__murmurentFetchData(window.DATA.persona);
-      }
-      onClose();
-    } catch (ex) {
-      setErr(String(ex.message || ex));
-    } finally { setBusy(false); }
-  };
-  return (
-    <div onClick={onClose} style={{
-      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
-      display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
-      padding:"40px 20px", overflowY:"auto",
-    }}>
-      <form onSubmit={submit} onClick={e => e.stopPropagation()} style={{
-        background:"var(--card)", border:"1px solid var(--rule-strong)",
-        borderRadius:2, padding:18, width:"min(560px, 92vw)",
-        display:"flex", flexDirection:"column", gap:10,
-        maxHeight:"90vh", overflowY:"auto",
-      }}>
-        <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
-          New SEA
-        </h2>
-        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>project</label>
-        <select value={project} onChange={e => setProject(e.target.value)}
-                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}>
-          {projects.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
-        </select>
-        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>to (recipient handle, e.g. @bob)</label>
-        <input value={toTarget} onChange={e => setToTarget(e.target.value)} placeholder="@bob"
-               style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
-        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>kind</label>
-        <select value={kind} onChange={e => setKind(e.target.value)}
-                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}>
-          <option value="skill">skill</option>
-          <option value="experiment">experiment</option>
-          <option value="analysis">analysis</option>
-        </select>
-        <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>description</label>
-        <textarea value={description} onChange={e => setDescription(e.target.value)}
-                  rows={4} placeholder="One-paragraph statement of what you're asking for."
-                  style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--serif)", fontSize:14}}/>
-        {err && <div style={{color:"var(--red)", fontSize:12}}>{err}</div>}
-        <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:6}}>
-          <button type="button" className="btn sm ghost" onClick={onClose}>cancel</button>
-          <button type="submit" className="btn sm primary" disabled={busy}>
-            {busy ? "…" : "file SEA"}
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-}
-
-/* ───────── SEAs panel ───────── */
-function SeasPanel({ seas, span="c-7" }) {
-  const [tab, setTab] = useState("in");
-  const [showNew, setShowNew] = useState(false);
-  const [openSea, setOpenSea] = useState(null);  // {project, id}
-  const filtered = seas.filter(s => s.dir === tab);
-  return (
-    <div className={"panel "+span}>
-      <header>
-        <h2>All SEAs</h2>
-        <div className="row" style={{gap:10}}>
-          <span className="meta">internal · cross-group inbound visible to receptionist</span>
-          <div className="persona">
-            <button className={tab==="in"?"on":""}  onClick={()=>setTab("in")} style={{padding:"5px 10px",fontSize:12}}>incoming&nbsp;·&nbsp;{seas.filter(s=>s.dir==="in").length}</button>
-            <button className={tab==="out"?"on":""} onClick={()=>setTab("out")} style={{padding:"5px 10px",fontSize:12}}>outgoing&nbsp;·&nbsp;{seas.filter(s=>s.dir==="out").length}</button>
-          </div>
-          <button className="btn sm" onClick={() => setShowNew(true)}>＋ new SEA</button>
-        </div>
-      </header>
-      {showNew && (
-        <NewSeaModal
-          projects={window.DATA.projects || []}
-          onClose={() => setShowNew(false)}
-        />
-      )}
-      {openSea && (
-        <SeaDetailModal
-          project={openSea.project}
-          id={openSea.id}
-          onClose={() => setOpenSea(null)}
-        />
-      )}
-      <div className="body" style={{padding:0}}>
-        <table className="dt">
-          <thead>
-            <tr>
-              <th style={{width:50}}>id</th>
-              <th style={{width:110}}>state</th>
-              <th style={{width:90}}>kind</th>
-              <th>description</th>
-              <th style={{width:140}}>project</th>
-              <th style={{width:80}}>{tab==="in"?"from":"to"}</th>
-              <th style={{width:60}} className="num">age</th>
-              <th style={{width:130}}></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(s => (
-              <tr key={s.id}>
-                <td className="num">
-                  <a
-                    href="#"
-                    onClick={e => { e.preventDefault(); setOpenSea({project: s.project, id: s.id}); }}
-                  >#{s.id}</a>
-                </td>
-                <td><Pill tone={s.state==="complete"?"green":s.state==="claimed"?"purple":"outline"}>{s.state}</Pill></td>
-                <td className="mono muted" style={{fontSize:12}}>{s.kind}</td>
-                <td>{s.desc}</td>
-                <td className="mono" style={{fontSize:12}}>{s.project}</td>
-                <td className="mono" style={{fontSize:12}}>{s.who}</td>
-                <td className="num muted">{s.age}</td>
-                <td>
-                  <div className="row" style={{justifyContent:"flex-end"}}>
-                    {s.state==="requested" && <SeaActionButton sea={s} action="claim"    label="claim"    tone="primary" />}
-                    {s.state==="claimed"   && <SeaActionButton sea={s} action="complete" label="complete" tone="tiger"   needsDelivery />}
-                    {s.state==="complete"  && <SeaActionButton sea={s} action="examine"  label="accept"   tone="primary" />}
-                    {s.state==="examined"  && <SeaActionButton sea={s} action="conclude" label="review"   tone=""        />}
-                    <SeaActionMore sea={s} />
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 /* ───────── project detail rows + provision buttons ───────── */
 /* ───────── project detail rows + provision buttons ───────── */
 const REPO_ROLE_COLOUR = { code: "#1565c0", manuscript: "#8e2f6b",
@@ -3491,6 +3278,7 @@ function AgentToggleButton({ agent }) {
             model: frontmatter); the parenthetical is just the current tier
             version for display — keep in sync with VALID_MODELS in
             dashboard/server.py when models bump. */}
+        <option value="fable">fable (5)</option>
         <option value="opus">opus (4.8)</option>
         <option value="sonnet">sonnet (5)</option>
         <option value="haiku">haiku (4.5)</option>
@@ -3503,50 +3291,88 @@ function AgentToggleButton({ agent }) {
   );
 }
 
+function AgentCard({ a }) {
+  return (
+    <div style={{
+      padding:"9px 14px", borderBottom:"1px solid var(--rule)",
+      borderRight:"1px solid var(--rule)",
+      opacity: a.disabled ? 0.55 : 1,
+    }}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
+        <div>
+          <span style={{fontWeight:500, textTransform:"capitalize"}}>{a.name}</span>
+          {a.disabled && (
+            <span className="mono muted" style={{fontSize:10, marginLeft:8}}>
+              DISABLED
+            </span>
+          )}
+        </div>
+        <AgentToggleButton agent={a} />
+      </div>
+      <div className="muted" style={{fontSize:12, marginTop:3, lineHeight:1.4}}>
+        {a.description}
+      </div>
+      <div className="mono muted" style={{fontSize:10, marginTop:4, letterSpacing:1}}>
+        {a.model && <span>{a.model.toUpperCase()}</span>}
+        {a.required_tools && a.required_tools.length > 0 && (
+          <span style={{marginLeft:10}}>
+            · {a.required_tools.length} tool{a.required_tools.length === 1 ? "" : "s"}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// One labelled sub-section of the Agents panel (a commons category, or the
+// personal section). Hidden when it has no agents.
+function AgentGroup({ title, hint, agents }) {
+  if (!agents || agents.length === 0) return null;
+  return (
+    <div>
+      <div className="mono muted" style={{
+        padding:"7px 14px", fontSize:10, letterSpacing:1, textTransform:"uppercase",
+        borderBottom:"1px solid var(--rule)", background:"var(--paper-2, #faf9f7)",
+      }}>
+        {title} · {agents.length}
+        {hint && <span style={{textTransform:"none", letterSpacing:0, marginLeft:8}}>{hint}</span>}
+      </div>
+      <div style={{display:"grid", gridTemplateColumns:"repeat(2, 1fr)"}}>
+        {agents.map(a => <AgentCard key={a.name} a={a} />)}
+      </div>
+    </div>
+  );
+}
+
 function AgentsPanel({ agents, span="c-4" }) {
   const list = agents || [];
-  // Render as a 2-column compact grid since this panel is now full-width.
+  // Two axes (#38): origin (commons vs personal) and, for commons, category
+  // (member / administrative / choreography-support). freeze stays orthogonal.
+  const commons  = list.filter(a => (a.origin || "commons") === "commons");
+  const personal = list.filter(a => a.origin === "personal");
+  const byCat = c => commons.filter(a => (a.category || "member") === c);
   return (
     <div className={"panel "+span}>
       <header>
         <h2>Agents</h2>
         <span className="meta">
-          {list.length} installed · {list.filter(a => a.disabled).length} disabled
+          {commons.length} commons · {personal.length} personal · {list.filter(a => a.disabled).length} disabled
         </span>
       </header>
       <div className="body" style={{padding:0}}>
-        <div style={{display:"grid", gridTemplateColumns:"repeat(2, 1fr)"}}>
-          {list.map(a => (
-            <div key={a.name} style={{
-              padding:"9px 14px", borderBottom:"1px solid var(--rule)",
-              borderRight:"1px solid var(--rule)",
-              opacity: a.disabled ? 0.55 : 1,
-            }}>
-              <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
-                <div>
-                  <span style={{fontWeight:500, textTransform:"capitalize"}}>{a.name}</span>
-                  {a.disabled && (
-                    <span className="mono muted" style={{fontSize:10, marginLeft:8}}>
-                      DISABLED
-                    </span>
-                  )}
-                </div>
-                <AgentToggleButton agent={a} />
-              </div>
-              <div className="muted" style={{fontSize:12, marginTop:3, lineHeight:1.4}}>
-                {a.description}
-              </div>
-              <div className="mono muted" style={{fontSize:10, marginTop:4, letterSpacing:1}}>
-                {a.model && <span>{a.model.toUpperCase()}</span>}
-                {a.required_tools && a.required_tools.length > 0 && (
-                  <span style={{marginLeft:10}}>
-                    · {a.required_tools.length} tool{a.required_tools.length === 1 ? "" : "s"}
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
+        <AgentGroup title="Member" agents={byCat("member")} />
+        <AgentGroup title="Administrative" agents={byCat("administrative")} />
+        <AgentGroup title="Choreography support" agents={byCat("choreography-support")} />
+        <AgentGroup title="Personal agents"
+          hint="— yours; kept in your village, backed to your GitHub"
+          agents={personal} />
+        {personal.length === 0 && list.length > 0 && (
+          <div className="muted" style={{padding:"10px 14px", fontSize:12, borderTop:"1px solid var(--rule)"}}>
+            No personal agents yet. Make a commons agent your own with{" "}
+            <code className="mono">murmurent agent fork &lt;name&gt;</code>, or add your
+            own — they live only in your village and are backed to your GitHub.
+          </div>
+        )}
         {list.length === 0 && (
           <div className="muted" style={{padding:"14px", fontSize:13}}>
             No agents installed. Run <code className="mono">murmurent agent list</code>.
@@ -4248,249 +4074,6 @@ async function postCommonSeaArchive(slug) {
     throw new Error(detail);
   }
   return res.json();
-}
-
-function SeaCatalogPanel({ entries, span="c-12" }) {
-  const persona = window.DATA.persona || "member";
-  const isPI = persona === "pi";
-  const [editing, setEditing] = useState(null);  // null | {} (new) | entry (edit)
-  const [busy, setBusy] = useState(null);
-  const [commonSeas, setCommonSeas] = useState(null);
-  const [copied, setCopied] = useState(null);
-  const list = entries || [];
-
-  const refresh = async () => {
-    if (typeof window.__murmurentFetchData === "function") {
-      try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
-    }
-  };
-  const reloadCommonSeas = async () => {
-    try {
-      const res = await fetch("/api/common_seas", { credentials: "same-origin" });
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      setCommonSeas((await res.json()).seas || []);
-    } catch (_) { setCommonSeas([]); }
-  };
-  useEffect(() => { reloadCommonSeas(); }, []);
-
-  const onToggle = async (entry) => {
-    setBusy(entry.slug);
-    try { await postCatalogAction(entry.slug, entry.accepting ? "disable" : "enable"); await refresh(); }
-    catch (ex) { alert(ex.message || ex); }
-    finally { setBusy(null); }
-  };
-  const onDelete = async (entry) => {
-    if (!window.confirm(`Delete catalog entry "${entry.slug}"?`)) return;
-    setBusy(entry.slug);
-    try { await postCatalogAction(entry.slug, "delete"); await refresh(); }
-    catch (ex) { alert(ex.message || ex); }
-    finally { setBusy(null); }
-  };
-
-  const onSubmitCommon = async () => {
-    const slug = window.prompt("Slug (lowercase, underscores, e.g. 'qc_drift_routine'):");
-    if (!slug) return;
-    const name = window.prompt("Display name:");
-    if (!name) return;
-    const k = window.prompt("Kind (service | skill | routine | mcp | dataset):", "skill");
-    if (!k) return;
-    const description = window.prompt("One-line description:", "") || "";
-    const install = window.prompt("Copy-paste install command:", "") || "";
-    const url = window.prompt("Canonical URL (git repo or docs):", "") || "";
-    const tagsRaw = window.prompt("Tags (comma-separated, optional):", "") || "";
-    const tags = tagsRaw.split(",").map(s => s.trim()).filter(Boolean);
-    try {
-      await postCommonSeaSubmit({ slug, name, kind: k, description, install, url, tags });
-      reloadCommonSeas();
-    } catch (ex) { alert("Submit failed: " + (ex.message || ex)); }
-  };
-  const onArchiveCommon = async (sea) => {
-    if (!window.confirm(`Archive common SEA "${sea.slug}"?`)) return;
-    try { await postCommonSeaArchive(sea.slug); reloadCommonSeas(); }
-    catch (ex) { alert("Archive failed: " + (ex.message || ex)); }
-  };
-  const onCopy = async (text, key) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(key); setTimeout(() => setCopied(null), 1500);
-    } catch (_) {}
-  };
-
-  const commonList = commonSeas || [];
-
-  return (
-    <div className={"panel "+span}>
-      <header>
-        <h2>SEAs we offer</h2>
-        <div className="row" style={{gap:8}}>
-          <span className="meta">
-            {list.length} per-lab · {commonList.length} common
-          </span>
-        </div>
-      </header>
-      {editing !== null && (
-        <CatalogEntryForm
-          entry={Object.keys(editing).length === 0 ? null : editing}
-          onClose={() => setEditing(null)}
-        />
-      )}
-
-      {/* Per-lab SEAs (existing concept: lab-to-lab agreements) */}
-      <div style={{padding:"10px 14px 4px",
-                    display:"flex", justifyContent:"space-between",
-                    alignItems:"baseline",
-                    borderBottom:"1px solid #eee"}}>
-        <h3 style={{margin:0, fontSize:14}}>Per-lab agreements</h3>
-        {isPI && (
-          <button className="btn sm primary" onClick={() => setEditing({})}>
-            ＋ add per-lab SEA
-          </button>
-        )}
-      </div>
-      <div style={{padding:0}}>
-        {list.length === 0 ? (
-          <div className="muted" style={{padding:"14px", fontSize:13}}>
-            No per-lab SEAs yet.{" "}
-            {isPI && <span>Click <code>＋ add per-lab SEA</code> for lab-to-lab service agreements.</span>}
-          </div>
-        ) : (
-        <table className="dt">
-          <thead><tr>
-            <th>slug</th><th>title</th><th style={{width:90}}>kind</th>
-            <th style={{width:90}}>contact</th><th style={{width:80}}>turnaround</th>
-            <th style={{width:80}}>state</th>
-            {isPI && <th style={{width:200}}></th>}
-          </tr></thead>
-          <tbody>
-            {list.map(e => (
-              <tr key={e.slug} style={{opacity: e.accepting ? 1 : 0.55}}>
-                <td className="mono" style={{fontSize:12}}>{e.slug}</td>
-                <td>
-                  <div style={{fontWeight:500}}>{e.title}</div>
-                  {e.description && (
-                    <div className="muted" style={{fontSize:11, marginTop:2}}>
-                      {e.description.length > 80 ? e.description.slice(0, 80) + "…" : e.description}
-                    </div>
-                  )}
-                </td>
-                <td className="mono muted" style={{fontSize:12}}>{e.kind}</td>
-                <td className="mono" style={{fontSize:12}}>{e.contact}</td>
-                <td className="num">{e.turnaround_days ? `${e.turnaround_days}d` : "—"}</td>
-                <td>
-                  <Pill tone={e.accepting ? "green" : "outline"}>
-                    {e.accepting ? "accepting" : "paused"}
-                  </Pill>
-                </td>
-                {isPI && (
-                  <td>
-                    <div className="row" style={{justifyContent:"flex-end", gap:4}}>
-                      <button className="btn sm" disabled={busy===e.slug}
-                              onClick={() => setEditing(e)}>edit</button>
-                      <button className="btn sm" disabled={busy===e.slug}
-                              onClick={() => onToggle(e)}>
-                        {e.accepting ? "pause" : "resume"}
-                      </button>
-                      <button className="btn sm danger" disabled={busy===e.slug}
-                              onClick={() => onDelete(e)}>delete</button>
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        )}
-      </div>
-
-      {/* Centre-wide common SEAs (skills / routines / MCPs / datasets
-          / services any lab can clone) */}
-      <div style={{padding:"10px 14px 4px",
-                    display:"flex", justifyContent:"space-between",
-                    alignItems:"baseline",
-                    borderTop:"1px solid #ddd",
-                    borderBottom:"1px solid #eee",
-                    marginTop:8}}>
-        <h3 style={{margin:0, fontSize:14}}>Common SEAs (centre-wide)</h3>
-        {isPI && (
-          <button className="btn sm primary" onClick={onSubmitCommon}>
-            ＋ submit common SEA
-          </button>
-        )}
-      </div>
-      <div style={{padding:0}}>
-        {commonList.length === 0 ? (
-          <div className="muted" style={{padding:"14px", fontSize:13}}>
-            No common SEAs registered yet.{" "}
-            {isPI && <span>Click <code>＋ submit common SEA</code> to publish a skill / routine / MCP / dataset for the whole centre.</span>}
-          </div>
-        ) : (
-        <table className="dt">
-          <thead><tr>
-            <th>name</th>
-            <th style={{width:90}}>kind</th>
-            <th style={{width:100}}>owner</th>
-            <th>install</th>
-            {isPI && <th style={{width:90}}></th>}
-          </tr></thead>
-          <tbody>
-            {commonList.map(s => (
-              <tr key={s.slug}>
-                <td>
-                  <div style={{fontWeight:500}}>
-                    {s.name}
-                    {s.url && (
-                      <a href={s.url} target="_blank" rel="noopener"
-                         style={{marginLeft:6, fontSize:11}}>↗</a>
-                    )}
-                  </div>
-                  {s.description && (
-                    <div className="muted" style={{fontSize:11}}>{s.description}</div>
-                  )}
-                  {(s.tags || []).length > 0 && (
-                    <div style={{marginTop:3}}>
-                      {s.tags.map(x => (
-                        <span key={x} className="pill" style={{fontSize:10, marginRight:3}}>{x}</span>
-                      ))}
-                    </div>
-                  )}
-                </td>
-                <td className="mono muted" style={{fontSize:11}}>{s.kind}</td>
-                <td className="mono" style={{fontSize:11}}>{s.owner_lab}</td>
-                <td>
-                  {s.install ? (
-                    <div style={{display:"flex", gap:4, alignItems:"center"}}>
-                      <code style={{flex:1, fontSize:11,
-                                     padding:"2px 4px",
-                                     background:"#f5f5f5",
-                                     borderRadius:2,
-                                     overflow:"hidden",
-                                     textOverflow:"ellipsis",
-                                     whiteSpace:"nowrap"}}>{s.install}</code>
-                      <button className="btn sm" onClick={() => onCopy(s.install, s.slug)}>
-                        {copied === s.slug ? "copied!" : "copy"}
-                      </button>
-                    </div>
-                  ) : (
-                    <span className="muted" style={{fontSize:11}}>see source ↗</span>
-                  )}
-                </td>
-                {isPI && (
-                  <td>
-                    <div className="row" style={{justifyContent:"flex-end", gap:4}}>
-                      <button className="btn sm danger" onClick={() => onArchiveCommon(s)}>
-                        archive
-                      </button>
-                    </div>
-                  </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        )}
-      </div>
-    </div>
-  );
 }
 
 /* ───────── Core services panel (Phase 3e of the cores rollout) ─────────
@@ -5675,108 +5258,6 @@ function DecommissionReportModal({ report, onClose }) {
 }
 
 /* ───────── Receptionist (inbound cross-group SEA queue) ───────── */
-async function postInboundAction(id, action, body) {
-  const params = new URLSearchParams(window.location.search);
-  const userParam = params.get("user");
-  const url = "/api/inbound-sea/" + encodeURIComponent(id) + "/" + encodeURIComponent(action)
-    + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Accept: "application/json" },
-    body: JSON.stringify(body || {}),
-  });
-  if (!res.ok) {
-    let detail = "HTTP " + res.status;
-    try { detail = (await res.json()).detail || detail; } catch (_) {}
-    throw new Error(detail);
-  }
-  return res.json();
-}
-
-function ReceptionistPanel({ inbound, span="c-12" }) {
-  const persona = window.DATA.persona || "member";
-  if (persona !== "pi") return null;  // member doesn't see this box
-  const list = inbound || [];
-  const refresh = async () => {
-    if (typeof window.__murmurentFetchData === "function") {
-      try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
-    }
-  };
-  const onAccept = async (req) => {
-    const routed_to = window.prompt("Route to which member? (e.g. @allie)");
-    if (!routed_to || !routed_to.trim()) return;
-    try { await postInboundAction(req.id, "accept", { routed_to: routed_to.trim() }); await refresh(); }
-    catch (ex) { alert(ex.message || ex); }
-  };
-  const onDecline = async (req) => {
-    const reason = window.prompt("Decline reason:");
-    if (!reason || !reason.trim()) return;
-    try { await postInboundAction(req.id, "decline", { reason: reason.trim() }); await refresh(); }
-    catch (ex) { alert(ex.message || ex); }
-  };
-  return (
-    <div className={"panel "+span}>
-      <header>
-        <h2>Receptionist · inbound SEA requests</h2>
-        <span className="meta">
-          {list.filter(r => r.state === "pending").length} pending ·
-          {" "}{list.filter(r => r.state !== "pending").length} resolved
-        </span>
-      </header>
-      <div className="body" style={{padding:"6px 0"}}>
-        {list.length === 0 && (
-          <div className="muted" style={{padding:"14px", fontSize:13}}>
-            No inbound requests. Other groups will appear here when they
-            consume our sea_catalog MCP.
-          </div>
-        )}
-        {list.map(r => (
-          <div key={r.id} style={{padding:"9px 14px", borderBottom:"1px solid var(--rule)",
-                                  opacity: r.state === "pending" ? 1 : 0.6}}>
-            <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
-              <div>
-                <Pill tone={r.state === "pending" ? "amber" : (r.state === "accepted" ? "green" : "red")}>
-                  {r.state}
-                </Pill>
-                <span className="mono" style={{fontSize:12, marginLeft:8}}>#{r.id}</span>
-                <span className="muted" style={{marginLeft:6}}>·</span>
-                <span style={{marginLeft:6, fontWeight:500}}>{r.from_handle}</span>
-                <span className="muted" style={{marginLeft:4}}>({r.from_group})</span>
-                <span className="muted" style={{marginLeft:6}}>→</span>
-                <span className="mono" style={{marginLeft:6, fontSize:12, color:"var(--purple)"}}>
-                  {r.catalog_slug}
-                </span>
-              </div>
-              <span className="mono muted" style={{fontSize:10}}>{r.created_at}</span>
-            </div>
-            {r.description && (
-              <div className="muted" style={{fontSize:12, marginTop:4, lineHeight:1.45}}>
-                {r.description}
-              </div>
-            )}
-            {r.routed_to && (
-              <div className="mono muted" style={{fontSize:11, marginTop:3}}>
-                routed to {r.routed_to}
-              </div>
-            )}
-            {r.decline_reason && (
-              <div style={{fontSize:11, color:"var(--red)", marginTop:3}}>
-                {r.decline_reason}
-              </div>
-            )}
-            {r.state === "pending" && (
-              <div className="row" style={{marginTop:6, justifyContent:"flex-end", gap:6}}>
-                <button className="btn sm primary" onClick={() => onAccept(r)}>accept · route</button>
-                <button className="btn sm" onClick={() => onDecline(r)}>decline</button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 /* ───────── lab oracle panel ───────── */
 function OracleProcessButton() {
   const [busy, setBusy] = useState(false);
@@ -8507,33 +7988,15 @@ function App() {
           <AgentsActivityPanel activity={D.agents_activity} span="c-12" />
         </div>
 
-        {/* Daily action zone (Receptionist → All SEAs), sits below the live
-            agent feed per PI preference. Project-join requests and the
-            Collaborations window are gone — membership is lead-controlled via
-            certificates (project → Members), and inter-group work is just a
-            project spanning groups. */}
-        {persona === "pi" && (
-          <div className="grid" style={{marginBottom:14}}>
-            <ReceptionistPanel inbound={D.inbound_requests} span="c-12" />
-          </div>
-        )}
-
-        <div className="grid" style={{marginBottom:14}}>
-          <SeasPanel seas={D.seas} span="c-12" />
-        </div>
+        {/* SEA windows (Receptionist inbound queue, All SEAs, SEAs-we-offer
+            catalog) were removed in #38 as murmurent moves from SEA-based
+            exchange to choreographies. The SEA backend remains but is no longer
+            surfaced here; choreography + phrase panels replace it (Phases B/C). */}
 
         {/* Inventory: things you check, but not every day. (Lab members moved
             to the top of the page.) */}
         <div className="grid" style={{marginBottom:14}}>
           <InventoryPanel inv={D.inventory} span="c-12" />
-        </div>
-
-        {/* SEAs we offer (catalog) - every member sees; PI edits.
-            Includes BOTH per-lab SEAs (the lab's own catalog) AND
-            common SEAs shared centre-wide (kind ∈ skill/routine/mcp/
-            dataset/service). Same outbound concept, two scopes. */}
-        <div className="grid" style={{marginBottom:14}}>
-          <SeaCatalogPanel entries={D.sea_catalog} span="c-12" />
         </div>
 
         {/* Core services browse + my bookings (Phase 3e of cores rollout).

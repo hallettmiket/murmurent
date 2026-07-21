@@ -1,6 +1,7 @@
 ---
 name: artist
-description: 'MUST: first line of every final response is a ≤200-char verdict in your own voice (see rules/headline_first.md). Visualization and communication specialist. Creates figures, plots, and presentation materials.'
+category: member
+description: 'Visualization and communication specialist. Creates figures, plots, and presentation materials.'
 freeze: personal
 model: sonnet
 required_tools:

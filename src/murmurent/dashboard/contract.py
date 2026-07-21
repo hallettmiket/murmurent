@@ -354,7 +354,15 @@ class PeerRow(BaseModel):
 
 
 class AgentRow(BaseModel):
-    """Phase 7: an installed agent visible to the dashboard."""
+    """Phase 7: an installed agent visible to the dashboard.
+
+    ``origin`` splits the two dashboard sections: ``commons`` agents ship with
+    murmurent and are in every member's environment; ``personal`` agents are
+    member-created/forked, live in the member's own ``~/.murmurent/agent_forks``
+    (git-trackable → their GitHub), and appear only in their village.
+    ``category`` sub-groups the commons agents (member / administrative /
+    choreography-support). ``freeze`` is the orthogonal editability flag.
+    """
 
     name: str
     description: str
@@ -362,6 +370,8 @@ class AgentRow(BaseModel):
     model: str | None = None
     required_tools: list[str] = []
     disabled: bool = False  # personal agents only; frozen are always active
+    origin: Literal["commons", "personal"] = "commons"
+    category: Literal["member", "administrative", "choreography-support"] = "member"
 
 
 class OracleEntry(BaseModel):

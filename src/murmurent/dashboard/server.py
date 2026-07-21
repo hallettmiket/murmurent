@@ -6072,14 +6072,14 @@ def create_app() -> FastAPI:
         action: str,
         model: str | None = Query(
             None,
-            description="When action='set_model', the new model shorthand (opus|sonnet|haiku).",
+            description="When action='set_model', the new model shorthand (fable|opus|sonnet|haiku).",
         ),
     ) -> dict:
         """Manage a personal agent's frontmatter.
 
         Actions:
           - ``enable`` / ``disable`` — flip the ``disabled:`` flag
-          - ``set_model`` — pick a model shorthand (``opus|sonnet|haiku``)
+          - ``set_model`` — pick a model shorthand (``fable|opus|sonnet|haiku``)
 
         Frozen agents (centre-controlled) cannot be modified here; they
         require a PR against the agents/ registry.
@@ -6087,7 +6087,10 @@ def create_app() -> FastAPI:
         from ..core import agents as agents_core
         from ..core.repo import murmurent_repo_root
 
-        VALID_MODELS = {"opus", "sonnet", "haiku"}
+        # ``fable`` (claude-fable-5) is the most-capable tier; offered so a
+        # member can put a personal agent (or the Oracle) on it. Kept in sync
+        # with the model dropdown in docs/designer_dashboard/hifi-app.jsx.
+        VALID_MODELS = {"fable", "opus", "sonnet", "haiku"}
         if action not in {"enable", "disable", "set_model"}:
             raise HTTPException(status_code=422, detail=f"unknown action: {action}")
         if action == "set_model" and (not model or model not in VALID_MODELS):

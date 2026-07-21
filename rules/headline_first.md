@@ -37,7 +37,6 @@ vocabulary:
 | `conscience` | `OK / Flagged — <one-line concern>` |
 | `lawyer` | `Clear / Conflict / Unknown — <one-line on patent landscape>` |
 | `cable_guy` | `Provisioned / Skipped / Failed — <one-line on what>` |
-| `receptionist` | `Routed / Held / Bounced — <one-line on who/why>` |
 | `registrar` | `Recorded / Conflict / Skipped — <one-line on what>` |
 | `judge` | `Presented / Split / Insufficient — <one-line on the combined result>` |
 

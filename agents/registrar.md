@@ -1,6 +1,7 @@
 ---
 name: registrar
-description: 'MUST: first line of every final response is a ≤200-char verdict in your own voice (see rules/headline_first.md). Administrative agent above the group/lab level. Tracks all labs, cores, and collaborations in a bioconvergence centre. Manages the registry (create / archive / modify lab and core entries) and surfaces an institution-level view to the centre''s administrative head.'
+category: administrative
+description: 'Administrative agent above the group/lab level. Tracks all labs, cores, and collaborations in a bioconvergence centre. Manages the registry (create / archive / modify lab and core entries) and surfaces an institution-level view to the centre''s administrative head.'
 freeze: frozen
 model: sonnet
 required_tools:

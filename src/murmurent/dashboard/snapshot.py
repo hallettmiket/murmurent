@@ -1454,12 +1454,13 @@ def _peer_role(handle: str) -> str:
 
 
 def _agents() -> list[C.AgentRow]:
-    """Load the murmurent agent registry as a list of dashboard rows."""
+    """Load the agent registry as dashboard rows: the commons agents (grouped by
+    category) plus this member's own personal (member-created) agents."""
+    rows: list[C.AgentRow] = []
     try:
         registry = load_agent_registry(murmurent_repo_root() / "agents")
     except Exception:
-        return []
-    rows: list[C.AgentRow] = []
+        registry = []
     for record in registry:
         # The AgentRecord doesn't expose model + disabled directly, so
         # re-parse the source file for the extra fields.
@@ -1472,6 +1473,48 @@ def _agents() -> list[C.AgentRow]:
                 model=model,
                 required_tools=list(record.required_tools),
                 disabled=disabled,
+                origin="commons",
+                category=getattr(record, "category", "member"),  # type: ignore[arg-type]
+            )
+        )
+    rows.extend(_personal_agents())
+    return rows
+
+
+def _personal_agents() -> list[C.AgentRow]:
+    """This member's own agents: files in the machine's CC agents dir
+    (``~/.claude/agents``) whose name is NOT part of the commons. These are the
+    ad-hoc agents a member created for their own work; they live only in this
+    village (git-backed via ``~/.murmurent/agent_forks``). Best-effort — a
+    missing dir just yields none."""
+    from ..core import agent_forks as _af
+
+    try:
+        installed = _af.installed_agents_dir()
+        commons = _af.commons_agent_names()
+    except Exception:
+        return []
+    if not installed.is_dir():
+        return []
+    rows: list[C.AgentRow] = []
+    for path in sorted(installed.glob("*.md")):
+        if path.stem in commons:
+            continue  # a commons agent (or a fork of one) — shown in Commons
+        try:
+            meta = parse_file(path).meta or {}
+        except Exception:
+            continue
+        freeze = meta.get("freeze")
+        rows.append(
+            C.AgentRow(
+                name=str(meta.get("name") or path.stem),
+                description=str(meta.get("description", "")).strip(),
+                freeze=freeze if freeze in ("frozen", "personal") else "personal",  # type: ignore[arg-type]
+                model=(str(meta["model"]) if meta.get("model") else None),
+                required_tools=[],
+                disabled=bool(meta.get("disabled", False)),
+                origin="personal",
+                category="member",
             )
         )
     return rows

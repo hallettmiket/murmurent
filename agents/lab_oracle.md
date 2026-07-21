@@ -1,6 +1,7 @@
 ---
 name: lab_oracle
-description: 'MUST: first line of every final response is a ≤200-char verdict in your own voice (see rules/headline_first.md). Lab-wide, reviewed institutional memory backed by the lab-mgmt repo. Read-only from the agent side; entries arrive via the murmurent oracle publish CLI after PI/peer review. Use to recall what the WHOLE lab has agreed on, distinct from one member''s personal Oracle.'
+category: member
+description: 'Lab-wide, reviewed institutional memory backed by the lab-mgmt repo. Read-only from the agent side; entries arrive via the murmurent oracle publish CLI after PI/peer review. Use to recall what the WHOLE lab has agreed on, distinct from one member''s personal Oracle.'
 freeze: frozen
 model: sonnet
 required_tools:
