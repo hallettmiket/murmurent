@@ -100,6 +100,7 @@ nav:
       - "Overview: members, groups, projects": overview.md
       - Group-level architecture: group_level.md
       - "Choreographies 🚧": choreography.md
+      - "Assembling a choreography 🚧": assembling_choreographies.md
       - "Security Guard & Cable Guy (lab)": guardians.md
       - What Murmurent creates: what_mm_creates.md
       - The lab-mgmt repo: lab_mgmt.md

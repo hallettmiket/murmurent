@@ -23,6 +23,7 @@ from pathlib import Path
 import click
 
 from ..core import choreography as _ch
+from ..core import phrase_run as _run
 from ..core import phrase_spec as _ps
 
 
@@ -169,4 +170,31 @@ def cmd_show(choreography_path: str) -> int:
             f"{contract.metric} [{contract.units}], {contract.direction} "
             f"(key {contract.candidate_key} — {join})"
         )
+    return 0
+
+
+def cmd_prepare_run(*, choreography_path: str, out: str | None) -> int:
+    """Assemble a run package (choreography + contracts + outputs + judge version)."""
+    try:
+        dest = _run.prepare_run(choreography_path, out_dir=out)
+    except _run.RunError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Prepared run package → {dest}")
+    click.echo(f"  manifest: {dest / _run.MANIFEST_NAME}")
+    click.echo("Hand this package to the judge agent to combine + present the phrases.")
+    return 0
+
+
+def cmd_freeze_run(
+    *, choreography_path: str, result: str, run: str | None, out: str | None
+) -> int:
+    """Freeze the run (package + judge result) into an append-only run record."""
+    try:
+        dest = _run.freeze_run(
+            choreography_path, result_path=result, run_package=run, out_dir=out
+        )
+    except _run.RunError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Froze run record → {dest}")
+    click.echo(f"  record: {dest / _run.RECORD_MANIFEST_NAME}")
     return 0

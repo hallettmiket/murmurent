@@ -24,6 +24,7 @@ EXPECTED_AGENTS = {
     "cable_guy",
     "centre_cable_guy",
     "conscience",
+    "judge",
     "lab_oracle",
     "oracle",
     "receptionist",

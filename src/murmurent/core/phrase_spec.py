@@ -130,6 +130,9 @@ class PhraseSpec:
     contract: str
     steps: list[Step] = field(default_factory=list)
     transitions: list[Transition] = field(default_factory=list)
+    #: Optional path (relative to the spec) to the produced output table — set
+    #: once the phrase has been run. Absent on a freshly-authored spec.
+    output: str = ""
     notes: str = ""
     #: Set by :meth:`from_file`; used as the default base dir for resolving the
     #: (possibly relative) contract reference during :meth:`validate`.
@@ -148,10 +151,14 @@ class PhraseSpec:
           - each transition has a name and a valid ``kind``
             (``rank`` | ``filter`` | ``select``);
           - the referenced ``contract`` resolves to a file that is itself a
-            valid :class:`~murmurent.core.phrase_contract.PhraseContract`.
+            valid :class:`~murmurent.core.phrase_contract.PhraseContract`;
+          - **when an ``output`` is set** (the phrase has been run), the output
+            table conforms to the referenced contract
+            (:func:`murmurent.core.phrase_output.validate_output`). ``output`` is
+            optional — a spec authored before it is run is still valid.
 
-        ``base_dir`` roots relative contract references; it defaults to the
-        directory the spec was read from (``source``) or the current dir.
+        ``base_dir`` roots relative contract/output references; it defaults to
+        the directory the spec was read from (``source``) or the current dir.
         """
         problems: list[str] = []
 
@@ -195,6 +202,11 @@ class PhraseSpec:
         if self.contract and self.contract.strip():
             problems.extend(self._validate_contract(base_dir))
 
+        # Produced output table (optional): validate against the contract only
+        # when present — a spec may be authored before the phrase is ever run.
+        if self.output and self.output.strip():
+            problems.extend(self._validate_output(base_dir))
+
         return problems
 
     def _validate_contract(self, base_dir: str | Path | None) -> list[str]:
@@ -212,6 +224,33 @@ class PhraseSpec:
         return [
             f"referenced contract {path.name}: {p}" for p in contract.validate()
         ]
+
+    def _validate_output(self, base_dir: str | Path | None) -> list[str]:
+        from . import phrase_output as _po  # deferred: keeps the import surface small
+
+        contract = self.resolved_contract(base_dir)
+        if contract is None:
+            # The contract problem is already reported by _validate_contract;
+            # without it there is nothing to validate the output against.
+            return []
+        path = self.resolved_output(base_dir)
+        if path is None:
+            return [
+                f"declared output {self.output!r} could not be resolved "
+                f"(looked for a path relative to the spec)"
+            ]
+        return [f"output {path.name}: {p}" for p in _po.validate_output(contract, path)]
+
+    def resolved_output(self, base_dir: str | Path | None = None) -> Path | None:
+        """Resolve the produced output table path, or ``None`` if not found."""
+        if not (self.output and self.output.strip()):
+            return None
+        base = self._resolve_base_dir(base_dir)
+        p = Path(self.output).expanduser()
+        for cand in ([p] if p.is_absolute() else [base / p, Path.cwd() / p]):
+            if cand.is_file():
+                return cand
+        return None
 
     def _resolve_base_dir(self, base_dir: str | Path | None) -> Path:
         if base_dir is not None:
@@ -240,8 +279,12 @@ class PhraseSpec:
     # -- serialization -----------------------------------------------------
 
     def to_frontmatter(self) -> dict[str, Any]:
-        """The ordered frontmatter mapping this spec serializes to."""
-        return {
+        """The ordered frontmatter mapping this spec serializes to.
+
+        The ``output`` key is emitted only once the phrase has been run (an
+        output is set), so a freshly-authored spec's serialization is unchanged.
+        """
+        meta: dict[str, Any] = {
             "kind": KIND,
             "phrase": self.phrase,
             "author": self.author,
@@ -250,6 +293,9 @@ class PhraseSpec:
             "steps": [s.to_dict() for s in self.steps],
             "transitions": [t.to_dict() for t in self.transitions],
         }
+        if self.output and self.output.strip():
+            meta["output"] = self.output
+        return meta
 
     def to_markdown(self) -> str:
         """Serialize to a markdown entry: YAML frontmatter + optional body."""
@@ -276,6 +322,7 @@ class PhraseSpec:
             contract=str(meta.get("contract", "") or ""),
             steps=steps,
             transitions=transitions,
+            output=str(meta.get("output", "") or ""),
             notes=body.strip(),
             source=source,
         )

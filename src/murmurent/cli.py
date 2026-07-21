@@ -1993,6 +1993,38 @@ def choreography_show(choreography_path: str) -> None:
     raise SystemExit(_ch_cmd.cmd_show(choreography_path))
 
 
+@choreography_group.command(
+    "prepare-run",
+    help="Assemble a run package (choreography + contracts + outputs + judge version).")
+@click.argument("choreography_path", type=click.Path())
+@click.option("--out", "out", default=None, type=click.Path(),
+              help="Output dir for the run package. Default: append_only/ if the "
+                   "data tree exists, else a temp dir.")
+def choreography_prepare_run(choreography_path: str, out: str | None) -> None:
+    from .commands import choreography_cmd as _ch_cmd
+    raise SystemExit(_ch_cmd.cmd_prepare_run(choreography_path=choreography_path, out=out))
+
+
+@choreography_group.command(
+    "freeze-run",
+    help="Freeze a run (package + judge result) into an append-only run record.")
+@click.argument("choreography_path", type=click.Path())
+@click.option("--result", "result", required=True, type=click.Path(),
+              help="The judge's produced result (the combined presentation).")
+@click.option("--run", "run", default=None, type=click.Path(),
+              help="An existing run package (from prepare-run). If omitted, one is "
+                   "assembled first.")
+@click.option("--out", "out", default=None, type=click.Path(),
+              help="Output dir for the run record. Default: append_only/ if the "
+                   "data tree exists, else a temp dir.")
+def choreography_freeze_run(
+    choreography_path: str, result: str, run: str | None, out: str | None
+) -> None:
+    from .commands import choreography_cmd as _ch_cmd
+    raise SystemExit(_ch_cmd.cmd_freeze_run(
+        choreography_path=choreography_path, result=result, run=run, out=out))
+
+
 # Register the `murmurent reconcile` subcommand. Kept at the bottom so
 # it sees the fully-built `cli` group object.
 reconcile_impl.add_to_cli(cli)

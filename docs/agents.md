@@ -346,6 +346,31 @@ jointly maintains identity-key hygiene alongside the Cable Guy.
 
 ---
 
+## Judge
+
+Combines and presents the phrases contributed to a compositional
+choreography (see [Choreographies](choreography.md) and
+[Phrases](phrases.md)). Given a run package, it joins the phrases' outputs on
+the choreography's candidate-identity key, applies the criteria the
+question-poser supplied, and presents the candidates with full provenance. It
+surfaces disagreement between phrases rather than hiding it, and computes a
+single consensus only when the phrase outputs share a metric; otherwise it
+presents the alternatives side by side. It never silently discards a phrase's
+output, hands the combined presentation to the [Artist](#artist) for
+expression, and its combination is reviewed by the [Adversary](#adversary).
+Its ranking and decision strategy evolves in its own definition over time and
+can be forked per lab like any reference agent.
+
+**Verdict vocabulary:** `Presented / Split / Insufficient — <one-line on the combined result>`
+
+> **You:** Judge, combine the phrases for the sulfopin choreography.
+>
+> **Judge:** Split: the docking and ML phrases agree on the top two
+> candidates, but the wet-lab affinities rank them in the opposite order;
+> presenting both rankings side by side with the measured values flagged.
+
+---
+
 ## Where to go next
 
 | You want to… | Read |
