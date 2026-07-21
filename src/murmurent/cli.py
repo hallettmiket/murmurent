@@ -1809,6 +1809,70 @@ def member_activate_cmd(handle: str) -> None:
     click.echo(f"Activated @{rec.handle}.")
 
 
+# ---------------------------------------------------------------------------
+# phrase (choreography Phase 1: the phrase output-contract)
+# ---------------------------------------------------------------------------
+
+
+@cli.group("phrase", help="Author + validate phrase output-contracts.")
+def phrase_group() -> None:
+    """A phrase declares a typed output contract so heterogeneous phrase
+    outputs can be aligned on a shared candidate identity and judged."""
+
+
+@phrase_group.group("contract", help="Manage phrase output-contracts.")
+def phrase_contract_group() -> None:
+    pass
+
+
+@phrase_contract_group.command("new", help="Write a valid phrase output-contract.")
+@click.option("--phrase", "phrase", required=True, help="Phrase name/slug.")
+@click.option("--author", required=True, help="Offering member handle (e.g. @member_a).")
+@click.option("--question", required=True, help="Posed question / choreography id.")
+@click.option("--candidate-key", "candidate_key", required=True,
+              help="Identity space naming a candidate: inchikey | smiles | "
+                   "gene_symbol | uniprot | other:<free-text>.")
+@click.option("--metric", required=True, help="What the phrase reports (e.g. binding_affinity).")
+@click.option("--units", required=True, help="Metric units (e.g. nM, kcal/mol, dimensionless).")
+@click.option("--direction", required=True,
+              type=click.Choice(["higher_better", "lower_better"]),
+              help="Is a higher or a lower value better?")
+@click.option("--uncertainty", default="none", show_default=True,
+              help="How uncertainty is expressed (e.g. stderr, ci95, none).")
+@click.option("--out", "out", default=None, type=click.Path(),
+              help="Output path (file or dir). Default: <vault>/phrases/; stdout if no vault.")
+def phrase_contract_new(
+    phrase: str,
+    author: str,
+    question: str,
+    candidate_key: str,
+    metric: str,
+    units: str,
+    direction: str,
+    uncertainty: str,
+    out: str | None,
+) -> None:
+    from .commands import phrase_cmd as _phrase_cmd
+    raise SystemExit(_phrase_cmd.cmd_contract_new(
+        phrase=phrase,
+        author=author,
+        question=question,
+        candidate_key=candidate_key,
+        metric=metric,
+        units=units,
+        direction=direction,
+        uncertainty=uncertainty,
+        out=out,
+    ))
+
+
+@phrase_contract_group.command("validate", help="Validate a phrase output-contract file.")
+@click.argument("path", type=click.Path())
+def phrase_contract_validate(path: str) -> None:
+    from .commands import phrase_cmd as _phrase_cmd
+    raise SystemExit(_phrase_cmd.cmd_contract_validate(path))
+
+
 # Register the `murmurent reconcile` subcommand. Kept at the bottom so
 # it sees the fully-built `cli` group object.
 reconcile_impl.add_to_cli(cli)
