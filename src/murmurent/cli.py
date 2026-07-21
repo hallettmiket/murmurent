@@ -1873,6 +1873,126 @@ def phrase_contract_validate(path: str) -> None:
     raise SystemExit(_phrase_cmd.cmd_contract_validate(path))
 
 
+# -- phrase spec (Phase 2a: the authored phrase — steps + transitions) ------
+
+
+@phrase_group.group("spec", help="Author + validate phrase specs (steps/transitions).")
+def phrase_spec_group() -> None:
+    """A phrase spec is the authored phrase a member offers into a
+    choreography: an ordered graph of steps + transitions producing an output
+    that conforms to its (Phase-1) output contract."""
+
+
+@phrase_spec_group.command("new", help="Write a valid phrase spec.")
+@click.option("--phrase", "phrase", required=True, help="Phrase name/slug.")
+@click.option("--author", required=True, help="Offering member handle (e.g. @member_a).")
+@click.option("--question", required=True, help="Posed question / choreography id.")
+@click.option("--contract", required=True,
+              help="Reference to the phrase's Phase-1 output contract "
+                   "(relative path or slug).")
+@click.option("--step", "steps", multiple=True, required=True,
+              metavar="NAME:KIND:RUN",
+              help="A step 'name:kind:run' (kind = agent|script). Repeatable.")
+@click.option("--transition", "transitions", multiple=True,
+              metavar="NAME:KIND",
+              help="A transition 'name:kind' (kind = rank|filter|select). Repeatable.")
+@click.option("--out", "out", default=None, type=click.Path(),
+              help="Output path (file or dir). Default: <vault>/phrases/; stdout if no vault.")
+def phrase_spec_new(
+    phrase: str,
+    author: str,
+    question: str,
+    contract: str,
+    steps: tuple[str, ...],
+    transitions: tuple[str, ...],
+    out: str | None,
+) -> None:
+    from .commands import phrase_cmd as _phrase_cmd
+    raise SystemExit(_phrase_cmd.cmd_spec_new(
+        phrase=phrase,
+        author=author,
+        question=question,
+        contract=contract,
+        steps=steps,
+        transitions=transitions,
+        out=out,
+    ))
+
+
+@phrase_spec_group.command("validate", help="Validate a phrase spec file (incl. its contract).")
+@click.argument("path", type=click.Path())
+def phrase_spec_validate(path: str) -> None:
+    from .commands import phrase_cmd as _phrase_cmd
+    raise SystemExit(_phrase_cmd.cmd_spec_validate(path))
+
+
+# ---------------------------------------------------------------------------
+# choreography (Phase 2a: the compositional choreography object)
+# ---------------------------------------------------------------------------
+
+
+@cli.group("choreography", help="Pose + validate compositional choreographies.")
+def choreography_group() -> None:
+    """A choreography poses a question; contributors offer phrases whose output
+    contracts must all join on the choreography's candidate-identity key."""
+
+
+@choreography_group.command("new", help="Pose a new choreography (a question).")
+@click.option("--question", required=True, help="Question slug/id.")
+@click.option("--poser", required=True, help="Posing member handle (e.g. @the_pi).")
+@click.option("--title", required=True, help="The human question, in prose.")
+@click.option("--candidate-key", "candidate_key", required=True,
+              help="Identity space for the whole choreography: inchikey | smiles | "
+                   "gene_symbol | uniprot | other:<free-text>.")
+@click.option("--criteria", required=True,
+              help="Poser's judging/presentation criteria (text, or @file to read).")
+@click.option("--out", "out", default=None, type=click.Path(),
+              help="Output path (file or dir). Default: lab-mgmt choreographies/ "
+                   "→ <vault>/choreographies/; stdout if neither resolves.")
+def choreography_new(
+    question: str,
+    poser: str,
+    title: str,
+    candidate_key: str,
+    criteria: str,
+    out: str | None,
+) -> None:
+    from .commands import choreography_cmd as _ch_cmd
+    raise SystemExit(_ch_cmd.cmd_new(
+        question=question,
+        poser=poser,
+        title=title,
+        candidate_key=candidate_key,
+        criteria=criteria,
+        out=out,
+    ))
+
+
+@choreography_group.command("offer", help="Attach a phrase contribution to a choreography.")
+@click.argument("choreography_path", type=click.Path())
+@click.option("--phrase", "phrase", required=True, type=click.Path(),
+              help="Reference to the phrase spec to attach (path or slug).")
+def choreography_offer(choreography_path: str, phrase: str) -> None:
+    from .commands import choreography_cmd as _ch_cmd
+    raise SystemExit(_ch_cmd.cmd_offer(
+        choreography_path=choreography_path, phrase=phrase))
+
+
+@choreography_group.command("validate",
+                            help="Validate a choreography (incl. candidate-key joinability).")
+@click.argument("choreography_path", type=click.Path())
+def choreography_validate(choreography_path: str) -> None:
+    from .commands import choreography_cmd as _ch_cmd
+    raise SystemExit(_ch_cmd.cmd_validate(choreography_path))
+
+
+@choreography_group.command("show", help="Print the posed question, criteria, and phrases.")
+@click.argument("choreography_path", type=click.Path())
+def choreography_show(choreography_path: str) -> None:
+    from .commands import choreography_cmd as _ch_cmd
+    raise SystemExit(_ch_cmd.cmd_show(choreography_path))
+
+
 # Register the `murmurent reconcile` subcommand. Kept at the bottom so
 # it sees the fully-built `cli` group object.
 reconcile_impl.add_to_cli(cli)

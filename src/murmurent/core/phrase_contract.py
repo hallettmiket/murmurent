@@ -251,3 +251,39 @@ def default_contract_filename(phrase: str) -> str:
     """The default basename for a contract file, derived from the phrase slug."""
     slug = slugify(phrase) or "phrase"
     return f"{slug}_contract.md"
+
+
+def resolve_contract_reference(
+    ref: str, base_dir: str | Path | None = None
+) -> Path | None:
+    """Resolve a contract reference (relative/absolute path, or a bare slug).
+
+    A phrase spec / choreography refers to a contract "by relative path or
+    slug". This tries, in order: the ref as an explicit path (absolute, then
+    under ``base_dir``, then the cwd); then a ``<slug>_contract.md`` file under
+    ``base_dir`` and under :func:`default_contract_dir`. Returns ``None`` when
+    nothing on disk matches.
+    """
+    ref = (ref or "").strip()
+    if not ref:
+        return None
+    base = Path(base_dir).expanduser() if base_dir is not None else None
+    candidates: list[Path] = []
+    p = Path(ref).expanduser()
+    if p.is_absolute():
+        candidates.append(p)
+    else:
+        if base is not None:
+            candidates.append(base / p)
+        candidates.append(Path.cwd() / p)
+    if "/" not in ref and not ref.endswith(".md"):
+        fname = default_contract_filename(ref)
+        if base is not None:
+            candidates.append(base / fname)
+        d = default_contract_dir()
+        if d is not None:
+            candidates.append(d / fname)
+    for c in candidates:
+        if c.is_file():
+            return c
+    return None
