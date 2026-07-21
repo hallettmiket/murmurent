@@ -346,11 +346,57 @@ def test_member_settings_silently_drops_obsidian_fields(world):
     assert meta["obsidian"]["vault_path"] == "/legacy/path"
 
 
-def test_member_settings_404_when_member_file_missing(world, monkeypatch):
+def test_member_nonwriter_edit_stages_and_never_touches_roster(world, monkeypatch, tmp_path):
+    """A non-PI member's profile edit is STAGED to their own profile.yaml and
+    never committed to the read-only roster clone (#34 Option C) — even before
+    the PI has added them to the roster. This is the fix for the unpushable-
+    local-commit divergence that used to strand member edits."""
+    monkeypatch.setenv("MURMURENT_USER", "bob")            # a member, not the PI
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "bob-home"))
+    from murmurent.core import member_profile as mp
+
+    client = TestClient(create_app())
+    res = client.post("/api/member/settings", json={
+        "email": "bob@example.edu", "office": "MSB-1", "slack_handle": "@bobby",
+    })
+    assert res.status_code == 200, res.text
+    body = res.json()
+    assert body.get("staged") is True and body["probes"] == []
+
+    # The roster clone was NOT modified (bob's record is untouched; no commit).
+    bob_meta = parse_file(world["lab_mgmt"] / "members" / "bob.md").meta
+    assert "contact" not in bob_meta and "location" not in bob_meta
+
+    # The edit landed in bob's own profile.yaml, in roster shape, for the PI to
+    # ingest on the next sync.
+    staged = mp.staged_roster_profile("bob")
+    assert staged["contact"]["email"] == "bob@example.edu"
+    assert staged["location"]["office"] == "MSB-1"
+    assert staged["slack"] == "bobby"
+
+
+def test_member_missing_from_roster_still_stages_no_404(world, monkeypatch, tmp_path):
+    """A non-writer with no roster file at all stages cleanly (no 404) — the
+    roster-file-missing 404 now only guards the writer (PI) path."""
     monkeypatch.setenv("MURMURENT_USER", "ghost")
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "ghost-home"))
     client = TestClient(create_app())
     res = client.post("/api/member/settings", json={"email": "x@y.z"})
-    assert res.status_code == 404
+    assert res.status_code == 200, res.text
+    assert res.json().get("staged") is True
+    assert not (world["lab_mgmt"] / "members" / "ghost.md").exists()
+
+
+def test_staged_member_edit_overlays_own_dashboard(world, monkeypatch, tmp_path):
+    """After staging, the member's OWN dashboard reflects the edit immediately
+    (overlay), even though the roster hasn't been synced yet."""
+    monkeypatch.setenv("MURMURENT_USER", "bob")
+    monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "bob-home"))
+    client = TestClient(create_app())
+    client.post("/api/member/settings", json={"email": "bob@example.edu"})
+
+    payload = client.get("/api/dashboard?user=bob").json()
+    assert payload["member_settings"]["email"] == "bob@example.edu"
 
 
 # ---------------------------------------------------------------------------
