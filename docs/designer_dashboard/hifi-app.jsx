@@ -1682,11 +1682,13 @@ function NewSeaModal({ projects, onClose }) {
     <div onClick={onClose} style={{
       position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
       display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
+      padding:"40px 20px", overflowY:"auto",
     }}>
       <form onSubmit={submit} onClick={e => e.stopPropagation()} style={{
         background:"var(--card)", border:"1px solid var(--rule-strong)",
         borderRadius:2, padding:18, width:"min(560px, 92vw)",
         display:"flex", flexDirection:"column", gap:10,
+        maxHeight:"90vh", overflowY:"auto",
       }}>
         <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
           New SEA
@@ -3725,11 +3727,13 @@ function NewProjectModal({ onClose }) {
     <div onClick={onClose} style={{
       position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
       display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
+      padding:"40px 20px", overflowY:"auto",
     }}>
       <form onSubmit={submit} onClick={e => e.stopPropagation()} style={{
         background:"var(--card)", border:"1px solid var(--rule-strong)",
         borderRadius:2, padding:18, width:"min(560px, 92vw)",
         display:"flex", flexDirection:"column", gap:8,
+        maxHeight:"90vh", overflowY:"auto",
       }}>
         <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
           Propose new project
@@ -4160,11 +4164,13 @@ function CatalogEntryForm({ entry, onClose }) {
     <div onClick={onClose} style={{
       position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
       display:"flex", alignItems:"center", justifyContent:"center", zIndex:100,
+      padding:"40px 20px", overflowY:"auto",
     }}>
       <form onSubmit={submit} onClick={e => e.stopPropagation()} style={{
         background:"var(--card)", border:"1px solid var(--rule-strong)",
         borderRadius:2, padding:18, width:"min(560px, 92vw)",
         display:"flex", flexDirection:"column", gap:8,
+        maxHeight:"90vh", overflowY:"auto",
       }}>
         <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
           {entry ? "Edit catalog entry" : "Add catalog entry"}
