@@ -76,6 +76,7 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 | `murmurent group list` | List groups visible from your identity |
 | `murmurent group join <group>` | Request membership; PI approves |
 | `murmurent group leave <group>` | Remove yourself from a group |
+| `murmurent group-setup <group> --set <key>=<value>` *PI* | Fill in a group's post-creation details, written to its `lab.md` (repeatable `--set`; interactive without `--set`). Keys: `github`, `github_org`, `notebook_host`, `notebook_path`, `slack_workspace`, `slack_invite_url`, `data_host`, `data_raw`, `data_refined`. Setting `github=<org>/<repo>` also fills `github_org` when unset, clearing the "no GitHub org configured" warning |
 
 ### Roles (PI-only commands marked)
 

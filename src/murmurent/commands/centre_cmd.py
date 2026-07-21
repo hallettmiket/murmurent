@@ -1633,9 +1633,11 @@ _GROUP_SETUP_PROMPTS = [
                      "exists; writes to the group's lab.md.")
 @click.argument("group")
 @click.option("--set", "sets", multiple=True, metavar="KEY=VALUE",
-              help="Set a field directly (repeatable): github, notebook_host, "
-                   "notebook_path, slack_workspace, slack_invite_url, data_host, "
-                   "data_raw, data_refined.")
+              help="Set a field directly (repeatable): github, github_org, "
+                   "notebook_host, notebook_path, slack_workspace, "
+                   "slack_invite_url, data_host, data_raw, data_refined. Setting "
+                   "github=<org>/<repo> also fills github_org (the org project "
+                   "repos are created under) when it is unset.")
 @click.option("--non-interactive", is_flag=True,
               help="Don't prompt; apply only --set values.")
 def group_setup(group: str, sets: tuple[str, ...], non_interactive: bool) -> None:
@@ -1686,7 +1688,9 @@ def group_setup(group: str, sets: tuple[str, ...], non_interactive: bool) -> Non
         click.echo("    (empty)")
     if not prof.get("github"):
         click.echo("\nTip: create a PRIVATE group repo (your agent toolkit + lab-mgmt), "
-                   f"then set it:  murmurent group-setup {group} --set github=<org>/<repo>")
+                   f"then set it:  murmurent group-setup {group} --set github=<org>/<repo>\n"
+                   "     (this also sets the org project repos are created under, "
+                   'clearing the dashboard\'s "no GitHub org configured" warning).')
 
 
 _GROUP_SLACK_SCOPES = [

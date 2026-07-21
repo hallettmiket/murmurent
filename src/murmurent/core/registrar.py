@@ -1259,6 +1259,9 @@ def remove_group_member(
 # and backs up — distinct from the centre registry the mayor holds.
 GROUP_PROFILE_FIELDS: tuple[str, ...] = (
     "github",           # the group's GitHub repo, e.g. "org/mh_lab"
+    "github_org",       # org used to provision project repos (read by
+                        # load_lab_config); kept in sync with github's org half
+                        # when unset, so `--set github=<org>/<repo>` also fills it
     "notebook_host",    # a machine (in the host registry) where lab notebooks live
     "notebook_path",    # path on that host
     "slack_workspace",  # the group's OWN Slack workspace/team id (per-group workspace)
@@ -1309,6 +1312,14 @@ def update_group_profile(
             meta[k] = val
         else:
             meta.pop(k, None)
+    # Keep github_org (the org used to provision project repos, read by
+    # load_lab_config) in sync with the org half of the group's github repo
+    # when it is otherwise unset. This is what makes `group-setup <group> --set
+    # github=<org>/<repo>` also clear the "no GitHub org configured" warning.
+    if "github_org" not in fields and not str(meta.get("github_org", "")).strip():
+        gh = str(meta.get("github", "")).strip()
+        if "/" in gh:
+            meta["github_org"] = gh.split("/", 1)[0]
     p.write_text(_dump(meta, doc.body), encoding="utf-8")
     return True
 

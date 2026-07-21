@@ -115,6 +115,15 @@ is a one-time task:
   private GitHub repository of the same name and pushes it. See
   [`lab_mgmt.md`](lab_mgmt.md) for the repository's contents and access
   model.
+- `murmurent group-setup <lab> --set github=<org>/<repo>` records the lab's
+  GitHub. Setting `github` also fills the lab's **GitHub org** (the org that
+  project repositories are created under), which clears the dashboard Repos
+  panel's "no GitHub org configured" warning and lets Murmurent create a
+  project's repository under your org. The same fields can be set from the
+  dashboard's **Lab Settings** panel. `group-setup` also configures the lab
+  notebook host and path, the lab's own Slack workspace, and the
+  data-storage paths; run `murmurent group-setup <lab> --help` for the full
+  list of settable fields.
 - `murmurent group-slack-setup <lab>` creates the lab's Slack channel and
   configures the bot token. See
   [`group_slack_setup.md`](group_slack_setup.md) for the required OAuth

@@ -231,6 +231,17 @@ def test_group_profile_roundtrip(world):
     assert "github" not in R.read_group_profile("dcis")
 
 
+def test_group_profile_derives_github_org_from_github(world):
+    R.create_lab(name="bio", display_name="bio", pi_handle="@pi", pi_email="p@x")
+    # setting github=<org>/<repo> back-fills github_org with the org half, so the
+    # dashboard's "no GitHub org configured" warning (which reads github_org) clears
+    R.update_group_profile("bio", {"github": "westernorg/bio_lab"})
+    assert R.read_group_profile("bio")["github_org"] == "westernorg"
+    # an explicit github_org is respected, not overwritten by the github org
+    R.update_group_profile("bio", {"github_org": "explicitorg"})
+    assert R.read_group_profile("bio")["github_org"] == "explicitorg"
+
+
 def test_update_group_profile_no_such_group(world):
     assert R.update_group_profile("ghost", {"github": "x/y"}) is False
 
