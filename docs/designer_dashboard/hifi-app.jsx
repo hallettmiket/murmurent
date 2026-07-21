@@ -3212,6 +3212,263 @@ function SecurityAccessPanel({ peers, span = "c-12" }) {
   );
 }
 
+/* ───────── phrases + choreographies (#38 Phases B/C) ───────── */
+async function postJSON(url, body) {
+  const opts = { method: "POST", headers: { Accept: "application/json" } };
+  if (body !== undefined) {
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+async function refreshDashboard() {
+  if (typeof window.__murmurentFetchData === "function") {
+    try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
+  }
+}
+
+// A phrase's typed output contract, as a compact one-line signature. This is
+// what makes phrases joinable: two phrases combine iff they share candidate_key.
+function ContractSignature({ c }) {
+  if (!c) return <span className="mono muted" style={{fontSize:10}}>no contract</span>;
+  const arrow = c.direction === "lower_better" ? "↓" : (c.direction === "higher_better" ? "↑" : "");
+  return (
+    <span className="mono" style={{fontSize:10, letterSpacing:0.3}}>
+      <span style={{color:"var(--purple-deep)"}}>{c.candidate_key || "—"}</span>
+      <span className="muted"> → </span>
+      <span>{c.metric || "—"}{c.units ? " ("+c.units+")" : ""} {arrow}</span>
+      {c.uncertainty && c.uncertainty !== "none" && (
+        <span className="muted"> ± {c.uncertainty}</span>
+      )}
+    </span>
+  );
+}
+
+function MyPhrasesPanel({ phrases, span="c-12" }) {
+  const list = phrases || [];
+  const [busy, setBusy] = useState(null);
+  const [err, setErr]   = useState(null);
+  const onState = async (slug) => {
+    setBusy(slug); setErr(null);
+    try { await postJSON("/api/phrases/" + encodeURIComponent(slug) + "/state"); await refreshDashboard(); }
+    catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(null); }
+  };
+  return (
+    <div className={"panel "+span}>
+      <header>
+        <h2>My phrases</h2>
+        <span className="meta">
+          {list.length} authored · {list.filter(p => p.stated).length} stated to group
+        </span>
+      </header>
+      <div className="body" style={{padding:0}}>
+        {err && <div style={{padding:"6px 14px", color:"var(--red)", fontSize:12}}>{err}</div>}
+        {list.length === 0 && (
+          <div className="muted" style={{padding:"14px", fontSize:13}}>
+            No phrases yet. Author one in your vault with{" "}
+            <code className="mono">murmurent phrase spec new</code> — a phrase is a
+            small recipe (steps + transitions) with a typed output contract.
+          </div>
+        )}
+        {list.map(p => (
+          <div key={p.slug || p.phrase} style={{
+            padding:"9px 14px", borderBottom:"1px solid var(--rule)",
+            display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10,
+          }}>
+            <div style={{minWidth:0}}>
+              <div style={{fontWeight:500}}>{p.phrase}</div>
+              {p.question && <div className="muted" style={{fontSize:12, marginTop:2}}>{p.question}</div>}
+              <div style={{marginTop:4}}><ContractSignature c={p.contract} /></div>
+              <div className="mono muted" style={{fontSize:10, marginTop:3}}>
+                {p.steps} step{p.steps === 1 ? "" : "s"} · {p.transitions} transition{p.transitions === 1 ? "" : "s"}
+                {p.author ? " · " + p.author : ""}
+              </div>
+            </div>
+            <div style={{flexShrink:0}}>
+              {p.stated ? (
+                <span className="mono" style={{fontSize:10, letterSpacing:1, color:"var(--green,#2e7d32)"}}
+                      title="Published to your group so others can build a choreography from it">
+                  STATED
+                </span>
+              ) : (
+                <button className="btn sm" disabled={busy === p.slug}
+                        title="Publish this phrase to your group so other members can build a choreography from it"
+                        onClick={() => onState(p.slug)}>
+                  {busy === p.slug ? "…" : "state to group"}
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function NewChoreographyModal({ onClose }) {
+  const [form, setForm] = useState({ title:"", question:"", candidate_key:"", criteria:"" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState(null);
+  const set = k => e => setForm({ ...form, [k]: e.target.value });
+  const submit = async () => {
+    setBusy(true); setErr(null);
+    try {
+      await postJSON("/api/choreography", form);
+      await refreshDashboard();
+      onClose();
+    } catch (ex) { setErr(String(ex.message || ex)); setBusy(false); }
+  };
+  const KEYS = ["inchikey", "smiles", "gene_symbol", "uniprot"];
+  const field = (label, k, ph) => (
+    <label style={{display:"block", marginBottom:10}}>
+      <div className="mono muted" style={{fontSize:11, marginBottom:3}}>{label}</div>
+      <input value={form[k]} onChange={set(k)} placeholder={ph}
+             style={{width:"100%", padding:"6px 8px", border:"1px solid var(--rule-strong)",
+                     borderRadius:2, fontFamily:"var(--sans)", fontSize:13}} />
+    </label>
+  );
+  return (
+    <div onClick={onClose} style={MODAL_BACKDROP_STYLE}>
+      <div onClick={e => e.stopPropagation()} style={{...MODAL_PANEL_STYLE, maxWidth:520}}>
+        <div style={{background:"var(--paper-2)", borderBottom:"1px solid var(--rule)", padding:"12px 16px"}}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:17, color:"var(--purple-deep)"}}>
+            Pose a choreography
+          </h2>
+          <div className="muted" style={{fontSize:12, marginTop:3}}>
+            Advertise a target. Members contribute phrases that join on the candidate key.
+          </div>
+        </div>
+        <div style={{padding:16}}>
+          {field("Title", "title", "e.g. Target X binders")}
+          {field("Question", "question", "the compositional question being posed")}
+          <label style={{display:"block", marginBottom:10}}>
+            <div className="mono muted" style={{fontSize:11, marginBottom:3}}>
+              Candidate key <span style={{textTransform:"none"}}>(the join/identity space)</span>
+            </div>
+            <input value={form.candidate_key} onChange={set("candidate_key")} list="ck-list"
+                   placeholder="inchikey | smiles | gene_symbol | uniprot | other:<text>"
+                   style={{width:"100%", padding:"6px 8px", border:"1px solid var(--rule-strong)",
+                           borderRadius:2, fontFamily:"var(--mono)", fontSize:12}} />
+            <datalist id="ck-list">{KEYS.map(k => <option key={k} value={k} />)}</datalist>
+          </label>
+          {field("Criteria", "criteria", "how the judge should present + rank candidates")}
+          {err && <div style={{color:"var(--red)", fontSize:12, marginBottom:8}}>{err}</div>}
+          <div style={{display:"flex", justifyContent:"flex-end", gap:8, marginTop:6}}>
+            <button className="btn sm" onClick={onClose} disabled={busy}>cancel</button>
+            <button className="btn sm primary" onClick={submit}
+                    disabled={busy || !form.title || !form.question || !form.candidate_key || !form.criteria}>
+              {busy ? "posing…" : "pose choreography"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChoreographyCard({ c }) {
+  const [busy, setBusy] = useState(null);
+  const [err, setErr]   = useState(null);
+  const attach = async (slug) => {
+    setBusy(slug); setErr(null);
+    try {
+      await postJSON("/api/choreography/" + encodeURIComponent(c.id) + "/attach?phrase=" + encodeURIComponent(slug));
+      await refreshDashboard();
+    } catch (ex) { setErr(String(ex.message || ex)); }
+    finally { setBusy(null); }
+  };
+  return (
+    <div style={{padding:"11px 14px", borderBottom:"1px solid var(--rule)"}}>
+      <div style={{display:"flex", justifyContent:"space-between", alignItems:"baseline", gap:8}}>
+        <div style={{fontWeight:600, fontFamily:"var(--serif)"}}>{c.title}</div>
+        <span className="mono muted" style={{fontSize:10}}>
+          join on <span style={{color:"var(--purple-deep)"}}>{c.candidate_key || "—"}</span>
+        </span>
+      </div>
+      {c.question && <div className="muted" style={{fontSize:12, marginTop:2}}>{c.question}</div>}
+      {c.criteria && <div className="muted" style={{fontSize:11, marginTop:2, fontStyle:"italic"}}>criteria: {c.criteria}</div>}
+      <div className="mono muted" style={{fontSize:10, marginTop:3}}>
+        posed by {c.poser || "—"}
+        {c.attached.length > 0 && (c.all_join
+          ? <span style={{color:"var(--green,#2e7d32)", marginLeft:8}}>· all {c.attached.length} phrase(s) join — ready to compose</span>
+          : <span style={{color:"var(--red)", marginLeft:8}}>· some attached phrases don't join</span>)}
+      </div>
+
+      {c.attached.length > 0 && (
+        <div style={{marginTop:6}}>
+          <div className="mono muted" style={{fontSize:10, letterSpacing:1}}>CONTRIBUTED</div>
+          {c.attached.map((a, i) => (
+            <div key={i} style={{fontSize:12, marginTop:2, display:"flex", gap:6, alignItems:"baseline"}}>
+              <span style={{color: a.joins ? "var(--green,#2e7d32)" : "var(--red)"}}>{a.joins ? "✓" : "✕"}</span>
+              <span>{a.phrase}</span>
+              {a.author && <span className="mono muted" style={{fontSize:10}}>{a.author}</span>}
+              {!a.joins && a.reason && <span className="mono" style={{fontSize:10, color:"var(--red)"}}>{a.reason}</span>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {c.joinable.length > 0 && (
+        <div style={{marginTop:6}}>
+          <div className="mono muted" style={{fontSize:10, letterSpacing:1}}>JOINABLE — stated group phrases you can attach</div>
+          {c.joinable.map((j, i) => (
+            <div key={i} style={{fontSize:12, marginTop:2, display:"flex", justifyContent:"space-between", gap:8, alignItems:"baseline"}}>
+              <span>{j.phrase} {j.author && <span className="mono muted" style={{fontSize:10}}>{j.author}</span>}</span>
+              <button className="btn sm" disabled={busy === j.phrase}
+                      onClick={() => attach(slugify(j.phrase))}>
+                {busy === j.phrase ? "…" : "attach"}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {err && <div style={{color:"var(--red)", fontSize:11, marginTop:4}}>{err}</div>}
+    </div>
+  );
+}
+
+// Client-side slug (mirrors core.phrase_contract.slugify closely enough for
+// addressing a stated phrase by name).
+function slugify(text) {
+  return String(text || "").trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "phrase";
+}
+
+function ChoreographiesPanel({ choreographies, span="c-12" }) {
+  const list = choreographies || [];
+  const [modal, setModal] = useState(false);
+  return (
+    <div className={"panel "+span}>
+      <header>
+        <h2>Choreographies</h2>
+        <span className="meta" style={{display:"flex", alignItems:"center", gap:8}}>
+          {list.length} posed
+          <button className="btn sm" onClick={() => setModal(true)}>+ pose</button>
+        </span>
+      </header>
+      <div className="body" style={{padding:0}}>
+        {list.length === 0 && (
+          <div className="muted" style={{padding:"14px", fontSize:13}}>
+            No choreographies yet. Pose one to advertise a target; members then
+            contribute phrases that join on its candidate key, and the judge
+            combines them.
+          </div>
+        )}
+        {list.map(c => <ChoreographyCard key={c.id || c.title} c={c} />)}
+      </div>
+      {modal && <NewChoreographyModal onClose={() => setModal(false)} />}
+    </div>
+  );
+}
+
 /* ───────── agents panel ───────── */
 async function postAgentAction(name, action, params = {}) {
   const qs = new URLSearchParams(params).toString();
@@ -7988,10 +8245,16 @@ function App() {
           <AgentsActivityPanel activity={D.agents_activity} span="c-12" />
         </div>
 
-        {/* SEA windows (Receptionist inbound queue, All SEAs, SEAs-we-offer
-            catalog) were removed in #38 as murmurent moves from SEA-based
-            exchange to choreographies. The SEA backend remains but is no longer
-            surfaced here; choreography + phrase panels replace it (Phases B/C). */}
+        {/* Choreographies (group-shared) + my phrases (member-owned) replace
+            the removed SEA windows (#38): murmurent moved from SEA exchange to
+            compositional choreographies. A member states phrases; the group
+            assembles them into a choreography that joins on a candidate key. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <ChoreographiesPanel choreographies={D.choreographies} span="c-12" />
+        </div>
+        <div className="grid" style={{marginBottom:14}}>
+          <MyPhrasesPanel phrases={D.my_phrases} span="c-12" />
+        </div>
 
         {/* Inventory: things you check, but not every day. (Lab members moved
             to the top of the page.) */}
