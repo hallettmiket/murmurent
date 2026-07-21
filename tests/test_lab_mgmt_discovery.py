@@ -114,3 +114,57 @@ def test_pinned_pointer_still_wins_over_discovery(member_machine, tmp_path):
     _repo.set_lab_mgmt_path(already)  # e.g. a prior pi-init or discovery run
 
     assert _repo.lab_mgmt_repo_root() == already
+
+
+# --- registry-authoritative net (#31/#33: canonical resolution, no legacy name) -----
+
+def test_registry_owner_claim_wins_over_discovery_even_when_absent(
+    member_machine, tmp_path, monkeypatch
+):
+    """The machine owner's registered group is authoritative: it outranks
+    shape-discovery AND is returned even when the clone isn't on disk yet — the
+    honest answer that never silently resolves to some other lab's roster."""
+    # A discoverable clone exists on disk (bob is in it)...
+    _make_clone(member_machine, "murmurent_lab_mgmt_bioinformatics", members=["bob"])
+    # ...but the registry claims bob for a DIFFERENT (not-yet-cloned) lab.
+    from murmurent.core import registrar as _reg
+    registry_path = tmp_path / "canonical" / "murmurent_lab_mgmt_mh"
+    monkeypatch.setattr(
+        _reg, "resolve_viewer_lab_mgmt",
+        lambda handle, env=None: ("mh", str(registry_path)),
+    )
+
+    resolved = _repo.lab_mgmt_repo_root()
+    assert resolved == registry_path          # registry beats discovery...
+    assert not registry_path.exists()         # ...and is returned though absent.
+
+
+def test_registry_miss_falls_through_to_discovery(member_machine, monkeypatch):
+    """No registry claim → discovery still self-heals the member machine."""
+    clone = _make_clone(member_machine, "murmurent_lab_mgmt_mh", members=["bob"])
+    from murmurent.core import registrar as _reg
+    monkeypatch.setattr(_reg, "resolve_viewer_lab_mgmt", lambda handle, env=None: None)
+
+    assert _repo.lab_mgmt_repo_root() == clone
+
+
+def test_pre_convention_repos_lab_mgmt_resolved_by_shape_not_name(
+    member_machine, monkeypatch
+):
+    """An un-migrated clone literally named ``lab_mgmt`` still resolves — via
+    SHAPE (lab.md + members/), the same path as any canonical clone. Proves
+    dropping the hardcoded name doesn't strand the couple of un-migrated users."""
+    legacy = _make_clone(member_machine, "lab_mgmt", members=["bob"])
+    from murmurent.core import registrar as _reg
+    monkeypatch.setattr(_reg, "resolve_viewer_lab_mgmt", lambda handle, env=None: None)
+
+    assert _repo.lab_mgmt_repo_root() == legacy
+
+
+def test_last_resort_default_is_canonical_never_repos_lab_mgmt():
+    """The honest last-resort default follows the ``murmurent_lab_mgmt`` naming
+    convention and is never the pre-convention ``~/repos/lab_mgmt`` — that path
+    is no longer one murmurent ever falls back to (#31/#33)."""
+    default = _repo.DEFAULT_LAB_MGMT_REPO
+    assert default.name == "murmurent_lab_mgmt"
+    assert default != Path("~/repos/lab_mgmt").expanduser()

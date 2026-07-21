@@ -141,27 +141,42 @@ join-request approval flow.
 `core.repo.lab_mgmt_repo_root()` returns the active lab's repo path
 using this order:
 
-1. **Thread-local override**: the dashboard sets this per-request
-   so the registrar can switch between viewing different labs.
-2. **`$MURMURENT_LAB_MGMT_REPO` env var**: for tests + scripted use.
+1. **Thread-local override**: the dashboard sets this per-request so a
+   shared, multi-lab dashboard scopes each request to the acting viewer's
+   own lab (via `use_lab_mgmt_root(resolve_viewer_lab_mgmt(actor))`).
+2. **`$MURMURENT_LAB_MGMT_REPO` env var**: an explicit operator pin to
+   one lab (single-lab installs, tests, scripted use). When set, it wins
+   over the registry net below — and the dashboard's per-viewer scoping
+   stands down, since a machine pinned to one lab is not multi-lab.
 3. **This machine's pinned pointer** (`~/.murmurent/lab_mgmt_path`):
    written by `murmurent pi-init <lab>`, and by discovery (step 5).
-4. **`~/repos/lab_mgmt`, then `~/repos/<lab>-lab-mgmt`**: if either
-   exists. Pre-convention names, kept working for clones made before
-   `murmurent_lab_mgmt_<lab>` was settled; not what you should create.
+4. **Registry-authoritative** (`_registry_lab_mgmt_for_owner`): the
+   machine owner's own group per the centre registry (`_registry.yaml`).
+   A bare call acts for the owner, so their registered group is the
+   canonical default — returned **even if the clone isn't on disk yet**
+   (the honest answer; panels render empty until it's cloned). This is
+   what replaced the old hardcoded `~/repos/lab_mgmt` fallback.
 5. **Discovery**: scans `~/repos` for a directory with the lab_mgmt
    shape (`lab.md` + `members/`), preferring one whose roster contains
-   your handle, and **pins** an unambiguous hit so this runs once. This
-   is what finds `~/repos/murmurent_lab_mgmt_<lab>` on a member machine
-   (they never run `pi-init`, so nothing pinned it). If two clones match,
-   it refuses to guess and the panels stay empty; set
-   `MURMURENT_LAB_MGMT_REPO` to break the tie.
-6. **`~/repos/lab_mgmt`**: last-resort default if nothing above hit.
+   your handle, and **pins** an unambiguous hit so this runs once. It
+   matches on shape, not name, so a pre-convention `~/repos/lab_mgmt`
+   clone is still found here — the name was dropped as a *fallback*, the
+   folder still resolves. If two clones match, it refuses to guess and
+   the panels stay empty; set `MURMURENT_LAB_MGMT_REPO` to break the tie.
+6. **Canonical-convention default** (`~/repos/murmurent_lab_mgmt`, no
+   group suffix): the honest last resort when nothing above resolves. It
+   never exists on disk, so every lookup misses cleanly and any resulting
+   404 names the canonical convention. Murmurent no longer falls back to
+   `~/repos/lab_mgmt` by name (that pre-convention path used to outrank
+   discovery and was returned even when absent — the root of the
+   wrong-roster 404s in issues #31 / #33).
 
 So the canonical clone path needs no configuration: `pi-init` pins it
-for the PI, discovery pins it for members. The `MURMURENT_LAB_MGMT_REPO`
-env var is the knob for tests and unusual deployments (e.g. a multi-lab
-dev workstation where discovery is ambiguous by design).
+for the PI; for members the registry net (step 4) resolves it the moment
+the PI has pushed their roster record, and discovery (step 5) self-heals
+the pre-registry case. The `MURMURENT_LAB_MGMT_REPO` env var remains the
+knob for tests and unusual deployments (e.g. a multi-lab dev workstation
+where discovery is ambiguous by design).
 
 ## Backfilling access for pre-existing members
 
@@ -206,6 +221,23 @@ In practice the granular write permissions are enforced by the
 but the inventory MCP refuses to commit-publish their changes unless
 they hold the `lab_manager` role. The PI's review on incoming PRs is
 the final gate.
+
+### Member profile edits are staged, not committed (#34)
+
+Members hold the roster clone **read-only** by design: the PI/leader is
+the only writer, so a member's `git pull --ff-only` on the roster can
+never conflict. That is why a member editing their own profile in the
+dashboard does **not** write to `members/<handle>.md` — committing to a
+read-only clone leaves an unpushable local commit that diverges it and
+breaks the next pull.
+
+Instead, a non-writer's profile edit is **staged** to their own
+`~/.murmurent/profile.yaml` under a `roster_profile:` block (shaped like
+the roster frontmatter), and their own dashboard overlays it so the edit
+shows immediately. The PI applies staged edits to the roster on the next
+sync. Only the writer (PI/leader) edits `members/<handle>.md` directly,
+with a real commit + push. (The reconcile step that ingests staged member
+profiles into the roster is the durable follow-up to this staging store.)
 
 ## `lab_mgmt` vs `~/.murmurent/lab_info/`: the comparison
 
