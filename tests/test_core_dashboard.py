@@ -43,6 +43,43 @@ def world(monkeypatch, tmp_path):
     return tmp_path
 
 
+def test_member_settings_scopes_to_viewer_lab_mgmt(world, monkeypatch, tmp_path):
+    """Regression: POST /api/member/settings must resolve <lab-mgmt> via the
+    VIEWER's own registry entry (use_lab_mgmt_root), not a bare
+    lab_mgmt_repo_root() that falls through to ~/repos/lab_mgmt.
+
+    Reproduces a real member machine: no MURMURENT_LAB_MGMT_REPO env var (that
+    env is what masked the bug in every other test), and the member's roster
+    lives at a non-default clone the registry points to.
+    """
+    from murmurent.core import git_persist as _gp
+
+    # The member's REAL roster lives here — NOT ~/repos/lab_mgmt.
+    real_clone = tmp_path / "murmurent_lab_mgmt_xlab"
+    (real_clone / "members").mkdir(parents=True)
+    (real_clone / "members" / "alice.md").write_text(
+        "---\nhandle: '@alice'\nrole: member\nstatus: active\n---\n# @alice\n",
+        encoding="utf-8",
+    )
+    # Point the viewer resolver at that clone; drop the env var so a bare
+    # resolution would MISS instead of silently resolving.
+    monkeypatch.setattr(
+        R, "resolve_viewer_lab_mgmt",
+        lambda h, env=None: ("xlab", str(real_clone))
+        if h.strip().lstrip("@").lower() == "alice" else None,
+    )
+    monkeypatch.delenv("MURMURENT_LAB_MGMT_REPO", raising=False)
+    # Keep the test off git — commit_and_push is best-effort anyway.
+    monkeypatch.setattr(_gp, "commit_and_push", lambda *a, **k: [])
+
+    client = TestClient(create_app())
+    res = client.post("/api/member/settings?user=alice",
+                      json={"city": "London, ON N6A 3K7"})
+    assert res.status_code == 200, res.text
+    # The save landed in the viewer's clone, not the default roster.
+    assert "London, ON N6A 3K7" in (real_clone / "members" / "alice.md").read_text()
+
+
 def _seed_core(name="biocore", display="BioCORE", leader="@biocore_leader"):
     R.create_core(
         name=name,

@@ -1772,14 +1772,17 @@ def create_app() -> FastAPI:
         from ..core.frontmatter import parse_file, dump_document
 
         actor = _resolve_actor(user)
-        _require_active(actor)
-
-        member_path = lab_mgmt_repo_root() / "members" / f"{actor}.md"
-        if not member_path.is_file():
-            raise HTTPException(
-                status_code=404,
-                detail=f"member file not found: {member_path}",
-            )
+        # Scope to the acting member's OWN lab_mgmt clone (matches the read-side
+        # dashboard). Without this, resolution falls through to ~/repos/lab_mgmt
+        # and the save 404s against a roster the member doesn't use.
+        with _viewer_lab_mgmt(actor):
+            _require_active(actor)
+            member_path = lab_mgmt_repo_root() / "members" / f"{actor}.md"
+            if not member_path.is_file():
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"member file not found: {member_path}",
+                )
 
         parsed = parse_file(member_path)
         meta = dict(parsed.meta or {})
@@ -1887,11 +1890,15 @@ def create_app() -> FastAPI:
         """
         from ..core.frontmatter import parse_file, dump_document
 
-        _require_pi(user)
-
-        lab_path = lab_mgmt_repo_root() / "lab.md"
-        if not lab_path.is_file():
-            raise HTTPException(status_code=404, detail=f"lab.md not found at {lab_path}")
+        actor = _resolve_actor(user)
+        # Scope to the acting PI's OWN lab_mgmt clone before the PI check and the
+        # lab.md read (both read <lab-mgmt>/…); a bare resolution would test
+        # against ~/repos/lab_mgmt.
+        with _viewer_lab_mgmt(actor):
+            _require_pi(user)
+            lab_path = lab_mgmt_repo_root() / "lab.md"
+            if not lab_path.is_file():
+                raise HTTPException(status_code=404, detail=f"lab.md not found at {lab_path}")
 
         parsed = parse_file(lab_path)
         meta = dict(parsed.meta or {})
@@ -5811,6 +5818,25 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail="No actor resolved")
         return actor
 
+    def _viewer_lab_mgmt(actor: str):
+        """Context manager: scope ``lab_mgmt_repo_root()`` to ``actor``'s own lab
+        for the duration of the block — the write-side twin of how
+        ``/api/dashboard`` scopes reads (``resolve_viewer_lab_mgmt`` +
+        ``use_lab_mgmt_root``, resolution step 1).
+
+        Any endpoint that touches ``<lab-mgmt>/…`` on behalf of the acting user
+        MUST wrap the auth check + path resolution in this. A bare
+        ``lab_mgmt_repo_root()`` skips the per-viewer registry lookup and falls
+        through to the fragile discovery / ``~/repos/lab_mgmt`` default — which
+        is why member/lab-settings saves and oracle approvals could land on the
+        wrong (or a missing) roster even though the read-side dashboard resolved
+        correctly.
+        """
+        from ..core import registrar as _registrar
+        from ..core.repo import use_lab_mgmt_root
+        match = _registrar.resolve_viewer_lab_mgmt(actor)
+        return use_lab_mgmt_root(match[1] if match else None)
+
     def _require_active(actor: str) -> None:
         """403 if ``actor`` is in members/ but flagged inactive.
 
@@ -5979,19 +6005,22 @@ def create_app() -> FastAPI:
         """Approve or decline a draft oracle entry. PI only."""
         from ..core import slack_distill as _distill
 
-        actor = _require_pi(user)
-
-        path = lab_mgmt_repo_root() / "oracle" / f"{slug}"
-        # Allow callers to pass either "<slug>" or "<slug>.md".
-        if not path.suffix:
-            path = path.with_suffix(".md")
-        if not path.is_file():
-            raise HTTPException(status_code=404, detail=f"oracle entry not found: {slug}")
-        if not _distill.is_draft(path):
-            raise HTTPException(
-                status_code=409,
-                detail=f"oracle entry {slug!r} is not a draft.",
-            )
+        actor = _resolve_actor(user)
+        # Scope to the acting PI's OWN lab_mgmt clone before the PI check and the
+        # oracle-dir read; a bare resolution would look under ~/repos/lab_mgmt.
+        with _viewer_lab_mgmt(actor):
+            _require_pi(user)
+            path = lab_mgmt_repo_root() / "oracle" / f"{slug}"
+            # Allow callers to pass either "<slug>" or "<slug>.md".
+            if not path.suffix:
+                path = path.with_suffix(".md")
+            if not path.is_file():
+                raise HTTPException(status_code=404, detail=f"oracle entry not found: {slug}")
+            if not _distill.is_draft(path):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"oracle entry {slug!r} is not a draft.",
+                )
         try:
             if action == "approve":
                 _distill.approve_draft(path, approver=actor)
