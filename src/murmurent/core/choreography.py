@@ -1,23 +1,23 @@
 """
 Purpose: The compositional choreography object — a posed question that
-         contributors answer by offering phrases. A member (the *poser*) states
+         contributors answer by offering contributions. A member (the *poser*) states
          the question, the candidate-identity space, and the judging criteria;
-         members then attach phrases (:mod:`murmurent.core.phrase_spec`). The
+         members then attach contributions (:mod:`murmurent.core.contribution_spec`). The
          KEY invariant this module enforces is *joinability*: every contributed
-         phrase's output contract must share the choreography's ``candidate_key``
-         so the phrases can be aligned + combined later by the judge.
+         contribution's output contract must share the choreography's ``candidate_key``
+         so the contributions can be aligned + combined later by the judge.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
 Input: Keyword args (posing a choreography) or a schema-validated markdown entry
        (YAML frontmatter + optional body).
 Output: :class:`Choreography` instances; markdown serialization via
         ``to_markdown()`` / ``from_markdown()`` / ``from_file()``; operations to
-        pose, attach a phrase, and ``validate()`` (incl. the candidate-key
-        joinability check across all attached phrases).
+        pose, attach a contribution, and ``validate()`` (incl. the candidate-key
+        joinability check across all attached contributions).
 
 Boundary: this module defines, poses, and validates the choreography artefact
 only. It does NOT run the choreography, invoke the judge, or express results —
-those are later phases. See ``docs/choreography.md`` / ``docs/phrases.md``.
+those are later phases. See ``docs/choreography.md`` / ``docs/contributions.md``.
 
 Path resolution (for the default write location):
   - ``$MURMURENT_CHOREOGRAPHY_DIR`` if set, else
@@ -34,8 +34,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from . import phrase_contract as _pc
-from . import phrase_spec as _ps
+from . import contribution_contract as _pc
+from . import contribution_spec as _ps
 from .frontmatter import dump_document, parse_file, parse_text
 
 #: Frontmatter fields that must be present and non-empty for a valid object.
@@ -59,12 +59,12 @@ class ChoreographyError(ValueError):
 
 @dataclass
 class Choreography:
-    """A posed compositional question with its attached phrase contributions.
+    """A posed compositional question with its attached contribution contributions.
 
     ``candidate_key`` is the identity space for the whole choreography (same
-    vocabulary as :class:`~murmurent.core.phrase_contract.PhraseContract`); it
-    is the join column that makes the contributed phrases combinable. ``phrases``
-    holds references (path or slug) to the contributed phrase specs.
+    vocabulary as :class:`~murmurent.core.contribution_contract.ContributionContract`); it
+    is the join column that makes the contributed contributions combinable. ``contributions``
+    holds references (path or slug) to the contributed contribution specs.
     """
 
     question: str
@@ -72,23 +72,23 @@ class Choreography:
     title: str
     candidate_key: str
     criteria: str
-    phrases: list[str] = field(default_factory=list)
+    contributions: list[str] = field(default_factory=list)
     notes: str = ""
-    #: Set by :meth:`from_file`; base dir for resolving phrase references.
+    #: Set by :meth:`from_file`; base dir for resolving contribution references.
     source: Path | None = field(default=None, compare=False)
 
     # -- operations --------------------------------------------------------
 
-    def attach_phrase(self, reference: str) -> bool:
-        """Attach a phrase contribution by reference (path or slug).
+    def attach_contribution(self, reference: str) -> bool:
+        """Attach a contribution contribution by reference (path or slug).
 
         Returns ``True`` if newly added, ``False`` if it was already attached
         (idempotent — attaching the same reference twice is a no-op).
         """
         reference = (reference or "").strip()
-        if not reference or reference in self.phrases:
+        if not reference or reference in self.contributions:
             return False
-        self.phrases.append(reference)
+        self.contributions.append(reference)
         return True
 
     # -- validation --------------------------------------------------------
@@ -101,9 +101,9 @@ class Choreography:
           - ``poser`` is a handle of the form ``@name``;
           - ``candidate_key`` is in the shared vocabulary (or an ``other:``
             escape);
-          - **joinability**: each attached phrase resolves to a valid spec whose
+          - **joinability**: each attached contribution resolves to a valid spec whose
             output contract's ``candidate_key`` equals this choreography's
-            ``candidate_key``. Any phrase whose contract key differs (or whose
+            ``candidate_key``. Any contribution whose contract key differs (or whose
             spec/contract cannot be resolved) is reported.
         """
         problems: list[str] = []
@@ -131,27 +131,27 @@ class Choreography:
     def _validate_joinability(self, base_dir: str | Path | None) -> list[str]:
         base = self._resolve_base_dir(base_dir)
         problems: list[str] = []
-        for ref in self.phrases:
+        for ref in self.contributions:
             spec_path = _ps.resolve_spec_reference(ref, base)
             if spec_path is None:
-                problems.append(f"phrase {ref!r}: spec could not be resolved")
+                problems.append(f"contribution {ref!r}: spec could not be resolved")
                 continue
             try:
-                spec = _ps.PhraseSpec.from_file(spec_path)
-            except _ps.PhraseSpecError as exc:
-                problems.append(f"phrase {ref!r}: spec could not be parsed: {exc}")
+                spec = _ps.ContributionSpec.from_file(spec_path)
+            except _ps.ContributionSpecError as exc:
+                problems.append(f"contribution {ref!r}: spec could not be parsed: {exc}")
                 continue
             contract = spec.resolved_contract()
             if contract is None:
                 problems.append(
-                    f"phrase {ref!r}: its output contract could not be resolved"
+                    f"contribution {ref!r}: its output contract could not be resolved"
                 )
                 continue
             if contract.candidate_key != self.candidate_key:
                 problems.append(
-                    f"phrase {ref!r}: contract candidate_key "
+                    f"contribution {ref!r}: contract candidate_key "
                     f"{contract.candidate_key!r} does not join the choreography's "
-                    f"{self.candidate_key!r} — phrases are not combinable"
+                    f"{self.candidate_key!r} — contributions are not combinable"
                 )
         return problems
 
@@ -177,7 +177,7 @@ class Choreography:
             "title": self.title,
             "candidate_key": self.candidate_key,
             "criteria": self.criteria,
-            "phrases": list(self.phrases),
+            "contributions": list(self.contributions),
         }
 
     def to_markdown(self) -> str:
@@ -192,18 +192,18 @@ class Choreography:
         """Build a choreography from a parsed frontmatter mapping + body text."""
         if not isinstance(meta, dict):
             raise ChoreographyError("choreography frontmatter must be a mapping")
-        phrases_raw = meta.get("phrases") or []
-        if isinstance(phrases_raw, str):
-            phrases = [p.strip() for p in phrases_raw.split(",") if p.strip()]
+        contributions_raw = meta.get("contributions") or []
+        if isinstance(contributions_raw, str):
+            contributions = [p.strip() for p in contributions_raw.split(",") if p.strip()]
         else:
-            phrases = [str(p) for p in phrases_raw]
+            contributions = [str(p) for p in contributions_raw]
         return cls(
             question=str(meta.get("question", "") or ""),
             poser=str(meta.get("poser", "") or ""),
             title=str(meta.get("title", "") or ""),
             candidate_key=str(meta.get("candidate_key", "") or ""),
             criteria=str(meta.get("criteria", "") or ""),
-            phrases=phrases,
+            contributions=contributions,
             notes=body.strip(),
             source=source,
         )
@@ -243,7 +243,7 @@ def pose(
     candidate_key: str,
     criteria: str,
 ) -> Choreography:
-    """Pose a new choreography (no phrases attached yet)."""
+    """Pose a new choreography (no contributions attached yet)."""
     return Choreography(
         question=question,
         poser=poser,

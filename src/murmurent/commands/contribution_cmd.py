@@ -1,7 +1,7 @@
 """
-Purpose: Implementation of the ``murmurent phrase contract ...`` subcommands —
-         author and validate a phrase output-contract (the typed data contract
-         that lets heterogeneous phrase outputs be aligned + judged).
+Purpose: Implementation of the ``murmurent contribution contract ...`` subcommands —
+         author and validate a contribution output-contract (the typed data contract
+         that lets heterogeneous contribution outputs be aligned + judged).
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
 Input: CLI arguments forwarded from :mod:`murmurent.cli`.
@@ -16,13 +16,13 @@ from pathlib import Path
 
 import click
 
-from ..core import phrase_contract as _pc
-from ..core import phrase_spec as _ps
+from ..core import contribution_contract as _pc
+from ..core import contribution_spec as _ps
 
 
 def cmd_contract_new(
     *,
-    phrase: str,
+    contribution: str,
     author: str,
     question: str,
     candidate_key: str,
@@ -33,8 +33,8 @@ def cmd_contract_new(
     out: str | None,
 ) -> int:
     """Build + validate a contract, then write it (vault → --out → stdout)."""
-    contract = _pc.PhraseContract(
-        phrase=phrase,
+    contract = _pc.ContributionContract(
+        contribution=contribution,
         author=author,
         question=question,
         candidate_key=candidate_key,
@@ -53,22 +53,22 @@ def cmd_contract_new(
 
     markdown = contract.to_markdown()
 
-    # Resolve the destination: explicit --out wins; else the vault phrases/
+    # Resolve the destination: explicit --out wins; else the vault contributions/
     # dir; else print to stdout so the command is still useful without a vault.
     if out is not None:
         dest = Path(out).expanduser()
         if dest.is_dir():
-            dest = dest / _pc.default_contract_filename(phrase)
+            dest = dest / _pc.default_contract_filename(contribution)
     else:
         base = _pc.default_contract_dir()
         if base is None:
             click.echo(markdown, nl=False)
             return 0
-        dest = base / _pc.default_contract_filename(phrase)
+        dest = base / _pc.default_contract_filename(contribution)
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(markdown, encoding="utf-8")
-    click.echo(f"Wrote phrase contract → {dest}")
+    click.echo(f"Wrote contribution contract → {dest}")
     return 0
 
 
@@ -78,13 +78,13 @@ def cmd_contract_validate(path: str) -> int:
     if not p.is_file():
         raise click.ClickException(f"no such file: {p}")
     try:
-        contract = _pc.PhraseContract.from_file(p)
-    except _pc.PhraseContractError as exc:
+        contract = _pc.ContributionContract.from_file(p)
+    except _pc.ContributionContractError as exc:
         raise click.ClickException(str(exc)) from exc
 
     problems = contract.validate()
     if not problems:
-        click.echo(f"OK — {p} is a valid phrase contract.")
+        click.echo(f"OK — {p} is a valid contribution contract.")
         return 0
     click.echo(f"INVALID — {p} has {len(problems)} problem(s):")
     for prob in problems:
@@ -93,7 +93,7 @@ def cmd_contract_validate(path: str) -> int:
 
 
 # ---------------------------------------------------------------------------
-# phrase spec — the authored phrase (steps + transitions + contract reference)
+# contribution spec — the authored contribution (steps + transitions + contract reference)
 # ---------------------------------------------------------------------------
 
 
@@ -123,7 +123,7 @@ def _parse_transition(spec: str) -> _ps.Transition:
 
 def cmd_spec_new(
     *,
-    phrase: str,
+    contribution: str,
     author: str,
     question: str,
     contract: str,
@@ -131,9 +131,9 @@ def cmd_spec_new(
     transitions: tuple[str, ...],
     out: str | None,
 ) -> int:
-    """Build + validate a phrase spec, then write it (vault → --out → stdout)."""
-    spec = _ps.PhraseSpec(
-        phrase=phrase,
+    """Build + validate a contribution spec, then write it (vault → --out → stdout)."""
+    spec = _ps.ContributionSpec(
+        contribution=contribution,
         author=author,
         question=question,
         contract=contract,
@@ -149,7 +149,7 @@ def cmd_spec_new(
         for prob in problems:
             click.echo(f"  - {prob}")
         raise click.ClickException(
-            f"refusing to write an invalid phrase spec ({len(problems)} problem(s))."
+            f"refusing to write an invalid contribution spec ({len(problems)} problem(s))."
         )
 
     markdown = spec.to_markdown()
@@ -157,17 +157,17 @@ def cmd_spec_new(
     if out is not None:
         dest = Path(out).expanduser()
         if dest.is_dir():
-            dest = dest / _ps.default_spec_filename(phrase)
+            dest = dest / _ps.default_spec_filename(contribution)
     else:
         base_dir = _ps.default_spec_dir()
         if base_dir is None:
             click.echo(markdown, nl=False)
             return 0
-        dest = base_dir / _ps.default_spec_filename(phrase)
+        dest = base_dir / _ps.default_spec_filename(contribution)
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_text(markdown, encoding="utf-8")
-    click.echo(f"Wrote phrase spec → {dest}")
+    click.echo(f"Wrote contribution spec → {dest}")
     return 0
 
 
@@ -180,20 +180,20 @@ def _spec_base_dir(out: str | None) -> Path | None:
 
 
 def cmd_spec_validate(path: str) -> int:
-    """Parse + validate a phrase spec file (incl. its referenced contract)."""
+    """Parse + validate a contribution spec file (incl. its referenced contract)."""
     p = Path(path).expanduser()
     if not p.is_file():
         raise click.ClickException(f"no such file: {p}")
     try:
-        spec = _ps.PhraseSpec.from_file(p)
-    except _ps.PhraseSpecError as exc:
+        spec = _ps.ContributionSpec.from_file(p)
+    except _ps.ContributionSpecError as exc:
         raise click.ClickException(str(exc)) from exc
 
     problems = spec.validate()
     if not problems:
-        click.echo(f"OK — {p} is a valid phrase spec.")
+        click.echo(f"OK — {p} is a valid contribution spec.")
         return 0
     click.echo(f"INVALID — {p} has {len(problems)} problem(s):")
     for prob in problems:
         click.echo(f"  - {prob}")
-    raise click.ClickException("phrase spec failed validation.")
+    raise click.ClickException("contribution spec failed validation.")

@@ -1,6 +1,6 @@
 """
-Purpose: Unit + CLI tests for the phrase output-contract
-         (:mod:`murmurent.core.phrase_contract` and ``murmurent phrase contract``).
+Purpose: Unit + CLI tests for the contribution output-contract
+         (:mod:`murmurent.core.contribution_contract` and ``murmurent contribution contract``).
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
 Input: Synthetic contracts + ``click.testing.CliRunner`` invocations.
@@ -13,12 +13,12 @@ import pytest
 from click.testing import CliRunner
 
 from murmurent.cli import cli
-from murmurent.core import phrase_contract as pc
+from murmurent.core import contribution_contract as pc
 
 
-def _valid() -> pc.PhraseContract:
-    return pc.PhraseContract(
-        phrase="dock_and_filter",
+def _valid() -> pc.ContributionContract:
+    return pc.ContributionContract(
+        contribution="dock_and_filter",
         author="@member_a",
         question="optimize_sulfopin",
         candidate_key="inchikey",
@@ -41,14 +41,14 @@ def test_valid_contract_has_no_problems() -> None:
 
 def test_markdown_round_trip() -> None:
     c = _valid()
-    parsed = pc.PhraseContract.from_markdown(c.to_markdown())
+    parsed = pc.ContributionContract.from_markdown(c.to_markdown())
     assert parsed == c
 
 
 def test_to_markdown_has_frontmatter_and_kind() -> None:
     md = _valid().to_markdown()
     assert md.startswith("---\n")
-    assert "kind: phrase_contract" in md
+    assert "kind: contribution_contract" in md
     assert "candidate_key: inchikey" in md
     assert "Docks candidate analogues" in md  # body/notes preserved
 
@@ -94,8 +94,8 @@ def test_author_without_handle_flagged() -> None:
 
 
 def test_from_markdown_without_frontmatter_raises() -> None:
-    with pytest.raises(pc.PhraseContractError):
-        pc.PhraseContract.from_markdown("no frontmatter here\n")
+    with pytest.raises(pc.ContributionContractError):
+        pc.ContributionContract.from_markdown("no frontmatter here\n")
 
 
 # -- CLI: new + validate ----------------------------------------------------
@@ -103,7 +103,7 @@ def test_from_markdown_without_frontmatter_raises() -> None:
 
 def _new_args(**overrides) -> list[str]:
     base = {
-        "--phrase": "dock_and_filter",
+        "--contribution": "dock_and_filter",
         "--author": "@member_a",
         "--question": "optimize_sulfopin",
         "--candidate-key": "inchikey",
@@ -113,21 +113,21 @@ def _new_args(**overrides) -> list[str]:
         "--uncertainty": "stderr",
     }
     base.update(overrides)
-    args = ["phrase", "contract", "new"]
+    args = ["contribution", "contract", "new"]
     for k, v in base.items():
         args += [k, v]
     return args
 
 
 def test_cli_new_writes_to_vault_dir(tmp_path, monkeypatch) -> None:
-    phrases = tmp_path / "phrases"
-    monkeypatch.setenv(pc.ENV_CONTRACT_DIR, str(phrases))
+    contributions = tmp_path / "contributions"
+    monkeypatch.setenv(pc.ENV_CONTRACT_DIR, str(contributions))
     res = CliRunner().invoke(cli, _new_args())
     assert res.exit_code == 0, res.output
-    written = phrases / "dock_and_filter_contract.md"
+    written = contributions / "dock_and_filter_contract.md"
     assert written.is_file()
     # Round-trips back into a valid contract.
-    assert pc.PhraseContract.from_file(written).is_valid()
+    assert pc.ContributionContract.from_file(written).is_valid()
 
 
 def test_cli_new_out_path_overrides(tmp_path, monkeypatch) -> None:
@@ -139,17 +139,17 @@ def test_cli_new_out_path_overrides(tmp_path, monkeypatch) -> None:
 
 
 def test_cli_new_bad_direction_rejected_by_choice(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv(pc.ENV_CONTRACT_DIR, str(tmp_path / "phrases"))
+    monkeypatch.setenv(pc.ENV_CONTRACT_DIR, str(tmp_path / "contributions"))
     res = CliRunner().invoke(cli, _new_args(**{"--direction": "sideways"}))
     assert res.exit_code != 0
-    assert not (tmp_path / "phrases").exists()
+    assert not (tmp_path / "contributions").exists()
 
 
 def test_cli_validate_ok(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv(pc.ENV_CONTRACT_DIR, str(tmp_path / "phrases"))
+    monkeypatch.setenv(pc.ENV_CONTRACT_DIR, str(tmp_path / "contributions"))
     CliRunner().invoke(cli, _new_args())
-    path = tmp_path / "phrases" / "dock_and_filter_contract.md"
-    res = CliRunner().invoke(cli, ["phrase", "contract", "validate", str(path)])
+    path = tmp_path / "contributions" / "dock_and_filter_contract.md"
+    res = CliRunner().invoke(cli, ["contribution", "contract", "validate", str(path)])
     assert res.exit_code == 0, res.output
     assert "OK" in res.output
 
@@ -158,8 +158,8 @@ def test_cli_validate_reports_problems_nonzero(tmp_path) -> None:
     bad = tmp_path / "bad.md"
     bad.write_text(
         "---\n"
-        "kind: phrase_contract\n"
-        "phrase: p\n"
+        "kind: contribution_contract\n"
+        "contribution: p\n"
         "author: member_a\n"          # no leading @
         "question: q\n"
         "candidate_key: pdb_id\n"      # not in vocab
@@ -171,7 +171,7 @@ def test_cli_validate_reports_problems_nonzero(tmp_path) -> None:
         "---\n",
         encoding="utf-8",
     )
-    res = CliRunner().invoke(cli, ["phrase", "contract", "validate", str(bad)])
+    res = CliRunner().invoke(cli, ["contribution", "contract", "validate", str(bad)])
     assert res.exit_code != 0
     assert "candidate_key" in res.output
     assert "direction" in res.output
@@ -179,6 +179,6 @@ def test_cli_validate_reports_problems_nonzero(tmp_path) -> None:
 
 
 def test_cli_validate_missing_file_errors() -> None:
-    res = CliRunner().invoke(cli, ["phrase", "contract", "validate", "/no/such/file.md"])
+    res = CliRunner().invoke(cli, ["contribution", "contract", "validate", "/no/such/file.md"])
     assert res.exit_code != 0
     assert "no such file" in res.output

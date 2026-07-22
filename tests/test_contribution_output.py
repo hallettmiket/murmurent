@@ -1,6 +1,6 @@
 """
-Purpose: Unit tests for the phrase output-table validator
-         (:mod:`murmurent.core.phrase_output`) and the ``PhraseSpec.output``
+Purpose: Unit tests for the contribution output-table validator
+         (:mod:`murmurent.core.contribution_output`) and the ``ContributionSpec.output``
          extension that validates a produced output when present.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
@@ -14,14 +14,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from murmurent.core import phrase_contract as pc
-from murmurent.core import phrase_output as po
-from murmurent.core import phrase_spec as ps
+from murmurent.core import contribution_contract as pc
+from murmurent.core import contribution_output as po
+from murmurent.core import contribution_spec as ps
 
 
-def _contract(*, uncertainty: str = "stderr") -> pc.PhraseContract:
-    return pc.PhraseContract(
-        phrase="dock_and_filter",
+def _contract(*, uncertainty: str = "stderr") -> pc.ContributionContract:
+    return pc.ContributionContract(
+        contribution="dock_and_filter",
         author="@member_a",
         question="optimize_sulfopin",
         candidate_key="inchikey",
@@ -142,7 +142,7 @@ def test_unsupported_format_flagged(tmp_path) -> None:
     assert any("unsupported output format" in p for p in problems)
 
 
-# -- PhraseSpec.output integration ------------------------------------------
+# -- ContributionSpec.output integration ------------------------------------------
 
 
 def _write_contract(directory: Path) -> None:
@@ -152,9 +152,9 @@ def _write_contract(directory: Path) -> None:
     )
 
 
-def _spec(output: str = "") -> ps.PhraseSpec:
-    return ps.PhraseSpec(
-        phrase="dock_and_filter",
+def _spec(output: str = "") -> ps.ContributionSpec:
+    return ps.ContributionSpec(
+        contribution="dock_and_filter",
         author="@member_a",
         question="optimize_sulfopin",
         contract="dock_and_filter",
@@ -173,7 +173,7 @@ def test_spec_without_output_is_valid_and_omits_key(tmp_path) -> None:
 def test_spec_output_round_trips_when_set() -> None:
     s = _spec(output="out.csv")
     assert "output: out.csv" in s.to_markdown()
-    assert ps.PhraseSpec.from_markdown(s.to_markdown()) == s
+    assert ps.ContributionSpec.from_markdown(s.to_markdown()) == s
 
 
 def test_spec_with_conforming_output_validates(tmp_path) -> None:

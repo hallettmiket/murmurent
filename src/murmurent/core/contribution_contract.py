@@ -1,23 +1,23 @@
 """
-Purpose: The phrase output-contract — the typed data contract that declares
-         the shape and meaning of a phrase's output so heterogeneous phrase
+Purpose: The contribution output-contract — the typed data contract that declares
+         the shape and meaning of a contribution's output so heterogeneous contribution
          outputs (different metrics, units, directions) can be aligned on a
          shared candidate identity and combined by a choreography judge.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
 Input: Keyword args (constructing a contract) or a schema-validated markdown
        entry (YAML frontmatter + optional body), mirroring Oracle entries.
-Output: :class:`PhraseContract` instances; markdown serialization via
+Output: :class:`ContributionContract` instances; markdown serialization via
         ``to_markdown()`` / ``from_markdown()``; a ``validate()`` that returns
         a list of human-readable problems (empty == valid).
 
 Boundary: this module defines and validates the contract artefact only. It does
-NOT run phrases, align outputs, or judge them — those are later choreography
-phases. See ``docs/phrases.md`` and ``docs/choreography.md``.
+NOT run contributions, align outputs, or judge them — those are later choreography
+phases. See ``docs/contributions.md`` and ``docs/choreography.md``.
 
 Path resolution (for the default write location):
-  - ``$MURMURENT_PHRASE_CONTRACT_DIR`` if set, else
-  - ``<personal-vault>/phrases/`` (sibling of the Oracle dir, resolved the
+  - ``$MURMURENT_CONTRIBUTION_CONTRACT_DIR`` if set, else
+  - ``<personal-vault>/contributions/`` (sibling of the Oracle dir, resolved the
     same way ``murmurent.core.oracle_publish.personal_oracle_dir`` resolves).
   - ``default_contract_dir()`` returns ``None`` when no vault is registered,
     letting callers fall back to an explicit ``--out`` path or stdout.
@@ -47,7 +47,7 @@ OTHER_PREFIX = "other:"
 
 #: Frontmatter fields that must be present and non-empty for a valid contract.
 REQUIRED_FIELDS: tuple[str, ...] = (
-    "phrase",
+    "contribution",
     "author",
     "question",
     "candidate_key",
@@ -58,7 +58,7 @@ REQUIRED_FIELDS: tuple[str, ...] = (
 )
 
 #: Marker written into the frontmatter so tooling can recognise the artefact.
-KIND = "phrase_contract"
+KIND = "contribution_contract"
 
 _SLUG_RE = re.compile(r"[^a-z0-9_]+")
 
@@ -74,7 +74,7 @@ class Direction(str, Enum):
     LOWER_BETTER = "lower_better"
 
 
-class PhraseContractError(ValueError):
+class ContributionContractError(ValueError):
     """Raised when a contract cannot be parsed from markdown."""
 
 
@@ -93,15 +93,15 @@ def candidate_key_ok(value: str) -> bool:
 
 
 @dataclass
-class PhraseContract:
-    """A phrase's typed output contract (a Tier-2, schema-validated artefact).
+class ContributionContract:
+    """A contribution's typed output contract (a Tier-2, schema-validated artefact).
 
-    The fields declare *what* the phrase reports and *how to read it*, so two
-    phrases contributing to the same question can be joined on
+    The fields declare *what* the contribution reports and *how to read it*, so two
+    contributions contributing to the same question can be joined on
     ``candidate_key`` and combined even when their ``metric`` differs.
     """
 
-    phrase: str
+    contribution: str
     author: str
     question: str
     candidate_key: str
@@ -161,7 +161,7 @@ class PhraseContract:
         """The ordered frontmatter mapping this contract serializes to."""
         return {
             "kind": KIND,
-            "phrase": self.phrase,
+            "contribution": self.contribution,
             "author": self.author,
             "question": self.question,
             "candidate_key": self.candidate_key,
@@ -178,17 +178,17 @@ class PhraseContract:
         return dump_document(self.to_frontmatter(), body)
 
     @classmethod
-    def from_meta(cls, meta: dict[str, Any], body: str = "") -> "PhraseContract":
+    def from_meta(cls, meta: dict[str, Any], body: str = "") -> "ContributionContract":
         """Build a contract from a parsed frontmatter mapping + body text."""
         if not isinstance(meta, dict):
-            raise PhraseContractError("contract frontmatter must be a mapping")
+            raise ContributionContractError("contract frontmatter must be a mapping")
         tags_raw = meta.get("tags") or []
         if isinstance(tags_raw, str):
             tags = [t.strip() for t in tags_raw.split(",") if t.strip()]
         else:
             tags = [str(t) for t in tags_raw]
         return cls(
-            phrase=str(meta.get("phrase", "") or ""),
+            contribution=str(meta.get("contribution", "") or ""),
             author=str(meta.get("author", "") or ""),
             question=str(meta.get("question", "") or ""),
             candidate_key=str(meta.get("candidate_key", "") or ""),
@@ -201,22 +201,22 @@ class PhraseContract:
         )
 
     @classmethod
-    def from_markdown(cls, text: str) -> "PhraseContract":
+    def from_markdown(cls, text: str) -> "ContributionContract":
         """Parse a contract from a markdown string (frontmatter + body)."""
         doc = parse_text(text)
         if not doc.meta:
-            raise PhraseContractError(
-                "no YAML frontmatter found — a phrase contract needs a '---' block"
+            raise ContributionContractError(
+                "no YAML frontmatter found — a contribution contract needs a '---' block"
             )
         return cls.from_meta(doc.meta, doc.body)
 
     @classmethod
-    def from_file(cls, path: str | Path) -> "PhraseContract":
+    def from_file(cls, path: str | Path) -> "ContributionContract":
         """Read and parse a contract markdown file."""
         doc = parse_file(path)
         if not doc.meta:
-            raise PhraseContractError(
-                f"no YAML frontmatter found in {path} — not a phrase contract"
+            raise ContributionContractError(
+                f"no YAML frontmatter found in {path} — not a contribution contract"
             )
         return cls.from_meta(doc.meta, doc.body)
 
@@ -225,13 +225,13 @@ class PhraseContract:
 # Default write location
 # ---------------------------------------------------------------------------
 
-ENV_CONTRACT_DIR = "MURMURENT_PHRASE_CONTRACT_DIR"
+ENV_CONTRACT_DIR = "MURMURENT_CONTRIBUTION_CONTRACT_DIR"
 
 
 def default_contract_dir() -> Path | None:
-    """Where ``murmurent phrase contract new`` writes by default.
+    """Where ``murmurent contribution contract new`` writes by default.
 
-    ``$MURMURENT_PHRASE_CONTRACT_DIR`` wins; otherwise a ``phrases/`` folder
+    ``$MURMURENT_CONTRIBUTION_CONTRACT_DIR`` wins; otherwise a ``contributions/`` folder
     beside the personal Oracle dir (resolved the same way the Oracle is).
     Returns ``None`` when no vault is registered, so the caller can fall back
     to an explicit ``--out`` path or stdout.
@@ -242,14 +242,14 @@ def default_contract_dir() -> Path | None:
     try:
         from . import oracle_publish as _op  # deferred: optional dashboard deps
 
-        return _op.personal_oracle_dir().parent / "phrases"
+        return _op.personal_oracle_dir().parent / "contributions"
     except Exception:
         return None
 
 
-def default_contract_filename(phrase: str) -> str:
-    """The default basename for a contract file, derived from the phrase slug."""
-    slug = slugify(phrase) or "phrase"
+def default_contract_filename(contribution: str) -> str:
+    """The default basename for a contract file, derived from the contribution slug."""
+    slug = slugify(contribution) or "contribution"
     return f"{slug}_contract.md"
 
 
@@ -258,7 +258,7 @@ def resolve_contract_reference(
 ) -> Path | None:
     """Resolve a contract reference (relative/absolute path, or a bare slug).
 
-    A phrase spec / choreography refers to a contract "by relative path or
+    A contribution spec / choreography refers to a contract "by relative path or
     slug". This tries, in order: the ref as an explicit path (absolute, then
     under ``base_dir``, then the cwd); then a ``<slug>_contract.md`` file under
     ``base_dir`` and under :func:`default_contract_dir`. Returns ``None`` when
