@@ -355,17 +355,27 @@ function CmdBar({ query, setQuery }) {
   return (
     <div className="cmdbar">
       {showLabTop && <LabSettingsModal onClose={() => setShowLabTop(false)} />}
-      {/* murmurent logo — the murmuration wordmark animation, served by the
-          dashboard at /murmuration (?logo = chrome-free, auto-play, muted). */}
-      <iframe
-        src="/murmuration?logo"
-        title="murmurent"
-        scrolling="no"
-        style={{
-          width:120, height:120, border:"none", borderRadius:8, flexShrink:0,
-          background:"#f4f1ea", boxShadow:"0 1px 5px rgba(32,20,54,0.15)",
-        }}
-      />
+      {/* murmurent logo — the murmuration wordmark animation, served at
+          /murmuration (?logo = chrome-free, auto-play, muted). The animation
+          fills its own viewport, and the flock density + murmuration ribbons
+          only read in a LARGE world; a 120px iframe crams ~260 birds into a
+          swarm. So we render it in a 720px world and CSS-scale it down into a
+          ~156px box (overflow-clipped) — real murmuration density, shown small,
+          and the scale-down slows the on-screen motion too. */}
+      <div style={{
+        width:156, height:156, flexShrink:0, overflow:"hidden", borderRadius:8,
+        background:"#f4f1ea", boxShadow:"0 1px 5px rgba(32,20,54,0.15)",
+      }}>
+        <iframe
+          src="/murmuration?logo"
+          title="murmurent"
+          scrolling="no"
+          style={{
+            width:720, height:720, border:"none",
+            transform:"scale(0.2167)", transformOrigin:"top left",
+          }}
+        />
+      </div>
       <div className="home">Murmurent{window.DATA.version ? <small> v{window.DATA.version}</small> : null}</div>
       <div className="search">
         <span className="mono muted" style={{fontSize:12}}>›</span>

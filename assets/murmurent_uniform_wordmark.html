@@ -94,6 +94,11 @@
   window.addEventListener("resize", resize);
   resize();
 
+  // Logo mode (?logo / #logo): purple, slightly larger birds, slowed motion —
+  // for the murmurent logo widget. The interactive page keeps its own look.
+  const LOGO = new URLSearchParams(location.search).has("logo")
+               || location.hash.replace("#", "") === "logo";
+
   // ---------- flock ----------
   const N = Math.round(Math.min(620, Math.max(260, (W * H) / 2000)));
   const birds = [];
@@ -126,7 +131,7 @@
       ink: rand(0.5, 1),                 // per-bird darkness
       flap: rand(0, 6.283),              // wingbeat phase
       rate: rand(17, 36),                // wingbeat rad/sec
-      size: rand(0.82, 1.28),
+      size: rand(0.82, 1.28) * (LOGO ? 1.95 : 1),
 
       // --- individual temperament: no two birds fly the same ---
       cruise: rand(0.72, 1.34),          // personal airspeed
@@ -293,9 +298,14 @@
       const mdx = lure.x - b.x, mdy = lure.y - b.y;
       const md = Math.hypot(mdx, mdy) + 0.01;
       const ux = mdx / md, uy = mdy / md;
-      const pull = Math.min(0.9, 90 / md) * 2.4 * b.kLure;
+      // When the cursor is OFF (idle / ghost lure), pull the flock in more
+      // gently and swirl it wider, so it spreads into a broad murmuration around
+      // the fixed point instead of collapsing into a tight dot. An active cursor
+      // keeps the tighter, responsive follow.
+      const idle = !mouse.active;
+      const pull = Math.min(0.9, 90 / md) * (idle ? 1.05 : 2.4) * b.kLure;
       fx += ux * pull; fy += uy * pull;
-      const tang = Math.min(1.1, 120 / md) * regime.swirl * b.swirl * 0.16;
+      const tang = Math.min(1.1, 120 / md) * regime.swirl * b.swirl * (idle ? 0.30 : 0.16);
       fx += -uy * tang; fy += ux * tang;
 
       // drift back toward this bird's preferred cruising depth
@@ -384,7 +394,7 @@
 
       // silhouette area + atmospheric haze -> the flock twinkles and recedes
       const a = (0.2 + 0.38 * b.ink) * (0.55 + 0.45 * spread) * (0.32 + 0.68 * b.z);
-      ctx.fillStyle = "rgba(32, 28, 24, " + a.toFixed(3) + ")";
+      ctx.fillStyle = (LOGO ? "rgba(106, 46, 158, " : "rgba(32, 28, 24, ") + a.toFixed(3) + ")";
 
       ctx.beginPath();
       // beak / head
@@ -489,13 +499,18 @@
   }
 
   // ---------- loop ----------
+  // Logo mode slows the flock — a small icon reads as frantic at full speed.
+  // A scaled sim-clock (simT) advances the noise fields + boids together so the
+  // slowdown is uniform. Full-speed (TIME_SCALE = 1) for the interactive page.
+  const TIME_SCALE = LOGO ? 0.4 : 1;
   let last = performance.now();
+  let simT = 0;
   function frame(now) {
-    const t = now / 1000;
-    const dt = Math.min(0.05, (now - last) / 1000);
+    const dt = Math.min(0.05, (now - last) / 1000) * TIME_SCALE;
     last = now;
+    simT += dt;
 
-    step(t, dt);
+    step(simT, dt);
     draw();
 
     if (audio && !muted) {
@@ -554,10 +569,8 @@
   veil.querySelector(".go").addEventListener("click", begin);
 
   // Logo mode: auto-reveal the flock (the canvas already animates from load),
-  // no "Begin" click and no audio. Enabled with ?logo or #logo.
-  const logoMode = new URLSearchParams(location.search).has("logo")
-                   || location.hash.replace("#", "") === "logo";
-  if (logoMode) {
+  // no "Begin" click and no audio.
+  if (LOGO) {
     document.documentElement.classList.add("logo");
     veil.classList.add("hidden");
   }
