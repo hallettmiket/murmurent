@@ -413,7 +413,22 @@
 
       // silhouette area + atmospheric haze -> the flock twinkles and recedes
       const a = (0.2 + 0.38 * b.ink) * (0.55 + 0.45 * spread) * (0.32 + 0.68 * b.z);
-      ctx.fillStyle = (LOGO ? "rgba(106, 46, 158, " : "rgba(32, 28, 24, ") + a.toFixed(3) + ")";
+      // Depth-cued violet (aerial perspective -> reads as 3D): FAR birds recede
+      // into a pale, desaturated blue-violet haze; NEAR birds come forward as a
+      // deep, vivid magenta-violet. A per-bird hue offset (b.swirl) spreads the
+      // shades so same-depth birds aren't identical, and faster birds burn a
+      // touch brighter -> the whole flock shimmers with depth instead of one flat
+      // purple. (Non-logo keeps the charcoal ink.)
+      if (LOGO) {
+        const spN = Math.min(1, sp / 5);
+        const hue = 272 + 30 * b.z + 10 * b.swirl;   // indigo (far) -> magenta (near)
+        const sat = 40 + 44 * b.z + 10 * spN;        // hazy/slow -> saturated/fast
+        const lig = 66 - 30 * b.z - 6 * spN;         // pale far -> deep near
+        ctx.fillStyle = "hsla(" + hue.toFixed(1) + "," + sat.toFixed(1) + "%,"
+                                + lig.toFixed(1) + "%," + a.toFixed(3) + ")";
+      } else {
+        ctx.fillStyle = "rgba(32, 28, 24, " + a.toFixed(3) + ")";
+      }
 
       ctx.beginPath();
       // beak / head
