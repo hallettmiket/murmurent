@@ -724,6 +724,20 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
         </span>
       );
     }
+    // A plain project folder that isn't a git repo yet (#49). It shows up so it
+    // doesn't silently vanish from the manager; but "make ready" needs a git
+    // repo, so we surface it with a git-init hint rather than a broken button.
+    if (c.is_git === false) {
+      return (
+        <span title={c.path + " — a folder here, but not a git repo. Run "
+                     + "`git -C " + c.path + " init` (and add a remote) to make it "
+                     + "a repo, then it can be made murmurent-ready."}
+              style={{fontSize:11, color:"var(--muted)", fontFamily:"var(--mono)",
+                      whiteSpace:"nowrap"}}>
+          ○ folder · not a git repo
+        </span>
+      );
+    }
     if (c.is_murmurent_ready) {
       return (
         <span style={{display:"inline-flex", alignItems:"center", gap:8, whiteSpace:"nowrap"}}>

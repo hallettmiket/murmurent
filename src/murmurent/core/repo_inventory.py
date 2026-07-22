@@ -67,6 +67,7 @@ class RepoOnHost:
     has_claude_dir: bool            # ``.claude/agents/`` exists
     is_murmurent_ready: bool        # marker + .claude/agents — the repo is murmurent-ready
     is_murmurent_infra: bool = False  # murmurent's own repo — never "made ready" (#41 pt 5)
+    is_git: bool = True             # a git repo (False = a plain project folder, #49)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -197,10 +198,23 @@ def _scan_script(scan_dirs: tuple[str, ...]) -> str:
     This lets a host scan both ``~/repos`` and a shared mount like
     ``/srv/projects`` in the same pass.
 
-    Output format: ``<path>|<origin>|<has_marker>|<has_claude_agents>``
+    Output format: ``<path>|<origin>|<has_marker>|<has_claude_agents>|<is_git>``
     where ``has_marker`` (readiness marker: .murmurent.yaml — a legacy
-    CHARTER.md no longer counts, issue #28) and ``has_claude_agents`` are
-    1/0. Uses ``|`` because git remote URLs can contain ``:`` (ssh form).
+    CHARTER.md no longer counts, issue #28), ``has_claude_agents``, and
+    ``is_git`` are 1/0. Uses ``|`` because git remote URLs can contain ``:``
+    (ssh form).
+
+    Two passes so nothing under a scan dir silently disappears from the
+    repo manager (#49):
+      1. **Git repos** at depth 2--3 --- ``.git`` matched as a directory OR a
+         FILE, so linked worktrees and submodule clones are found, not just
+         plain clones (the previous ``-type d`` missed worktrees).
+      2. **Non-git project folders** --- every immediate child directory of a
+         scan dir that is neither a git repo itself nor a container of git
+         repos (a plain ``~/repos/<project>`` the user has not ``git init``'d,
+         or has not cloned as git). These are emitted with ``is_git=0`` so the
+         dashboard can show them (marked "not a git repo") instead of dropping
+         them.
     """
     quoted = " ".join(shlex.quote(d) for d in scan_dirs)
     return (
@@ -212,19 +226,26 @@ def _scan_script(scan_dirs: tuple[str, ...]) -> str:
         '    *)  full="$HOME/$base" ;; '
         '  esac; '
         '  [ -d "$full" ] || continue; '
-        # Find .git dirs at depth 2 (i.e. <full>/<name>/.git). Depth 3
-        # could catch nested but slows things down — depth 2 matches
-        # the convention.
-        '  find "$full" -mindepth 2 -maxdepth 3 -name .git -type d 2>/dev/null | '
+        # (1) Git repos (depth 2-3). ``-name .git`` (no -type) matches a .git
+        # directory AND a .git file (worktrees/submodules).
+        '  find "$full" -mindepth 2 -maxdepth 3 -name .git 2>/dev/null | '
         '  while IFS= read -r gitdir; do '
         '    repo=$(dirname "$gitdir"); '
-        # Parse origin URL out of .git/config — single shell expr keeps
-        # us inside the same SSH session. Falls back to empty if no
-        # ``origin`` remote.
         '    url=$(git -C "$repo" remote get-url origin 2>/dev/null); '
         '    marked=0; [ -f "$repo/.murmurent.yaml" ] && marked=1; '
         '    claude=0; [ -d "$repo/.claude/agents" ] && claude=1; '
-        '    echo "$repo|$url|$marked|$claude"; '
+        '    echo "$repo|$url|$marked|$claude|1"; '
+        '  done; '
+        # (2) Non-git immediate child folders (plain project dirs).
+        '  for child in "$full"/*/; do '
+        '    [ -d "$child" ] || continue; child="${child%/}"; '
+        '    [ -e "$child/.git" ] && continue; '   # it IS a git repo -> pass (1)
+        # skip a container folder that holds git repos one level down; its
+        # repos are already emitted by pass (1).
+        '    if find "$child" -mindepth 1 -maxdepth 2 -name .git 2>/dev/null | grep -q .; then continue; fi; '
+        '    marked=0; [ -f "$child/.murmurent.yaml" ] && marked=1; '
+        '    claude=0; [ -d "$child/.claude/agents" ] && claude=1; '
+        '    echo "$child||$marked|$claude|0"; '
         '  done; '
         'done'
     )
@@ -266,10 +287,11 @@ def list_machine_repos(host_name: str) -> tuple[list[RepoOnHost], str | None]:
         line = line.strip()
         if not line:
             continue
-        parts = line.split("|", 3)
+        parts = line.split("|", 4)
         if len(parts) < 4:
             continue
-        path, origin, marked, claude = parts
+        path, origin, marked, claude = parts[:4]
+        is_git = parts[4] if len(parts) >= 5 else "1"  # tolerate 4-field output
         out.append(RepoOnHost(
             host=host_name,
             path=path,
@@ -280,6 +302,7 @@ def list_machine_repos(host_name: str) -> tuple[list[RepoOnHost], str | None]:
             # the repo-side state, independent of any project.
             is_murmurent_ready=(marked == "1" and claude == "1"),
             is_murmurent_infra=is_murmurent_infra_repo(path),
+            is_git=is_git == "1",
         ))
     return out, None
 

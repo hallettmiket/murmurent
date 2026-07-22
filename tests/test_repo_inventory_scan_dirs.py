@@ -86,3 +86,33 @@ def test_is_murmurent_infra_repo_classifies_own_repos():
         assert f(infra) is True, infra
     for project in ("dcis_imaging", "my_project", "murmurentish", "", "/x/new_project"):
         assert f(project) is False, project
+
+
+def test_scan_surfaces_git_worktree_and_plain_folders(tmp_path):
+    """The scan must not silently drop folders under a scan dir (#49): a normal
+    git repo, a worktree (.git FILE), and a plain non-git folder all appear,
+    flagged by is_git; a container folder holding a nested repo is not itself
+    emitted (its repo is)."""
+    import subprocess
+    home = tmp_path
+    repos = home / "repos"
+    (repos / "proj_git").mkdir(parents=True)
+    subprocess.run(["git", "-C", str(repos / "proj_git"), "init", "-q"], check=True)
+    (repos / "pin1_screen").mkdir()                       # plain folder
+    (repos / "proj_worktree").mkdir()
+    (repos / "proj_worktree" / ".git").write_text("gitdir: /x/.git/worktrees/w\n")
+    (repos / "group" / "nested").mkdir(parents=True)
+    subprocess.run(["git", "-C", str(repos / "group" / "nested"), "init", "-q"], check=True)
+
+    script = repo_inventory._scan_script(("repos",))
+    res = subprocess.run(["bash", "-c", script], capture_output=True, text=True,
+                         env={"HOME": str(home), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"})
+    rows = {}
+    for line in res.stdout.splitlines():
+        parts = line.split("|")
+        rows[parts[0].rsplit("/", 1)[-1]] = parts[-1]  # name -> is_git flag
+    assert rows.get("proj_git") == "1"
+    assert rows.get("proj_worktree") == "1"              # worktree .git FILE found
+    assert rows.get("pin1_screen") == "0"                # plain folder surfaced
+    assert rows.get("nested") == "1"
+    assert "group" not in rows                           # container not emitted
