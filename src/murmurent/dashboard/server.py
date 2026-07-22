@@ -2262,6 +2262,20 @@ def create_app() -> FastAPI:
         statuses via ``core.adopt.ERROR_HTTP_STATUS``.
         """
         from ..core import adopt as _adopt
+        from ..core.repo_inventory import is_murmurent_infra_repo as _is_infra
+
+        # Defense in depth (#55): refuse murmurent-infra repos before we even
+        # reach the core chokepoint. The dashboard hides the Make-ready button
+        # for these, but a direct API call (or a stale JSX) must still bounce.
+        # adopt_clone() also refuses, so this is a belt-and-suspenders 409 with
+        # a UI-friendly message.
+        _infra_name = Path(str(body.clone_path or "")).name
+        if _is_infra(_infra_name):
+            raise HTTPException(
+                status_code=409,
+                detail=(f"{_infra_name!r} is murmurent infrastructure — not a "
+                        "project; it cannot be made ready."),
+            )
 
         try:
             outcome = _adopt.adopt_clone(

@@ -678,10 +678,35 @@ function _fmtLocalStamp(iso) {
   });
 }
 
+/* Frontend mirror of core.repo_inventory.is_murmurent_infra_repo(): murmurent's
+   OWN repos — the commons clone ``murmurent`` + the ``murmurent_*`` family
+   (lab_mgmt, vault, public, manuscript, …) — are infrastructure, never a
+   project, so they can never be "made ready". Duplicated here (not only trusted
+   from the server's is_murmurent_infra flag) so the button is suppressed even
+   when the panel is showing a STALE cached report scanned before that flag
+   existed — which is exactly what left the button active in #55. */
+function isMurmurentInfraName(name) {
+  const n = String(name || "").trim().split("/").pop();
+  return n === "murmurent" || n.startsWith("murmurent_");
+}
+
+/* Is this whole inventory row a murmurent-infra repo? True if the server flagged
+   any clone, OR the repo/clone name matches the classifier (covers stale caches
+   and GitHub-only rows that have no clone to carry the flag). */
+function rowIsMurmurentInfra(row) {
+  if (isMurmurentInfraName(row.name)) return true;
+  for (const c of (row.clones || [])) {
+    if (c.is_murmurent_infra) return true;
+    if (isMurmurentInfraName((c.path || "").split("/").pop())) return true;
+  }
+  return false;
+}
+
 function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
   const gh = row.github;
   const cloneByHost = {};
   for (const c of (row.clones || [])) cloneByHost[c.host] = c;
+  const rowInfra = rowIsMurmurentInfra(row);
 
   // GitHub cell: a link to the repo, labelled with its visibility.
   // (Was "✓ {visibility[0]}" — the first letter of "public" and "private" is
@@ -714,10 +739,15 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
     // infrastructure — they are never "made ready" (a repo can't adopt itself;
     // lab-mgmt is governance, not a project). Mark them distinctly and offer no
     // make-ready button, so they don't read as ready-buttons that are broken
-    // (#41 pt 5). This wins over the ready/not-ready branches below.
-    if (c.is_murmurent_infra) {
+    // (#41 pt 5). This wins over the ready/not-ready branches below. We also
+    // fall back to the name classifier so a stale cached report (one scanned
+    // before the is_murmurent_infra flag existed) still suppresses the button
+    // instead of leaving it active — the bug in #55.
+    if (c.is_murmurent_infra || rowInfra
+        || isMurmurentInfraName((c.path || "").split("/").pop())) {
       return (
-        <span title={c.path + " — murmurent infrastructure; not a project repo"}
+        <span title={c.path + " — murmurent infrastructure — not a project; "
+                     + "cannot be made ready"}
               style={{fontSize:11, color:"var(--purple)", fontFamily:"var(--mono)",
                       whiteSpace:"nowrap"}}>
           ◆ murmurent
@@ -794,6 +824,14 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
     <tr>
       <td style={{fontSize:12}}>
         <strong>{row.name}</strong>
+        {rowInfra && (
+          <span title="murmurent infrastructure — not a project; cannot be made ready"
+                style={{fontSize:10, marginLeft:6, padding:"1px 6px", borderRadius:4,
+                        color:"var(--purple)", border:"1px solid var(--purple)",
+                        fontFamily:"var(--mono)", whiteSpace:"nowrap"}}>
+            ◆ murmurent infra
+          </span>
+        )}
         {row.local_only && (
           <span className="muted" style={{fontSize:10, marginLeft:6}}>
             (local-only — no GitHub origin)
