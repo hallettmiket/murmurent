@@ -111,10 +111,22 @@
 
   function rand(a, b) { return a + Math.random() * (b - a); }
 
+  // While the cursor is away, the ghost lure doesn't sit still — it drifts on a
+  // slow Lissajous path so the whole flock sweeps in broad arcs across the frame
+  // (a real murmuration) instead of balling up around one fixed point like bees.
+  const ghost = { cx: 0.5, cy: 0.5,
+                  px: rand(0, 6.28), py: rand(0, 6.28),
+                  sx: rand(0.00006, 0.00012), sy: rand(0.00005, 0.0001),
+                  rx: rand(0.20, 0.28), ry: rand(0.18, 0.26) };
+
   function pickGhost() {
-    // keep it off the very edges so the orbit stays on screen
-    lure.x = rand(W * 0.2, W * 0.8);
-    lure.y = rand(H * 0.2, H * 0.8);
+    // fresh drift centre + phase, kept off the edges so the arc stays on screen
+    ghost.cx = rand(0.38, 0.62);
+    ghost.cy = rand(0.38, 0.62);
+    ghost.px = rand(0, 6.28);
+    ghost.py = rand(0, 6.28);
+    lure.x = ghost.cx * W;
+    lure.y = ghost.cy * H;
   }
 
   for (let i = 0; i < N; i++) {
@@ -131,7 +143,7 @@
       ink: rand(0.5, 1),                 // per-bird darkness
       flap: rand(0, 6.283),              // wingbeat phase
       rate: rand(17, 36),                // wingbeat rad/sec
-      size: rand(0.82, 1.28) * (LOGO ? 1.95 : 1),
+      size: rand(0.82, 1.28) * (LOGO ? 2.9 : 1),
 
       // --- individual temperament: no two birds fly the same ---
       cruise: rand(0.72, 1.34),          // personal airspeed
@@ -226,6 +238,13 @@
       a.cy = (a.ay + a.ry * Math.cos(t * 1000 * a.sy + a.py)) * H;
     }
 
+    // idle: drift the ghost lure so the whole flock sweeps in broad arcs across
+    // the frame instead of orbiting one static point.
+    if (!mouse.active) {
+      lure.x = (ghost.cx + ghost.rx * Math.sin(t * 1000 * ghost.sx + ghost.px)) * W;
+      lure.y = (ghost.cy + ghost.ry * Math.cos(t * 1000 * ghost.sy + ghost.py)) * H;
+    }
+
     // bucket birds into the grid
     for (let c = 0; c < cells.length; c++) cells[c].length = 0;
     for (let i = 0; i < N; i++) {
@@ -303,9 +322,9 @@
       // the fixed point instead of collapsing into a tight dot. An active cursor
       // keeps the tighter, responsive follow.
       const idle = !mouse.active;
-      const pull = Math.min(0.9, 90 / md) * (idle ? 1.05 : 2.4) * b.kLure;
+      const pull = Math.min(0.9, 90 / md) * (idle ? 0.82 : 2.4) * b.kLure;
       fx += ux * pull; fy += uy * pull;
-      const tang = Math.min(1.1, 120 / md) * regime.swirl * b.swirl * (idle ? 0.30 : 0.16);
+      const tang = Math.min(1.1, 120 / md) * regime.swirl * b.swirl * (idle ? 0.44 : 0.16);
       fx += -uy * tang; fy += ux * tang;
 
       // drift back toward this bird's preferred cruising depth
