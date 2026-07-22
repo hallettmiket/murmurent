@@ -233,6 +233,49 @@ function groupNoun() {
   return ((window.DATA.lab_settings || {}).kind === "core") ? "Core" : "Lab";
 }
 
+// Notification-only "murmurent update available" banner (issue #41 pt 1).
+// Checks whether this install (~/repos/murmurent) is behind upstream and, if so,
+// shows the exact pull command. It does NOT pull or restart — that one-click
+// auto-update is a tracked upgrade.
+function UpdateBanner() {
+  const [st, setSt] = useState(null);
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/murmurent/update-status?fetch=1", { headers: { Accept: "application/json" } })
+      .then(r => r.json()).then(d => { if (alive) setSt(d); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  if (!st || !st.ok || st.behind <= 0 || dismissed) return null;
+  const diverged = !st.can_ff;
+  const cmd = "cd ~/repos/murmurent && git pull --ff-only && bash scripts/setup.sh";
+  return (
+    <div role="status" style={{
+      display:"flex", alignItems:"center", gap:10, flexWrap:"wrap",
+      padding:"8px 16px", fontSize:13,
+      background: diverged ? "rgba(198,40,40,0.09)" : "rgba(90,60,160,0.10)",
+      borderBottom:"1px solid var(--rule-strong)",
+    }}>
+      <span style={{fontWeight:600}}>
+        {diverged ? "⚠ Murmurent update available (local diverged)" : "⬆ Murmurent update available"}
+      </span>
+      <span className="muted">{st.behind} new commit{st.behind === 1 ? "" : "s"} upstream ({st.current}→{st.latest}).</span>
+      {diverged
+        ? <span className="muted">Your install has local changes — reconcile <code>~/repos/murmurent</code> manually first.</span>
+        : <>
+            <code className="mono" style={{fontSize:11, background:"var(--paper-2)",
+                 border:"1px solid var(--rule)", borderRadius:2, padding:"2px 6px"}}>{cmd}</code>
+            <button type="button" className="btn sm ghost"
+              onClick={() => { try { navigator.clipboard.writeText(cmd); } catch (_) {} }}>copy</button>
+            <span className="muted" style={{fontSize:11}}>then restart the dashboard.</span>
+          </>}
+      <button type="button" className="btn sm ghost" style={{marginLeft:"auto"}}
+        onClick={() => setDismissed(true)}>dismiss</button>
+    </div>
+  );
+}
+
 function TopBar() {
   const m = window.DATA.member || {};
   const ls = window.DATA.lab_settings || {};
@@ -3826,7 +3869,7 @@ function NewProjectModal({ onClose }) {
           and adds the proposed members to MEMBERS.
         </p>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>name (snake_case)</label>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. dcis_imaging_genomics"
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. new_project"
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
 
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>slack channel (optional)</label>
@@ -3904,7 +3947,7 @@ function NewProjectModal({ onClose }) {
             </div>
             <input value={slackWorkspace}
                    onChange={e => setSlackWorkspace(e.target.value)}
-                   placeholder="e.g. mh  (or a dedicated shared workspace id)"
+                   placeholder="e.g. lab_ws  (or a dedicated shared workspace id)"
                    style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
           </>
         )}
@@ -4267,7 +4310,7 @@ function CatalogEntryForm({ entry, onClose }) {
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>title</label>
         <input value={title} onChange={e => setTitle(e.target.value)}
-               placeholder="DCIS bulk RNA-seq alignment"
+               placeholder="Bulk RNA-seq alignment"
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2}}/>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>kind</label>
         <select value={kind} onChange={e => setKind(e.target.value)}
@@ -4277,13 +4320,13 @@ function CatalogEntryForm({ entry, onClose }) {
           <option value="analysis">analysis</option>
         </select>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>contact (member who owns it)</label>
-        <input value={contact} onChange={e => setContact(e.target.value)} placeholder="@allie"
+        <input value={contact} onChange={e => setContact(e.target.value)} placeholder="@handle"
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>turnaround (days, optional)</label>
         <input value={turnaround} onChange={e => setTurnaround(e.target.value)} placeholder="7"
                type="number" min="0" style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)", width:120}}/>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>prerequisites (comma-separated)</label>
-        <input value={prereqs} onChange={e => setPrereqs(e.target.value)} placeholder="GRCh38 reference, fastq files"
+        <input value={prereqs} onChange={e => setPrereqs(e.target.value)} placeholder="reference genome, input files"
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2}}/>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>description</label>
         <textarea value={description} onChange={e => setDescription(e.target.value)}
@@ -5514,7 +5557,6 @@ function DecommissionReportModal({ report, onClose }) {
   );
 }
 
-/* ───────── Receptionist (inbound cross-group SEA queue) ───────── */
 /* ───────── lab oracle panel ───────── */
 function OracleProcessButton() {
   const [busy, setBusy] = useState(false);
@@ -6198,7 +6240,7 @@ function MemberProfileModal({ onClose }) {
               <div style={labelStyle}>official handle</div>
               <input style={inputStyle} value={form.official_handle}
                      onChange={update("official_handle")}
-                     placeholder="e.g. the_pit (your institutional netname)" />
+                     placeholder="e.g. jdoe (your institutional netname)" />
             </div>
             <div style={{flex:1}}>
               <div style={labelStyle}>murmurent handle</div>
@@ -6907,7 +6949,7 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
       <div style={labelStyle}>username on this machine</div>
       <input style={inputStyle} value={conn.remote_user}
              onChange={e => setConn(c => ({...c, remote_user: e.target.value}))}
-             placeholder="mth" />
+             placeholder="jdoe" />
 
       <div style={labelStyle}>Large file location</div>
       <input style={inputStyle} value={form.wigamig_base}
@@ -7922,10 +7964,10 @@ function LabSettingsModal({ onClose }) {
           </div>
           <div style={labelStyle}>display name</div>
           <input style={inputStyle} value={form.display_name} onChange={update("display_name")}
-                 placeholder="e.g. Hallett Lab" />
+                 placeholder="e.g. Example Lab" />
           <div style={labelStyle}>lab website</div>
           <input style={inputStyle} value={form.website} onChange={update("website")}
-                 placeholder="https://mikehallett.science" />
+                 placeholder="https://your-lab.example.edu" />
         </div>
 
         {/* 2 · Members with administrative privileges */}
@@ -8206,6 +8248,7 @@ function App() {
 
   return (
     <>
+      <UpdateBanner />
       <TopBar />
       <div className="app">
         <CmdBar query={query} setQuery={setQuery} />

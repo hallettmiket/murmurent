@@ -195,7 +195,7 @@ def build_response(
         persona=effective_persona,  # type: ignore[arg-type]
         member=member_block,
         pi=_pi_identity(),
-        member_settings=_member_settings(member_profile),
+        member_settings=_member_settings(_overlay_staged_profile(member_profile, norm)),
         machine_settings=_machine_settings_mod.load(
             legacy_obsidian=member_profile.get("obsidian") if isinstance(member_profile, dict) else None,
         ),
@@ -370,6 +370,34 @@ def _merge_location(meta: dict | None) -> C.MemberLocation:
 # ---------------------------------------------------------------------------
 # Member settings (profile modal)
 # ---------------------------------------------------------------------------
+
+
+def _overlay_staged_profile(profile: dict, handle: str) -> dict:
+    """Overlay the member's OWN staged roster edits on top of their read-only
+    roster record, so their dashboard reflects a profile save immediately.
+
+    Members hold the roster clone read-only, so a profile edit is staged to
+    their own ``profile.yaml`` (``roster_profile`` block, #34) and only reaches
+    the roster when the PI syncs. Until then this overlay makes the edit visible
+    to the member. A no-op for everyone else: ``staged_roster_profile`` guards
+    by handle, so it returns ``{}`` unless ``handle`` owns this machine's staged
+    block.
+    """
+    if not isinstance(profile, dict):
+        profile = {}
+    from ..core import member_profile as _mp
+    staged = _mp.staged_roster_profile(handle)
+    if not staged:
+        return profile
+    merged = dict(profile)
+    for block in ("contact", "location", "git_logins"):
+        if isinstance(staged.get(block), dict):
+            base = merged.get(block) if isinstance(merged.get(block), dict) else {}
+            merged[block] = {**base, **staged[block]}
+    for top in ("official_handle", "slack"):
+        if top in staged:
+            merged[top] = staged[top]
+    return merged
 
 
 def _member_settings(profile: dict) -> C.MemberSettings:

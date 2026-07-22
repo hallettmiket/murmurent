@@ -25,10 +25,22 @@ MEMBERS_SUBDIR = "members"
 # clone (see ``identity_card.import_card`` + ``is_card_import_stub``).
 CARD_STUB_MARKER = ".murmurent_card_stub"
 DEFAULT_MURMURENT_REPO = Path("~/repos/murmurent").expanduser()
-# 2026-05-14: repo is being renamed from "hallett-lab-mgmt" to the per-group
-# convention "lab_mgmt". During the transition we prefer the new path but
-# fall back to the legacy name so existing clones keep working.
-DEFAULT_LAB_MGMT_REPO = Path("~/repos/lab_mgmt").expanduser()
+# The canonical lab-mgmt clone is ``~/repos/murmurent_lab_mgmt_<group>`` (see
+# ``lab_repo_path``). ``DEFAULT_LAB_MGMT_REPO`` is ONLY the honest last-resort
+# return for a machine where nothing resolves — it is group-less and never
+# exists on disk, so every lookup against it misses cleanly and the resulting
+# 404s name the canonical convention rather than a stale legacy path.
+#
+# Deliberately NOT ``~/repos/lab_mgmt``: that pre-convention name used to be a
+# hardcoded fallback that outranked canonical-clone discovery and was returned
+# even when absent, producing ``…/repos/lab_mgmt/members/<h>.md not found`` on
+# member machines whose real clone lived elsewhere (#31/#33). A pre-convention
+# ``~/repos/lab_mgmt`` folder still resolves — ``_discover_lab_mgmt_clone``
+# finds it by SHAPE (lab.md + members/) — but murmurent no longer falls back to
+# it by NAME.
+DEFAULT_LAB_MGMT_REPO = Path("~/repos/murmurent_lab_mgmt").expanduser()
+# Retained for the (now shape-discovered, not name-matched) older clones and for
+# tests that force the defaults to miss. No longer consulted by name.
 LEGACY_LAB_MGMT_REPO  = Path("~/repos/hallett-lab-mgmt").expanduser()
 
 # Per-request lab-mgmt override. FastAPI dispatches sync handlers into a
@@ -73,11 +85,20 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
       2. ``$MURMURENT_LAB_MGMT_REPO`` env var
       3. This machine's pinned pointer (``~/.murmurent/lab_mgmt_path``), written
          by ``pi-init`` and by discovery below.
-      4. ``~/repos/lab_mgmt`` if it exists (pre-convention name)
-      5. ``~/repos/hallett-lab-mgmt`` (legacy fallback) if it exists
-      6. Discovery: an unambiguous lab_mgmt-shaped clone under ``repos_root()``
-         — the member-machine case — pinned on the way out.
-      7. ``~/repos/lab_mgmt`` (last-resort default, even if missing)
+      4. Registry-authoritative: the machine owner's own group per the centre
+         registry (``_registry_lab_mgmt_for_owner``). A bare call acts for the
+         owner, so their registered group is the canonical default — returned
+         even when the clone isn't on disk yet (the honest answer; panels just
+         render empty until it's cloned).
+      5. Discovery: an unambiguous lab_mgmt-shaped clone under ``repos_root()``
+         — the member-machine case — pinned on the way out. Finds a
+         pre-convention ``~/repos/lab_mgmt`` by SHAPE, so un-migrated clones
+         keep resolving.
+      6. ``DEFAULT_LAB_MGMT_REPO`` — a group-less canonical-convention path that
+         never exists on disk (NOT ``~/repos/lab_mgmt``; see the constant).
+
+    The old name-based ``~/repos/lab_mgmt`` fallback (which outranked discovery
+    and was returned even when absent) is gone — that was the root of #31/#33.
     """
     override = getattr(_thread_local, "lab_mgmt_root", None)
     if override is not None:
@@ -89,20 +110,53 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
     pinned = _pinned_lab_mgmt_path()          # persistent pointer (set by pi-init)
     if pinned is not None:
         return pinned
-    if DEFAULT_LAB_MGMT_REPO.exists():
-        return DEFAULT_LAB_MGMT_REPO
-    if LEGACY_LAB_MGMT_REPO.exists():
-        return LEGACY_LAB_MGMT_REPO
-    # Everything above missed. A MEMBER machine (no env var, no pin — they
-    # never ran pi-init) natural-names its clone after the repo itself
-    # (``~/repos/murmurent_lab_mgmt_<lab>``), NOT ``~/repos/lab_mgmt``, so the
-    # roster silently resolves to a non-existent default and every panel goes
-    # empty. Self-heal: scan for a clone that looks like a lab_mgmt repo and,
-    # on an unambiguous hit, pin it so this discovery runs exactly once.
+    # Canonical, registry-authoritative default for THIS machine's owner. This
+    # replaces the hardcoded ``~/repos/lab_mgmt`` fallback: the registry records
+    # each group's real ``lab_mgmt_path``, so the owner's own group is the right
+    # default and it can never be out-ranked by (or resolve past) a canonical
+    # clone.
+    registered = _registry_lab_mgmt_for_owner(env)
+    if registered is not None:
+        return registered
+    # Member machine with no registry claim yet (cloned before the PI pushed
+    # their record, or a pre-registry install). Self-heal: scan for a clone that
+    # looks like a lab_mgmt repo (lab.md + members/) and, on an unambiguous hit,
+    # pin it so this discovery runs exactly once. Matches on SHAPE, so a
+    # pre-convention ``~/repos/lab_mgmt`` is found here just like a canonical
+    # ``~/repos/murmurent_lab_mgmt_<lab>``.
     discovered = _discover_lab_mgmt_clone()
     if discovered is not None:
         return discovered
     return DEFAULT_LAB_MGMT_REPO
+
+
+def _registry_lab_mgmt_for_owner(env: dict[str, str] | None = None) -> Path | None:
+    """The machine owner's own lab-mgmt clone per the centre registry, or None.
+
+    A bare :func:`lab_mgmt_repo_root` acts on behalf of the machine's owner, so
+    their handle's registered group is the authoritative default. Returns the
+    registry-recorded path **even if the clone is not on disk yet** — that IS
+    the correct answer (the dashboard renders empty until it's cloned), and it
+    is always the canonical location, never a stale name.
+
+    Best-effort and fully isolated: a missing handle, an empty/absent registry,
+    or any import hiccup yields ``None`` so discovery and the last-resort default
+    still run. The registrar import is function-local to break the
+    ``repo`` ⇄ ``registrar`` cycle; the registry read never calls back into
+    ``lab_mgmt_repo_root``, so there is no recursion.
+    """
+    handle = _current_handle()
+    if not handle:
+        return None
+    try:
+        from . import registrar as _reg
+
+        match = _reg.resolve_viewer_lab_mgmt(handle, env)
+    except Exception:  # noqa: BLE001 — registry trouble must never break resolution
+        return None
+    if match is None:
+        return None
+    return Path(match[1]).expanduser()
 
 
 def _looks_like_lab_mgmt_clone(path: Path) -> bool:

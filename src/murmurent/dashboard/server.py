@@ -1780,10 +1780,79 @@ def create_app() -> FastAPI:
         clients are silently dropped — they belong on machine.yaml.
         """
         from ..core.frontmatter import parse_file, dump_document
+        from ..core.repo import use_lab_mgmt_root as _use_lab_mgmt_root
+        from ..core import registrar as _reg
 
         actor = _resolve_actor(user)
-        _require_active(actor)
 
+        # Scope resolution to the ACTING viewer's own lab, so on a shared,
+        # multi-lab dashboard the edit lands on their roster and never the
+        # machine-default lab (#32/#33). No-op on a single-lab install, and an
+        # explicit ``MURMURENT_LAB_MGMT_REPO`` operator pin always wins (mirrors
+        # the resolver: env var outranks the registry net).
+        import os as _os
+        _scoped = (None if _os.environ.get("MURMURENT_LAB_MGMT_REPO")
+                   else _reg.resolve_viewer_lab_mgmt(actor))
+        with _use_lab_mgmt_root(_scoped[1] if _scoped else None):
+            _require_active(actor)
+
+            # Only modify fields the request actually sent — a partial POST
+            # like ``{"email": "x"}`` must not nuke the user's other contact
+            # info. ``model_fields_set`` distinguishes "omitted" from
+            # "explicitly null", which a plain dict from body.model_dump()
+            # cannot.
+            sent = body.model_fields_set
+            contact_keys = ("email", "orcid", "bluesky", "github", "osf", "website")
+            location_keys = ("office", "dry_lab", "wet_labs", "address", "city", "department")
+
+            # Members hold the roster clone READ-ONLY by design (the PI/leader is
+            # the only writer, so member-side `git pull --ff-only` never
+            # conflicts). Committing a member's edit to that clone leaves an
+            # unpushable local commit that diverges it and breaks the next pull
+            # (#34). So a non-writer's edit is STAGED to their own profile.yaml
+            # (the PI applies it on the next reconcile); only the writer edits
+            # the roster clone directly below.
+            try:
+                from ..core.lab import pi_handle as _pi_handle
+                is_writer = actor.lower() == _pi_handle().lower()
+            except Exception:  # noqa: BLE001 — no resolvable PI ⇒ treat as non-writer
+                is_writer = False
+
+            if not is_writer:
+                from ..core import member_profile as _mp
+                edits: dict = {
+                    "contact": {k: getattr(body, k) for k in contact_keys if k in sent},
+                    "location": {k: getattr(body, k) for k in location_keys if k in sent},
+                }
+                if "official_handle" in sent:
+                    edits["official_handle"] = body.official_handle
+                if "slack_handle" in sent:
+                    edits["slack"] = body.slack_handle
+                if "git_logins" in sent and body.git_logins is not None:
+                    edits["git_logins"] = body.git_logins
+                path = _mp.stage_roster_profile(actor, edits)
+                return {
+                    "ok": True, "staged": True, "path": str(path),
+                    "message": (
+                        "Saved to your profile. Members hold the lab roster "
+                        "read-only, so this doesn't touch it — your PI applies "
+                        "it to the roster on the next sync."
+                    ),
+                    "probes": [],
+                }
+
+            return _save_member_settings_to_roster(
+                body, actor, sent, contact_keys, location_keys,
+                parse_file, dump_document,
+            )
+
+    def _save_member_settings_to_roster(
+        body, actor, sent, contact_keys, location_keys, parse_file, dump_document,
+    ) -> dict:
+        """Writer (PI/leader) path: edit ``members/<actor>.md`` + commit/push.
+
+        Only ever reached for the roster's sole writer — a member's edit is
+        staged to their own profile.yaml before this runs (see #34)."""
         member_path = lab_mgmt_repo_root() / "members" / f"{actor}.md"
         if not member_path.is_file():
             raise HTTPException(
@@ -1793,15 +1862,6 @@ def create_app() -> FastAPI:
 
         parsed = parse_file(member_path)
         meta = dict(parsed.meta or {})
-
-        # Only modify fields the request actually sent — a partial POST
-        # like ``{"email": "x"}`` must not nuke the user's other contact
-        # info. ``model_fields_set`` distinguishes "omitted" from
-        # "explicitly null", which a plain dict from body.model_dump()
-        # cannot.
-        sent = body.model_fields_set
-        contact_keys = ("email", "orcid", "bluesky", "github", "osf", "website")
-        location_keys = ("office", "dry_lab", "wet_labs", "address", "city", "department")
 
         def _merge(block_name: str, fields: dict) -> None:
             existing = meta.get(block_name)
@@ -1884,7 +1944,50 @@ def create_app() -> FastAPI:
             "probes": [p.to_dict() for p in probes],
         }
 
+    def _scoped_to_viewer(fn):
+        """Pin lab_mgmt resolution to the ACTING viewer's own lab for the whole
+        request, so roster/security endpoints act on the viewer's roster and
+        never the machine-default lab on a shared, multi-lab dashboard (#32/#33).
+
+        Reads the actor from the handler's standard ``user`` query kwarg and
+        wraps the call in ``use_lab_mgmt_root(resolve_viewer_lab_mgmt(actor))``.
+        A no-op when the viewer isn't registry-claimed (single-lab install →
+        override ``None`` → normal resolution, which the registry net already
+        makes correct for the machine owner). Kept fully isolated: any
+        resolution hiccup falls back to unscoped rather than 500-ing the route.
+
+        The wrapper runs the handler in the SAME call (hence same thread), which
+        is what makes the thread-local override reliable under FastAPI's sync
+        threadpool. ``functools.wraps`` preserves the original signature so
+        FastAPI's dependency introspection is unaffected.
+        """
+        import functools
+
+        @functools.wraps(fn)
+        def wrapper(*args, **kwargs):
+            import os
+            from ..core import registrar as _reg
+            from ..core.repo import use_lab_mgmt_root as _use
+            # An explicit ``MURMURENT_LAB_MGMT_REPO`` is a deliberate operator pin
+            # to ONE lab (a single-lab install, or a test harness). Honour it —
+            # per-viewer scoping only applies on a genuine multi-lab machine,
+            # which never sets that env var. This mirrors the resolver, where the
+            # env var (step 2) outranks the registry net (step 4).
+            if os.environ.get("MURMURENT_LAB_MGMT_REPO"):
+                return fn(*args, **kwargs)
+            scoped = None
+            try:
+                actor = _resolve_actor(kwargs.get("user", "") or "")
+                scoped = _reg.resolve_viewer_lab_mgmt(actor)
+            except Exception:  # noqa: BLE001 — never let scoping break the route
+                scoped = None
+            with _use(scoped[1] if scoped else None):
+                return fn(*args, **kwargs)
+
+        return wrapper
+
     @app.post("/api/lab/settings")
+    @_scoped_to_viewer
     def save_lab_settings(
         body: LabSettingsBody,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
@@ -2232,6 +2335,21 @@ def create_app() -> FastAPI:
         return _rs.pull_lab_mgmt().to_dict()
 
     # -----------------------------------------------------------------
+    # Murmurent install freshness — the "update available" banner (issue #41 pt 1)
+    # -----------------------------------------------------------------
+
+    @app.get("/api/murmurent/update-status")
+    def murmurent_update_status(
+        fetch: bool = Query(True, description="Hit the remote (default) or just "
+                            "compare against the last fetch (instant, no network)."),
+    ) -> dict:
+        """Is the local murmurent install behind upstream? Backs the dashboard's
+        'update available' banner. Notification-only — never pulls or restarts.
+        Best-effort: an offline remote yields ``ok=False``, not an error."""
+        from ..core import mm_update as _mm
+        return _mm.check_update(fetch=fetch).to_dict()
+
+    # -----------------------------------------------------------------
     # Personal vault (murmurent_vault) freshness + ff-only pull (issue #25 §3)
     # -----------------------------------------------------------------
 
@@ -2252,6 +2370,7 @@ def create_app() -> FastAPI:
         return _vs.pull_personal_vault().to_dict()
 
     @app.post("/api/members")
+    @_scoped_to_viewer
     def add_member_endpoint(
         body: AddMemberBody,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
@@ -2287,6 +2406,7 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/members/issue-card")
+    @_scoped_to_viewer
     def issue_member_card_endpoint(
         body: IssueMemberCardBody,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
@@ -2376,6 +2496,7 @@ def create_app() -> FastAPI:
         }
 
     @app.get("/api/members/audit")
+    @_scoped_to_viewer
     def members_audit_endpoint(
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
@@ -2408,6 +2529,7 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/members/audit/notify")
+    @_scoped_to_viewer
     def members_audit_notify_endpoint(
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
@@ -2581,6 +2703,7 @@ def create_app() -> FastAPI:
             tf.extract(member, dest_dir)
 
     @app.get("/api/security/findings")
+    @_scoped_to_viewer
     def security_findings_endpoint(
         host: str = Query(..., description="Registered host name."),
         refresh: bool = Query(False, description="Re-run the scan now."),
@@ -2718,6 +2841,7 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/security/dump")
+    @_scoped_to_viewer
     def security_dump_endpoint(
         body: dict,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
@@ -2800,6 +2924,7 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/security/agent_review")
+    @_scoped_to_viewer
     def security_agent_review_endpoint(
         body: dict,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
@@ -2927,6 +3052,7 @@ def create_app() -> FastAPI:
         return {"ok": True, "host": host, "findings": mine}
 
     @app.post("/api/members/{handle}/lab_sudo")
+    @_scoped_to_viewer
     def member_lab_sudo_endpoint(
         handle: str,
         body: dict,
@@ -2967,6 +3093,7 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/members/{handle}/{action}")
+    @_scoped_to_viewer
     def member_status_endpoint(
         handle: str,
         action: str,
@@ -3329,6 +3456,7 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/project/{project}/sync_slack_members")
+    @_scoped_to_viewer
     def sync_project_slack_members(
         project: str,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
@@ -5980,6 +6108,7 @@ def create_app() -> FastAPI:
         return {"ok": True, "request": req.to_meta()}
 
     @app.post("/api/oracle/{slug}/{action}")
+    @_scoped_to_viewer
     def oracle_approve_decline(
         slug: str,
         action: str,
