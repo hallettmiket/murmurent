@@ -116,8 +116,8 @@
   // (a real murmuration) instead of balling up around one fixed point like bees.
   const ghost = { cx: 0.5, cy: 0.5,
                   px: rand(0, 6.28), py: rand(0, 6.28),
-                  sx: rand(0.00006, 0.00012), sy: rand(0.00005, 0.0001),
-                  rx: rand(0.20, 0.28), ry: rand(0.18, 0.26) };
+                  sx: rand(0.00011, 0.00020), sy: rand(0.00009, 0.00017),
+                  rx: rand(0.24, 0.33), ry: rand(0.22, 0.31) };
 
   function pickGhost() {
     // fresh drift centre + phase, kept off the edges so the arc stays on screen
@@ -322,9 +322,9 @@
       // the fixed point instead of collapsing into a tight dot. An active cursor
       // keeps the tighter, responsive follow.
       const idle = !mouse.active;
-      const pull = Math.min(0.9, 90 / md) * (idle ? 0.82 : 2.4) * b.kLure;
+      const pull = Math.min(0.9, 90 / md) * (idle ? 0.72 : 2.4) * b.kLure;
       fx += ux * pull; fy += uy * pull;
-      const tang = Math.min(1.1, 120 / md) * regime.swirl * b.swirl * (idle ? 0.44 : 0.16);
+      const tang = Math.min(1.1, 120 / md) * regime.swirl * b.swirl * (idle ? 0.62 : 0.16);
       fx += -uy * tang; fy += ux * tang;
 
       // drift back toward this bird's preferred cruising depth
@@ -412,7 +412,7 @@
       const wingL = 0.98 * spread * (1 - roll * 0.5);
 
       // silhouette area + atmospheric haze -> the flock twinkles and recedes
-      const a = (0.2 + 0.38 * b.ink) * (0.55 + 0.45 * spread) * (0.32 + 0.68 * b.z);
+      const a = (0.2 + 0.38 * b.ink) * (0.55 + 0.45 * spread) * (0.46 + 0.54 * b.z);
       // Depth-cued violet (aerial perspective -> reads as 3D): FAR birds recede
       // into a pale, desaturated blue-violet haze; NEAR birds come forward as a
       // deep, vivid magenta-violet. A per-bird hue offset (b.swirl) spreads the
@@ -421,9 +421,13 @@
       // purple. (Non-logo keeps the charcoal ink.)
       if (LOGO) {
         const spN = Math.min(1, sp / 5);
-        const hue = 272 + 30 * b.z + 10 * b.swirl;   // indigo (far) -> magenta (near)
-        const sat = 40 + 44 * b.z + 10 * spN;        // hazy/slow -> saturated/fast
-        const lig = 66 - 30 * b.z - 6 * spN;         // pale far -> deep near
+        // Bold temperature sweep across depth: FAR birds are a cool, bright
+        // blue-violet; NEAR birds a hot, deep magenta. Both stay saturated so the
+        // hue contrast (not just lightness) carries the 3D read. A 74deg hue span
+        // + a 42-point lightness swing make it dramatic rather than subtle.
+        const hue = 250 + 74 * b.z + 14 * b.swirl;   // blue-violet (far) -> magenta (near)
+        const sat = 58 + 32 * b.z + 8 * spN;         // saturated throughout -> hue contrast reads
+        const lig = 70 - 42 * b.z - 6 * spN;         // bright pale far -> deep rich near
         ctx.fillStyle = "hsla(" + hue.toFixed(1) + "," + sat.toFixed(1) + "%,"
                                 + lig.toFixed(1) + "%," + a.toFixed(3) + ")";
       } else {
