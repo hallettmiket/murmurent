@@ -4030,9 +4030,12 @@ function NewProjectModal({ onClose }) {
         </div>
 
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>proposed members</label>
-        {/* chips: already-selected handles */}
+        {/* chips: already-selected handles. Bounded + scrolls so adding many
+            members doesn't push the repo picker + lower sections out of view,
+            and flexShrink:0 stops the flex-column form from collapsing it (#51). */}
         {selectedMembers.length > 0 && (
-          <div className="row" style={{flexWrap:"wrap", gap:4}}>
+          <div className="row" style={{flexWrap:"wrap", gap:4, maxHeight:96,
+                                       overflowY:"auto", flexShrink:0}}>
             {selectedMembers.map(h => (
               <span key={h} className="mono"
                     style={{fontSize:11, padding:"2px 6px",
@@ -4149,7 +4152,8 @@ function NewProjectModal({ onClose }) {
             dir (e.g. <code>~/repos</code>) first, then refresh the Repos panel.
           </div>
         ) : (
-          <div style={{display:"flex", flexWrap:"wrap", gap:6, maxHeight:120, overflowY:"auto"}}>
+          <div style={{display:"flex", flexWrap:"wrap", gap:6, maxHeight:140,
+                       minHeight:64, overflowY:"auto", flexShrink:0}}>
             {repoOptions.map(opt => {
               const on = attachRepos.includes(opt.name);
               return (

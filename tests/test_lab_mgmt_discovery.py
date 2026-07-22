@@ -118,25 +118,42 @@ def test_pinned_pointer_still_wins_over_discovery(member_machine, tmp_path):
 
 # --- registry-authoritative net (#31/#33: canonical resolution, no legacy name) -----
 
-def test_registry_owner_claim_wins_over_discovery_even_when_absent(
-    member_machine, tmp_path, monkeypatch
-):
-    """The machine owner's registered group is authoritative: it outranks
-    shape-discovery AND is returned even when the clone isn't on disk yet — the
-    honest answer that never silently resolves to some other lab's roster."""
-    # A discoverable clone exists on disk (bob is in it)...
+def test_existing_registry_path_wins_over_discovery(member_machine, tmp_path, monkeypatch):
+    """A registered path that EXISTS on disk is authoritative — it wins over any
+    other shape-discovered clone."""
     _make_clone(member_machine, "murmurent_lab_mgmt_bioinformatics", members=["bob"])
-    # ...but the registry claims bob for a DIFFERENT (not-yet-cloned) lab.
+    reg_clone = _make_clone(tmp_path, "murmurent_lab_mgmt_mh", members=["bob"])
     from murmurent.core import registrar as _reg
-    registry_path = tmp_path / "canonical" / "murmurent_lab_mgmt_mh"
-    monkeypatch.setattr(
-        _reg, "resolve_viewer_lab_mgmt",
-        lambda handle, env=None: ("mh", str(registry_path)),
-    )
+    monkeypatch.setattr(_reg, "resolve_viewer_lab_mgmt",
+                        lambda handle, env=None: ("mh", str(reg_clone)))
+    assert _repo.lab_mgmt_repo_root() == reg_clone
 
+
+def test_discovery_beats_nonexistent_registry_path(member_machine, tmp_path, monkeypatch):
+    """#52 regression: a registry path that does NOT exist on disk must not
+    short-circuit discovery of the member's real clone. Previously the registry
+    net returned the (absent) path, blanking the roster + lab name for a member
+    whose registry entry named a wrong/bare path while their real clone sat right
+    there in ~/repos."""
+    real = _make_clone(member_machine, "murmurent_lab_mgmt_bioinformatics", members=["bob"])
+    from murmurent.core import registrar as _reg
+    bogus = tmp_path / "nope" / "murmurent_lab_mgmt"        # never created on disk
+    monkeypatch.setattr(_reg, "resolve_viewer_lab_mgmt",
+                        lambda handle, env=None: ("bioinformatics", str(bogus)))
     resolved = _repo.lab_mgmt_repo_root()
-    assert resolved == registry_path          # registry beats discovery...
-    assert not registry_path.exists()         # ...and is returned though absent.
+    assert resolved == real                                 # the real clone, not the bogus path
+    assert not bogus.exists()
+
+
+def test_absent_registry_path_used_when_no_clone_exists(member_machine, tmp_path, monkeypatch):
+    """When nothing is on disk, the registry's canonical path is still the answer
+    (so a 'clone it at <path>' hint points at the right place)."""
+    from murmurent.core import registrar as _reg
+    canonical = tmp_path / "canonical" / "murmurent_lab_mgmt_mh"
+    monkeypatch.setattr(_reg, "resolve_viewer_lab_mgmt",
+                        lambda handle, env=None: ("mh", str(canonical)))
+    assert _repo.lab_mgmt_repo_root() == canonical
+    assert not canonical.exists()
 
 
 def test_registry_miss_falls_through_to_discovery(member_machine, monkeypatch):
