@@ -83,3 +83,20 @@ outputs can be aligned even though their metrics differ (a measured K_D in
 nM, a docking score in kcal/mol, a model score). How these phrases combine
 into one answer is the job of the choreography's judge; see
 [Choreographies](choreography.md).
+
+## In the dashboard
+
+A member authors phrases privately in their vault
+(`<vault>/phrases/`, via `murmurent phrase spec new`). The dashboard's **My
+phrases** panel lists them, each showing the question it answers, its output
+contract as a compact signature (`candidate_key → metric (units) direction`),
+and its step/transition counts.
+
+To make a phrase known to the group as an offered method or service, the member
+**states** it: the panel's *state to group* action publishes the phrase — its
+spec and its contract — into the group's governance repo under `phrases/` (a
+sibling of `choreographies/`). Two things then work that could not before:
+other members see the offered phrase, and a choreography (which lives in the
+same repo) can resolve it to check joinability. Authoring stays private; stating
+is the deliberate step that shares. A choreography assembles stated phrases —
+see [Choreographies](choreography.md).

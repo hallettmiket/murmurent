@@ -103,3 +103,20 @@ The dashboard makes an outstanding finalisation visible, so "what does this
 mean?" becomes a default step rather than an optional one. Curated
 conclusions are then promoted to the group Oracle (see
 [The Oracle](oracle-workflow.md)).
+
+## In the dashboard
+
+The **Choreographies** panel is where a group assembles compositional
+choreographies. Each choreography advertises its target — the question, the
+title, the `candidate_key` it joins on, and the criteria the judge applies.
+*Pose* opens a form to advertise a new one.
+
+For each choreography the panel shows its **contributed** phrases (with a tick
+or cross for whether each joins on the shared candidate key) and, below them, a
+**joinable** pool: the group's stated phrases (see [Phrases](phrases.md)) whose
+contract shares that candidate key but which are not attached yet. *Attach*
+adds one; a phrase that does not join is refused, because a mismatched key
+means the outputs cannot be combined. When every contributed phrase joins, the
+choreography is ready to compose — the judge aligns the outputs on the shared
+key and presents the result (see the `judge` agent in
+[the reference agents](agents.md)).

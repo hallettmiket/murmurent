@@ -184,6 +184,16 @@ class MachineSettingsBody(BaseModel):
     lab_base: str | None = None
 
 
+class NewChoreographyBody(BaseModel):
+    """JSON body for ``POST /api/choreography`` — pose a group choreography (#38)."""
+
+    question: str
+    title: str
+    candidate_key: str
+    criteria: str
+    poser: str = ""   # defaults to the acting handle when blank
+
+
 class MemberSettingsBody(BaseModel):
     """JSON body for ``POST /api/member/settings``.
 
@@ -6201,14 +6211,14 @@ def create_app() -> FastAPI:
         action: str,
         model: str | None = Query(
             None,
-            description="When action='set_model', the new model shorthand (opus|sonnet|haiku).",
+            description="When action='set_model', the new model shorthand (fable|opus|sonnet|haiku).",
         ),
     ) -> dict:
         """Manage a personal agent's frontmatter.
 
         Actions:
           - ``enable`` / ``disable`` — flip the ``disabled:`` flag
-          - ``set_model`` — pick a model shorthand (``opus|sonnet|haiku``)
+          - ``set_model`` — pick a model shorthand (``fable|opus|sonnet|haiku``)
 
         Frozen agents (centre-controlled) cannot be modified here; they
         require a PR against the agents/ registry.
@@ -6216,7 +6226,10 @@ def create_app() -> FastAPI:
         from ..core import agents as agents_core
         from ..core.repo import murmurent_repo_root
 
-        VALID_MODELS = {"opus", "sonnet", "haiku"}
+        # ``fable`` (claude-fable-5) is the most-capable tier; offered so a
+        # member can put a personal agent (or the Oracle) on it. Kept in sync
+        # with the model dropdown in docs/designer_dashboard/hifi-app.jsx.
+        VALID_MODELS = {"fable", "opus", "sonnet", "haiku"}
         if action not in {"enable", "disable", "set_model"}:
             raise HTTPException(status_code=422, detail=f"unknown action: {action}")
         if action == "set_model" and (not model or model not in VALID_MODELS):
@@ -6259,6 +6272,105 @@ def create_app() -> FastAPI:
             "disabled": bool(parsed.meta.get("disabled", False)),
             "model": parsed.meta.get("model"),
         }
+
+    # -- Phrases + choreographies (#38 Phases B/C) -------------------------
+
+    @app.post("/api/phrases/{slug}/state")
+    def state_phrase_endpoint(
+        slug: str,
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """State (publish) one of the member's own phrases to their group, so
+        other members can build a choreography from it. Copies the spec + its
+        contract from the member's vault into the group repo's ``phrases/``."""
+        from ..core import phrase_publish as _pp
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        try:
+            res = _pp.state_phrase_to_group(slug)
+        except _pp.PhrasePublishError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"ok": True, "slug": res.slug, "path": str(res.spec_path)}
+
+    @app.post("/api/choreography")
+    def new_choreography_endpoint(
+        body: NewChoreographyBody,
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Pose a new group choreography — advertise a target (question + title +
+        candidate_key + criteria) that members contribute joinable phrases to."""
+        from ..core import choreography as _ch
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        cdir = _ch.default_choreography_dir()
+        if cdir is None:
+            raise HTTPException(
+                status_code=422,
+                detail="no group choreographies location resolved — is a group "
+                       "governance repo present on this machine?",
+            )
+        poser = body.poser.strip() or f"@{actor.lstrip('@')}"
+        obj = _ch.Choreography(
+            question=body.question, poser=poser, title=body.title,
+            candidate_key=body.candidate_key, criteria=body.criteria,
+        )
+        # Validate everything EXCEPT joinability (a fresh choreography has no
+        # attached phrases yet).
+        problems = [p for p in obj.validate() if "phrase" not in p.lower()]
+        if problems:
+            raise HTTPException(status_code=422, detail="; ".join(problems))
+        dest_dir = Path(cdir)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / _ch.default_choreography_filename(body.question)
+        if dest.exists():
+            raise HTTPException(
+                status_code=409, detail=f"a choreography already exists at {dest.name}")
+        dest.write_text(obj.to_markdown(), encoding="utf-8")
+        return {"ok": True, "id": dest.stem, "path": str(dest)}
+
+    @app.post("/api/choreography/{cid}/attach")
+    def attach_phrase_endpoint(
+        cid: str,
+        phrase: str = Query(..., description="Slug of the stated group phrase to attach."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Attach (offer) a stated group phrase to a choreography. Rejects a
+        phrase that doesn't join on the choreography's candidate_key."""
+        from ..core import choreography as _ch
+        from ..core import phrase_spec as _ps
+        from ..core import phrase_publish as _pp
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        cdir = _ch.default_choreography_dir()
+        if cdir is None:
+            raise HTTPException(status_code=404, detail="no choreographies location resolved")
+        path = Path(cdir) / f"{cid}.md"
+        if not path.is_file():
+            raise HTTPException(status_code=404, detail=f"choreography not found: {cid}")
+        obj = _ch.Choreography.from_file(path)
+
+        # The phrase must be stated to the group and must join on candidate_key.
+        spec_path = _ps.resolve_spec_reference(phrase, _pp.group_phrases_dir())
+        if spec_path is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"phrase {phrase!r} is not stated to the group — state it first.")
+        spec = _ps.PhraseSpec.from_file(spec_path)
+        contract = spec.resolved_contract()
+        ck = getattr(contract, "candidate_key", "") if contract else ""
+        if ck != obj.candidate_key:
+            raise HTTPException(
+                status_code=422,
+                detail=f"phrase candidate_key {ck or '—'} does not join the "
+                       f"choreography's {obj.candidate_key!r} — not combinable.")
+
+        added = obj.attach_phrase(phrase)
+        if added:
+            path.write_text(obj.to_markdown(), encoding="utf-8")
+        return {"ok": True, "attached": added, "total": len(obj.phrases)}
 
     @app.post("/api/notebook/edit")
     def notebook_edit(

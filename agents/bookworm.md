@@ -1,6 +1,7 @@
 ---
 name: bookworm
-description: 'MUST: first line of every final response is a ≤200-char verdict in your own voice (see rules/headline_first.md). Literature and database specialist. Queries scientific databases, annotates data with published knowledge, summarises literature, and curates reading lists.'
+category: member
+description: 'Literature and database specialist. Queries scientific databases, annotates data with published knowledge, summarises literature, and curates reading lists.'
 freeze: personal
 model: sonnet
 required_tools:

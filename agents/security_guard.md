@@ -1,6 +1,7 @@
 ---
 name: security_guard
-description: 'MUST: first line of every final response is a ≤200-char verdict in your own voice (see rules/headline_first.md). Guardian persona that scans diffs and outgoing artefacts for secrets, restricted paths, and PHI patterns. Always invoked on PRs that touch shared code or data.'
+category: member
+description: 'Guardian persona that scans diffs and outgoing artefacts for secrets, restricted paths, and PHI patterns. Always invoked on PRs that touch shared code or data.'
 freeze: frozen
 model: sonnet
 required_tools:

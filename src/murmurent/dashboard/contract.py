@@ -354,7 +354,15 @@ class PeerRow(BaseModel):
 
 
 class AgentRow(BaseModel):
-    """Phase 7: an installed agent visible to the dashboard."""
+    """Phase 7: an installed agent visible to the dashboard.
+
+    ``origin`` splits the two dashboard sections: ``commons`` agents ship with
+    murmurent and are in every member's environment; ``personal`` agents are
+    member-created/forked, live in the member's own ``~/.murmurent/agent_forks``
+    (git-trackable → their GitHub), and appear only in their village.
+    ``category`` sub-groups the commons agents (member / administrative /
+    choreography-support). ``freeze`` is the orthogonal editability flag.
+    """
 
     name: str
     description: str
@@ -362,6 +370,8 @@ class AgentRow(BaseModel):
     model: str | None = None
     required_tools: list[str] = []
     disabled: bool = False  # personal agents only; frozen are always active
+    origin: Literal["commons", "personal"] = "commons"
+    category: Literal["member", "administrative", "choreography-support"] = "member"
 
 
 class OracleEntry(BaseModel):
@@ -406,6 +416,67 @@ class AgentActivity(BaseModel):
     agent: str = ""         # subagent type (e.g. "blacksmith")
     text: str = ""          # the ≤200-char verdict, or the starting description
     started: bool = False   # True = a "starting" line; False = a done/verdict line
+
+
+# ---------------------------------------------------------------------------
+# Phrases + choreographies (issue #38, Phases B/C)
+# ---------------------------------------------------------------------------
+
+
+class PhraseContractView(BaseModel):
+    """A phrase's typed output contract — the part that makes phrases joinable.
+
+    ``candidate_key`` is the identity/join column (inchikey, gene_symbol, …);
+    two phrases are combinable in a choreography iff they share it."""
+
+    candidate_key: str = ""
+    metric: str = ""
+    units: str = ""
+    direction: str = ""       # higher_better | lower_better
+    uncertainty: str = "none"
+
+
+class PhraseRow(BaseModel):
+    """Phase B: one phrase a member has authored in their personal vault."""
+
+    phrase: str
+    slug: str = ""            # slugified name — addresses the phrase in the API
+    question: str = ""
+    author: str = ""
+    contract: PhraseContractView | None = None
+    steps: int = 0
+    transitions: int = 0
+    stated: bool = False      # already stated (published) to the group?
+    path: str = ""
+
+
+class ChoreographyPhraseRow(BaseModel):
+    """A phrase in relation to a choreography: does it join, is it attached?"""
+
+    phrase: str
+    author: str = ""
+    candidate_key: str = ""
+    joins: bool = False       # contract candidate_key == the choreography's
+    reason: str = ""          # why it does not join, when joins is False
+
+
+class ChoreographyRow(BaseModel):
+    """Phase C: a posed compositional choreography (group-shared).
+
+    ``candidate_key`` + ``question``/``title`` + ``criteria`` are the advertised
+    target. ``attached`` are the contributed phrases; ``joinable`` are stated
+    group phrases that could join but haven't been attached yet."""
+
+    title: str
+    id: str = ""              # filename stem (slug of the question) — API address
+    question: str = ""
+    poser: str = ""
+    candidate_key: str = ""
+    criteria: str = ""
+    attached: list[ChoreographyPhraseRow] = []
+    joinable: list[ChoreographyPhraseRow] = []
+    all_join: bool = True     # every attached phrase joins → ready to compose
+    path: str = ""
 
 
 class PersonalOracleBlock(BaseModel):
@@ -1017,6 +1088,8 @@ class DashboardResponse(BaseModel):
     machine_settings: MachineSettings = MachineSettings()
     lab_settings: LabSettings = LabSettings()
     agents: list[AgentRow] = []
+    my_phrases: list[PhraseRow] = []             # Phase B: the member's own phrases
+    choreographies: list[ChoreographyRow] = []   # Phase C: group-shared choreographies
     oracle_recent: list[OracleEntry] = []
     oracle_drafts: list[OracleEntry] = []  # PI-only; awaiting approval
     personal_oracle: PersonalOracleBlock = PersonalOracleBlock(folder="oracle/")

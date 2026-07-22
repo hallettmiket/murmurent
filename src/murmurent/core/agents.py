@@ -19,6 +19,16 @@ from .repo import murmurent_repo_root
 AGENTS_DIRNAME = "agents"
 VALID_FREEZE_VALUES = {"frozen", "personal"}
 
+# Commons-agent category (orthogonal to ``freeze``, which is about editability).
+# Groups the shared agents in the dashboard: the per-member/per-lab science
+# toolkit (``member``), the centre-level singletons that act above a single lab
+# (``administrative`` — registrar, centre_cable_guy, and eventually a
+# centre_security_guard), and the agents that specifically support building
+# compositional choreographies (``choreography-support`` — the judge, plus the
+# data-shaping / filtering / chaining agents to come).
+VALID_CATEGORY_VALUES = {"member", "administrative", "choreography-support"}
+DEFAULT_CATEGORY = "member"
+
 
 @dataclass(frozen=True)
 class AgentRecord:
@@ -31,6 +41,7 @@ class AgentRecord:
     denied_tools: tuple[str, ...]
     defaults: dict[str, Any] = field(default_factory=dict)
     path: Path | None = None
+    category: str = DEFAULT_CATEGORY
 
 
 def agents_dir(repo_root: Path | None = None) -> Path:
@@ -71,6 +82,13 @@ def load_agent(path: str | Path) -> AgentRecord:
             f"Agent {name!r}: 'defaults' must be a mapping; got {type(defaults).__name__}."
         )
 
+    category = meta.get("category", DEFAULT_CATEGORY)
+    if category not in VALID_CATEGORY_VALUES:
+        raise FrontmatterError(
+            f"Agent {name!r}: 'category' must be one of "
+            f"{sorted(VALID_CATEGORY_VALUES)}; got {category!r}."
+        )
+
     return AgentRecord(
         name=str(name),
         freeze=str(freeze),
@@ -79,6 +97,7 @@ def load_agent(path: str | Path) -> AgentRecord:
         denied_tools=_coerce_tools(meta.get("denied_tools")),
         defaults=dict(defaults),
         path=Path(path),
+        category=str(category),
     )
 
 
