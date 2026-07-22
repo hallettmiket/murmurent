@@ -16,4 +16,4 @@ def test_murmuration_route_serves_the_wordmark_animation():
     # It's the uniform-wordmark file, and it carries logo mode (chrome-free).
     assert '<canvas id="stage">' in body
     assert "html.logo #mark" in body          # logo-mode CSS
-    assert "logoMode" in body                 # logo-mode JS (auto-play, no veil)
+    assert 'classList.add("logo")' in body    # logo-mode JS (auto-play, no veil)
