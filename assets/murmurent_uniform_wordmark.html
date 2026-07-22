@@ -489,13 +489,19 @@
   }
 
   // ---------- loop ----------
+  // Logo mode slows the flock — a small icon reads as frantic at full speed.
+  // A scaled sim-clock (simT) advances the noise fields + boids together so the
+  // slowdown is uniform. Full-speed (TIME_SCALE = 1) for the interactive page.
+  const TIME_SCALE = (new URLSearchParams(location.search).has("logo")
+                      || location.hash.replace("#", "") === "logo") ? 0.55 : 1;
   let last = performance.now();
+  let simT = 0;
   function frame(now) {
-    const t = now / 1000;
-    const dt = Math.min(0.05, (now - last) / 1000);
+    const dt = Math.min(0.05, (now - last) / 1000) * TIME_SCALE;
     last = now;
+    simT += dt;
 
-    step(t, dt);
+    step(simT, dt);
     draw();
 
     if (audio && !muted) {
