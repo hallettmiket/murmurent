@@ -215,6 +215,34 @@ def bootstrap_local(
                 required=False,
             ))
 
+    # .vscode/tasks.json — an "agents.log" task that AUTO-RUNS on folder open,
+    # so opening the repo (via the dashboard launch or plain `code .`) drops you
+    # into a terminal already tailing ~/.murmurent/agents.log, the live subagent
+    # feed (#41 pt 3). Previously this was a manual BR-pane step. Preserved if
+    # the project already has a tasks.json (don't clobber user tasks).
+    vscode_tasks = vscode_dir / "tasks.json"
+    if vscode_tasks.is_file():
+        probes.append(Probe(
+            name="vscode_tasks", status="ok",
+            detail=f"{vscode_tasks} (already exists, preserved)",
+            required=False,
+        ))
+    else:
+        try:
+            vscode_dir.mkdir(parents=True, exist_ok=True)
+            vscode_tasks.write_text(_vscode_tasks_json(), encoding="utf-8")
+            probes.append(Probe(
+                name="vscode_tasks", status="ok",
+                detail=f"created {vscode_tasks} (agents.log auto-tail)",
+                required=False,
+            ))
+        except OSError as exc:
+            probes.append(Probe(
+                name="vscode_tasks", status="warn",
+                detail=f"write {vscode_tasks}: {exc}",
+                required=False,
+            ))
+
     # CC hooks no longer live per-project — they're now merged into the
     # user-global ~/.claude/settings.json by `murmurent install --hooks`
     # so they fire for every project on this machine, sharing a single
@@ -369,11 +397,45 @@ def _vscode_settings_json() -> str:
         "workbench.sideBar.location": "right",
         "terminal.integrated.defaultLocation": "editor",
         "terminal.integrated.tabs.location": "right",
+        # Let the folderOpen "agents.log" task (tasks.json, #41 pt 3) run without
+        # the "Allow Automatic Tasks" prompt every open.
+        "task.allowAutomaticTasks": "on",
         "files.exclude": {
             "**/.pytest_cache": True,
             "**/__pycache__": True,
             "**/.venv": True,
         },
+    }, indent=2) + "\n"
+
+
+def _vscode_tasks_json() -> str:
+    """An auto-running "agents.log" task (#41 pt 3).
+
+    ``runOn: folderOpen`` makes VSCode start this task whenever the repo is
+    opened, so a terminal panel tailing ``~/.murmurent/agents.log`` — the live
+    subagent feed the dashboard also shows — is there BY DEFAULT, no manual
+    ``tail`` step. ``${userHome}`` resolves per-machine, so the same JSON works
+    everywhere. Preserved on re-bootstrap if the user already has a tasks.json.
+    """
+    return json.dumps({
+        "//": (
+            "Written by core.project_cc_init.bootstrap_local. The agents.log "
+            "task auto-tails the live subagent feed on folder open (#41). Edit "
+            "freely — murmurent preserves user-modified files on re-bootstrap."
+        ),
+        "version": "2.0.0",
+        "tasks": [{
+            "label": "agents.log",
+            "type": "shell",
+            "command": "tail -F \"${userHome}/.murmurent/agents.log\"",
+            "isBackground": True,
+            "presentation": {
+                "reveal": "always", "panel": "dedicated",
+                "group": "murmurent", "clear": True,
+            },
+            "runOptions": {"runOn": "folderOpen"},
+            "problemMatcher": [],
+        }],
     }, indent=2) + "\n"
 
 

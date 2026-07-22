@@ -36,7 +36,11 @@ One-time setup per project:
    thanks to `terminal.integrated.defaultLocation: editor`.
 2. Drag them into a 2×2 split.
 3. In BL: any tmux shell.
-4. In BR: `tail -F ~/.murmurent/agents.log`.
+4. The BR `tail -F ~/.murmurent/agents.log` starts **automatically**: a
+   murmurent-ready repo carries a `.vscode/tasks.json` `agents.log` task with
+   `runOn: folderOpen` (and `task.allowAutomaticTasks: on`), so opening the
+   folder drops you straight into the live subagent feed — no manual `tail`.
+   Drag that terminal into the BR quadrant.
 5. VSCode persists this editor-group state per folder.
 
 ## Title bar + chrome

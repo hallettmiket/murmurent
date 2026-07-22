@@ -671,6 +671,20 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
         </span>
       );
     }
+    // murmurent's OWN repos (the commons clone, lab-mgmt, vault, …) are
+    // infrastructure — they are never "made ready" (a repo can't adopt itself;
+    // lab-mgmt is governance, not a project). Mark them distinctly and offer no
+    // make-ready button, so they don't read as ready-buttons that are broken
+    // (#41 pt 5). This wins over the ready/not-ready branches below.
+    if (c.is_murmurent_infra) {
+      return (
+        <span title={c.path + " — murmurent infrastructure; not a project repo"}
+              style={{fontSize:11, color:"var(--purple)", fontFamily:"var(--mono)",
+                      whiteSpace:"nowrap"}}>
+          ◆ murmurent
+        </span>
+      );
+    }
     if (c.is_murmurent_ready) {
       return (
         <span style={{display:"inline-flex", alignItems:"center", gap:8, whiteSpace:"nowrap"}}>
@@ -1279,7 +1293,7 @@ function InstallModal({ initialProject, initialMachine, initialRepoUrl, onClose 
   const cloneRemote = (isSensitive || forceLocalRepo)
     ? _underLabBase(ls.lab_base, subpath + "/" + project + ".git")
     : (projectMeta.remote_url
-        || `https://github.com/${ls.github_org || "hallettmiket"}/${project}`);
+        || `https://github.com/${ls.github_org || "your-org"}/${project}`);
 
   const wb       = machineConfig ? machineConfig.wigamig_base : "";
   const rawPath      = _joinUnder(wb, "raw/" + project);
@@ -2527,7 +2541,7 @@ function ProjectsPanel({ projects, span="c-5" }) {
   );
 }
 
-/* ───────── Western training compliance panel ─────────
+/* ───────── Training compliance panel ─────────
    Each member × each required cert grid. Status colours match the
    Compliance heatmap (ok / amb / exp / mis) plus a "n/a" cell for
    optional certs and "✓" for one-time certs already completed. */
@@ -2542,10 +2556,10 @@ function TrainingCompliancePanel({ data, span="c-12" }) {
   if (required.length === 0) {
     return (
       <div className={"panel "+span}>
-        <header><h2>Compliance · Western training</h2></header>
+        <header><h2>Compliance · required training</h2></header>
         <div className="body" style={{padding:14, fontSize:13, color:"var(--muted)"}}>
           No compliance config. Seed <code>&lt;lab-mgmt&gt;/compliance.md</code> with the
-          Western required-training catalog.
+          required-training catalog for your institution.
         </div>
       </div>
     );
@@ -2570,7 +2584,7 @@ function TrainingCompliancePanel({ data, span="c-12" }) {
   return (
     <div className={"panel "+span}>
       <header>
-        <h2>Compliance · Western training</h2>
+        <h2>Compliance · required training</h2>
         <span className="meta">
           {counts.expired} expired · {counts.expiring} expiring · {counts.missing} missing
         </span>
@@ -4060,7 +4074,7 @@ function NewProjectModal({ onClose }) {
                 <input type="radio" name="repo_kind" value="github"
                        checked={repoKind === "github"}
                        onChange={() => setRepoKind("github")} />
-                GitHub <span className="mono muted" style={{fontSize:11}}>(default — pushes to github.com/{ls.github_org || "hallettmiket"})</span>
+                GitHub <span className="mono muted" style={{fontSize:11}}>(default — pushes to github.com/{ls.github_org || "your-org"})</span>
               </label>
               <label style={{display:"flex", alignItems:"center", gap:6, cursor:"pointer", fontSize:12}}>
                 <input type="radio" name="repo_kind" value="local"
@@ -7704,7 +7718,7 @@ function MasterFoldersPanel({ labBase }) {
 function GitProvidersEditor({ value, onChange }) {
   const KINDS = ["github", "gitea", "local-bare"];
   const HINTS = {
-    "github":     "target = org name (e.g. hallettmiket)",
+    "github":     "target = org name (e.g. your-org)",
     "gitea":      "target = base URL (e.g. https://lab-server/gitea)",
     "local-bare": "target = absolute server-side dir (e.g. /data/<lab id>/repos)",
   };
