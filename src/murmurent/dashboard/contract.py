@@ -419,15 +419,15 @@ class AgentActivity(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Phrases + choreographies (issue #38, Phases B/C)
+# Contributions + choreographies (issue #38, Phases B/C)
 # ---------------------------------------------------------------------------
 
 
-class PhraseContractView(BaseModel):
-    """A phrase's typed output contract — the part that makes phrases joinable.
+class ContributionContractView(BaseModel):
+    """A contribution's typed output contract — the part that makes contributions joinable.
 
     ``candidate_key`` is the identity/join column (inchikey, gene_symbol, …);
-    two phrases are combinable in a choreography iff they share it."""
+    two contributions are combinable in a choreography iff they share it."""
 
     candidate_key: str = ""
     metric: str = ""
@@ -436,24 +436,24 @@ class PhraseContractView(BaseModel):
     uncertainty: str = "none"
 
 
-class PhraseRow(BaseModel):
-    """Phase B: one phrase a member has authored in their personal vault."""
+class ContributionRow(BaseModel):
+    """Phase B: one contribution a member has authored in their personal vault."""
 
-    phrase: str
-    slug: str = ""            # slugified name — addresses the phrase in the API
+    contribution: str
+    slug: str = ""            # slugified name — addresses the contribution in the API
     question: str = ""
     author: str = ""
-    contract: PhraseContractView | None = None
+    contract: ContributionContractView | None = None
     steps: int = 0
     transitions: int = 0
     stated: bool = False      # already stated (published) to the group?
     path: str = ""
 
 
-class ChoreographyPhraseRow(BaseModel):
-    """A phrase in relation to a choreography: does it join, is it attached?"""
+class ChoreographyContributionRow(BaseModel):
+    """A contribution in relation to a choreography: does it join, is it attached?"""
 
-    phrase: str
+    contribution: str
     author: str = ""
     candidate_key: str = ""
     joins: bool = False       # contract candidate_key == the choreography's
@@ -464,8 +464,8 @@ class ChoreographyRow(BaseModel):
     """Phase C: a posed compositional choreography (group-shared).
 
     ``candidate_key`` + ``question``/``title`` + ``criteria`` are the advertised
-    target. ``attached`` are the contributed phrases; ``joinable`` are stated
-    group phrases that could join but haven't been attached yet."""
+    target. ``attached`` are the contributed contributions; ``joinable`` are stated
+    group contributions that could join but haven't been attached yet."""
 
     title: str
     id: str = ""              # filename stem (slug of the question) — API address
@@ -473,9 +473,9 @@ class ChoreographyRow(BaseModel):
     poser: str = ""
     candidate_key: str = ""
     criteria: str = ""
-    attached: list[ChoreographyPhraseRow] = []
-    joinable: list[ChoreographyPhraseRow] = []
-    all_join: bool = True     # every attached phrase joins → ready to compose
+    attached: list[ChoreographyContributionRow] = []
+    joinable: list[ChoreographyContributionRow] = []
+    all_join: bool = True     # every attached contribution joins → ready to compose
     path: str = ""
 
 
@@ -1088,7 +1088,7 @@ class DashboardResponse(BaseModel):
     machine_settings: MachineSettings = MachineSettings()
     lab_settings: LabSettings = LabSettings()
     agents: list[AgentRow] = []
-    my_phrases: list[PhraseRow] = []             # Phase B: the member's own phrases
+    my_contributions: list[ContributionRow] = []             # Phase B: the member's own contributions
     choreographies: list[ChoreographyRow] = []   # Phase C: group-shared choreographies
     oracle_recent: list[OracleEntry] = []
     oracle_drafts: list[OracleEntry] = []  # PI-only; awaiting approval

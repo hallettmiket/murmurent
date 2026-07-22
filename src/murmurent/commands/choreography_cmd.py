@@ -1,19 +1,19 @@
 """
 Purpose: Implementation of the ``murmurent choreography ...`` subcommands —
          pose a compositional choreography (a posed question + candidate-identity
-         space + judging criteria), attach contributed phrases to it, validate
+         space + judging criteria), attach contributed contributions to it, validate
          the whole thing (including the candidate-key joinability check across
-         all phrases), and show it.
+         all contributions), and show it.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
 Input: CLI arguments forwarded from :mod:`murmurent.cli`.
 Output: ``new`` writes a choreography markdown file (or stdout with no vault +
-        no ``--out``); ``offer`` re-writes the file with a phrase attached;
+        no ``--out``); ``offer`` re-writes the file with a contribution attached;
         ``validate`` reports problems + exit code; ``show`` prints the posed
-        question, poser, candidate key, criteria, and each phrase's metric.
+        question, poser, candidate key, criteria, and each contribution's metric.
 
 Boundary: authoring + validation only — no execution, no judge. See
-``docs/choreography.md`` / ``docs/phrases.md``.
+``docs/choreography.md`` / ``docs/contributions.md``.
 """
 
 from __future__ import annotations
@@ -23,8 +23,8 @@ from pathlib import Path
 import click
 
 from ..core import choreography as _ch
-from ..core import phrase_run as _run
-from ..core import phrase_spec as _ps
+from ..core import contribution_run as _run
+from ..core import contribution_spec as _ps
 
 
 def _load_criteria(raw: str) -> str:
@@ -54,7 +54,7 @@ def cmd_new(
         candidate_key=candidate_key,
         criteria=_load_criteria(criteria),
     )
-    # A freshly-posed choreography has no phrases yet, so validation only checks
+    # A freshly-posed choreography has no contributions yet, so validation only checks
     # the poser-supplied fields (the joinability check is a no-op here).
     problems = obj.validate()
     if problems:
@@ -83,8 +83,8 @@ def cmd_new(
     return 0
 
 
-def cmd_offer(*, choreography_path: str, phrase: str) -> int:
-    """Attach a phrase contribution to a choreography and re-write the file."""
+def cmd_offer(*, choreography_path: str, contribution: str) -> int:
+    """Attach a contribution contribution to a choreography and re-write the file."""
     p = Path(choreography_path).expanduser()
     if not p.is_file():
         raise click.ClickException(f"no such file: {p}")
@@ -93,13 +93,13 @@ def cmd_offer(*, choreography_path: str, phrase: str) -> int:
     except _ch.ChoreographyError as exc:
         raise click.ClickException(str(exc)) from exc
 
-    added = obj.attach_phrase(phrase)
+    added = obj.attach_contribution(contribution)
     if not added:
-        click.echo(f"Phrase {phrase!r} is already attached; nothing to do.")
+        click.echo(f"Contribution {contribution!r} is already attached; nothing to do.")
         return 0
 
     p.write_text(obj.to_markdown(), encoding="utf-8")
-    click.echo(f"Attached phrase {phrase!r} → {p} ({len(obj.phrases)} total).")
+    click.echo(f"Attached contribution {contribution!r} → {p} ({len(obj.contributions)} total).")
     return 0
 
 
@@ -117,7 +117,7 @@ def cmd_validate(choreography_path: str) -> int:
     if not problems:
         click.echo(
             f"OK — {p} is a valid choreography "
-            f"({len(obj.phrases)} phrase(s), all joinable on "
+            f"({len(obj.contributions)} contribution(s), all joinable on "
             f"{obj.candidate_key!r})."
         )
         return 0
@@ -128,7 +128,7 @@ def cmd_validate(choreography_path: str) -> int:
 
 
 def cmd_show(choreography_path: str) -> int:
-    """Print the posed question, poser, candidate key, criteria, and phrases."""
+    """Print the posed question, poser, candidate key, criteria, and contributions."""
     p = Path(choreography_path).expanduser()
     if not p.is_file():
         raise click.ClickException(f"no such file: {p}")
@@ -144,29 +144,29 @@ def cmd_show(choreography_path: str) -> int:
     click.echo("Criteria:")
     for line in (obj.criteria or "(none)").splitlines() or ["(none)"]:
         click.echo(f"  {line}")
-    click.echo(f"Phrases ({len(obj.phrases)}):")
-    if not obj.phrases:
+    click.echo(f"Contributions ({len(obj.contributions)}):")
+    if not obj.contributions:
         click.echo("  (none attached yet)")
         return 0
 
     base = p.parent
-    for ref in obj.phrases:
+    for ref in obj.contributions:
         spec_path = _ps.resolve_spec_reference(ref, base)
         if spec_path is None:
             click.echo(f"  - {ref}: [spec unresolved]")
             continue
         try:
-            spec = _ps.PhraseSpec.from_file(spec_path)
-        except _ps.PhraseSpecError:
+            spec = _ps.ContributionSpec.from_file(spec_path)
+        except _ps.ContributionSpecError:
             click.echo(f"  - {ref}: [spec unparseable]")
             continue
         contract = spec.resolved_contract()
         if contract is None:
-            click.echo(f"  - {spec.phrase} by {spec.author}: [contract unresolved]")
+            click.echo(f"  - {spec.contribution} by {spec.author}: [contract unresolved]")
             continue
         join = "joins" if contract.candidate_key == obj.candidate_key else "DIFFERS"
         click.echo(
-            f"  - {spec.phrase} by {spec.author}: "
+            f"  - {spec.contribution} by {spec.author}: "
             f"{contract.metric} [{contract.units}], {contract.direction} "
             f"(key {contract.candidate_key} — {join})"
         )
@@ -181,7 +181,7 @@ def cmd_prepare_run(*, choreography_path: str, out: str | None) -> int:
         raise click.ClickException(str(exc)) from exc
     click.echo(f"Prepared run package → {dest}")
     click.echo(f"  manifest: {dest / _run.MANIFEST_NAME}")
-    click.echo("Hand this package to the judge agent to combine + present the phrases.")
+    click.echo("Hand this package to the judge agent to combine + present the contributions.")
     return 0
 
 

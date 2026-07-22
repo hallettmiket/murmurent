@@ -1810,29 +1810,29 @@ def member_activate_cmd(handle: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# phrase (choreography Phase 1: the phrase output-contract)
+# contribution (choreography Phase 1: the contribution output-contract)
 # ---------------------------------------------------------------------------
 
 
-@cli.group("phrase", help="Author + validate phrase output-contracts.")
-def phrase_group() -> None:
-    """A phrase declares a typed output contract so heterogeneous phrase
+@cli.group("contribution", help="Author + validate contribution output-contracts.")
+def contribution_group() -> None:
+    """A contribution declares a typed output contract so heterogeneous contribution
     outputs can be aligned on a shared candidate identity and judged."""
 
 
-@phrase_group.group("contract", help="Manage phrase output-contracts.")
-def phrase_contract_group() -> None:
+@contribution_group.group("contract", help="Manage contribution output-contracts.")
+def contribution_contract_group() -> None:
     pass
 
 
-@phrase_contract_group.command("new", help="Write a valid phrase output-contract.")
-@click.option("--phrase", "phrase", required=True, help="Phrase name/slug.")
+@contribution_contract_group.command("new", help="Write a valid contribution output-contract.")
+@click.option("--contribution", "contribution", required=True, help="Contribution name/slug.")
 @click.option("--author", required=True, help="Offering member handle (e.g. @member_a).")
 @click.option("--question", required=True, help="Posed question / choreography id.")
 @click.option("--candidate-key", "candidate_key", required=True,
               help="Identity space naming a candidate: inchikey | smiles | "
                    "gene_symbol | uniprot | other:<free-text>.")
-@click.option("--metric", required=True, help="What the phrase reports (e.g. binding_affinity).")
+@click.option("--metric", required=True, help="What the contribution reports (e.g. binding_affinity).")
 @click.option("--units", required=True, help="Metric units (e.g. nM, kcal/mol, dimensionless).")
 @click.option("--direction", required=True,
               type=click.Choice(["higher_better", "lower_better"]),
@@ -1840,9 +1840,9 @@ def phrase_contract_group() -> None:
 @click.option("--uncertainty", default="none", show_default=True,
               help="How uncertainty is expressed (e.g. stderr, ci95, none).")
 @click.option("--out", "out", default=None, type=click.Path(),
-              help="Output path (file or dir). Default: <vault>/phrases/; stdout if no vault.")
-def phrase_contract_new(
-    phrase: str,
+              help="Output path (file or dir). Default: <vault>/contributions/; stdout if no vault.")
+def contribution_contract_new(
+    contribution: str,
     author: str,
     question: str,
     candidate_key: str,
@@ -1852,9 +1852,9 @@ def phrase_contract_new(
     uncertainty: str,
     out: str | None,
 ) -> None:
-    from .commands import phrase_cmd as _phrase_cmd
-    raise SystemExit(_phrase_cmd.cmd_contract_new(
-        phrase=phrase,
+    from .commands import contribution_cmd as _contribution_cmd
+    raise SystemExit(_contribution_cmd.cmd_contract_new(
+        contribution=contribution,
         author=author,
         question=question,
         candidate_key=candidate_key,
@@ -1866,29 +1866,29 @@ def phrase_contract_new(
     ))
 
 
-@phrase_contract_group.command("validate", help="Validate a phrase output-contract file.")
+@contribution_contract_group.command("validate", help="Validate a contribution output-contract file.")
 @click.argument("path", type=click.Path())
-def phrase_contract_validate(path: str) -> None:
-    from .commands import phrase_cmd as _phrase_cmd
-    raise SystemExit(_phrase_cmd.cmd_contract_validate(path))
+def contribution_contract_validate(path: str) -> None:
+    from .commands import contribution_cmd as _contribution_cmd
+    raise SystemExit(_contribution_cmd.cmd_contract_validate(path))
 
 
-# -- phrase spec (Phase 2a: the authored phrase — steps + transitions) ------
+# -- contribution spec (Phase 2a: the authored contribution — steps + transitions) ------
 
 
-@phrase_group.group("spec", help="Author + validate phrase specs (steps/transitions).")
-def phrase_spec_group() -> None:
-    """A phrase spec is the authored phrase a member offers into a
+@contribution_group.group("spec", help="Author + validate contribution specs (steps/transitions).")
+def contribution_spec_group() -> None:
+    """A contribution spec is the authored contribution a member offers into a
     choreography: an ordered graph of steps + transitions producing an output
     that conforms to its (Phase-1) output contract."""
 
 
-@phrase_spec_group.command("new", help="Write a valid phrase spec.")
-@click.option("--phrase", "phrase", required=True, help="Phrase name/slug.")
+@contribution_spec_group.command("new", help="Write a valid contribution spec.")
+@click.option("--contribution", "contribution", required=True, help="Contribution name/slug.")
 @click.option("--author", required=True, help="Offering member handle (e.g. @member_a).")
 @click.option("--question", required=True, help="Posed question / choreography id.")
 @click.option("--contract", required=True,
-              help="Reference to the phrase's Phase-1 output contract "
+              help="Reference to the contribution's Phase-1 output contract "
                    "(relative path or slug).")
 @click.option("--step", "steps", multiple=True, required=True,
               metavar="NAME:KIND:RUN",
@@ -1897,9 +1897,9 @@ def phrase_spec_group() -> None:
               metavar="NAME:KIND",
               help="A transition 'name:kind' (kind = rank|filter|select). Repeatable.")
 @click.option("--out", "out", default=None, type=click.Path(),
-              help="Output path (file or dir). Default: <vault>/phrases/; stdout if no vault.")
-def phrase_spec_new(
-    phrase: str,
+              help="Output path (file or dir). Default: <vault>/contributions/; stdout if no vault.")
+def contribution_spec_new(
+    contribution: str,
     author: str,
     question: str,
     contract: str,
@@ -1907,9 +1907,9 @@ def phrase_spec_new(
     transitions: tuple[str, ...],
     out: str | None,
 ) -> None:
-    from .commands import phrase_cmd as _phrase_cmd
-    raise SystemExit(_phrase_cmd.cmd_spec_new(
-        phrase=phrase,
+    from .commands import contribution_cmd as _contribution_cmd
+    raise SystemExit(_contribution_cmd.cmd_spec_new(
+        contribution=contribution,
         author=author,
         question=question,
         contract=contract,
@@ -1919,11 +1919,11 @@ def phrase_spec_new(
     ))
 
 
-@phrase_spec_group.command("validate", help="Validate a phrase spec file (incl. its contract).")
+@contribution_spec_group.command("validate", help="Validate a contribution spec file (incl. its contract).")
 @click.argument("path", type=click.Path())
-def phrase_spec_validate(path: str) -> None:
-    from .commands import phrase_cmd as _phrase_cmd
-    raise SystemExit(_phrase_cmd.cmd_spec_validate(path))
+def contribution_spec_validate(path: str) -> None:
+    from .commands import contribution_cmd as _contribution_cmd
+    raise SystemExit(_contribution_cmd.cmd_spec_validate(path))
 
 
 # ---------------------------------------------------------------------------
@@ -1933,7 +1933,7 @@ def phrase_spec_validate(path: str) -> None:
 
 @cli.group("choreography", help="Pose + validate compositional choreographies.")
 def choreography_group() -> None:
-    """A choreography poses a question; contributors offer phrases whose output
+    """A choreography poses a question; contributors offer contributions whose output
     contracts must all join on the choreography's candidate-identity key."""
 
 
@@ -1968,14 +1968,14 @@ def choreography_new(
     ))
 
 
-@choreography_group.command("offer", help="Attach a phrase contribution to a choreography.")
+@choreography_group.command("offer", help="Attach a contribution contribution to a choreography.")
 @click.argument("choreography_path", type=click.Path())
-@click.option("--phrase", "phrase", required=True, type=click.Path(),
-              help="Reference to the phrase spec to attach (path or slug).")
-def choreography_offer(choreography_path: str, phrase: str) -> None:
+@click.option("--contribution", "contribution", required=True, type=click.Path(),
+              help="Reference to the contribution spec to attach (path or slug).")
+def choreography_offer(choreography_path: str, contribution: str) -> None:
     from .commands import choreography_cmd as _ch_cmd
     raise SystemExit(_ch_cmd.cmd_offer(
-        choreography_path=choreography_path, phrase=phrase))
+        choreography_path=choreography_path, contribution=contribution))
 
 
 @choreography_group.command("validate",
@@ -1986,7 +1986,7 @@ def choreography_validate(choreography_path: str) -> None:
     raise SystemExit(_ch_cmd.cmd_validate(choreography_path))
 
 
-@choreography_group.command("show", help="Print the posed question, criteria, and phrases.")
+@choreography_group.command("show", help="Print the posed question, criteria, and contributions.")
 @click.argument("choreography_path", type=click.Path())
 def choreography_show(choreography_path: str) -> None:
     from .commands import choreography_cmd as _ch_cmd

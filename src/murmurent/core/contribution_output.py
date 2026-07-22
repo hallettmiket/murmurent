@@ -1,22 +1,22 @@
 """
-Purpose: Validate a phrase's produced *output table* against its Phase-1 output
-         contract (:mod:`murmurent.core.phrase_contract`). When a phrase is run
+Purpose: Validate a contribution's produced *output table* against its Phase-1 output
+         contract (:mod:`murmurent.core.contribution_contract`). When a contribution is run
          it emits a result table — one row per candidate — carrying the
          candidate-identity key, the reported metric, and (when the contract
          declares one) an uncertainty column. This module reads that table and
          checks it conforms to the contract, so the choreography judge can later
-         join heterogeneous phrase outputs on the shared candidate key.
+         join heterogeneous contribution outputs on the shared candidate key.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
-Input: A :class:`~murmurent.core.phrase_contract.PhraseContract` and a path to a
+Input: A :class:`~murmurent.core.contribution_contract.ContributionContract` and a path to a
        produced result table (CSV baseline; TSV / Parquet resolved by extension).
 Output: :func:`validate_output` returns a list of human-readable problems
         (empty == the table conforms); :func:`read_table` returns
         ``(columns, rows)`` for a supported table file.
 
 Boundary: this module reads + validates a produced output table only. It does
-NOT run phrases, align outputs across phrases, or judge them — the judge (an
-agent) does the combination. See ``docs/phrases.md`` / ``docs/choreography.md``.
+NOT run contributions, align outputs across contributions, or judge them — the judge (an
+agent) does the combination. See ``docs/contributions.md`` / ``docs/choreography.md``.
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ import csv
 from pathlib import Path
 from typing import Any
 
-from .phrase_contract import PhraseContract
+from .contribution_contract import ContributionContract
 
 #: Canonical header for the per-row uncertainty column.
 UNCERTAINTY_COLUMN = "uncertainty"
@@ -42,7 +42,7 @@ class OutputFormatError(ValueError):
     """Raised when an output table's file format is unsupported or unreadable."""
 
 
-def acceptable_uncertainty_columns(contract: PhraseContract) -> set[str]:
+def acceptable_uncertainty_columns(contract: ContributionContract) -> set[str]:
     """Column names accepted as the uncertainty column for ``contract``.
 
     Always the canonical ``uncertainty``; also the contract's declared
@@ -105,7 +105,7 @@ def _fmt_rows(rows: list[int]) -> str:
     return head
 
 
-def validate_output(contract: PhraseContract, path: str | Path) -> list[str]:
+def validate_output(contract: ContributionContract, path: str | Path) -> list[str]:
     """Return a list of problems; an empty list means the table conforms.
 
     Checks (mechanical only — this does not judge scientific merit):

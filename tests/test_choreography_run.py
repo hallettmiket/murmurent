@@ -1,10 +1,10 @@
 """
 Purpose: Unit + CLI tests for compositional-choreography *runs*
-         (:mod:`murmurent.core.phrase_run` and the ``choreography prepare-run`` /
+         (:mod:`murmurent.core.contribution_run` and the ``choreography prepare-run`` /
          ``freeze-run`` subcommands).
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
-Input: Synthetic choreographies + phrases with produced output tables in
+Input: Synthetic choreographies + contributions with produced output tables in
        ``tmp_path`` + ``click.testing.CliRunner``.
 Output: pytest cases asserting prepare-run assembles a package (contracts +
         outputs + judge version), refuses on missing output / invalid
@@ -20,20 +20,20 @@ from click.testing import CliRunner
 
 from murmurent.cli import cli
 from murmurent.core import choreography as ch
-from murmurent.core import phrase_contract as pc
-from murmurent.core import phrase_run as run
-from murmurent.core import phrase_spec as ps
+from murmurent.core import contribution_contract as pc
+from murmurent.core import contribution_run as run
+from murmurent.core import contribution_spec as ps
 
 _HEADER = "inchikey,binding_affinity,uncertainty"
 
 
-def _make_phrase(
+def _make_contribution(
     directory: Path, *, name: str, key: str = "inchikey", with_output: bool = True
 ) -> Path:
     """Write a contract, an output table, and a spec referencing both."""
     directory.mkdir(parents=True, exist_ok=True)
-    contract = pc.PhraseContract(
-        phrase=name,
+    contract = pc.ContributionContract(
+        contribution=name,
         author="@member_a",
         question="optimize_sulfopin",
         candidate_key=key,
@@ -53,8 +53,8 @@ def _make_phrase(
             encoding="utf-8",
         )
         output = out_name
-    spec = ps.PhraseSpec(
-        phrase=name,
+    spec = ps.ContributionSpec(
+        contribution=name,
         author="@member_a",
         question="optimize_sulfopin",
         contract=pc.default_contract_filename(name),
@@ -66,16 +66,16 @@ def _make_phrase(
     return spec_path
 
 
-def _make_choreography(directory: Path, *phrase_refs: str) -> Path:
+def _make_choreography(directory: Path, *contribution_refs: str) -> Path:
     obj = ch.pose(
         question="optimize_sulfopin",
         poser="@the_pi",
         title="optimize sulfopin",
         candidate_key="inchikey",
-        criteria="rank by measured affinity; flag single-phrase favourites",
+        criteria="rank by measured affinity; flag single-contribution favourites",
     )
-    for ref in phrase_refs:
-        obj.attach_phrase(ref)
+    for ref in contribution_refs:
+        obj.attach_contribution(ref)
     path = directory / "optimize_sulfopin.md"
     path.write_text(obj.to_markdown(), encoding="utf-8")
     return path
@@ -85,7 +85,7 @@ def _make_choreography(directory: Path, *phrase_refs: str) -> Path:
 
 
 def test_prepare_run_assembles_package(tmp_path) -> None:
-    spec = _make_phrase(tmp_path, name="dock_and_filter")
+    spec = _make_contribution(tmp_path, name="dock_and_filter")
     choreo = _make_choreography(tmp_path, spec.name)
     out = tmp_path / "runs"
 
@@ -98,9 +98,9 @@ def test_prepare_run_assembles_package(tmp_path) -> None:
     assert manifest["criteria"].startswith("rank by measured affinity")
     # The choreography copy is frozen.
     assert (dest / "choreography.md").is_file()
-    # One phrase entry, with its contract + output copied in and hashed.
-    assert len(manifest["phrases"]) == 1
-    entry = manifest["phrases"][0]
+    # One contribution entry, with its contract + output copied in and hashed.
+    assert len(manifest["contributions"]) == 1
+    entry = manifest["contributions"][0]
     assert entry["contract"]["metric"] == "binding_affinity"
     assert (dest / entry["contract"]["file"]).is_file()
     assert (dest / entry["output"]["file"]).is_file()
@@ -111,19 +111,19 @@ def test_prepare_run_assembles_package(tmp_path) -> None:
 
 
 def test_prepare_run_refuses_missing_output(tmp_path) -> None:
-    spec = _make_phrase(tmp_path, name="no_output", with_output=False)
+    spec = _make_contribution(tmp_path, name="no_output", with_output=False)
     choreo = _make_choreography(tmp_path, spec.name)
     try:
         run.prepare_run(choreo, out_dir=tmp_path / "runs")
     except run.RunError as exc:
         assert "no output" in str(exc)
     else:  # pragma: no cover
-        raise AssertionError("expected RunError for a phrase with no output")
+        raise AssertionError("expected RunError for a contribution with no output")
 
 
 def test_prepare_run_refuses_invalid_choreography(tmp_path) -> None:
-    # A phrase whose candidate key does not join → choreography invalid.
-    spec = _make_phrase(tmp_path, name="wrong_key", key="smiles")
+    # A contribution whose candidate key does not join → choreography invalid.
+    spec = _make_contribution(tmp_path, name="wrong_key", key="smiles")
     choreo = _make_choreography(tmp_path, spec.name)
     try:
         run.prepare_run(choreo, out_dir=tmp_path / "runs")
@@ -138,7 +138,7 @@ def test_prepare_run_prefers_append_only_when_present(tmp_path, monkeypatch) -> 
     data_root = tmp_path / "data"
     (data_root / "append_only").mkdir(parents=True)
     monkeypatch.setenv("MURMURENT_DATA_ROOT", str(data_root))
-    spec = _make_phrase(tmp_path, name="dock_and_filter")
+    spec = _make_contribution(tmp_path, name="dock_and_filter")
     choreo = _make_choreography(tmp_path, spec.name)
 
     dest = run.prepare_run(choreo)  # no --out
@@ -149,7 +149,7 @@ def test_prepare_run_prefers_append_only_when_present(tmp_path, monkeypatch) -> 
 
 
 def test_freeze_run_writes_record(tmp_path) -> None:
-    spec = _make_phrase(tmp_path, name="dock_and_filter")
+    spec = _make_contribution(tmp_path, name="dock_and_filter")
     choreo = _make_choreography(tmp_path, spec.name)
     pkg = run.prepare_run(choreo, out_dir=tmp_path / "runs")
     result = tmp_path / "combined.md"
@@ -173,7 +173,7 @@ def test_freeze_run_writes_record(tmp_path) -> None:
 
 
 def test_freeze_run_assembles_package_when_omitted(tmp_path) -> None:
-    spec = _make_phrase(tmp_path, name="dock_and_filter")
+    spec = _make_contribution(tmp_path, name="dock_and_filter")
     choreo = _make_choreography(tmp_path, spec.name)
     result = tmp_path / "combined.md"
     result.write_text("combined\n", encoding="utf-8")
@@ -183,7 +183,7 @@ def test_freeze_run_assembles_package_when_omitted(tmp_path) -> None:
 
 
 def test_freeze_run_does_not_overwrite(tmp_path) -> None:
-    spec = _make_phrase(tmp_path, name="dock_and_filter")
+    spec = _make_contribution(tmp_path, name="dock_and_filter")
     choreo = _make_choreography(tmp_path, spec.name)
     pkg = run.prepare_run(choreo, out_dir=tmp_path / "runs")
     result = tmp_path / "combined.md"
@@ -196,7 +196,7 @@ def test_freeze_run_does_not_overwrite(tmp_path) -> None:
 
 
 def test_freeze_run_missing_result_errors(tmp_path) -> None:
-    spec = _make_phrase(tmp_path, name="dock_and_filter")
+    spec = _make_contribution(tmp_path, name="dock_and_filter")
     choreo = _make_choreography(tmp_path, spec.name)
     try:
         run.freeze_run(choreo, result_path=tmp_path / "nope.md", out_dir=tmp_path / "o")
@@ -210,7 +210,7 @@ def test_freeze_run_missing_result_errors(tmp_path) -> None:
 
 
 def test_cli_prepare_run(tmp_path) -> None:
-    spec = _make_phrase(tmp_path, name="dock_and_filter")
+    spec = _make_contribution(tmp_path, name="dock_and_filter")
     choreo = _make_choreography(tmp_path, spec.name)
     res = CliRunner().invoke(
         cli,
@@ -221,7 +221,7 @@ def test_cli_prepare_run(tmp_path) -> None:
 
 
 def test_cli_prepare_run_refuses_missing_output(tmp_path) -> None:
-    spec = _make_phrase(tmp_path, name="no_output", with_output=False)
+    spec = _make_contribution(tmp_path, name="no_output", with_output=False)
     choreo = _make_choreography(tmp_path, spec.name)
     res = CliRunner().invoke(
         cli,
@@ -232,7 +232,7 @@ def test_cli_prepare_run_refuses_missing_output(tmp_path) -> None:
 
 
 def test_cli_freeze_run(tmp_path) -> None:
-    spec = _make_phrase(tmp_path, name="dock_and_filter")
+    spec = _make_contribution(tmp_path, name="dock_and_filter")
     choreo = _make_choreography(tmp_path, spec.name)
     result = tmp_path / "combined.md"
     result.write_text("combined\n", encoding="utf-8")

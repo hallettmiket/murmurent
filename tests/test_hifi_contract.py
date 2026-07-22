@@ -152,7 +152,7 @@ HIFI_TOP_LEVEL_KEYS = {
     "machine_settings",
     "lab_settings",
     "agents",
-    "my_phrases",        # #38 Phase B
+    "my_contributions",        # #38 Phase B
     "choreographies",    # #38 Phase C
     "oracle_recent",
     "oracle_drafts",

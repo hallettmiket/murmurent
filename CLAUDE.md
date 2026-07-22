@@ -40,7 +40,7 @@ reply with a ≤200-char verdict line (see
 | [`lawyer`](agents/lawyer.md) | Patent counsel + freedom-to-operate (formerly `saul_goodman`) |
 | [`cable_guy`](agents/cable_guy.md) | Infrastructure provisioner |
 | [`receptionist`](agents/receptionist.md) | Routes inbound cross-group SEA requests |
-| [`judge`](agents/judge.md) | Combines and presents member phrases in a compositional choreography |
+| [`judge`](agents/judge.md) | Combines and presents member contributions in a compositional choreography |
 | [`registrar`](agents/registrar.md) | Centre-wide registry of labs/cores/collaborations |
 | [`security_guard`](agents/security_guard.md) | Secrets, PHI, world-accessible files audit |
 

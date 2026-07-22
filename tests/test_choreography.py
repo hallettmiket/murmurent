@@ -3,7 +3,7 @@ Purpose: Unit + CLI tests for the compositional choreography object
          (:mod:`murmurent.core.choreography` and ``murmurent choreography``).
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
-Input: Synthetic choreographies + phrase specs/contracts + ``CliRunner``.
+Input: Synthetic choreographies + contribution specs/contracts + ``CliRunner``.
 Output: pytest cases asserting model round-trip, each validation failure, the
         candidate-key joinability check, and the CLI pose→offer→validate→show flow.
 """
@@ -17,15 +17,15 @@ from click.testing import CliRunner
 
 from murmurent.cli import cli
 from murmurent.core import choreography as ch
-from murmurent.core import phrase_contract as pc
-from murmurent.core import phrase_spec as ps
+from murmurent.core import contribution_contract as pc
+from murmurent.core import contribution_spec as ps
 
 
-def _make_phrase(directory: Path, *, name: str, key: str) -> Path:
-    """Write a contract + a phrase spec referencing it; return the spec path."""
+def _make_contribution(directory: Path, *, name: str, key: str) -> Path:
+    """Write a contract + a contribution spec referencing it; return the spec path."""
     directory.mkdir(parents=True, exist_ok=True)
-    contract = pc.PhraseContract(
-        phrase=name,
+    contract = pc.ContributionContract(
+        contribution=name,
         author="@member_a",
         question="optimize_sulfopin",
         candidate_key=key,
@@ -37,8 +37,8 @@ def _make_phrase(directory: Path, *, name: str, key: str) -> Path:
     (directory / pc.default_contract_filename(name)).write_text(
         contract.to_markdown(), encoding="utf-8"
     )
-    spec = ps.PhraseSpec(
-        phrase=name,
+    spec = ps.ContributionSpec(
+        contribution=name,
         author="@member_a",
         question="optimize_sulfopin",
         contract=pc.default_contract_filename(name),
@@ -55,7 +55,7 @@ def _choreo() -> ch.Choreography:
         poser="@the_pi",
         title="optimize sulfopin for potency + BBB permeability",
         candidate_key="inchikey",
-        criteria="rank by measured affinity; flag single-phrase favourites",
+        criteria="rank by measured affinity; flag single-contribution favourites",
     )
 
 
@@ -64,7 +64,7 @@ def _choreo() -> ch.Choreography:
 
 def test_markdown_round_trip() -> None:
     c = _choreo()
-    c.attach_phrase("a_phrase.md")
+    c.attach_contribution("a_contribution.md")
     parsed = ch.Choreography.from_markdown(c.to_markdown())
     assert parsed == c
 
@@ -76,11 +76,11 @@ def test_to_markdown_has_frontmatter_and_kind() -> None:
     assert "candidate_key: inchikey" in md
 
 
-def test_attach_phrase_is_idempotent() -> None:
+def test_attach_contribution_is_idempotent() -> None:
     c = _choreo()
-    assert c.attach_phrase("p.md") is True
-    assert c.attach_phrase("p.md") is False
-    assert c.phrases == ["p.md"]
+    assert c.attach_contribution("p.md") is True
+    assert c.attach_contribution("p.md") is False
+    assert c.contributions == ["p.md"]
 
 
 # -- validation failures ----------------------------------------------------
@@ -107,37 +107,37 @@ def test_bad_candidate_key_flagged() -> None:
 # -- the candidate-key joinability check ------------------------------------
 
 
-def test_joinable_phrase_passes(tmp_path) -> None:
-    spec_path = _make_phrase(tmp_path, name="dock_and_filter", key="inchikey")
+def test_joinable_contribution_passes(tmp_path) -> None:
+    spec_path = _make_contribution(tmp_path, name="dock_and_filter", key="inchikey")
     c = _choreo()
-    c.attach_phrase(spec_path.name)
+    c.attach_contribution(spec_path.name)
     assert c.validate(base_dir=tmp_path) == []
 
 
-def test_non_joinable_phrase_flagged(tmp_path) -> None:
-    # Phrase declares a different candidate key → not combinable.
-    spec_path = _make_phrase(tmp_path, name="wrong_key", key="smiles")
+def test_non_joinable_contribution_flagged(tmp_path) -> None:
+    # Contribution declares a different candidate key → not combinable.
+    spec_path = _make_contribution(tmp_path, name="wrong_key", key="smiles")
     c = _choreo()  # choreography key is inchikey
-    c.attach_phrase(spec_path.name)
+    c.attach_contribution(spec_path.name)
     problems = c.validate(base_dir=tmp_path)
     assert any("does not join" in p for p in problems)
     assert any("smiles" in p for p in problems)
 
 
-def test_mixed_phrases_reports_only_the_offender(tmp_path) -> None:
-    good = _make_phrase(tmp_path, name="good", key="inchikey")
-    bad = _make_phrase(tmp_path, name="bad", key="gene_symbol")
+def test_mixed_contributions_reports_only_the_offender(tmp_path) -> None:
+    good = _make_contribution(tmp_path, name="good", key="inchikey")
+    bad = _make_contribution(tmp_path, name="bad", key="gene_symbol")
     c = _choreo()
-    c.attach_phrase(good.name)
-    c.attach_phrase(bad.name)
+    c.attach_contribution(good.name)
+    c.attach_contribution(bad.name)
     problems = c.validate(base_dir=tmp_path)
     assert len(problems) == 1
     assert "bad" in problems[0]
 
 
-def test_unresolvable_phrase_flagged(tmp_path) -> None:
+def test_unresolvable_contribution_flagged(tmp_path) -> None:
     c = _choreo()
-    c.attach_phrase("ghost_phrase.md")
+    c.attach_contribution("ghost_contribution.md")
     assert any("could not be resolved" in p for p in c.validate(base_dir=tmp_path))
 
 
@@ -150,7 +150,7 @@ def _pose_args(out: Path, **overrides) -> list[str]:
         "--poser": "@the_pi",
         "--title": "optimize sulfopin for potency + BBB permeability",
         "--candidate-key": "inchikey",
-        "--criteria": "rank by measured affinity; flag single-phrase favourites",
+        "--criteria": "rank by measured affinity; flag single-contribution favourites",
     }
     base.update(overrides)
     args = ["choreography", "new"]
@@ -161,7 +161,7 @@ def _pose_args(out: Path, **overrides) -> list[str]:
 
 
 def test_cli_full_flow(tmp_path) -> None:
-    spec_path = _make_phrase(tmp_path, name="dock_and_filter", key="inchikey")
+    spec_path = _make_contribution(tmp_path, name="dock_and_filter", key="inchikey")
     choreo_path = tmp_path / "optimize_sulfopin.md"
     runner = CliRunner()
 
@@ -170,7 +170,7 @@ def test_cli_full_flow(tmp_path) -> None:
     assert choreo_path.is_file()
 
     r2 = runner.invoke(
-        cli, ["choreography", "offer", str(choreo_path), "--phrase", str(spec_path)]
+        cli, ["choreography", "offer", str(choreo_path), "--contribution", str(spec_path)]
     )
     assert r2.exit_code == 0, r2.output
 
@@ -186,12 +186,12 @@ def test_cli_full_flow(tmp_path) -> None:
 
 
 def test_cli_validate_flags_non_joinable(tmp_path) -> None:
-    spec_path = _make_phrase(tmp_path, name="wrong", key="smiles")
+    spec_path = _make_contribution(tmp_path, name="wrong", key="smiles")
     choreo_path = tmp_path / "optimize_sulfopin.md"
     runner = CliRunner()
     runner.invoke(cli, _pose_args(choreo_path))
     runner.invoke(
-        cli, ["choreography", "offer", str(choreo_path), "--phrase", str(spec_path)]
+        cli, ["choreography", "offer", str(choreo_path), "--contribution", str(spec_path)]
     )
     res = runner.invoke(cli, ["choreography", "validate", str(choreo_path)])
     assert res.exit_code != 0
@@ -217,7 +217,7 @@ def test_cli_new_refuses_invalid_poser(tmp_path) -> None:
 
 def test_cli_offer_missing_file_errors() -> None:
     res = CliRunner().invoke(
-        cli, ["choreography", "offer", "/no/such.md", "--phrase", "p.md"]
+        cli, ["choreography", "offer", "/no/such.md", "--contribution", "p.md"]
     )
     assert res.exit_code != 0
     assert "no such file" in res.output

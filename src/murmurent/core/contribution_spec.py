@@ -1,25 +1,25 @@
 """
-Purpose: The phrase spec — an authored phrase offered by a member into a
-         compositional choreography. A phrase is a small graph of *steps*
+Purpose: The contribution spec — an authored contribution offered by a member into a
+         compositional choreography. A contribution is a small graph of *steps*
          (analyses that transform data) and *transitions* (rank/filter/select
          decisions on a step's output) that produces an output conforming to
-         its Phase-1 output contract (:mod:`murmurent.core.phrase_contract`).
+         its Phase-1 output contract (:mod:`murmurent.core.contribution_contract`).
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
 Input: Keyword args (constructing a spec) or a schema-validated markdown entry
-       (YAML frontmatter + optional body), mirroring the phrase contract.
-Output: :class:`PhraseSpec` instances; markdown serialization via
+       (YAML frontmatter + optional body), mirroring the contribution contract.
+Output: :class:`ContributionSpec` instances; markdown serialization via
         ``to_markdown()`` / ``from_markdown()`` / ``from_file()``; and a
         ``validate()`` that returns a list of human-readable problems (empty ==
         valid), including resolving + validating the referenced output contract.
 
-Boundary: this module defines and validates the *authored* phrase artefact
+Boundary: this module defines and validates the *authored* contribution artefact
 only. It does NOT execute steps, apply transitions, or judge outputs — those
-are later choreography phases. See ``docs/phrases.md`` / ``docs/choreography.md``.
+are later choreography phases. See ``docs/contributions.md`` / ``docs/choreography.md``.
 
 Path resolution (for the default write location):
-  - ``$MURMURENT_PHRASE_SPEC_DIR`` if set, else
-  - ``<personal-vault>/phrases/`` (the same folder the phrase contract uses).
+  - ``$MURMURENT_CONTRIBUTION_SPEC_DIR`` if set, else
+  - ``<personal-vault>/contributions/`` (the same folder the contribution contract uses).
   - ``default_spec_dir()`` returns ``None`` when no vault is registered, letting
     callers fall back to an explicit ``--out`` path or stdout.
 """
@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from . import phrase_contract as _pc
+from . import contribution_contract as _pc
 from .frontmatter import dump_document, parse_file, parse_text
 
 # ---------------------------------------------------------------------------
@@ -45,22 +45,22 @@ STEP_KIND_VOCAB: frozenset[str] = frozenset({"agent", "script"})
 TRANSITION_KIND_VOCAB: frozenset[str] = frozenset({"rank", "filter", "select"})
 
 #: Frontmatter fields that must be present and non-empty for a valid spec.
-REQUIRED_FIELDS: tuple[str, ...] = ("phrase", "author", "question", "contract")
+REQUIRED_FIELDS: tuple[str, ...] = ("contribution", "author", "question", "contract")
 
 #: Marker written into the frontmatter so tooling can recognise the artefact.
-KIND = "phrase_spec"
+KIND = "contribution_spec"
 
 # Re-export the slug helper so callers have one import surface.
 slugify = _pc.slugify
 
 
-class PhraseSpecError(ValueError):
-    """Raised when a phrase spec cannot be parsed from markdown."""
+class ContributionSpecError(ValueError):
+    """Raised when a contribution spec cannot be parsed from markdown."""
 
 
 @dataclass
 class Step:
-    """One analysis in a phrase: transforms an input ``X'`` into ``X''``.
+    """One analysis in a contribution: transforms an input ``X'`` into ``X''``.
 
     ``kind`` is ``agent`` (``run`` names an agent) or ``script`` (``run`` is a
     command). ``description`` is a short human-readable note on what it does.
@@ -116,22 +116,22 @@ class Transition:
 
 
 @dataclass
-class PhraseSpec:
-    """An authored phrase: a small graph of steps + transitions + a contract.
+class ContributionSpec:
+    """An authored contribution: a small graph of steps + transitions + a contract.
 
     The spec references its Phase-1 output contract (by relative path or slug);
     :meth:`validate` resolves that reference and validates the contract too, so
-    an authored phrase and the shape of what it produces stay consistent.
+    an authored contribution and the shape of what it produces stay consistent.
     """
 
-    phrase: str
+    contribution: str
     author: str
     question: str
     contract: str
     steps: list[Step] = field(default_factory=list)
     transitions: list[Transition] = field(default_factory=list)
     #: Optional path (relative to the spec) to the produced output table — set
-    #: once the phrase has been run. Absent on a freshly-authored spec.
+    #: once the contribution has been run. Absent on a freshly-authored spec.
     output: str = ""
     notes: str = ""
     #: Set by :meth:`from_file`; used as the default base dir for resolving the
@@ -151,10 +151,10 @@ class PhraseSpec:
           - each transition has a name and a valid ``kind``
             (``rank`` | ``filter`` | ``select``);
           - the referenced ``contract`` resolves to a file that is itself a
-            valid :class:`~murmurent.core.phrase_contract.PhraseContract`;
-          - **when an ``output`` is set** (the phrase has been run), the output
+            valid :class:`~murmurent.core.contribution_contract.ContributionContract`;
+          - **when an ``output`` is set** (the contribution has been run), the output
             table conforms to the referenced contract
-            (:func:`murmurent.core.phrase_output.validate_output`). ``output`` is
+            (:func:`murmurent.core.contribution_output.validate_output`). ``output`` is
             optional — a spec authored before it is run is still valid.
 
         ``base_dir`` roots relative contract/output references; it defaults to
@@ -203,7 +203,7 @@ class PhraseSpec:
             problems.extend(self._validate_contract(base_dir))
 
         # Produced output table (optional): validate against the contract only
-        # when present — a spec may be authored before the phrase is ever run.
+        # when present — a spec may be authored before the contribution is ever run.
         if self.output and self.output.strip():
             problems.extend(self._validate_output(base_dir))
 
@@ -218,15 +218,15 @@ class PhraseSpec:
                 f"(looked for a path or a <slug>_contract.md)"
             ]
         try:
-            contract = _pc.PhraseContract.from_file(path)
-        except _pc.PhraseContractError as exc:
+            contract = _pc.ContributionContract.from_file(path)
+        except _pc.ContributionContractError as exc:
             return [f"referenced contract {path} could not be parsed: {exc}"]
         return [
             f"referenced contract {path.name}: {p}" for p in contract.validate()
         ]
 
     def _validate_output(self, base_dir: str | Path | None) -> list[str]:
-        from . import phrase_output as _po  # deferred: keeps the import surface small
+        from . import contribution_output as _po  # deferred: keeps the import surface small
 
         contract = self.resolved_contract(base_dir)
         if contract is None:
@@ -265,15 +265,15 @@ class PhraseSpec:
 
     def resolved_contract(
         self, base_dir: str | Path | None = None
-    ) -> _pc.PhraseContract | None:
+    ) -> _pc.ContributionContract | None:
         """Load the referenced contract, or ``None`` if it cannot be resolved."""
         base = self._resolve_base_dir(base_dir)
         path = _pc.resolve_contract_reference(self.contract, base)
         if path is None:
             return None
         try:
-            return _pc.PhraseContract.from_file(path)
-        except _pc.PhraseContractError:
+            return _pc.ContributionContract.from_file(path)
+        except _pc.ContributionContractError:
             return None
 
     # -- serialization -----------------------------------------------------
@@ -281,12 +281,12 @@ class PhraseSpec:
     def to_frontmatter(self) -> dict[str, Any]:
         """The ordered frontmatter mapping this spec serializes to.
 
-        The ``output`` key is emitted only once the phrase has been run (an
+        The ``output`` key is emitted only once the contribution has been run (an
         output is set), so a freshly-authored spec's serialization is unchanged.
         """
         meta: dict[str, Any] = {
             "kind": KIND,
-            "phrase": self.phrase,
+            "contribution": self.contribution,
             "author": self.author,
             "question": self.question,
             "contract": self.contract,
@@ -305,10 +305,10 @@ class PhraseSpec:
     @classmethod
     def from_meta(
         cls, meta: dict[str, Any], body: str = "", source: Path | None = None
-    ) -> "PhraseSpec":
+    ) -> "ContributionSpec":
         """Build a spec from a parsed frontmatter mapping + body text."""
         if not isinstance(meta, dict):
-            raise PhraseSpecError("phrase spec frontmatter must be a mapping")
+            raise ContributionSpecError("contribution spec frontmatter must be a mapping")
         steps_raw = meta.get("steps") or []
         trans_raw = meta.get("transitions") or []
         steps = [Step.from_dict(s) for s in steps_raw if isinstance(s, dict)]
@@ -316,7 +316,7 @@ class PhraseSpec:
             Transition.from_dict(t) for t in trans_raw if isinstance(t, dict)
         ]
         return cls(
-            phrase=str(meta.get("phrase", "") or ""),
+            contribution=str(meta.get("contribution", "") or ""),
             author=str(meta.get("author", "") or ""),
             question=str(meta.get("question", "") or ""),
             contract=str(meta.get("contract", "") or ""),
@@ -328,23 +328,23 @@ class PhraseSpec:
         )
 
     @classmethod
-    def from_markdown(cls, text: str) -> "PhraseSpec":
+    def from_markdown(cls, text: str) -> "ContributionSpec":
         """Parse a spec from a markdown string (frontmatter + body)."""
         doc = parse_text(text)
         if not doc.meta:
-            raise PhraseSpecError(
-                "no YAML frontmatter found — a phrase spec needs a '---' block"
+            raise ContributionSpecError(
+                "no YAML frontmatter found — a contribution spec needs a '---' block"
             )
         return cls.from_meta(doc.meta, doc.body)
 
     @classmethod
-    def from_file(cls, path: str | Path) -> "PhraseSpec":
+    def from_file(cls, path: str | Path) -> "ContributionSpec":
         """Read and parse a spec markdown file (records ``source`` for resolution)."""
         p = Path(path)
         doc = parse_file(p)
         if not doc.meta:
-            raise PhraseSpecError(
-                f"no YAML frontmatter found in {path} — not a phrase spec"
+            raise ContributionSpecError(
+                f"no YAML frontmatter found in {path} — not a contribution spec"
             )
         return cls.from_meta(doc.meta, doc.body, source=p)
 
@@ -353,14 +353,14 @@ class PhraseSpec:
 # Default write location + reference resolution
 # ---------------------------------------------------------------------------
 
-ENV_SPEC_DIR = "MURMURENT_PHRASE_SPEC_DIR"
+ENV_SPEC_DIR = "MURMURENT_CONTRIBUTION_SPEC_DIR"
 
 
 def default_spec_dir() -> Path | None:
-    """Where ``murmurent phrase spec new`` writes by default.
+    """Where ``murmurent contribution spec new`` writes by default.
 
-    ``$MURMURENT_PHRASE_SPEC_DIR`` wins; otherwise the same ``phrases/`` folder
-    the phrase contract uses (beside the personal Oracle dir). Returns ``None``
+    ``$MURMURENT_CONTRIBUTION_SPEC_DIR`` wins; otherwise the same ``contributions/`` folder
+    the contribution contract uses (beside the personal Oracle dir). Returns ``None``
     when no vault is registered, so the caller can fall back to ``--out``/stdout.
     """
     pin = os.environ.get(ENV_SPEC_DIR, "").strip()
@@ -369,19 +369,19 @@ def default_spec_dir() -> Path | None:
     return _pc.default_contract_dir()
 
 
-def default_spec_filename(phrase: str) -> str:
-    """The default basename for a spec file, derived from the phrase slug."""
-    slug = slugify(phrase) or "phrase"
-    return f"{slug}_phrase.md"
+def default_spec_filename(contribution: str) -> str:
+    """The default basename for a spec file, derived from the contribution slug."""
+    slug = slugify(contribution) or "contribution"
+    return f"{slug}_contribution.md"
 
 
 def resolve_spec_reference(
     ref: str, base_dir: str | Path | None = None
 ) -> Path | None:
-    """Resolve a phrase-spec reference (relative/absolute path, or a slug).
+    """Resolve a contribution-spec reference (relative/absolute path, or a slug).
 
     Tries, in order: the ref as an explicit path (absolute, then under
-    ``base_dir``, then the cwd), then a ``<slug>_phrase.md`` file under
+    ``base_dir``, then the cwd), then a ``<slug>_contribution.md`` file under
     ``base_dir`` and under :func:`default_spec_dir`. Returns ``None`` if nothing
     on disk matches.
     """

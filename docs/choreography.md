@@ -16,7 +16,7 @@ producing what artefacts. A choreography runs in one of two modes.
   a completed result means. These are largely prose-plus-command recipes,
   run with a human in the loop.
 - **Compositional mode**: a scientific pattern in which a lab or centre poses
-  a question, contributors offer [phrases](phrases.md) that tackle it from
+  a question, contributors offer [contributions](contributions.md) that tackle it from
   different angles, and a **judge** combines and presents their outputs. This
   mode is the focus below.
 
@@ -33,11 +33,11 @@ Y. The poser also states the **candidate-identity space** (here, chemical
 structures) and the **criteria** the judge should use to rank and present
 results.
 
-**2. Contributors offer phrases.** Members and groups each offer a
-[phrase](phrases.md), a small graph of steps and transitions, from anywhere
+**2. Contributors offer contributions.** Members and groups each offer a
+[contribution](contributions.md), a small graph of steps and transitions, from anywhere
 on the spectrum between low-throughput human biology and fully AI-driven
-optimization. Each phrase declares a typed output contract (candidate key,
-metric, units, direction, uncertainty), so the phrases can later be aligned.
+optimization. Each contribution declares a typed output contract (candidate key,
+metric, units, direction, uncertainty), so the contributions can later be aligned.
 
 **3. The judge combines them.** The **judge** is a markdown-defined agent.
 Its ranking and decision strategy is supplied by the poser and evolves in
@@ -47,7 +47,7 @@ per lab like any reference agent (see
 [Customizing an agent](group_level.md#customizing-an-agent-and-keeping-your-changes)).
 The judge:
 
-- aligns phrase outputs on the shared candidate-identity key;
+- aligns contribution outputs on the shared candidate-identity key;
 - presents them with full provenance and **surfaces where they disagree**;
 - computes a single consensus only when the outputs share a metric, and
   otherwise reports the alternatives side by side with their evidence;
@@ -62,22 +62,22 @@ Non-linearity is allowed; unbounded iteration is not.
 ### Reproducibility
 
 Every run freezes, as append-only artefacts, the judge's definition version,
-the poser's criteria, and each phrase's declared output, so the same
+the poser's criteria, and each contribution's declared output, so the same
 choreography can be re-run and its headline result reconstructed. This
 follows the same immutable / append-only discipline as the rest of
 Murmurent's data governance.
 
 ### Worked example: optimizing a Pin1 inhibitor
 
-A lab poses: optimize sulfopin, a Pin1 inhibitor. Three members offer phrases
+A lab poses: optimize sulfopin, a Pin1 inhibitor. Three members offer contributions
 (a wet-lab binding assay; a structure-based docking-and-filter; an ML
 generate-and-score), each declaring the molecule as its candidate-identity
 key. The judge, using the poser's criteria, aligns the three candidate
 rankings, shows where the measured affinities and the computed scores agree
-and disagree, flags candidates that only one phrase favours, and presents a
+and disagree, flags candidates that only one contribution favours, and presents a
 combined shortlist with the provenance of every number. The PI reviews and
 decides which candidates to pursue. The contributing units are described in
-[Phrases](phrases.md).
+[Contributions](contributions.md).
 
 ## Coordination choreographies
 
@@ -111,12 +111,12 @@ choreographies. Each choreography advertises its target — the question, the
 title, the `candidate_key` it joins on, and the criteria the judge applies.
 *Pose* opens a form to advertise a new one.
 
-For each choreography the panel shows its **contributed** phrases (with a tick
+For each choreography the panel shows its **contributed** contributions (with a tick
 or cross for whether each joins on the shared candidate key) and, below them, a
-**joinable** pool: the group's stated phrases (see [Phrases](phrases.md)) whose
+**joinable** pool: the group's stated contributions (see [Contributions](contributions.md)) whose
 contract shares that candidate key but which are not attached yet. *Attach*
-adds one; a phrase that does not join is refused, because a mismatched key
-means the outputs cannot be combined. When every contributed phrase joins, the
+adds one; a contribution that does not join is refused, because a mismatched key
+means the outputs cannot be combined. When every contributed contribution joins, the
 choreography is ready to compose — the judge aligns the outputs on the shared
 key and presents the result (see the `judge` agent in
 [the reference agents](agents.md)).

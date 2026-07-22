@@ -201,7 +201,7 @@ def build_response(
         ),
         lab_settings=_lab_settings(lab_name),
         agents=_agents(),
-        my_phrases=_my_phrases(),
+        my_contributions=_my_contributions(),
         choreographies=_choreographies(),
         oracle_recent=_oracle_recent(limit=8),
         oracle_drafts=_oracle_drafts(effective_persona, limit=20),
@@ -1551,14 +1551,14 @@ def _personal_agents() -> list[C.AgentRow]:
 
 
 # ---------------------------------------------------------------------------
-# Phrases + choreographies (issue #38, Phases B/C)
+# Contributions + choreographies (issue #38, Phases B/C)
 # ---------------------------------------------------------------------------
 
 
-def _contract_view(contract) -> "C.PhraseContractView | None":
+def _contract_view(contract) -> "C.ContributionContractView | None":
     if contract is None:
         return None
-    return C.PhraseContractView(
+    return C.ContributionContractView(
         candidate_key=str(getattr(contract, "candidate_key", "") or ""),
         metric=str(getattr(contract, "metric", "") or ""),
         units=str(getattr(contract, "units", "") or ""),
@@ -1567,30 +1567,30 @@ def _contract_view(contract) -> "C.PhraseContractView | None":
     )
 
 
-def _my_phrases() -> list[C.PhraseRow]:
-    """The machine owner's own phrases, from their personal vault (Phase B).
+def _my_contributions() -> list[C.ContributionRow]:
+    """The machine owner's own contributions, from their personal vault (Phase B).
     Each carries its typed output contract and whether it's been stated to the
-    group. Best-effort: no vault / unreadable phrases yields an empty list."""
-    from ..core import phrase_publish as _pp
+    group. Best-effort: no vault / unreadable contributions yields an empty list."""
+    from ..core import contribution_publish as _pp
 
     try:
-        specs = _pp.list_member_phrases()
+        specs = _pp.list_member_contributions()
     except Exception:
         return []
-    rows: list[C.PhraseRow] = []
+    rows: list[C.ContributionRow] = []
     for spec in specs:
         try:
             contract = spec.resolved_contract()
         except Exception:
             contract = None
         try:
-            stated = _pp.is_stated(spec.phrase)
+            stated = _pp.is_stated(spec.contribution)
         except Exception:
             stated = False
-        from ..core import phrase_contract as _pc
-        rows.append(C.PhraseRow(
-            phrase=str(spec.phrase or ""),
-            slug=_pc.slugify(str(spec.phrase or "")),
+        from ..core import contribution_contract as _pc
+        rows.append(C.ContributionRow(
+            contribution=str(spec.contribution or ""),
+            slug=_pc.slugify(str(spec.contribution or "")),
             question=str(spec.question or ""),
             author=str(spec.author or ""),
             contract=_contract_view(contract),
@@ -1603,21 +1603,21 @@ def _my_phrases() -> list[C.PhraseRow]:
 
 
 def _choreographies() -> list[C.ChoreographyRow]:
-    """The group's choreographies (Phase C), each with its attached phrases (and
+    """The group's choreographies (Phase C), each with its attached contributions (and
     whether each joins on the shared candidate_key) plus the pool of stated group
-    phrases that could still join. Read from the group repo's ``choreographies/``;
-    stated phrases from its ``phrases/``. Best-effort."""
+    contributions that could still join. Read from the group repo's ``choreographies/``;
+    stated contributions from its ``contributions/``. Best-effort."""
     from ..core import choreography as _ch
-    from ..core import phrase_spec as _ps
-    from ..core import phrase_contract as _pc
-    from ..core import phrase_publish as _pp
+    from ..core import contribution_spec as _ps
+    from ..core import contribution_contract as _pc
+    from ..core import contribution_publish as _pp
 
     cdir = _ch.default_choreography_dir()
     if cdir is None or not Path(cdir).is_dir():
         return []
-    group_dir = _pp.group_phrases_dir()
+    group_dir = _pp.group_contributions_dir()
     try:
-        group_specs = _pp.list_group_phrases()
+        group_specs = _pp.list_group_contributions()
     except Exception:
         group_specs = []
 
@@ -1635,37 +1635,37 @@ def _choreographies() -> list[C.ChoreographyRow]:
         except Exception:
             continue
         target_key = str(ch.candidate_key or "")
-        attached: list[C.ChoreographyPhraseRow] = []
+        attached: list[C.ChoreographyContributionRow] = []
         attached_slugs: set[str] = set()
-        for ref in ch.phrases:
+        for ref in ch.contributions:
             spec_path = (_ps.resolve_spec_reference(ref, group_dir)
                          or _ps.resolve_spec_reference(ref, Path(path).parent))
             if spec_path is None:
-                attached.append(C.ChoreographyPhraseRow(
-                    phrase=str(ref), joins=False, reason="phrase not found in the group"))
+                attached.append(C.ChoreographyContributionRow(
+                    contribution=str(ref), joins=False, reason="contribution not found in the group"))
                 continue
             try:
-                spec = _ps.PhraseSpec.from_file(spec_path)
+                spec = _ps.ContributionSpec.from_file(spec_path)
             except Exception:
-                attached.append(C.ChoreographyPhraseRow(
-                    phrase=str(ref), joins=False, reason="phrase could not be parsed"))
+                attached.append(C.ChoreographyContributionRow(
+                    contribution=str(ref), joins=False, reason="contribution could not be parsed"))
                 continue
-            attached_slugs.add(_pc.slugify(spec.phrase))
+            attached_slugs.add(_pc.slugify(spec.contribution))
             ck = _ck(spec)
             joins = bool(ck) and ck == target_key
-            attached.append(C.ChoreographyPhraseRow(
-                phrase=str(spec.phrase or ref), author=str(spec.author or ""),
+            attached.append(C.ChoreographyContributionRow(
+                contribution=str(spec.contribution or ref), author=str(spec.author or ""),
                 candidate_key=ck, joins=joins,
                 reason=("" if joins else
                         f"candidate_key {ck or '—'} ≠ {target_key or '—'}")))
-        joinable: list[C.ChoreographyPhraseRow] = []
+        joinable: list[C.ChoreographyContributionRow] = []
         for spec in group_specs:
-            if _pc.slugify(spec.phrase) in attached_slugs:
+            if _pc.slugify(spec.contribution) in attached_slugs:
                 continue
             ck = _ck(spec)
             if ck and ck == target_key:
-                joinable.append(C.ChoreographyPhraseRow(
-                    phrase=str(spec.phrase or ""), author=str(spec.author or ""),
+                joinable.append(C.ChoreographyContributionRow(
+                    contribution=str(spec.contribution or ""), author=str(spec.author or ""),
                     candidate_key=ck, joins=True))
         rows.append(C.ChoreographyRow(
             title=str(ch.title or ""), id=Path(path).stem,

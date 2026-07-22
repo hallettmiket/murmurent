@@ -1,5 +1,5 @@
 """
-Purpose: Assemble + freeze a compositional-choreography *run*. Combining phrase
+Purpose: Assemble + freeze a compositional-choreography *run*. Combining contribution
          outputs is the judge's job — an agent that reasons in a Claude Code
          session — so this module does NOT compute the combination. It mirrors
          the finalisation choreography's shape: ASSEMBLE the inputs the judge
@@ -7,15 +7,15 @@ Purpose: Assemble + freeze a compositional-choreography *run*. Combining phrase
          judge has produced its combined presentation (freeze-run).
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
-Input: A validated choreography file (its attached phrases must each carry a
+Input: A validated choreography file (its attached contributions must each carry a
        produced ``output`` table), and — for freezing — the judge's result file.
-Output: :func:`prepare_run` writes a *run package* (choreography + each phrase's
+Output: :func:`prepare_run` writes a *run package* (choreography + each contribution's
         contract + output + the judge-definition version) and returns its path;
         :func:`freeze_run` copies that package together with the judge's result
         into an append-only *run record* and returns its path.
 
 Reproducibility (see ``docs/choreography.md`` § Reproducibility): a run record
-freezes the judge's definition version, the poser's criteria, and every phrase's
+freezes the judge's definition version, the poser's criteria, and every contribution's
 declared output, so the same choreography can be re-run and reconstructed.
 
 Boundary: assemble + freeze only. No judging, no aligning, no consensus — that
@@ -33,9 +33,9 @@ from typing import Any
 
 import yaml
 
-from . import phrase_contract as _pc
-from . import phrase_output as _po
-from . import phrase_spec as _ps
+from . import contribution_contract as _pc
+from . import contribution_output as _po
+from . import contribution_spec as _ps
 from .choreography import Choreography
 from .lab_vm import append_only_root
 from .notebook import sha256_file
@@ -88,13 +88,13 @@ def judge_definition_sha256() -> str | None:
 
 
 @dataclass
-class _PhraseInputs:
-    """The resolved artefacts for one attached phrase."""
+class _ContributionInputs:
+    """The resolved artefacts for one attached contribution."""
 
     ref: str
-    spec: _ps.PhraseSpec
+    spec: _ps.ContributionSpec
     spec_path: Path
-    contract: _pc.PhraseContract
+    contract: _pc.ContributionContract
     contract_path: Path
     output_path: Path
 
@@ -130,41 +130,41 @@ def _unique_dir(root: Path, stem: str) -> Path:
     return dest
 
 
-def _gather_phrase_inputs(choreo: Choreography, base: Path) -> list[_PhraseInputs]:
-    """Resolve each attached phrase's spec, contract, and produced output.
+def _gather_contribution_inputs(choreo: Choreography, base: Path) -> list[_ContributionInputs]:
+    """Resolve each attached contribution's spec, contract, and produced output.
 
-    Raises :class:`RunError` if a phrase cannot be resolved or has no output.
+    Raises :class:`RunError` if a contribution cannot be resolved or has no output.
     """
-    gathered: list[_PhraseInputs] = []
-    for ref in choreo.phrases:
+    gathered: list[_ContributionInputs] = []
+    for ref in choreo.contributions:
         spec_path = _ps.resolve_spec_reference(ref, base)
         if spec_path is None:
-            raise RunError(f"phrase {ref!r}: spec could not be resolved")
-        spec = _ps.PhraseSpec.from_file(spec_path)
+            raise RunError(f"contribution {ref!r}: spec could not be resolved")
+        spec = _ps.ContributionSpec.from_file(spec_path)
         spec_dir = spec_path.parent
 
         contract_path = _pc.resolve_contract_reference(spec.contract, spec_dir)
         contract = spec.resolved_contract(spec_dir)
         if contract is None or contract_path is None:
-            raise RunError(f"phrase {ref!r}: output contract could not be resolved")
+            raise RunError(f"contribution {ref!r}: output contract could not be resolved")
 
         if not (spec.output and spec.output.strip()):
             raise RunError(
-                f"phrase {ref!r}: no output table declared — run the phrase and "
+                f"contribution {ref!r}: no output table declared — run the contribution and "
                 f"record its 'output' before preparing a run"
             )
         output_path = spec.resolved_output(spec_dir)
         if output_path is None:
             raise RunError(
-                f"phrase {ref!r}: declared output {spec.output!r} could not be resolved"
+                f"contribution {ref!r}: declared output {spec.output!r} could not be resolved"
             )
         out_problems = _po.validate_output(contract, output_path)
         if out_problems:
             joined = "; ".join(out_problems)
-            raise RunError(f"phrase {ref!r}: output does not conform to contract: {joined}")
+            raise RunError(f"contribution {ref!r}: output does not conform to contract: {joined}")
 
         gathered.append(
-            _PhraseInputs(
+            _ContributionInputs(
                 ref=ref,
                 spec=spec,
                 spec_path=spec_path,
@@ -186,13 +186,13 @@ def prepare_run(
     """Assemble a run package for a valid choreography; return its directory.
 
     The choreography must pass ``validate()`` (joinability holds) and every
-    attached phrase must carry a produced ``output`` table conforming to its
+    attached contribution must carry a produced ``output`` table conforming to its
     contract; otherwise :class:`RunError` is raised. The package contains:
 
       - ``choreography.md`` — a copy of the choreography (question, poser,
-        candidate_key, criteria, attached phrases);
-      - ``phrases/<slug>/contract.md`` + the phrase's output table, for each
-        contributed phrase;
+        candidate_key, criteria, attached contributions);
+      - ``contributions/<slug>/contract.md`` + the contribution's output table, for each
+        contributed contribution;
       - ``run.yaml`` — a manifest tying it together, including the
         judge-definition version (sha256 of ``agents/judge.md``) and a sha256
         for each frozen file. ``timestamp`` is recorded when supplied (callers
@@ -210,10 +210,10 @@ def prepare_run(
         raise RunError(
             f"choreography is invalid; refusing to prepare a run:\n  - {joined}"
         )
-    if not choreo.phrases:
-        raise RunError("choreography has no attached phrases; nothing to run")
+    if not choreo.contributions:
+        raise RunError("choreography has no attached contributions; nothing to run")
 
-    phrases = _gather_phrase_inputs(choreo, base)
+    contributions = _gather_contribution_inputs(choreo, base)
 
     root = _resolve_run_root(out_dir, PACKAGE_SUBDIR, env)
     root.mkdir(parents=True, exist_ok=True)
@@ -221,24 +221,24 @@ def prepare_run(
     if timestamp:
         stem = f"{stem}_{_pc.slugify(timestamp)}"
     dest = _unique_dir(root, stem)
-    (dest / "phrases").mkdir(parents=True)
+    (dest / "contributions").mkdir(parents=True)
 
     # Copy the choreography itself.
     shutil.copyfile(ch_path, dest / CHOREOGRAPHY_COPY)
 
-    phrase_entries: list[dict[str, Any]] = []
-    for pin in phrases:
-        slug = _pc.slugify(pin.spec.phrase) or _pc.slugify(pin.ref) or "phrase"
-        pdir = _unique_dir(dest / "phrases", slug)
+    contribution_entries: list[dict[str, Any]] = []
+    for pin in contributions:
+        slug = _pc.slugify(pin.spec.contribution) or _pc.slugify(pin.ref) or "contribution"
+        pdir = _unique_dir(dest / "contributions", slug)
         pdir.mkdir(parents=True)
         contract_copy = pdir / "contract.md"
         output_copy = pdir / f"output{pin.output_path.suffix or '.csv'}"
         shutil.copyfile(pin.contract_path, contract_copy)
         shutil.copyfile(pin.output_path, output_copy)
-        phrase_entries.append(
+        contribution_entries.append(
             {
                 "ref": pin.ref,
-                "phrase": pin.spec.phrase,
+                "contribution": pin.spec.contribution,
                 "author": pin.spec.author,
                 "contract": {
                     "file": str(contract_copy.relative_to(dest)),
@@ -271,7 +271,7 @@ def prepare_run(
             "agent": JUDGE_AGENT,
             "version_sha256": judge_definition_sha256(),
         },
-        "phrases": phrase_entries,
+        "contributions": contribution_entries,
     }
     if timestamp:
         manifest["created"] = timestamp
@@ -301,7 +301,7 @@ def freeze_run(
 ) -> Path:
     """Freeze a run as an append-only record; return the record directory.
 
-    Copies the run package (choreography, each phrase's contract + output, the
+    Copies the run package (choreography, each contribution's contract + output, the
     judge-definition version, the criteria) together with the judge's produced
     ``result_path`` (the combined presentation) into a new record directory, and
     writes ``record.yaml`` summarising the frozen files with their sha256s.

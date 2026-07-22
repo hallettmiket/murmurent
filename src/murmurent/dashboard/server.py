@@ -6273,23 +6273,23 @@ def create_app() -> FastAPI:
             "model": parsed.meta.get("model"),
         }
 
-    # -- Phrases + choreographies (#38 Phases B/C) -------------------------
+    # -- Contributions + choreographies (#38 Phases B/C) -------------------------
 
-    @app.post("/api/phrases/{slug}/state")
-    def state_phrase_endpoint(
+    @app.post("/api/contributions/{slug}/state")
+    def state_contribution_endpoint(
         slug: str,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
-        """State (publish) one of the member's own phrases to their group, so
+        """State (publish) one of the member's own contributions to their group, so
         other members can build a choreography from it. Copies the spec + its
-        contract from the member's vault into the group repo's ``phrases/``."""
-        from ..core import phrase_publish as _pp
+        contract from the member's vault into the group repo's ``contributions/``."""
+        from ..core import contribution_publish as _pp
 
         actor = _resolve_actor(user)
         _require_active(actor)
         try:
-            res = _pp.state_phrase_to_group(slug)
-        except _pp.PhrasePublishError as exc:
+            res = _pp.state_contribution_to_group(slug)
+        except _pp.ContributionPublishError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         return {"ok": True, "slug": res.slug, "path": str(res.spec_path)}
 
@@ -6299,7 +6299,7 @@ def create_app() -> FastAPI:
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
         """Pose a new group choreography — advertise a target (question + title +
-        candidate_key + criteria) that members contribute joinable phrases to."""
+        candidate_key + criteria) that members contribute joinable contributions to."""
         from ..core import choreography as _ch
 
         actor = _resolve_actor(user)
@@ -6317,8 +6317,8 @@ def create_app() -> FastAPI:
             candidate_key=body.candidate_key, criteria=body.criteria,
         )
         # Validate everything EXCEPT joinability (a fresh choreography has no
-        # attached phrases yet).
-        problems = [p for p in obj.validate() if "phrase" not in p.lower()]
+        # attached contributions yet).
+        problems = [p for p in obj.validate() if "contribution" not in p.lower()]
         if problems:
             raise HTTPException(status_code=422, detail="; ".join(problems))
         dest_dir = Path(cdir)
@@ -6331,16 +6331,16 @@ def create_app() -> FastAPI:
         return {"ok": True, "id": dest.stem, "path": str(dest)}
 
     @app.post("/api/choreography/{cid}/attach")
-    def attach_phrase_endpoint(
+    def attach_contribution_endpoint(
         cid: str,
-        phrase: str = Query(..., description="Slug of the stated group phrase to attach."),
+        contribution: str = Query(..., description="Slug of the stated group contribution to attach."),
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
-        """Attach (offer) a stated group phrase to a choreography. Rejects a
-        phrase that doesn't join on the choreography's candidate_key."""
+        """Attach (offer) a stated group contribution to a choreography. Rejects a
+        contribution that doesn't join on the choreography's candidate_key."""
         from ..core import choreography as _ch
-        from ..core import phrase_spec as _ps
-        from ..core import phrase_publish as _pp
+        from ..core import contribution_spec as _ps
+        from ..core import contribution_publish as _pp
 
         actor = _resolve_actor(user)
         _require_active(actor)
@@ -6352,25 +6352,25 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail=f"choreography not found: {cid}")
         obj = _ch.Choreography.from_file(path)
 
-        # The phrase must be stated to the group and must join on candidate_key.
-        spec_path = _ps.resolve_spec_reference(phrase, _pp.group_phrases_dir())
+        # The contribution must be stated to the group and must join on candidate_key.
+        spec_path = _ps.resolve_spec_reference(contribution, _pp.group_contributions_dir())
         if spec_path is None:
             raise HTTPException(
                 status_code=422,
-                detail=f"phrase {phrase!r} is not stated to the group — state it first.")
-        spec = _ps.PhraseSpec.from_file(spec_path)
+                detail=f"contribution {contribution!r} is not stated to the group — state it first.")
+        spec = _ps.ContributionSpec.from_file(spec_path)
         contract = spec.resolved_contract()
         ck = getattr(contract, "candidate_key", "") if contract else ""
         if ck != obj.candidate_key:
             raise HTTPException(
                 status_code=422,
-                detail=f"phrase candidate_key {ck or '—'} does not join the "
+                detail=f"contribution candidate_key {ck or '—'} does not join the "
                        f"choreography's {obj.candidate_key!r} — not combinable.")
 
-        added = obj.attach_phrase(phrase)
+        added = obj.attach_contribution(contribution)
         if added:
             path.write_text(obj.to_markdown(), encoding="utf-8")
-        return {"ok": True, "attached": added, "total": len(obj.phrases)}
+        return {"ok": True, "attached": added, "total": len(obj.contributions)}
 
     @app.post("/api/notebook/edit")
     def notebook_edit(

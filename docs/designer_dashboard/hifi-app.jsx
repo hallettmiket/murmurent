@@ -3255,7 +3255,7 @@ function SecurityAccessPanel({ peers, span = "c-12" }) {
   );
 }
 
-/* ───────── phrases + choreographies (#38 Phases B/C) ───────── */
+/* ───────── contributions + choreographies (#38 Phases B/C) ───────── */
 async function postJSON(url, body) {
   const opts = { method: "POST", headers: { Accept: "application/json" } };
   if (body !== undefined) {
@@ -3277,8 +3277,8 @@ async function refreshDashboard() {
   }
 }
 
-// A phrase's typed output contract, as a compact one-line signature. This is
-// what makes phrases joinable: two phrases combine iff they share candidate_key.
+// A contribution's typed output contract, as a compact one-line signature. This is
+// what makes contributions joinable: two contributions combine iff they share candidate_key.
 function ContractSignature({ c }) {
   if (!c) return <span className="mono muted" style={{fontSize:10}}>no contract</span>;
   const arrow = c.direction === "lower_better" ? "↓" : (c.direction === "higher_better" ? "↑" : "");
@@ -3294,20 +3294,20 @@ function ContractSignature({ c }) {
   );
 }
 
-function MyPhrasesPanel({ phrases, span="c-12" }) {
-  const list = phrases || [];
+function MyContributionsPanel({ contributions, span="c-12" }) {
+  const list = contributions || [];
   const [busy, setBusy] = useState(null);
   const [err, setErr]   = useState(null);
   const onState = async (slug) => {
     setBusy(slug); setErr(null);
-    try { await postJSON("/api/phrases/" + encodeURIComponent(slug) + "/state"); await refreshDashboard(); }
+    try { await postJSON("/api/contributions/" + encodeURIComponent(slug) + "/state"); await refreshDashboard(); }
     catch (ex) { setErr(String(ex.message || ex)); }
     finally { setBusy(null); }
   };
   return (
     <div className={"panel "+span}>
       <header>
-        <h2>My phrases</h2>
+        <h2>My contributions</h2>
         <span className="meta">
           {list.length} authored · {list.filter(p => p.stated).length} stated to group
         </span>
@@ -3316,18 +3316,18 @@ function MyPhrasesPanel({ phrases, span="c-12" }) {
         {err && <div style={{padding:"6px 14px", color:"var(--red)", fontSize:12}}>{err}</div>}
         {list.length === 0 && (
           <div className="muted" style={{padding:"14px", fontSize:13}}>
-            No phrases yet. Author one in your vault with{" "}
-            <code className="mono">murmurent phrase spec new</code> — a phrase is a
+            No contributions yet. Author one in your vault with{" "}
+            <code className="mono">murmurent contribution spec new</code> — a contribution is a
             small recipe (steps + transitions) with a typed output contract.
           </div>
         )}
         {list.map(p => (
-          <div key={p.slug || p.phrase} style={{
+          <div key={p.slug || p.contribution} style={{
             padding:"9px 14px", borderBottom:"1px solid var(--rule)",
             display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:10,
           }}>
             <div style={{minWidth:0}}>
-              <div style={{fontWeight:500}}>{p.phrase}</div>
+              <div style={{fontWeight:500}}>{p.contribution}</div>
               {p.question && <div className="muted" style={{fontSize:12, marginTop:2}}>{p.question}</div>}
               <div style={{marginTop:4}}><ContractSignature c={p.contract} /></div>
               <div className="mono muted" style={{fontSize:10, marginTop:3}}>
@@ -3343,7 +3343,7 @@ function MyPhrasesPanel({ phrases, span="c-12" }) {
                 </span>
               ) : (
                 <button className="btn sm" disabled={busy === p.slug}
-                        title="Publish this phrase to your group so other members can build a choreography from it"
+                        title="Publish this contribution to your group so other members can build a choreography from it"
                         onClick={() => onState(p.slug)}>
                   {busy === p.slug ? "…" : "state to group"}
                 </button>
@@ -3386,7 +3386,7 @@ function NewChoreographyModal({ onClose }) {
             Pose a choreography
           </h2>
           <div className="muted" style={{fontSize:12, marginTop:3}}>
-            Advertise a target. Members contribute phrases that join on the candidate key.
+            Advertise a target. Members contribute contributions that join on the candidate key.
           </div>
         </div>
         <div style={{padding:16}}>
@@ -3423,7 +3423,7 @@ function ChoreographyCard({ c }) {
   const attach = async (slug) => {
     setBusy(slug); setErr(null);
     try {
-      await postJSON("/api/choreography/" + encodeURIComponent(c.id) + "/attach?phrase=" + encodeURIComponent(slug));
+      await postJSON("/api/choreography/" + encodeURIComponent(c.id) + "/attach?contribution=" + encodeURIComponent(slug));
       await refreshDashboard();
     } catch (ex) { setErr(String(ex.message || ex)); }
     finally { setBusy(null); }
@@ -3441,8 +3441,8 @@ function ChoreographyCard({ c }) {
       <div className="mono muted" style={{fontSize:10, marginTop:3}}>
         posed by {c.poser || "—"}
         {c.attached.length > 0 && (c.all_join
-          ? <span style={{color:"var(--green,#2e7d32)", marginLeft:8}}>· all {c.attached.length} phrase(s) join — ready to compose</span>
-          : <span style={{color:"var(--red)", marginLeft:8}}>· some attached phrases don't join</span>)}
+          ? <span style={{color:"var(--green,#2e7d32)", marginLeft:8}}>· all {c.attached.length} contribution(s) join — ready to compose</span>
+          : <span style={{color:"var(--red)", marginLeft:8}}>· some attached contributions don't join</span>)}
       </div>
 
       {c.attached.length > 0 && (
@@ -3451,7 +3451,7 @@ function ChoreographyCard({ c }) {
           {c.attached.map((a, i) => (
             <div key={i} style={{fontSize:12, marginTop:2, display:"flex", gap:6, alignItems:"baseline"}}>
               <span style={{color: a.joins ? "var(--green,#2e7d32)" : "var(--red)"}}>{a.joins ? "✓" : "✕"}</span>
-              <span>{a.phrase}</span>
+              <span>{a.contribution}</span>
               {a.author && <span className="mono muted" style={{fontSize:10}}>{a.author}</span>}
               {!a.joins && a.reason && <span className="mono" style={{fontSize:10, color:"var(--red)"}}>{a.reason}</span>}
             </div>
@@ -3461,13 +3461,13 @@ function ChoreographyCard({ c }) {
 
       {c.joinable.length > 0 && (
         <div style={{marginTop:6}}>
-          <div className="mono muted" style={{fontSize:10, letterSpacing:1}}>JOINABLE — stated group phrases you can attach</div>
+          <div className="mono muted" style={{fontSize:10, letterSpacing:1}}>JOINABLE — stated group contributions you can attach</div>
           {c.joinable.map((j, i) => (
             <div key={i} style={{fontSize:12, marginTop:2, display:"flex", justifyContent:"space-between", gap:8, alignItems:"baseline"}}>
-              <span>{j.phrase} {j.author && <span className="mono muted" style={{fontSize:10}}>{j.author}</span>}</span>
-              <button className="btn sm" disabled={busy === j.phrase}
-                      onClick={() => attach(slugify(j.phrase))}>
-                {busy === j.phrase ? "…" : "attach"}
+              <span>{j.contribution} {j.author && <span className="mono muted" style={{fontSize:10}}>{j.author}</span>}</span>
+              <button className="btn sm" disabled={busy === j.contribution}
+                      onClick={() => attach(slugify(j.contribution))}>
+                {busy === j.contribution ? "…" : "attach"}
               </button>
             </div>
           ))}
@@ -3478,11 +3478,11 @@ function ChoreographyCard({ c }) {
   );
 }
 
-// Client-side slug (mirrors core.phrase_contract.slugify closely enough for
-// addressing a stated phrase by name).
+// Client-side slug (mirrors core.contribution_contract.slugify closely enough for
+// addressing a stated contribution by name).
 function slugify(text) {
   return String(text || "").trim().toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "phrase";
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "contribution";
 }
 
 function ChoreographiesPanel({ choreographies, span="c-12" }) {
@@ -3501,7 +3501,7 @@ function ChoreographiesPanel({ choreographies, span="c-12" }) {
         {list.length === 0 && (
           <div className="muted" style={{padding:"14px", fontSize:13}}>
             No choreographies yet. Pose one to advertise a target; members then
-            contribute phrases that join on its candidate key, and the judge
+            contribute contributions that join on its candidate key, and the judge
             combines them.
           </div>
         )}
@@ -8288,15 +8288,15 @@ function App() {
           <AgentsActivityPanel activity={D.agents_activity} span="c-12" />
         </div>
 
-        {/* Choreographies (group-shared) + my phrases (member-owned) replace
+        {/* Choreographies (group-shared) + my contributions (member-owned) replace
             the removed SEA windows (#38): murmurent moved from SEA exchange to
-            compositional choreographies. A member states phrases; the group
+            compositional choreographies. A member states contributions; the group
             assembles them into a choreography that joins on a candidate key. */}
         <div className="grid" style={{marginBottom:14}}>
           <ChoreographiesPanel choreographies={D.choreographies} span="c-12" />
         </div>
         <div className="grid" style={{marginBottom:14}}>
-          <MyPhrasesPanel phrases={D.my_phrases} span="c-12" />
+          <MyContributionsPanel contributions={D.my_contributions} span="c-12" />
         </div>
 
         {/* Inventory: things you check, but not every day. (Lab members moved
