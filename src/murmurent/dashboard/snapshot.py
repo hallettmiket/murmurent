@@ -1512,32 +1512,45 @@ def _agents() -> list[C.AgentRow]:
 
 
 def _personal_agents() -> list[C.AgentRow]:
-    """This member's own agents: files in the machine's CC agents dir
-    (``~/.claude/agents``) whose name is NOT part of the commons. These are the
-    ad-hoc agents a member created for their own work; they live only in this
-    village (git-backed via ``~/.murmurent/agent_forks``). Best-effort — a
-    missing dir just yields none."""
+    """This member's own (net-new) agents — NOT part of the commons, so present
+    in their village only. The canonical home is the vault's ``agents/`` folder
+    (backed up to the member's GitHub via ``murmurent vault sync``, #38 item 3);
+    also picks up any non-commons file installed directly in the CC agents dir
+    (a hand-authored agent or a symlink). Deduplicated by name. Best-effort."""
     from ..core import agent_forks as _af
+    from ..core import personal_agents as _pa
 
     try:
-        installed = _af.installed_agents_dir()
         commons = _af.commons_agent_names()
     except Exception:
-        return []
-    if not installed.is_dir():
-        return []
+        commons = set()
+
+    sources: list[Path] = []
+    vdir = _pa.vault_agents_dir()
+    if vdir is not None and Path(vdir).is_dir():
+        sources.extend(sorted(Path(vdir).glob("*.md")))
+    try:
+        installed = _af.installed_agents_dir()
+        if installed.is_dir():
+            sources.extend(sorted(installed.glob("*.md")))
+    except Exception:
+        pass
+
     rows: list[C.AgentRow] = []
-    for path in sorted(installed.glob("*.md")):
-        if path.stem in commons:
-            continue  # a commons agent (or a fork of one) — shown in Commons
+    seen: set[str] = set()
+    for path in sources:
         try:
             meta = parse_file(path).meta or {}
         except Exception:
             continue
+        name = str(meta.get("name") or path.stem)
+        if name in commons or name in seen:
+            continue  # commons agent (shown in Commons) or already listed
+        seen.add(name)
         freeze = meta.get("freeze")
         rows.append(
             C.AgentRow(
-                name=str(meta.get("name") or path.stem),
+                name=name,
                 description=str(meta.get("description", "")).strip(),
                 freeze=freeze if freeze in ("frozen", "personal") else "personal",  # type: ignore[arg-type]
                 model=(str(meta["model"]) if meta.get("model") else None),

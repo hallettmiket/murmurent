@@ -20,6 +20,21 @@ from rich.table import Table
 from ..core import agent_forks as _af
 
 
+def cmd_new(name: str, *, description: str = "", model: str | None = None,
+            tools: list[str] | None = None) -> None:
+    """Create a net-new personal agent in the member's vault + install it."""
+    from ..core import personal_agents as _pa
+
+    try:
+        path = _pa.create_personal_agent(name, description, model=model, tools=tools)
+    except _pa.PersonalAgentError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Created personal agent {name!r}.")
+    click.echo(f"  vault file:  {path}   (backed up on `murmurent vault sync`)")
+    click.echo(f"  loaded by CC via a symlink in {_af.installed_agents_dir()}")
+    click.echo("  edit the vault file to shape how it works; it is yours alone.")
+
+
 def _upstream_label(st: _af.AgentStatus) -> str:
     if not st.in_commons:
         return "[yellow]orphaned[/yellow]"

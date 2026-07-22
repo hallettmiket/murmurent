@@ -36,7 +36,11 @@ from . import repo as _repo
 # holds arbitrary reference files (PDFs, spreadsheets, protocols, images) that
 # agents Glob/Read on demand — resolved by the murmurent-data MCP.
 VAULT_SUBDIRS: tuple[str, ...] = (
-    "oracle", "oracle/drafts", "lab-notebook", "maps-legends", "murmurent_data")
+    "oracle", "oracle/drafts", "lab-notebook", "maps-legends", "murmurent_data",
+    # Net-new personal agents a member creates (#38 item 3). Living in the vault
+    # means `murmurent vault sync` backs them up to the member's GitHub; they are
+    # symlinked into ~/.claude/agents so Claude Code loads them.
+    "agents")
 
 GITKEEP = ".gitkeep"
 CLAUDE_MD = "CLAUDE.md"
