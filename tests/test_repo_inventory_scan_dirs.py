@@ -74,3 +74,15 @@ def test_scan_script_expands_tilde_prefix(tmp_path):
             capture_output=True, text=True, env={"HOME": str(home), "PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"},
         )
         assert str(repo) in res.stdout, (scan_dir, res.stdout, res.stderr)
+
+
+def test_is_murmurent_infra_repo_classifies_own_repos():
+    """murmurent's own repos are flagged so the dashboard never offers a
+    'make ready' button for them (#41 pt 5). Project repos are not flagged."""
+    f = repo_inventory.is_murmurent_infra_repo
+    for infra in ("murmurent", "murmurent_lab_mgmt_mh", "murmurent_vault",
+                  "murmurent_public", "murmurent_manuscript",
+                  "/home/x/repos/murmurent_lab_mgmt_bio"):
+        assert f(infra) is True, infra
+    for project in ("dcis_imaging", "my_project", "murmurentish", "", "/x/new_project"):
+        assert f(project) is False, project

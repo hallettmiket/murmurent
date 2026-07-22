@@ -60,6 +60,28 @@ def test_bootstrap_writes_vscode_settings(world):
     assert data["terminal.integrated.defaultLocation"] == "editor"
 
 
+def test_bootstrap_writes_agents_log_task(world):
+    """A fresh project gets `.vscode/tasks.json` with an agents.log task that
+    auto-runs on folder open (#41 pt 3), and settings that let it run without
+    the prompt."""
+    bootstrap_local(world["project"], world["commons"], agents=[], project_name="demo")
+    tasks = json.loads((world["project"] / ".vscode" / "tasks.json").read_text())
+    task = next(t for t in tasks["tasks"] if t["label"] == "agents.log")
+    assert task["runOptions"]["runOn"] == "folderOpen"
+    assert "agents.log" in task["command"] and "tail -F" in task["command"]
+    settings = json.loads((world["project"] / ".vscode" / "settings.json").read_text())
+    assert settings["task.allowAutomaticTasks"] == "on"
+
+
+def test_bootstrap_preserves_existing_tasks(world):
+    """A user-authored tasks.json is never clobbered on re-bootstrap."""
+    proj = world["project"]
+    (proj / ".vscode").mkdir()
+    (proj / ".vscode" / "tasks.json").write_text('{"version":"2.0.0","tasks":[]}')
+    bootstrap_local(proj, world["commons"], agents=[], project_name="demo")
+    assert (proj / ".vscode" / "tasks.json").read_text() == '{"version":"2.0.0","tasks":[]}'
+
+
 def test_bootstrap_does_not_write_cc_settings(world):
     """The murmurent subagent-reporter hooks moved out of per-project
     .claude/settings.json into the user-global ~/.claude/settings.json

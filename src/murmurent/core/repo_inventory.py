@@ -45,6 +45,17 @@ SCAN_INTERVAL_DAYS = 7  # weekly refresh
 DEFAULT_SCAN_DIRS = ("repo", "repos")  # under each host's $HOME
 
 
+def is_murmurent_infra_repo(name: str) -> bool:
+    """True for murmurent's OWN repos — the commons clone (``murmurent``) and the
+    ``murmurent_*`` family (``murmurent_lab_mgmt_<lab>``, ``murmurent_vault``,
+    ``murmurent_public``, ``murmurent_manuscript``, …). These are murmurent
+    infrastructure, not project working repos: they must never be "made ready"
+    (a repo can't adopt itself; a lab-mgmt clone is governance, not a project).
+    The dashboard flags them and disables their make-ready button (#41 pt 5)."""
+    n = (name or "").strip().rsplit("/", 1)[-1]
+    return n == "murmurent" or n.startswith("murmurent_")
+
+
 @dataclass
 class RepoOnHost:
     """One clone of a project, on one machine."""
@@ -55,6 +66,7 @@ class RepoOnHost:
     has_marker: bool                # readiness marker (.murmurent.yaml)
     has_claude_dir: bool            # ``.claude/agents/`` exists
     is_murmurent_ready: bool        # marker + .claude/agents — the repo is murmurent-ready
+    is_murmurent_infra: bool = False  # murmurent's own repo — never "made ready" (#41 pt 5)
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -267,6 +279,7 @@ def list_machine_repos(host_name: str) -> tuple[list[RepoOnHost], str | None]:
             # "murmurent-ready" = readiness marker + .claude/agents —
             # the repo-side state, independent of any project.
             is_murmurent_ready=(marked == "1" and claude == "1"),
+            is_murmurent_infra=is_murmurent_infra_repo(path),
         ))
     return out, None
 
