@@ -184,6 +184,15 @@ class MachineSettingsBody(BaseModel):
     lab_base: str | None = None
 
 
+class NewPersonalAgentBody(BaseModel):
+    """JSON body for ``POST /api/agents/new`` — create a personal agent (#38 item 3)."""
+
+    name: str
+    description: str = ""
+    model: str | None = None
+    tools: list[str] = []
+
+
 class NewChoreographyBody(BaseModel):
     """JSON body for ``POST /api/choreography`` — pose a group choreography (#38)."""
 
@@ -6272,6 +6281,23 @@ def create_app() -> FastAPI:
             "disabled": bool(parsed.meta.get("disabled", False)),
             "model": parsed.meta.get("model"),
         }
+
+    @app.post("/api/agents/new")
+    def new_personal_agent_endpoint(body: NewPersonalAgentBody) -> dict:
+        """Create a net-new PERSONAL agent for this member (#38 item 3). It is
+        written to the member's vault (``<vault>/agents/``), backed up to their
+        GitHub by ``murmurent vault sync``, and symlinked into ``~/.claude/agents``
+        so Claude Code loads it. Not part of the commons."""
+        from ..core import personal_agents as _pa
+
+        try:
+            path = _pa.create_personal_agent(
+                body.name, body.description, model=body.model,
+                tools=[t for t in (body.tools or []) if t.strip()],
+            )
+        except _pa.PersonalAgentError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
+        return {"ok": True, "name": body.name, "path": str(path)}
 
     # -- Contributions + choreographies (#38 Phases B/C) -------------------------
 

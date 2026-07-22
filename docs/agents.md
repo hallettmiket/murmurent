@@ -19,9 +19,15 @@ fall into three categories:
   chaining agents to come).
 
 Alongside the commons, a member can create **personal agents** for their
-own work: ad-hoc agents kept in their own environment
-(`~/.murmurent/agent_forks/`, git-trackable → their GitHub), present in
-their village only and not shared with others.
+own work — for a bespoke step in a choreography, or just for day-to-day
+computing. Create one with `murmurent agent new <name>` (or the dashboard
+Agents panel's **+ new**); it is written to your personal vault under
+`agents/`, so `murmurent vault sync` backs it up to your GitHub, and it is
+symlinked into `~/.claude/agents/` so Claude Code loads it. A personal agent
+lives in your village only — it is never part of the commons and never
+appears in another member's environment. (Making your own copy of a *commons*
+agent instead is a **fork**: `murmurent agent fork <name>`, kept in
+`~/.murmurent/agent_forks/`.)
 
 You invoke these by addressing an agent by name in plain English (for
 example, *"Bookworm, find all manuscripts related to MMP11 in breast

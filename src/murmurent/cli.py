@@ -105,6 +105,22 @@ def agent_list() -> None:
 
 
 @agent_group.command(
+    "new",
+    help="Create your OWN (net-new) personal agent — kept in your vault (backed "
+         "up to your GitHub on `murmurent vault sync`) and loaded by Claude Code. "
+         "Not part of the commons, so it stays in your village only.",
+)
+@click.argument("name")
+@click.option("--description", "-d", default="", help="One-line description of what it does.")
+@click.option("--model", type=click.Choice(["fable", "opus", "sonnet", "haiku"]), default=None,
+              help="Model this agent uses (default: inherit).")
+@click.option("--tool", "tools", multiple=True, help="A tool the agent may use (repeatable).")
+def agent_new(name: str, description: str, model: str | None, tools: tuple[str, ...]) -> None:
+    from .commands import agent_cmd as _agent_cmd
+    _agent_cmd.cmd_new(name, description=description, model=model, tools=list(tools))
+
+
+@agent_group.command(
     "fork",
     help="Replace an agent's commons symlink with a personal copy that survives "
          "commons upgrades. Records provenance for drift detection.",

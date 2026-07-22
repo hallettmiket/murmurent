@@ -149,8 +149,20 @@ for i in "${!AGENTS[@]}"; do
   sleep 0.4
 done
 
+# Central live agent feed — the SAME stream the dashboard's live panel shows
+# (every subagent's ≤200-char verdict, newest last). Opened by default so you
+# can watch agents work from a terminal (#41 pt 3). Fills the agent column; if
+# specific agents were also picked, this opens last (on top of their windows).
+AGENTS_LOG="${MURMURENT_AGENT_LOG:-$HOME/.murmurent/agents.log}"
+mkdir -p "$(dirname "$AGENTS_LOG")" 2>/dev/null || true
+touch "$AGENTS_LOG" 2>/dev/null || true
+open_agent_window "🐝  AGENTS.LOG · live feed" \
+  "$AGENT_LEFT" "$AGENT_TOP" "$AGENT_RIGHT" "$AGENT_BOTTOM" \
+  37 "$AGENTS_LOG"
+sleep 0.4
+
 echo ""
 echo "Workspace ready for $PROJECT_NAME."
 echo "  Left:  VSCode at $PROJECT_DIR"
-echo "  Right: $(IFS='|'; echo "${AGENTS[*]}")"
+echo "  Right: agents.log (live feed)$([ ${N_AGENTS:-0} -gt 0 ] && echo " + $(IFS='|'; echo "${AGENTS[*]}")")"
 [[ -n "$SEA_ID" ]] && echo "  Focus: SEA #$SEA_ID — open seas/$SEA_ID.md to start."
