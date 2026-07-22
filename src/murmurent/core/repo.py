@@ -85,17 +85,18 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
       2. ``$MURMURENT_LAB_MGMT_REPO`` env var
       3. This machine's pinned pointer (``~/.murmurent/lab_mgmt_path``), written
          by ``pi-init`` and by discovery below.
-      4. Registry-authoritative: the machine owner's own group per the centre
-         registry (``_registry_lab_mgmt_for_owner``). A bare call acts for the
-         owner, so their registered group is the canonical default — returned
-         even when the clone isn't on disk yet (the honest answer; panels just
-         render empty until it's cloned).
+      4. Registry-authoritative, IF it exists on disk: the machine owner's own
+         group per the centre registry (``_registry_lab_mgmt_for_owner``). Only
+         wins here when the recorded path is actually present — a registry path
+         that points nowhere must not out-rank a real clone (#52).
       5. Discovery: an unambiguous lab_mgmt-shaped clone under ``repos_root()``
          — the member-machine case — pinned on the way out. Finds a
          pre-convention ``~/repos/lab_mgmt`` by SHAPE, so un-migrated clones
-         keep resolving.
-      6. ``DEFAULT_LAB_MGMT_REPO`` — a group-less canonical-convention path that
-         never exists on disk (NOT ``~/repos/lab_mgmt``; see the constant).
+         keep resolving. This beats a non-existent registry path.
+      6. The registry path even if absent (so a "clone it at <path>" hint points
+         at the canonical location), else ``DEFAULT_LAB_MGMT_REPO`` — a
+         group-less canonical-convention path that never exists on disk (NOT
+         ``~/repos/lab_mgmt``; see the constant).
 
     The old name-based ``~/repos/lab_mgmt`` fallback (which outranked discovery
     and was returned even when absent) is gone — that was the root of #31/#33.
@@ -116,17 +117,25 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
     # default and it can never be out-ranked by (or resolve past) a canonical
     # clone.
     registered = _registry_lab_mgmt_for_owner(env)
-    if registered is not None:
+    # A registry path that actually EXISTS on disk wins (fast + correct).
+    if registered is not None and registered.exists():
         return registered
-    # Member machine with no registry claim yet (cloned before the PI pushed
-    # their record, or a pre-registry install). Self-heal: scan for a clone that
-    # looks like a lab_mgmt repo (lab.md + members/) and, on an unambiguous hit,
-    # pin it so this discovery runs exactly once. Matches on SHAPE, so a
-    # pre-convention ``~/repos/lab_mgmt`` is found here just like a canonical
+    # Otherwise, a real clone on disk beats a registry path that points nowhere.
+    # A stale/misrecorded ``lab_mgmt_path`` (or a member whose clone dir is named
+    # differently than the registry expects) must not short-circuit discovery of
+    # the actual clone — that regression blanked the roster + lab name for a
+    # member whose registry entry named a non-existent path (#52). Discovery
+    # matches on SHAPE (lab.md + members/) and pins an unambiguous hit so it runs
+    # once; it finds a pre-convention ``~/repos/lab_mgmt`` just like a canonical
     # ``~/repos/murmurent_lab_mgmt_<lab>``.
     discovered = _discover_lab_mgmt_clone()
     if discovered is not None:
         return discovered
+    # No clone on disk anywhere. Prefer the registry's canonical location (so a
+    # "clone it at <path>" hint points at the right place) over the group-less
+    # default.
+    if registered is not None:
+        return registered
     return DEFAULT_LAB_MGMT_REPO
 
 
