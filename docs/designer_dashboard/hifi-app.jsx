@@ -3644,8 +3644,77 @@ function AgentGroup({ title, hint, agents }) {
   );
 }
 
+function NewPersonalAgentModal({ onClose }) {
+  const [form, setForm] = useState({ name:"", description:"", model:"" });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr]   = useState(null);
+  const set = k => e => setForm({ ...form, [k]: e.target.value });
+  const submit = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const body = { name: form.name.trim(), description: form.description.trim() };
+      if (form.model) body.model = form.model;
+      await postJSON("/api/agents/new", body);
+      await refreshDashboard();
+      onClose();
+    } catch (ex) { setErr(String(ex.message || ex)); setBusy(false); }
+  };
+  return (
+    <div onClick={onClose} style={MODAL_BACKDROP_STYLE}>
+      <div onClick={e => e.stopPropagation()} style={{...MODAL_PANEL_STYLE, maxWidth:500}}>
+        <div style={{background:"var(--paper-2)", borderBottom:"1px solid var(--rule)", padding:"12px 16px"}}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:17, color:"var(--purple-deep)"}}>
+            New personal agent
+          </h2>
+          <div className="muted" style={{fontSize:12, marginTop:3}}>
+            Yours alone — kept in your vault (backed up to your GitHub on{" "}
+            <code className="mono">murmurent vault sync</code>) and loaded by Claude Code.
+          </div>
+        </div>
+        <div style={{padding:16}}>
+          <label style={{display:"block", marginBottom:10}}>
+            <div className="mono muted" style={{fontSize:11, marginBottom:3}}>
+              Name <span style={{textTransform:"none"}}>(lowercase, letters/digits/underscores)</span>
+            </div>
+            <input value={form.name} onChange={set("name")} placeholder="e.g. my_docking_helper"
+                   style={{width:"100%", padding:"6px 8px", border:"1px solid var(--rule-strong)",
+                           borderRadius:2, fontFamily:"var(--mono)", fontSize:12}} />
+          </label>
+          <label style={{display:"block", marginBottom:10}}>
+            <div className="mono muted" style={{fontSize:11, marginBottom:3}}>What it does</div>
+            <input value={form.description} onChange={set("description")}
+                   placeholder="one line — you can flesh out the agent file afterward"
+                   style={{width:"100%", padding:"6px 8px", border:"1px solid var(--rule-strong)",
+                           borderRadius:2, fontFamily:"var(--sans)", fontSize:13}} />
+          </label>
+          <label style={{display:"block", marginBottom:10}}>
+            <div className="mono muted" style={{fontSize:11, marginBottom:3}}>Model</div>
+            <select value={form.model} onChange={set("model")}
+                    style={{padding:"6px 8px", border:"1px solid var(--rule-strong)",
+                            borderRadius:2, fontFamily:"var(--mono)", fontSize:12, background:"#fff"}}>
+              <option value="">default (inherit)</option>
+              <option value="fable">fable (5)</option>
+              <option value="opus">opus (4.8)</option>
+              <option value="sonnet">sonnet (5)</option>
+              <option value="haiku">haiku (4.5)</option>
+            </select>
+          </label>
+          {err && <div style={{color:"var(--red)", fontSize:12, marginBottom:8}}>{err}</div>}
+          <div style={{display:"flex", justifyContent:"flex-end", gap:8, marginTop:6}}>
+            <button className="btn sm" onClick={onClose} disabled={busy}>cancel</button>
+            <button className="btn sm primary" onClick={submit} disabled={busy || !form.name.trim()}>
+              {busy ? "creating…" : "create agent"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AgentsPanel({ agents, span="c-4" }) {
   const list = agents || [];
+  const [modal, setModal] = useState(false);
   // Two axes (#38): origin (commons vs personal) and, for commons, category
   // (member / administrative / choreography-support). freeze stays orthogonal.
   const commons  = list.filter(a => (a.origin || "commons") === "commons");
@@ -3655,8 +3724,12 @@ function AgentsPanel({ agents, span="c-4" }) {
     <div className={"panel "+span}>
       <header>
         <h2>Agents</h2>
-        <span className="meta">
+        <span className="meta" style={{display:"flex", alignItems:"center", gap:8}}>
           {commons.length} commons · {personal.length} personal · {list.filter(a => a.disabled).length} disabled
+          <button className="btn sm" onClick={() => setModal(true)}
+                  title="Create your own agent — kept in your vault, loaded by Claude Code">
+            + new
+          </button>
         </span>
       </header>
       <div className="body" style={{padding:0}}>
@@ -3664,13 +3737,14 @@ function AgentsPanel({ agents, span="c-4" }) {
         <AgentGroup title="Administrative" agents={byCat("administrative")} />
         <AgentGroup title="Choreography support" agents={byCat("choreography-support")} />
         <AgentGroup title="Personal agents"
-          hint="— yours; kept in your village, backed to your GitHub"
+          hint="— yours; kept in your vault, backed to your GitHub"
           agents={personal} />
         {personal.length === 0 && list.length > 0 && (
           <div className="muted" style={{padding:"10px 14px", fontSize:12, borderTop:"1px solid var(--rule)"}}>
-            No personal agents yet. Make a commons agent your own with{" "}
-            <code className="mono">murmurent agent fork &lt;name&gt;</code>, or add your
-            own — they live only in your village and are backed to your GitHub.
+            No personal agents yet. Click <b>+ new</b> to create your own (or{" "}
+            <code className="mono">murmurent agent new &lt;name&gt;</code>); fork a
+            commons agent with <code className="mono">murmurent agent fork &lt;name&gt;</code>.
+            Either way it lives in your vault only and is backed up to your GitHub.
           </div>
         )}
         {list.length === 0 && (
@@ -3679,6 +3753,7 @@ function AgentsPanel({ agents, span="c-4" }) {
           </div>
         )}
       </div>
+      {modal && <NewPersonalAgentModal onClose={() => setModal(false)} />}
     </div>
   );
 }
