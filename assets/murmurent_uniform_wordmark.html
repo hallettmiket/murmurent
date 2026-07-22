@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whispering Murmuration</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: #f4f1ea;
+    font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    cursor: crosshair;
+  }
+  #stage { display: block; width: 100vw; height: 100vh; }
+
+  #veil {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    background: rgba(244, 241, 234, 0.92);
+    color: #2a2620; text-align: center;
+    transition: opacity 0.9s ease; z-index: 10;
+  }
+  #veil h1 { font-weight: 300; letter-spacing: 0.14em; font-size: 26px; margin: 0 0 10px; }
+  #veil p  { font-weight: 300; opacity: 0.6; font-size: 14px; max-width: 340px; line-height: 1.6; }
+  #veil .go {
+    margin-top: 26px; padding: 12px 30px;
+    border: 1px solid rgba(42,38,32,0.35); border-radius: 40px;
+    font-size: 13px; letter-spacing: 0.18em; text-transform: uppercase;
+    background: transparent; color: #2a2620; cursor: pointer;
+    transition: background 0.3s, color 0.3s;
+  }
+  #veil .go:hover { background: #2a2620; color: #f4f1ea; }
+  #veil.hidden { opacity: 0; pointer-events: none; }
+
+  #mark {
+    position: fixed; top: 36px; left: 48px; z-index: 5;
+    font-weight: 600; font-size: 30px; letter-spacing: 0.1em;
+    color: #6A2E9E;
+    user-select: none; pointer-events: none;
+  }
+
+  #hud {
+    position: fixed; left: 16px; bottom: 14px; z-index: 5;
+    font-size: 11px; letter-spacing: 0.12em; color: rgba(42,38,32,0.45);
+    font-weight: 300; user-select: none; line-height: 1.7;
+  }
+  #hud b { font-weight: 400; color: rgba(42,38,32,0.7); }
+  kbd {
+    font: inherit; border: 1px solid rgba(42,38,32,0.25);
+    border-radius: 4px; padding: 1px 5px; color: rgba(42,38,32,0.6);
+  }
+
+  /* Logo mode (?logo / #logo): the wordmark murmuration alone, no chrome — for
+     embedding as the murmurent logo (dashboard widget + VSCode window). The
+     full interactive page is unchanged without the flag. */
+  html.logo #mark, html.logo #hud, html.logo #veil { display: none !important; }
+  html.logo, html.logo body { cursor: default; }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+
+<div id="mark">Murmurent</div>
+
+<div id="hud">
+  <span>move mouse to lure the flock &nbsp;·&nbsp; <kbd>space</kbd> startle &nbsp;·&nbsp; <kbd>m</kbd> mute whispers</span>
+</div>
+
+<div id="veil">
+  <h1>WHISPERING MURMURATION</h1>
+  <p>A flock of starlings folding through unstable air. Turn your sound up — they only whisper.</p>
+  <button class="go">Begin</button>
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  const canvas = document.getElementById("stage");
+  const ctx = canvas.getContext("2d");
+  let W, H, DPR;
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth; H = window.innerHeight;
+    canvas.width = W * DPR; canvas.height = H * DPR;
+    canvas.style.width = W + "px"; canvas.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // paint the paper
+    ctx.fillStyle = "#f4f1ea";
+    ctx.fillRect(0, 0, W, H);
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  // ---------- flock ----------
+  const N = Math.round(Math.min(620, Math.max(260, (W * H) / 2000)));
+  const birds = [];
+  const mouse = { x: W / 2, y: H / 2, active: false };
+
+  // The flock always has something to orbit. When the real cursor is present the
+  // lure tracks it; when it leaves, the lure parks at a random "ghost" point and
+  // the birds wheel around that instead, exactly as if you'd left the pointer there.
+  const lure = { x: W / 2, y: H / 2 };
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+
+  function pickGhost() {
+    // keep it off the very edges so the orbit stays on screen
+    lure.x = rand(W * 0.2, W * 0.8);
+    lure.y = rand(H * 0.2, H * 0.8);
+  }
+
+  for (let i = 0; i < N; i++) {
+    birds.push({
+      x: rand(0, W), y: rand(0, H),
+      vx: rand(-1, 1), vy: rand(-1, 1),
+
+      // --- depth axis: 0 = far from camera, 1 = near ---
+      z: Math.random(),
+      vz: rand(-0.004, 0.004),
+      band: rand(0.12, 0.88),            // preferred cruising depth
+
+      grp: (Math.random() * 3) | 0,      // which attractor it favours
+      ink: rand(0.5, 1),                 // per-bird darkness
+      flap: rand(0, 6.283),              // wingbeat phase
+      rate: rand(17, 36),                // wingbeat rad/sec
+      size: rand(0.82, 1.28),
+
+      // --- individual temperament: no two birds fly the same ---
+      cruise: rand(0.72, 1.34),          // personal airspeed
+      agile:  rand(0.55, 1.75),          // how hard it can steer
+      kAli:   rand(0.45, 1.7),           // how much it copies its neighbours
+      kCoh:   rand(0.45, 1.7),           // how much it wants company
+      kSep:   rand(0.55, 1.8),           // how much personal space it insists on
+      kFlow:  rand(0.3, 2.0),            // how much the turbulence pushes it
+      kLure:  rand(0.2, 1.6),            // how strongly the lure attracts it
+      swirl:  rand(-1, 1),               // orbit direction and strength
+
+      hdg: 0, bank: 0                    // heading + smoothed roll, for banking
+    });
+  }
+
+  pickGhost();   // start with the flock already orbiting somewhere
+
+  // wandering attractors — the flock splits and re-merges around these
+  const attractors = [0, 1, 2].map((k) => ({
+    ax: rand(0.2, 0.8), ay: rand(0.2, 0.8),
+    sx: rand(0.00013, 0.00031), sy: rand(0.00011, 0.00029),
+    px: rand(0, 6.28), py: rand(0, 6.28),
+    rx: rand(0.28, 0.42), ry: rand(0.24, 0.4)
+  }));
+
+  // Multi-octave curl-ish flow field. Octave 1 makes big slow structures, octave 2
+  // adds small fast eddies, and fz drives movement along the depth axis.
+  const _fl = { fx: 0, fy: 0, fz: 0 };
+  function flow3(x, y, z, t) {
+    const nx = x * 0.0016, ny = y * 0.0016, nz = z * 2.4;
+    const a1 =
+      Math.sin(nx + t * 0.21) +
+      Math.sin(ny * 1.3 - t * 0.17) +
+      Math.sin((nx + ny) * 0.7 + nz + t * 0.13);
+    const b1 =
+      Math.cos(ny + t * 0.19) +
+      Math.cos(nx * 1.1 + t * 0.23) +
+      Math.cos((nx - ny) * 0.9 - nz - t * 0.11);
+    const a2 = Math.sin(nx * 3.7 - t * 0.53) + Math.sin(ny * 4.1 + nz * 1.7 + t * 0.61);
+    const b2 = Math.cos(ny * 3.3 + t * 0.47) + Math.cos(nx * 4.3 - nz * 1.3 - t * 0.59);
+    const ang = (a1 + b1) * 1.05 + (a2 + b2) * 0.4;
+    _fl.fx = Math.cos(ang);
+    _fl.fy = Math.sin(ang);
+    _fl.fz = 0.5 * Math.sin((nx - ny) * 1.9 + nz * 2.2 + t * 0.29) +
+             0.5 * Math.sin(nx * 2.6 - ny * 1.4 + t * 0.4);
+  }
+
+  // coarse spatial grid so neighbour lookup stays cheap as the flock grows
+  const CELL = 46;
+  let gw, gh, cells;
+  function buildGrid() {
+    gw = Math.max(1, Math.ceil(W / CELL));
+    gh = Math.max(1, Math.ceil(H / CELL));
+    cells = new Array(gw * gh);
+    for (let i = 0; i < cells.length; i++) cells[i] = [];
+  }
+  buildGrid();
+
+  // regime shifts: every so often the whole mood changes -> "crazy"
+  let regime = { sep: 26, ali: 0.05, coh: 0.0016, flow: 0.9, pull: 0.0011,
+                 swirl: 0.6, churn: 0.6, next: 0 };
+  function shuffleRegime(t) {
+    regime.sep  = rand(14, 40);
+    regime.ali  = rand(0.02, 0.12);
+    regime.coh  = rand(0.0006, 0.0032);
+    regime.flow = rand(0.5, 2.2);
+    regime.pull = rand(0.0004, 0.0022) * (Math.random() < 0.22 ? -1 : 1); // sometimes repel!
+    regime.swirl = rand(0.2, 2.0) * (Math.random() < 0.35 ? -1 : 1);      // orbit reverses
+    regime.churn = rand(0.25, 1.6);                                        // depth turbulence
+    regime.next = t + rand(3.5, 9);
+    // occasionally re-cast group loyalties -> subflocks reform
+    if (Math.random() < 0.5) {
+      for (const b of birds) if (Math.random() < 0.4) b.grp = (Math.random() * 3) | 0;
+    }
+    // and re-stratify: birds pick new cruising depths, so layers dissolve and reform
+    if (Math.random() < 0.45) {
+      for (const b of birds) if (Math.random() < 0.35) b.band = rand(0.12, 0.88);
+    }
+  }
+
+  let startle = 0;               // decays; injects chaos
+  let excitement = 0;            // drives the whispers
+
+  const MAXV = 4.4, NEIGH = 42, NEIGH2 = NEIGH * NEIGH;
+
+  function step(t, dt) {
+    if (t > regime.next) shuffleRegime(t);
+
+    // move attractors along slow Lissajous paths
+    for (const a of attractors) {
+      a.cx = (a.ax + a.rx * Math.sin(t * 1000 * a.sx + a.px)) * W;
+      a.cy = (a.ay + a.ry * Math.cos(t * 1000 * a.sy + a.py)) * H;
+    }
+
+    // bucket birds into the grid
+    for (let c = 0; c < cells.length; c++) cells[c].length = 0;
+    for (let i = 0; i < N; i++) {
+      const b = birds[i];
+      let gx = (b.x / CELL) | 0, gy = (b.y / CELL) | 0;
+      gx = ((gx % gw) + gw) % gw; gy = ((gy % gh) + gh) % gh;
+      cells[gy * gw + gx].push(i);
+    }
+
+    let speedSum = 0, turnSum = 0;
+    const halfW = W * 0.5, halfH = H * 0.5;
+
+    for (let i = 0; i < N; i++) {
+      const b = birds[i];
+      let ax = 0, ay = 0, cx = 0, cy = 0, sx = 0, sy = 0, az = 0, wsum = 0;
+
+      // neighbours: only the 9 surrounding cells, wrap-aware
+      const bgx = (b.x / CELL) | 0, bgy = (b.y / CELL) | 0;
+      for (let ox = -1; ox <= 1; ox++) {
+        for (let oy = -1; oy <= 1; oy++) {
+          const cxi = ((bgx + ox) % gw + gw) % gw;
+          const cyi = ((bgy + oy) % gh + gh) % gh;
+          const bucket = cells[cyi * gw + cxi];
+          for (let k = 0; k < bucket.length; k++) {
+            const j = bucket[k];
+            if (j === i) continue;
+            const o = birds[j];
+            let dx = o.x - b.x, dy = o.y - b.y;
+            if (dx > halfW) dx -= W; else if (dx < -halfW) dx += W;
+            if (dy > halfH) dy -= H; else if (dy < -halfH) dy += H;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < NEIGH2 && d2 > 0.0001) {
+              // a bird mostly notices others at a similar depth -> layered sheets
+              const dz = o.z - b.z;
+              const w = 1 / (1 + dz * dz * 24);
+              ax += o.vx * w; ay += o.vy * w;   // alignment
+              cx += dx * w;   cy += dy * w;     // cohesion (relative offsets)
+              az += dz * w;                     // depth cohesion
+              const inv = w / d2;
+              sx -= dx * inv; sy -= dy * inv;   // separation
+              wsum += w;
+            }
+          }
+        }
+      }
+
+      let fx = 0, fy = 0, fz = 0;
+      if (wsum > 0) {
+        ax /= wsum; ay /= wsum;
+        fx += (ax - b.vx) * regime.ali * b.kAli;
+        fy += (ay - b.vy) * regime.ali * b.kAli;
+        cx /= wsum; cy /= wsum;
+        fx += cx * regime.coh * b.kCoh; fy += cy * regime.coh * b.kCoh;
+        fx += sx * regime.sep * 0.02 * b.kSep; fy += sy * regime.sep * 0.02 * b.kSep;
+        fz += (az / wsum) * 0.006 * b.kCoh;
+      }
+
+      // multi-octave turbulence, including along the depth axis
+      flow3(b.x, b.y, b.z, t);
+      fx += _fl.fx * regime.flow * 0.12 * b.kFlow;
+      fy += _fl.fy * regime.flow * 0.12 * b.kFlow;
+      fz += _fl.fz * regime.churn * 0.0016 * b.kFlow;
+
+      // pull toward this bird's favoured attractor (or push away)
+      const at = attractors[b.grp];
+      fx += (at.cx - b.x) * regime.pull; fy += (at.cy - b.y) * regime.pull;
+
+      // lure: radial pull PLUS a tangential swirl, so the flock orbits instead of
+      // collapsing. Each bird's swirl sign differs -> counter-rotating shells that shear.
+      const mdx = lure.x - b.x, mdy = lure.y - b.y;
+      const md = Math.hypot(mdx, mdy) + 0.01;
+      const ux = mdx / md, uy = mdy / md;
+      const pull = Math.min(0.9, 90 / md) * 2.4 * b.kLure;
+      fx += ux * pull; fy += uy * pull;
+      const tang = Math.min(1.1, 120 / md) * regime.swirl * b.swirl * 0.16;
+      fx += -uy * tang; fy += ux * tang;
+
+      // drift back toward this bird's preferred cruising depth
+      fz += (b.band - b.z) * 0.02;
+
+      // startle: brief scatter impulse
+      if (startle > 0.01) {
+        fx += (Math.random() - 0.5) * startle * 3.2;
+        fy += (Math.random() - 0.5) * startle * 3.2;
+        fz += (Math.random() - 0.5) * startle * 0.03;
+      }
+
+      // integrate — each bird steers and cruises at its own rate
+      b.vx += fx * b.agile; b.vy += fy * b.agile;
+
+      const vmax = MAXV * b.cruise, vmin = 1.4 * b.cruise;
+      let sp = Math.hypot(b.vx, b.vy);
+      if (sp > vmax) { const k = vmax / sp; b.vx *= k; b.vy *= k; sp = vmax; }
+      else if (sp < vmin) { const k = vmin / (sp || 1); b.vx *= k; b.vy *= k; sp = vmin; }
+
+      // depth is damped and softly bounded
+      b.vz = (b.vz + fz) * 0.94;
+      b.z += b.vz;
+      if (b.z < 0.02) { b.z = 0.02; b.vz = Math.abs(b.vz) * 0.5; }
+      else if (b.z > 0.98) { b.z = 0.98; b.vz = -Math.abs(b.vz) * 0.5; }
+
+      // parallax: distant birds cross the frame more slowly
+      const par = 0.6 + 0.58 * b.z;
+      b.x += b.vx * par; b.y += b.vy * par;
+
+      // wrap toroidally
+      if (b.x < -12) b.x += W + 24; else if (b.x > W + 12) b.x -= W + 24;
+      if (b.y < -12) b.y += H + 24; else if (b.y > H + 12) b.y -= H + 24;
+
+      // banking: how fast the heading is swinging, smoothed into a roll angle
+      const hdg = Math.atan2(b.vy, b.vx);
+      let dh = hdg - b.hdg;
+      if (dh > Math.PI) dh -= 6.28318; else if (dh < -Math.PI) dh += 6.28318;
+      b.hdg = hdg;
+      b.bank += (Math.max(-1, Math.min(1, dh * 8)) - b.bank) * 0.2;
+
+      // wings beat faster when the bird is working harder
+      b.flap += b.rate * dt * (0.6 + 0.7 * (sp / vmax) + startle * 0.8 + Math.abs(b.bank) * 0.6);
+
+      speedSum += sp / b.cruise;
+      turnSum += Math.abs(dh);
+    }
+
+    startle *= 0.9;
+
+    // excitement = how fast + how much the flock is changing
+    const avgSp = speedSum / N, avgTurn = turnSum / N;
+    const target = Math.min(1, (avgSp / MAXV) * 0.5 + avgTurn * 2.4 + startle * 0.5);
+    excitement += (target - excitement) * 0.06;
+  }
+
+  const order = new Array(N);
+  for (let i = 0; i < N; i++) order[i] = i;
+
+  function draw() {
+    // fade the paper slightly each frame -> soft ink trails on off-white
+    ctx.fillStyle = "rgba(244, 241, 234, 0.24)";
+    ctx.fillRect(0, 0, W, H);
+
+    // paint far birds first so near ones pass in front of them
+    order.sort((p, q) => birds[p].z - birds[q].z);
+
+    for (let n = 0; n < N; n++) {
+      const b = birds[order[n]];
+      const sp = Math.hypot(b.vx, b.vy) || 1;
+
+      // depth: near birds are bigger and darker, far ones small and hazy
+      const depth = 0.42 + 0.95 * b.z;
+      const L = (2.5 + sp * 0.55) * b.size * depth;
+      const fx = (b.vx / sp) * L, fy = (b.vy / sp) * L;   // forward vector
+      const sx = -fy,            sy = fx;                  // perpendicular
+
+      // wingbeat: 1 = wings spread broadside, ~0.2 = folded / edge-on
+      const spread = 0.2 + 0.8 * (0.5 + 0.5 * Math.sin(b.flap));
+      const sweep = -0.42 - 0.3 * (1 - spread);  // tips swing back when folding
+
+      // banking rolls the bird: the near wing opens up, the far one foreshortens
+      const roll = b.bank * 0.5;
+      const wingR = 0.98 * spread * (1 + roll * 0.5);
+      const wingL = 0.98 * spread * (1 - roll * 0.5);
+
+      // silhouette area + atmospheric haze -> the flock twinkles and recedes
+      const a = (0.2 + 0.38 * b.ink) * (0.55 + 0.45 * spread) * (0.32 + 0.68 * b.z);
+      ctx.fillStyle = "rgba(32, 28, 24, " + a.toFixed(3) + ")";
+
+      ctx.beginPath();
+      // beak / head
+      ctx.moveTo(b.x + fx * 1.12,                 b.y + fy * 1.12);
+      // right shoulder -> wingtip -> wing root
+      ctx.lineTo(b.x + fx * 0.18 + sx * 0.17,     b.y + fy * 0.18 + sy * 0.17);
+      ctx.lineTo(b.x + fx * sweep + sx * wingR,   b.y + fy * sweep + sy * wingR);
+      ctx.lineTo(b.x - fx * 0.22 + sx * 0.15,     b.y - fy * 0.22 + sy * 0.15);
+      // short squared tail
+      ctx.lineTo(b.x - fx * 1.0 + sx * 0.11,      b.y - fy * 1.0 + sy * 0.11);
+      ctx.lineTo(b.x - fx * 1.0 - sx * 0.11,      b.y - fy * 1.0 - sy * 0.11);
+      // left wing root -> wingtip -> shoulder
+      ctx.lineTo(b.x - fx * 0.22 - sx * 0.15,     b.y - fy * 0.22 - sy * 0.15);
+      ctx.lineTo(b.x + fx * sweep - sx * wingL,   b.y + fy * sweep - sy * wingL);
+      ctx.lineTo(b.x + fx * 0.18 - sx * 0.17,     b.y + fy * 0.18 - sy * 0.17);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // ---------- whispering audio ----------
+  let audio = null, muted = false;
+
+  function makeNoiseBuffer(actx) {
+    const len = actx.sampleRate * 2;
+    const buf = actx.createBuffer(1, len, actx.sampleRate);
+    const d = buf.getChannelData(0);
+    let last = 0;
+    for (let i = 0; i < len; i++) {
+      // pink-ish noise: leaky-integrated white, sounds more breath-like
+      const white = Math.random() * 2 - 1;
+      last = (last + 0.02 * white) / 1.02;
+      d[i] = last * 3.2;
+    }
+    return buf;
+  }
+
+  function startAudio() {
+    if (audio) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    const actx = new AC();
+    const master = actx.createGain();
+    master.gain.value = 0.0;
+    master.connect(actx.destination);
+
+    const buffer = makeNoiseBuffer(actx);
+    const voices = [];
+    const VOICES = 5;
+
+    for (let i = 0; i < VOICES; i++) {
+      const src = actx.createBufferSource();
+      src.buffer = buffer; src.loop = true;
+
+      // shape the noise into a breathy "shhh": high-pass + wandering band-pass
+      const hp = actx.createBiquadFilter();
+      hp.type = "highpass"; hp.frequency.value = 700;
+
+      const bp = actx.createBiquadFilter();
+      bp.type = "bandpass";
+      bp.frequency.value = rand(1200, 3400);
+      bp.Q.value = rand(1.4, 4.5);
+
+      const g = actx.createGain(); g.gain.value = 0.0;
+
+      const pan = actx.createStereoPanner ? actx.createStereoPanner() : null;
+      if (pan) pan.pan.value = rand(-0.85, 0.85);
+
+      src.connect(hp); hp.connect(bp); bp.connect(g);
+      if (pan) { g.connect(pan); pan.connect(master); } else { g.connect(master); }
+      src.start(rand(0, 1));
+
+      voices.push({ src, hp, bp, g, pan, nextBreath: 0, centre: bp.frequency.value });
+    }
+
+    audio = { actx, master, voices };
+
+    // scheduler: each voice utters whispered "breaths" of varying length/pitch
+    function schedule() {
+      if (!audio) return;
+      const now = actx.currentTime;
+      for (const v of audio.voices) {
+        if (now >= v.nextBreath) {
+          const dur = rand(0.7, 2.6);
+          const peak = rand(0.15, 0.55) * (0.5 + excitement);
+          const g = v.g.gain;
+          g.cancelScheduledValues(now);
+          g.setValueAtTime(Math.max(0.0001, g.value), now);
+          g.linearRampToValueAtTime(peak, now + dur * rand(0.25, 0.45)); // inhale-ish swell
+          g.exponentialRampToValueAtTime(0.0008, now + dur);             // fade to breath
+          // drift the timbre so no two whispers sound alike
+          v.centre += rand(-500, 500);
+          v.centre = Math.max(900, Math.min(4200, v.centre));
+          v.bp.frequency.setTargetAtTime(v.centre, now, 0.3);
+          v.bp.Q.setTargetAtTime(rand(1.2, 5), now, 0.4);
+          if (v.pan) v.pan.pan.setTargetAtTime(rand(-0.9, 0.9), now, 0.5);
+          v.nextBreath = now + dur + rand(0.15, 1.4);
+        }
+      }
+      setTimeout(schedule, 120);
+    }
+    schedule();
+  }
+
+  // ---------- loop ----------
+  let last = performance.now();
+  function frame(now) {
+    const t = now / 1000;
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+
+    step(t, dt);
+    draw();
+
+    if (audio && !muted) {
+      // overall whisper bed swells with the flock's excitement
+      const targetVol = 0.06 + excitement * 0.34;
+      audio.master.gain.setTargetAtTime(targetVol, audio.actx.currentTime, 0.25);
+    } else if (audio && muted) {
+      audio.master.gain.setTargetAtTime(0, audio.actx.currentTime, 0.2);
+    }
+
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ---------- input ----------
+  function cursorHere(x, y) {
+    mouse.x = x; mouse.y = y; mouse.active = true;
+    lure.x = x; lure.y = y;
+  }
+  function cursorGone() {
+    if (!mouse.active) return;     // don't re-roll if already away
+    mouse.active = false;
+    pickGhost();
+  }
+
+  window.addEventListener("mousemove", (e) => cursorHere(e.clientX, e.clientY));
+  document.addEventListener("mouseleave", cursorGone);
+  window.addEventListener("blur", cursorGone);           // alt-tab / another window
+  document.addEventListener("mouseout", (e) => {         // pointer exits the viewport
+    if (!e.relatedTarget) cursorGone();
+  });
+
+  window.addEventListener("touchmove", (e) => {
+    if (e.touches[0]) cursorHere(e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  window.addEventListener("touchend", cursorGone);
+
+  // keep the ghost point on screen if the window changes size
+  window.addEventListener("resize", () => {
+    buildGrid();
+    if (!mouse.active) pickGhost();
+    lure.x = Math.min(lure.x, W); lure.y = Math.min(lure.y, H);
+  });
+
+  window.addEventListener("keydown", (e) => {
+    if (e.code === "Space") { e.preventDefault(); startle = 1; }
+    if (e.key === "m" || e.key === "M") { muted = !muted; }
+  });
+
+  const veil = document.getElementById("veil");
+  function begin() {
+    startAudio();
+    if (audio && audio.actx.state === "suspended") audio.actx.resume();
+    veil.classList.add("hidden");
+  }
+  veil.querySelector(".go").addEventListener("click", begin);
+
+  // Logo mode: auto-reveal the flock (the canvas already animates from load),
+  // no "Begin" click and no audio. Enabled with ?logo or #logo.
+  const logoMode = new URLSearchParams(location.search).has("logo")
+                   || location.hash.replace("#", "") === "logo";
+  if (logoMode) {
+    document.documentElement.classList.add("logo");
+    veil.classList.add("hidden");
+  }
+})();
+</script>
+</body>
+</html>

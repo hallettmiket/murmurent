@@ -117,5 +117,24 @@ tell application "System Events" to tell process "Code"
 end tell
 EOF
 
+# 5. Murmurent logo — a small companion window with the murmuration wordmark
+# animation, opened beside VSCode. ``#logo`` renders it chrome-free (no intro /
+# HUD / audio). A Chrome app-window is chromeless + sized; we fall back to the
+# default browser otherwise. Resolved relative to this script so it works
+# wherever the murmurent commons is cloned. Best-effort — never blocks launch.
+LOGO_FILE="$(cd "$(dirname "$0")/.." >/dev/null 2>&1 && pwd)/assets/murmurent_uniform_wordmark.html"
+if [ -f "$LOGO_FILE" ]; then
+    LOGO_URL="file://$LOGO_FILE#logo"
+    LOGO_W=240; LOGO_H=260
+    LOGO_X=$(( SX + SW - LOGO_W - 28 ))   # top-right of the chosen display
+    LOGO_Y=$(( SY + 64 ))
+    open -na "Google Chrome" --args \
+        --app="$LOGO_URL" \
+        --window-size=${LOGO_W},${LOGO_H} \
+        --window-position=${LOGO_X},${LOGO_Y} >/dev/null 2>&1 \
+      || open "$LOGO_URL" >/dev/null 2>&1 || true
+fi
+
 echo "  opened $REPO_NAME — first time? arrange the 4 quadrants once;"
 echo "  VSCode will restore the layout on every subsequent open."
+echo "  (a small murmurent logo window opens alongside — close it any time.)"

@@ -355,6 +355,17 @@ function CmdBar({ query, setQuery }) {
   return (
     <div className="cmdbar">
       {showLabTop && <LabSettingsModal onClose={() => setShowLabTop(false)} />}
+      {/* murmurent logo — the murmuration wordmark animation, served by the
+          dashboard at /murmuration (?logo = chrome-free, auto-play, muted). */}
+      <iframe
+        src="/murmuration?logo"
+        title="murmurent"
+        scrolling="no"
+        style={{
+          width:120, height:120, border:"none", borderRadius:8, flexShrink:0,
+          background:"#f4f1ea", boxShadow:"0 1px 5px rgba(32,20,54,0.15)",
+        }}
+      />
       <div className="home">Murmurent{window.DATA.version ? <small> v{window.DATA.version}</small> : null}</div>
       <div className="search">
         <span className="mono muted" style={{fontSize:12}}>›</span>
