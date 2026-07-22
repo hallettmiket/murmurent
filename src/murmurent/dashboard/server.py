@@ -2325,6 +2325,21 @@ def create_app() -> FastAPI:
         return _rs.pull_lab_mgmt().to_dict()
 
     # -----------------------------------------------------------------
+    # Murmurent install freshness — the "update available" banner (issue #41 pt 1)
+    # -----------------------------------------------------------------
+
+    @app.get("/api/murmurent/update-status")
+    def murmurent_update_status(
+        fetch: bool = Query(True, description="Hit the remote (default) or just "
+                            "compare against the last fetch (instant, no network)."),
+    ) -> dict:
+        """Is the local murmurent install behind upstream? Backs the dashboard's
+        'update available' banner. Notification-only — never pulls or restarts.
+        Best-effort: an offline remote yields ``ok=False``, not an error."""
+        from ..core import mm_update as _mm
+        return _mm.check_update(fetch=fetch).to_dict()
+
+    # -----------------------------------------------------------------
     # Personal vault (murmurent_vault) freshness + ff-only pull (issue #25 §3)
     # -----------------------------------------------------------------
 
