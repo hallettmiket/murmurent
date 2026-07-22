@@ -93,6 +93,41 @@ def test_adopt_refuses_path_outside_repos(world):
     assert "must live under" in res.json()["detail"]
 
 
+@pytest.mark.parametrize("name", [
+    "murmurent",                 # the commons clone
+    "murmurent_public",          # the onboarding hub
+    "murmurent_lab_mgmt_mh",     # a lab-mgmt governance clone
+    "murmurent_manuscript",      # the paper
+    "murmurent_vault",           # a personal-vault repo
+])
+def test_adopt_refuses_murmurent_infra_repo(world, name):
+    """murmurent's OWN repos are infrastructure, not projects — the adopt
+    endpoint must refuse them with a clear 4xx even when the clone is a valid
+    git tree under ~/repos (so the frontend can't be the only line of defense;
+    a direct API call or a stale dashboard is bounced too). Issue #55."""
+    clone = _make_git_clone(world["repos"], name)
+    client = TestClient(create_app())
+    res = client.post("/api/inventory/adopt", json={"clone_path": str(clone)})
+    assert res.status_code == 409, res.text
+    assert "infrastructure" in res.json()["detail"].lower()
+    # Nothing was written — no readiness marker, no CC bootstrap.
+    assert not (clone / ".murmurent.yaml").exists()
+    assert not (clone / ".claude").exists()
+
+
+def test_adopt_clone_core_refuses_infra_before_repos_root_check(world):
+    """The refusal lives at the core chokepoint (not only the HTTP layer), so
+    the CLI (``murmurent repo adopt``) and remote/SSH adopts are covered too.
+    It fires ahead of the repos-root / git-tree checks: an infra repo is refused
+    on its NAME regardless of where it sits. Issue #55."""
+    from murmurent.core import adopt as _adopt
+
+    with pytest.raises(_adopt.AdoptError) as ei:
+        _adopt.adopt_clone(clone_path="/anywhere/at/all/murmurent_lab_mgmt_bio")
+    assert ei.value.code == "infra_refused"
+    assert _adopt.ERROR_HTTP_STATUS[ei.value.code] == 409
+
+
 def test_adopt_refuses_non_git_dir(world):
     bare = world["repos"] / "not_a_repo"
     bare.mkdir()

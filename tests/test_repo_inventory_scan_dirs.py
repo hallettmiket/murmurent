@@ -88,6 +88,27 @@ def test_is_murmurent_infra_repo_classifies_own_repos():
         assert f(project) is False, project
 
 
+def test_repo_on_host_to_dict_carries_infra_flag():
+    """The JSX repo panel keys the make-ready button off ``is_murmurent_infra``
+    in each clone's serialized dict, so the field MUST survive to_dict() for
+    both infra and project repos (#55). A missing field reads as falsy in JS and
+    re-enables the button — exactly the stale-report failure mode."""
+    infra = repo_inventory.RepoOnHost(
+        host="local", path="/home/x/repos/murmurent_public", origin_url="",
+        has_marker=False, has_claude_dir=False, is_murmurent_ready=False,
+        is_murmurent_infra=repo_inventory.is_murmurent_infra_repo(
+            "/home/x/repos/murmurent_public"),
+    )
+    proj = repo_inventory.RepoOnHost(
+        host="local", path="/home/x/repos/dcis_imaging", origin_url="",
+        has_marker=False, has_claude_dir=False, is_murmurent_ready=False,
+        is_murmurent_infra=repo_inventory.is_murmurent_infra_repo(
+            "/home/x/repos/dcis_imaging"),
+    )
+    assert infra.to_dict()["is_murmurent_infra"] is True
+    assert proj.to_dict()["is_murmurent_infra"] is False
+
+
 def test_scan_surfaces_git_worktree_and_plain_folders(tmp_path):
     """The scan must not silently drop folders under a scan dir (#49): a normal
     git repo, a worktree (.git FILE), and a plain non-git folder all appear,

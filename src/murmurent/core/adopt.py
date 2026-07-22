@@ -36,6 +36,7 @@ from . import hosts as _hosts
 from . import remote as _remote
 from . import repo as _repo
 from . import repo_ready as _rr
+from .repo_inventory import is_murmurent_infra_repo
 
 # code → the HTTP status the dashboard endpoint responds with. Kept here
 # so the mapping can't drift from the codes adopt_clone() raises.
@@ -43,6 +44,7 @@ ERROR_HTTP_STATUS = {
     "host_not_found": 404,
     "bad_request": 400,
     "conflict": 409,
+    "infra_refused": 409,  # a murmurent-infra repo can never be "made ready" (#55)
     "bootstrap_failed": 422,
     "ssh_failed": 502,
     "internal": 500,
@@ -93,6 +95,14 @@ def adopt_clone(
 
     Raises :class:`AdoptError`; never touches HTTP.
     """
+    # murmurent's OWN repos (the commons clone ``murmurent`` + the
+    # ``murmurent_*`` family: lab_mgmt, vault, public, manuscript, …) are
+    # infrastructure, not project working repos — they must never be "made
+    # ready" (a repo can't adopt itself; a lab-mgmt clone is governance).
+    # Refuse here at the shared chokepoint so BOTH the CLI and every HTTP
+    # path (local + SSH) are covered, even against a direct API call or a
+    # stale dashboard whose button-hiding predates this guard (#55).
+    _refuse_if_infra(clone_path)
     if host and host != "local":
         return _adopt_remote(clone_path=clone_path, lab=lab,
                              agents=agents, host=host)
@@ -125,6 +135,21 @@ def adopt_clone(
     _raise_if_required_failed(probes)
     return AdoptOutcome(repo=clone.name, host="local",
                         clone_path=str(clone), probes=probes)
+
+
+def _refuse_if_infra(clone_path: str) -> None:
+    """Raise :class:`AdoptError` when ``clone_path`` names a murmurent-infra
+    repo. Classifies on the basename so it works identically for a local path,
+    an SSH-host path, or a bare repo name. See
+    :func:`repo_inventory.is_murmurent_infra_repo`."""
+    name = Path(str(clone_path or "")).name
+    if is_murmurent_infra_repo(name):
+        raise AdoptError(
+            f"{name!r} is murmurent infrastructure — not a project; it cannot "
+            "be made ready (a repo can't adopt itself; a lab-mgmt/vault/public "
+            "clone is governance, not a project).",
+            code="infra_refused",
+        )
 
 
 def _default_lab() -> str:
