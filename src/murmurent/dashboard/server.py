@@ -7915,6 +7915,20 @@ def create_app() -> FastAPI:
         for asset in ("hifi-data.jsx", "hifi-notebook.jsx", "hifi-app.jsx"):
             _register_static_alias(app, asset, STATIC_DIR / asset)
 
+        # The murmurent logo: the murmuration animation (assets/), served for the
+        # dashboard header widget (``<iframe src="/murmuration?logo">``) and for
+        # any VSCode / browser window that wants it. ``?logo`` renders it chrome-
+        # free (no intro veil / HUD / audio).
+        _MURMURATION = REPO_ROOT / "assets" / "murmurent_uniform_wordmark.html"
+
+        @app.get("/murmuration")
+        def murmuration():
+            from fastapi.responses import Response
+            if not _MURMURATION.is_file():
+                return Response(status_code=404)
+            return FileResponse(str(_MURMURATION), media_type="text/html",
+                                headers=_NO_CACHE)
+
         @app.get("/favicon.ico")
         def favicon():
             # 204 = "No Content" — body MUST be empty. Returning
