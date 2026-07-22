@@ -3743,7 +3743,7 @@ function NewProjectModal({ onClose }) {
           and adds the proposed members to MEMBERS.
         </p>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>name (snake_case)</label>
-        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. dcis_imaging_genomics"
+        <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. new_project"
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
 
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>slack channel (optional)</label>
@@ -3821,7 +3821,7 @@ function NewProjectModal({ onClose }) {
             </div>
             <input value={slackWorkspace}
                    onChange={e => setSlackWorkspace(e.target.value)}
-                   placeholder="e.g. mh  (or a dedicated shared workspace id)"
+                   placeholder="e.g. lab_ws  (or a dedicated shared workspace id)"
                    style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
           </>
         )}
@@ -4184,7 +4184,7 @@ function CatalogEntryForm({ entry, onClose }) {
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>title</label>
         <input value={title} onChange={e => setTitle(e.target.value)}
-               placeholder="DCIS bulk RNA-seq alignment"
+               placeholder="Bulk RNA-seq alignment"
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2}}/>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>kind</label>
         <select value={kind} onChange={e => setKind(e.target.value)}
@@ -4194,13 +4194,13 @@ function CatalogEntryForm({ entry, onClose }) {
           <option value="analysis">analysis</option>
         </select>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>contact (member who owns it)</label>
-        <input value={contact} onChange={e => setContact(e.target.value)} placeholder="@allie"
+        <input value={contact} onChange={e => setContact(e.target.value)} placeholder="@handle"
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)"}}/>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>turnaround (days, optional)</label>
         <input value={turnaround} onChange={e => setTurnaround(e.target.value)} placeholder="7"
                type="number" min="0" style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2, fontFamily:"var(--mono)", width:120}}/>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>prerequisites (comma-separated)</label>
-        <input value={prereqs} onChange={e => setPrereqs(e.target.value)} placeholder="GRCh38 reference, fastq files"
+        <input value={prereqs} onChange={e => setPrereqs(e.target.value)} placeholder="reference genome, input files"
                style={{padding:"6px 8px", border:"1px solid var(--rule-strong)", borderRadius:2}}/>
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase"}}>description</label>
         <textarea value={description} onChange={e => setDescription(e.target.value)}
@@ -5703,7 +5703,7 @@ function ReceptionistPanel({ inbound, span="c-12" }) {
     }
   };
   const onAccept = async (req) => {
-    const routed_to = window.prompt("Route to which member? (e.g. @allie)");
+    const routed_to = window.prompt("Route to which member? (e.g. @handle)");
     if (!routed_to || !routed_to.trim()) return;
     try { await postInboundAction(req.id, "accept", { routed_to: routed_to.trim() }); await refresh(); }
     catch (ex) { alert(ex.message || ex); }
@@ -6460,7 +6460,7 @@ function MemberProfileModal({ onClose }) {
               <div style={labelStyle}>official handle</div>
               <input style={inputStyle} value={form.official_handle}
                      onChange={update("official_handle")}
-                     placeholder="e.g. the_pit (your institutional netname)" />
+                     placeholder="e.g. jdoe (your institutional netname)" />
             </div>
             <div style={{flex:1}}>
               <div style={labelStyle}>murmurent handle</div>
@@ -7169,7 +7169,7 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
       <div style={labelStyle}>username on this machine</div>
       <input style={inputStyle} value={conn.remote_user}
              onChange={e => setConn(c => ({...c, remote_user: e.target.value}))}
-             placeholder="mth" />
+             placeholder="jdoe" />
 
       <div style={labelStyle}>Large file location</div>
       <input style={inputStyle} value={form.wigamig_base}
@@ -8184,10 +8184,10 @@ function LabSettingsModal({ onClose }) {
           </div>
           <div style={labelStyle}>display name</div>
           <input style={inputStyle} value={form.display_name} onChange={update("display_name")}
-                 placeholder="e.g. Hallett Lab" />
+                 placeholder="e.g. Example Lab" />
           <div style={labelStyle}>lab website</div>
           <input style={inputStyle} value={form.website} onChange={update("website")}
-                 placeholder="https://mikehallett.science" />
+                 placeholder="https://your-lab.example.edu" />
         </div>
 
         {/* 2 · Members with administrative privileges */}
