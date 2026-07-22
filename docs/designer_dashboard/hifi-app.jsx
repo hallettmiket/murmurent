@@ -233,6 +233,49 @@ function groupNoun() {
   return ((window.DATA.lab_settings || {}).kind === "core") ? "Core" : "Lab";
 }
 
+// Notification-only "murmurent update available" banner (issue #41 pt 1).
+// Checks whether this install (~/repos/murmurent) is behind upstream and, if so,
+// shows the exact pull command. It does NOT pull or restart — that one-click
+// auto-update is a tracked upgrade.
+function UpdateBanner() {
+  const [st, setSt] = useState(null);
+  const [dismissed, setDismissed] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/murmurent/update-status?fetch=1", { headers: { Accept: "application/json" } })
+      .then(r => r.json()).then(d => { if (alive) setSt(d); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  if (!st || !st.ok || st.behind <= 0 || dismissed) return null;
+  const diverged = !st.can_ff;
+  const cmd = "cd ~/repos/murmurent && git pull --ff-only && bash scripts/setup.sh";
+  return (
+    <div role="status" style={{
+      display:"flex", alignItems:"center", gap:10, flexWrap:"wrap",
+      padding:"8px 16px", fontSize:13,
+      background: diverged ? "rgba(198,40,40,0.09)" : "rgba(90,60,160,0.10)",
+      borderBottom:"1px solid var(--rule-strong)",
+    }}>
+      <span style={{fontWeight:600}}>
+        {diverged ? "⚠ Murmurent update available (local diverged)" : "⬆ Murmurent update available"}
+      </span>
+      <span className="muted">{st.behind} new commit{st.behind === 1 ? "" : "s"} upstream ({st.current}→{st.latest}).</span>
+      {diverged
+        ? <span className="muted">Your install has local changes — reconcile <code>~/repos/murmurent</code> manually first.</span>
+        : <>
+            <code className="mono" style={{fontSize:11, background:"var(--paper-2)",
+                 border:"1px solid var(--rule)", borderRadius:2, padding:"2px 6px"}}>{cmd}</code>
+            <button type="button" className="btn sm ghost"
+              onClick={() => { try { navigator.clipboard.writeText(cmd); } catch (_) {} }}>copy</button>
+            <span className="muted" style={{fontSize:11}}>then restart the dashboard.</span>
+          </>}
+      <button type="button" className="btn sm ghost" style={{marginLeft:"auto"}}
+        onClick={() => setDismissed(true)}>dismiss</button>
+    </div>
+  );
+}
+
 function TopBar() {
   const m = window.DATA.member || {};
   const ls = window.DATA.lab_settings || {};
@@ -8468,6 +8511,7 @@ function App() {
 
   return (
     <>
+      <UpdateBanner />
       <TopBar />
       <div className="app">
         <CmdBar query={query} setQuery={setQuery} />
