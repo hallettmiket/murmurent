@@ -2353,10 +2353,30 @@ def create_app() -> FastAPI:
                             "compare against the last fetch (instant, no network)."),
     ) -> dict:
         """Is the local murmurent install behind upstream? Backs the dashboard's
-        'update available' banner. Notification-only — never pulls or restarts.
+        'update available' banner. Read-only — never pulls or restarts.
         Best-effort: an offline remote yields ``ok=False``, not an error."""
         from ..core import mm_update as _mm
         return _mm.check_update(fetch=fetch).to_dict()
+
+    @app.post("/api/murmurent/update")
+    def murmurent_update() -> dict:
+        """One-click update: ``git pull --ff-only`` the murmurent install, then
+        restart the dashboard so the new code takes effect.
+
+        Only touches the murmurent CODE repo (``~/repos/murmurent``) — never
+        ~/.murmurent, the roster clone, or the data root (all outside the repo),
+        and ``--ff-only`` refuses to overwrite a diverged/dirty tree. The one
+        thing at risk is uncommitted local changes to murmurent's own code
+        ("your current build"), which the UI warns about before calling this."""
+        from ..core import mm_update as _mm
+        result = _mm.apply_update()
+        if result.get("restart"):
+            # Restart AFTER this response flushes: a 1s timer, then os.execv
+            # replaces the process with fresh code. The client polls /healthz
+            # and reloads once it's back.
+            import threading
+            threading.Timer(1.0, _mm.reexec).start()
+        return result
 
     # -----------------------------------------------------------------
     # Personal vault (murmurent_vault) freshness + ff-only pull (issue #25 §3)

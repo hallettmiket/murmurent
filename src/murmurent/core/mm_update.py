@@ -96,3 +96,58 @@ def check_update(*, fetch: bool = True) -> UpdateStatus:
                             current=current, latest=latest, detail=detail)
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
         return _na(f"update check failed: {exc}")
+
+
+def apply_update() -> dict:
+    """Fast-forward the local murmurent install to upstream. Does NOT restart —
+    the caller schedules that after the HTTP response flushes.
+
+    **Scope is deliberately narrow — this only updates code, never user data.**
+    It runs ``git pull --ff-only`` inside the murmurent repo (``~/repos/
+    murmurent``) and nothing else. User identity/profile/tokens/keys live in
+    ``~/.murmurent``, the roster in its own clone, and data under the data root —
+    all *outside* this repo, so a pull cannot reach them. ``--ff-only`` refuses
+    to overwrite: if local commits have diverged, or uncommitted changes would
+    conflict, it aborts and reports rather than clobbering. Untracked files (e.g.
+    a nested ``murmurent_lab_mgmt_*``) are never touched by git.
+
+    Returns ``{ok, pulled, restart, detail, from, to}`` — ``restart`` True only
+    when a fast-forward actually happened.
+    """
+    st = check_update(fetch=True)
+    base = {"pulled": False, "restart": False, "from": st.current, "to": st.latest}
+
+    if not st.is_git:
+        return {**base, "ok": False, "detail": "not a git checkout — nothing to update"}
+    if not st.ok:
+        return {**base, "ok": False, "detail": st.detail}
+    if st.behind == 0:
+        return {**base, "ok": True, "detail": "already up to date"}
+    if not st.can_ff:
+        # Never force over a diverged / dirty install — surface it instead.
+        return {**base, "ok": False,
+                "detail": "local has diverged from upstream — resolve manually; "
+                          "not pulling (your local commits are untouched)"}
+
+    try:
+        pull = _run_git(murmurent_repo_root(), "pull", "--ff-only")
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {**base, "ok": False, "detail": f"git pull failed: {exc}"}
+    if pull.returncode != 0:
+        # e.g. uncommitted changes that would be overwritten — git refused, safe.
+        err = (pull.stderr or pull.stdout or "git pull --ff-only failed").strip()
+        return {**base, "ok": False, "detail": err.splitlines()[-1][:200]}
+
+    return {**base, "ok": True, "pulled": True, "restart": True,
+            "detail": f"updated {st.current} → {st.latest}; restarting"}
+
+
+def reexec() -> None:
+    """Replace the running process with a fresh copy of itself so the just-pulled
+    code takes effect. Python's sockets are close-on-exec, so the old listening
+    socket is released and the new process re-binds the port. Preserves the exact
+    launch command (``sys.argv``) — port, ``--hifi``, etc."""
+    import os
+    import sys
+
+    os.execv(sys.argv[0], sys.argv)
