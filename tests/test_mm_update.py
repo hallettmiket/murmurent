@@ -28,7 +28,7 @@ def repo(monkeypatch, tmp_path):
 
 
 def _wire(monkeypatch, *, upstream_rc=0, upstream="origin/main", fetch_rc=0,
-          behind=0, is_ancestor_rc=0):
+          behind=0, is_ancestor_rc=0, pull_rc=0, pull_out=""):
     """Install a fake _run_git dispatching on the git subcommand."""
     def fake(root, *args):
         if args[:1] == ("rev-parse",) and args[-1] == "@{u}":
@@ -41,6 +41,8 @@ def _wire(monkeypatch, *, upstream_rc=0, upstream="origin/main", fetch_rc=0,
             return _cp(0, str(behind))
         if args[:1] == ("merge-base",):
             return _cp(is_ancestor_rc)
+        if args[:1] == ("pull",):
+            return _cp(pull_rc, pull_out)
         return _cp(0, "")
     monkeypatch.setattr(MM, "_run_git", fake)
 
@@ -93,3 +95,42 @@ def test_not_a_git_checkout(monkeypatch, tmp_path):
     monkeypatch.setattr(MM, "murmurent_repo_root", lambda: tmp_path / "plain")
     s = MM.check_update()
     assert s.is_git is False and s.behind == 0
+
+
+# ---- apply_update (git pull --ff-only, no restart here) ----------------------
+
+def test_apply_update_fast_forwards_and_signals_restart(repo, monkeypatch):
+    _wire(monkeypatch, behind=2, is_ancestor_rc=0, pull_rc=0)
+    out = MM.apply_update()
+    assert out["ok"] and out["pulled"] and out["restart"] is True
+    assert out["from"] == "abc1234" and out["to"] == "def5678"
+
+
+def test_apply_update_refuses_when_diverged(repo, monkeypatch):
+    # behind, but local is NOT an ancestor of upstream → never force.
+    _wire(monkeypatch, behind=1, is_ancestor_rc=1)
+    out = MM.apply_update()
+    assert out["ok"] is False and out["pulled"] is False and out["restart"] is False
+    assert "diverged" in out["detail"]
+
+
+def test_apply_update_already_current(repo, monkeypatch):
+    _wire(monkeypatch, behind=0)
+    out = MM.apply_update()
+    assert out["ok"] and out["restart"] is False
+    assert out["detail"] == "already up to date"
+
+
+def test_apply_update_pull_refused_surfaces_error(repo, monkeypatch):
+    # ff-able at check time, but git pull refuses (e.g. uncommitted changes).
+    _wire(monkeypatch, behind=1, is_ancestor_rc=0, pull_rc=1,
+          pull_out="error: Your local changes would be overwritten")
+    out = MM.apply_update()
+    assert out["ok"] is False and out["restart"] is False
+    assert "local changes" in out["detail"]
+
+
+def test_apply_update_not_a_git_checkout(monkeypatch, tmp_path):
+    monkeypatch.setattr(MM, "murmurent_repo_root", lambda: tmp_path / "plain")
+    out = MM.apply_update()
+    assert out["ok"] is False and out["restart"] is False
