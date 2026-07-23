@@ -29,8 +29,15 @@ def cmd_dashboard(
     hifi: bool = False,
     host: str = "127.0.0.1",
     port: int = 8770,
+    tunnel: str = "",
+    tunnel_port: int | None = None,
 ) -> int:
     """``murmurent dashboard`` — open Streamlit, print the snapshot, or print outstanding."""
+    # Tunnel mode: no local server at all — forward a remote machine's
+    # dashboard (bound to its own 127.0.0.1) to this laptop over SSH.
+    if tunnel:
+        return _launch_tunnel(target=tunnel, port=port, local_port=tunnel_port)
+
     identity = resolve_identity(allow_unknown=True)
     handle = identity.handle if identity.source != "unknown" else ""
 
@@ -110,6 +117,85 @@ def _launch_hifi(*, host: str, port: int) -> int:
         log_level="info",
         reload=False,
     )
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# SSH tunnel to a remote machine's dashboard (issue #80, remote-dashboard phase)
+# ---------------------------------------------------------------------------
+
+
+def resolve_tunnel_destination(target: str) -> str:
+    """Turn ``target`` into an ssh destination string.
+
+    If ``target`` names an ssh-kind host in ``~/.murmurent/hosts.yaml``,
+    its ``ssh_host`` (prefixed with ``remote_user@`` when set and not
+    already embedded) is used. A registry hit of kind ``local`` is an
+    error (there is nothing to tunnel to on this machine). Any name not
+    in the registry is passed to ssh verbatim, so plain ``you@host``
+    destinations and ``~/.ssh/config`` aliases keep working.
+    """
+    from ..core import hosts as _hosts
+
+    try:
+        entry = _hosts.resolve(target)
+    except _hosts.HostNotFound:
+        return target
+    if not entry.is_remote():
+        raise click.ClickException(
+            f"host {target!r} is this machine (kind: local) — nothing to "
+            f"tunnel to. Run `murmurent dashboard --hifi` instead."
+        )
+    dest = entry.ssh_host
+    if entry.remote_user and "@" not in dest:
+        dest = f"{entry.remote_user}@{dest}"
+    return dest
+
+
+def build_tunnel_argv(ssh_dest: str, *, remote_port: int, local_port: int) -> list[str]:
+    """Fixed-list ssh argv for the local port-forward (no shell involved)."""
+    return [
+        "ssh",
+        "-N",
+        "-L",
+        f"{local_port}:localhost:{remote_port}",
+        ssh_dest,
+    ]
+
+
+def _launch_tunnel(*, target: str, port: int, local_port: int | None) -> int:
+    """Forward ``localhost:<local_port>`` to ``target``'s dashboard port.
+
+    The remote dashboard stays bound to its own 127.0.0.1; the forward is
+    the only way in, which is the point. Blocks until interrupted.
+    """
+    if shutil.which("ssh") is None:
+        raise click.ClickException(
+            "ssh not found on PATH. Install an OpenSSH client to use "
+            "--tunnel (macOS/Linux ship one; on Windows enable the "
+            "'OpenSSH Client' optional feature)."
+        )
+    ssh_dest = resolve_tunnel_destination(target)
+    lport = local_port if local_port is not None else port
+    argv = build_tunnel_argv(ssh_dest, remote_port=port, local_port=lport)
+    click.echo(
+        f"Open http://localhost:{lport} on this machine — you're viewing "
+        f"{target}'s dashboard"
+    )
+    click.echo(f"  Forwarding via: {' '.join(argv)}")
+    click.echo("  Ctrl+C to stop.")
+    try:
+        rc = subprocess.call(argv)
+    except KeyboardInterrupt:
+        return 0
+    if rc == 130:  # ssh killed by the user's Ctrl+C — a clean stop
+        return 0
+    if rc != 0:
+        raise click.ClickException(
+            f"ssh exited with status {rc} (destination: {ssh_dest}). Check "
+            f"that the host is reachable and that `murmurent dashboard "
+            f"--hifi` is running there."
+        )
     return 0
 
 
