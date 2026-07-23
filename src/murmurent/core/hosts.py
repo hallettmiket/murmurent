@@ -224,7 +224,23 @@ def resolve(name: str, env: dict[str, str] | None = None) -> Host:
 
 
 def write(hosts: dict[str, Host], env: dict[str, str] | None = None) -> Path:
-    """Serialise ``hosts`` to ``hosts.yaml``. Creates parent dirs.
+    """Serialise ``hosts`` to ``hosts.yaml`` as a CONNECTION-ONLY registry.
+
+    Issue #80 (machine-config simplification): ``hosts.yaml`` is now a thin,
+    non-authoritative *connection + repo-location* registry. It records how to
+    reach a machine (``ssh_host`` / ``remote_user`` / ``mount_point``) and
+    where its git clones live (``project_root`` + ``scan_dirs``) — exactly what
+    the ``repo_inventory`` SSH scan + remote-deploy need — plus a
+    ``description``. It deliberately DROPS a machine's *configuration* params —
+    the data-root (``lab_vm_root``), personal vault (``vault_root``), lab vault
+    (``lab_vault_root``), and vault subfolders — because those differ per
+    machine and are edited ONLY on that machine's own dashboard via
+    ``machine.yaml``/``save_machine_settings`` (mirrored to the synced
+    ``<vault>/machines/*.yaml`` registry), never across machines from here.
+
+    Migration is graceful + non-destructive: legacy rows that still carry the
+    dropped config params are read back (see ``_coerce_host``) but omitted on
+    the next write. Connection rows themselves are never removed.
 
     The ``local`` entry is always retained (re-added if absent) so the
     registry is never empty after a write.
@@ -235,21 +251,13 @@ def write(hosts: dict[str, Host], env: dict[str, str] | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {"version": 1, "hosts": {}}
     for name, host in hosts.items():
+        # Connection + repo-location coordinates only. Deliberately omits the
+        # per-machine CONFIG params (lab_vm_root / vault_root / lab_vault_root /
+        # oracle|notebook|data subfolders) — those belong to machine.yaml.
         row: dict[str, Any] = {"kind": host.kind}
         if host.ssh_host:    row["ssh_host"]    = host.ssh_host
         if host.remote_user: row["remote_user"] = host.remote_user
         row["project_root"]  = host.project_root
-        row["lab_vm_root"]   = host.lab_vm_root
-        row["vault_root"]    = host.vault_root
-        # Personal-vault subfolders: only persist when they differ from the
-        # convention default, so existing hosts.yaml stays terse.
-        if host.oracle_subfolder and host.oracle_subfolder != "oracle":
-            row["oracle_subfolder"] = host.oracle_subfolder
-        if host.notebook_subfolder and host.notebook_subfolder != "lab-notebook":
-            row["notebook_subfolder"] = host.notebook_subfolder
-        if host.data_subfolder and host.data_subfolder != "murmurent_data":
-            row["data_subfolder"] = host.data_subfolder
-        if host.lab_vault_root: row["lab_vault_root"] = host.lab_vault_root
         if host.mount_point: row["mount_point"] = host.mount_point
         if host.description: row["description"] = host.description
         if host.scan_dirs:   row["scan_dirs"]   = list(host.scan_dirs)
@@ -327,32 +335,23 @@ def update_host(
     *,
     ssh_host: str | None = None,
     remote_user: str | None = None,
-    lab_vm_root: str | None = None,
-    vault_root: str | None = None,
-    oracle_subfolder: str | None = None,
-    notebook_subfolder: str | None = None,
-    data_subfolder: str | None = None,
-    lab_vault_root: str | None = None,
     description: str | None = None,
     scan_dirs: tuple[str, ...] | list[str] | None = None,
     env: dict[str, str] | None = None,
 ) -> Host:
-    """Update a registered host's editable fields, leaving the rest untouched.
+    """Update a registered host's **connection-only** fields (issue #80).
 
-    ``None`` means "don't change" for every field. The dashboard Machines
-    editor now edits the same field set as the Add form: connection
-    (``ssh_host``, ``remote_user``), ``lab_vm_root`` (Files root), the
-    PERSONAL vault (``vault_root`` + ``oracle_subfolder`` /
-    ``notebook_subfolder`` / ``data_subfolder``), the LAB vault clone
-    (``lab_vault_root``), ``description``, and ``scan_dirs`` (Repo locations).
+    ``None`` means "don't change". The Machines editor no longer configures a
+    foreign machine's data-root / vault / project paths — those are edited only
+    on that machine's own dashboard (``machine.yaml``). What survives here is
+    what reaching the machine needs: ``ssh_host`` + ``remote_user`` (connection)
+    plus ``description`` and ``scan_dirs`` (the repo-inventory SSH scan).
     ``name`` and ``kind`` are identity and are never changed here.
 
-    Blanking rules differ by field: ``ssh_host``, ``vault_root``, and the three
-    subfolders fall back to the current value when cleared (an ssh host must
-    keep a host; the vault + its subfolders keep their convention), while
-    ``remote_user``, ``lab_vault_root``, and ``description`` accept an empty
-    string as an explicit clear (a machine may genuinely have no lab-mgmt
-    clone).
+    Blanking rules: ``ssh_host`` falls back to the current value when cleared
+    (an ssh host must keep a host), while ``remote_user`` and ``description``
+    accept an empty string as an explicit clear. Any param-field kwargs an
+    older client sends are simply ignored — the registry never stores them.
     """
     registry = read(env)
     if name not in registry:
@@ -370,13 +369,7 @@ def update_host(
         kind=current.kind,
         ssh_host=_keep_if_blank(ssh_host, current.ssh_host),
         remote_user=_allow_clear(remote_user, current.remote_user),
-        project_root=current.project_root,
-        lab_vm_root=_keep_if_blank(lab_vm_root, current.lab_vm_root),
-        vault_root=_keep_if_blank(vault_root, current.vault_root),
-        oracle_subfolder=_keep_if_blank(oracle_subfolder, current.oracle_subfolder),
-        notebook_subfolder=_keep_if_blank(notebook_subfolder, current.notebook_subfolder),
-        data_subfolder=_keep_if_blank(data_subfolder, current.data_subfolder),
-        lab_vault_root=_allow_clear(lab_vault_root, current.lab_vault_root),
+        project_root=current.project_root,   # repo-location coordinate, preserved
         mount_point=current.mount_point,
         description=_allow_clear(description, current.description),
         scan_dirs=_coerce_scan_dirs(scan_dirs) if scan_dirs is not None

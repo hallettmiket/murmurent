@@ -221,23 +221,27 @@ def host_list_cmd() -> None:
 )
 @click.option("--remote-user", default="", help="Username on the remote host.")
 @click.option("--project-root", default="~/repos", show_default=True,
-              help="Where projects live on the remote host.")
-@click.option("--lab-vm-root", default="/data/lab_vm", show_default=True,
-              help="Where /data/lab_vm/{raw,refined} live on the remote host.")
-@click.option("--vault-root", default="~/Obsidian", show_default=True,
-              help="Where the user's Obsidian vault lives on the remote host.")
+              help="Where projects live on the remote host (first repo location).")
+@click.option("--scan-dir", "scan_dirs", multiple=True,
+              help="Repo location to scan on the host (repeatable). "
+                   "$HOME-relative or absolute.")
+@click.option("--lab-vm-root", default="", hidden=True,
+              help="DEPRECATED (#80): ignored — configure on the machine's own dashboard.")
+@click.option("--vault-root", default="", hidden=True,
+              help="DEPRECATED (#80): ignored — configure on the machine's own dashboard.")
 @click.option("--mount-point", default="",
               help="Optional SSHFS mount point on the laptop (for Obsidian).")
 @click.option("--description", default="", help="Free-form note for `host list`.")
 def host_add_cmd(
     name: str, ssh_host: str, remote_user: str,
-    project_root: str, lab_vm_root: str, vault_root: str,
+    project_root: str, scan_dirs: tuple[str, ...], lab_vm_root: str, vault_root: str,
     mount_point: str, description: str,
 ) -> None:
     from .commands import host_cmd as _host_cmd
     raise SystemExit(_host_cmd.cmd_add(
         name=name, ssh_host=ssh_host, remote_user=remote_user,
-        project_root=project_root, lab_vm_root=lab_vm_root, vault_root=vault_root,
+        project_root=project_root, scan_dirs=scan_dirs,
+        lab_vm_root=lab_vm_root, vault_root=vault_root,
         mount_point=mount_point, description=description,
     ))
 

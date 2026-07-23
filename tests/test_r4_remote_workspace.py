@@ -81,9 +81,11 @@ def test_post_host_duplicate_409(world):
     assert res2.status_code == 409
 
 
-def test_post_host_persists_vault_locations(world):
-    """Issue #25: the Add-machine form's personal-vault subfolders + lab-mgmt
-    clone path round-trip through POST /api/hosts → GET /api/hosts."""
+def test_post_host_ignores_vault_config_params(world):
+    """Issue #80: hosts.yaml is connection-only. The retired per-machine CONFIG
+    params (personal/lab vault paths + subfolders) sent to POST /api/hosts are
+    IGNORED — they never persist; the machine is configured on its own
+    dashboard via machine.yaml instead."""
     client = TestClient(create_app())
     res = client.post("/api/hosts", json={
         "name": "lab-server",
@@ -96,33 +98,31 @@ def test_post_host_persists_vault_locations(world):
     assert res.status_code == 200, res.text
     row = next(h for h in client.get("/api/hosts").json()["hosts"]
                if h["name"] == "lab-server")
-    assert row["vault_root"] == "/home/the_pi/murmurent_vault"
-    assert row["oracle_subfolder"] == "orc"
-    assert row["notebook_subfolder"] == "nb"
-    assert row["lab_vault_root"] == "/home/the_pi/murmurent_lab_mgmt_mh"
+    # Connection info survives; the config params fell back to defaults/empty.
+    assert row["ssh_host"] == "lab-server"
+    assert row["vault_root"] != "/home/the_pi/murmurent_vault"
+    assert row["lab_vault_root"] == ""
 
 
-def test_patch_host_edits_vault_locations(world):
-    """Issue #25: the remote-machine editor's PATCH updates both vaults'
-    per-machine locations."""
+def test_patch_host_ignores_vault_config_params(world):
+    """Issue #80: PATCH /api/hosts is connection-only — the retired vault CONFIG
+    fields are ignored, never persisted."""
     client = TestClient(create_app())
     client.post("/api/hosts", json={"name": "lab-server", "ssh_host": "lab-server"})
     res = client.patch("/api/hosts/lab-server", json={
+        "description": "compute node",
         "vault_root": "/srv/murmurent_vault",
         "oracle_subfolder": "oracle2",
         "notebook_subfolder": "notebook2",
         "lab_vault_root": "/srv/murmurent_lab_mgmt_mh",
     })
     assert res.status_code == 200, res.text
-    h = res.json()["host"]
-    assert h["vault_root"] == "/srv/murmurent_vault"
-    assert h["oracle_subfolder"] == "oracle2"
-    assert h["notebook_subfolder"] == "notebook2"
-    assert h["lab_vault_root"] == "/srv/murmurent_lab_mgmt_mh"
-    # Persisted: a fresh GET sees the same values.
     row = next(r for r in client.get("/api/hosts").json()["hosts"]
                if r["name"] == "lab-server")
-    assert row["lab_vault_root"] == "/srv/murmurent_lab_mgmt_mh"
+    # The connection-only edit landed; the config params did not.
+    assert row["description"] == "compute node"
+    assert row["lab_vault_root"] == ""
+    assert row["vault_root"] != "/srv/murmurent_vault"
 
 
 def test_post_host_local_is_re_derivable(world):

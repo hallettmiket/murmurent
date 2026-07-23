@@ -280,7 +280,8 @@ def test_plan_adopt_murmurent_scope_allowlists_folders(tmp_path):
     plan = VP.plan_adopt(v)                       # default scope = murmurent
     assert plan["scope"] == "murmurent"
     assert plan["tracked_folders"] == ["oracle", "lab-notebook", "maps-legends",
-                                       "murmurent_data", "agents", "agent_forks"]
+                                       "murmurent_data", "agents", "agent_forks",
+                                       "machines"]
     assert "health" in plan["kept_local_folders"]
     assert "/*" in plan["gitignore"] and "!/oracle/" in plan["gitignore"]
     # pure: nothing written
