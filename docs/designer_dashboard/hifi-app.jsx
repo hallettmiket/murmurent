@@ -388,12 +388,12 @@ function CmdBar({ query, setQuery }) {
           />
         </div>
         <div style={{
-          position:"absolute", top:7, right:9, fontSize:20, fontWeight:800,
+          position:"absolute", top:7, left:9, fontSize:20, fontWeight:800,
           color:"#4a1e70", letterSpacing:"0.2px", lineHeight:1,
           textShadow:"0 1px 2px rgba(244,241,234,0.92)", pointerEvents:"none",
         }}>Murmurent</div>
         {window.DATA.version ? <div style={{
-          position:"absolute", bottom:7, left:9, fontSize:11, fontWeight:600,
+          position:"absolute", bottom:7, right:9, fontSize:11, fontWeight:600,
           color:"#4a1e70", opacity:0.9, lineHeight:1, pointerEvents:"none",
           textShadow:"0 1px 2px rgba(244,241,234,0.92)",
         }}>v{window.DATA.version}</div> : null}
