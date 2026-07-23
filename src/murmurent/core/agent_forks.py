@@ -5,7 +5,9 @@ Author: Mike Hallett (with Claude Code)
 Date: 2026-07-20
 Input: The commons agents dir (``<murmurent-repo>/agents/``), the installed CC
        agents dir (``~/.claude/agents/``), and the fork home
-       (``~/.murmurent/agent_forks/`` — canonical copies + ``agent_forks.yaml``).
+       (``<vault>/agent_forks/`` when a personal vault is registered on this
+       machine, else the legacy ``~/.murmurent/agent_forks/`` — canonical
+       copies + ``agent_forks.yaml``).
 Output: ``AgentStatus`` records + fork/unfork side effects.
 
 Design
@@ -29,6 +31,17 @@ both indicators:
 
   * upstream-changed  = sha256(current commons file) != source_sha
   * locally-modified  = sha256(local working copy)   != source_sha
+
+Multi-machine sync (issue #80)
+------------------------------
+When a personal vault is registered on this machine, the fork home is
+``<vault>/agent_forks/`` — an allowlist-tracked vault folder — so the canonical
+copies + manifest ride ``murmurent vault sync`` to the member's GitHub and back
+onto every other machine. ``migrate_legacy_forks()`` moves an existing
+``~/.murmurent/agent_forks/`` into the vault once (idempotent, non-destructive);
+``murmurent agent relink`` re-materialises the working copies after a vault
+pull on a second machine. Without a registered vault, the legacy
+``~/.murmurent/agent_forks/`` home keeps working unchanged.
 """
 
 from __future__ import annotations
@@ -46,6 +59,9 @@ from .repo import murmurent_repo_root
 
 FORKS_DIRNAME = "agent_forks"
 MANIFEST_FILENAME = "agent_forks.yaml"
+
+#: Test/override pin for the fork home (mirrors ``MURMURENT_CC_AGENTS_DIR``).
+ENV_FORKS_DIR = "MURMURENT_AGENT_FORKS_DIR"
 
 
 class AgentForkError(RuntimeError):
@@ -78,13 +94,40 @@ def _wig_home() -> Path:
     return Path(os.environ.get("MURMURENT_HOME", str(Path.home() / ".murmurent")))
 
 
-def forks_dir() -> Path:
-    """The canonical, git-trackable fork home (``~/.murmurent/agent_forks``)."""
+def legacy_forks_dir() -> Path:
+    """The pre-#80 fork home (``~/.murmurent/agent_forks``) — machine-local,
+    so a fork made here never reached the member's other machines."""
     return _wig_home() / FORKS_DIRNAME
 
 
+def forks_dir() -> Path:
+    """The canonical, git-trackable fork home.
+
+    Resolution order:
+
+    1. ``$MURMURENT_AGENT_FORKS_DIR`` (tests / unusual installs),
+    2. ``<vault>/agent_forks/`` when a personal vault is registered on this
+       machine (``machine.yaml``) — the fork copies + manifest then ride
+       ``murmurent vault sync`` across the member's machines (issue #80),
+    3. the legacy ``~/.murmurent/agent_forks/`` (no vault → single-machine
+       behaviour, unchanged).
+    """
+    pin = os.environ.get(ENV_FORKS_DIR, "").strip()
+    if pin:
+        return Path(pin).expanduser()
+    try:
+        from . import vault_sync as _vs  # deferred: optional dashboard deps
+
+        root = _vs.personal_vault_root()
+    except Exception:  # noqa: BLE001 — unresolvable vault → legacy home
+        root = None
+    if root is not None:
+        return Path(root) / FORKS_DIRNAME
+    return legacy_forks_dir()
+
+
 def manifest_path() -> Path:
-    """The fork provenance manifest (``~/.murmurent/agent_forks/agent_forks.yaml``)."""
+    """The fork provenance manifest (``<forks_dir>/agent_forks.yaml``)."""
     return forks_dir() / MANIFEST_FILENAME
 
 
@@ -329,3 +372,73 @@ def unfork_agent(name: str, *, force: bool = False) -> Path:
         del manifest["forks"][name]
         save_manifest(manifest)
     return dest
+
+
+# ---------------------------------------------------------------------------
+# legacy-home migration (issue #80: forks ride the vault across machines)
+# ---------------------------------------------------------------------------
+
+
+def migrate_legacy_forks() -> dict:
+    """One-time move of ``~/.murmurent/agent_forks/`` into the vault fork home.
+
+    Idempotent and non-destructive:
+
+    * no vault registered (``forks_dir()`` IS the legacy dir) → no-op;
+    * files already present in the vault home are never overwritten (skipped);
+    * the member's live working copy wins: if ``~/.claude/agents/<name>.md``
+      diverged from the legacy canonical (the copy-fallback install case), its
+      bytes become the vault canonical before re-linking;
+    * the legacy dir is kept on disk, renamed to ``agent_forks.migrated`` as a
+      backup (left untouched if that name already exists).
+
+    Returns a summary dict (``migrated``, ``copied``, ``skipped``,
+    ``relinked``, ``backup``, ``detail``).
+    """
+    legacy = legacy_forks_dir()
+    target = forks_dir()
+    out: dict = {"migrated": False, "from": str(legacy), "to": str(target),
+                 "copied": [], "skipped": [], "relinked": [], "backup": "",
+                 "detail": ""}
+    if target == legacy:
+        out["detail"] = "no personal vault registered — fork home unchanged"
+        return out
+    if not legacy.is_dir() or not any(legacy.iterdir()):
+        out["detail"] = "no legacy fork home — nothing to migrate"
+        return out
+
+    target.mkdir(parents=True, exist_ok=True)
+    for src in sorted(p for p in legacy.iterdir() if p.is_file()):
+        dst = target / src.name
+        if dst.exists():
+            out["skipped"].append(src.name)  # vault copy wins — never clobber
+            continue
+        dst.write_bytes(src.read_bytes())
+        out["copied"].append(src.name)
+
+    # Re-point the installed working copies at the migrated canonicals so an
+    # edit keeps flowing into the vault (hardlink; plain copy cross-device).
+    for name in sorted(load_manifest()["forks"]):
+        canonical = target / f"{name}.md"
+        if not canonical.is_file():
+            continue
+        dest = installed_agents_dir() / f"{name}.md"
+        if dest.exists() and not dest.is_symlink() \
+                and dest.read_bytes() != canonical.read_bytes():
+            # A copy-fallback working copy carries edits the legacy canonical
+            # never saw — the member's live copy is the truth.
+            canonical.write_bytes(dest.read_bytes())
+        _install_working_copy(canonical, dest)
+        out["relinked"].append(name)
+
+    backup = legacy.with_name(legacy.name + ".migrated")
+    if not backup.exists():
+        try:
+            legacy.rename(backup)
+            out["backup"] = str(backup)
+        except OSError:
+            pass  # copy already landed; a stubborn legacy dir is harmless
+    out["migrated"] = True
+    out["detail"] = (f"moved {len(out['copied'])} file(s) into {target} "
+                     f"({len(out['skipped'])} already there)")
+    return out

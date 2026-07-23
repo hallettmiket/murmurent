@@ -2,7 +2,9 @@
 
 Pins the load-bearing invariants:
   * a fork is a NON-symlink real file in ~/.claude/agents/ (so setup.sh preserves it)
-  * the canonical copy + manifest live under ~/.murmurent/agent_forks/ (git-trackable)
+  * the canonical copy + manifest live in the fork home — here the legacy
+    ~/.murmurent/agent_forks/ (no vault registered in this fixture; vault-backed
+    resolution is covered in test_agent_sync.py)
   * drift keys on the fork-time commons hash: upstream-changed vs locally-modified
   * unfork restores the commons symlink and drops the manifest entry
 """

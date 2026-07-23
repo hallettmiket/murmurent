@@ -358,8 +358,10 @@ class AgentRow(BaseModel):
 
     ``origin`` splits the two dashboard sections: ``commons`` agents ship with
     murmurent and are in every member's environment; ``personal`` agents are
-    member-created/forked, live in the member's own ``~/.murmurent/agent_forks``
-    (git-trackable → their GitHub), and appear only in their village.
+    member-created/forked, live in the member's own vault (``agents/`` +
+    ``agent_forks/``, synced to their GitHub and their other machines via
+    ``murmurent vault sync``; legacy ``~/.murmurent/agent_forks`` when no vault
+    is registered), and appear only in their village.
     ``category`` sub-groups the commons agents (member / administrative /
     choreography-support). ``freeze`` is the orthogonal editability flag.
     """
