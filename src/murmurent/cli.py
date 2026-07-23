@@ -1146,6 +1146,21 @@ def breach_cmd(project_name: str, description: str) -> None:
 )
 @click.option("--host", default="127.0.0.1", show_default=True, help="Hi-fi server host.")
 @click.option("--port", default=8770, show_default=True, type=int, help="Hi-fi server port.")
+@click.option(
+    "--tunnel",
+    default="",
+    metavar="HOST",
+    help="Don't start a server; SSH port-forward HOST's dashboard to this "
+    "machine (HOST = a name from `murmurent host list` or a literal ssh "
+    "destination like you@host).",
+)
+@click.option(
+    "--tunnel-port",
+    default=None,
+    type=int,
+    metavar="PORT",
+    help="Local port for --tunnel if the default (--port, 8770) is taken.",
+)
 def dashboard_cmd(
     pi_view: bool,
     snapshot: bool,
@@ -1153,6 +1168,8 @@ def dashboard_cmd(
     hifi: bool,
     host: str,
     port: int,
+    tunnel: str,
+    tunnel_port: int | None,
 ) -> None:
     dashboard_impl.cmd_dashboard(
         pi_view=pi_view,
@@ -1161,6 +1178,8 @@ def dashboard_cmd(
         hifi=hifi,
         host=host,
         port=port,
+        tunnel=tunnel,
+        tunnel_port=tunnel_port,
     )
 
 
