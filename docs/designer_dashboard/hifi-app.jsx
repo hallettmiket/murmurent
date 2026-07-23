@@ -5978,16 +5978,34 @@ function PersonalOraclePanel({ data, span="c-4" }) {
   );
 }
 
-// A deterministic, vivid colour per agent name — same agent always gets the same
-// hue, so the live feed is scannable at a glance.
-const AGENT_PALETTE = [
-  "#c0392b", "#d35400", "#b7791f", "#2e7d32", "#0b7285", "#1565c0",
-  "#5b3a91", "#8e2f6b", "#00838f", "#4e342e", "#37474f", "#6a1b9a",
-];
+// A deterministic, vivid colour per agent name — same agent always gets the
+// same hue, so the live feed is scannable at a glance. The commons agents get
+// hand-picked hues spread across the wheel (the old hash-into-a-12-colour
+// palette collided: bookworm + blacksmith + lab_oracle all landed on
+// near-identical teals). All colours are dark enough that the white chip
+// text stays readable.
+const AGENT_COLOURS = {
+  adversary:      "#b91c1c", // red
+  artist:         "#c2410c", // orange
+  blacksmith:     "#a16207", // gold
+  cable_guy:      "#4d7c0f", // olive
+  conscience:     "#15803d", // green
+  lawyer:         "#0f766e", // teal
+  receptionist:   "#0284c7", // sky
+  bookworm:       "#1e40af", // indigo
+  oracle:         "#6d28d9", // violet
+  lab_oracle:     "#a21caf", // fuchsia
+  judge:          "#be185d", // magenta
+  registrar:      "#78350f", // brown
+  security_guard: "#475569", // slate
+};
 function agentColour(name) {
+  if (AGENT_COLOURS[name]) return AGENT_COLOURS[name];
+  // Unknown agents: golden-angle hue walk off the name hash, so any two
+  // distinct names land far apart on the wheel instead of sharing a bucket.
   let h = 0;
   for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return AGENT_PALETTE[h % AGENT_PALETTE.length];
+  return "hsl(" + Math.round((h * 137.508) % 360) + ", 62%, 34%)";
 }
 
 // Short day label for an agent-activity entry: "today" / "yesterday" /
