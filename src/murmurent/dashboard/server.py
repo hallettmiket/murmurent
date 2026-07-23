@@ -185,12 +185,44 @@ class MachineSettingsBody(BaseModel):
 
 
 class NewPersonalAgentBody(BaseModel):
-    """JSON body for ``POST /api/agents/new`` — create a personal agent (#38 item 3)."""
+    """JSON body for ``POST /api/agents/new`` — create a personal agent.
+
+    Only ``name`` + ``description`` (the one-line role) are load-bearing; the rest
+    feed the richer DEFINE wizard (issue #84 item 2) and default sensibly, so an
+    old caller sending just name+description+model+tools still works unchanged.
+    """
 
     name: str
     description: str = ""
     model: str | None = None
     tools: list[str] = []
+    # -- richer DEFINE wizard fields (all optional, all default) ---------------
+    responsibilities: list[str] | str | None = None
+    non_goals: str | None = None
+    denied_tools: list[str] = []
+    persona: str | None = None
+    output_format: str | None = None
+    guardrails: str | None = None
+    example: str | None = None
+    verdict: str | None = None
+
+
+class AgentEditBody(BaseModel):
+    """JSON body for ``POST /api/agent_edit/{name}`` — modify an editable agent
+    (issue #84 item 3). ``name``/``category``/``freeze`` are locked server-side."""
+
+    role: str | None = None
+    responsibilities: list[str] | str | None = None
+    non_goals: str | None = None
+    required_tools: list[str] = []
+    denied_tools: list[str] = []
+    persona: str | None = None
+    output_format: str | None = None
+    guardrails: str | None = None
+    example: str | None = None
+    verdict: str | None = None
+    model: str | None = None
+    allow_warn: bool = True
 
 
 class NewChoreographyBody(BaseModel):
@@ -6380,10 +6412,60 @@ def create_app() -> FastAPI:
             path = _pa.create_personal_agent(
                 body.name, body.description, model=body.model,
                 tools=[t for t in (body.tools or []) if t.strip()],
+                responsibilities=body.responsibilities,
+                non_goals=body.non_goals,
+                denied_tools=[t for t in (body.denied_tools or []) if t.strip()],
+                persona=body.persona,
+                output_format=body.output_format,
+                guardrails=body.guardrails,
+                example=body.example,
+                verdict=body.verdict,
             )
         except _pa.PersonalAgentError as exc:
             raise HTTPException(status_code=422, detail=str(exc))
         return {"ok": True, "name": body.name, "path": str(path)}
+
+    @app.get("/api/agent_edit/{name}")
+    def agent_edit_context(name: str) -> dict:
+        """MODIFY (issue #84 item 3): what the wizard needs to open — the
+        editability gate, current field values to pre-fill, the locked-field
+        list, and the diff-vs-commons pane. Frozen / guardian agents come back
+        ``editable: False`` with a member-facing reason."""
+        from ..core import agent_edit as _ae
+
+        try:
+            return _ae.edit_context(name)
+        except _ae.AgentEditError as exc:
+            raise HTTPException(status_code=404, detail=str(exc))
+
+    @app.post("/api/agent_edit/{name}")
+    def agent_edit_save(name: str, body: AgentEditBody) -> dict:
+        """MODIFY save: fork-on-first-edit for a commons agent (lands in the
+        vault-tracked ``agent_forks/``), or edit a personal agent in place; runs
+        the item-8 save-time integrity check first — a hard regression is refused
+        (409), a frozen / guardian agent is refused up front (403)."""
+        from ..core import agent_edit as _ae
+
+        try:
+            return _ae.save_edit(
+                name,
+                role=body.role,
+                responsibilities=body.responsibilities,
+                non_goals=body.non_goals,
+                required_tools=[t for t in (body.required_tools or []) if t.strip()],
+                denied_tools=[t for t in (body.denied_tools or []) if t.strip()],
+                persona=body.persona,
+                output_format=body.output_format,
+                guardrails=body.guardrails,
+                example=body.example,
+                verdict=body.verdict,
+                model=body.model,
+                allow_warn=body.allow_warn,
+            )
+        except _ae.AgentNotEditableError as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+        except _ae.AgentEditError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
 
     # -- Contributions + choreographies (#38 Phases B/C) -------------------------
 

@@ -1051,6 +1051,44 @@ def _risk_grep(name: str, body: str, *, guardian: bool, handle: str) -> Finding 
                notes="ambiguous (weak match only)" if not strong else "")
 
 
+def assess_agent_edit(name: str, proposed_text: str, *,
+                      handle: str = "") -> list[Finding]:
+    """Save-time integrity check for a MODIFY edit (issue #84 item 3).
+
+    Reuses the exact item-8 machinery ``check_agent_integrity`` runs at audit
+    time — :func:`_diff_fork` (guardrail weakening, tool widening, safety-marker
+    removal, freeze/category/model tamper) plus the body :func:`_risk_grep` — but
+    against a *proposed* agent text rather than a file already on disk, so the
+    dashboard can warn (or block on a hard regression) before the edit is written.
+
+    When ``name`` has no commons origin (a net-new personal agent), only the risk
+    grep applies — there is nothing to diff against. Returns the findings; the
+    caller decides: any ``block``-severity finding is a hard regression that
+    should refuse the save, ``warn`` findings are surfaced but allowed.
+    """
+    commons_path = _af.commons_agent_path(name)
+    commons_meta: dict | None = None
+    commons_body = ""
+    if commons_path.is_file():
+        try:
+            commons_meta, commons_body = _parse_agent(
+                commons_path.read_text(encoding="utf-8"))
+        except OSError:
+            commons_meta, commons_body = None, ""
+
+    new_meta, new_body = _parse_agent(proposed_text)
+    guardian = _is_guardian(name, commons_meta)
+
+    out: list[Finding] = []
+    if commons_meta is not None:
+        out += _diff_fork(name, new_meta, new_body, commons_meta, commons_body,
+                          guardian=guardian, handle=handle or None)
+    rg = _risk_grep(name, new_body, guardian=guardian, handle=handle or None)
+    if rg:
+        out.append(rg)
+    return out
+
+
 def check_agent_integrity(handle: str, env: dict | None) -> list[Finding]:
     """Item 8 (deterministic half). Classify every installed CC agent and, for
     forks / untracked overrides, diff them against the commons origin. Read-only:
