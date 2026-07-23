@@ -2952,6 +2952,15 @@ async function postVaultRefresh() {
   if (!res.ok) throw new Error("HTTP " + res.status);
   return res.json();
 }
+// One-click "Sync vault" for THIS machine (issue #80 Wave 3): push local edits
+// then ff-pull what other machines pushed. Returns {pushed, pulled, diverged,
+// message, as_of}. Never auto-merges: diverged=true means "reconcile on the
+// other machine first". Never a 5xx.
+async function postVaultSync() {
+  const res = await fetch("/api/vault/sync", { method: "POST", headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
 // Colour + label for a member's certificate standing (from PeerRow.cert).
 const CERT_TONE = { valid:"green", uncertified:"red", revoked:"red", expired:"amber", mismatch:"amber" };
 const CERT_LABEL = { valid:"✓ id", uncertified:"no cert", revoked:"revoked", expired:"expired", mismatch:"mismatch" };
@@ -7164,6 +7173,81 @@ function MachineCard({ machine, isCurrent, onEditClick, onRemove, onScanDirsSave
   );
 }
 
+// One-click "Sync vault" affordance for THIS machine (issue #80 Wave 3, Part A).
+// Push local vault edits, then ff-pull what other machines pushed. Surfaces the
+// "as of <date>" freshness stamp, and — crucially — turns a --ff-only refusal
+// into a calm, non-alarming "vault diverged, reconcile there" banner rather
+// than an error. Never auto-merges or forces. Degrades to a plain notice when
+// no personal vault is adopted on this machine.
+function VaultSyncControl({ vaultPath }) {
+  const hasVault = vaultPath && String(vaultPath).trim() &&
+                   String(vaultPath).trim().toLowerCase() !== "na";
+  const [busy, setBusy] = useState(false);
+  const [asOf, setAsOf] = useState("");
+  const [result, setResult] = useState(null);   // {pushed, pulled, diverged, message, as_of}
+
+  useEffect(() => {
+    if (!hasVault) return;
+    getVaultInfo().then(v => setAsOf(v && v.as_of ? v.as_of : "")).catch(() => {});
+  }, [hasVault, vaultPath]);
+
+  if (!hasVault) {
+    return (
+      <div style={{marginTop:8, fontSize:11, color:"var(--muted)"}}>
+        No personal vault on this machine — nothing to sync. Set a vault path above (or run
+        {" "}<code className="mono">murmurent vault init</code>) to enable one-click sync.
+      </div>
+    );
+  }
+
+  const sync = async () => {
+    setBusy(true); setResult(null);
+    try {
+      const r = await postVaultSync();
+      setResult(r);
+      if (r && r.as_of) setAsOf(r.as_of);
+    } catch (ex) {
+      setResult({ diverged:false, pushed:false, pulled:false,
+                  message:String(ex.message || ex) });
+    } finally { setBusy(false); }
+  };
+
+  const diverged = result && result.diverged;
+  const stamp = (result && result.as_of) || asOf;
+
+  return (
+    <div style={{marginTop:8}}>
+      <div className="row" style={{gap:10, alignItems:"baseline"}}>
+        <button type="button" className="btn sm" onClick={sync} disabled={busy}>
+          {busy ? "syncing…" : "⇅ Sync vault"}
+        </button>
+        <span style={{fontSize:11, color:"var(--muted)"}}>
+          push local edits, then ff-pull other machines
+          {stamp && <span title={"last commit " + stamp}>{" · as of " + stamp.slice(0, 10)}</span>}
+        </span>
+      </div>
+      {diverged && (
+        // Non-alarming amber (not red): this is expected when you edit two
+        // machines without pushing. We NEVER auto-merge; the fix is on the
+        // other machine.
+        <div style={{
+          marginTop:8, padding:"8px 10px", borderRadius:2,
+          background:"rgba(214,140,40,0.10)", border:"1px solid var(--tiger)",
+          fontSize:12, color:"var(--ink)",
+        }}>
+          <strong>Vault diverged</strong> — you have unsynced edits on another machine.
+          Reconcile there (push), then sync here. Murmurent will not auto-merge or force.
+        </div>
+      )}
+      {result && !diverged && (
+        <div style={{marginTop:6, fontSize:11, color:"var(--muted)", fontFamily:"var(--mono)"}}>
+          {result.message}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ThisMachineEditor({ initial, onSaved, onCancel }) {
   const [form, setForm] = useState({
     machine_name:        initial.machine_name        || "",
@@ -7314,6 +7398,9 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
           <div>lab-notebook → {_joinPath(form.obsidian_vault_path, form.notebook_subfolder || "lab-notebook")}</div>
         </div>
       )}
+      {/* One-click sync + divergence banner (issue #80 Wave 3). Reads the live
+          vault path from the form so it reflects an unsaved edit. */}
+      <VaultSyncControl vaultPath={form.obsidian_vault_path} />
 
       {/* Lab (group) vault — read-only here. It IS the lab-mgmt clone
           (murmurent_lab_mgmt_<lab>); its location is managed at install /

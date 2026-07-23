@@ -263,6 +263,63 @@ def _ensure_dir(path: Path, *, label: str, required: bool) -> Probe:
         )
 
 
+#: Sensitivity tiers treated as tier-3 for residency purposes. Today only
+#: ``clinical`` (the top of ``cert_projects.VALID_SENSITIVITY_TIERS``); kept as
+#: a set so a future "restricted-large" class can join without touching callers.
+TIER3_SENSITIVITIES: frozenset[str] = frozenset({"clinical"})
+
+
+def probe_tier3_residency(
+    *,
+    sensitivity: str | None,
+    role: str,
+    project: str = "",
+    data_root: str | None = None,
+) -> Probe:
+    """Residency policy: tier-3 (clinical) data must never live on a laptop.
+
+    Large / tier-3 data is server-resident and *reached* over the network
+    (SSH / sshfs / Remote-SSH), never *replicated* onto a portable device
+    (``rules/data-storage.md`` → "Data tiering & residency"). This probe is the
+    machine-role gate on binding a project's data root:
+
+    - ``role == "laptop"`` **and** the project is tier-3 (``clinical``) →
+      ``fail`` (``required=True``) — the manifest write is refused. The message
+      names the fix (reach it over SSH, don't replicate it here).
+    - a ``host`` / server → ``ok`` (the data root's proper home).
+    - any standard / restricted tier → ``ok`` on any machine (non-blocking; a
+      laptop may hold small derived tier-1 outputs for offline work).
+
+    Pure decision function: it inspects only ``sensitivity`` + ``role`` (both
+    supplied by the caller — role from :func:`machine_registry.machine_kind`,
+    sensitivity from :class:`cert_projects.CertProject`), so it is trivially
+    unit-testable and never itself touches git, the network, or the disk.
+    """
+    tier = str(sensitivity or "standard").strip().lower() or "standard"
+    who = f" for project {project!r}" if project else ""
+    if tier not in TIER3_SENSITIVITIES:
+        return Probe(
+            name="data residency", status="ok",
+            detail=f"{tier} tier{who} — no residency restriction; may live on this machine.",
+            required=False,
+        )
+    where = f" ({data_root})" if data_root else ""
+    if role == "laptop":
+        return Probe(
+            name="data residency", status="fail",
+            detail=(
+                f"clinical/tier-3 data must stay on a server; this machine is a "
+                f"laptop{where} — reach it over SSH, don't replicate it to a laptop."
+            ),
+            required=True,
+        )
+    return Probe(
+        name="data residency", status="ok",
+        detail=f"clinical/tier-3 data{who} on a host/server{where} — allowed (server-resident).",
+        required=False,
+    )
+
+
 def overall_status(probes: list[Probe]) -> str:
     """Roll-up: ``fail`` if any required probe failed, else ``warn`` if
     any probe is warn/fail, else ``ok``.

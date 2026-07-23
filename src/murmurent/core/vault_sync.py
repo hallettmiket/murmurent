@@ -252,6 +252,21 @@ def vault_info() -> VaultSyncResult:
     )
 
 
+def is_divergence(detail: str) -> bool:
+    """True when a failed ff-only pull failed *because the branches diverged*.
+
+    ``git pull --ff-only`` refuses with "Not possible to fast-forward,
+    aborting." (or "…have diverged…") precisely in the two-machine case: you
+    committed on machine A, committed on machine B, and neither pushed first.
+    That is the one failure the dashboard turns into a calm "reconcile there,
+    then sync here" banner rather than a generic error — every other pull
+    failure (no network, auth, timeout) is transient and retryable. Matching on
+    git's own wording keeps this a pure string check with no extra git call.
+    """
+    low = (detail or "").lower()
+    return "fast-forward" in low or "fast forward" in low or "diverge" in low
+
+
 def pull_personal_vault() -> VaultSyncResult:
     """Fast-forward the personal-vault clone from its remote.
 
@@ -299,5 +314,5 @@ def pull_personal_vault() -> VaultSyncResult:
 
 __all__ = [
     "CommitResult", "VaultSyncResult", "personal_vault_root",
-    "commit_and_push", "vault_info", "pull_personal_vault",
+    "commit_and_push", "vault_info", "pull_personal_vault", "is_divergence",
 ]
