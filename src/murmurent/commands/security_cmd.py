@@ -198,6 +198,96 @@ def cmd_audit_me(*, json_out: bool = False) -> int:
     return 1 if report.counts()["block"] else 0
 
 
+def _render_secret_hits(hits, scope_desc: str) -> None:
+    """Render redacted secret hits grouped by file, headline-first."""
+    from ..core.secret_scan import SEVERITY_BLOCK, SEVERITY_WARN
+
+    console = Console()
+    n_block = sum(1 for h in hits if h.severity == SEVERITY_BLOCK)
+    n_warn = sum(1 for h in hits if h.severity == SEVERITY_WARN)
+
+    # Headline-first (rules/headline_first.md).
+    if n_block:
+        console.print(
+            f"[bold red]BLOCKED[/] — {n_block} block-severity secret(s) in "
+            f"{scope_desc}; do NOT push.\n"
+        )
+    elif n_warn:
+        console.print(
+            f"[bold yellow]Warnings[/] — {n_warn} secret-looking value(s) in "
+            f"{scope_desc}; review before pushing.\n"
+        )
+    else:
+        console.print(f"[bold green]Clear[/] — no secrets detected in {scope_desc}.\n")
+        return
+
+    color = {SEVERITY_BLOCK: "red", SEVERITY_WARN: "yellow"}
+    by_file: dict[str, list] = {}
+    for h in hits:
+        by_file.setdefault(h.path, []).append(h)
+    for path in sorted(by_file):
+        console.print(f"[bold]{path}[/]")
+        table = Table(show_lines=False)
+        table.add_column("sev")
+        table.add_column("line", justify="right")
+        table.add_column("rule", style="cyan")
+        table.add_column("redacted")
+        table.add_column("hint", style="dim", overflow="fold")
+        for h in sorted(by_file[path], key=lambda x: x.line):
+            c = color.get(h.severity, "white")
+            table.add_row(f"[{c}]{h.severity}[/]", str(h.line), h.rule,
+                          h.redacted, h.hint)
+        console.print(table)
+        console.print()
+
+
+def cmd_secrets_scan(*, staged: bool = True, tracked: bool = False,
+                     paths: tuple[str, ...] = (), json_out: bool = False,
+                     strict: bool = False, repo_root: str | None = None) -> int:
+    """Deterministic secret-CONTENT scan.
+
+    Exit-code contract (this is what the ``murmurent-push`` skill gates on):
+
+    - **2** — at least one ``block``-severity hit (high-confidence secret).
+      Never push.
+    - **1** — only ``warn`` hits AND ``--strict`` was given.
+    - **0** — clean, or warn-only without ``--strict``.
+    """
+    from ..core import secret_scan as _ss
+
+    root = repo_root or "."
+    if paths:
+        hits = _ss.scan_paths(list(paths))
+        scope = f"{len(paths)} path(s)"
+    elif tracked:
+        tracked_paths = _ss._git(root, ["ls-files", "-z"]).split("\0")
+        tracked_paths = [str(Path(root) / p) for p in tracked_paths if p]
+        hits = _ss.scan_paths(tracked_paths)
+        scope = "tracked files"
+    else:  # default: --staged
+        hits = _ss.scan_staged(root)
+        scope = "staged changes"
+
+    n_block = sum(1 for h in hits if h.severity == _ss.SEVERITY_BLOCK)
+    n_warn = sum(1 for h in hits if h.severity == _ss.SEVERITY_WARN)
+
+    if json_out:
+        click.echo(json.dumps({
+            "scope": scope,
+            "block": n_block,
+            "warn": n_warn,
+            "hits": [h.to_dict() for h in hits],
+        }, indent=2))
+    else:
+        _render_secret_hits(hits, scope)
+
+    if n_block:
+        return 2
+    if n_warn and strict:
+        return 1
+    return 0
+
+
 def add_to_cli(cli_group: click.Group) -> None:
     """Attach the ``murmurent security`` subcommand group."""
 
@@ -229,5 +319,26 @@ def add_to_cli(cli_group: click.Group) -> None:
                       repo_large_mb=repo_large_mb)
         sys.exit(rc)
 
+    @_security.command(
+        "secrets-scan",
+        help="Deterministic secret-CONTENT scan of staged/tracked/given paths "
+             "(pre-push gate). Exit 2 on a block hit.",
+    )
+    @click.option("--staged", "mode_staged", is_flag=True, default=False,
+                  help="Scan STAGED content (the default when no mode/paths given).")
+    @click.option("--tracked", "mode_tracked", is_flag=True, default=False,
+                  help="Scan all git-tracked files instead of the staged set.")
+    @click.option("--strict", is_flag=True, default=False,
+                  help="Exit 1 on warn-only hits (default: warn-only exits 0).")
+    @click.option("--json", "json_out", is_flag=True, help="Emit JSON instead of a table.")
+    @click.argument("paths", nargs=-1, type=click.Path())
+    def _secrets_scan(mode_staged: bool, mode_tracked: bool, strict: bool,
+                      json_out: bool, paths: tuple[str, ...]) -> None:
+        # Default to --staged unless the caller named paths or --tracked.
+        use_staged = mode_staged or (not mode_tracked and not paths)
+        rc = cmd_secrets_scan(staged=use_staged, tracked=mode_tracked,
+                              paths=paths, json_out=json_out, strict=strict)
+        sys.exit(rc)
 
-__all__ = ["cmd_scan", "cmd_audit_me", "add_to_cli"]
+
+__all__ = ["cmd_scan", "cmd_audit_me", "cmd_secrets_scan", "add_to_cli"]
