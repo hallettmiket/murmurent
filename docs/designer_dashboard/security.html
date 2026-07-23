@@ -140,6 +140,66 @@
       .footer { margin: 30px 0 20px; padding: 0 28px;
                 font-family: var(--mono); font-size: 11px; color: var(--muted); }
       .footer a { color: var(--purple); }
+
+      /* ---- personal audit ---- */
+      .pa-summary { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 14px; }
+      .pa-tile { border: 1px solid var(--rule-strong); border-radius: 2px;
+                 padding: 8px 14px; min-width: 78px; text-align: center;
+                 font-family: var(--mono); background: var(--paper-2); }
+      .pa-tile .n { font-size: 22px; font-weight: 700; }
+      .pa-tile .l { font-size: 10px; letter-spacing: 1px; text-transform: uppercase;
+                    color: var(--muted); }
+      .pa-tile.block .n { color: var(--red); }
+      .pa-tile.concern .n { color: var(--tiger); }
+      .pa-tile.ok .n { color: var(--green); }
+      .pa-tile.unver .n { color: var(--muted); }
+      .pa-headline { font-family: var(--mono); font-size: 13px; margin-bottom: 12px;
+                     padding: 8px 12px; border-left: 4px solid var(--purple);
+                     background: var(--paper-2); }
+      .pa-headline.block { border-left-color: var(--red); }
+      .pa-headline.concern { border-left-color: var(--tiger); }
+      .pa-headline.ok { border-left-color: var(--green); }
+      .pa-section { margin: 16px 0; }
+      .pa-section h3 { font-size: 13px; color: var(--purple-deep); margin: 0 0 8px;
+                       font-family: var(--mono); letter-spacing: 1px;
+                       text-transform: uppercase; }
+      /* heatmap */
+      .heat { width: 100%; border-collapse: collapse; font-family: var(--mono);
+              font-size: 11.5px; }
+      .heat th, .heat td { border: 1px solid var(--rule); padding: 5px 8px;
+                           text-align: left; }
+      .heat th { background: var(--paper-2); color: var(--purple-deep); }
+      .chip { display: inline-block; min-width: 46px; text-align: center;
+              border-radius: 2px; padding: 2px 6px; font-size: 10px;
+              font-weight: 700; color: white; }
+      .chip.green { background: var(--green); }
+      .chip.amber { background: var(--tiger); color: var(--ink); }
+      .chip.red { background: var(--red); }
+      .chip.grey { background: var(--rule-strong); color: var(--ink-2); }
+      .clin-flag { display: inline-block; margin-left: 6px; font-size: 9px;
+                   font-weight: 700; letter-spacing: 1px; color: white;
+                   background: var(--red); padding: 1px 5px; border-radius: 2px; }
+      /* diff tables */
+      .diff { width: 100%; border-collapse: collapse; font-family: var(--mono);
+              font-size: 11.5px; margin-bottom: 10px; }
+      .diff th, .diff td { border: 1px solid var(--rule); padding: 5px 8px;
+                           text-align: left; vertical-align: top; }
+      .diff th { background: var(--paper-2); }
+      .diff .insync { color: var(--green); }
+      .diff .missing { color: var(--red); font-weight: 700; }
+      .diff .extra { color: var(--muted); }
+      /* cert timeline */
+      .tl-row { display: flex; align-items: center; gap: 10px; margin: 4px 0;
+                font-family: var(--mono); font-size: 11.5px; }
+      .tl-label { min-width: 200px; }
+      .tl-bar { flex: 1; height: 12px; background: var(--paper-2);
+                border: 1px solid var(--rule); border-radius: 2px; position: relative; }
+      .tl-fill { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 2px; }
+      .tl-fill.green { background: var(--green); }
+      .tl-fill.amber { background: var(--tiger); }
+      .tl-fill.red { background: var(--red); }
+      .tl-when { min-width: 150px; color: var(--muted); }
+      .pa-empty { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
     </style>
   </head>
   <body>
@@ -154,6 +214,43 @@
     </div>
 
     <div class="container">
+      <div class="card">
+        <header>
+          <h2>Personal audit</h2>
+          <div class="controls">
+            <button id="pa-run-btn">Run personal audit</button>
+            <span id="pa-status" class="muted"></span>
+          </div>
+        </header>
+        <div class="body">
+          <div class="pa-empty" id="pa-empty">
+            Runs locally (no SSH): checks your GitHub &amp; Slack project access,
+            local repo &amp; vault permissions, your certificate validity, and
+            clinical-data containment. Read-only — nothing is changed.
+          </div>
+          <div id="pa-result" style="display:none">
+            <div class="pa-headline" id="pa-headline"></div>
+            <div class="pa-summary" id="pa-summary"></div>
+            <div class="pa-section" id="pa-heatmap-sec">
+              <h3>Repo &amp; vault access heatmap</h3>
+              <div id="pa-heatmap"></div>
+            </div>
+            <div class="pa-section" id="pa-membership-sec">
+              <h3>Membership diffs (GitHub &amp; Slack)</h3>
+              <div id="pa-membership"></div>
+            </div>
+            <div class="pa-section" id="pa-cert-sec">
+              <h3>Certificate timeline</h3>
+              <div id="pa-cert"></div>
+            </div>
+            <div class="pa-section" id="pa-other-sec">
+              <h3>Other findings</h3>
+              <div id="pa-other"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="card">
         <header>
           <h2>Scan</h2>
@@ -548,6 +645,173 @@
         }
       }
       document.getElementById("dump-btn").addEventListener("click", onRunDump);
+
+      // ----- personal audit -----
+      const escP = s => String(s || "").replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+      }[c]));
+
+      async function runPersonalAudit() {
+        const url = "/api/security/audit-me"
+                  + (ACTOR ? `?user=${encodeURIComponent(ACTOR)}` : "");
+        const res = await fetch(url, { method: "POST" });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          throw new Error(d.detail || `HTTP ${res.status}`);
+        }
+        return res.json();
+      }
+
+      function paChip(state) {
+        // state: "green" | "amber" | "red" | "grey"
+        const label = { green: "owner", amber: "group", red: "world", grey: "n/a" }[state] || state;
+        return `<span class="chip ${state}">${label}</span>`;
+      }
+
+      // Repo/vault ACL findings → one heatmap row each.
+      function renderHeatmap(findings) {
+        const acl = findings.filter(f =>
+          f.rule && f.rule.startsWith("PERSONAL-ACL"));
+        const host = document.getElementById("pa-heatmap");
+        if (!acl.length) { host.innerHTML = '<div class="pa-empty">No local repos or vault scanned.</div>'; return; }
+        const rows = acl.map(f => {
+          const clinical = (f.notes || "").includes("clinical") || f.category === "vault"
+                        || f.rule === "PERSONAL-ACL-CLINICAL-01";
+          const cur = f.current_state || "";
+          // owner is always ok; group/world derive from severity + text.
+          const world = /world/.test(cur);
+          const group = /group/.test(cur);
+          const ownerChip = paChip("green");
+          const groupChip = group ? paChip(clinical ? "red" : "amber") : paChip("green");
+          const worldChip = world ? paChip("red") : paChip("green");
+          const flag = clinical ? '<span class="clin-flag">CLINICAL</span>' : "";
+          return `<tr>
+            <td>${escP(f.path)}${flag}</td>
+            <td>${worldChip}</td><td>${groupChip}</td><td>${ownerChip}</td>
+            <td>${escP(f.current_state)}</td>
+          </tr>`;
+        }).join("");
+        host.innerHTML = `<table class="heat">
+          <thead><tr><th>repo / vault</th><th>world</th><th>group</th><th>owner</th><th>state</th></tr></thead>
+          <tbody>${rows}</tbody></table>`;
+      }
+
+      // GitHub + Slack membership findings → per-project diff tables.
+      function renderMembership(findings) {
+        const host = document.getElementById("pa-membership");
+        const mem = findings.filter(f => f.category === "github" || f.category === "slack");
+        if (!mem.length) { host.innerHTML = '<div class="pa-empty">No project memberships to show.</div>'; return; }
+        // Group by project.
+        const byProj = {};
+        for (const f of mem) {
+          const p = f.project || "(no project)";
+          (byProj[p] = byProj[p] || []).push(f);
+        }
+        const cls = f => {
+          if (/MISSING|NO-ACCESS|NOT-IN-CHANNEL/.test(f.rule)) return "missing";
+          if (/EXTRA/.test(f.rule)) return "extra";
+          return "insync";
+        };
+        const blocks = Object.keys(byProj).sort().map(p => {
+          const rows = byProj[p].map(f =>
+            `<tr>
+               <td>${escP(f.category)}</td>
+               <td class="${cls(f)}">${escP(f.current_state)}</td>
+               <td>${f.verify_state === "verified" ? "" : "could-not-verify"}</td>
+             </tr>`).join("");
+          return `<div><strong>${escP(p)}</strong>
+            <table class="diff"><thead><tr><th>area</th><th>status</th><th>verify</th></tr></thead>
+            <tbody>${rows}</tbody></table></div>`;
+        }).join("");
+        host.innerHTML = blocks;
+      }
+
+      // Cert / REB findings → a simple timeline of remaining days.
+      function renderCert(findings) {
+        const host = document.getElementById("pa-cert");
+        const cert = findings.filter(f => f.category === "cert");
+        if (!cert.length) { host.innerHTML = '<div class="pa-empty">No certificate findings.</div>'; return; }
+        const rows = cert.map(f => {
+          let fill = "green", pct = 100;
+          if (/EXPIRED|INVALID|MISSING/.test(f.rule)) { fill = "red"; pct = 100; }
+          else if (/EXPIRING/.test(f.rule)) { fill = "amber"; pct = 40; }
+          else if (f.verify_state !== "verified") { fill = "green"; pct = 10; }
+          const m = (f.current_state || "").match(/(\d{4}-\d{2}-\d{2})/);
+          const when = m ? m[1] : (f.verify_state === "verified" ? "valid" : "unknown");
+          return `<div class="tl-row">
+            <div class="tl-label">${escP(f.path)}</div>
+            <div class="tl-bar"><div class="tl-fill ${fill}" style="width:${pct}%"></div></div>
+            <div class="tl-when">${escP(when)}</div>
+          </div>`;
+        }).join("");
+        host.innerHTML = rows;
+      }
+
+      function renderOther(findings) {
+        const host = document.getElementById("pa-other");
+        const other = findings.filter(f => f.category === "non-mm"
+          || (f.category === "vault" && !/ACL/.test(f.rule)));
+        if (!other.length) { host.innerHTML = '<div class="pa-empty">Nothing else to report.</div>'; return; }
+        const sevOrder = { block: 0, warn: 1, info: 2 };
+        other.sort((a, b) => (sevOrder[a.severity] || 9) - (sevOrder[b.severity] || 9));
+        const rows = other.map(f =>
+          `<tr>
+             <td><span class="pill ${f.severity}">${f.severity}</span></td>
+             <td><code>${escP(f.rule)}</code></td>
+             <td class="path">${escP(f.path)}</td>
+             <td>${escP(f.current_state)}</td>
+           </tr>`).join("");
+        host.innerHTML = `<table class="findings">
+          <thead><tr><th>sev</th><th>rule</th><th>path</th><th>finding</th></tr></thead>
+          <tbody>${rows}</tbody></table>`;
+      }
+
+      function renderPersonalAudit(d) {
+        const c = d.counts || {};
+        const hl = document.getElementById("pa-headline");
+        const kind = c.block ? "block" : (c.concern ? "concern" : "ok");
+        hl.className = "pa-headline " + kind;
+        hl.textContent = d.headline || "";
+        const tiles = [
+          ["block", "Block", c.block || 0],
+          ["concern", "Concern", c.concern || 0],
+          ["ok", "OK", c.ok || 0],
+          ["unver", "Can't verify", c.unverifiable || 0],
+        ];
+        document.getElementById("pa-summary").innerHTML = tiles.map(([k, l, n]) =>
+          `<div class="pa-tile ${k}"><div class="n">${n}</div><div class="l">${l}</div></div>`
+        ).join("");
+        const findings = d.findings || [];
+        renderHeatmap(findings);
+        renderMembership(findings);
+        renderCert(findings);
+        renderOther(findings);
+        document.getElementById("pa-empty").style.display = "none";
+        document.getElementById("pa-result").style.display = "block";
+      }
+
+      async function onRunPersonalAudit() {
+        const btn = document.getElementById("pa-run-btn");
+        const status = document.getElementById("pa-status");
+        btn.disabled = true;
+        status.textContent = "running personal audit (local, read-only)…";
+        status.style.color = "var(--muted)";
+        try {
+          const d = await runPersonalAudit();
+          renderPersonalAudit(d);
+          const c = d.counts || {};
+          status.textContent =
+            `done · ${c.block || 0} block · ${c.concern || 0} concern · `
+            + `${c.unverifiable || 0} could-not-verify`;
+          status.style.color = c.block ? "var(--red)" : "var(--green)";
+        } catch (ex) {
+          status.textContent = "error: " + (ex.message || ex);
+          status.style.color = "var(--red)";
+        } finally {
+          btn.disabled = false;
+        }
+      }
+      document.getElementById("pa-run-btn").addEventListener("click", onRunPersonalAudit);
 
       // ----- boot -----
       (async () => {

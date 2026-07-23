@@ -62,6 +62,29 @@ def test_source_and_tier_validation():
         _make(tier="tier3")
 
 
+def test_verify_state_defaults_and_validation():
+    # Default is "verified".
+    assert _make().verify_state == "verified"
+    # Explicit "unverifiable" is accepted.
+    assert _make(verify_state="unverifiable").verify_state == "unverifiable"
+    # Anything else is rejected (mirrors severity/source/tier validation).
+    with pytest.raises(ValueError):
+        _make(verify_state="maybe")
+
+
+def test_verify_state_roundtrips_and_is_forward_compat(tmp_path):
+    from murmurent.core.security_findings import Finding
+    f = _make(verify_state="unverifiable")
+    path = tmp_path / "vs.jsonl"
+    write_jsonl(path, [f])
+    (loaded,) = read_jsonl(path)
+    assert loaded.verify_state == "unverifiable"
+    # from_dict drops unknown keys → old code can read a newer schema.
+    d = f.to_dict()
+    d["some_future_field"] = 123
+    assert Finding.from_dict(d).verify_state == "unverifiable"
+
+
 def test_jsonl_roundtrip(tmp_path):
     findings = [
         _make(severity=SEVERITY_BLOCK, path="/data/lab_vm/raw/p/a.bam"),

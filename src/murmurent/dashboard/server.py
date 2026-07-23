@@ -3102,6 +3102,29 @@ def create_app() -> FastAPI:
                 if f.owner_handle and f.owner_handle.lstrip("@").lower() == actor.lower()]
         return {"ok": True, "host": host, "findings": mine}
 
+    @app.post("/api/security/audit-me")
+    def security_audit_me_endpoint(
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Run the LOCAL personal security audit (issue #63 Phase 1) for the
+        calling member and return the grouped report as JSON.
+
+        Read-only by construction: the audit runs every drift-reconciler with
+        ``apply=False`` and only ``stat``s directories — it NEVER mutates
+        GitHub, Slack, or the filesystem. No ``lab_sudo`` gate: a member audits
+        their own posture. Persists the report as JSONL under
+        ``~/.murmurent/security/local/`` (same layout as the SSH scanner).
+        """
+        from ..core import personal_audit as _pa
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        report, path = _pa.run_and_persist(handle=actor)
+        payload = report.to_dict()
+        payload["ok"] = True
+        payload["persisted"] = str(path)
+        return payload
+
     @app.post("/api/members/{handle}/lab_sudo")
     @_scoped_to_viewer
     def member_lab_sudo_endpoint(

@@ -1,0 +1,950 @@
+"""
+Purpose: the LOCAL, member-initiated **personal security audit** — issue #63
+         Phase 1. Aggregates existing drift-reconcilers + scanners into one
+         on-demand report of the calling member's own security posture, with
+         NO SSH and NO write actions (every reconciler runs ``apply=False``;
+         ACL checks ``stat`` only).
+Author: Mike Hallett (with Claude Code)
+Date: 2026-07-23
+Input: the current member handle (env ``MURMURENT_USER`` / ``~/.murmurent/user``
+       / ``gh``), the cert-project registry, the local repo inventory, and the
+       personal vault path — all read-only.
+Output: a :class:`PersonalAuditReport` of :class:`Finding` objects grouped by
+        area, persisted as JSONL under
+        ``~/.murmurent/security/local/personal-<date>.jsonl`` (+ ``latest``).
+
+Design (from the maintainer's locked decisions on issue #63):
+  1. One ``Finding`` pipeline + the new ``verify_state`` field — so a missing
+     prerequisite (no ``gh``, no Slack token, no handle) yields an explicit
+     ``verify_state="unverifiable"`` finding rather than a false "in sync" or a
+     false "everyone is missing". The report never silently lies.
+  3. Phase-1 scope = aggregate EXISTING checks behind one button: item 1
+     (GitHub perms), 2i (local repo + vault ACLs), 4 (Slack membership), 6
+     (non-MM repos), 7-member (own cert validity), and item V clinical
+     containment. New content scanners (2ii-iv), machine posture (5), and
+     project-CARD expiry across other members are Phase 2/3 — NOT here.
+
+Clinical-repo rule: a repo is clinical if its linked cert-project has
+``sensitivity == "clinical"`` (matched by ``github_repo`` and/or a repo path in
+``repos``), OR its ``.murmurent.yaml`` declares ``sensitivity: clinical``. For a
+clinical repo and for the personal vault, an over-share ACL finding escalates
+from ``warn`` to ``block``.
+
+Read-only by construction. This module never mutates GitHub, Slack, or the
+filesystem; it only reports.
+"""
+
+from __future__ import annotations
+
+import datetime as _dt
+import os
+import stat as _stat
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from . import cert_projects as _cp
+from . import cert_provision as _cprov
+from . import group_reconcile as _gr
+from . import identity as _identity
+from . import lab_vm as _lab_vm
+from . import project_provision as _pp
+from . import repo as _repo
+from . import repo_inventory as _inv
+from .security_findings import (
+    Finding,
+    SEVERITY_BLOCK,
+    SEVERITY_INFO,
+    SEVERITY_WARN,
+    SOURCE_SCANNER,
+    VERIFY_UNVERIFIABLE,
+    VERIFY_VERIFIED,
+    write_jsonl,
+)
+
+# ---------------------------------------------------------------------------
+# Areas + persistence
+# ---------------------------------------------------------------------------
+
+AREA_GITHUB = "github"
+AREA_SLACK = "slack"
+AREA_CERT = "cert"
+AREA_REPOS = "repos"
+AREA_VAULT = "vault"
+AREA_NON_MM = "non-mm"
+ALL_AREAS = (AREA_GITHUB, AREA_SLACK, AREA_CERT, AREA_REPOS, AREA_VAULT, AREA_NON_MM)
+
+# The synthetic host for a local, no-SSH audit. Keeps the JSONL layout identical
+# to the SSH scanner's ``~/.murmurent/security/<host>/`` tree.
+LOCAL_HOST = "local"
+PERSIST_ROOT = Path.home() / ".murmurent" / "security"
+
+# Certs / REB expiry thresholds (days). A cert inside its warn window is amber;
+# past valid_until is a block.
+CERT_WARN_DAYS = 14
+REB_WARN_DAYS = 30
+
+MARKER_FILENAME = ".murmurent.yaml"
+
+
+def _now() -> _dt.datetime:
+    return _dt.datetime.now(_dt.timezone.utc)
+
+
+def _iso(dt: _dt.datetime) -> str:
+    return dt.astimezone(_dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _norm(handle: str) -> str:
+    return str(handle or "").strip().lstrip("@").lower()
+
+
+# ---------------------------------------------------------------------------
+# Report
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class PersonalAuditReport:
+    """The result of one personal audit: a flat list of :class:`Finding` plus
+    the metadata needed to render + persist it. ``findings`` carry their own
+    ``category`` (one of :data:`ALL_AREAS`) so grouping is derived, not stored
+    twice."""
+
+    handle: str
+    generated_at: str
+    findings: list[Finding] = field(default_factory=list)
+
+    # ---- grouping / summary -------------------------------------------------
+    def by_area(self) -> dict[str, list[Finding]]:
+        """``{area: [Finding, …]}`` for every area, empty lists included so the
+        renderer can show a green "nothing to report" per area."""
+        out: dict[str, list[Finding]] = {a: [] for a in ALL_AREAS}
+        for f in self.findings:
+            out.setdefault(f.category, []).append(f)
+        return out
+
+    def counts(self) -> dict[str, int]:
+        """``{ok, concern, block, unverifiable}`` summary counts.
+
+        ``concern`` = warn-severity, verified. ``block`` = block-severity,
+        verified. ``unverifiable`` = any could-not-verify finding (regardless of
+        severity). ``ok`` = verified info findings (the green "checked, fine"
+        rows)."""
+        c = {"ok": 0, "concern": 0, "block": 0, "unverifiable": 0}
+        for f in self.findings:
+            if f.verify_state == VERIFY_UNVERIFIABLE:
+                c["unverifiable"] += 1
+            elif f.severity == SEVERITY_BLOCK:
+                c["block"] += 1
+            elif f.severity == SEVERITY_WARN:
+                c["concern"] += 1
+            else:
+                c["ok"] += 1
+        return c
+
+    def headline(self) -> str:
+        """A ≤200-char, headline-first verdict line (per rules/headline_first)."""
+        c = self.counts()
+        if c["block"]:
+            verb = f"BLOCKED — {c['block']} blocking issue(s)"
+        elif c["concern"]:
+            verb = f"Concerns — {c['concern']} to review"
+        else:
+            verb = "Clear — no blocking or concern findings"
+        tail = f"; {c['unverifiable']} could-not-verify" if c["unverifiable"] else ""
+        return f"{verb} for @{self.handle}{tail}."[:200]
+
+    def to_dict(self) -> dict:
+        return {
+            "handle": self.handle,
+            "generated_at": self.generated_at,
+            "counts": self.counts(),
+            "headline": self.headline(),
+            "areas": {a: [f.to_dict() for f in fs] for a, fs in self.by_area().items()},
+            "findings": [f.to_dict() for f in self.findings],
+        }
+
+
+# ---------------------------------------------------------------------------
+# Finding factory
+# ---------------------------------------------------------------------------
+
+
+def _mk(area: str, rule: str, *, severity: str, path: str, current: str,
+        expected: str = "", fix: str = "", handle: str | None = None,
+        project: str | None = None, notes: str = "",
+        verify_state: str = VERIFY_VERIFIED, when: str = "") -> Finding:
+    """Build a personal-audit :class:`Finding`. Thin wrapper so every check
+    emits a consistent row (source=scanner, host=local)."""
+    return Finding(
+        severity=severity, category=area, rule=rule, host=LOCAL_HOST, path=path,
+        current_state=current, expected_state=expected, suggested_fix=fix,
+        detected_at=when or _iso(_now()), source=SOURCE_SCANNER,
+        verify_state=verify_state,
+        owner_handle=(f"@{_norm(handle)}" if handle else None),
+        project=project, notes=notes,
+        rule_doc_anchor="docs/security-dashboard.md#personal-audit",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Project scoping
+# ---------------------------------------------------------------------------
+
+
+def _my_projects(handle: str, env: dict | None) -> list[_cp.CertProject]:
+    """Active cert-projects where ``handle`` is the lead OR a member."""
+    h = _norm(handle)
+    out: list[_cp.CertProject] = []
+    for p in _cp.iter_projects(env):
+        if p.status != "active":
+            continue
+        if _norm(p.lead) == h or any(_norm(m) == h for m in p.members):
+            out.append(p)
+    return out
+
+
+def _is_lead(cp: _cp.CertProject, handle: str) -> bool:
+    return _norm(cp.lead) == _norm(handle)
+
+
+# ===========================================================================
+# Item 1 — GitHub collaborator perms
+# ===========================================================================
+
+
+def check_github(handle: str, projects: list[_cp.CertProject],
+                 env: dict | None) -> list[Finding]:
+    """Item 1. As LEAD: every project member should have push; extra
+    collaborators are noted (info, not a drift). As MEMBER: the viewer should be
+    a collaborator. ``gh`` absent/unauthed ⇒ one ``unverifiable`` finding per
+    project (never a false drift)."""
+    gh_ok = _pp._gh_available()
+    out: list[Finding] = []
+    for cp in projects:
+        repo = cp.github_repo or "(unprovisioned)"
+        if not (cp.github_repo and "/" in cp.github_repo):
+            out.append(_mk(AREA_GITHUB, "PERSONAL-GH-UNPROVISIONED-01",
+                           severity=SEVERITY_INFO, path=repo,
+                           current=f"{cp.name}: no GitHub repo provisioned yet",
+                           expected="a private repo per project",
+                           handle=handle, project=cp.name))
+            continue
+        if not gh_ok:
+            out.append(_mk(AREA_GITHUB, "PERSONAL-GH-UNVERIFIABLE-01",
+                           severity=SEVERITY_INFO, path=repo,
+                           current="gh CLI not installed / not authenticated",
+                           expected="`gh auth login` so collaborators can be read",
+                           fix="gh auth login",
+                           handle=handle, project=cp.name,
+                           verify_state=VERIFY_UNVERIFIABLE,
+                           notes="Could not read GitHub collaborators; not a drift."))
+            continue
+        try:
+            drift = _cprov.reconcile_github(cp.name, env=env, apply=False)
+        except Exception as exc:  # noqa: BLE001
+            out.append(_mk(AREA_GITHUB, "PERSONAL-GH-UNVERIFIABLE-01",
+                           severity=SEVERITY_INFO, path=repo,
+                           current=f"could not reconcile: {exc}",
+                           handle=handle, project=cp.name,
+                           verify_state=VERIFY_UNVERIFIABLE))
+            continue
+        if not drift.get("ok"):
+            out.append(_mk(AREA_GITHUB, "PERSONAL-GH-UNVERIFIABLE-01",
+                           severity=SEVERITY_INFO, path=repo,
+                           current=f"reconcile unavailable: {drift.get('error')}",
+                           handle=handle, project=cp.name,
+                           verify_state=VERIFY_UNVERIFIABLE))
+            continue
+        to_add = drift.get("to_add") or []      # desired members missing push
+        to_remove = drift.get("to_remove") or []  # extra collaborators (owner excluded)
+        if _is_lead(cp, handle):
+            if to_add:
+                out.append(_mk(AREA_GITHUB, "PERSONAL-GH-MEMBER-MISSING-01",
+                               severity=SEVERITY_WARN, path=repo,
+                               current=f"{len(to_add)} project member(s) lack push: "
+                                       + ", ".join(to_add),
+                               expected="every project member has push access",
+                               fix=f"murmurent project reconcile {cp.name} --apply",
+                               handle=handle, project=cp.name))
+            if to_remove:
+                out.append(_mk(AREA_GITHUB, "PERSONAL-GH-EXTRA-COLLAB-01",
+                               severity=SEVERITY_INFO, path=repo,
+                               current=f"{len(to_remove)} collaborator(s) not in the "
+                                       f"project (noted, not an error): "
+                                       + ", ".join(to_remove),
+                               expected="informational — review if unexpected",
+                               handle=handle, project=cp.name,
+                               notes="Extra collaborators are allowed; surfaced so "
+                                     "you can react if unintended."))
+            if not to_add and not to_remove:
+                out.append(_mk(AREA_GITHUB, "PERSONAL-GH-IN-SYNC-01",
+                               severity=SEVERITY_INFO, path=repo,
+                               current="collaborators match project members",
+                               expected="in sync", handle=handle, project=cp.name))
+        else:
+            # As a member: am I (my github login) a collaborator? The reconcile
+            # ``to_add`` lists the desired logins missing from actual; if MY login
+            # is in it, I lack access.
+            gh_map = _cprov.member_github_map([handle])
+            my_login = gh_map.get(_norm(handle))
+            if my_login and my_login in to_add:
+                out.append(_mk(AREA_GITHUB, "PERSONAL-GH-NO-ACCESS-01",
+                               severity=SEVERITY_WARN, path=repo,
+                               current=f"you ({my_login}) are not a collaborator",
+                               expected="you should have push access",
+                               fix="ask the project lead to add you",
+                               handle=handle, project=cp.name))
+            elif not my_login:
+                out.append(_mk(AREA_GITHUB, "PERSONAL-GH-NO-LOGIN-01",
+                               severity=SEVERITY_INFO, path=repo,
+                               current="no GitHub login recorded on your roster entry",
+                               expected="a github login so access can be verified",
+                               handle=handle, project=cp.name,
+                               verify_state=VERIFY_UNVERIFIABLE))
+            else:
+                out.append(_mk(AREA_GITHUB, "PERSONAL-GH-ACCESS-OK-01",
+                               severity=SEVERITY_INFO, path=repo,
+                               current=f"you ({my_login}) have push access",
+                               expected="ok", handle=handle, project=cp.name))
+    return out
+
+
+# ===========================================================================
+# Item 4 — Slack channel membership
+# ===========================================================================
+
+
+def check_slack(handle: str, projects: list[_cp.CertProject],
+                env: dict | None) -> list[Finding]:
+    """Item 4. As LEAD: project members should be in the channel; extras noted.
+    As MEMBER: the viewer should be in the channel. Missing token ⇒
+    ``unverifiable`` (never a false in-sync)."""
+    out: list[Finding] = []
+    for cp in projects:
+        chan = cp.slack_channel_id or "(unprovisioned)"
+        if not cp.slack_channel_id:
+            out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-UNPROVISIONED-01",
+                           severity=SEVERITY_INFO, path=chan,
+                           current=f"{cp.name}: no Slack channel provisioned yet",
+                           handle=handle, project=cp.name))
+            continue
+        workspace = cp.slack_workspace or cp.lab
+        token = ""
+        try:
+            token = _gr.resolve_group_slack_token(workspace) if workspace else ""
+        except Exception:  # noqa: BLE001
+            token = ""
+        if not token:
+            out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-UNVERIFIABLE-01",
+                           severity=SEVERITY_INFO, path=chan,
+                           current="no Slack bot token for this workspace",
+                           expected="a group Slack token so membership can be read",
+                           handle=handle, project=cp.name,
+                           verify_state=VERIFY_UNVERIFIABLE,
+                           notes="Could not read channel membership; not a drift."))
+            continue
+        try:
+            drift = _cprov.reconcile_slack(cp.name, env=env, apply=False,
+                                           remove_extras=True)
+        except Exception as exc:  # noqa: BLE001
+            out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-UNVERIFIABLE-01",
+                           severity=SEVERITY_INFO, path=chan,
+                           current=f"could not reconcile: {exc}",
+                           handle=handle, project=cp.name,
+                           verify_state=VERIFY_UNVERIFIABLE))
+            continue
+        if not drift.get("ok"):
+            out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-UNVERIFIABLE-01",
+                           severity=SEVERITY_INFO, path=chan,
+                           current=f"reconcile unavailable: {drift.get('error')}",
+                           handle=handle, project=cp.name,
+                           verify_state=VERIFY_UNVERIFIABLE))
+            continue
+        to_invite = drift.get("to_invite") or []
+        to_kick = drift.get("to_kick") or []       # extras, bot already excluded
+        unresolved = drift.get("unresolved") or []
+        if _is_lead(cp, handle):
+            if to_invite:
+                out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-MEMBER-MISSING-01",
+                               severity=SEVERITY_WARN, path=chan,
+                               current=f"{len(to_invite)} project member(s) not in "
+                                       f"the channel: " + ", ".join(to_invite),
+                               expected="every project member is in the channel",
+                               fix=f"murmurent project reconcile {cp.name} --apply",
+                               handle=handle, project=cp.name))
+            if to_kick:
+                out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-EXTRA-MEMBER-01",
+                               severity=SEVERITY_INFO, path=chan,
+                               current=f"{len(to_kick)} channel member(s) not in the "
+                                       f"project (noted, not an error)",
+                               handle=handle, project=cp.name,
+                               notes="Extra channel members are allowed; surfaced so "
+                                     "you can react if unintended."))
+            if unresolved:
+                out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-UNRESOLVED-01",
+                               severity=SEVERITY_INFO, path=chan,
+                               current=f"{len(unresolved)} member(s) had no resolvable "
+                                       f"Slack id: " + ", ".join(unresolved),
+                               handle=handle, project=cp.name,
+                               verify_state=VERIFY_UNVERIFIABLE))
+            if not to_invite and not to_kick and not unresolved:
+                out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-IN-SYNC-01",
+                               severity=SEVERITY_INFO, path=chan,
+                               current="channel members match project members",
+                               handle=handle, project=cp.name))
+        else:
+            if _norm(handle) in {_norm(h) for h in to_invite}:
+                out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-NOT-IN-CHANNEL-01",
+                               severity=SEVERITY_WARN, path=chan,
+                               current="you are not in the project's Slack channel",
+                               expected="you should be in the channel",
+                               fix="ask the project lead to invite you",
+                               handle=handle, project=cp.name))
+            elif _norm(handle) in {_norm(h) for h in unresolved}:
+                out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-UNRESOLVED-01",
+                               severity=SEVERITY_INFO, path=chan,
+                               current="your Slack id could not be resolved",
+                               handle=handle, project=cp.name,
+                               verify_state=VERIFY_UNVERIFIABLE))
+            else:
+                out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-IN-CHANNEL-01",
+                               severity=SEVERITY_INFO, path=chan,
+                               current="you are in the project's Slack channel",
+                               handle=handle, project=cp.name))
+    return out
+
+
+# ===========================================================================
+# Item 7 (member) — the viewer's own certificate validity + clinical REB
+# ===========================================================================
+
+
+def _own_card_valid_until(env: dict | None) -> _dt.datetime | None:
+    """``valid_until`` of this machine's stored signed member card, or ``None``
+    when no dated card is on disk (member cards live in ``~/.murmurent/cards/``)."""
+    try:
+        from . import identity_card as _ic
+        from . import issuance as _iss
+        local = _ic.local_card(env=env) or {}
+        centre = str(local.get("centre") or "")
+        if not centre:
+            return None
+        import json
+        safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in centre)
+        member_p = _iss.cards_dir() / f"{safe}_member.json"
+        if not member_p.is_file():
+            return None
+        bundle = json.loads(member_p.read_text(encoding="utf-8"))
+        vu = (((bundle.get("member_card") or {}).get("payload") or {})
+              .get("valid_until"))
+        if not vu:
+            return None
+        dt = _dt.datetime.fromisoformat(str(vu).replace("Z", "+00:00"))
+        return dt if dt.tzinfo else dt.replace(tzinfo=_dt.timezone.utc)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def check_cert(handle: str, projects: list[_cp.CertProject],
+               env: dict | None, now: _dt.datetime | None = None) -> list[Finding]:
+    """Item 7 (member scope). Validate the viewer's OWN identity card
+    (expired/revoked ⇒ block; expiring within 14 days ⇒ warn) via the crypto
+    verifier, plus — for clinical projects the viewer LEADS — the REB expiry."""
+    now = now or _now()
+    out: list[Finding] = []
+
+    # -- the viewer's own card ------------------------------------------------
+    try:
+        from . import issuance as _iss
+        status, reason = _iss.verify_local_identity(env=env, now=now)
+    except Exception as exc:  # noqa: BLE001
+        status, reason = "unverifiable", str(exc)
+
+    if status == "no_card":
+        out.append(_mk(AREA_CERT, "PERSONAL-CERT-NO-CARD-01",
+                       severity=SEVERITY_INFO, path="~/.murmurent/cards",
+                       current="no signed identity card on this machine",
+                       expected="an imported member/PI card",
+                       handle=handle, verify_state=VERIFY_UNVERIFIABLE,
+                       notes="Cannot verify certificate standing without a card."))
+    elif status == "reject":
+        out.append(_mk(AREA_CERT, "PERSONAL-CERT-INVALID-01",
+                       severity=SEVERITY_BLOCK, path="~/.murmurent/cards",
+                       current=f"your identity card is not valid: {reason}",
+                       expected="a valid, unrevoked, unexpired card",
+                       fix="ask your PI to re-issue your card",
+                       handle=handle))
+    elif status == "ok":
+        vu = _own_card_valid_until(env)
+        if vu is not None and (vu - now).days <= CERT_WARN_DAYS:
+            days = (vu - now).days
+            out.append(_mk(AREA_CERT, "PERSONAL-CERT-EXPIRING-01",
+                           severity=SEVERITY_WARN, path="~/.murmurent/cards",
+                           current=f"your identity card expires in {days} day(s) "
+                                   f"({vu.date().isoformat()})",
+                           expected=f"renew before it lapses (>{CERT_WARN_DAYS}d out)",
+                           fix="ask your PI to re-issue your card",
+                           handle=handle))
+        else:
+            out.append(_mk(AREA_CERT, "PERSONAL-CERT-OK-01",
+                           severity=SEVERITY_INFO, path="~/.murmurent/cards",
+                           current="your identity card is valid",
+                           handle=handle))
+    else:
+        out.append(_mk(AREA_CERT, "PERSONAL-CERT-UNVERIFIABLE-01",
+                       severity=SEVERITY_INFO, path="~/.murmurent/cards",
+                       current=f"could not verify your card: {reason}",
+                       handle=handle, verify_state=VERIFY_UNVERIFIABLE))
+
+    # -- REB expiry on clinical projects the viewer LEADS ---------------------
+    for cp in projects:
+        if cp.sensitivity != "clinical" or not _is_lead(cp, handle):
+            continue
+        reb = (cp.reb_expires or "").strip()
+        if not reb:
+            out.append(_mk(AREA_CERT, "PERSONAL-REB-MISSING-01",
+                           severity=SEVERITY_BLOCK, path=cp.name,
+                           current="clinical project has no reb_expires recorded",
+                           expected="a valid REB approval date",
+                           handle=handle, project=cp.name))
+            continue
+        try:
+            exp = _dt.datetime.fromisoformat(reb.replace("Z", "+00:00"))
+            exp = exp if exp.tzinfo else exp.replace(tzinfo=_dt.timezone.utc)
+        except ValueError:
+            out.append(_mk(AREA_CERT, "PERSONAL-REB-BAD-DATE-01",
+                           severity=SEVERITY_WARN, path=cp.name,
+                           current=f"unparseable reb_expires: {reb!r}",
+                           handle=handle, project=cp.name,
+                           verify_state=VERIFY_UNVERIFIABLE))
+            continue
+        days = (exp - now).days
+        if days < 0:
+            out.append(_mk(AREA_CERT, "PERSONAL-REB-EXPIRED-01",
+                           severity=SEVERITY_BLOCK, path=cp.name,
+                           current=f"REB approval expired {exp.date().isoformat()}",
+                           expected="a current REB approval",
+                           fix="renew the REB before continuing clinical work",
+                           handle=handle, project=cp.name))
+        elif days <= REB_WARN_DAYS:
+            out.append(_mk(AREA_CERT, "PERSONAL-REB-EXPIRING-01",
+                           severity=SEVERITY_WARN, path=cp.name,
+                           current=f"REB approval expires in {days} day(s) "
+                                   f"({exp.date().isoformat()})",
+                           expected=f"renew before it lapses (>{REB_WARN_DAYS}d out)",
+                           handle=handle, project=cp.name))
+        else:
+            out.append(_mk(AREA_CERT, "PERSONAL-REB-OK-01",
+                           severity=SEVERITY_INFO, path=cp.name,
+                           current=f"REB valid until {exp.date().isoformat()}",
+                           handle=handle, project=cp.name))
+    return out
+
+
+# ===========================================================================
+# Item 2i + vault — local repo + vault directory ACLs
+# ===========================================================================
+
+
+def _describe_access(path: Path) -> dict:
+    """POSIX-mode access probe for ``path`` (follows symlinks — the vault is
+    often a symlinked folder). Returns owner/group/world r/w/x bits + whether
+    the current user owns it. ``stat`` only; never mutates."""
+    st = path.stat()  # follows symlinks by design (item V: follow the vault link)
+    mode = st.st_mode
+    def bit(m: int) -> bool:
+        return bool(mode & m)
+    return {
+        "mode": _stat.S_IMODE(mode),
+        "owner_uid": st.st_uid,
+        "is_owner": st.st_uid == os.getuid(),
+        "group_read": bit(_stat.S_IRGRP), "group_write": bit(_stat.S_IWGRP),
+        "group_exec": bit(_stat.S_IXGRP),
+        "world_read": bit(_stat.S_IROTH), "world_write": bit(_stat.S_IWOTH),
+        "world_exec": bit(_stat.S_IXOTH),
+    }
+
+
+def _acl_finding(area: str, path: Path, acc: dict, *, clinical: bool,
+                 handle: str, project: str | None, label: str) -> Finding:
+    """Turn an access description into a Finding. Ideal = owner-only (0700). Any
+    group/world read or write escalates: warn on a normal repo, BLOCK on a
+    clinical repo or the vault."""
+    over_share = (acc["group_read"] or acc["group_write"] or acc["world_read"]
+                  or acc["world_write"])
+    mode_str = oct(acc["mode"])[-3:]
+    if not over_share:
+        return _mk(area, "PERSONAL-ACL-OK-01", severity=SEVERITY_INFO,
+                   path=str(path),
+                   current=f"{label}: owner-only ({mode_str})",
+                   expected="owner-only (0700)", handle=handle, project=project,
+                   notes="clinical" if clinical else "")
+    who = []
+    if acc["world_read"] or acc["world_write"]:
+        who.append("world")
+    if acc["group_read"] or acc["group_write"]:
+        who.append("group")
+    sev = SEVERITY_BLOCK if clinical else SEVERITY_WARN
+    rule = ("PERSONAL-ACL-CLINICAL-01" if clinical
+            else "PERSONAL-ACL-OVERSHARE-01")
+    kind = "clinical repo/vault" if clinical else "repo"
+    return _mk(area, rule, severity=sev, path=str(path),
+               current=f"{label}: {'/'.join(who)}-accessible ({mode_str})",
+               expected="owner-only (0700)",
+               fix=f"chmod 700 {path}",
+               handle=handle, project=project,
+               notes=(f"{kind}: over-shared directory permissions escalate to "
+                      "BLOCK for clinical data." if clinical else ""))
+
+
+def _clinical_repo_index(env: dict | None) -> tuple[set[str], set[str]]:
+    """Return ``(clinical_repo_paths, clinical_github_slugs)`` derived from
+    cert-projects with ``sensitivity == "clinical"``. Paths are resolved
+    absolute strings; slugs are lower-cased ``org/name``."""
+    paths: set[str] = set()
+    slugs: set[str] = set()
+    for cp in _cp.iter_projects(env):
+        if cp.sensitivity != "clinical":
+            continue
+        if cp.github_repo and "/" in cp.github_repo:
+            slugs.add(cp.github_repo.strip().lower())
+        for r in cp.repos:
+            if r.path:
+                try:
+                    paths.add(str(Path(r.path).expanduser().resolve()))
+                except OSError:
+                    paths.add(str(Path(r.path).expanduser()))
+        if cp.code_repo:
+            try:
+                paths.add(str(Path(cp.code_repo).expanduser().resolve()))
+            except OSError:
+                paths.add(str(Path(cp.code_repo).expanduser()))
+    return paths, slugs
+
+
+def _marker_declares_clinical(repo_dir: Path) -> bool:
+    """True when ``repo_dir/.murmurent.yaml`` declares ``sensitivity: clinical``."""
+    marker = repo_dir / MARKER_FILENAME
+    if not marker.is_file():
+        return False
+    try:
+        import yaml
+        data = yaml.safe_load(marker.read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001
+        return False
+    return str((data or {}).get("sensitivity") or "").strip().lower() == "clinical"
+
+
+def _repo_is_clinical(repo, clinical_paths: set[str], clinical_slugs: set[str]) -> bool:
+    """Whether a scanned local repo is clinical: its path or origin matches a
+    clinical cert-project, or its own ``.murmurent.yaml`` says so."""
+    p = Path(repo.path)
+    try:
+        rp = str(p.resolve())
+    except OSError:
+        rp = str(p)
+    if rp in clinical_paths or str(p) in clinical_paths:
+        return True
+    if repo.origin_url:
+        canon = _inv._canonical_url(repo.origin_url)  # "github.com/org/name"
+        slug = canon[len("github.com/"):] if canon.startswith("github.com/") else canon
+        if slug and slug in clinical_slugs:
+            return True
+    return _marker_declares_clinical(p)
+
+
+def check_repo_acls(handle: str, repos: list, env: dict | None) -> list[Finding]:
+    """Item 2i. For each local MM-ready repo, describe who can read/write/execute
+    it; over-share warns (blocks on a clinical repo)."""
+    clinical_paths, clinical_slugs = _clinical_repo_index(env)
+    out: list[Finding] = []
+    for repo in repos:
+        if not getattr(repo, "is_murmurent_ready", False):
+            continue
+        p = Path(repo.path)
+        try:
+            acc = _describe_access(p)
+        except OSError as exc:
+            out.append(_mk(AREA_REPOS, "PERSONAL-ACL-UNVERIFIABLE-01",
+                           severity=SEVERITY_INFO, path=str(p),
+                           current=f"could not stat: {exc}", handle=handle,
+                           verify_state=VERIFY_UNVERIFIABLE))
+            continue
+        clinical = _repo_is_clinical(repo, clinical_paths, clinical_slugs)
+        out.append(_acl_finding(AREA_REPOS, p, acc, clinical=clinical,
+                                handle=handle, project=None,
+                                label=p.name + (" [clinical]" if clinical else "")))
+    return out
+
+
+def check_vault_acls(handle: str, env: dict | None) -> list[Finding]:
+    """Item V (ACLs). The personal vault should be owner-only; ANY group/world
+    read or write is a BLOCK (a clinical oracle entry behind a readable vault is
+    a serious leak). Follows the vault symlink."""
+    from . import vault_sync as _vs
+    root = _vs.personal_vault_root()
+    if root is None:
+        return [_mk(AREA_VAULT, "PERSONAL-VAULT-UNREGISTERED-01",
+                    severity=SEVERITY_INFO, path="(none)",
+                    current="no personal vault registered on this machine",
+                    expected="`murmurent vault init` to create/adopt one",
+                    handle=handle, verify_state=VERIFY_UNVERIFIABLE)]
+    if not root.exists():
+        return [_mk(AREA_VAULT, "PERSONAL-VAULT-MISSING-01",
+                    severity=SEVERITY_INFO, path=str(root),
+                    current="registered vault path does not exist",
+                    handle=handle, verify_state=VERIFY_UNVERIFIABLE)]
+    try:
+        acc = _describe_access(root)
+    except OSError as exc:
+        return [_mk(AREA_VAULT, "PERSONAL-VAULT-UNVERIFIABLE-01",
+                    severity=SEVERITY_INFO, path=str(root),
+                    current=f"could not stat vault: {exc}", handle=handle,
+                    verify_state=VERIFY_UNVERIFIABLE)]
+    # The vault is always treated as clinical-grade (block on over-share).
+    return [_acl_finding(AREA_VAULT, root, acc, clinical=True, handle=handle,
+                         project=None, label="personal vault")]
+
+
+# ===========================================================================
+# Item V — clinical-containment sweep (no clinical entry outside the vault)
+# ===========================================================================
+
+
+def check_clinical_containment(handle: str, repos: list,
+                               env: dict | None) -> list[Finding]:
+    """Item V. Scan lab-shared locations (the group governance repo ``oracle/``
+    and every local repo) for oracle markdown carrying frontmatter
+    ``sensitivity: clinical``. Any hit OUTSIDE the personal vault is a BLOCK —
+    a clinical entry must never leave the personal vault (rules/oracle_schema)."""
+    from . import vault_sync as _vs
+    from .frontmatter import parse_file as _pf
+
+    vault_root = _vs.personal_vault_root()
+    try:
+        vault_abs = vault_root.resolve() if vault_root else None
+    except OSError:
+        vault_abs = vault_root
+
+    scan_roots: list[Path] = []
+    try:
+        lab_root = _repo.lab_mgmt_repo_root(env)
+        if lab_root and lab_root.is_dir():
+            scan_roots.append(lab_root)
+    except Exception:  # noqa: BLE001
+        pass
+    for repo in repos:
+        try:
+            scan_roots.append(Path(repo.path))
+        except Exception:  # noqa: BLE001
+            continue
+
+    out: list[Finding] = []
+    seen: set[str] = set()
+    for root in scan_roots:
+        if not root.is_dir():
+            continue
+        try:
+            if vault_abs is not None and root.resolve().is_relative_to(vault_abs):
+                continue  # inside the vault — clinical is allowed there
+        except (OSError, ValueError):
+            pass
+        for md in root.rglob("*.md"):
+            if ".git" in md.parts:
+                continue
+            key = str(md)
+            if key in seen:
+                continue
+            try:
+                meta = _pf(md).meta or {}
+            except Exception:  # noqa: BLE001
+                continue
+            if str(meta.get("sensitivity") or "").strip().lower() != "clinical":
+                continue
+            seen.add(key)
+            out.append(_mk(AREA_VAULT, "PERSONAL-CLINICAL-LEAK-01",
+                           severity=SEVERITY_BLOCK, path=str(md),
+                           current="clinical-tagged oracle entry outside the "
+                                   "personal vault",
+                           expected="clinical entries live ONLY in the personal vault",
+                           fix="move this entry into your personal vault and remove "
+                               "the shared copy",
+                           handle=handle,
+                           notes="rules/oracle_schema.md: a clinical entry must "
+                                 "never leave the personal vault."))
+    if not out:
+        out.append(_mk(AREA_VAULT, "PERSONAL-CLINICAL-CONTAINED-01",
+                       severity=SEVERITY_INFO, path="(lab-shared locations)",
+                       current="no clinical entries found outside the personal vault",
+                       handle=handle))
+    return out
+
+
+# ===========================================================================
+# Item 6 — non-MM repos
+# ===========================================================================
+
+
+def check_non_mm(handle: str, repos: list, github_repos: list,
+                 inventory_keys: set[str], env: dict | None) -> list[Finding]:
+    """Item 6. Local git repos that are NOT murmurent-ready and NOT murmurent
+    infra ⇒ "using CC, not MM; may not follow lab rules". GitHub repos absent
+    from the local inventory ⇒ info (could be cloned)."""
+    out: list[Finding] = []
+    for repo in repos:
+        if not getattr(repo, "is_git", True):
+            continue
+        if getattr(repo, "is_murmurent_ready", False):
+            continue
+        if getattr(repo, "is_murmurent_infra", False):
+            continue
+        out.append(_mk(AREA_NON_MM, "PERSONAL-NON-MM-REPO-01",
+                       severity=SEVERITY_INFO, path=repo.path,
+                       current="git repo is not murmurent-ready",
+                       expected="`murmurent adopt` to bring it under lab rules",
+                       fix="murmurent adopt  # from inside the repo",
+                       handle=handle,
+                       notes="Using Claude Code, not murmurent — may not follow "
+                             "lab data/naming rules."))
+    for gh in github_repos:
+        if getattr(gh, "archived", False):
+            continue
+        canon = _inv._canonical_url(getattr(gh, "ssh_url", ""))
+        if canon and canon not in inventory_keys:
+            out.append(_mk(AREA_NON_MM, "PERSONAL-GH-NOT-LOCAL-01",
+                           severity=SEVERITY_INFO, path=gh.full_name,
+                           current="GitHub repo not cloned on this machine",
+                           expected="informational — clone if you work on it here",
+                           handle=handle))
+    return out
+
+
+# ===========================================================================
+# Orchestrator
+# ===========================================================================
+
+
+def _local_repos() -> tuple[list, str | None]:
+    """Scan this machine's local git repos via the repo inventory (no SSH — the
+    ``local`` host runs the scan script in a local shell). Best-effort."""
+    try:
+        return _inv.list_machine_repos(LOCAL_HOST)
+    except Exception as exc:  # noqa: BLE001
+        return [], str(exc)
+
+
+def _github_repos(env: dict | None) -> tuple[list, str | None]:
+    """Best-effort GitHub repo list for the lab org (item 6). Empty on any
+    failure — never fatal."""
+    try:
+        from .lab import load_lab_config
+        org = load_lab_config().github_org
+    except Exception:  # noqa: BLE001
+        org = ""
+    if not org:
+        return [], "no github org configured"
+    try:
+        return _inv.list_github_repos(org)
+    except Exception as exc:  # noqa: BLE001
+        return [], str(exc)
+
+
+def run_personal_audit(handle: str | None = None,
+                       env: dict | None = None) -> PersonalAuditReport:
+    """Run the full personal audit LOCALLY and return a
+    :class:`PersonalAuditReport`. NO SSH; every reconciler is ``apply=False``;
+    ACL checks ``stat`` only. Missing prerequisites yield ``unverifiable``
+    findings so the report never silently lies.
+
+    ``handle`` defaults to the resolved current member (env / user-file / gh).
+    When no handle resolves, identity-dependent checks (github/slack/cert) are
+    skipped with a single ``unverifiable`` finding; the filesystem checks
+    (repos/vault/non-mm) still run."""
+    when = _iso(_now())
+    findings: list[Finding] = []
+
+    # -- resolve identity -----------------------------------------------------
+    if handle:
+        resolved = _norm(handle)
+    else:
+        ident = _identity.resolve(allow_unknown=True)
+        resolved = "" if ident.source == "unknown" else _norm(ident.handle)
+
+    # -- local filesystem inventory (identity-independent) --------------------
+    repos, repo_err = _local_repos()
+    inventory_keys = {
+        _inv._canonical_url(r.origin_url) for r in repos if r.origin_url
+    }
+    if repo_err:
+        findings.append(_mk(AREA_REPOS, "PERSONAL-INVENTORY-UNVERIFIABLE-01",
+                            severity=SEVERITY_INFO, path=LOCAL_HOST,
+                            current=f"repo inventory scan failed: {repo_err}",
+                            handle=resolved or None,
+                            verify_state=VERIFY_UNVERIFIABLE, when=when))
+
+    gh_repos, _gh_err = _github_repos(env)
+
+    # -- identity-dependent checks -------------------------------------------
+    if not resolved:
+        findings.append(_mk(AREA_CERT, "PERSONAL-NO-HANDLE-01",
+                            severity=SEVERITY_INFO, path="(identity)",
+                            current="could not resolve your murmurent handle",
+                            expected="set $MURMURENT_USER or run `gh auth login`",
+                            verify_state=VERIFY_UNVERIFIABLE, when=when,
+                            notes="Skipped GitHub/Slack/cert checks (need a handle)."))
+    else:
+        projects = _my_projects(resolved, env)
+        findings += check_github(resolved, projects, env)
+        findings += check_slack(resolved, projects, env)
+        findings += check_cert(resolved, projects, env)
+
+    # -- filesystem checks (run regardless of handle) -------------------------
+    findings += check_repo_acls(resolved, repos, env)
+    findings += check_vault_acls(resolved, env)
+    findings += check_clinical_containment(resolved, repos, env)
+    findings += check_non_mm(resolved, repos, gh_repos, inventory_keys, env)
+
+    return PersonalAuditReport(handle=resolved or "unknown",
+                               generated_at=when, findings=findings)
+
+
+# ---------------------------------------------------------------------------
+# Persistence
+# ---------------------------------------------------------------------------
+
+
+def persist(report: PersonalAuditReport) -> Path:
+    """Write the report as JSONL under
+    ``~/.murmurent/security/local/personal-<date>.jsonl`` and refresh the
+    ``latest.jsonl`` symlink. Returns the dated path."""
+    out_dir = PERSIST_ROOT / LOCAL_HOST
+    out_dir.mkdir(parents=True, exist_ok=True)
+    date = report.generated_at[:10]
+    target = out_dir / f"personal-{date}.jsonl"
+    write_jsonl(target, report.findings)
+    latest = out_dir / "personal-latest.jsonl"
+    try:
+        if latest.is_symlink() or latest.exists():
+            latest.unlink()
+        latest.symlink_to(target.name)
+    except OSError:
+        pass
+    return target
+
+
+def run_and_persist(handle: str | None = None,
+                    env: dict | None = None) -> tuple[PersonalAuditReport, Path]:
+    """Convenience: run the audit + persist it. Returns ``(report, path)``."""
+    report = run_personal_audit(handle=handle, env=env)
+    path = persist(report)
+    return report, path
+
+
+__all__ = [
+    "PersonalAuditReport", "run_personal_audit", "persist", "run_and_persist",
+    "check_github", "check_slack", "check_cert", "check_repo_acls",
+    "check_vault_acls", "check_clinical_containment", "check_non_mm",
+    "ALL_AREAS", "AREA_GITHUB", "AREA_SLACK", "AREA_CERT", "AREA_REPOS",
+    "AREA_VAULT", "AREA_NON_MM", "LOCAL_HOST", "CERT_WARN_DAYS", "REB_WARN_DAYS",
+]
