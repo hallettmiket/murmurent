@@ -254,6 +254,11 @@ function UpdateBanner() {
   }, []);
   if (!st || !st.ok || st.behind <= 0 || dismissed) return null;
   const diverged = !st.can_ff;
+  // Version skew: the JSX is served fresh from disk, so it can be newer than the
+  // running server. `can_self_update` is returned only by servers that also have
+  // POST /api/murmurent/update — gate the button on it so we never offer a click
+  // that would 404. An older (skewed) server gets restart guidance instead.
+  const canSelfUpdate = !!st.can_self_update;
 
   // After the server restarts, poll /healthz until it answers, then hard-reload.
   const waitForRestartAndReload = async () => {
@@ -303,12 +308,14 @@ function UpdateBanner() {
         ? <span className="muted" style={{color:"var(--tiger-deep)"}}>{msg}</span>
         : diverged
           ? <span className="muted">Your install has local changes — reconcile <code>~/repos/murmurent</code> manually first.</span>
-          : <>
-              <button type="button" className="btn sm primary" disabled={busy} onClick={doUpdate}>
-                {busy ? "updating…" : "update & restart"}
-              </button>
-              <span className="muted" style={{fontSize:11}}>pulls latest + restarts — you may lose unsaved build progress.</span>
-            </>}
+          : !canSelfUpdate
+            ? <span className="muted">Your dashboard is running older code than what's on disk — restart it to enable one-click update: <code className="mono">murmurent dashboard --hifi</code>, then reload.</span>
+            : <>
+                <button type="button" className="btn sm primary" disabled={busy} onClick={doUpdate}>
+                  {busy ? "updating…" : "update & restart"}
+                </button>
+                <span className="muted" style={{fontSize:11}}>pulls latest + restarts — you may lose unsaved build progress.</span>
+              </>}
       <button type="button" className="btn sm ghost" style={{marginLeft:"auto"}}
         onClick={() => setDismissed(true)}>dismiss</button>
     </div>

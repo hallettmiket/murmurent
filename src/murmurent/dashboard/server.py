@@ -2368,9 +2368,17 @@ def create_app() -> FastAPI:
     ) -> dict:
         """Is the local murmurent install behind upstream? Backs the dashboard's
         'update available' banner. Read-only — never pulls or restarts.
-        Best-effort: an offline remote yields ``ok=False``, not an error."""
+        Best-effort: an offline remote yields ``ok=False``, not an error.
+
+        Carries ``can_self_update: True`` — a capability flag present only on
+        server versions that ALSO expose ``POST /api/murmurent/update``. The
+        banner keys the one-click button off this flag, so a server whose served
+        JSX is newer than the running process (version skew) never offers a
+        button that would 404; it shows restart guidance instead."""
         from ..core import mm_update as _mm
-        return _mm.check_update(fetch=fetch).to_dict()
+        result = _mm.check_update(fetch=fetch).to_dict()
+        result["can_self_update"] = True
+        return result
 
     @app.post("/api/murmurent/update")
     def murmurent_update() -> dict:
