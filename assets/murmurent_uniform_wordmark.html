@@ -111,22 +111,24 @@
 
   function rand(a, b) { return a + Math.random() * (b - a); }
 
-  // While the cursor is away, the ghost lure doesn't sit still — it drifts on a
-  // slow Lissajous path so the whole flock sweeps in broad arcs across the frame
-  // (a real murmuration) instead of balling up around one fixed point like bees.
-  const ghost = { cx: 0.5, cy: 0.5,
-                  px: rand(0, 6.28), py: rand(0, 6.28),
-                  sx: rand(0.00011, 0.00020), sy: rand(0.00009, 0.00017),
-                  rx: rand(0.24, 0.33), ry: rand(0.22, 0.31) };
+  // While the cursor is away, the ghost lure doesn't sit still — it sweeps
+  // edge-to-edge across the WHOLE frame, emulating a slow cursor crossing the
+  // window (~3-4s per crossing, the pace that reads as a real murmuration). A
+  // small fixed point makes the flock ball up like bees; a full-window sweep
+  // makes it wheel and stream like starlings. sx/sy are tuned against
+  // TIME_SCALE (t runs at 0.4x real) so a half-Lissajous ≈ 3-4.5s.
+  const ghost = { px: rand(0, 6.28), py: rand(0, 6.28),
+                  sx: rand(0.0018, 0.0026), sy: rand(0.0015, 0.0023),
+                  rx: 0.42, ry: 0.40 };
 
   function pickGhost() {
-    // fresh drift centre + phase, kept off the edges so the arc stays on screen
-    ghost.cx = rand(0.38, 0.62);
-    ghost.cy = rand(0.38, 0.62);
+    // re-roll the sweep: fresh phase + speed so it crosses from a new angle
     ghost.px = rand(0, 6.28);
     ghost.py = rand(0, 6.28);
-    lure.x = ghost.cx * W;
-    lure.y = ghost.cy * H;
+    ghost.sx = rand(0.0018, 0.0026);
+    ghost.sy = rand(0.0015, 0.0023);
+    lure.x = (0.5 + ghost.rx * Math.sin(ghost.px)) * W;
+    lure.y = (0.5 + ghost.ry * Math.cos(ghost.py)) * H;
   }
 
   for (let i = 0; i < N; i++) {
@@ -238,11 +240,12 @@
       a.cy = (a.ay + a.ry * Math.cos(t * 1000 * a.sy + a.py)) * H;
     }
 
-    // idle: drift the ghost lure so the whole flock sweeps in broad arcs across
-    // the frame instead of orbiting one static point.
+    // idle: sweep the ghost lure edge-to-edge across the frame (like a slow
+    // cursor crossing) so the whole flock streams after it as a murmuration
+    // instead of orbiting one static point.
     if (!mouse.active) {
-      lure.x = (ghost.cx + ghost.rx * Math.sin(t * 1000 * ghost.sx + ghost.px)) * W;
-      lure.y = (ghost.cy + ghost.ry * Math.cos(t * 1000 * ghost.sy + ghost.py)) * H;
+      lure.x = (0.5 + ghost.rx * Math.sin(t * 1000 * ghost.sx + ghost.px)) * W;
+      lure.y = (0.5 + ghost.ry * Math.cos(t * 1000 * ghost.sy + ghost.py)) * H;
     }
 
     // bucket birds into the grid
@@ -421,11 +424,11 @@
       // purple. (Non-logo keeps the charcoal ink.)
       if (LOGO) {
         const spN = Math.min(1, sp / 5);
-        // Bold temperature sweep across depth: FAR birds are a cool, bright
-        // blue-violet; NEAR birds a hot, deep magenta. Both stay saturated so the
-        // hue contrast (not just lightness) carries the 3D read. A 74deg hue span
-        // + a 42-point lightness swing make it dramatic rather than subtle.
-        const hue = 250 + 74 * b.z + 14 * b.swirl;   // blue-violet (far) -> magenta (near)
+        // Bold temperature sweep across depth: FAR birds are a cool blue-indigo;
+        // NEAR birds a hot pink-magenta. Both stay saturated so the hue contrast
+        // (not just lightness) carries the 3D read. A 100deg hue span + a
+        // 42-point lightness swing make it dramatic rather than subtle.
+        const hue = 244 + 100 * b.z + 14 * b.swirl;  // blue-indigo (far) -> pink-magenta (near)
         const sat = 58 + 32 * b.z + 8 * spN;         // saturated throughout -> hue contrast reads
         const lig = 70 - 42 * b.z - 6 * spN;         // bright pale far -> deep rich near
         ctx.fillStyle = "hsla(" + hue.toFixed(1) + "," + sat.toFixed(1) + "%,"
