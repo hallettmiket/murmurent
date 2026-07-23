@@ -152,6 +152,17 @@ def agent_unfork(name: str, force: bool) -> None:
     _agent_cmd.cmd_unfork(name, force=force)
 
 
+@agent_group.command(
+    "relink",
+    help="Re-link your vault's personal agents (symlinks) + forks (hardlinks) "
+         "into ~/.claude/agents — run after a vault pull on another machine. "
+         "Also migrates a legacy ~/.murmurent/agent_forks/ into the vault once.",
+)
+def agent_relink() -> None:
+    from .commands import agent_cmd as _agent_cmd
+    _agent_cmd.cmd_relink()
+
+
 # ---------------------------------------------------------------------------
 # preference
 # ---------------------------------------------------------------------------

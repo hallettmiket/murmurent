@@ -57,6 +57,21 @@ def _isolate_wigamig_home(monkeypatch, tmp_path):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_machine_settings(monkeypatch, tmp_path):
+    """Point ``machine_settings.MACHINE_FILE`` at a per-test temp path.
+
+    ``machine.yaml`` lives at the real ``~/.murmurent`` (not ``MURMURENT_HOME``-
+    aware), so without this any code that resolves the personal vault through
+    it — e.g. ``agent_forks.forks_dir()`` preferring ``<vault>/agent_forks/``
+    (issue #80) — would read the developer's REAL vault registration and could
+    leak test writes into it. Tests that need a specific machine.yaml still
+    just ``monkeypatch.setattr`` it again."""
+    from murmurent.dashboard import machine_settings as _ms
+
+    monkeypatch.setattr(_ms, "MACHINE_FILE", tmp_path / "_machine.yaml")
+
+
+@pytest.fixture(autouse=True)
 def _isolate_repos_root(monkeypatch, tmp_path):
     """Point ``MURMURENT_REPOS_ROOT`` at a per-test temp dir so anything that creates
     a lab-mgmt repo (``pi-init`` → ``~/repos/wigamig_<lab>``) never writes into the

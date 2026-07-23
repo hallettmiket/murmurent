@@ -40,7 +40,11 @@ VAULT_SUBDIRS: tuple[str, ...] = (
     # Net-new personal agents a member creates (#38 item 3). Living in the vault
     # means `murmurent vault sync` backs them up to the member's GitHub; they are
     # symlinked into ~/.claude/agents so Claude Code loads them.
-    "agents")
+    "agents",
+    # Canonical copies of forked commons agents + agent_forks.yaml (#80). In the
+    # vault so a fork made on one machine reaches every other machine; hardlinked
+    # into ~/.claude/agents by `murmurent agent relink`.
+    "agent_forks")
 
 GITKEEP = ".gitkeep"
 CLAUDE_MD = "CLAUDE.md"
@@ -81,7 +85,13 @@ def seed_claude_md() -> str:
         "stay consistent.\n"
         "- `murmurent_data/` — arbitrary reference files (PDFs, spreadsheets, "
         "protocols, images) that agents may read on demand; not schema-validated "
-        "like the Oracle.\n\n"
+        "like the Oracle.\n"
+        "- `agents/` — your own (net-new) personal agents "
+        "(`murmurent agent new`).\n"
+        "- `agent_forks/` — your forks of commons agents "
+        "(`murmurent agent fork`) + their provenance manifest. Both folders "
+        "sync with the vault; run `murmurent agent relink` on another machine "
+        "to load them into `~/.claude/agents/`.\n\n"
         "## Sync\n\n"
         "This vault is git-backed. After writing entries, run `murmurent vault "
         "sync` to commit + push (best-effort). Pull the latest from another "
@@ -240,7 +250,10 @@ DEFAULT_EXCLUDED_SENSITIVITIES: tuple[str, ...] = ("clinical",)
 # CLAUDE.md and leaves everything else local (off GitHub). This is safer than a
 # clinical denylist, which would push untagged personal notes.
 MURMURENT_TRACKED_FOLDERS: tuple[str, ...] = (
-    "oracle", "lab-notebook", "maps-legends", "murmurent_data")
+    "oracle", "lab-notebook", "maps-legends", "murmurent_data",
+    # Personal agents + commons-agent forks sync across the member's machines
+    # via the vault (issue #80) — so both must survive the allowlist.
+    "agents", "agent_forks")
 
 
 def _allowlist_gitignore_lines() -> list[str]:

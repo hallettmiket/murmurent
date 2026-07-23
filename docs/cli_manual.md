@@ -54,9 +54,10 @@ Effects:
 | Command | Effect | Notes |
 |---|---|---|
 | `murmurent agent list` | List installed agents in `~/.claude/agents/` | Each shown as **linked** (commons symlink), **forked** (personal copy), or **user-file**; forks also show upstream/local drift status |
-| `murmurent agent fork <name> [--force]` | Replace a commons agent's symlink with an editable personal copy | Preserved across commons upgrades; canonical copy under `~/.murmurent/agent_forks/` (git-trackable), hardlinked into `~/.claude/agents/`. `--force` re-snapshots from the current commons |
+| `murmurent agent fork <name> [--force]` | Replace a commons agent's symlink with an editable personal copy | Preserved across commons upgrades; canonical copy in the vault's `agent_forks/` (rides `murmurent vault sync` to your other machines; legacy `~/.murmurent/agent_forks/` when no vault), hardlinked into `~/.claude/agents/`. `--force` re-snapshots from the current commons |
 | `murmurent agent drift [<name>]` | Merge indicator for forks | Per fork: `UP-TO-DATE` / `LOCAL-ONLY` / `UPSTREAM` / `DIVERGED` / `ORPHANED`, plus a summary of forks needing review |
 | `murmurent agent unfork <name> [--force]` | Restore the commons symlink, dropping the personal copy | Prompts if local edits would be lost, unless `--force` |
+| `murmurent agent relink` | Re-link the vault's personal agents (symlinks) + forks (hardlinks) into `~/.claude/agents/` | Run after a vault pull on another machine (`scripts/setup.sh` also runs it). Migrates a legacy `~/.murmurent/agent_forks/` into the vault once; idempotent and non-destructive |
 
 ### Preferences
 
