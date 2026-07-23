@@ -26,8 +26,11 @@ Agents panel's **+ new**); it is written to your personal vault under
 symlinked into `~/.claude/agents/` so Claude Code loads it. A personal agent
 lives in your village only — it is never part of the commons and never
 appears in another member's environment. (Making your own copy of a *commons*
-agent instead is a **fork**: `murmurent agent fork <name>`, kept in
-`~/.murmurent/agent_forks/`.)
+agent instead is a **fork**: `murmurent agent fork <name>`, kept in your
+vault under `agent_forks/`.) Because both folders live in the vault, your
+personal agents and forks follow you to every machine: after a vault pull,
+run `murmurent agent relink` (`scripts/setup.sh` also runs it) to load them
+into that machine's `~/.claude/agents/`.
 
 You invoke these by addressing an agent by name in plain English (for
 example, *"Bookworm, find all manuscripts related to MMP11 in breast

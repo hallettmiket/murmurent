@@ -155,10 +155,14 @@ murmurent agent fork <name>
 
 This replaces the symlink with a personal copy you can edit freely. The copy
 is a non-symlink, so `scripts/setup.sh` preserves it across commons upgrades
-rather than overwriting it. The canonical copy lives under
-`~/.murmurent/agent_forks/` (a directory you can `git init` and push, giving
-you a permanent, version-controlled record), and is hardlinked into
-`~/.claude/agents/` so Claude Code loads it with no extra sync step.
+rather than overwriting it. The canonical copy lives in your personal vault
+under `agent_forks/` (so `murmurent vault sync` carries your forks to your
+GitHub and on to your other machines), and is hardlinked into
+`~/.claude/agents/` so Claude Code loads it with no extra sync step. On
+another machine, pull the vault and run `murmurent agent relink` to load the
+forks there too. A pre-existing `~/.murmurent/agent_forks/` (the old,
+machine-local home) is migrated into the vault automatically the first time
+`murmurent agent relink` runs; the originals are kept as an on-disk backup.
 
 Because the commons keeps evolving, Murmurent records the commons version
 you forked from and provides a merge-style drift indicator:
