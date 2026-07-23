@@ -369,21 +369,35 @@ function CmdBar({ query, setQuery }) {
           swarm. So we render it in a 720px world and CSS-scale it down into a
           ~156px box (overflow-clipped) — real murmuration density, shown small,
           and the scale-down slows the on-screen motion too. */}
-      <div style={{
-        width:156, height:156, flexShrink:0, overflow:"hidden", borderRadius:8,
-        background:"#f4f1ea", boxShadow:"0 1px 5px rgba(32,20,54,0.15)",
-      }}>
-        <iframe
-          src="/murmuration?logo"
-          title="murmurent"
-          scrolling="no"
-          style={{
-            width:720, height:720, border:"none",
-            transform:"scale(0.2167)", transformOrigin:"top left",
-          }}
-        />
+      {/* Logo widget: the murmuration animation with the "Murmurent" wordmark
+          overlaid top-right (dark purple) and the version bottom-left. The
+          separate ".home" brand title was removed — the wordmark IS the title. */}
+      <div style={{position:"relative", width:156, height:156, flexShrink:0}}>
+        <div style={{
+          width:156, height:156, overflow:"hidden", borderRadius:8,
+          background:"#f4f1ea", boxShadow:"0 1px 5px rgba(32,20,54,0.15)",
+        }}>
+          <iframe
+            src="/murmuration?logo"
+            title="murmurent"
+            scrolling="no"
+            style={{
+              width:720, height:720, border:"none",
+              transform:"scale(0.2167)", transformOrigin:"top left",
+            }}
+          />
+        </div>
+        <div style={{
+          position:"absolute", top:7, right:9, fontSize:20, fontWeight:800,
+          color:"#4a1e70", letterSpacing:"0.2px", lineHeight:1,
+          textShadow:"0 1px 2px rgba(244,241,234,0.92)", pointerEvents:"none",
+        }}>Murmurent</div>
+        {window.DATA.version ? <div style={{
+          position:"absolute", bottom:7, left:9, fontSize:11, fontWeight:600,
+          color:"#4a1e70", opacity:0.9, lineHeight:1, pointerEvents:"none",
+          textShadow:"0 1px 2px rgba(244,241,234,0.92)",
+        }}>v{window.DATA.version}</div> : null}
       </div>
-      <div className="home">Murmurent{window.DATA.version ? <small> v{window.DATA.version}</small> : null}</div>
       <div className="search">
         <span className="mono muted" style={{fontSize:12}}>›</span>
         <input
