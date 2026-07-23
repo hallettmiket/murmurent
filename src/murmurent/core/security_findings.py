@@ -53,6 +53,18 @@ ALL_SOURCES = (SOURCE_SCANNER, SOURCE_AGENT, SOURCE_SNAPSHOT)
 TIER_1 = "tier1"
 TIER_2 = "tier2"
 
+# Whether the scanner could actually confirm the state it reports.
+# ``verified`` = the check ran and its result is trustworthy.
+# ``unverifiable`` = a prerequisite was missing (no ``gh`` CLI, no Slack
+# token, no identity handle), so the check COULD NOT run — the finding is a
+# "could-not-verify" placeholder, NOT a real drift. Orthogonal to severity:
+# an unverifiable finding is usually ``info`` but says "I couldn't check",
+# never "this is fine". Added for the personal audit (issue #63 Phase 1) so a
+# report never silently lies when a reconciler degrades to an empty set.
+VERIFY_VERIFIED = "verified"
+VERIFY_UNVERIFIABLE = "unverifiable"
+ALL_VERIFY_STATES = (VERIFY_VERIFIED, VERIFY_UNVERIFIABLE)
+
 
 @dataclass
 class Finding:
@@ -74,6 +86,7 @@ class Finding:
     detected_at: str                     # ISO8601 UTC, e.g. "2026-05-19T14:00:00Z"
     source: str = SOURCE_SCANNER         # scanner | agent | snapshot
     tier: str = TIER_1                   # tier1 | tier2
+    verify_state: str = VERIFY_VERIFIED  # verified | unverifiable (could-not-verify)
     is_directory: bool = False
     aggregate_count: int = 1             # >1 when a parent dir rolled up siblings
     owner_handle: str | None = None      # "@the_pi" when attributable to a member
@@ -96,6 +109,11 @@ class Finding:
         if self.tier not in (TIER_1, TIER_2):
             raise ValueError(
                 f"Finding.tier must be {TIER_1!r} or {TIER_2!r}; got {self.tier!r}"
+            )
+        if self.verify_state not in ALL_VERIFY_STATES:
+            raise ValueError(
+                f"Finding.verify_state must be one of {ALL_VERIFY_STATES}; "
+                f"got {self.verify_state!r}"
             )
 
     def to_dict(self) -> dict:
@@ -316,6 +334,9 @@ __all__ = [
     "ALL_SOURCES",
     "TIER_1",
     "TIER_2",
+    "VERIFY_VERIFIED",
+    "VERIFY_UNVERIFIABLE",
+    "ALL_VERIFY_STATES",
     "ROLLUP_THRESHOLD",
     "stable_finding_id",
     "write_jsonl",

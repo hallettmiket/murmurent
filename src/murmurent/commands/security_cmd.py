@@ -145,12 +145,71 @@ def cmd_scan(host_name: str, *, json_out: bool = False, timeout: int = 600,
     return 1 if has_block else 0
 
 
+def _render_personal(report) -> None:
+    """Render a :class:`PersonalAuditReport` as a headline-first grouped table."""
+    from ..core import personal_audit as _pa
+
+    console = Console()
+    # Headline-first (rules/headline_first.md): the verdict line comes first.
+    counts = report.counts()
+    console.print(f"[bold]{report.headline()}[/]\n")
+    console.print(
+        f"[bold]Summary[/] · "
+        f"[red]{counts['block']} BLOCK[/] · "
+        f"[yellow]{counts['concern']} CONCERN[/] · "
+        f"[green]{counts['ok']} OK[/] · "
+        f"[dim]{counts['unverifiable']} could-not-verify[/]\n"
+    )
+    color = {SEVERITY_BLOCK: "red", SEVERITY_WARN: "yellow", SEVERITY_INFO: "blue"}
+    by_area = report.by_area()
+    for area in _pa.ALL_AREAS:
+        rows = by_area.get(area) or []
+        if not rows:
+            continue
+        console.print(f"[bold cyan]{area}[/]")
+        table = Table(show_lines=False)
+        table.add_column("sev")
+        table.add_column("verify")
+        table.add_column("rule", style="cyan")
+        table.add_column("finding", overflow="fold")
+        table.add_column("fix", style="dim", overflow="fold")
+        for f in rows:
+            c = color.get(f.severity, "white")
+            vs = "[dim]?[/]" if f.verify_state != "verified" else "[green]✓[/]"
+            table.add_row(f"[{c}]{f.severity}[/]", vs, f.rule,
+                          f.current_state, f.suggested_fix)
+        console.print(table)
+        console.print()
+
+
+def cmd_audit_me(*, json_out: bool = False) -> int:
+    """Run the LOCAL personal audit (issue #63 Phase 1). Returns 1 if any
+    BLOCK finding, else 0."""
+    from ..core import personal_audit as _pa
+
+    report, path = _pa.run_and_persist()
+    if json_out:
+        payload = report.to_dict()
+        payload["persisted"] = str(path)
+        click.echo(json.dumps(payload, indent=2))
+    else:
+        _render_personal(report)
+        click.echo(f"Persisted to: {path}", err=True)
+    return 1 if report.counts()["block"] else 0
+
+
 def add_to_cli(cli_group: click.Group) -> None:
     """Attach the ``murmurent security`` subcommand group."""
 
     @cli_group.group("security", help="Per-lab security agent + dashboard.")
     def _security() -> None:
         """Security agent commands."""
+
+    @_security.command("audit-me",
+                       help="Run the LOCAL personal security audit (no SSH).")
+    @click.option("--json", "json_out", is_flag=True, help="Emit JSON instead of a table.")
+    def _audit_me(json_out: bool) -> None:
+        sys.exit(cmd_audit_me(json_out=json_out))
 
     @_security.command("scan", help="Run the Tier-1 scanner on a host (unprivileged).")
     @click.option("--host", required=True, help="Registered host name (see `murmurent host list`).")
@@ -171,4 +230,4 @@ def add_to_cli(cli_group: click.Group) -> None:
         sys.exit(rc)
 
 
-__all__ = ["cmd_scan", "add_to_cli"]
+__all__ = ["cmd_scan", "cmd_audit_me", "add_to_cli"]
