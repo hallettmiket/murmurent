@@ -416,24 +416,24 @@
 
       // silhouette area + atmospheric haze -> the flock twinkles and recedes
       const a = (0.2 + 0.38 * b.ink) * (0.55 + 0.45 * spread) * (0.46 + 0.54 * b.z);
-      // Iridescent metallic flock (starling oil-slick sheen). Each bird's hue
-      // shifts with its HEADING, so as the flock wheels through the murmuration
-      // waves of colour ripple across it; a per-bird offset (b.ink) + a slow time
-      // drift keep it varied and alive. A wing-beat "shimmer" swings each bird
-      // between vivid CHROMATIC colour and a bright metallic SILVER glint, so it
-      // sparkles rather than sitting at one flat tone. (Non-logo keeps charcoal.)
+      // Polished SILVER flock that catches the light. Birds are metallic grey
+      // (depth sets the shade); each one glints toward bright silver when its
+      // HEADING aligns with a fixed light source, so as the flock wheels a wave
+      // of reflections sweeps across the birds facing the light -- the colour is
+      // tied to the murmur movement, not random. Only at a glint's peak does a
+      // faint thin-film IRIDESCENCE (a narrow cyan->magenta sheen) tint the
+      // reflection; the rest of the time it stays silver. (Non-logo: charcoal.)
       if (LOGO) {
         const spN = Math.min(1, sp / 5);
-        const head = Math.atan2(b.vy, b.vx) * 57.2958;      // heading, degrees
-        let hue = (head * 1.4 + b.ink * 360 + b.swirl * 160 + simT * 45) % 360;
-        if (hue < 0) hue += 360;
-        // glint peaks with the wingbeat + a per-bird phase, sharpest when the
-        // wings are broadside -> intermittent silver flashes across the flock
-        const shimmer = 0.5 + 0.5 * Math.sin(b.flap * 0.9 + b.ink * 20 + simT * 2.2);
-        const glint = shimmer * shimmer * (0.55 + 0.45 * spread);
-        const sat = 22 + 60 * (1 - glint);                  // vivid colour, dropping to silver on a glint
-        const baseL = 46 + 16 * b.z;                         // depth: far a touch brighter
-        const lig = Math.min(90, baseL + glint * 40 + spN * 5);  // silver specular highlight
+        const nx = b.vx / sp, ny = b.vy / sp;               // heading unit vector
+        const LX = -0.6, LY = -0.8;                         // light from upper-left (unit-ish)
+        const align = Math.abs(nx * LX + ny * LY);          // 0..1: heading vs light
+        const spec = align * align * align;                 // sharp -> a moving band of glints
+        const baseL = 50 + 20 * b.z;                        // metallic grey, far a touch lighter
+        const lig = Math.min(95, baseL + spec * 36 + spN * 4);   // glint -> bright silver
+        const irid = spec * spec;                           // tint only at the peak of a glint
+        let hue = (200 + 130 * align + simT * 26) % 360;    // narrow cyan->magenta, angle-driven
+        const sat = 5 + 34 * irid;                          // silver most of the time; a sheen on glints
         ctx.fillStyle = "hsla(" + hue.toFixed(1) + "," + sat.toFixed(1) + "%,"
                                 + lig.toFixed(1) + "%," + a.toFixed(3) + ")";
       } else {
