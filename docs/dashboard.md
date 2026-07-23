@@ -21,6 +21,13 @@ read-mostly: most panels display state, and a few offer buttons for common
 actions (such as adopting a repository or adding a machine), each of which
 has an equivalent `murmurent` command.
 
+The dashboard binds to loopback, so each machine's dashboard is visible
+on that machine alone. To view a remote server's dashboard from your
+laptop, use an SSH port-forward, either by hand or via
+`murmurent dashboard --tunnel you@host`; see
+[`setup.md`](setup.md#viewing-a-remote-machines-dashboard) for the
+recipe (including the VS Code Remote-SSH auto-forward route).
+
 ## Installing a desktop launcher (menu icon)
 
 Rather than typing the command each time, you can install a desktop icon

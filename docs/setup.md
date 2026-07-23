@@ -311,6 +311,44 @@ After that, the Repos panel's **↑ adopt** action works for `• clone`
 rows on the remote host, over a single batched SSH session. See
 [`ready_vs_projects.md`](ready_vs_projects.md) for what adoption does.
 
+### Viewing a remote machine's dashboard
+
+Each machine runs its own dashboard, bound to `127.0.0.1:8770` on that
+machine only. To view a remote server's dashboard from your laptop, use
+an SSH local port-forward. Three equivalent routes, most manual first:
+
+1. **Manual recipe.** In a terminal on the laptop:
+
+   ```bash
+   ssh -N -L 8770:localhost:8770 you@host
+   ```
+
+   then open `http://localhost:8770` in the laptop's browser. You are
+   now viewing the remote machine's dashboard; Ctrl+C stops the
+   forward.
+
+2. **The shortcut.** The same forward, wrapped:
+
+   ```bash
+   murmurent dashboard --tunnel you@host
+   ```
+
+   `--tunnel` accepts either a literal ssh destination (as above) or the
+   name of a registered ssh host from `murmurent host list`, in which
+   case the destination comes from `~/.murmurent/hosts.yaml`. If port
+   8770 is already in use on the laptop, add `--tunnel-port 8771` and
+   open `http://localhost:8771` instead; `--port` changes the remote
+   dashboard port when the server there runs on something other than
+   the default.
+
+3. **VS Code Remote-SSH.** If you run `murmurent dashboard --hifi` in a
+   Remote-SSH integrated terminal, VS Code auto-forwards port 8770 for
+   you, and the dashboard's own links emit `vscode-remote://ssh-remote+`
+   URLs that open on the right machine. Zero extra setup.
+
+In every case the remote dashboard stays bound to its own loopback
+interface; the SSH forward is the only way in from outside.
+
 ## Resetting a machine
 
 The `/murmurent-reset` skill (run inside a Claude Code session) backs up
