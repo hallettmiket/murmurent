@@ -1118,9 +1118,3 @@ class DashboardResponse(BaseModel):
     inventory: InventoryBlock
     notebook: NotebookBlock
     installations: list[InstallationRow] = []
-    # Cached status of the lab's master folders on its lab_base server.
-    # Rendered as a persistent green/yellow/red pill on the dashboard so
-    # the user can see at a glance whether lab-server has been
-    # bootstrapped. Empty dict when never probed — the pill shows "?"
-    # and prompts the PI to click "check" inside Lab Settings.
-    master_folders: dict = {}
