@@ -63,12 +63,17 @@ def test_post_host_ignores_param_fields(env):
     })
     assert res.status_code == 200, res.text
     text = (env["tmp"] / "hosts.yaml").read_text(encoding="utf-8")
-    for banned in ("lab_vm_root", "vault_root", "project_root",
-                   "lab_vault_root", "oracle_subfolder"):
+    # The per-machine CONFIG params must never be persisted.
+    for banned in ("lab_vm_root", "vault_root", "lab_vault_root",
+                   "oracle_subfolder"):
         assert banned not in text, f"{banned} should not be persisted"
     h = _hosts.resolve("lab-server")
     assert h.ssh_host == "lab-server" and h.remote_user == "the_pi"
     assert h.scan_dirs == ("repos",)
+    # The retired config params fell back to dataclass defaults (not the POSTed
+    # values) — proof they were ignored, not stored.
+    assert h.lab_vm_root == "~/lab_vm/data"
+    assert h.vault_root == "~/Documents/Obsidian"
 
 
 def test_patch_host_ignores_param_fields(env):
@@ -154,6 +159,23 @@ def test_mirror_is_noop_without_vault(monkeypatch, tmp_path):
     monkeypatch.setattr(_mr, "vault_machines_dir", lambda: None)
     assert _mr.mirror_this_machine(
         C.MachineSettings(machine_name="x")) is None
+
+
+def test_mirror_never_creates_na_dir(monkeypatch, tmp_path):
+    """Regression: obsidian_vault_path='NA' (the "no vault here" sentinel) must
+    NOT resolve to a literal ``NA`` dir. Saving with NA writes machine.yaml but
+    creates no mirror and no ``NA/machines`` folder in the CWD."""
+    from murmurent.core import vault_sync as _vs
+    monkeypatch.delenv(_mr.ENV_MACHINES_DIR, raising=False)
+    monkeypatch.setattr(_ms, "MACHINE_FILE", tmp_path / "machine.yaml")
+    monkeypatch.setenv("MURMURENT_HOSTS_FILE", str(tmp_path / "hosts.yaml"))
+    monkeypatch.chdir(tmp_path)
+    # personal_vault_root treats "NA" as unregistered.
+    _ms.write(C.MachineSettings(machine_name="box", obsidian_vault_path="NA"))
+    assert _vs.personal_vault_root() is None
+    assert _mr.mirror_this_machine(
+        C.MachineSettings(machine_name="box", obsidian_vault_path="NA")) is None
+    assert not (tmp_path / "NA").exists(), "must not create a literal NA/ dir"
 
 
 def test_machine_id_prefers_name_then_hostname(env, monkeypatch):

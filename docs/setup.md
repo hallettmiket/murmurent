@@ -299,13 +299,24 @@ To run Murmurent on a remote host as well (for example, a shared lab
 server):
 
 ```bash
-# Add the host to the local registry (dashboard Machines panel,
-# or ~/.murmurent/hosts.yaml directly).
-murmurent host add my-server --ssh-host <my_server> ...
+# Register the host as a CONNECTION target (dashboard Machines panel →
+# "Add machine (SSH host)", or ~/.murmurent/hosts.yaml directly).
+murmurent host add my-server --ssh-host <my_server> --scan-dir repos
 
 # Clone murmurent on the remote so the commons agents resolve there.
 scripts/install_remote.sh my-server
 ```
+
+`hosts.yaml` is a **connection-only registry** (issue #80): it records how to
+reach a machine (`ssh_host`, `remote_user`) and where its git clones live
+(`project_root` + `scan_dirs`) — exactly what the Repo Inventory SSH scan and
+remote deploy need. It does **not** hold a machine's data-root or vault paths.
+Each machine configures its own data-root + personal/lab vault on **its own
+dashboard** (This machine → edit → save, written to that machine's
+`~/.murmurent/machine.yaml`); reach a remote machine's dashboard over the SSH
+tunnel below. Every machine mirrors its own config to
+`<vault>/machines/<machine_id>.yaml`, which syncs via the personal vault, so
+each dashboard shows a read-only view of your other machines.
 
 After that, the Repos panel's **↑ adopt** action works for `• clone`
 rows on the remote host, over a single batched SSH session. See

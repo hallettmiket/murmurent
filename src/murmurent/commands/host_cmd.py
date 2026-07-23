@@ -41,12 +41,19 @@ def cmd_add(
     ssh_host: str | None,
     remote_user: str,
     project_root: str,
-    lab_vm_root: str,
-    vault_root: str,
+    scan_dirs: tuple[str, ...] = (),
     mount_point: str,
     description: str,
+    lab_vm_root: str = "",   # deprecated (issue #80): accepted, not persisted
+    vault_root: str = "",    # deprecated (issue #80): accepted, not persisted
 ) -> int:
-    """Register a new SSH host. Refuses on duplicate name."""
+    """Register a new SSH host as a CONNECTION target. Refuses on duplicate name.
+
+    Issue #80: ``hosts.yaml`` is connection-only, so ``--lab-vm-root`` /
+    ``--vault-root`` are deprecated — still accepted (so old scripts don't
+    break) but ignored on write. A machine's data-root / vault paths are set on
+    that machine's own dashboard (``machine.yaml``).
+    """
     kind = "ssh" if ssh_host else "local"
     host = _hosts.Host(
         name=name,
@@ -54,21 +61,23 @@ def cmd_add(
         ssh_host=ssh_host or "",
         remote_user=remote_user,
         project_root=project_root,
-        lab_vm_root=lab_vm_root,
-        vault_root=vault_root,
         mount_point=mount_point,
         description=description,
+        scan_dirs=tuple(scan_dirs),
     )
     try:
         _hosts.add(host)
     except _hosts.HostError as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo(f"Registered host {name!r} ({kind}).")
+    click.echo(f"Registered host {name!r} ({kind}) — connection only.")
     if kind == "ssh":
         click.echo(f"  ssh_host:     {ssh_host}")
         click.echo(f"  remote_user:  {remote_user or '(use ssh_config default)'}")
         click.echo(f"  project_root: {project_root}")
-        click.echo(f"  lab_vm_root:  {lab_vm_root}")
+        click.echo(f"  scan_dirs:    {', '.join(scan_dirs) or '(inventory default)'}")
+        if lab_vm_root or vault_root:
+            click.echo("  note: --lab-vm-root/--vault-root are deprecated (#80) and "
+                       "were ignored; configure this machine on its own dashboard.")
         click.echo("Next: run `murmurent host test " + name + "` to verify connectivity.")
     return 0
 

@@ -46,9 +46,15 @@ def personal_vault_root() -> Path | None:
         s = _ms.load()
     except Exception:  # noqa: BLE001 — best-effort; unregistered on any failure
         return None
-    if s.obsidian_vault_path:
-        return Path(s.obsidian_vault_path).expanduser()
-    return None
+    raw = (s.obsidian_vault_path or "").strip()
+    # "NA" (any casing) is the explicit "no personal vault on this machine"
+    # marker (same set machine_settings._derive_vault_name treats as empty), not
+    # a real path — treat it as unregistered so callers never resolve a bogus
+    # ``NA`` directory (which the machine-registry mirror would otherwise create
+    # in the CWD).
+    if not raw or raw.lower() in {"na", "n/a", "none", "n.a.", "not applicable"}:
+        return None
+    return Path(raw).expanduser()
 
 
 # ---------------------------------------------------------------------------
