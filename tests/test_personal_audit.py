@@ -10,9 +10,12 @@ the Finding shape: severity, category, and the new verify_state three-state.
 from __future__ import annotations
 
 import datetime as _dt
+import hashlib
 import os
+from pathlib import Path
 
 import pytest
+import yaml
 
 from murmurent.core import cert_projects as CP
 from murmurent.core import cert_provision as CPROV
@@ -54,6 +57,9 @@ def _isolate(monkeypatch, tmp_path):
     monkeypatch.setenv("MURMURENT_HOME", str(tmp_path / "dot"))
     monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(tmp_path / "labmgmt"))
     monkeypatch.setenv("MURMURENT_REPOS_ROOT", str(tmp_path / "repos"))
+    # Point the installed-agents dir at an empty (nonexistent) path so the
+    # agent-integrity check never reads the developer's real ~/.claude/agents.
+    monkeypatch.setenv("MURMURENT_CC_AGENTS_DIR", str(tmp_path / "cc_agents_none"))
     # No cards / no crypto by default.
     monkeypatch.setattr(ISS, "verify_local_identity", lambda **kw: ("no_card", ""))
     # No vault by default.
@@ -325,6 +331,146 @@ def test_no_handle_skips_identity_checks(monkeypatch):
     report = PA.run_personal_audit(env=None)
     assert any(f.rule == "PERSONAL-NO-HANDLE-01" and f.verify_state == "unverifiable"
                for f in report.findings)
+
+
+# ---------------------------------------------------------------------------
+# item 8 — agent integrity
+# ---------------------------------------------------------------------------
+
+
+def _agent_md(name, *, freeze="personal", category="member", model="sonnet",
+              required=("Read",), denied=(), tools=(), body="Do the work.\n"):
+    fm = {"name": name, "category": category, "freeze": freeze, "model": model,
+          "required_tools": list(required)}
+    if denied:
+        fm["denied_tools"] = list(denied)
+    if tools:
+        fm["tools"] = list(tools)
+    return "---\n" + yaml.safe_dump(fm, sort_keys=False) + "---\n\n" + body
+
+
+def _sha(p):
+    return hashlib.sha256(Path(p).read_bytes()).hexdigest()
+
+
+@pytest.fixture
+def agents_env(tmp_path, monkeypatch):
+    """Create isolated commons + installed CC agent dirs and point
+    agent_forks at them. Returns ``(commons, installed)`` Paths."""
+    commons = tmp_path / "commons_agents"
+    commons.mkdir()
+    installed = tmp_path / "cc_agents"
+    installed.mkdir()
+    monkeypatch.setenv("MURMURENT_CC_AGENTS_DIR", str(installed))
+    monkeypatch.setattr(PA._af, "commons_agents_dir", lambda: commons)
+    return commons, installed
+
+
+def _write_commons(commons, name, **kw):
+    p = commons / f"{name}.md"
+    p.write_text(_agent_md(name, **kw), encoding="utf-8")
+    return p
+
+
+def _register_fork(commons_path, name):
+    """Record a manifest entry so ``name`` classifies as a tracked fork whose
+    source_sha is the commons file's current content."""
+    m = PA._af.load_manifest()
+    m["forks"][name] = {"source_sha": _sha(commons_path),
+                        "forked_at": "2026-07-23T00:00:00+00:00",
+                        "source_path": str(commons_path)}
+    PA._af.save_manifest(m)
+
+
+def test_agent_pristine_symlink_is_ok(agents_env):
+    commons, installed = agents_env
+    cp = _write_commons(commons, "artist")
+    (installed / "artist.md").symlink_to(cp)
+    (f,) = PA.check_agent_integrity("alice", None)
+    assert f.rule == "PERSONAL-AGENT-PRISTINE-01"
+    assert f.severity == "info"
+    assert f.verify_state == "verified"
+
+
+def test_agent_fork_clean_is_ok(agents_env):
+    commons, installed = agents_env
+    cp = _write_commons(commons, "artist")
+    (installed / "artist.md").write_text(cp.read_text(), encoding="utf-8")
+    _register_fork(cp, "artist")   # source_sha == installed content → not modified
+    rules = {f.rule for f in PA.check_agent_integrity("alice", None)}
+    assert rules == {"PERSONAL-AGENT-FORK-CLEAN-01"}
+
+
+def test_agent_fork_removes_denied_tool_warns(agents_env):
+    commons, installed = agents_env
+    # Non-egress denial → the agent is NOT a guardian, so weakening stays warn.
+    cp = _write_commons(commons, "artist", required=("Read",),
+                        denied=("NotebookEdit",))
+    # Fork drops the denial (regains a withheld capability).
+    (installed / "artist.md").write_text(
+        _agent_md("artist", required=("Read",)), encoding="utf-8")
+    _register_fork(cp, "artist")
+    out = PA.check_agent_integrity("alice", None)
+    (f,) = [x for x in out if x.rule == "PERSONAL-AGENT-GUARDRAIL-WEAKENED-01"]
+    assert f.severity == "warn"
+    assert f.category == "agents"
+    assert "NotebookEdit" in f.current_state
+
+
+def test_agent_fork_grants_extra_tool_warns(agents_env):
+    commons, installed = agents_env
+    cp = _write_commons(commons, "artist", required=("Read",))
+    (installed / "artist.md").write_text(
+        _agent_md("artist", required=("Read", "Edit")), encoding="utf-8")
+    _register_fork(cp, "artist")
+    (f,) = [x for x in PA.check_agent_integrity("alice", None)
+            if x.rule == "PERSONAL-AGENT-TOOLS-WIDENED-01"]
+    assert f.severity == "warn"
+    assert "Edit" in f.current_state
+
+
+def test_agent_guardian_modification_escalates_to_block(agents_env):
+    commons, installed = agents_env
+    cp = _write_commons(commons, "security_guard", freeze="frozen",
+                        denied=("WebFetch", "WebSearch"))
+    # Fork strips the egress denials on a GUARDIAN agent → block.
+    (installed / "security_guard.md").write_text(
+        _agent_md("security_guard", freeze="frozen"), encoding="utf-8")
+    _register_fork(cp, "security_guard")
+    (f,) = [x for x in PA.check_agent_integrity("alice", None)
+            if x.rule == "PERSONAL-AGENT-GUARDRAIL-WEAKENED-01"]
+    assert f.severity == "block"           # guardian elevation
+
+
+def test_agent_frozen_modified_warns(agents_env):
+    commons, installed = agents_env
+    cp = _write_commons(commons, "artist", freeze="frozen", body="Original.\n")
+    # Body-only change, no tool diff → the frozen-modified warning fires.
+    (installed / "artist.md").write_text(
+        _agent_md("artist", freeze="frozen", body="Reworded.\n"), encoding="utf-8")
+    _register_fork(cp, "artist")
+    (f,) = [x for x in PA.check_agent_integrity("alice", None)
+            if x.rule == "PERSONAL-AGENT-FROZEN-MODIFIED-01"]
+    assert f.severity == "warn"
+
+
+def test_agent_orphan_is_info(agents_env):
+    commons, installed = agents_env
+    # A real installed file with no commons origin + no manifest entry.
+    (installed / "medchem.md").write_text(
+        _agent_md("medchem"), encoding="utf-8")
+    (f,) = [x for x in PA.check_agent_integrity("alice", None)
+            if x.rule == "PERSONAL-AGENT-ORPHAN-01"]
+    assert f.severity == "info"
+    assert f.verify_state == "verified"
+
+
+def test_agent_commons_unresolvable_is_unverifiable(tmp_path, monkeypatch):
+    monkeypatch.setattr(PA._af, "commons_agents_dir",
+                        lambda: tmp_path / "does_not_exist")
+    (f,) = PA.check_agent_integrity("alice", None)
+    assert f.rule == "PERSONAL-AGENT-COMMONS-UNRESOLVABLE-01"
+    assert f.verify_state == "unverifiable"
 
 
 def test_persist_writes_jsonl_and_latest(monkeypatch, tmp_path):
