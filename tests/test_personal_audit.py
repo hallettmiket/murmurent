@@ -599,6 +599,134 @@ def test_content_scan_skips_non_ready_repos(monkeypatch, tmp_path, data_root):
     assert out == []                              # nothing ready → nothing scanned
 
 
+# ---------------------------------------------------------------------------
+# secrets — tracked content + git-history + GitHub alerts (issue #63 follow-up)
+# ---------------------------------------------------------------------------
+
+import subprocess as _sp
+
+# AKIA + exactly 16 uppercase-alnum chars: valid shape, not a real credential.
+_FAKE_AWS = "AKIA" + "IOSFODNN7ABCD123"
+
+
+def _git_repo(base, name):
+    """Init a real temp git repo (for ls-files + history scanning)."""
+    d = base / name
+    d.mkdir(parents=True, exist_ok=True)
+    _sp.run(["git", "-C", str(d), "init", "-q"], check=True, capture_output=True)
+    _sp.run(["git", "-C", str(d), "config", "user.email", "t@e.com"], check=True)
+    _sp.run(["git", "-C", str(d), "config", "user.name", "T"], check=True)
+    return d
+
+
+def _git(d, *args):
+    _sp.run(["git", "-C", str(d), *args], check=True, capture_output=True)
+
+
+def test_secrets_planted_tracked_secret_blocks(tmp_path):
+    d = _git_repo(tmp_path, "proj")
+    (d / "cfg.py").write_text(f'aws = "{_FAKE_AWS}"\n')
+    _git(d, "add", "cfg.py")
+    _git(d, "commit", "-q", "-m", "init")
+    out = PA.check_secrets("alice", [_repo_on_host(d)], [], None)
+    hits = [f for f in out if f.rule == "PERSONAL-SECRET-IN-REPO-01"]
+    assert hits and hits[0].severity == "block"
+    assert hits[0].category == "secrets"
+    # Redacted — the raw secret never lands in a finding.
+    assert all(_FAKE_AWS not in f.to_json_line() for f in out)
+
+
+def test_secrets_history_finds_committed_then_deleted(tmp_path):
+    d = _git_repo(tmp_path, "proj")
+    (d / "cfg.py").write_text(f'aws = "{_FAKE_AWS}"\n')
+    _git(d, "add", "cfg.py")
+    _git(d, "commit", "-q", "-m", "add secret")
+    _git(d, "rm", "-q", "cfg.py")
+    _git(d, "commit", "-q", "-m", "remove secret")
+    out = PA.check_secrets("alice", [_repo_on_host(d)], [], None)
+    hits = [f for f in out if f.rule == "PERSONAL-SECRET-IN-HISTORY-01"]
+    assert hits and hits[0].severity == "block"
+    assert all(_FAKE_AWS not in f.to_json_line() for f in out)
+
+
+def test_secrets_clean_repo_emits_no_secret_finding(tmp_path):
+    d = _git_repo(tmp_path, "proj")
+    (d / "ok.py").write_text("clean = 1\n")
+    _git(d, "add", "ok.py")
+    _git(d, "commit", "-q", "-m", "clean")
+    out = PA.check_secrets("alice", [_repo_on_host(d)], [], None)
+    assert not [f for f in out if f.rule in
+                ("PERSONAL-SECRET-IN-REPO-01", "PERSONAL-SECRET-IN-HISTORY-01")]
+    assert any(f.rule == "PERSONAL-SECRET-CLEAN-01" for f in out)
+
+
+def test_secrets_skips_non_ready_repos(tmp_path):
+    d = _git_repo(tmp_path, "plain")
+    (d / "cfg.py").write_text(f'aws = "{_FAKE_AWS}"\n')
+    _git(d, "add", "cfg.py")
+    _git(d, "commit", "-q", "-m", "init")
+    out = PA.check_secrets("alice", [_repo_on_host(d, ready=False)], [], None)
+    assert not [f for f in out if f.rule == "PERSONAL-SECRET-IN-REPO-01"]
+
+
+def test_secrets_github_alerts_unverifiable_when_gh_absent(monkeypatch):
+    monkeypatch.setattr(PP, "_gh_available", lambda: False)
+    p = _proj(github_repo="org/proj1")
+    out = PA.check_secrets("alice", [], [p], None)
+    (f,) = [x for x in out if x.rule == "PERSONAL-SECRET-GH-UNVERIFIABLE-01"]
+    assert f.verify_state == "unverifiable"
+    assert f.severity == "info"          # could-not-verify, never a false clean
+
+
+def test_secrets_github_open_alerts_warn(monkeypatch):
+    monkeypatch.setattr(PP, "_gh_available", lambda: True)
+
+    class _R:
+        returncode = 0
+        stdout = ('[{"state":"open","secret_type_display_name":"AWS Access Key"},'
+                  '{"state":"open","secret_type_display_name":"AWS Access Key"}]')
+        stderr = ""
+
+    monkeypatch.setattr(PP, "_gh", lambda *a, **k: _R())
+    p = _proj(github_repo="org/proj1")
+    out = PA.check_secrets("alice", [], [p], None)
+    (f,) = [x for x in out if x.rule == "PERSONAL-SECRET-GH-ALERT-01"]
+    assert f.severity == "warn"
+    assert "2 open" in f.current_state
+
+
+def test_secrets_github_error_is_unverifiable_not_clean(monkeypatch):
+    monkeypatch.setattr(PP, "_gh_available", lambda: True)
+
+    class _R:
+        returncode = 1
+        stdout = ""
+        stderr = "HTTP 403: Secret scanning is disabled"
+
+    monkeypatch.setattr(PP, "_gh", lambda *a, **k: _R())
+    p = _proj(github_repo="org/proj1")
+    out = PA.check_secrets("alice", [], [p], None)
+    (f,) = [x for x in out if x.rule == "PERSONAL-SECRET-GH-UNVERIFIABLE-01"]
+    assert f.verify_state == "unverifiable"
+    # NEVER a false "no alerts" when we couldn't read them.
+    assert not [x for x in out if x.rule == "PERSONAL-SECRET-GH-OK-01"]
+
+
+def test_secrets_wired_into_run_personal_audit(monkeypatch, tmp_path):
+    d = _git_repo(tmp_path, "proj")
+    (d / "cfg.py").write_text(f'aws = "{_FAKE_AWS}"\n')
+    _git(d, "add", "cfg.py")
+    _git(d, "commit", "-q", "-m", "init")
+    monkeypatch.setattr(INV, "list_machine_repos",
+                        lambda h: ([_repo_on_host(d)], None))
+    monkeypatch.setattr(CP, "iter_projects", lambda env=None: [])
+    report = PA.run_personal_audit(env=None)
+    assert "secrets" in PA.ALL_AREAS
+    secret_findings = report.by_area()["secrets"]
+    assert any(f.rule == "PERSONAL-SECRET-IN-REPO-01" for f in secret_findings)
+    assert report.counts()["block"] >= 1
+
+
 def test_persist_writes_jsonl_and_latest(monkeypatch, tmp_path):
     monkeypatch.setattr(CP, "iter_projects", lambda env=None: [])
     report = PA.run_personal_audit(env=None)

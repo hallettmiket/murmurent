@@ -17,10 +17,12 @@ from click.testing import CliRunner
 
 from murmurent.cli import cli
 from murmurent.core.secret_scan import (
+    HISTORY_TRUNCATED_RULE,
     SEVERITY_BLOCK,
     SEVERITY_WARN,
     redact,
     scan_file,
+    scan_history,
     scan_staged,
     scan_text,
 )
@@ -183,3 +185,84 @@ def test_cli_exits_0_when_clean(tmp_path):
         os.chdir(repo)
         result = runner.invoke(cli, ["security", "secrets-scan", "--staged"])
     assert result.exit_code == 0
+
+
+# ---------------------------------------------------------------------------
+# Git-history walk (real temp git repo)
+# ---------------------------------------------------------------------------
+
+def test_scan_history_finds_secret_committed_then_deleted(tmp_path):
+    repo = _init_repo(tmp_path)
+    # Commit a secret...
+    (repo / "cfg.py").write_text(f'aws = "{FAKE_AWS}"\n')
+    _git(repo, "add", "cfg.py")
+    _git(repo, "commit", "-q", "-m", "add secret")
+    # ...then delete the file in a later commit.
+    _git(repo, "rm", "-q", "cfg.py")
+    _git(repo, "commit", "-q", "-m", "remove secret")
+    # A clean commit on top, so HEAD's tree has no secret at all.
+    (repo / "ok.py").write_text("clean = 1\n")
+    _git(repo, "add", "ok.py")
+    _git(repo, "commit", "-q", "-m", "clean")
+
+    hits = scan_history(repo)
+    real = [h for h in hits if h.rule != HISTORY_TRUNCATED_RULE]
+    assert "AWS-ACCESS-KEY-ID" in _rules(real)
+    # It records the file, a commit-ish, and never the raw secret.
+    hit = next(h for h in real if h.rule == "AWS-ACCESS-KEY-ID")
+    assert hit.path == "cfg.py"
+    assert hit.commit  # some commit-ish attributed
+    assert FAKE_AWS not in hit.redacted
+
+
+def test_scan_history_clean_repo_has_no_secret_hits(tmp_path):
+    repo = _init_repo(tmp_path)
+    (repo / "ok.py").write_text("clean = 1\n")
+    _git(repo, "add", "ok.py")
+    _git(repo, "commit", "-q", "-m", "clean")
+    hits = scan_history(repo)
+    assert [h for h in hits if h.rule != HISTORY_TRUNCATED_RULE] == []
+
+
+def test_scan_history_bounded_emits_truncation_notice(tmp_path):
+    repo = _init_repo(tmp_path)
+    for i in range(4):
+        (repo / f"f{i}.py").write_text(f"x = {i}\n")
+        _git(repo, "add", f"f{i}.py")
+        _git(repo, "commit", "-q", "-m", f"c{i}")
+    # Cap below the commit count → must flag truncation, never a secret.
+    hits = scan_history(repo, max_commits=1)
+    assert any(h.rule == HISTORY_TRUNCATED_RULE for h in hits)
+    assert all(h.severity == "info" for h in hits
+               if h.rule == HISTORY_TRUNCATED_RULE)
+
+
+def test_scan_history_not_a_git_repo_returns_empty(tmp_path):
+    # No git init here — scan_history must degrade gracefully, not raise.
+    assert scan_history(tmp_path) == []
+
+
+def test_scan_history_respects_allowlist_pragma(tmp_path):
+    repo = _init_repo(tmp_path)
+    (repo / "cfg.py").write_text(
+        f'aws = "{FAKE_AWS}"  # pragma: allowlist secret\n')
+    _git(repo, "add", "cfg.py")
+    _git(repo, "commit", "-q", "-m", "suppressed")
+    hits = scan_history(repo)
+    assert [h for h in hits if h.rule != HISTORY_TRUNCATED_RULE] == []
+
+
+def test_cli_history_flag_exits_2_on_block_hit(tmp_path):
+    repo = _init_repo(tmp_path)
+    (repo / "cfg.py").write_text(f'aws = "{FAKE_AWS}"\n')
+    _git(repo, "add", "cfg.py")
+    _git(repo, "commit", "-q", "-m", "add secret")
+    _git(repo, "rm", "-q", "cfg.py")
+    _git(repo, "commit", "-q", "-m", "remove secret")
+    runner = CliRunner()
+    with runner.isolated_filesystem():
+        import os
+        os.chdir(repo)
+        result = runner.invoke(cli, ["security", "secrets-scan", "--history"])
+    assert result.exit_code == 2
+    assert FAKE_AWS not in result.output  # never leak the raw secret
