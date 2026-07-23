@@ -429,8 +429,8 @@
         const LX = -0.6, LY = -0.8;                         // light from upper-left (unit-ish)
         const align = Math.abs(nx * LX + ny * LY);          // 0..1: heading vs light
         const spec = align * align * align;                 // sharp -> a moving band of glints
-        const baseL = 50 + 20 * b.z;                        // metallic grey, far a touch lighter
-        const lig = Math.min(95, baseL + spec * 36 + spN * 4);   // glint -> bright silver
+        const baseL = 24 + 12 * b.z;                        // dark metal (~2x darker), far a touch lighter
+        const lig = Math.min(84, baseL + spec * 38 + spN * 4);   // glint -> bright silver flash
         const irid = spec * spec;                           // tint only at the peak of a glint
         let hue = (200 + 130 * align + simT * 26) % 360;    // narrow cyan->magenta, angle-driven
         const sat = 5 + 34 * irid;                          // silver most of the time; a sheen on glints
