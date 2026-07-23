@@ -224,9 +224,10 @@
         </header>
         <div class="body">
           <div class="pa-empty" id="pa-empty">
-            Runs locally (no SSH): checks your GitHub &amp; Slack project access,
-            local repo &amp; vault permissions, your certificate validity, and
-            clinical-data containment. Read-only — nothing is changed.
+            Purpose: runs locally on your own machine (your repos, vault, and
+            certificates) — no SSH, read-only, nothing is changed. It checks
+            your GitHub &amp; Slack project access, local repo &amp; vault
+            permissions, certificate validity, and clinical-data containment.
           </div>
           <div id="pa-result" style="display:none">
             <div class="pa-headline" id="pa-headline"></div>
@@ -263,6 +264,11 @@
           </div>
         </header>
         <div class="body">
+          <div class="pa-empty" style="margin-bottom:12px">
+            Scan: checks a lab machine's files and permissions for exposed
+            secrets, world-readable data, and risky settings. Pick a host and
+            press Re-scan; read-only, nothing is changed.
+          </div>
           <div class="tier2-banner" id="tier2-banner" style="display:none">
             <strong>POSIX bits not authoritative on this host's data tree</strong> —
             it's served over NFSv3 from an ACL-backed NAS, so the real ACLs live in
@@ -300,26 +306,24 @@
 
       <div class="card">
         <header>
-          <h2>Agent review (LLM)</h2>
+          <h2>Agent review</h2>
           <div class="controls">
             <label>project:
               <select id="agent-project"></select>
             </label>
-            <label><input type="checkbox" id="agent-cat-code" checked /> code</label>
-            <label><input type="checkbox" id="agent-cat-secrets" checked /> secrets</label>
-            <label><input type="checkbox" id="agent-cat-cc" checked /> cc settings</label>
+            <label title="Check the project's source code for security defects like hardcoded credentials or unsafe patterns."><input type="checkbox" id="agent-cat-code" checked /> code</label>
+            <label title="Look for secret-shaped files (keys, tokens, .env) that shouldn't be exposed."><input type="checkbox" id="agent-cat-secrets" checked /> secrets</label>
+            <label title="Check the Claude Code settings (.claude/settings.json) for over-permissive access."><input type="checkbox" id="agent-cat-cc" checked /> cc settings</label>
             <button id="agent-run-btn">Run review</button>
             <span id="agent-status" class="muted"></span>
           </div>
         </header>
         <div class="body" style="font-family:var(--mono); font-size:11.5px;
                                   line-height:1.55; color:var(--ink-2)">
-          Walks the chosen project, sends source files + tracked-file index +
-          <code>.claude/settings.json</code> to <code>claude-sonnet-4-6</code>
-          via the murmurent <code>security_guard</code> agent. Findings merge
-          into the table below with <code>source: agent</code>. Cached by
-          (project, file-hash, category) — unchanged inputs return for free.
-          <span class="muted">Token + cost meta appears in the status line after each run.</span>
+          A closer AI-assisted look that catches risks the quick scan can miss.
+          Tick the areas to review (each checkbox includes that category: code,
+          secret-shaped files, or Claude Code settings), then Run review;
+          results appear in the table below.
         </div>
       </div>
 
