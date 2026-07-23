@@ -217,10 +217,6 @@
       <div class="card">
         <header>
           <h2>Personal audit</h2>
-          <div class="controls">
-            <button id="pa-run-btn">Run personal audit</button>
-            <span id="pa-status" class="muted"></span>
-          </div>
         </header>
         <div class="body">
           <div class="pa-empty" id="pa-empty">
@@ -228,6 +224,10 @@
             certificates) — no SSH, read-only, nothing is changed. It checks
             your GitHub &amp; Slack project access, local repo &amp; vault
             permissions, certificate validity, and clinical-data containment.
+          </div>
+          <div class="controls" style="margin-bottom:12px">
+            <button id="pa-run-btn">Run personal audit</button>
+            <span id="pa-status" class="muted"></span>
           </div>
           <div id="pa-result" style="display:none">
             <div class="pa-headline" id="pa-headline"></div>
@@ -255,19 +255,19 @@
       <div class="card">
         <header>
           <h2>Scan</h2>
-          <div class="controls">
-            <label>host:
-              <select id="host-picker"></select>
-            </label>
-            <button id="refresh-btn">Re-scan (live)</button>
-            <span id="status-line" class="muted"></span>
-          </div>
         </header>
         <div class="body">
           <div class="pa-empty" style="margin-bottom:12px">
             Scan: checks a lab machine's files and permissions for exposed
             secrets, world-readable data, and risky settings. Pick a host and
             press Re-scan; read-only, nothing is changed.
+          </div>
+          <div class="controls" style="margin-bottom:12px">
+            <label>host:
+              <select id="host-picker"></select>
+            </label>
+            <button id="refresh-btn">Re-scan (live)</button>
+            <span id="status-line" class="muted"></span>
           </div>
           <div class="tier2-banner" id="tier2-banner" style="display:none">
             <strong>POSIX bits not authoritative on this host's data tree</strong> —
@@ -307,6 +307,15 @@
       <div class="card">
         <header>
           <h2>Agent review</h2>
+        </header>
+        <div class="body">
+          <div style="font-family:var(--mono); font-size:11.5px;
+                      line-height:1.55; color:var(--ink-2); margin-bottom:12px">
+            A closer AI-assisted look that catches risks the quick scan can miss.
+            Tick the areas to review (each checkbox includes that category: code,
+            secret-shaped files, or Claude Code settings), then Run review;
+            results appear in the table below.
+          </div>
           <div class="controls">
             <label>project:
               <select id="agent-project"></select>
@@ -317,13 +326,6 @@
             <button id="agent-run-btn">Run review</button>
             <span id="agent-status" class="muted"></span>
           </div>
-        </header>
-        <div class="body" style="font-family:var(--mono); font-size:11.5px;
-                                  line-height:1.55; color:var(--ink-2)">
-          A closer AI-assisted look that catches risks the quick scan can miss.
-          Tick the areas to review (each checkbox includes that category: code,
-          secret-shaped files, or Claude Code settings), then Run review;
-          results appear in the table below.
         </div>
       </div>
 
