@@ -154,6 +154,73 @@ def create_personal_agent(
     return canonical
 
 
+def relink_vault_agents() -> dict:
+    """Materialise this member's vault agents into ``~/.claude/agents/``.
+
+    The multi-machine half of agent sync (issue #80): after a vault ff-pull on
+    another machine, the agent files exist in the vault but Claude Code has
+    nothing to load. This re-links them, matching the original installs:
+
+    * ``<vault>/agents/<name>.md``       → symlink  (as ``create_personal_agent``)
+    * ``<vault>/agent_forks/<name>.md``  → hardlink (as ``fork_agent``; plain
+      copy when the vault sits on another device)
+
+    Also runs the one-time legacy ``~/.murmurent/agent_forks/`` migration first.
+    Idempotent (safe to run repeatedly) and non-destructive: a local working
+    copy whose bytes diverged from the vault fork is left alone and reported
+    under ``skipped`` rather than clobbered. With no vault registered it
+    degrades to a harmless no-op over the legacy fork home.
+    """
+    out: dict = {"vault_agents": None, "forks_dir": None, "migrated": None,
+                 "personal": [], "forks": [], "skipped": []}
+
+    try:
+        out["migrated"] = _af.migrate_legacy_forks()
+    except Exception as exc:  # noqa: BLE001 — migration is best-effort
+        out["migrated"] = {"migrated": False, "detail": str(exc)}
+
+    commons = _af.commons_agent_names()
+
+    # 1) net-new personal agents → symlinks into ~/.claude/agents/
+    d = vault_agents_dir()
+    out["vault_agents"] = str(d) if d is not None else None
+    for canonical in list_personal_agents():
+        name = canonical.stem
+        if name in commons:
+            out["skipped"].append({
+                "name": name,
+                "reason": "shares a commons agent's name — a fork belongs in "
+                          "agent_forks/, not agents/"})
+            continue
+        out["personal"].append({"name": name, "method": _install(canonical)})
+
+    # 2) forks → hardlinks into ~/.claude/agents/ (survive setup.sh re-runs)
+    fdir = _af.forks_dir()
+    out["forks_dir"] = str(fdir)
+    if fdir.is_dir():
+        for canonical in sorted(fdir.glob("*.md")):
+            name = canonical.stem
+            dest = _af.installed_agents_dir() / canonical.name
+            if dest.exists() and not dest.is_symlink():
+                try:
+                    same_inode = os.stat(dest).st_ino == os.stat(canonical).st_ino
+                except OSError:
+                    same_inode = False
+                if same_inode:
+                    out["forks"].append({"name": name, "method": "already-linked"})
+                    continue
+                if dest.read_bytes() != canonical.read_bytes():
+                    out["skipped"].append({
+                        "name": name,
+                        "reason": f"local copy at {dest} differs from the vault "
+                                  f"fork — reconcile them, then re-run (or "
+                                  f"`murmurent agent fork {name} --force`)"})
+                    continue
+            out["forks"].append(
+                {"name": name, "method": _af._install_working_copy(canonical, dest)})
+    return out
+
+
 def remove_personal_agent(name: str) -> None:
     """Delete a personal agent from the vault and uninstall its CC symlink.
     Never touches a commons agent."""

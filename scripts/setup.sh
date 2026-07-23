@@ -185,6 +185,31 @@ else
   warn "no skills/ dir in murmurent — skipping"
 fi
 
+# ── Personal vault agents + forks (issue #80) ─────────────────────────────────
+# After the commons symlinks, re-materialise this member's OWN agents from
+# their personal vault: <vault>/agents/*.md (symlinked) and
+# <vault>/agent_forks/*.md (hardlinked, so the loop above preserves them on
+# re-runs). Covers the second-machine case: a vault pull brings the files,
+# this step loads them into ~/.claude/agents/. Idempotent + best-effort; a
+# machine with no registered vault just skips.
+echo
+echo "Personal vault agents:"
+if command -v murmurent >/dev/null 2>&1; then
+  if murmurent agent relink; then
+    ok "re-linked personal vault agents + forks into ~/.claude/agents/"
+  else
+    warn "couldn't re-link personal vault agents (run \`murmurent agent relink\` manually)"
+  fi
+elif [[ -x "$REPO_DIR/.venv/bin/murmurent" ]]; then
+  if "$REPO_DIR/.venv/bin/murmurent" agent relink; then
+    ok "re-linked personal vault agents + forks into ~/.claude/agents/ (via .venv)"
+  else
+    warn "couldn't re-link personal vault agents (run \`murmurent agent relink\` manually)"
+  fi
+else
+  warn "murmurent CLI not found — skipping personal-agent re-link"
+fi
+
 # ── One-click dashboard launcher (every member: mayor, PI, member) ────────────
 # Gives anyone a menu/Dock icon that starts the dashboard and opens it in their
 # browser. macOS gets a ~/Applications/*.app bundle; Linux gets a freedesktop

@@ -124,6 +124,37 @@ def cmd_drift(name: str | None) -> None:
         console.print(f"\n{summary}")
 
 
+def cmd_relink() -> None:
+    """Re-link every vault agent + fork into ``~/.claude/agents/`` (issue #80).
+
+    Run after a vault pull on a second machine (setup.sh also runs it), so
+    agents created or forked elsewhere are loaded by Claude Code here.
+    """
+    from ..core import personal_agents as _pa
+
+    res = _pa.relink_vault_agents()
+    mig = res.get("migrated") or {}
+    if mig.get("migrated"):
+        click.echo(f"Migrated legacy fork home: {mig.get('detail', '')}")
+        if mig.get("backup"):
+            click.echo(f"  backup kept at {mig['backup']}")
+    for row in res["personal"]:
+        click.echo(f"  personal  {row['name']:<20} {row['method']}")
+    for row in res["forks"]:
+        click.echo(f"  fork      {row['name']:<20} {row['method']}")
+    for row in res["skipped"]:
+        click.echo(f"  skipped   {row['name']:<20} {row['reason']}")
+    n = len(res["personal"]) + len(res["forks"])
+    if n == 0 and not res["skipped"]:
+        if res.get("vault_agents") is None:
+            click.echo("No personal vault registered on this machine — nothing "
+                       "to re-link (run `murmurent vault init` first).")
+        else:
+            click.echo("No vault agents or forks to re-link.")
+    else:
+        click.echo(f"Re-linked {n} agent(s) into {_af.installed_agents_dir()}.")
+
+
 def cmd_unfork(name: str, force: bool) -> None:
     """Restore the commons symlink after confirmation (or with ``--force``)."""
     st = _af.status_for(name)
