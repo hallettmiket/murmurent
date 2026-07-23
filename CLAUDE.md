@@ -39,7 +39,7 @@ reply with a ≤200-char verdict line (see
 | [`conscience`](agents/conscience.md) | EDID + bias review |
 | [`lawyer`](agents/lawyer.md) | Patent counsel + freedom-to-operate (formerly `saul_goodman`) |
 | [`cable_guy`](agents/cable_guy.md) | Infrastructure provisioner |
-| [`receptionist`](agents/receptionist.md) | Routes inbound cross-group SEA requests |
+| [`centre_cable_guy`](agents/centre_cable_guy.md) | Centre-wide infrastructure reconciler (cross-lab ACLs, drift loop) |
 | [`judge`](agents/judge.md) | Combines and presents member contributions in a compositional choreography |
 | [`registrar`](agents/registrar.md) | Centre-wide registry of labs/cores/collaborations |
 | [`security_guard`](agents/security_guard.md) | Secrets, PHI, world-accessible files audit |
