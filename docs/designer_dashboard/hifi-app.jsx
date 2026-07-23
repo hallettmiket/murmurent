@@ -3473,6 +3473,16 @@ async function postJSON(url, body) {
   return res.json();
 }
 
+async function getJSON(url) {
+  const res = await fetch(url, { headers: { Accept: "application/json" } });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
 async function refreshDashboard() {
   if (typeof window.__murmurentFetchData === "function") {
     try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
@@ -3793,7 +3803,15 @@ function AgentToggleButton({ agent }) {
   );
 }
 
+// Guardian agents can never be edited (mirrors core.personal_audit.GUARDIAN_AGENTS);
+// keep in sync there. Frozen agents are also uneditable (flagged by a.freeze).
+const GUARDIAN_AGENTS = ["security_guard", "adversary", "conscience"];
+
 function AgentCard({ a }) {
+  const [modify, setModify] = useState(false);
+  // Show the Modify affordance only where an edit could land: not frozen, not a
+  // guardian. The server re-checks (403) — this is just to avoid dead clicks.
+  const canModify = a.freeze !== "frozen" && !GUARDIAN_AGENTS.includes(a.name);
   return (
     <div style={{
       padding:"9px 14px", borderBottom:"1px solid var(--rule)",
@@ -3814,14 +3832,26 @@ function AgentCard({ a }) {
       <div className="muted" style={{fontSize:12, marginTop:3, lineHeight:1.4}}>
         {a.description}
       </div>
-      <div className="mono muted" style={{fontSize:10, marginTop:4, letterSpacing:1}}>
+      <div className="mono muted" style={{fontSize:10, marginTop:4, letterSpacing:1,
+           display:"flex", alignItems:"center", gap:0}}>
         {a.model && <span>{a.model.toUpperCase()}</span>}
         {a.required_tools && a.required_tools.length > 0 && (
           <span style={{marginLeft:10}}>
             · {a.required_tools.length} tool{a.required_tools.length === 1 ? "" : "s"}
           </span>
         )}
+        <span style={{marginLeft:"auto"}}>
+          {canModify ? (
+            <button className="btn sm" onClick={() => setModify(true)}
+                    title="Edit this agent — commons agents fork into your vault on first save">
+              modify
+            </button>
+          ) : (
+            <span title="frozen / guardian — not editable" style={{letterSpacing:1}}>🔒</span>
+          )}
+        </span>
       </div>
+      {modify && <ModifyAgentModal name={a.name} onClose={() => setModify(false)} />}
     </div>
   );
 }
@@ -3846,16 +3876,130 @@ function AgentGroup({ title, hint, agents }) {
   );
 }
 
+// Shared input styles for the DEFINE / MODIFY wizards.
+const WIZ_INPUT = {width:"100%", padding:"6px 8px", border:"1px solid var(--rule-strong)",
+                   borderRadius:2, fontFamily:"var(--sans)", fontSize:13, boxSizing:"border-box"};
+const WIZ_MONO  = {...WIZ_INPUT, fontFamily:"var(--mono)", fontSize:12};
+const WIZ_LABEL = {display:"block", marginBottom:10};
+const WIZ_CAP   = {fontSize:11, marginBottom:3};
+
+function WizField({ label, hint, children }) {
+  return (
+    <label style={WIZ_LABEL}>
+      <div className="mono muted" style={WIZ_CAP}>
+        {label}{hint && <span style={{textTransform:"none"}}> — {hint}</span>}
+      </div>
+      {children}
+    </label>
+  );
+}
+
+// The shared wizard body (fields 2–12 of the bookworm's design). Used by both
+// DEFINE (net-new) and MODIFY (edit existing). ``locked`` disables the name box
+// (MODIFY can't rename). Everything but name + role defaults, so "name it and go"
+// stays two boxes; the rest expand under a "more…" disclosure.
+function AgentWizardFields({ form, set, locked }) {
+  const [more, setMore] = useState(false);
+  return (
+    <div>
+      {!locked && (
+        <WizField label="Name" hint="lowercase, letters/digits/underscores">
+          <input value={form.name} onChange={set("name")} placeholder="e.g. my_docking_helper"
+                 style={WIZ_MONO} />
+        </WizField>
+      )}
+      <WizField label="One-line role" hint="required — what is this agent for?">
+        <input value={form.role} onChange={set("role")}
+               placeholder="one line — the rest defaults, flesh it out below or later"
+               style={WIZ_INPUT} />
+      </WizField>
+      <button className="btn sm" type="button" onClick={() => setMore(!more)}
+              style={{marginBottom:10}}>
+        {more ? "fewer options" : "more options (scope, tools, voice, guardrails…)"}
+      </button>
+      {more && (
+        <div>
+          <WizField label="Responsibilities" hint="one per line; defaults to the role">
+            <textarea value={form.responsibilities} onChange={set("responsibilities")} rows={3}
+                      placeholder={"load data\ntrain models\nreport metrics"} style={WIZ_INPUT} />
+          </WizField>
+          <WizField label="Scope & non-goals" hint="what it must NOT do — highest-leverage box">
+            <textarea value={form.non_goals} onChange={set("non_goals")} rows={2}
+                      placeholder="e.g. does not visualise — hand that to the artist"
+                      style={WIZ_INPUT} />
+          </WizField>
+          <WizField label="Tools it MAY use" hint="comma-separated; blank inherits all">
+            <input value={form.required_tools} onChange={set("required_tools")}
+                   placeholder="Read, Bash, Grep" style={WIZ_MONO} />
+          </WizField>
+          <WizField label="Tools it must NOT use" hint="comma-separated">
+            <input value={form.denied_tools} onChange={set("denied_tools")}
+                   placeholder="WebFetch, WebSearch" style={WIZ_MONO} />
+          </WizField>
+          <WizField label="Persona / voice">
+            <input value={form.persona} onChange={set("persona")}
+                   placeholder="terse and skeptical; warm and pedagogical…" style={WIZ_INPUT} />
+          </WizField>
+          <WizField label="Output & communication format">
+            <input value={form.output_format} onChange={set("output_format")}
+                   placeholder="markdown report / HTML / slides / figures / tables" style={WIZ_INPUT} />
+          </WizField>
+          <WizField label="Headline-first verdict" hint="the verb vocabulary it leads every reply with">
+            <input value={form.verdict} onChange={set("verdict")}
+                   placeholder="Done / Failed / Partial" style={WIZ_MONO} />
+          </WizField>
+          <WizField label="Guardrails / safety" hint="always-do / ask-first / never-do">
+            <textarea value={form.guardrails} onChange={set("guardrails")} rows={2}
+                      placeholder="e.g. never write outside outputs/" style={WIZ_INPUT} />
+          </WizField>
+          <WizField label="Worked example" hint="one request + ideal response, to anchor behaviour">
+            <textarea value={form.example} onChange={set("example")} rows={3}
+                      placeholder="Request: … → Response: …" style={WIZ_INPUT} />
+          </WizField>
+          <WizField label="Model" hint="big model for hard reasoning, small for cheap/fast">
+            <select value={form.model} onChange={set("model")}
+                    style={{...WIZ_MONO, width:"auto", background:"#fff"}}>
+              <option value="">default (inherit)</option>
+              <option value="fable">fable (5)</option>
+              <option value="opus">opus (4.8)</option>
+              <option value="sonnet">sonnet (5)</option>
+              <option value="haiku">haiku (4.5)</option>
+            </select>
+          </WizField>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const EMPTY_WIZ = {
+  name:"", role:"", responsibilities:"", non_goals:"", required_tools:"",
+  denied_tools:"", persona:"", output_format:"", verdict:"", guardrails:"",
+  example:"", model:"",
+};
+
+// Split a comma/space list string into an array for the API.
+const wizTools = s => (s || "").split(/[,\s]+/).map(t => t.trim()).filter(Boolean);
+
 function NewPersonalAgentModal({ onClose }) {
-  const [form, setForm] = useState({ name:"", description:"", model:"" });
+  const [form, setForm] = useState({ ...EMPTY_WIZ });
   const [busy, setBusy] = useState(false);
   const [err, setErr]   = useState(null);
   const set = k => e => setForm({ ...form, [k]: e.target.value });
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
-      const body = { name: form.name.trim(), description: form.description.trim() };
+      const body = { name: form.name.trim(), description: form.role.trim() };
       if (form.model) body.model = form.model;
+      if (form.required_tools.trim()) body.tools = wizTools(form.required_tools);
+      if (form.denied_tools.trim()) body.denied_tools = wizTools(form.denied_tools);
+      if (form.responsibilities.trim()) body.responsibilities = form.responsibilities;
+      if (form.non_goals.trim()) body.non_goals = form.non_goals;
+      if (form.persona.trim()) body.persona = form.persona;
+      if (form.output_format.trim()) body.output_format = form.output_format;
+      if (form.guardrails.trim()) body.guardrails = form.guardrails;
+      if (form.example.trim()) body.example = form.example;
+      if (form.verdict.trim()) body.verdict = form.verdict;
       await postJSON("/api/agents/new", body);
       await refreshDashboard();
       onClose();
@@ -3863,7 +4007,7 @@ function NewPersonalAgentModal({ onClose }) {
   };
   return (
     <div onClick={onClose} style={MODAL_BACKDROP_STYLE}>
-      <div onClick={e => e.stopPropagation()} style={{...MODAL_PANEL_STYLE, maxWidth:500}}>
+      <div onClick={e => e.stopPropagation()} style={{...MODAL_PANEL_STYLE, maxWidth:520, maxHeight:"85vh", overflowY:"auto"}}>
         <div style={{background:"var(--paper-2)", borderBottom:"1px solid var(--rule)", padding:"12px 16px"}}>
           <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:17, color:"var(--purple-deep)"}}>
             New personal agent
@@ -3871,42 +4015,131 @@ function NewPersonalAgentModal({ onClose }) {
           <div className="muted" style={{fontSize:12, marginTop:3}}>
             Yours alone — kept in your vault (backed up to your GitHub on{" "}
             <code className="mono">murmurent vault sync</code>) and loaded by Claude Code.
+            Only name + role are required.
           </div>
         </div>
         <div style={{padding:16}}>
-          <label style={{display:"block", marginBottom:10}}>
-            <div className="mono muted" style={{fontSize:11, marginBottom:3}}>
-              Name <span style={{textTransform:"none"}}>(lowercase, letters/digits/underscores)</span>
-            </div>
-            <input value={form.name} onChange={set("name")} placeholder="e.g. my_docking_helper"
-                   style={{width:"100%", padding:"6px 8px", border:"1px solid var(--rule-strong)",
-                           borderRadius:2, fontFamily:"var(--mono)", fontSize:12}} />
-          </label>
-          <label style={{display:"block", marginBottom:10}}>
-            <div className="mono muted" style={{fontSize:11, marginBottom:3}}>What it does</div>
-            <input value={form.description} onChange={set("description")}
-                   placeholder="one line — you can flesh out the agent file afterward"
-                   style={{width:"100%", padding:"6px 8px", border:"1px solid var(--rule-strong)",
-                           borderRadius:2, fontFamily:"var(--sans)", fontSize:13}} />
-          </label>
-          <label style={{display:"block", marginBottom:10}}>
-            <div className="mono muted" style={{fontSize:11, marginBottom:3}}>Model</div>
-            <select value={form.model} onChange={set("model")}
-                    style={{padding:"6px 8px", border:"1px solid var(--rule-strong)",
-                            borderRadius:2, fontFamily:"var(--mono)", fontSize:12, background:"#fff"}}>
-              <option value="">default (inherit)</option>
-              <option value="fable">fable (5)</option>
-              <option value="opus">opus (4.8)</option>
-              <option value="sonnet">sonnet (5)</option>
-              <option value="haiku">haiku (4.5)</option>
-            </select>
-          </label>
+          <AgentWizardFields form={form} set={set} locked={false} />
           {err && <div style={{color:"var(--red)", fontSize:12, marginBottom:8}}>{err}</div>}
           <div style={{display:"flex", justifyContent:"flex-end", gap:8, marginTop:6}}>
             <button className="btn sm" onClick={onClose} disabled={busy}>cancel</button>
-            <button className="btn sm primary" onClick={submit} disabled={busy || !form.name.trim()}>
+            <button className="btn sm primary" onClick={submit}
+                    disabled={busy || !form.name.trim() || !form.role.trim()}>
               {busy ? "creating…" : "create agent"}
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// MODIFY an existing, editable agent (issue #84 item 3). Fetches the editability
+// gate + current field values on open; a frozen / guardian agent shows a lock
+// message instead of the form. Save forks-on-first-edit for a commons agent
+// (transparent) and surfaces item-8 integrity warnings inline.
+function ModifyAgentModal({ name, onClose }) {
+  const [ctx, setCtx]     = useState(null);
+  const [form, setForm]   = useState({ ...EMPTY_WIZ });
+  const [busy, setBusy]   = useState(false);
+  const [err, setErr]     = useState(null);
+  const [warn, setWarn]   = useState([]);
+  const set = k => e => setForm({ ...form, [k]: e.target.value });
+
+  React.useEffect(() => {
+    let live = true;
+    getJSON("/api/agent_edit/" + encodeURIComponent(name)).then(c => {
+      if (!live) return;
+      setCtx(c);
+      const f = c.fields || {};
+      setForm({
+        ...EMPTY_WIZ, name: c.name, role: f.role || "",
+        required_tools: (f.required_tools || []).join(", "),
+        denied_tools: (f.denied_tools || []).join(", "),
+        model: f.model || "",
+      });
+    }).catch(ex => live && setErr(String(ex.message || ex)));
+    return () => { live = false; };
+  }, [name]);
+
+  const submit = async () => {
+    setBusy(true); setErr(null); setWarn([]);
+    try {
+      const body = { role: form.role, allow_warn: true };
+      body.required_tools = wizTools(form.required_tools);
+      body.denied_tools = wizTools(form.denied_tools);
+      if (form.model) body.model = form.model;
+      if (form.responsibilities.trim()) body.responsibilities = form.responsibilities;
+      if (form.non_goals.trim()) body.non_goals = form.non_goals;
+      if (form.persona.trim()) body.persona = form.persona;
+      if (form.output_format.trim()) body.output_format = form.output_format;
+      if (form.guardrails.trim()) body.guardrails = form.guardrails;
+      if (form.example.trim()) body.example = form.example;
+      if (form.verdict.trim()) body.verdict = form.verdict;
+      const res = await postJSON("/api/agent_edit/" + encodeURIComponent(name), body);
+      if (res.warnings && res.warnings.length) { setWarn(res.warnings); setBusy(false); return; }
+      await refreshDashboard();
+      onClose();
+    } catch (ex) { setErr(String(ex.message || ex)); setBusy(false); }
+  };
+
+  const locked = ctx && !ctx.editable;
+  return (
+    <div onClick={onClose} style={MODAL_BACKDROP_STYLE}>
+      <div onClick={e => e.stopPropagation()} style={{...MODAL_PANEL_STYLE, maxWidth:560, maxHeight:"85vh", overflowY:"auto"}}>
+        <div style={{background:"var(--paper-2)", borderBottom:"1px solid var(--rule)", padding:"12px 16px"}}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:17, color:"var(--purple-deep)"}}>
+            Modify agent · <code className="mono">{name}</code>
+          </h2>
+          {ctx && ctx.origin === "commons" && !locked && (
+            <div className="muted" style={{fontSize:12, marginTop:3}}>
+              Editing a commons agent forks it into your vault on first save, so
+              your changes survive commons upgrades and sync across machines.
+              <span style={{marginLeft:4}}>Locked: {(ctx.locked_fields||[]).join(", ")}.</span>
+            </div>
+          )}
+        </div>
+        <div style={{padding:16}}>
+          {!ctx && !err && <div className="muted" style={{fontSize:13}}>loading…</div>}
+          {locked && (
+            <div style={{padding:"10px 12px", border:"1px solid var(--rule-strong)", borderRadius:3,
+                         background:"var(--paper-2)", fontSize:13, color:"var(--red)"}}>
+              🔒 {ctx.reason}
+            </div>
+          )}
+          {ctx && !locked && (
+            <div>
+              <AgentWizardFields form={form} set={set} locked={true} />
+              {ctx.diff_vs_commons && (
+                <details style={{marginBottom:10}}>
+                  <summary className="mono muted" style={{fontSize:11, cursor:"pointer"}}>
+                    diff vs commons
+                  </summary>
+                  <pre className="mono" style={{fontSize:10, maxHeight:180, overflow:"auto",
+                       background:"var(--paper-2)", padding:8, border:"1px solid var(--rule)"}}>
+                    {ctx.diff_vs_commons}
+                  </pre>
+                </details>
+              )}
+              {warn.length > 0 && (
+                <div style={{marginBottom:10, padding:"8px 10px", border:"1px solid var(--amber, #b8860b)",
+                             borderRadius:3, fontSize:12}}>
+                  <b>Integrity warnings</b> (saved anyway):
+                  <ul style={{margin:"4px 0 0 16px", padding:0}}>
+                    {warn.map((w, i) => <li key={i}><code className="mono">{w.rule}</code> — {w.detail}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          {err && <div style={{color:"var(--red)", fontSize:12, marginTop:8}}>{err}</div>}
+          <div style={{display:"flex", justifyContent:"flex-end", gap:8, marginTop:10}}>
+            <button className="btn sm" onClick={onClose} disabled={busy}>close</button>
+            {ctx && !locked && (
+              <button className="btn sm primary" onClick={submit} disabled={busy || !form.role.trim()}>
+                {busy ? "saving…" : "save changes"}
+              </button>
+            )}
           </div>
         </div>
       </div>
