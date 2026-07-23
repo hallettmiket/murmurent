@@ -1610,9 +1610,33 @@ def create_app() -> FastAPI:
         # they're only the *user's* data dirs when has_direct_access=True.
         raw_proj = Path(body.raw_path).expanduser() / body.project
         refined_proj = Path(body.refined_path).expanduser() / body.project
-        if body.has_direct_access or not body.ssh_remote:
-            for label, path in (("immutable", raw_proj), ("append_only", refined_proj)):
-                probes.append(_pf._ensure_dir(path, label=label, required=False))
+        binding_local_data = body.has_direct_access or not body.ssh_remote
+        if binding_local_data:
+            # Tier-3 residency gate (issue #80 Wave 3): before materialising a
+            # clinical project's data root on THIS box, check the machine role.
+            # A laptop must never become the residency for clinical / tier-3
+            # data — refuse (required fail) with a message that names the fix.
+            # A host/server is the data root's proper home → ok. Standard /
+            # restricted tiers are unrestricted anywhere. We surface this as a
+            # probe so a required fail blocks the manifest write below rather
+            # than silently dropping the request.
+            from ..core import cert_projects as _cp
+            from ..core import machine_registry as _mr
+            _cproj = _cp.get(body.project)
+            _sensitivity = _cproj.sensitivity if _cproj is not None else "standard"
+            _residency = _pf.probe_tier3_residency(
+                sensitivity=_sensitivity,
+                role=_mr.machine_kind(),
+                project=body.project,
+                data_root=str(raw_proj),
+            )
+            probes.append(_residency)
+            # Only materialise the data dirs when residency allows it — a
+            # refused clinical-on-laptop bind must not even create empty
+            # immutable/append_only dirs on the portable box.
+            if _residency.status != "fail":
+                for label, path in (("immutable", raw_proj), ("append_only", refined_proj)):
+                    probes.append(_pf._ensure_dir(path, label=label, required=False))
 
         # NOTE: bootstrap + manifest + lab_mgmt registry are now all
         # done in one go by core.projectize.make_wigamig_project, called
@@ -2355,6 +2379,55 @@ def create_app() -> FastAPI:
         (mirrors ``/api/members/refresh``)."""
         from ..core import vault_sync as _vs
         return _vs.pull_personal_vault().to_dict()
+
+    @app.post("/api/vault/sync")
+    def post_vault_sync() -> dict:
+        """One-click "Sync vault" for THIS machine (issue #80 Wave 3, Part A).
+
+        Push local edits, then fast-forward-pull what other machines pushed —
+        the two halves of the "push before you leave, ff-pull when you arrive"
+        discipline, in one button. Returns a structured, never-5xx result:
+
+          ``{pushed, pulled, diverged, message, as_of}``
+
+        - ``diverged`` is ``True`` only when the ff-only pull refused because
+          you edited two machines without pushing (``vault_sync.is_divergence``).
+          We NEVER auto-merge or force — we just report it and tell the user to
+          reconcile on the other machine first.
+        - When no personal vault is adopted on this machine, degrade to a calm
+          "No personal vault on this machine" message instead of erroring.
+        """
+        from ..core import vault_sync as _vs
+
+        root = _vs.personal_vault_root()
+        if root is None:
+            return {
+                "pushed": False, "pulled": False, "diverged": False,
+                "message": "No personal vault on this machine — run "
+                           "`murmurent vault init` or set the vault path in "
+                           "Machine settings.",
+                "as_of": "",
+            }
+
+        commit = _vs.commit_and_push(root, message="vault sync (dashboard)")
+        pull = _vs.pull_personal_vault()
+        diverged = (not pull.ok) and _vs.is_divergence(pull.detail)
+
+        if diverged:
+            message = ("Vault diverged — you have unsynced edits on another "
+                       "machine. Reconcile there (push), then sync here.")
+        else:
+            push_part = "pushed" if commit.pushed else f"push: {commit.detail}"
+            pull_part = "pulled" if pull.ok else f"pull: {pull.detail}"
+            message = f"{push_part}; {pull_part}"
+
+        return {
+            "pushed": bool(commit.pushed),
+            "pulled": bool(pull.ok) and not diverged,
+            "diverged": diverged,
+            "message": message,
+            "as_of": pull.as_of or _vs.vault_info().as_of,
+        }
 
     @app.post("/api/members")
     @_scoped_to_viewer
@@ -7771,6 +7844,11 @@ def create_app() -> FastAPI:
         # to the hostname when machine.yaml isn't written yet.
         machine_name = short
         machine_id = short
+        # ``kind`` is the machine ROLE (laptop vs host). It drives both this
+        # header badge (Wave 2) and the tier-3 residency preflight (Wave 3), so
+        # it is resolved through the one shared helper — machine_registry.
+        # machine_kind — rather than re-deriving the hostname heuristic here.
+        kind = "laptop"
         try:
             from . import machine_settings as _ms
             from ..core import machine_registry as _mr
@@ -7778,6 +7856,7 @@ def create_app() -> FastAPI:
             if _s.machine_name:
                 machine_name = _s.machine_name
             machine_id = _mr.machine_id(_s)
+            kind = _mr.machine_kind(_s)
         except Exception:  # noqa: BLE001
             pass
         return {
@@ -7786,7 +7865,7 @@ def create_app() -> FastAPI:
             "short_hostname": short,
             "machine_name": machine_name,
             "machine_id": machine_id,
-            "kind": "laptop" if short and not short.endswith("server") else "host",
+            "kind": kind,
             "platform": platform.system().lower(),
         }
 

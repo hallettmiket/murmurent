@@ -80,6 +80,43 @@ def machine_id(settings: Any | None = None) -> str:
     return _slug(name or _short_hostname())
 
 
+#: Env pin for THIS machine's role — "laptop" or "host". Set by an operator
+#: (or a test) when the hostname heuristic guesses wrong. Authoritative when
+#: present; else the hostname heuristic below decides.
+ENV_MACHINE_ROLE = "MURMURENT_MACHINE_ROLE"
+
+#: The two roles the tier-3 residency policy distinguishes. A "host" is a
+#: server (the data-root's proper home); a "laptop" is a portable box that must
+#: never become the residency for clinical / tier-3 data.
+MACHINE_ROLES: tuple[str, ...] = ("laptop", "host")
+
+
+def machine_kind(settings: Any | None = None) -> str:
+    """Return this machine's ROLE — ``"laptop"`` or ``"host"``.
+
+    This is the single source of truth for the Wave-2 machine-identity badge
+    AND the Wave-3 tier-3 residency preflight, so both agree on what "this box"
+    is. Resolution order:
+
+    1. ``$MURMURENT_MACHINE_ROLE`` — an explicit operator/test override
+       (``laptop`` / ``host``; anything else is ignored).
+    2. Hostname heuristic — a bare hostname ending in ``server`` (e.g.
+       ``lab-server``, ``biodatsci-server``) is a ``host``; everything else
+       (``mike-mbp``, ``alice-laptop``) is a ``laptop``.
+
+    A laptop is the *conservative* default: if we cannot tell, we assume the
+    box is portable, so the tier-3 guard errs toward refusing to plant clinical
+    data on it rather than silently allowing it. ``settings`` is accepted for
+    symmetry with :func:`machine_id` (a future machine.yaml role field could be
+    honoured here) but is unused today.
+    """
+    override = os.environ.get(ENV_MACHINE_ROLE, "").strip().lower()
+    if override in MACHINE_ROLES:
+        return override
+    short = _short_hostname().lower()
+    return "host" if short.endswith("server") else "laptop"
+
+
 def vault_machines_dir() -> Path | None:
     """``<vault>/machines/`` on this machine, or ``None`` when no vault is
     registered. ``$MURMURENT_VAULT_MACHINES_DIR`` overrides (for tests)."""
@@ -182,7 +219,10 @@ def read_registry() -> list[dict[str, Any]]:
 __all__ = [
     "VAULT_MACHINES_SUBDIR",
     "ENV_MACHINES_DIR",
+    "ENV_MACHINE_ROLE",
+    "MACHINE_ROLES",
     "machine_id",
+    "machine_kind",
     "vault_machines_dir",
     "mirror_this_machine",
     "read_registry",

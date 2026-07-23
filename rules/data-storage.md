@@ -59,3 +59,48 @@ Each project's ``src/`` directory should contain a ``ready_to_delete.md``
 listing append_only files and obsolete code considered safe to
 garbage-collect. This is the manifest the reconciliation routine reads
 before sweeping.
+
+## Data tiering & residency
+
+The data root is a **per-machine** resource, not a synced one:
+``$MURMURENT_DATA_ROOT`` resolves locally on each box, and the
+``raw_guard`` + ``protected_paths`` hooks enforce immutability /
+append-only **on the machine where the data physically lives**. There is
+no notion of replicating it across machines, by design. Repos sync via
+GitHub and the personal vault syncs via git; the data root is **reached,
+not replicated**.
+
+Residency follows sensitivity tier:
+
+- **Tier-3 (clinical, and very large genomic) data is server-resident.**
+  It stays on a lab server and is **reached over the network** — an SSH
+  session on the server, an ``sshfs`` / remote mount, or running the
+  experiment on the server via VS Code Remote-SSH — with
+  ``$MURMURENT_DATA_ROOT`` pointing at the server-side tree. It is
+  **never replicated onto a laptop**: multi-GB binaries are the wrong
+  payload for git/GitHub regardless, and clinical data must not land on a
+  portable device at all.
+- **Tier-1 / derived small outputs** may live in ``append_only/`` on a
+  laptop for offline work and be copied up to the server later. This is
+  the only tier that is expected to appear on a portable machine's data
+  root.
+
+### Enforcement (preflight)
+
+Registering a project's data root on a machine runs a residency preflight
+(`core.preflight.probe_tier3_residency`). It combines two facts:
+
+- the **machine ROLE** — ``laptop`` vs ``host`` — from
+  `core.machine_registry.machine_kind` (the same role the Wave-2 machine
+  badge shows: an explicit ``$MURMURENT_MACHINE_ROLE`` override, else a
+  hostname ending in ``server`` ⇒ host, else laptop); and
+- the **project sensitivity** — ``standard | restricted | clinical`` from
+  `cert_projects.CertProject.sensitivity`.
+
+On a **laptop**, binding a **clinical / tier-3** project's data root is
+**refused** with: *"clinical/tier-3 data must stay on a server; reach it
+over SSH, don't replicate it to a laptop."* On a **host / server** it is
+allowed (that is the data root's proper home). Standard / restricted
+tiers are unrestricted on any machine — the guard is non-blocking for
+them. The refusal is a required-fail probe surfaced at the
+project-workspace-initialize step; it is never silently dropped.
