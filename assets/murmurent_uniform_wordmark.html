@@ -416,18 +416,25 @@
 
       // silhouette area + atmospheric haze -> the flock twinkles and recedes
       const a = (0.2 + 0.38 * b.ink) * (0.55 + 0.45 * spread) * (0.46 + 0.54 * b.z);
-      // Monochrome metallic depth ramp (aerial perspective -> reads as 3D): FAR
-      // birds recede as light SILVER, mid-depth birds are GREY, NEAR birds come
-      // forward as BLACK. A per-bird lightness offset (b.swirl) spreads the tones
-      // so same-depth birds aren't identical, and faster birds glint a touch
-      // brighter. A faint cool tint keeps it reading as silver, not dead grey.
-      // (Non-logo keeps the charcoal ink.)
+      // Iridescent metallic flock (starling oil-slick sheen). Each bird's hue
+      // shifts with its HEADING, so as the flock wheels through the murmuration
+      // waves of colour ripple across it; a per-bird offset (b.ink) + a slow time
+      // drift keep it varied and alive. A wing-beat "shimmer" swings each bird
+      // between vivid CHROMATIC colour and a bright metallic SILVER glint, so it
+      // sparkles rather than sitting at one flat tone. (Non-logo keeps charcoal.)
       if (LOGO) {
         const spN = Math.min(1, sp / 5);
-        const hue = 214;                             // faint cool tint only
-        const sat = 8;                               // near-neutral -> metallic silver, not colourful
-        const lig = 66 - 58 * b.z + 7 * b.swirl - 4 * spN;  // silver (far) -> grey -> black (near)
-        ctx.fillStyle = "hsla(" + hue + "," + sat + "%,"
+        const head = Math.atan2(b.vy, b.vx) * 57.2958;      // heading, degrees
+        let hue = (head * 1.4 + b.ink * 360 + b.swirl * 160 + t * 45) % 360;
+        if (hue < 0) hue += 360;
+        // glint peaks with the wingbeat + a per-bird phase, sharpest when the
+        // wings are broadside -> intermittent silver flashes across the flock
+        const shimmer = 0.5 + 0.5 * Math.sin(b.flap * 0.9 + b.ink * 20 + t * 2.2);
+        const glint = shimmer * shimmer * (0.55 + 0.45 * spread);
+        const sat = 22 + 60 * (1 - glint);                  // vivid colour, dropping to silver on a glint
+        const baseL = 46 + 16 * b.z;                         // depth: far a touch brighter
+        const lig = Math.min(90, baseL + glint * 40 + spN * 5);  // silver specular highlight
+        ctx.fillStyle = "hsla(" + hue.toFixed(1) + "," + sat.toFixed(1) + "%,"
                                 + lig.toFixed(1) + "%," + a.toFixed(3) + ")";
       } else {
         ctx.fillStyle = "rgba(32, 28, 24, " + a.toFixed(3) + ")";
