@@ -3865,15 +3865,17 @@ def create_app() -> FastAPI:
         user can register lab-server without dropping to a terminal.
         """
         from ..core import hosts as _hosts
-        # Connection-only (issue #80): the registry stores how to REACH the
-        # machine (ssh_host + scan_dirs) plus friendly metadata. A machine's
-        # data-root / vault / project paths are NOT set here — they are edited
-        # on that machine's own dashboard via machine.yaml.
+        # Connection + repo-location only (issue #80): how to REACH the machine
+        # (ssh_host + scan_dirs) + where clones live. The first repo location
+        # doubles as project_root (where new remote clones land). A machine's
+        # data-root / vault CONFIG is NOT set here — it is edited on that
+        # machine's own dashboard via machine.yaml.
         host = _hosts.Host(
             name=body.name,
             kind="ssh" if body.ssh_host else "local",
             ssh_host=body.ssh_host,
             remote_user=body.remote_user,
+            project_root=(body.scan_dirs[0] if body.scan_dirs else "~/repos"),
             mount_point=body.mount_point,
             description=body.description,
             scan_dirs=tuple(body.scan_dirs),

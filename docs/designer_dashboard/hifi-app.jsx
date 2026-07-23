@@ -345,6 +345,51 @@ function TopBar() {
   );
 }
 
+/* ───────── machine-identity badge (issue #80) ─────────
+   Always-visible in the header so that, with a laptop dashboard and a tunneled
+   server dashboard both open in browser tabs, each tab plainly says WHICH
+   machine it is. Sourced from /api/environment/this_machine (machine_name +
+   id from machine.yaml, falling back to the hostname). Visually distinct
+   (icon + colored pill) so it is hard to miss. */
+function MachineBadge() {
+  const [env, setEnv] = useState(null);
+  useEffect(() => {
+    fetch("/api/environment/this_machine", { headers: { Accept: "application/json" } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setEnv(d); })
+      .catch(() => {});
+  }, []);
+  const name = env ? (env.machine_name || env.short_hostname || env.machine_id || "this machine") : "…";
+  const isLaptop = env && env.kind === "laptop";
+  const roleHint = env ? (isLaptop ? "laptop" : "host") : "";
+  const tip = env
+    ? `You are on "${name}" (${env.hostname || env.machine_id || "?"}) · ${roleHint}`
+      + " — this dashboard drives THIS machine."
+    : "Identifying this machine…";
+  return (
+    <div title={tip} style={{
+      display:"inline-flex", alignItems:"center", gap:6, marginLeft:10,
+      padding:"3px 11px", borderRadius:14, fontWeight:700, fontSize:12,
+      fontFamily:"var(--mono)", letterSpacing:0.2, whiteSpace:"nowrap",
+      color:"var(--paper)",
+      background: isLaptop
+        ? "linear-gradient(90deg,#4f2683,#7a3fb0)"
+        : "linear-gradient(90deg,#0f766e,#0ea5a0)",
+      border:"1px solid rgba(0,0,0,0.15)",
+      boxShadow:"0 1px 3px rgba(32,20,54,0.28)",
+    }}>
+      <span aria-hidden="true" style={{fontSize:13}}>{isLaptop ? "💻" : "🖥"}</span>
+      <span>{name}</span>
+      {roleHint && (
+        <span style={{
+          fontSize:9, letterSpacing:1, textTransform:"uppercase", opacity:0.85,
+          borderLeft:"1px solid rgba(255,255,255,0.4)", paddingLeft:6,
+        }}>{roleHint}</span>
+      )}
+    </div>
+  );
+}
+
 function CmdBar({ query, setQuery }) {
   // The persona arrives via ?persona= from the /login landing page; the
   // role badge below the search is informational (it reflects the lens
@@ -407,6 +452,7 @@ function CmdBar({ query, setQuery }) {
         />
         <K>⌘K</K>
       </div>
+      <MachineBadge />
       {canEditLab && (
         <button
           type="button"
@@ -6805,18 +6851,14 @@ function HostsModal({ onClose }) {
 }
 
 function HostAddForm({ onCancel, onAdded }) {
-  /* Mirrors the machine cards + ThisMachineEditor (issue #25): beyond the
-     connection details (name, SSH host, username), a machine declares WHERE
-     each vault's clone lives on it — the PERSONAL vault (path + oracle/
-     lab-notebook subfolders) and the LAB (group) vault (the lab-mgmt clone
-     path) — plus Files and Repo locations. These forms set *location*; the
-     vaults' *identity* (which GitHub repo) is machine-independent and set in
-     Profile / Lab Settings. */
+  /* Issue #80 — CONNECTION-ONLY. hosts.yaml is now a thin target list for the
+     repo-inventory SSH scan, not a foreign-machine config editor. A machine's
+     data-root / vault / project paths are set ONLY on that machine's OWN
+     dashboard (This machine → save). So this form collects just what reaching
+     the machine + scanning it needs: name, SSH host, username, repo locations,
+     and a free-text note. */
   const [form, setForm] = useState({
     name: "", ssh_host: "", remote_user: "",
-    vault_root: "~/murmurent_vault", oracle_subfolder: "oracle",
-    notebook_subfolder: "lab-notebook", lab_vault_root: "",
-    files_root: "~/lab_vm/data",
     repos_text: "~/repos", description: "",
   });
   const [busy, setBusy] = useState(false);
@@ -6839,13 +6881,6 @@ function HostAddForm({ onCancel, onAdded }) {
           name: form.name.trim(),
           ssh_host: form.ssh_host.trim(),
           remote_user: form.remote_user.trim(),
-          vault_root: form.vault_root.trim() || "~/murmurent_vault",
-          oracle_subfolder: form.oracle_subfolder.trim() || "oracle",
-          notebook_subfolder: form.notebook_subfolder.trim() || "lab-notebook",
-          lab_vault_root: form.lab_vault_root.trim(),
-          lab_vm_root: form.files_root.trim() || "~/lab_vm/data",
-          // First repo location doubles as where new clones land.
-          project_root: repos[0] || "~/repos",
           scan_dirs: repos,
           description: form.description.trim(),
         }),
@@ -6871,9 +6906,14 @@ function HostAddForm({ onCancel, onAdded }) {
       padding:"10px 14px", background:"var(--paper)",
     }}>
       <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
-        <strong style={{fontFamily:"var(--serif)"}}>Add machine</strong>
+        <strong style={{fontFamily:"var(--serif)"}}>Add SSH machine (for repo scan)</strong>
         <button type="button" className="btn sm ghost" onClick={onCancel}>cancel</button>
       </div>
+      <p className="muted" style={{fontSize:11, margin:"4px 0 0"}}>
+        Registers a machine murmurent can reach over SSH so the Repo Inventory can
+        scan it. Its data-root / vault paths are configured on that machine's own
+        dashboard — not here.
+      </p>
       <div className="row" style={{gap:10, marginTop:6}}>
         <div style={{flex:1}}>
           <div style={lbl}>name (short id)</div>
@@ -6890,27 +6930,7 @@ function HostAddForm({ onCancel, onAdded }) {
       <input style={inp} value={form.remote_user} onChange={set("remote_user")}
              placeholder="the_pi" />
 
-      <div style={{...lbl, marginTop:14, color:"var(--ink)", fontSize:11}}>Personal Vault</div>
-      <input style={inp} value={form.vault_root} onChange={set("vault_root")}
-             placeholder="/home/you/murmurent_vault" />
-      <div className="row" style={{gap:10, marginTop:4}}>
-        <div style={{flex:1}}>
-          <div style={lbl}>Oracle subfolder</div>
-          <input style={inp} value={form.oracle_subfolder} onChange={set("oracle_subfolder")} />
-        </div>
-        <div style={{flex:1}}>
-          <div style={lbl}>Lab-notebook Subfolder</div>
-          <input style={inp} value={form.notebook_subfolder} onChange={set("notebook_subfolder")} />
-        </div>
-      </div>
-
-      <div style={{...lbl, marginTop:14, color:"var(--ink)", fontSize:11}}>Lab vault</div>
-      <input style={inp} value={form.lab_vault_root} onChange={set("lab_vault_root")}
-             placeholder="/home/you/murmurent_lab_mgmt_mh" />
-
-      <div style={{...lbl, marginTop:14}}>Files (data root — raw/ + refined/ live here)</div>
-      <input style={inp} value={form.files_root} onChange={set("files_root")} />
-      <div style={lbl}>Repo locations (one per line; the first is where new clones go)</div>
+      <div style={lbl}>Repo locations to scan (one per line)</div>
       <textarea style={{...inp, fontFamily:"var(--mono)", minHeight:54, resize:"vertical"}}
                 value={form.repos_text} onChange={set("repos_text")}
                 placeholder={"~/repos\n/srv/projects"} />
@@ -6923,6 +6943,67 @@ function HostAddForm({ onCancel, onAdded }) {
         </button>
       </div>
     </form>
+  );
+}
+
+/* ───────── Read-only cross-machine view (issue #80) ─────────
+   Each machine mirrors its OWN config to <vault>/machines/<id>.yaml; the vault
+   syncs those across the member's machines. This panel READS them (plus the
+   repo-inventory SSH scan) so you can SEE your other machines — display only,
+   never editing a foreign machine's params (those are edited on that machine's
+   own dashboard). */
+function OtherMachinesView() {
+  const [machines, setMachines] = useState([]);
+  const [thisId, setThisId] = useState("");
+  const [loaded, setLoaded] = useState(false);
+  useEffect(() => {
+    fetch("/api/machines/registry", { headers: { Accept: "application/json" } })
+      .then(r => r.ok ? r.json() : { machines: [] })
+      .then(d => { setMachines(d.machines || []); setThisId(d.this_machine_id || ""); })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+  const others = machines.filter(m => (m.machine_id || "") !== thisId);
+  if (!loaded) return null;
+  const lbl = {fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+               textTransform:"uppercase", color:"var(--muted)", width:96,
+               display:"inline-block"};
+  return (
+    <div style={{marginTop:14}}>
+      <div style={{fontFamily:"var(--serif)", fontSize:14, marginBottom:2}}>
+        Your other machines <span className="muted" style={{fontSize:11}}>· synced, read-only</span>
+      </div>
+      {others.length === 0 ? (
+        <p className="muted" style={{fontSize:11, margin:"2px 0"}}>
+          No other machines mirrored yet. Each machine publishes its own entry to
+          <code> &lt;vault&gt;/machines/</code> when you save its settings, and the
+          vault syncs it here. Configure each machine on its own dashboard.
+        </p>
+      ) : (
+        <div style={{display:"flex", flexWrap:"wrap", gap:10}}>
+          {others.map(m => (
+            <div key={m.machine_id} style={{
+              flex:"1 1 calc(50% - 5px)", minWidth:230,
+              border:"1px solid var(--rule-strong)", borderRadius:2,
+              padding:"10px 12px", background:"var(--paper-2)",
+            }}>
+              <div style={{fontFamily:"var(--serif)", fontSize:14}}>
+                {m.machine_name || m.machine_id}
+                {m.platform && <Pill tone="purple">{m.platform}</Pill>}
+              </div>
+              <div style={{marginTop:6, fontSize:11.5, lineHeight:1.7}}>
+                <div><span style={lbl}>data root</span>
+                  <code className="mono">{m.wigamig_base || "—"}</code></div>
+                <div><span style={lbl}>vault</span>
+                  <code className="mono">{m.obsidian_vault_path || "—"}</code></div>
+                {m.updated && <div><span style={lbl}>updated</span>
+                  <span className="muted">{String(m.updated).slice(0, 10)}</span></div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -7399,11 +7480,11 @@ function MachinesModal({ onClose }) {
           <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
         </div>
         <p className="muted" style={{fontSize:12, margin:"4px 0 8px"}}>
-          Computers where you work. Each declares a large-file location
-          containing <code>raw/</code>, <code>refined/</code>, and
-          <code>lab_notebooks/</code>. The Obsidian vault (which hosts your
-          personal oracle) lives separately. Stored in
-          <code>~/.murmurent/machine.yaml</code> and <code>~/.murmurent/hosts.yaml</code>.
+          This window configures <strong>this machine only</strong> (issue #80).
+          Each install configures itself and mirrors its config to the synced
+          vault; your other machines are shown read-only below. Stored in
+          <code>~/.murmurent/machine.yaml</code>; SSH scan targets in
+          <code>~/.murmurent/hosts.yaml</code>.
         </p>
 
         {editingThis ? (
@@ -7426,23 +7507,45 @@ function MachinesModal({ onClose }) {
           <div style={{color:"var(--red)", fontSize:12}}>load failed: {loadErr}</div>
         )}
 
-        {remoteCards.map(m => (
-          <MachineCard key={m.name} machine={m} isCurrent={false}
-                       onRemove={() => removeHost(m.name)}
-                       onScanDirsSaved={refreshHosts} />
-        ))}
+        {/* Read-only cross-machine view (synced <vault>/machines/*.yaml). */}
+        <OtherMachinesView />
 
-        <div style={{marginTop:6}}>
-          {showAdd ? (
-            <HostAddForm onCancel={() => setShowAdd(false)} onAdded={async () => {
-              setShowAdd(false);
-              await refreshHosts();
-            }} />
-          ) : (
-            <button type="button" className="btn sm" onClick={() => setShowAdd(true)}>
-              + Add machine (SSH host)
-            </button>
+        <div style={{marginTop:12, borderTop:"1px solid var(--rule)", paddingTop:10}}>
+          <div style={{fontFamily:"var(--serif)", fontSize:14, marginBottom:4}}>
+            SSH scan targets <span className="muted" style={{fontSize:11}}>· connection only, for Repo Inventory</span>
+          </div>
+          {remoteCards.length === 0 && !showAdd && (
+            <p className="muted" style={{fontSize:11, margin:"2px 0"}}>
+              None registered.
+            </p>
           )}
+          {remoteCards.map(m => (
+            <div key={m.name} className="row" style={{
+              justifyContent:"space-between", alignItems:"baseline",
+              padding:"6px 0", borderBottom:"1px solid var(--rule)",
+            }}>
+              <span style={{fontSize:12, fontFamily:"var(--mono)"}}>
+                <strong>{m.name}</strong> · {m.remote_user ? m.remote_user + "@" : ""}{m.ssh_host}
+                <span className="muted"> · scan {(m.scan_dirs && m.scan_dirs.length) ? m.scan_dirs.join(", ") : "default"}</span>
+              </span>
+              {(window.DATA.persona === "pi") && (
+                <button type="button" className="btn sm" onClick={() => removeHost(m.name)}
+                        style={{color:"var(--red)"}}>remove</button>
+              )}
+            </div>
+          ))}
+          <div style={{marginTop:8}}>
+            {showAdd ? (
+              <HostAddForm onCancel={() => setShowAdd(false)} onAdded={async () => {
+                setShowAdd(false);
+                await refreshHosts();
+              }} />
+            ) : (
+              <button type="button" className="btn sm" onClick={() => setShowAdd(true)}>
+                + Add machine (SSH host)
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -7457,19 +7560,15 @@ const MachineSettingsModal = MachinesModal;
    sits next to Projects (below Installations). Replaces the old footer
    "⚙ machines" button — machines are conceptually part of the dashboard's
    content, not chrome. */
-/* Editor for a REMOTE machine. Deliberately a mirror of HostAddForm — same
-   layout, styling, and field set (minus the immutable name, shown read-only) —
-   so editing a machine looks and feels like adding one. Saves via
-   PATCH /api/hosts/<name>. */
+/* Connection-only editor for a REMOTE SSH machine (issue #80). Edits ONLY what
+   the repo-inventory scan needs to reach + scan the machine: ssh_host,
+   remote_user, repo locations, description. A foreign machine's data-root /
+   vault / project paths are NOT editable from here — they are configured on
+   that machine's own dashboard. Saves via PATCH /api/hosts/<name>. */
 function HostEditForm({ host, onCancel, onSaved }) {
   const [form, setForm] = useState({
     ssh_host: host.ssh_host || "",
     remote_user: host.remote_user || "",
-    vault_root: host.obsidian_vault_path || "",
-    oracle_subfolder: host.oracle_subfolder || "oracle",
-    notebook_subfolder: host.notebook_subfolder || "lab-notebook",
-    lab_vault_root: host.lab_vault_path || "",
-    files_root: host.wigamig_base || "",
     repos_text: (host.scan_dirs || []).join("\n"),
     description: host.description || "",
   });
@@ -7489,11 +7588,6 @@ function HostEditForm({ host, onCancel, onSaved }) {
         body: JSON.stringify({
           ssh_host: form.ssh_host.trim(),
           remote_user: form.remote_user.trim(),
-          vault_root: form.vault_root.trim(),
-          oracle_subfolder: form.oracle_subfolder.trim(),
-          notebook_subfolder: form.notebook_subfolder.trim(),
-          lab_vault_root: form.lab_vault_root.trim(),
-          lab_vm_root: form.files_root.trim(),
           description: form.description.trim(),
           scan_dirs: repos,
         }),
@@ -7514,48 +7608,20 @@ function HostEditForm({ host, onCancel, onSaved }) {
       padding:"10px 14px", background:"var(--paper)",
     }}>
       <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
-        <strong style={{fontFamily:"var(--serif)"}}>Edit machine</strong>
+        <strong style={{fontFamily:"var(--serif)"}}>Edit connection · {host.name}</strong>
         <button type="button" className="btn sm ghost" onClick={onCancel}>cancel</button>
       </div>
-      <div className="row" style={{gap:10, marginTop:6}}>
-        <div style={{flex:1}}>
-          <div style={lbl}>name (short id)</div>
-          {/* name is the machine's identity key — shown, not editable. */}
-          <input style={{...inp, color:"var(--muted)", background:"var(--paper-2)"}}
-                 value={host.name || ""} readOnly disabled />
-        </div>
-        <div style={{flex:2}}>
-          <div style={lbl}>SSH host (alias in ~/.ssh/config or full hostname)</div>
-          <input style={inp} value={form.ssh_host} onChange={set("ssh_host")}
-                 placeholder="lab-server.example.edu" />
-        </div>
-      </div>
+      <p className="muted" style={{fontSize:11, margin:"4px 0 0"}}>
+        Connection only — how murmurent reaches + scans this machine. Its
+        data-root / vault paths are configured on its own dashboard.
+      </p>
+      <div style={lbl}>SSH host (alias in ~/.ssh/config or full hostname)</div>
+      <input style={inp} value={form.ssh_host} onChange={set("ssh_host")}
+             placeholder="lab-server.example.edu" />
       <div style={lbl}>username on host (optional)</div>
       <input style={inp} value={form.remote_user} onChange={set("remote_user")}
              placeholder="the_pi" />
-
-      <div style={{...lbl, marginTop:14, color:"var(--ink)", fontSize:11}}>Personal Vault</div>
-      <input style={inp} value={form.vault_root} onChange={set("vault_root")}
-             placeholder="/home/you/murmurent_vault" />
-      <div className="row" style={{gap:10, marginTop:4}}>
-        <div style={{flex:1}}>
-          <div style={lbl}>Oracle subfolder</div>
-          <input style={inp} value={form.oracle_subfolder} onChange={set("oracle_subfolder")} />
-        </div>
-        <div style={{flex:1}}>
-          <div style={lbl}>Lab-notebook Subfolder</div>
-          <input style={inp} value={form.notebook_subfolder} onChange={set("notebook_subfolder")} />
-        </div>
-      </div>
-
-      <div style={{...lbl, marginTop:14, color:"var(--ink)", fontSize:11}}>Lab vault</div>
-      <input style={inp} value={form.lab_vault_root} onChange={set("lab_vault_root")}
-             placeholder="/home/you/murmurent_lab_mgmt_mh" />
-
-      <div style={{...lbl, marginTop:14}}>Files (data root — raw/ + refined/ live here)</div>
-      <input style={inp} value={form.files_root} onChange={set("files_root")}
-             placeholder="/data/lab_vm/…" />
-      <div style={lbl}>Repo locations (one per line; the first is where new clones go)</div>
+      <div style={lbl}>Repo locations to scan (one per line)</div>
       <textarea style={{...inp, fontFamily:"var(--mono)", minHeight:54, resize:"vertical"}}
                 value={form.repos_text} onChange={set("repos_text")}
                 placeholder={"~/repos\n/srv/projects"} />
@@ -7648,19 +7714,16 @@ function MachinesPanel({ span = "c-5" }) {
     description: h.description || "",
     scan_dirs: h.scan_dirs || [],
   }));
-  const total = 1 + remoteCards.length;
+  const sshTargets = remoteCards;
 
   return (
     <div className={"panel " + span}>
       <header>
-        <h2>Machines</h2>
+        <h2>This machine</h2>
         <div className="row" style={{gap:6}}>
           <span className="meta">
-            {total} total · 1 here · {remoteCards.length} remote
+            {sshTargets.length} SSH scan target{sshTargets.length === 1 ? "" : "s"}
           </span>
-          <button className="btn sm" onClick={() => setShowAdd(s => !s)}>
-            {showAdd ? "× cancel" : "＋ add machine"}
-          </button>
         </div>
       </header>
       <div style={{padding:"10px 14px"}}>
@@ -7669,6 +7732,9 @@ function MachinesPanel({ span = "c-5" }) {
             load failed: {loadErr}
           </div>
         )}
+        {/* Issue #80: the Machines window edits THIS machine only. Each install
+            configures itself; other machines are shown read-only (synced from
+            the vault) below. */}
         {editingThis ? (
           <ThisMachineEditor
             initial={{ ...ms, scan_dirs: thisCard.scan_dirs,
@@ -7679,34 +7745,74 @@ function MachinesPanel({ span = "c-5" }) {
             onSaved={() => { setEditingThis(false); refreshHosts(); }}
             onCancel={() => setEditingThis(false)}
           />
-        ) : editingHost ? (
-          <HostEditForm
-            host={remoteCards.find(m => m.name === editingHost) || {}}
-            onCancel={() => setEditingHost(null)}
-            onSaved={async () => { setEditingHost(null); await refreshHosts(); }}
-          />
         ) : (
-          /* Up to 3 machine cards per row. */
-          <div style={{display:"flex", flexWrap:"wrap", gap:10, alignItems:"stretch"}}>
-            <div style={{flex:"1 1 calc(33.333% - 7px)", minWidth:230, display:"flex"}}>
-              <MachineCard machine={thisCard} isCurrent
-                           onEditClick={() => setEditingThis(true)} />
+          <MachineCard machine={thisCard} isCurrent
+                       onEditClick={() => setEditingThis(true)} />
+        )}
+
+        {/* Read-only cross-machine view (synced <vault>/machines/*.yaml). */}
+        <OtherMachinesView />
+
+        {/* Connection-only SSH targets for the Repo Inventory scan. Not a
+            foreign-machine config editor — only ssh_host + scan dirs. */}
+        <div style={{marginTop:16, borderTop:"1px solid var(--rule)", paddingTop:12}}>
+          <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+            <div style={{fontFamily:"var(--serif)", fontSize:14}}>
+              SSH scan targets <span className="muted" style={{fontSize:11}}>· connection only, for Repo Inventory</span>
             </div>
-            {remoteCards.map(m => (
-              <div key={m.name} style={{flex:"1 1 calc(33.333% - 7px)", minWidth:230, display:"flex"}}>
-                <MachineCard machine={m} isCurrent={false}
-                             onEditClick={() => setEditingHost(m.name)}
-                             onRemove={() => removeHost(m.name)} />
-              </div>
-            ))}
+            <button className="btn sm" onClick={() => setShowAdd(s => !s)}>
+              {showAdd ? "× cancel" : "＋ add machine"}
+            </button>
           </div>
-        )}
-        {showAdd && (
-          <HostAddForm onCancel={() => setShowAdd(false)} onAdded={async () => {
-            setShowAdd(false);
-            await refreshHosts();
-          }} />
-        )}
+          {editingHost ? (
+            <HostEditForm
+              host={sshTargets.find(m => m.name === editingHost) || {}}
+              onCancel={() => setEditingHost(null)}
+              onSaved={async () => { setEditingHost(null); await refreshHosts(); }}
+            />
+          ) : sshTargets.length === 0 ? (
+            <p className="muted" style={{fontSize:11, margin:"4px 0"}}>
+              None. Add an SSH machine so the Repo Inventory can scan it.
+            </p>
+          ) : (
+            <div style={{marginTop:6, display:"flex", flexDirection:"column", gap:6}}>
+              {sshTargets.map(m => (
+                <div key={m.name} style={{
+                  border:"1px solid var(--rule-strong)", borderRadius:2,
+                  padding:"8px 10px", background:"var(--paper)",
+                }}>
+                  <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+                    <div>
+                      <strong style={{fontFamily:"var(--serif)", fontSize:14}}>{m.name}</strong>{" "}
+                      <Pill tone="purple">SSH</Pill>
+                      <span style={{fontSize:11, fontFamily:"var(--mono)", color:"var(--muted)", marginLeft:6}}>
+                        {m.remote_user ? m.remote_user + "@" : ""}{m.ssh_host}
+                      </span>
+                    </div>
+                    <div style={{display:"flex", gap:6}}>
+                      <button type="button" className="btn sm" onClick={() => setEditingHost(m.name)}>edit</button>
+                      {(window.DATA.persona === "pi") && (
+                        <button type="button" className="btn sm" onClick={() => removeHost(m.name)}
+                                style={{color:"var(--red)"}}>remove</button>
+                      )}
+                    </div>
+                  </div>
+                  <div style={{marginTop:4, fontSize:11, fontFamily:"var(--mono)", color:"var(--muted)"}}>
+                    scan → {(m.scan_dirs && m.scan_dirs.length) ? m.scan_dirs.join(", ") : "default (~/repo + ~/repos)"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {showAdd && (
+            <div style={{marginTop:8}}>
+              <HostAddForm onCancel={() => setShowAdd(false)} onAdded={async () => {
+                setShowAdd(false);
+                await refreshHosts();
+              }} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

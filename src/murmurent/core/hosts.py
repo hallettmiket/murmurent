@@ -227,18 +227,20 @@ def write(hosts: dict[str, Host], env: dict[str, str] | None = None) -> Path:
     """Serialise ``hosts`` to ``hosts.yaml`` as a CONNECTION-ONLY registry.
 
     Issue #80 (machine-config simplification): ``hosts.yaml`` is now a thin,
-    non-authoritative *target list* — it records only what
-    ``repo_inventory``'s SSH scan needs to reach a machine (``ssh_host`` +
-    ``scan_dirs``) plus friendly connection metadata (``remote_user``,
-    ``mount_point``, ``description``). A machine's *configuration* (data-root,
-    vault, project paths) is edited ONLY on that machine's own dashboard via
-    ``machine.yaml``/``save_machine_settings`` and mirrored to the synced
-    ``<vault>/machines/*.yaml`` registry — never persisted here.
+    non-authoritative *connection + repo-location* registry. It records how to
+    reach a machine (``ssh_host`` / ``remote_user`` / ``mount_point``) and
+    where its git clones live (``project_root`` + ``scan_dirs``) — exactly what
+    the ``repo_inventory`` SSH scan + remote-deploy need — plus a
+    ``description``. It deliberately DROPS a machine's *configuration* params —
+    the data-root (``lab_vm_root``), personal vault (``vault_root``), lab vault
+    (``lab_vault_root``), and vault subfolders — because those differ per
+    machine and are edited ONLY on that machine's own dashboard via
+    ``machine.yaml``/``save_machine_settings`` (mirrored to the synced
+    ``<vault>/machines/*.yaml`` registry), never across machines from here.
 
-    Migration is graceful + non-destructive: legacy rows that still carry
-    ``project_root`` / ``lab_vm_root`` / ``vault_root`` / ``lab_vault_root`` /
-    subfolder params are read back (see ``_coerce_host``) but dropped on the
-    next write. Connection rows themselves are never removed.
+    Migration is graceful + non-destructive: legacy rows that still carry the
+    dropped config params are read back (see ``_coerce_host``) but omitted on
+    the next write. Connection rows themselves are never removed.
 
     The ``local`` entry is always retained (re-added if absent) so the
     registry is never empty after a write.
@@ -249,13 +251,13 @@ def write(hosts: dict[str, Host], env: dict[str, str] | None = None) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {"version": 1, "hosts": {}}
     for name, host in hosts.items():
-        # CONNECTION-ONLY: kind + how to reach the machine + what to scan.
-        # Deliberately omits every configuration/param field (project_root,
-        # lab_vm_root, vault_root, lab_vault_root, oracle/notebook/data
-        # subfolders) — those belong to each machine's own machine.yaml.
+        # Connection + repo-location coordinates only. Deliberately omits the
+        # per-machine CONFIG params (lab_vm_root / vault_root / lab_vault_root /
+        # oracle|notebook|data subfolders) — those belong to machine.yaml.
         row: dict[str, Any] = {"kind": host.kind}
         if host.ssh_host:    row["ssh_host"]    = host.ssh_host
         if host.remote_user: row["remote_user"] = host.remote_user
+        row["project_root"]  = host.project_root
         if host.mount_point: row["mount_point"] = host.mount_point
         if host.description: row["description"] = host.description
         if host.scan_dirs:   row["scan_dirs"]   = list(host.scan_dirs)
@@ -367,6 +369,7 @@ def update_host(
         kind=current.kind,
         ssh_host=_keep_if_blank(ssh_host, current.ssh_host),
         remote_user=_allow_clear(remote_user, current.remote_user),
+        project_root=current.project_root,   # repo-location coordinate, preserved
         mount_point=current.mount_point,
         description=_allow_clear(description, current.description),
         scan_dirs=_coerce_scan_dirs(scan_dirs) if scan_dirs is not None

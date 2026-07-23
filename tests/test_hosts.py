@@ -58,37 +58,37 @@ def test_round_trip_with_ssh_host(isolated):
     reread = hosts.read()
     assert set(reread.keys()) == {"local", "lab-server"}
     bio2 = reread["lab-server"]
-    # Connection metadata survives.
+    # Connection + repo-location metadata survives.
     assert bio2.ssh_host == "lab-server"
     assert bio2.remote_user == "the_pi"
     assert bio2.mount_point == "~/Mounts/lab-server"
     assert bio2.description == "Schulich compute server"
-    # Param fields are dropped on write → revert to dataclass defaults on read.
+    assert bio2.project_root == "/home/the_pi/repos"
+    # CONFIG params are dropped on write → revert to dataclass defaults on read.
     assert bio2.lab_vm_root == "~/lab_vm/data"
-    assert bio2.project_root == "~/repos"
     assert bio2.vault_root == "~/Documents/Obsidian"
 
 
-def test_write_is_connection_only(isolated):
-    """The serialised YAML carries no config/param keys (issue #80)."""
+def test_write_drops_config_params(isolated):
+    """The serialised YAML carries no per-machine CONFIG keys (issue #80) —
+    but keeps connection + repo-location coordinates."""
     hosts.add(hosts.Host(
         name="lab-server", kind="ssh", ssh_host="lab-server",
         remote_user="the_pi", project_root="/p", lab_vm_root="/d",
         vault_root="/v", lab_vault_root="/lm", scan_dirs=("repos",),
     ))
     text = hosts.hosts_file().read_text(encoding="utf-8")
-    for banned in ("project_root", "lab_vm_root", "vault_root",
-                   "lab_vault_root", "oracle_subfolder", "notebook_subfolder",
-                   "data_subfolder"):
+    for banned in ("lab_vm_root", "vault_root", "lab_vault_root",
+                   "oracle_subfolder", "notebook_subfolder", "data_subfolder"):
         assert banned not in text, f"{banned} should not be persisted"
-    # ...but connection + scan info is there.
-    assert "ssh_host" in text
-    assert "scan_dirs" in text
+    # Connection + repo-location coordinates ARE there.
+    assert "ssh_host" in text and "scan_dirs" in text
+    assert "project_root" in text
 
 
-def test_legacy_param_rows_read_but_dropped_on_rewrite(isolated):
-    """A pre-#80 hosts.yaml with param fields still LOADS (non-destructive);
-    the connection row is preserved and the params drop on the next write."""
+def test_legacy_config_params_read_but_dropped_on_rewrite(isolated):
+    """A pre-#80 hosts.yaml with config params still LOADS (non-destructive);
+    the connection row is preserved and the config params drop on next write."""
     path = hosts.hosts_file()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -103,18 +103,20 @@ def test_legacy_param_rows_read_but_dropped_on_rewrite(isolated):
         "    scan_dirs: [repos]\n",
         encoding="utf-8",
     )
-    # Non-destructive read: legacy params are still honoured until rewritten.
+    # Non-destructive read: legacy config params are still honoured until rewritten.
     h = hosts.read()["lab-server"]
     assert h.lab_vm_root == "/data/lab_vm"
     assert h.scan_dirs == ("repos",)
-    # A connection-only edit preserves the row but drops the params.
+    # A connection edit preserves the row + repo-location but drops config params.
     hosts.update_host("lab-server", description="compute")
     text = hosts.hosts_file().read_text(encoding="utf-8")
     assert "lab-server" in text and "the_pi" in text   # row preserved
-    assert "lab_vm_root" not in text                   # param dropped
+    assert "project_root" in text                       # repo-location kept
+    assert "lab_vm_root" not in text                    # config param dropped
     reread = hosts.read()["lab-server"]
     assert reread.ssh_host == "lab-server"
     assert reread.description == "compute"
+    assert reread.project_root == "/home/the_pi/repos"
 
 
 def test_add_refuses_duplicate(isolated):

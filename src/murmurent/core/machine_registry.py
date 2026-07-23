@@ -117,11 +117,30 @@ def _entry_from_settings(settings: Any) -> dict[str, Any]:
 def mirror_this_machine(settings: Any) -> Path | None:
     """Write THIS machine's own entry to ``<vault>/machines/<machine_id>.yaml``.
 
-    Best-effort + non-raising: returns the path written, or ``None`` when no
-    personal vault is registered on this machine (nothing to mirror to). Never
-    touches another machine's file — single-writer-per-machine.
+    Best-effort + non-raising: returns the path written, or ``None`` when there
+    is nowhere to mirror to. Never touches another machine's file —
+    single-writer-per-machine.
+
+    Existence guard: when resolving the real personal vault, we only write if
+    the vault root already exists on disk — we must NOT materialise a
+    not-yet-cloned vault dir (that would fool ``vault_info``'s "no clone"
+    probe). An explicit ``$MURMURENT_VAULT_MACHINES_DIR`` pin bypasses the
+    guard (tests, or a deliberate override).
     """
-    d = vault_machines_dir()
+    pin = os.environ.get(ENV_MACHINES_DIR, "").strip()
+    if pin:
+        d: Path | None = Path(pin).expanduser()
+    else:
+        try:
+            from . import vault_sync as _vs  # deferred: optional dashboard dep
+
+            root = _vs.personal_vault_root()
+        except Exception:  # noqa: BLE001
+            root = None
+        # No vault registered, or the clone isn't on disk yet → nothing to do.
+        if root is None or not Path(root).expanduser().is_dir():
+            return None
+        d = Path(root).expanduser() / VAULT_MACHINES_SUBDIR
     if d is None:
         return None
     try:
