@@ -7731,198 +7731,6 @@ function _underLabBase(labBase, sub) {
   return host ? host + ":" + joined : joined;
 }
 
-/* MasterFoldersDot — tiny persistent status pill next to "⚙ lab" in
-   the footer. Renders from the cached snapshot field
-   ``window.DATA.master_folders`` so it never blocks page load on an
-   SSH probe. Clicking opens Lab Settings so the user can re-check or
-   initialize. The cache fills in the first time the user presses the
-   "check" or "initialize" buttons inside Lab Settings → Master Folders. */
-function MasterFoldersDot({ onClick }) {
-  const mf = (window.DATA && window.DATA.master_folders) || {};
-  const overall = mf.overall;
-  const color =
-    overall === "ok"   ? "var(--green)" :
-    overall === "warn" ? "var(--tiger)" :
-    overall === "fail" ? "var(--red)"   : "var(--muted)";
-  const label =
-    overall === "ok"   ? "master folders ok"     :
-    overall === "warn" ? "master folders: gaps"  :
-    overall === "fail" ? "master folders: error" :
-                          "master folders: ?";
-  const tip = mf.checked
-    ? `Last checked ${mf.checked.slice(0, 16).replace("T", " ")}. Click for details.`
-    : "Master folders status not yet probed. Click to check.";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={tip}
-      style={{
-        background:"transparent", border:"1px solid var(--rule)",
-        borderRadius:2, padding:"1px 6px", cursor:"pointer",
-        fontSize:11, color:"var(--muted)",
-        display:"inline-flex", alignItems:"center", gap:4,
-      }}>
-      <span style={{color, fontSize:13, lineHeight:1}}>●</span>
-      <span>{label}</span>
-    </button>
-  );
-}
-
-/* MasterFoldersPanel — inline block on the Lab Settings modal that
-   probes the five master folders on the lab_base server and lets the
-   PI bootstrap any that are missing. Probes go through SSH (Remote
-   over ~/.ssh/config), so the panel only fires on explicit user
-   click — no automatic SSH on dashboard open. The result is cached
-   server-side so the dashboard's persistent indicator can render
-   without re-connecting. */
-function MasterFoldersPanel({ labBase }) {
-  const cached = (window.DATA && window.DATA.master_folders) || {};
-  const [probes, setProbes] = useState(null);
-  const [overall, setOverall] = useState(cached.overall || null);
-  const [checked, setChecked] = useState(cached.checked || null);
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState(null);
-  // Lockout cooldown: lab-server locks the account for 30 minutes after
-  // 3 failed auths. When we see a "Permission denied" / auth-failure
-  // detail, freeze the buttons for 90s so the user can read the
-  // message and fix their key/VPN before tripping the lockout.
-  const [cooldownUntil, setCooldownUntil] = useState(0);
-  const [, setTick] = useState(0);  // forces re-render so the countdown updates
-  useEffect(() => {
-    if (cooldownUntil <= Date.now()) return;
-    const id = setInterval(() => setTick(t => t + 1), 1000);
-    return () => clearInterval(id);
-  }, [cooldownUntil]);
-  const remainingSec = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
-  const onCooldown = remainingSec > 0;
-
-  // Heuristic: any of these substrings in the probe details means the
-  // SSH server actively rejected our auth (vs a connection-refused /
-  // timeout, which doesn't count against the lockout).
-  const _looksLikeAuthFailure = (probesList) => {
-    const blob = (probesList || []).map(p => (p.detail || "").toLowerCase()).join("\n");
-    return [
-      "permission denied",
-      "authentication failed",
-      "publickey,password",
-      "too many authentication failures",
-    ].some(s => blob.includes(s));
-  };
-
-  const run = async (mode /* "check" | "init" */) => {
-    if (onCooldown) return;
-    setBusy(true); setErr(null); setProbes(null);
-    try {
-      const url = mode === "init"
-        ? "/api/lab/master_folders/init?user="
-            + encodeURIComponent(new URLSearchParams(window.location.search).get("user") || "")
-        : "/api/lab/master_folders?refresh=true";
-      const res = await fetch(url, { method: mode === "init" ? "POST" : "GET" });
-      const body = await res.json();
-      if (!res.ok) throw new Error(body.detail || ("HTTP " + res.status));
-      setProbes(body.probes || []);
-      setOverall(body.overall || null);
-      setChecked(body.checked || null);
-      if (_looksLikeAuthFailure(body.probes)) {
-        setCooldownUntil(Date.now() + 90 * 1000);
-      }
-      if (typeof window.__murmurentFetchData === "function") {
-        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
-      }
-    } catch (ex) { setErr(String(ex.message || ex)); }
-    finally { setBusy(false); }
-  };
-
-  const pillColor =
-    overall === "ok"   ? "var(--green)" :
-    overall === "warn" ? "var(--tiger)" :
-    overall === "fail" ? "var(--red)"   : "var(--muted)";
-  const pillText =
-    overall === "ok"   ? "all 5 folders present" :
-    overall === "warn" ? "some folders missing"  :
-    overall === "fail" ? "ssh / probe failed"    :
-    "not checked yet";
-
-  return (
-    <div style={{marginTop:12, padding:"10px 12px",
-                 background:"var(--paper-2)", border:"1px solid var(--rule)", borderRadius:2}}>
-      <div className="row" style={{justifyContent:"space-between", alignItems:"baseline", gap:8}}>
-        <div>
-          <div style={{fontSize:10.5, letterSpacing:1, textTransform:"uppercase",
-                       fontFamily:"var(--mono)", color:"var(--muted)"}}>
-            master folders on lab server
-          </div>
-          <div style={{fontSize:12, marginTop:2}}>
-            <span style={{color:pillColor, marginRight:6}}>●</span>
-            <span style={{color:"var(--ink)"}}>{pillText}</span>
-            {checked && (
-              <span className="muted" style={{fontSize:10.5, marginLeft:8}}>
-                checked {checked.slice(0, 16).replace("T", " ")}
-              </span>
-            )}
-          </div>
-        </div>
-        <div style={{display:"flex", gap:6}}>
-          <button type="button" className="btn sm"
-                  disabled={busy || onCooldown || !labBase}
-                  onClick={() => run("check")}>
-            {busy ? "…" : onCooldown ? `wait ${remainingSec}s` : "check"}
-          </button>
-          <button type="button" className="btn sm primary"
-                  disabled={busy || onCooldown || !labBase}
-                  onClick={() => run("init")}>
-            {onCooldown ? `wait ${remainingSec}s` : "initialize missing"}
-          </button>
-        </div>
-      </div>
-      {onCooldown && (
-        <div style={{
-          marginTop:8, padding:"8px 10px", borderRadius:2,
-          background:"rgba(240, 167, 87, 0.12)",
-          border:"1px solid var(--tiger)",
-          fontSize:11.5, lineHeight:1.5, color:"var(--ink)",
-        }}>
-          <strong>Auth failure detected.</strong> lab-server locks the account for
-          <strong> 30 minutes after 3 failed logins</strong>. Buttons disabled
-          for {remainingSec}s so you can: (1) check Western VPN is connected;
-          (2) verify <code>ssh lab-server.example.edu</code> works in a
-          terminal; (3) install your key with <code>ssh-copy-id -i ~/.ssh/laptop.pub lab-server.example.edu</code> if it isn't already authorized.
-          Each click here is one auth attempt against the 3-strike limit.
-        </div>
-      )}
-      {err && (
-        <div style={{fontSize:11, color:"var(--red)", marginTop:6}}>{err}</div>
-      )}
-      {probes && probes.length > 0 && (
-        <div style={{marginTop:8}}>
-          {probes.map((p, i) => (
-            <div key={p.name + i} style={{
-              fontSize:12, fontFamily:"var(--mono)",
-              display:"flex", gap:6, alignItems:"baseline", marginTop:1,
-            }}>
-              <span style={{
-                color: p.status === "ok" ? "var(--green)" :
-                       p.status === "warn" ? "var(--tiger)" : "var(--red)",
-                width:12,
-              }}>
-                {p.status === "ok" ? "✓" : p.status === "warn" ? "!" : "✗"}
-              </span>
-              <span style={{width:100, color:"var(--muted)"}}>{p.name}</span>
-              <span style={{flex:1, color:"var(--ink)"}}>{p.detail}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      <div className="muted" style={{fontSize:11, marginTop:8, lineHeight:1.5}}>
-        Probes <code>{labBase || "(set lab_base above first)"}</code> over
-        SSH. <strong>check</strong> only reads; <strong>initialize</strong> runs <code>mkdir -p</code> for each missing subfolder. Existing folders are
-        never overwritten.
-      </div>
-    </div>
-  );
-}
-
 /* GitProvidersEditor — inline list editor used inside Lab Settings.
    Each row is one provider: {id, kind, label, target}. PI adds /
    edits / removes; the parent form sends the full list on save. Kept
@@ -8324,20 +8132,17 @@ function FooterMeta() {
                   state stays wired for back-compat in case external callers
                   still trigger it. */}
               {canEditLab && (
-                <>
-                  <button
-                    type="button"
-                    title={groupNoun() + " settings (PI / admin)"}
-                    onClick={() => setShowLabSettings(true)}
-                    style={{
-                      background:"transparent", border:"1px solid var(--rule-strong)",
-                      borderRadius:2, padding:"1px 6px", cursor:"pointer",
-                      fontSize:11, color:"var(--purple)",
-                    }}>
-                    ⚙ {groupNoun().toLowerCase()}
-                  </button>
-                  <MasterFoldersDot onClick={() => setShowLabSettings(true)} />
-                </>
+                <button
+                  type="button"
+                  title={groupNoun() + " settings (PI / admin)"}
+                  onClick={() => setShowLabSettings(true)}
+                  style={{
+                    background:"transparent", border:"1px solid var(--rule-strong)",
+                    borderRadius:2, padding:"1px 6px", cursor:"pointer",
+                    fontSize:11, color:"var(--purple)",
+                  }}>
+                  ⚙ {groupNoun().toLowerCase()}
+                </button>
               )}
               {m.is_registrar && (
                 <a

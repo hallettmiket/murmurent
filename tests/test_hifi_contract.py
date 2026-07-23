@@ -180,7 +180,6 @@ HIFI_TOP_LEVEL_KEYS = {
     "inventory",
     "notebook",
     "installations",
-    "master_folders",
 }
 
 

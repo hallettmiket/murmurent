@@ -245,7 +245,6 @@ def build_response(
         inventory=_inventory(snap),
         notebook=_notebook(handle, today_d),
         installations=_installations(norm, effective_persona),
-        master_folders=_master_folders_summary(),
     )
 
 
@@ -604,23 +603,6 @@ def _agents_activity(*, limit: int = 16) -> list[C.AgentActivity]:
         if len(out) >= limit:
             break
     return out
-
-
-def _master_folders_summary() -> dict:
-    """Return the cached master-folders status for the current lab.
-
-    The dashboard pill reads this on every refresh; live SSH probes
-    only happen when the user clicks "check" or "init" in Lab Settings.
-    Returns an empty dict when nothing has been cached yet so the JSX
-    can render "?" + a prompt.
-    """
-    try:
-        from ..core import master_folders as _mf
-        lab_name = ""  # resolved from the viewer's lab.md via the request override
-        summary = _mf.cached_summary(lab_name)
-        return summary or {}
-    except Exception:
-        return {}
 
 
 def _lab_settings(lab_name: str) -> C.LabSettings:

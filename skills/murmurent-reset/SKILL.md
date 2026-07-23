@@ -20,7 +20,7 @@ then run for real**.
 | `centre` (default) | `~/.murmurent/lab_info/` only → centre-init is first-run again | everything else |
 | `install` | centre + reinstall the tool from `~/repos/murmurent` (`uv tool install --force --python 3.12 -e '.[dashboard,slack,mcp]'`) + `scripts/setup.sh` + `murmurent install --hooks` | credentials, installations, audit |
 | `full` | install + machine-local **caches** (`workspaces/`, `*.log`, `dashboard.pid`, `security/agent_cache`, stale `RESUME.md`) | credentials, `installations/`, `decommissions/`, audit logs, `hosts.yaml`/`machine.yaml` |
-| `data` | **all data you entered** into `~/.murmurent` — `lab_info/`, `profile.yaml`, `hosts`/`machine`/`master_folders` yaml, `inventory/`, `cores/`, `onboarding/`, `decommissions/`, `security/`, identity/cards/trust/revocation, logs — everything *except* key material (allowlist-based, so new files are caught) | `keys/`, `age/`, `installations/` (other projects), and `~/.config/murmurent`. **No reinstall.** |
+| `data` | **all data you entered** into `~/.murmurent` — `lab_info/`, `profile.yaml`, `hosts`/`machine` yaml, `inventory/`, `cores/`, `onboarding/`, `decommissions/`, `security/`, identity/cards/trust/revocation, logs — everything *except* key material (allowlist-based, so new files are caught) | `keys/`, `age/`, `installations/` (other projects), and `~/.config/murmurent`. **No reinstall.** |
 
 Use `data` for "wipe everything I've entered and start over, but keep my keys and
 credentials." It's the level to reach for when `full` leaves too much behind
