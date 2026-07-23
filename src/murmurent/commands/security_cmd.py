@@ -222,6 +222,7 @@ def _render_secret_hits(hits, scope_desc: str) -> None:
         return
 
     color = {SEVERITY_BLOCK: "red", SEVERITY_WARN: "yellow"}
+    show_commit = any(getattr(h, "commit", "") for h in hits)
     by_file: dict[str, list] = {}
     for h in hits:
         by_file.setdefault(h.path, []).append(h)
@@ -230,19 +231,25 @@ def _render_secret_hits(hits, scope_desc: str) -> None:
         table = Table(show_lines=False)
         table.add_column("sev")
         table.add_column("line", justify="right")
+        if show_commit:
+            table.add_column("commit", style="magenta")
         table.add_column("rule", style="cyan")
         table.add_column("redacted")
         table.add_column("hint", style="dim", overflow="fold")
         for h in sorted(by_file[path], key=lambda x: x.line):
             c = color.get(h.severity, "white")
-            table.add_row(f"[{c}]{h.severity}[/]", str(h.line), h.rule,
-                          h.redacted, h.hint)
+            row = [f"[{c}]{h.severity}[/]", str(h.line)]
+            if show_commit:
+                row.append((getattr(h, "commit", "") or "")[:9])
+            row += [h.rule, h.redacted, h.hint]
+            table.add_row(*row)
         console.print(table)
         console.print()
 
 
 def cmd_secrets_scan(*, staged: bool = True, tracked: bool = False,
-                     paths: tuple[str, ...] = (), json_out: bool = False,
+                     paths: tuple[str, ...] = (), history: bool = False,
+                     json_out: bool = False,
                      strict: bool = False, repo_root: str | None = None) -> int:
     """Deterministic secret-CONTENT scan.
 
@@ -256,7 +263,10 @@ def cmd_secrets_scan(*, staged: bool = True, tracked: bool = False,
     from ..core import secret_scan as _ss
 
     root = repo_root or "."
-    if paths:
+    if history:
+        hits = _ss.scan_history(root)
+        scope = "git history"
+    elif paths:
         hits = _ss.scan_paths(list(paths))
         scope = f"{len(paths)} path(s)"
     elif tracked:
@@ -328,16 +338,21 @@ def add_to_cli(cli_group: click.Group) -> None:
                   help="Scan STAGED content (the default when no mode/paths given).")
     @click.option("--tracked", "mode_tracked", is_flag=True, default=False,
                   help="Scan all git-tracked files instead of the staged set.")
+    @click.option("--history", "mode_history", is_flag=True, default=False,
+                  help="Scan added lines across (bounded) git history — catches "
+                       "secrets committed then later deleted.")
     @click.option("--strict", is_flag=True, default=False,
                   help="Exit 1 on warn-only hits (default: warn-only exits 0).")
     @click.option("--json", "json_out", is_flag=True, help="Emit JSON instead of a table.")
     @click.argument("paths", nargs=-1, type=click.Path())
-    def _secrets_scan(mode_staged: bool, mode_tracked: bool, strict: bool,
-                      json_out: bool, paths: tuple[str, ...]) -> None:
-        # Default to --staged unless the caller named paths or --tracked.
-        use_staged = mode_staged or (not mode_tracked and not paths)
+    def _secrets_scan(mode_staged: bool, mode_tracked: bool, mode_history: bool,
+                      strict: bool, json_out: bool, paths: tuple[str, ...]) -> None:
+        # Default to --staged unless the caller named paths / --tracked / --history.
+        use_staged = mode_staged or (not mode_tracked and not mode_history
+                                     and not paths)
         rc = cmd_secrets_scan(staged=use_staged, tracked=mode_tracked,
-                              paths=paths, json_out=json_out, strict=strict)
+                              history=mode_history, paths=paths,
+                              json_out=json_out, strict=strict)
         sys.exit(rc)
 
 

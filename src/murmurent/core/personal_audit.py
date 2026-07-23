@@ -62,6 +62,7 @@ from .security_findings import (
     SOURCE_SCANNER,
     VERIFY_UNVERIFIABLE,
     VERIFY_VERIFIED,
+    rollup_by_directory,
     write_jsonl,
 )
 
@@ -82,8 +83,22 @@ AREA_AGENTS = "agents"
 AREA_OUTPUT = _rcs.AREA_OUTPUT      # 2(ii) output-location
 AREA_NETWORK = _rcs.AREA_NETWORK    # 2(iii) network safety
 AREA_EGRESS = _rcs.AREA_EGRESS      # 2(iv) data-shipping / external APIs
+# Secret detection (issue #63 Phase 2 follow-up): tracked-file CONTENT +
+# bounded git-history walk (via ``core.secret_scan``) + GitHub secret-scanning
+# alerts per project repo. Redacted by construction — no raw secret ever lands
+# in a Finding.
+AREA_SECRETS = "secrets"
 ALL_AREAS = (AREA_GITHUB, AREA_SLACK, AREA_CERT, AREA_REPOS, AREA_VAULT,
-             AREA_NON_MM, AREA_AGENTS, AREA_OUTPUT, AREA_NETWORK, AREA_EGRESS)
+             AREA_NON_MM, AREA_AGENTS, AREA_OUTPUT, AREA_NETWORK, AREA_EGRESS,
+             AREA_SECRETS)
+
+# Secret-scan bounds for the audit path — tighter than the standalone
+# ``secrets-scan`` CLI so ``audit-me`` stays a few seconds even across several
+# repos. History is capped by commits AND wall time; tracked-file content is
+# capped by file count. Truncation is surfaced as an ``unverifiable`` info row.
+SECRETS_HISTORY_MAX_COMMITS = 200
+SECRETS_HISTORY_MAX_SECONDS = 4.0
+SECRETS_MAX_TRACKED_FILES = 2000
 
 # The synthetic host for a local, no-SSH audit. Keeps the JSONL layout identical
 # to the SSH scanner's ``~/.murmurent/security/<host>/`` tree.
@@ -1196,6 +1211,189 @@ def check_repo_content(handle: str, repos: list, env: dict | None) -> list[Findi
 
 
 # ===========================================================================
+# Secrets — tracked-file content + git-history walk + GitHub alerts
+# ===========================================================================
+#
+# Reuses the merged deterministic scanner (:mod:`murmurent.core.secret_scan`):
+# ``scan_paths`` over tracked files (exactly what is pushed) and the bounded
+# ``scan_history`` (added lines across reachable commits — catches a secret
+# committed then deleted). GitHub's own secret-scanning alerts are queried per
+# project repo via ``gh``. Every value is REDACTED at the scanner boundary; a
+# Finding never carries raw secret material. Read-only throughout: only ``git
+# log`` / ``git ls-files`` / ``gh api`` (GET) run — no checkout, no mutation.
+#
+# TODO(phase-3): semantic LLM secret triage (is this high-entropy string an
+# actual live credential vs. a test fixture / example?) and rotation/remediation
+# actions (open a rotation ticket, call the secret store) plug in here as a new
+# ``security_agent_review`` reviewer consuming these deterministic hits as
+# priors. NOT built in this phase.
+
+
+def _secret_hit_to_finding(hit, rule: str, handle: str, *,
+                           in_history: bool):
+    """Translate a redacted :class:`secret_scan.SecretHit` into a personal-audit
+    :class:`Finding`. The history-truncation sentinel becomes an ``unverifiable``
+    info row; a real hit becomes a block (high-confidence) or warn (heuristic)
+    row. ``hit.redacted`` is the ONLY representation of the value — never the raw
+    secret."""
+    from . import secret_scan as _ss
+
+    if hit.rule == _ss.HISTORY_TRUNCATED_RULE:
+        return _mk(AREA_SECRETS, "PERSONAL-SECRET-HISTORY-TRUNCATED-01",
+                   severity=SEVERITY_INFO, path=hit.path,
+                   current="git-history secret scan hit its commit/time budget; "
+                           "older commits were not scanned",
+                   expected="informational — deep history not fully covered",
+                   handle=handle, verify_state=VERIFY_UNVERIFIABLE, notes=hit.hint)
+
+    sev = SEVERITY_BLOCK if hit.severity == _ss.SEVERITY_BLOCK else SEVERITY_WARN
+    loc = f"line {hit.line}" if hit.line else "unknown line"
+    where = f", commit {hit.commit[:9]}" if (in_history and hit.commit) else ""
+    fix = ("remove the secret, ROTATE the credential, and load it from "
+           "env/secret store")
+    if in_history:
+        fix += "; then purge it from history (e.g. git filter-repo) after rotating"
+    return _mk(AREA_SECRETS, rule, severity=sev, path=hit.path,
+               current=f"{hit.rule}: redacted secret {hit.redacted} ({loc}{where})",
+               expected="no secret material in tracked files or git history",
+               fix=fix, handle=handle, notes=hit.hint)
+
+
+def _check_github_secret_alerts(handle: str, projects: list[_cp.CertProject],
+                                env: dict | None) -> list[Finding]:
+    """Query GitHub secret-scanning alerts for each project's repo. OPEN alerts
+    ⇒ warn (metadata only — GitHub never returns the secret itself). ``gh``
+    absent / not-enabled / 403 / 404 ⇒ a single ``unverifiable`` row per repo —
+    NEVER a false clean. Read-only: ``gh api`` GET only."""
+    import json as _json
+
+    out: list[Finding] = []
+    gh_ok = _pp._gh_available()
+    for cp in projects:
+        slug = (cp.github_repo or "").strip()
+        if not slug or "/" not in slug:
+            continue  # unprovisioned repos are covered by the github area
+        if not gh_ok:
+            out.append(_mk(AREA_SECRETS, "PERSONAL-SECRET-GH-UNVERIFIABLE-01",
+                           severity=SEVERITY_INFO, path=slug,
+                           current="gh CLI not installed/authenticated — cannot "
+                                   "read GitHub secret-scanning alerts",
+                           expected="`gh auth login` so alerts can be read",
+                           fix="gh auth login", handle=handle, project=cp.name,
+                           verify_state=VERIFY_UNVERIFIABLE,
+                           notes="Could not query secret-scanning; not a clean result."))
+            continue
+        err = ""
+        res = None
+        try:
+            res = _pp._gh(["api", f"repos/{slug}/secret-scanning/alerts",
+                           "-f", "state=open", "--paginate"])
+        except Exception as exc:  # noqa: BLE001 — timeout / OS error
+            err = str(exc)
+        if res is None or res.returncode != 0:
+            detail = (getattr(res, "stderr", "") or err or "").strip()
+            first = detail.splitlines()[0] if detail else "unknown error"
+            out.append(_mk(AREA_SECRETS, "PERSONAL-SECRET-GH-UNVERIFIABLE-01",
+                           severity=SEVERITY_INFO, path=slug,
+                           current=f"could not read GitHub secret-scanning alerts "
+                                   f"({first})",
+                           expected="secret scanning enabled + access to read alerts",
+                           handle=handle, project=cp.name,
+                           verify_state=VERIFY_UNVERIFIABLE,
+                           notes="Common causes: secret scanning not enabled (403), "
+                                 "repo/endpoint not found (404), or no gh access."))
+            continue
+        try:
+            alerts = _json.loads(res.stdout or "[]")
+            if not isinstance(alerts, list):
+                alerts = []
+        except (ValueError, TypeError):
+            alerts = []
+        open_alerts = [a for a in alerts
+                       if str((a or {}).get("state", "")).lower() == "open"]
+        if open_alerts:
+            types: dict[str, int] = {}
+            for a in open_alerts:
+                t = (a.get("secret_type_display_name")
+                     or a.get("secret_type") or "unknown")
+                types[str(t)] = types.get(str(t), 0) + 1
+            summary = ", ".join(f"{k}×{v}" for k, v in sorted(types.items()))
+            out.append(_mk(AREA_SECRETS, "PERSONAL-SECRET-GH-ALERT-01",
+                           severity=SEVERITY_WARN, path=slug,
+                           current=f"{len(open_alerts)} open GitHub secret-scanning "
+                                   f"alert(s): {summary}",
+                           expected="zero open secret-scanning alerts",
+                           fix="rotate the exposed credential(s), then resolve the "
+                               "alert(s) on GitHub",
+                           handle=handle, project=cp.name,
+                           notes="GitHub returns alert metadata only (type/location), "
+                                 "never the secret value."))
+        else:
+            out.append(_mk(AREA_SECRETS, "PERSONAL-SECRET-GH-OK-01",
+                           severity=SEVERITY_INFO, path=slug,
+                           current="no open GitHub secret-scanning alerts",
+                           handle=handle, project=cp.name))
+    return out
+
+
+def check_secrets(handle: str, repos: list, projects: list[_cp.CertProject],
+                  env: dict | None) -> list[Finding]:
+    """Secret detection for the personal audit. For each LOCAL murmurent-ready
+    repo: scan tracked-file CONTENT (what a push publishes) and run the bounded
+    git-history walk (catches secrets committed then deleted). Plus GitHub
+    secret-scanning alerts per project repo. Confirmed local secrets BLOCK
+    (redacted); GitHub alerts warn; missing prerequisites are ``unverifiable``.
+    Findings are rolled up per directory so a messy repo does not flood."""
+    from . import secret_scan as _ss
+
+    out: list[Finding] = []
+    scanned_any = False
+    for repo in repos:
+        if not getattr(repo, "is_murmurent_ready", False):
+            continue
+        root = Path(getattr(repo, "path", ""))
+        if not root.is_dir():
+            continue
+        scanned_any = True
+
+        # -- tracked-file content (bounded by file count) --------------------
+        tracked = [str(root / p)
+                   for p in _ss._git(root, ["ls-files", "-z"]).split("\0") if p]
+        if len(tracked) > SECRETS_MAX_TRACKED_FILES:
+            tracked = tracked[:SECRETS_MAX_TRACKED_FILES]
+            out.append(_mk(AREA_SECRETS, "PERSONAL-SECRET-SCAN-TRUNCATED-01",
+                           severity=SEVERITY_INFO, path=str(root),
+                           current=f"scanned the first {SECRETS_MAX_TRACKED_FILES} "
+                                   "tracked files; some were not examined",
+                           expected="informational — a very large repo was only "
+                                    "partially scanned",
+                           handle=handle, verify_state=VERIFY_UNVERIFIABLE))
+        for hit in _ss.scan_paths(tracked):
+            out.append(_secret_hit_to_finding(
+                hit, "PERSONAL-SECRET-IN-REPO-01", handle, in_history=False))
+
+        # -- bounded git-history walk ----------------------------------------
+        for hit in _ss.scan_history(root,
+                                    max_commits=SECRETS_HISTORY_MAX_COMMITS,
+                                    max_seconds=SECRETS_HISTORY_MAX_SECONDS):
+            out.append(_secret_hit_to_finding(
+                hit, "PERSONAL-SECRET-IN-HISTORY-01", handle, in_history=True))
+
+    # Green "checked, clean" row when local scans found nothing real.
+    real_rules = {"PERSONAL-SECRET-IN-REPO-01", "PERSONAL-SECRET-IN-HISTORY-01"}
+    if scanned_any and not any(f.rule in real_rules for f in out):
+        out.append(_mk(AREA_SECRETS, "PERSONAL-SECRET-CLEAN-01",
+                       severity=SEVERITY_INFO, path="(local mm-ready repos)",
+                       current="no secrets in tracked content or recent history",
+                       handle=handle))
+
+    # -- GitHub secret-scanning alerts per project repo ----------------------
+    out += _check_github_secret_alerts(handle, projects, env)
+
+    return rollup_by_directory(out)
+
+
+# ===========================================================================
 # Orchestrator
 # ===========================================================================
 
@@ -1261,6 +1459,7 @@ def run_personal_audit(handle: str | None = None,
     gh_repos, _gh_err = _github_repos(env)
 
     # -- identity-dependent checks -------------------------------------------
+    projects: list[_cp.CertProject] = []
     if not resolved:
         findings.append(_mk(AREA_CERT, "PERSONAL-NO-HANDLE-01",
                             severity=SEVERITY_INFO, path="(identity)",
@@ -1281,6 +1480,7 @@ def run_personal_audit(handle: str | None = None,
     findings += check_non_mm(resolved, repos, gh_repos, inventory_keys, env)
     findings += check_agent_integrity(resolved, env)
     findings += check_repo_content(resolved, repos, env)
+    findings += check_secrets(resolved, repos, projects, env)
 
     return PersonalAuditReport(handle=resolved or "unknown",
                                generated_at=when, findings=findings)
@@ -1322,8 +1522,8 @@ __all__ = [
     "PersonalAuditReport", "run_personal_audit", "persist", "run_and_persist",
     "check_github", "check_slack", "check_cert", "check_repo_acls",
     "check_vault_acls", "check_clinical_containment", "check_non_mm",
-    "check_agent_integrity", "check_repo_content",
+    "check_agent_integrity", "check_repo_content", "check_secrets",
     "ALL_AREAS", "AREA_GITHUB", "AREA_SLACK", "AREA_CERT", "AREA_REPOS",
     "AREA_VAULT", "AREA_NON_MM", "AREA_AGENTS", "AREA_OUTPUT", "AREA_NETWORK",
-    "AREA_EGRESS", "LOCAL_HOST", "CERT_WARN_DAYS", "REB_WARN_DAYS",
+    "AREA_EGRESS", "AREA_SECRETS", "LOCAL_HOST", "CERT_WARN_DAYS", "REB_WARN_DAYS",
 ]

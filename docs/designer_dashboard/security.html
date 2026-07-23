@@ -308,6 +308,17 @@
               </div>
               <div id="pa-egress"></div>
             </div>
+            <div class="pa-section" id="pa-secrets-sec">
+              <h3>Secrets (content, history &amp; GitHub alerts)</h3>
+              <div class="pa-legend" style="font-family:var(--mono); font-size:11px; color:var(--muted); line-height:1.65; margin:2px 0 9px">
+                Hardcoded credentials in your repos — all values <b>redacted</b>, never shown raw:
+                <b style="color:var(--red)">block</b> = a high-confidence secret in a <b>tracked file</b> or in <b>git history</b> (committed then deleted still counts) ·
+                <b style="color:var(--tiger)">warn</b> = a secret-looking literal, or an <b>open GitHub secret-scanning alert</b> ·
+                <b style="color:var(--muted)">can't verify</b> = <code>gh</code> missing / scanning not enabled / history budget hit.
+                Fix: rotate the credential, load it from env/secret store, and purge it from history.
+              </div>
+              <div id="pa-secrets"></div>
+            </div>
             <div class="pa-section" id="pa-other-sec">
               <h3>Other findings</h3>
               <div id="pa-other"></div>
@@ -974,6 +985,39 @@
         host.innerHTML = blocks;
       }
 
+      // Secret findings → a table of redacted hits (content + history) plus
+      // GitHub secret-scanning alert rows. Never renders a raw secret — the
+      // scanner only ever emits `current_state` with a redacted span.
+      function renderSecrets(findings) {
+        const host = document.getElementById("pa-secrets");
+        const sec = findings.filter(f => f.category === "secrets");
+        if (!sec.length) { host.innerHTML = '<div class="pa-empty">No local repos scanned for secrets.</div>'; return; }
+        const isHit = f => /-(IN-REPO|IN-HISTORY|GH-ALERT)-01$/.test(f.rule);
+        const hits = sec.filter(isHit);
+        if (!hits.length) {
+          const unver = sec.filter(f => f.verify_state !== "verified");
+          const msg = unver.length
+            ? escP(unver[0].current_state)
+            : "No secrets in tracked content, git history, or GitHub alerts.";
+          host.innerHTML = `<div class="pa-empty">${msg}</div>`;
+          return;
+        }
+        const sevOrder = { block: 0, warn: 1, info: 2 };
+        hits.sort((a, b) => (sevOrder[a.severity] || 9) - (sevOrder[b.severity] || 9));
+        const srcOf = f => f.rule.includes("IN-HISTORY") ? "history"
+          : f.rule.includes("GH-ALERT") ? "github" : "tracked";
+        const rows = hits.map(f =>
+          `<tr>
+             <td><span class="pill ${f.severity}">${f.severity}</span></td>
+             <td>${srcOf(f)}</td>
+             <td class="path">${escP(shortPath(f.path))}</td>
+             <td>${escP(f.current_state)}</td>
+           </tr>`).join("");
+        host.innerHTML = `<table class="findings">
+          <thead><tr><th>sev</th><th>source</th><th>where</th><th>finding (redacted)</th></tr></thead>
+          <tbody>${rows}</tbody></table>`;
+      }
+
       function renderPersonalAudit(d) {
         const c = d.counts || {};
         const hl = document.getElementById("pa-headline");
@@ -997,6 +1041,7 @@
         renderOutput(findings);
         renderNetwork(findings);
         renderEgress(findings);
+        renderSecrets(findings);
         renderOther(findings);
         document.getElementById("pa-empty").style.display = "none";
         document.getElementById("pa-result").style.display = "block";
