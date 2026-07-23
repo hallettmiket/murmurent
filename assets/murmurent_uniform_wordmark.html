@@ -116,7 +116,7 @@
   // window (~3-4s per crossing, the pace that reads as a real murmuration). A
   // small fixed point makes the flock ball up like bees; a full-window sweep
   // makes it wheel and stream like starlings. sx/sy are tuned against
-  // TIME_SCALE (t runs at 0.4x real) so a half-Lissajous ≈ 3-4.5s.
+  // TIME_SCALE (t runs at 0.3x real) so a half-Lissajous ≈ 4-6s.
   const ghost = { px: rand(0, 6.28), py: rand(0, 6.28),
                   sx: rand(0.0018, 0.0026), sy: rand(0.0015, 0.0023),
                   rx: 0.42, ry: 0.40 };
@@ -546,7 +546,7 @@
   // Logo mode slows the flock — a small icon reads as frantic at full speed.
   // A scaled sim-clock (simT) advances the noise fields + boids together so the
   // slowdown is uniform. Full-speed (TIME_SCALE = 1) for the interactive page.
-  const TIME_SCALE = LOGO ? 0.4 : 1;
+  const TIME_SCALE = LOGO ? 0.3 : 1;
   let last = performance.now();
   let simT = 0;
   function frame(now) {
