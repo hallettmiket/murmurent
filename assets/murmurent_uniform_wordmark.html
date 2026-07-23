@@ -425,11 +425,11 @@
       if (LOGO) {
         const spN = Math.min(1, sp / 5);
         const head = Math.atan2(b.vy, b.vx) * 57.2958;      // heading, degrees
-        let hue = (head * 1.4 + b.ink * 360 + b.swirl * 160 + t * 45) % 360;
+        let hue = (head * 1.4 + b.ink * 360 + b.swirl * 160 + simT * 45) % 360;
         if (hue < 0) hue += 360;
         // glint peaks with the wingbeat + a per-bird phase, sharpest when the
         // wings are broadside -> intermittent silver flashes across the flock
-        const shimmer = 0.5 + 0.5 * Math.sin(b.flap * 0.9 + b.ink * 20 + t * 2.2);
+        const shimmer = 0.5 + 0.5 * Math.sin(b.flap * 0.9 + b.ink * 20 + simT * 2.2);
         const glint = shimmer * shimmer * (0.55 + 0.45 * spread);
         const sat = 22 + 60 * (1 - glint);                  // vivid colour, dropping to silver on a glint
         const baseL = 46 + 16 * b.z;                         // depth: far a touch brighter
