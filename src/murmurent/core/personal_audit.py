@@ -270,9 +270,9 @@ def check_github(handle: str, projects: list[_cp.CertProject],
             if to_remove:
                 out.append(_mk(AREA_GITHUB, "PERSONAL-GH-EXTRA-COLLAB-01",
                                severity=SEVERITY_INFO, path=repo,
-                               current=f"{len(to_remove)} collaborator(s) not in the "
-                                       f"project (noted, not an error): "
-                                       + ", ".join(to_remove),
+                               current=f"{len(to_remove)} GitHub account(s) with repo "
+                                       f"access but not in the project (noted, not an "
+                                       f"error): " + ", ".join(to_remove),
                                expected="informational — review if unexpected",
                                handle=handle, project=cp.name,
                                notes="Extra collaborators are allowed; surfaced so "
@@ -376,16 +376,18 @@ def check_slack(handle: str, projects: list[_cp.CertProject],
             if to_kick:
                 out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-EXTRA-MEMBER-01",
                                severity=SEVERITY_INFO, path=chan,
-                               current=f"{len(to_kick)} channel member(s) not in the "
-                                       f"project (noted, not an error)",
+                               current=f"{len(to_kick)} Slack account(s) in the channel "
+                                       f"but not in the project (noted, not an error)",
                                handle=handle, project=cp.name,
                                notes="Extra channel members are allowed; surfaced so "
                                      "you can react if unintended."))
             if unresolved:
                 out.append(_mk(AREA_SLACK, "PERSONAL-SLACK-UNRESOLVED-01",
                                severity=SEVERITY_INFO, path=chan,
-                               current=f"{len(unresolved)} member(s) had no resolvable "
-                                       f"Slack id: " + ", ".join(unresolved),
+                               current=f"couldn't find a Slack account for "
+                                       f"{len(unresolved)} project member(s) "
+                                       f"({', '.join(unresolved)}) — their roster email "
+                                       f"may be missing or not in the workspace",
                                handle=handle, project=cp.name,
                                verify_state=VERIFY_UNVERIFIABLE))
             if not to_invite and not to_kick and not unresolved:
