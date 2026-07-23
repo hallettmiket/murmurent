@@ -737,7 +737,8 @@
                <td class="${cls(f)}">${escP(f.current_state)}</td>
                <td>${f.verify_state === "verified" ? "" : "could-not-verify"}</td>
              </tr>`).join("");
-          return `<div><strong>${escP(p)}</strong>
+          return `<div style="margin:0 0 14px">
+            <div style="font-family:var(--mono); font-size:12px; font-weight:700; color:var(--ink); border-left:3px solid var(--purple); padding:2px 0 2px 8px; margin-bottom:6px">Project: ${escP(p)}</div>
             <table class="diff"><thead><tr><th>area</th><th>status</th><th>verify</th></tr></thead>
             <tbody>${rows}</tbody></table></div>`;
         }).join("");
