@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import re
 import subprocess
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,6 +42,10 @@ from pathlib import Path
 
 SEVERITY_BLOCK = "block"
 SEVERITY_WARN = "warn"
+# ``info`` is used only for non-secret bookkeeping rows (e.g. a history-scan
+# truncation notice). It is never counted as a block/warn hit by the CLI, so it
+# does not affect the exit-code contract.
+SEVERITY_INFO = "info"
 
 # Skip files bigger than this (bytes); a real secret is small, big files are
 # usually data/binaries and scanning them wastes time.
@@ -82,9 +87,10 @@ class SecretHit:
     path: str
     line: int  # 1-indexed
     rule: str
-    severity: str  # SEVERITY_BLOCK | SEVERITY_WARN
+    severity: str  # SEVERITY_BLOCK | SEVERITY_WARN | SEVERITY_INFO
     redacted: str
     hint: str
+    commit: str = ""  # commit-ish when the hit came from a history walk; else ""
 
     def to_dict(self) -> dict:
         return {
@@ -94,6 +100,7 @@ class SecretHit:
             "severity": self.severity,
             "redacted": self.redacted,
             "hint": self.hint,
+            "commit": self.commit,
         }
 
 
@@ -187,6 +194,58 @@ def _is_placeholder(value: str) -> bool:
 # Core scanning
 # ---------------------------------------------------------------------------
 
+def scan_line(line: str, path: str, lineno: int, *,
+              commit: str = "") -> list[SecretHit]:
+    """Scan a SINGLE line for secrets. Shared by :func:`scan_text` (whole-file)
+    and :func:`scan_history` (per added diff line), so both paths use exactly
+    the same detectors, placeholder/pragma suppression, and redaction.
+
+    ``commit`` is stamped onto each hit when the line came from history.
+    Never returns raw secret material — only redacted spans.
+    """
+    if _ALLOWLIST_RE.search(line):
+        # Explicit inline suppression on this line.
+        return []
+    hits: list[SecretHit] = []
+
+    # High-confidence structured detectors -> block.
+    for rule, pattern, hint in _BLOCK_DETECTORS:
+        m = pattern.search(line)
+        if not m:
+            continue
+        span = m.group(0)
+        hits.append(
+            SecretHit(
+                path=path,
+                line=lineno,
+                rule=rule,
+                severity=SEVERITY_BLOCK,
+                redacted=redact(span),
+                hint=hint,
+                commit=commit,
+            )
+        )
+
+    # Heuristic secret-looking assignment -> warn (unless placeholder).
+    am = _ASSIGNMENT_RE.search(line)
+    if am:
+        value = am.group("val")
+        if not _is_placeholder(value):
+            hits.append(
+                SecretHit(
+                    path=path,
+                    line=lineno,
+                    rule="GENERIC-SECRET-ASSIGNMENT",
+                    severity=SEVERITY_WARN,
+                    redacted=redact(value),
+                    hint="Secret-looking literal — load from env/secret store, "
+                    "or add `# pragma: allowlist secret` if a false positive.",
+                    commit=commit,
+                )
+            )
+    return hits
+
+
 def scan_text(text: str, path: str) -> list[SecretHit]:
     """Scan ``text`` for secrets, attributing hits to ``path``.
 
@@ -194,43 +253,7 @@ def scan_text(text: str, path: str) -> list[SecretHit]:
     """
     hits: list[SecretHit] = []
     for lineno, line in enumerate(text.splitlines(), start=1):
-        if _ALLOWLIST_RE.search(line):
-            # Explicit inline suppression on this line.
-            continue
-
-        # High-confidence structured detectors -> block.
-        for rule, pattern, hint in _BLOCK_DETECTORS:
-            m = pattern.search(line)
-            if not m:
-                continue
-            span = m.group(0)
-            hits.append(
-                SecretHit(
-                    path=path,
-                    line=lineno,
-                    rule=rule,
-                    severity=SEVERITY_BLOCK,
-                    redacted=redact(span),
-                    hint=hint,
-                )
-            )
-
-        # Heuristic secret-looking assignment -> warn (unless placeholder).
-        am = _ASSIGNMENT_RE.search(line)
-        if am:
-            value = am.group("val")
-            if not _is_placeholder(value):
-                hits.append(
-                    SecretHit(
-                        path=path,
-                        line=lineno,
-                        rule="GENERIC-SECRET-ASSIGNMENT",
-                        severity=SEVERITY_WARN,
-                        redacted=redact(value),
-                        hint="Secret-looking literal — load from env/secret store, "
-                        "or add `# pragma: allowlist secret` if a false positive.",
-                    )
-                )
+        hits.extend(scan_line(line, path, lineno))
     return hits
 
 
@@ -324,14 +347,156 @@ def scan_staged(repo_root: str | Path) -> list[SecretHit]:
     return hits
 
 
+# ---------------------------------------------------------------------------
+# Git-history scanning (bounded)
+# ---------------------------------------------------------------------------
+#
+# Walks reachable commit history (HEAD-first) and scans the ADDED lines of each
+# commit's diff, so a secret that was committed and later deleted is still
+# found (scanning only the current tree would miss it). Reuses the same
+# per-line detectors + redaction as the working-tree/staged scanners.
+#
+# BOUNDED by construction: it stops after ``max_commits`` commits OR
+# ``max_seconds`` of wall time, whichever comes first, and appends a single
+# ``HISTORY-SCAN-TRUNCATED`` info row (never a secret) when it did so, so the
+# caller can tell the difference between "clean" and "ran out of budget".
+
+# The rule id for the (non-secret) truncation notice.
+HISTORY_TRUNCATED_RULE = "HISTORY-SCAN-TRUNCATED"
+
+# Defaults keep a standalone ``secrets-scan --history`` responsive; the personal
+# audit passes tighter bounds so ``audit-me`` stays a few seconds.
+DEFAULT_HISTORY_MAX_COMMITS = 500
+DEFAULT_HISTORY_MAX_SECONDS = 8.0
+
+# Commit-boundary sentinel: git prints ``\x01<full-sha>`` (SOH byte) at the
+# start of the line for each commit. A real diff line never starts with \x01.
+_COMMIT_SENTINEL = "\x01"
+_HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+
+
+def scan_history(
+    repo_root: str | Path,
+    *,
+    max_commits: int = DEFAULT_HISTORY_MAX_COMMITS,
+    max_seconds: float = DEFAULT_HISTORY_MAX_SECONDS,
+) -> list[SecretHit]:
+    """Scan the ADDED lines across reachable commit history for secrets.
+
+    Deterministic within its budget: walks ``git log`` newest-first, parsing a
+    ``-U0`` patch and scanning every added (``+``) line. Each hit records the
+    file, the 1-indexed line in that commit's version, and the commit-ish — all
+    redacted. Stops at ``max_commits`` / ``max_seconds`` and, if it stopped
+    early, appends one ``HISTORY-SCAN-TRUNCATED`` info row.
+
+    Read-only: only ``git log`` (no checkout, no write). Never raises for a
+    repo with no commits / not a git repo — returns ``[]``.
+    """
+    root = str(repo_root)
+    # newest-first patch, no context (-U0), no rename/textconv noise. The
+    # ``--format`` sentinel lets us attribute each hunk to its commit.
+    proc = subprocess.Popen(  # noqa: S603 — args are a fixed list
+        [
+            "git", "-C", root, "log", "--no-color", "--no-textconv",
+            "-p", "-U0", f"--format={_COMMIT_SENTINEL}%H",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL,
+        text=True,
+        bufsize=1,
+    )
+    if proc.stdout is None:  # pragma: no cover - defensive
+        return []
+
+    hits: list[SecretHit] = []
+    start = time.monotonic()
+    commit = ""
+    path = ""
+    new_lineno = 0
+    commits_seen = 0
+    truncated = False
+    try:
+        for raw in proc.stdout:
+            if time.monotonic() - start > max_seconds:
+                truncated = True
+                break
+            line = raw.rstrip("\n")
+
+            if line.startswith(_COMMIT_SENTINEL):
+                commits_seen += 1
+                if commits_seen > max_commits:
+                    truncated = True
+                    break
+                commit = line[len(_COMMIT_SENTINEL):].strip()
+                path = ""
+                continue
+            if line.startswith("+++ "):
+                target = line[4:].strip()
+                if target == "/dev/null":
+                    path = ""
+                else:
+                    path = target[2:] if target.startswith(("a/", "b/")) else target
+                continue
+            if line.startswith("---") or line.startswith("diff ") or \
+                    line.startswith("index "):
+                continue
+            hm = _HUNK_RE.match(line)
+            if hm:
+                new_lineno = int(hm.group(1))
+                continue
+            if line.startswith("+"):
+                content = line[1:]
+                if path:
+                    hits.extend(scan_line(content, path, new_lineno, commit=commit))
+                new_lineno += 1
+                continue
+            if line.startswith(" "):  # context (rare with -U0)
+                new_lineno += 1
+    finally:
+        try:
+            proc.stdout.close()
+        except OSError:
+            pass
+        proc.terminate()
+        try:
+            proc.wait(timeout=2)
+        except subprocess.TimeoutExpired:  # pragma: no cover - defensive
+            proc.kill()
+            proc.wait()
+
+    if truncated:
+        hits.append(
+            SecretHit(
+                path=root,
+                line=0,
+                rule=HISTORY_TRUNCATED_RULE,
+                severity=SEVERITY_INFO,
+                redacted="",
+                hint=(
+                    f"history scan stopped after {commits_seen - 1 if commits_seen > max_commits else commits_seen} "
+                    f"commit(s) / {max_seconds:g}s budget; older commits were not "
+                    "scanned. Raise max_commits/max_seconds for full coverage."
+                ),
+                commit=commit,
+            )
+        )
+    return hits
+
+
 __all__ = [
     "SecretHit",
     "SEVERITY_BLOCK",
     "SEVERITY_WARN",
+    "SEVERITY_INFO",
+    "HISTORY_TRUNCATED_RULE",
+    "DEFAULT_HISTORY_MAX_COMMITS",
+    "DEFAULT_HISTORY_MAX_SECONDS",
     "redact",
+    "scan_line",
     "scan_text",
     "scan_file",
     "scan_paths",
     "scan_staged",
+    "scan_history",
     "staged_paths",
 ]
