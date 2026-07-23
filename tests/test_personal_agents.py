@@ -43,6 +43,40 @@ def test_create_writes_vault_symlinks_and_validates(env):
     assert parse_file(p).meta.get("model") == "fable"
 
 
+def test_create_wizard_fields_persist(env):
+    """The richer DEFINE wizard (#84 item 2): optional fields land in a valid,
+    commons-shaped MD, and only name+role are required."""
+    p = pa.create_personal_agent(
+        "wiz_agent", "Prepares docking inputs.",
+        model="sonnet", tools=["Read", "Bash"], denied_tools=["WebFetch"],
+        responsibilities=["fetch structures", "clean geometry"],
+        non_goals="Does not run the docking itself — hands that to the blacksmith.",
+        persona="Terse and exacting.",
+        output_format="Markdown tables.",
+        guardrails="Never write outside outputs/.",
+        example="Request: prep 4HHB → Response: cleaned PDB + report.",
+        verdict="Prepared / Skipped / Failed")
+    rec = _agents.load_agent(p)
+    assert rec.freeze == "personal" and rec.category == "member"
+    assert rec.required_tools == ("Read", "Bash")
+    assert rec.denied_tools == ("WebFetch",)
+    assert rec.description == "Prepares docking inputs."
+    text = p.read_text(encoding="utf-8")
+    for marker in ("MANDATORY OUTPUT RULE", "Prepared / Skipped / Failed",
+                   "## Scope & non-goals", "hands that to the blacksmith",
+                   "## Guardrails", "## Example", "Terse and exacting"):
+        assert marker in text, marker
+
+
+def test_create_minimal_still_works(env):
+    """Backward-compatible: name + description only, no wizard fields."""
+    p = pa.create_personal_agent("bare", "just a role line")
+    rec = _agents.load_agent(p)
+    assert rec.freeze == "personal"
+    text = p.read_text(encoding="utf-8")
+    assert "MANDATORY OUTPUT RULE" in text and "## Your responsibilities" in text
+
+
 def test_create_refusals(env):
     with pytest.raises(pa.PersonalAgentError):        # commons name → should fork
         pa.create_personal_agent("oracle", "x")
@@ -94,3 +128,12 @@ def test_endpoint_creates_and_rejects(env, monkeypatch, tmp_path):
     # A commons-name collision is a 422 (told to fork instead).
     r2 = client.post("/api/agents/new", json={"name": "oracle", "description": "x"})
     assert r2.status_code == 422 and "fork" in r2.json()["detail"].lower()
+    # The endpoint accepts + persists the richer DEFINE wizard fields.
+    r3 = client.post("/api/agents/new", json={
+        "name": "wiz_ep", "description": "prep inputs",
+        "non_goals": "does not run the analysis",
+        "denied_tools": ["WebFetch"], "verdict": "Prepared / Failed",
+        "guardrails": "stay in outputs/"})
+    assert r3.status_code == 200, r3.text
+    text = (env["vault_agents"] / "wiz_ep.md").read_text(encoding="utf-8")
+    assert "does not run the analysis" in text and "Prepared / Failed" in text
