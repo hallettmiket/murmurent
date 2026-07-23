@@ -234,6 +234,18 @@
             <div class="pa-summary" id="pa-summary"></div>
             <div class="pa-section" id="pa-heatmap-sec">
               <h3>Repo &amp; vault access heatmap</h3>
+              <div class="pa-legend" style="font-family:var(--mono); font-size:11px; color:var(--muted); line-height:1.65; margin:2px 0 9px">
+                Who, besides you, can open each folder on this machine:
+                <b style="color:var(--green)">owner</b> = just you (always fine) ·
+                <b style="color:var(--tiger)">group</b> = other accounts in the folder's group ·
+                <b style="color:var(--red)">world</b> = <i>everyone</i> on the machine.<br>
+                Square colour = is that a concern?
+                <b style="color:var(--green)">green</b> = no access (good) ·
+                <b style="color:var(--tiger)">amber</b> = group can get in ·
+                <b style="color:var(--red)">red</b> = world can get in (or group, on clinical data).
+                A private repo is ideally owner-only (<code>chmod 700 &lt;folder&gt;</code>);
+                <code>755</code> lets group and world read it.
+              </div>
               <div id="pa-heatmap"></div>
             </div>
             <div class="pa-section" id="pa-membership-sec">
