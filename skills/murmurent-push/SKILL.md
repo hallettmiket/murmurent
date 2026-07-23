@@ -22,13 +22,26 @@ Stage changed files, create a descriptive commit, push to the remote tracking br
 
    If any are present, **stop**, list them, and ask the user to confirm or remove. Do NOT proceed by default.
 
-4. **Refuse large files in tracked dirs.** Scan unstaged + untracked files. If any single file under `data/`, `src/`, `exp/`, or `obsolete/` is larger than 1 MB, stop and tell the user "move this to `<data_root>/append_only/<project>/` instead" (per `rules/project-structure.md`: `data/` is for *tiny* in-repo files only). The threshold is 1 MB because GitHub will warn at 50 MB and reject at 100 MB; 1 MB catches it early.
+4. **Scan staged content for secrets.** Filename checks (step 3) miss a hardcoded credential *inside* a `.py`/`.R`/`.yaml`/`.sh` file. After staging (or against the already-staged set), run the deterministic content scanner:
 
-5. **Skip `.claude/settings.json` even if it shows up changed.** The per-project `.claude/settings.json` is .gitignored by `project_cc_init.bootstrap_local` because it contains machine-absolute paths and per-machine permission allowlists. If `.gitignore` is missing the entry, add the entry to `.gitignore` first (`echo '.claude/settings.json' >> .gitignore`) and include that `.gitignore` change in the commit — but do NOT stage `.claude/settings.json` itself.
+   ```bash
+   murmurent security secrets-scan --staged
+   ```
 
-6. **Validate `.murmurent.yaml` / `CHARTER.md` if modified.** The marker must parse as YAML with `murmurent:` (schema int) and `lab:`; a legacy CHARTER needs `project`, `lead`, `members`, `sensitivity`. If broken, refuse the commit with the specific error.
+   It scans the STAGED blobs (exactly what the push would publish) and prints a **redacted** table — it never echoes the raw secret. Gate on the exit code:
+   - **exit 2** (a `block`-severity hit: private-key block, AWS/GitHub/Slack/Google token, …) → **STOP. Do NOT commit or push.** Show the redacted findings and tell the user to remove the secret and load it from an env var / secret store instead. If it is a genuine false positive, they may add an inline `# pragma: allowlist secret` (or `# noqa: secret`) on that line, or confirm explicitly — only then re-run and proceed.
+   - **exit 0** with `warn` notices (a secret-looking assignment) → surface the warnings but you may proceed; encourage the user to confirm each is not a live credential.
+   - **exit 0** clean → continue.
 
-7. **Validate `MEMBERS` file if it was modified.** Should be one `@handle` per line. Refuse if a line doesn't match `^@[A-Za-z0-9_-]+$`.
+   Never paste an un-redacted secret back to the user; rely on the scanner's redacted output.
+
+5. **Refuse large files in tracked dirs.** Scan unstaged + untracked files. If any single file under `data/`, `src/`, `exp/`, or `obsolete/` is larger than 1 MB, stop and tell the user "move this to `<data_root>/append_only/<project>/` instead" (per `rules/project-structure.md`: `data/` is for *tiny* in-repo files only). The threshold is 1 MB because GitHub will warn at 50 MB and reject at 100 MB; 1 MB catches it early.
+
+6. **Skip `.claude/settings.json` even if it shows up changed.** The per-project `.claude/settings.json` is .gitignored by `project_cc_init.bootstrap_local` because it contains machine-absolute paths and per-machine permission allowlists. If `.gitignore` is missing the entry, add the entry to `.gitignore` first (`echo '.claude/settings.json' >> .gitignore`) and include that `.gitignore` change in the commit — but do NOT stage `.claude/settings.json` itself.
+
+7. **Validate `.murmurent.yaml` / `CHARTER.md` if modified.** The marker must parse as YAML with `murmurent:` (schema int) and `lab:`; a legacy CHARTER needs `project`, `lead`, `members`, `sensitivity`. If broken, refuse the commit with the specific error.
+
+8. **Validate `MEMBERS` file if it was modified.** Should be one `@handle` per line. Refuse if a line doesn't match `^@[A-Za-z0-9_-]+$`.
 
 ## Stage + commit + push
 
@@ -78,6 +91,7 @@ Use `mcp__claude_ai_Slack__slack_send_message`, NOT `mcp__slack__slack_post_mess
 | Repo lacks a readiness marker (`.murmurent.yaml` / legacy `CHARTER.md`) | Refuse; suggest `/commit-push` | Not murmurent-ready |
 | Diff touches `data/lab_vm/immutable\|append_only/` (or legacy `raw\|refined/`) | Refuse | rules/data-storage.md (governed data) |
 | Secret-shaped filename in diff | Stop and ask | Prevent credential leak |
+| `murmurent security secrets-scan --staged` exits non-zero (block hit) | Refuse; show redacted findings | Hardcoded credential in file *content* would reach GitHub |
 | File > 1 MB in `data/`/`src/`/`exp/`/`obsolete/` | Refuse; suggest append_only/ | rules/project-structure.md |
 | `.claude/settings.json` staged | Drop from stage; ensure in `.gitignore` | Machine-absolute paths leak across collaborators |
 | Marker/CHARTER invalid YAML / missing fields | Refuse | corrupt readiness metadata |
@@ -99,6 +113,7 @@ Pre-flight ✓
   - readiness marker present
   - no /data/lab_vm/* in diff
   - no secret-shaped files
+  - no secrets in content ✓ (secrets-scan --staged: clean)
   - largest in-repo file: 24 KB (data/sample.csv)
 Staging 3 files: src/init.py, exp/00_qc/run_all.py, README.md
 Commit: "init: switch QC normalisation to scran"
