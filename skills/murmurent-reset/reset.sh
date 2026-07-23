@@ -10,7 +10,7 @@
 #            dashboard.pid, security/ agent cache). Still KEEPS credentials,
 #            installations/, decommissions/, audit logs, hosts/machine yaml.
 #   data     wipe ALL data you entered into ~/.murmurent (lab_info, profile.yaml,
-#            hosts/machine/master_folders yaml, inventory/, cores/, onboarding/,
+#            hosts/machine yaml, inventory/, cores/, onboarding/,
 #            decommissions/, security/, identity/cards/trust/revocation, logs,
 #            …) — everything EXCEPT your key material. KEEPS keys/, age/,
 #            installations/ (other projects), and ~/.config/murmurent. Robust: it
