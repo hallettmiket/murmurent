@@ -416,22 +416,18 @@
 
       // silhouette area + atmospheric haze -> the flock twinkles and recedes
       const a = (0.2 + 0.38 * b.ink) * (0.55 + 0.45 * spread) * (0.46 + 0.54 * b.z);
-      // Depth-cued violet (aerial perspective -> reads as 3D): FAR birds recede
-      // into a pale, desaturated blue-violet haze; NEAR birds come forward as a
-      // deep, vivid magenta-violet. A per-bird hue offset (b.swirl) spreads the
-      // shades so same-depth birds aren't identical, and faster birds burn a
-      // touch brighter -> the whole flock shimmers with depth instead of one flat
-      // purple. (Non-logo keeps the charcoal ink.)
+      // Monochrome metallic depth ramp (aerial perspective -> reads as 3D): FAR
+      // birds recede as light SILVER, mid-depth birds are GREY, NEAR birds come
+      // forward as BLACK. A per-bird lightness offset (b.swirl) spreads the tones
+      // so same-depth birds aren't identical, and faster birds glint a touch
+      // brighter. A faint cool tint keeps it reading as silver, not dead grey.
+      // (Non-logo keeps the charcoal ink.)
       if (LOGO) {
         const spN = Math.min(1, sp / 5);
-        // Bold temperature sweep across depth: FAR birds are a cool blue-indigo;
-        // NEAR birds a hot pink-magenta. Both stay saturated so the hue contrast
-        // (not just lightness) carries the 3D read. A 100deg hue span + a
-        // 42-point lightness swing make it dramatic rather than subtle.
-        const hue = 244 + 100 * b.z + 14 * b.swirl;  // blue-indigo (far) -> pink-magenta (near)
-        const sat = 58 + 32 * b.z + 8 * spN;         // saturated throughout -> hue contrast reads
-        const lig = 70 - 42 * b.z - 6 * spN;         // bright pale far -> deep rich near
-        ctx.fillStyle = "hsla(" + hue.toFixed(1) + "," + sat.toFixed(1) + "%,"
+        const hue = 214;                             // faint cool tint only
+        const sat = 8;                               // near-neutral -> metallic silver, not colourful
+        const lig = 66 - 58 * b.z + 7 * b.swirl - 4 * spN;  // silver (far) -> grey -> black (near)
+        ctx.fillStyle = "hsla(" + hue + "," + sat + "%,"
                                 + lig.toFixed(1) + "%," + a.toFixed(3) + ")";
       } else {
         ctx.fillStyle = "rgba(32, 28, 24, " + a.toFixed(3) + ")";
