@@ -38,10 +38,12 @@ from __future__ import annotations
 
 import datetime as _dt
 import os
+import re as _re
 import stat as _stat
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import agent_forks as _af
 from . import cert_projects as _cp
 from . import cert_provision as _cprov
 from . import group_reconcile as _gr
@@ -50,6 +52,7 @@ from . import lab_vm as _lab_vm
 from . import project_provision as _pp
 from . import repo as _repo
 from . import repo_inventory as _inv
+from .frontmatter import parse_text as _parse_fm
 from .security_findings import (
     Finding,
     SEVERITY_BLOCK,
@@ -71,7 +74,9 @@ AREA_CERT = "cert"
 AREA_REPOS = "repos"
 AREA_VAULT = "vault"
 AREA_NON_MM = "non-mm"
-ALL_AREAS = (AREA_GITHUB, AREA_SLACK, AREA_CERT, AREA_REPOS, AREA_VAULT, AREA_NON_MM)
+AREA_AGENTS = "agents"
+ALL_AREAS = (AREA_GITHUB, AREA_SLACK, AREA_CERT, AREA_REPOS, AREA_VAULT,
+             AREA_NON_MM, AREA_AGENTS)
 
 # The synthetic host for a local, no-SSH audit. Keeps the JSONL layout identical
 # to the SSH scanner's ``~/.murmurent/security/<host>/`` tree.
@@ -823,6 +828,342 @@ def check_non_mm(handle: str, repos: list, github_repos: list,
 
 
 # ===========================================================================
+# Item 8 — agent integrity (deterministic half; issue #63 item 8)
+# ===========================================================================
+#
+# Classify every installed CC agent (pristine commons symlink / personal fork /
+# orphan), then — for forks and untracked overrides — diff the fork against its
+# commons origin for GUARDRAIL WEAKENING (a withheld tool re-enabled), freeze /
+# category / model tampering, and safety-instruction removal, and run a static
+# risk grep over the agent body. Everything lands in the same ``Finding``
+# pipeline under ``category="agents"``. Read-only: agent files are only read,
+# never forked / unforked / rewritten (all mutation lives in ``agent_forks``).
+#
+# The reuse substrate is :mod:`murmurent.core.agent_forks`: ``iter_status()``
+# gives the install kind ("linked" | "forked" | "user-file") + drift booleans
+# derived from each fork's ``source_sha``; ``commons_agents_dir()`` /
+# ``commons_agent_path()`` locate the commons origin; ``load_manifest()`` is the
+# fork provenance.
+#
+# TODO(phase-2): the SEMANTIC half of item 8 — an LLM ``agents`` category in
+# ``security_agent_review.py`` that reasons about a fork's *intent* (a subtly
+# reworded refusal, a persona nudged toward over-compliance) — plugs in here,
+# consuming the same ``AREA_AGENTS`` findings as deterministic priors. Not built
+# in this phase; do NOT implement it in this module.
+
+# Guardian agents: any modification escalates one severity level (item 8.5).
+# The named set are the egress/PHI/methodology gatekeepers; additionally, any
+# commons agent whose frontmatter DENIES an egress tool is treated as guardian.
+GUARDIAN_AGENTS = frozenset({"security_guard", "adversary", "conscience"})
+EGRESS_TOOLS = frozenset({"WebFetch", "WebSearch", "Bash"})
+
+# Static risk grep over the agent BODY. STRONG matches are warn-worthy on their
+# own; WEAK matches are ambiguous → info. Guardian escalation still applies.
+_RISK_STRONG: tuple[tuple[str, str], ...] = (
+    (r"always\s+approve", "always-approve"),
+    (r"do\s+not\s+(?:check|report|verify|flag)", "do-not-check/report"),
+    (r"\bexfiltrat", "exfiltrate"),
+    (r"send\s+.{0,40}?\bto\s+https?://", "send-to-remote-host"),
+    (r"\brm\s+-rf\b", "destructive-rm"),
+    (r"curl\s+.{0,80}?\|\s*(?:ba)?sh", "pipe-curl-to-shell"),
+    (r"sk-[A-Za-z0-9]{16,}", "openai-key-shape"),
+    (r"AKIA[0-9A-Z]{12,}", "aws-key-shape"),
+    (r"xoxb-[0-9A-Za-z-]{10,}", "slack-token-shape"),
+    (r"-----BEGIN\s+[A-Z ]*PRIVATE KEY-----", "private-key-block"),
+    (r"(?:cat|read)\s+.{0,40}?(?:id_rsa|\.ssh/|\.env\b)", "read-secret-file"),
+)
+_RISK_WEAK: tuple[tuple[str, str], ...] = (
+    (r"\bignore\b", "ignore"),
+    (r"\bbypass\b", "bypass"),
+    (r"\bdisable\b", "disable"),
+)
+
+# Safety-instruction markers: if a phrase family is present in the COMMONS body
+# but absent from the fork body, that guardrail was removed.
+_SAFETY_MARKERS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("headline-first verdict", ("mandatory output rule", "verdict")),
+    ("PHI guardrail", ("phi",)),
+    ("secret guardrail", ("secret",)),
+    ("refusal language", ("refuse", "must never", "never let")),
+)
+
+
+def _tool_set(value) -> set[str]:
+    """Normalise a frontmatter tool field (list or comma-string) to a set."""
+    if value is None:
+        return set()
+    if isinstance(value, str):
+        return {p.strip() for p in value.split(",") if p.strip()}
+    if isinstance(value, (list, tuple)):
+        return {str(x).strip() for x in value if str(x).strip()}
+    return set()
+
+
+def _agent_tools(meta: dict) -> tuple[set[str], set[str]]:
+    """Return ``(allowed, denied)`` tool sets. ``allowed`` merges the murmurent
+    ``required_tools`` and the Claude-Code ``tools`` frontmatter fields."""
+    allowed = _tool_set(meta.get("required_tools")) | _tool_set(meta.get("tools"))
+    denied = _tool_set(meta.get("denied_tools"))
+    return allowed, denied
+
+
+def _is_guardian(name: str, commons_meta: dict | None) -> bool:
+    if name in GUARDIAN_AGENTS:
+        return True
+    if commons_meta is None:
+        return False
+    _, denied = _agent_tools(commons_meta)
+    return bool(denied & EGRESS_TOOLS)
+
+
+def _esc(severity: str, guardian: bool) -> str:
+    """Escalate a concern one severity level for guardian agents (item 8.5)."""
+    if not guardian:
+        return severity
+    return {SEVERITY_INFO: SEVERITY_WARN, SEVERITY_WARN: SEVERITY_BLOCK,
+            SEVERITY_BLOCK: SEVERITY_BLOCK}[severity]
+
+
+def _parse_agent(text: str) -> tuple[dict, str]:
+    """Best-effort ``(meta, body_lower)`` from agent markdown text. On a
+    frontmatter parse error, meta is ``{}`` and the whole text is the body."""
+    try:
+        doc = _parse_fm(text)
+        return (doc.meta or {}), doc.body.lower()
+    except Exception:  # noqa: BLE001
+        return {}, text.lower()
+
+
+def _diff_fork(name: str, fork_meta: dict, fork_body: str,
+               commons_meta: dict, commons_body: str, *, guardian: bool,
+               handle: str) -> list[Finding]:
+    """Diff a fork's frontmatter + body against its commons origin. Emits
+    guardrail-weakening, freeze/category/model-tamper and safety-removal
+    findings (all in ``AREA_AGENTS``)."""
+    out: list[Finding] = []
+    f_allowed, f_denied = _agent_tools(fork_meta)
+    c_allowed, c_denied = _agent_tools(commons_meta)
+
+    # -- guardrail weakening (highest signal) --------------------------------
+    regained = c_denied - f_denied            # a denied tool is no longer denied
+    widened = f_allowed - c_allowed           # a new tool granted
+    reenabled = sorted((regained | (widened & EGRESS_TOOLS)))
+    if regained or (widened & EGRESS_TOOLS):
+        # Block if a guardian regains a withheld (denied) tool (item 8.2/8.5).
+        base = SEVERITY_WARN
+        sev = SEVERITY_BLOCK if (guardian and regained) else _esc(base, guardian)
+        out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-GUARDRAIL-WEAKENED-01",
+                       severity=sev, path=name,
+                       current=f"fork re-enables withheld capability: "
+                               + ", ".join(reenabled),
+                       expected="fork keeps the commons tool guardrails",
+                       fix=f"murmurent agent unfork {name}  # or restore denied_tools",
+                       handle=handle,
+                       notes=("guardian agent — tool weakening escalated"
+                              if guardian else "")))
+    elif widened:
+        out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-TOOLS-WIDENED-01",
+                       severity=_esc(SEVERITY_WARN, guardian), path=name,
+                       current=f"fork grants extra tool(s): "
+                               + ", ".join(sorted(widened)),
+                       expected="fork keeps the commons tool set",
+                       handle=handle))
+
+    # -- freeze / category / model tampering ---------------------------------
+    if str(commons_meta.get("freeze") or "").strip().lower() == "frozen":
+        out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-FROZEN-MODIFIED-01",
+                       severity=_esc(SEVERITY_WARN, guardian), path=name,
+                       current="a commons-frozen agent has been modified locally",
+                       expected="frozen agents are not meant to be forked/edited",
+                       fix=f"murmurent agent unfork {name}",
+                       handle=handle))
+    if commons_meta.get("category") is not None and \
+            str(fork_meta.get("category")) != str(commons_meta.get("category")):
+        out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-CATEGORY-CHANGED-01",
+                       severity=_esc(SEVERITY_WARN, guardian), path=name,
+                       current=f"category changed "
+                               f"{commons_meta.get('category')!r} → "
+                               f"{fork_meta.get('category')!r}",
+                       expected="category matches the commons definition",
+                       handle=handle))
+    if commons_meta.get("model") is not None and \
+            str(fork_meta.get("model")) != str(commons_meta.get("model")):
+        out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-MODEL-CHANGED-01",
+                       severity=_esc(SEVERITY_WARN, guardian), path=name,
+                       current=f"model changed {commons_meta.get('model')!r} → "
+                               f"{fork_meta.get('model')!r}",
+                       expected="model matches the commons definition",
+                       handle=handle))
+
+    # -- safety-instruction removal ------------------------------------------
+    removed = []
+    for label, subs in _SAFETY_MARKERS:
+        in_commons = any(s in commons_body for s in subs)
+        in_fork = any(s in fork_body for s in subs)
+        if in_commons and not in_fork:
+            removed.append(label)
+    if removed:
+        out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-SAFETY-REMOVED-01",
+                       severity=_esc(SEVERITY_WARN, guardian), path=name,
+                       current="fork drops safety language present in commons: "
+                               + ", ".join(removed),
+                       expected="fork retains the commons safety instructions",
+                       handle=handle))
+    return out
+
+
+def _risk_grep(name: str, body: str, *, guardian: bool, handle: str) -> Finding | None:
+    """Static risk grep over an agent body. Returns one summarising Finding, or
+    ``None`` when nothing matched. STRONG hits ⇒ warn; only-WEAK hits ⇒ info."""
+    strong = sorted({tag for pat, tag in _RISK_STRONG if _re.search(pat, body, _re.I)})
+    weak = sorted({tag for pat, tag in _RISK_WEAK if _re.search(pat, body, _re.I)})
+    if not strong and not weak:
+        return None
+    base = SEVERITY_WARN if strong else SEVERITY_INFO
+    tags = strong + weak
+    return _mk(AREA_AGENTS, "PERSONAL-AGENT-RISK-GREP-01",
+               severity=_esc(base, guardian), path=name,
+               current="risk pattern(s) in agent body: " + ", ".join(tags),
+               expected="agent body free of override / exfiltration language",
+               handle=handle,
+               notes="ambiguous (weak match only)" if not strong else "")
+
+
+def check_agent_integrity(handle: str, env: dict | None) -> list[Finding]:
+    """Item 8 (deterministic half). Classify every installed CC agent and, for
+    forks / untracked overrides, diff them against the commons origin. Read-only:
+    only reads agent files. Missing prerequisites (commons dir unresolvable,
+    unreadable manifest) ⇒ a single ``unverifiable`` finding, never a false
+    clean."""
+    h = handle or None
+
+    commons_dir = _af.commons_agents_dir()
+    if not commons_dir.is_dir():
+        return [_mk(AREA_AGENTS, "PERSONAL-AGENT-COMMONS-UNRESOLVABLE-01",
+                    severity=SEVERITY_INFO, path=str(commons_dir),
+                    current="commons agents dir not found — cannot classify agents",
+                    expected="a resolvable <murmurent-repo>/agents directory",
+                    handle=h, verify_state=VERIFY_UNVERIFIABLE,
+                    notes="Could not resolve the commons; not a clean result.")]
+    try:
+        _af.load_manifest()
+    except Exception as exc:  # noqa: BLE001
+        return [_mk(AREA_AGENTS, "PERSONAL-AGENT-MANIFEST-UNREADABLE-01",
+                    severity=SEVERITY_INFO, path=str(_af.manifest_path()),
+                    current=f"agent-fork manifest unreadable: {exc}",
+                    handle=h, verify_state=VERIFY_UNVERIFIABLE,
+                    notes="Could not read fork provenance; not a clean result.")]
+    try:
+        statuses = _af.iter_status()
+    except Exception as exc:  # noqa: BLE001
+        return [_mk(AREA_AGENTS, "PERSONAL-AGENT-STATUS-UNVERIFIABLE-01",
+                    severity=SEVERITY_INFO, path=str(_af.installed_agents_dir()),
+                    current=f"could not read installed agents: {exc}",
+                    handle=h, verify_state=VERIFY_UNVERIFIABLE)]
+
+    if not statuses:
+        return [_mk(AREA_AGENTS, "PERSONAL-AGENT-NONE-01",
+                    severity=SEVERITY_INFO, path=str(_af.installed_agents_dir()),
+                    current="no installed agents to check",
+                    handle=h)]
+
+    out: list[Finding] = []
+    for st in statuses:
+        name = st.name
+        commons_path = _af.commons_agent_path(name)
+        installed_path = _af.installed_agents_dir() / f"{name}.md"
+
+        commons_meta: dict | None = None
+        commons_body = ""
+        if commons_path.is_file():
+            try:
+                commons_meta, commons_body = _parse_agent(
+                    commons_path.read_text(encoding="utf-8"))
+            except OSError:
+                commons_meta, commons_body = None, ""
+        guardian = _is_guardian(name, commons_meta)
+
+        # --- pristine commons symlink ---------------------------------------
+        if st.kind == "linked":
+            out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-PRISTINE-01",
+                           severity=SEVERITY_INFO, path=name,
+                           current="pristine commons symlink",
+                           expected="commons symlink (unmodified)", handle=h,
+                           notes="guardian" if guardian else ""))
+            continue
+
+        # Read the working copy body once for fork/override/orphan cases.
+        try:
+            fork_text = installed_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-STATUS-UNVERIFIABLE-01",
+                           severity=SEVERITY_INFO, path=name,
+                           current=f"could not read agent file: {exc}", handle=h,
+                           verify_state=VERIFY_UNVERIFIABLE))
+            continue
+        fork_meta, fork_body = _parse_agent(fork_text)
+
+        # --- orphan: a real file with no commons origin ---------------------
+        if commons_meta is None:
+            out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-ORPHAN-01",
+                           severity=SEVERITY_INFO, path=name,
+                           current="orphan agent — no commons origin, no known "
+                                   "group-toolkit source",
+                           expected="awareness — a group-toolkit agent is fine; a "
+                                    "stray file may not be",
+                           handle=h, verify_state=VERIFY_VERIFIED,
+                           notes="Orphans are surfaced for awareness, not as an error."))
+            rg = _risk_grep(name, fork_body, guardian=guardian, handle=h)
+            if rg:
+                out.append(rg)
+            continue
+
+        # --- forked (tracked) or untracked override (user-file) -------------
+        modified = True
+        if st.kind == "forked":
+            if st.in_commons is False:
+                out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-FORK-ORPHANED-01",
+                               severity=SEVERITY_WARN, path=name,
+                               current="fork of a commons agent that no longer exists",
+                               expected="the commons still ships this agent",
+                               handle=h))
+                rg = _risk_grep(name, fork_body, guardian=guardian, handle=h)
+                if rg:
+                    out.append(rg)
+                continue
+            modified = bool(st.locally_modified)
+            if not modified:
+                out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-FORK-CLEAN-01",
+                               severity=SEVERITY_INFO, path=name,
+                               current="personal fork, unmodified since fork point"
+                                       + (" (commons has since changed)"
+                                          if st.upstream_changed else ""),
+                               expected="fork tracks the commons", handle=h,
+                               notes="guardian" if guardian else ""))
+                continue
+            out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-FORK-MODIFIED-01",
+                           severity=SEVERITY_INFO, path=name,
+                           current="personal fork differs from the commons origin",
+                           expected="review the diff below", handle=h,
+                           notes="guardian" if guardian else ""))
+        else:  # kind == "user-file" that shadows a commons agent → untracked override
+            out.append(_mk(AREA_AGENTS, "PERSONAL-AGENT-UNTRACKED-OVERRIDE-01",
+                           severity=_esc(SEVERITY_INFO, guardian), path=name,
+                           current="hand-authored file shadows a commons agent "
+                                   "(no fork provenance)",
+                           expected="`murmurent agent fork` to track it, or unfork",
+                           handle=h,
+                           notes="guardian" if guardian else ""))
+
+        out += _diff_fork(name, fork_meta, fork_body, commons_meta, commons_body,
+                          guardian=guardian, handle=h)
+        rg = _risk_grep(name, fork_body, guardian=guardian, handle=h)
+        if rg:
+            out.append(rg)
+    return out
+
+
+# ===========================================================================
 # Orchestrator
 # ===========================================================================
 
@@ -906,6 +1247,7 @@ def run_personal_audit(handle: str | None = None,
     findings += check_vault_acls(resolved, env)
     findings += check_clinical_containment(resolved, repos, env)
     findings += check_non_mm(resolved, repos, gh_repos, inventory_keys, env)
+    findings += check_agent_integrity(resolved, env)
 
     return PersonalAuditReport(handle=resolved or "unknown",
                                generated_at=when, findings=findings)
@@ -947,6 +1289,8 @@ __all__ = [
     "PersonalAuditReport", "run_personal_audit", "persist", "run_and_persist",
     "check_github", "check_slack", "check_cert", "check_repo_acls",
     "check_vault_acls", "check_clinical_containment", "check_non_mm",
+    "check_agent_integrity",
     "ALL_AREAS", "AREA_GITHUB", "AREA_SLACK", "AREA_CERT", "AREA_REPOS",
-    "AREA_VAULT", "AREA_NON_MM", "LOCAL_HOST", "CERT_WARN_DAYS", "REB_WARN_DAYS",
+    "AREA_VAULT", "AREA_NON_MM", "AREA_AGENTS", "LOCAL_HOST", "CERT_WARN_DAYS",
+    "REB_WARN_DAYS",
 ]

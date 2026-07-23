@@ -256,6 +256,17 @@
               <h3>Certificate timeline</h3>
               <div id="pa-cert"></div>
             </div>
+            <div class="pa-section" id="pa-agents-sec">
+              <h3>Agent integrity</h3>
+              <div class="pa-legend" style="font-family:var(--mono); font-size:11px; color:var(--muted); line-height:1.65; margin:2px 0 9px">
+                Each Claude Code agent installed on this machine:
+                <b style="color:var(--green)">pristine</b> = the commons symlink, unchanged ·
+                <b style="color:var(--tiger)">fork</b> = your personal copy (diffed against the commons for weakened tool guardrails, frozen/model/category tampering, or removed safety language) ·
+                <b style="color:var(--rule-strong)">orphan</b> = a file with no commons origin.
+                Guardian agents (security_guard, adversary, conscience) escalate one level when modified.
+              </div>
+              <div id="pa-agents"></div>
+            </div>
             <div class="pa-section" id="pa-other-sec">
               <h3>Other findings</h3>
               <div id="pa-other"></div>
@@ -785,6 +796,51 @@
           <tbody>${rows}</tbody></table>`;
       }
 
+      // Agent-integrity findings → one row per agent with a status chip.
+      function renderAgents(findings) {
+        const host = document.getElementById("pa-agents");
+        const ag = findings.filter(f => f.category === "agents");
+        if (!ag.length) { host.innerHTML = '<div class="pa-empty">No agents checked.</div>'; return; }
+        // Prerequisite / machine-level rows (path is a dir, not an agent name).
+        const preRules = /(COMMONS-UNRESOLVABLE|MANIFEST-UNREADABLE|STATUS-UNVERIFIABLE-01|AGENT-NONE)/;
+        const pre = ag.filter(f => preRules.test(f.rule) && f.path !== f.rule);
+        const perAgent = ag.filter(f => !pre.includes(f));
+        // Group per-agent findings by agent name (path).
+        const byAgent = {};
+        for (const f of perAgent) (byAgent[f.path] = byAgent[f.path] || []).push(f);
+        const statusOf = fs => {
+          if (fs.some(f => f.rule === "PERSONAL-AGENT-PRISTINE-01")) return ["green", "pristine"];
+          if (fs.some(f => /-ORPHAN-01$/.test(f.rule))) return ["grey", "orphan"];
+          return ["amber", "fork"];
+        };
+        const sevRank = fs => Math.min(...fs.map(f =>
+          ({ block: 0, warn: 1, info: 2 }[f.severity] ?? 9)));
+        const names = Object.keys(byAgent).sort((a, b) =>
+          sevRank(byAgent[a]) - sevRank(byAgent[b]) || a.localeCompare(b));
+        const rows = names.map(n => {
+          const fs = byAgent[n];
+          const [chipCls, chipLbl] = statusOf(fs);
+          const guardian = fs.some(f => (f.notes || "").includes("guardian"));
+          const detail = fs.map(f => {
+            const pill = `<span class="pill ${f.severity}">${f.severity}</span>`;
+            const uv = f.verify_state === "verified" ? "" :
+              ' <span style="color:var(--muted)">· could-not-verify</span>';
+            return `<div>${pill} <code>${escP(f.rule)}</code> — ${escP(f.current_state)}${uv}</div>`;
+          }).join("");
+          return `<tr>
+            <td>${escP(n)}${guardian ? '<span class="clin-flag">GUARDIAN</span>' : ''}</td>
+            <td><span class="chip ${chipCls}">${chipLbl}</span></td>
+            <td>${detail}</td>
+          </tr>`;
+        }).join("");
+        const preHtml = pre.map(f =>
+          `<div class="pa-empty"><span class="pill ${f.severity}">${f.severity}</span> ${escP(f.current_state)}</div>`
+        ).join("");
+        host.innerHTML = `<table class="heat">
+          <thead><tr><th>agent</th><th>status</th><th>findings</th></tr></thead>
+          <tbody>${rows}</tbody></table>${preHtml}`;
+      }
+
       function renderPersonalAudit(d) {
         const c = d.counts || {};
         const hl = document.getElementById("pa-headline");
@@ -804,6 +860,7 @@
         renderHeatmap(findings);
         renderMembership(findings);
         renderCert(findings);
+        renderAgents(findings);
         renderOther(findings);
         document.getElementById("pa-empty").style.display = "none";
         document.getElementById("pa-result").style.display = "block";
