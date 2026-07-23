@@ -43,6 +43,8 @@ def test_read_local_only_when_file_missing(isolated):
 
 
 def test_round_trip_with_ssh_host(isolated):
+    """Connection fields round-trip; param fields are NOT persisted (issue #80 —
+    hosts.yaml is a connection-only registry now)."""
     bio = hosts.Host(
         name="lab-server", kind="ssh", ssh_host="lab-server",
         remote_user="the_pi",
@@ -56,10 +58,63 @@ def test_round_trip_with_ssh_host(isolated):
     reread = hosts.read()
     assert set(reread.keys()) == {"local", "lab-server"}
     bio2 = reread["lab-server"]
+    # Connection metadata survives.
     assert bio2.ssh_host == "lab-server"
     assert bio2.remote_user == "the_pi"
-    assert bio2.lab_vm_root == "/data/lab_vm"
     assert bio2.mount_point == "~/Mounts/lab-server"
+    assert bio2.description == "Schulich compute server"
+    # Param fields are dropped on write → revert to dataclass defaults on read.
+    assert bio2.lab_vm_root == "~/lab_vm/data"
+    assert bio2.project_root == "~/repos"
+    assert bio2.vault_root == "~/Documents/Obsidian"
+
+
+def test_write_is_connection_only(isolated):
+    """The serialised YAML carries no config/param keys (issue #80)."""
+    hosts.add(hosts.Host(
+        name="lab-server", kind="ssh", ssh_host="lab-server",
+        remote_user="the_pi", project_root="/p", lab_vm_root="/d",
+        vault_root="/v", lab_vault_root="/lm", scan_dirs=("repos",),
+    ))
+    text = hosts.hosts_file().read_text(encoding="utf-8")
+    for banned in ("project_root", "lab_vm_root", "vault_root",
+                   "lab_vault_root", "oracle_subfolder", "notebook_subfolder",
+                   "data_subfolder"):
+        assert banned not in text, f"{banned} should not be persisted"
+    # ...but connection + scan info is there.
+    assert "ssh_host" in text
+    assert "scan_dirs" in text
+
+
+def test_legacy_param_rows_read_but_dropped_on_rewrite(isolated):
+    """A pre-#80 hosts.yaml with param fields still LOADS (non-destructive);
+    the connection row is preserved and the params drop on the next write."""
+    path = hosts.hosts_file()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "version: 1\nhosts:\n"
+        "  lab-server:\n"
+        "    kind: ssh\n"
+        "    ssh_host: lab-server\n"
+        "    remote_user: the_pi\n"
+        "    project_root: /home/the_pi/repos\n"
+        "    lab_vm_root: /data/lab_vm\n"
+        "    vault_root: /home/the_pi/Obsidian\n"
+        "    scan_dirs: [repos]\n",
+        encoding="utf-8",
+    )
+    # Non-destructive read: legacy params are still honoured until rewritten.
+    h = hosts.read()["lab-server"]
+    assert h.lab_vm_root == "/data/lab_vm"
+    assert h.scan_dirs == ("repos",)
+    # A connection-only edit preserves the row but drops the params.
+    hosts.update_host("lab-server", description="compute")
+    text = hosts.hosts_file().read_text(encoding="utf-8")
+    assert "lab-server" in text and "the_pi" in text   # row preserved
+    assert "lab_vm_root" not in text                   # param dropped
+    reread = hosts.read()["lab-server"]
+    assert reread.ssh_host == "lab-server"
+    assert reread.description == "compute"
 
 
 def test_add_refuses_duplicate(isolated):
@@ -170,21 +225,19 @@ def test_scan_dirs_omitted_from_yaml_when_empty(isolated):
 
 
 def test_update_scan_dirs_preserves_other_fields(isolated):
-    """Editing scan_dirs from the dashboard must not blank out
-    ssh_host, remote_user, wigamig_base, etc."""
+    """Editing scan_dirs from the dashboard must not blank out the connection
+    metadata (ssh_host, remote_user, description)."""
     hosts.add(hosts.Host(
         name="bio", kind="ssh", ssh_host="bio.example",
-        remote_user="the_pi", lab_vm_root="/srv/wigamig",
-        vault_root="/home/the_pi/Obsidian", description="schulich",
+        remote_user="the_pi", description="schulich",
     ))
     updated = hosts.update_scan_dirs("bio", ["repos", "/srv/projects"])
     assert updated.scan_dirs == ("repos", "/srv/projects")
     assert updated.ssh_host == "bio.example"
     assert updated.remote_user == "the_pi"
-    assert updated.lab_vm_root == "/srv/wigamig"
     assert updated.description == "schulich"
     # Round-trip verifies write persisted scan_dirs without losing the
-    # original fields.
+    # connection fields.
     reread = hosts.read()["bio"]
     assert reread.scan_dirs == ("repos", "/srv/projects")
     assert reread.ssh_host == "bio.example"
@@ -356,41 +409,50 @@ def test_remote_murmurent_version_parses_stdout(isolated, monkeypatch):
     assert r.murmurent_version() == "murmurent, version 1.0.0"
 
 
-def test_update_host_edits_full_field_set(isolated):
-    """The Machines editor writes the same fields the Add form does. Each is
-    independently updatable; None leaves a field untouched."""
+def test_update_host_edits_connection_fields(isolated):
+    """The Machines editor is connection-only (issue #80): ssh_host,
+    remote_user, description, scan_dirs. Each is independently updatable; None
+    leaves a field untouched. Param fields are no longer accepted."""
     hosts.add(hosts.Host(
         name="lab-server", kind="ssh", ssh_host="old.host", remote_user="u1",
-        lab_vm_root="/old", vault_root="~/V", description="d1",
-        scan_dirs=("~/repos",),
+        description="d1", scan_dirs=("~/repos",),
     ))
     u = hosts.update_host(
         "lab-server", ssh_host="new.host", remote_user="u2",
-        lab_vm_root="/new", vault_root="~/V2", description="d2",
-        scan_dirs=["~/a", "~/b"],
+        description="d2", scan_dirs=["~/a", "~/b"],
     )
-    assert (u.ssh_host, u.remote_user, u.lab_vm_root, u.vault_root,
-            u.description, u.scan_dirs) == (
-        "new.host", "u2", "/new", "~/V2", "d2", ("~/a", "~/b"))
+    assert (u.ssh_host, u.remote_user, u.description, u.scan_dirs) == (
+        "new.host", "u2", "d2", ("~/a", "~/b"))
 
     # Partial update leaves untouched fields alone.
     u2 = hosts.update_host("lab-server", remote_user="u3")
     assert u2.remote_user == "u3"
-    assert u2.ssh_host == "new.host" and u2.lab_vm_root == "/new"
+    assert u2.ssh_host == "new.host" and u2.description == "d2"
 
 
 def test_update_host_blank_rules(isolated):
-    """ssh_host/vault_root keep their current value when blanked (an ssh host
-    must keep a host); remote_user/description accept an empty-string clear."""
+    """ssh_host keeps its current value when blanked (an ssh host must keep a
+    host); remote_user/description accept an empty-string clear."""
     hosts.add(hosts.Host(
         name="lab-server", kind="ssh", ssh_host="keep.host", remote_user="u1",
-        lab_vm_root="/d", vault_root="~/V", description="d1",
-        scan_dirs=("~/repos",),
+        description="d1", scan_dirs=("~/repos",),
     ))
-    u = hosts.update_host("lab-server", ssh_host="   ", vault_root="  ",
+    u = hosts.update_host("lab-server", ssh_host="   ",
                           remote_user="  ", description="  ")
-    assert u.ssh_host == "keep.host" and u.vault_root == "~/V"
+    assert u.ssh_host == "keep.host"
     assert u.remote_user == "" and u.description == ""
+
+
+def test_update_host_ignores_legacy_param_kwargs(isolated):
+    """An older client passing lab_vm_root/vault_root/etc. to update_host is
+    tolerated (via **kwargs swallow) — none of it lands in the registry."""
+    hosts.add(hosts.Host(name="lab-server", kind="ssh", ssh_host="lab-server"))
+    # update_host's signature no longer declares param kwargs; the server body
+    # (HostUpdateBody, extra=ignore) drops them before they ever reach here, so
+    # a connection-only edit is all that persists.
+    hosts.update_host("lab-server", description="just connection")
+    text = hosts.hosts_file().read_text(encoding="utf-8")
+    assert "lab_vm_root" not in text and "vault_root" not in text
 
 
 def test_update_host_unknown_raises(isolated):
@@ -398,83 +460,11 @@ def test_update_host_unknown_raises(isolated):
         hosts.update_host("nope", ssh_host="x")
 
 
-# ---------------------------------------------------------------------------
-# Issue #25: per-machine vault-location fields (personal subfolders + the
-# lab-mgmt clone path) round-trip through hosts.yaml + update_host.
-# ---------------------------------------------------------------------------
-
-
-def test_vault_fields_round_trip(isolated):
-    """Personal-vault subfolders + the lab-mgmt clone path persist to
-    hosts.yaml and read back on the Host."""
-    hosts.add(hosts.Host(
-        name="lab-server", kind="ssh", ssh_host="lab-server",
-        vault_root="/home/the_pi/murmurent_vault",
-        oracle_subfolder="oracle-notes",
-        notebook_subfolder="daily",
-        lab_vault_root="/home/the_pi/murmurent_lab_mgmt_mh",
-    ))
-    bio = hosts.read()["lab-server"]
-    assert bio.oracle_subfolder == "oracle-notes"
-    assert bio.notebook_subfolder == "daily"
-    assert bio.lab_vault_root == "/home/the_pi/murmurent_lab_mgmt_mh"
-
-
 def test_vault_subfolders_default_to_convention(isolated):
-    """A pre-#25 hosts.yaml entry (no subfolder / lab-vault keys) keeps
-    working: subfolders fall back to the oracle/lab-notebook convention and
-    the lab-vault path is empty."""
+    """The dataclass still exposes convention defaults for the retired param
+    fields, so any downstream reader that touches them keeps working."""
     hosts.add(hosts.Host(name="lab-server", kind="ssh", ssh_host="lab-server"))
     bio = hosts.read()["lab-server"]
     assert bio.oracle_subfolder == "oracle"
     assert bio.notebook_subfolder == "lab-notebook"
     assert bio.lab_vault_root == ""
-
-
-def test_convention_subfolders_omitted_from_yaml(isolated):
-    """Convention-default subfolders are not serialised, keeping existing
-    terse hosts.yaml files unchanged; a custom value IS written."""
-    import yaml as _yaml
-    hosts.add(hosts.Host(name="a", kind="ssh", ssh_host="a"))
-    hosts.add(hosts.Host(name="b", kind="ssh", ssh_host="b",
-                         oracle_subfolder="custom"))
-    raw = _yaml.safe_load(hosts.hosts_file().read_text())["hosts"]
-    assert "oracle_subfolder" not in raw["a"]
-    assert "notebook_subfolder" not in raw["a"]
-    assert raw["b"]["oracle_subfolder"] == "custom"
-
-
-def test_update_host_edits_vault_fields(isolated):
-    """update_host edits the new vault-location fields; subfolders keep their
-    value when blanked, lab_vault_root accepts an explicit clear."""
-    hosts.add(hosts.Host(
-        name="lab-server", kind="ssh", ssh_host="lab-server",
-        oracle_subfolder="oracle", notebook_subfolder="lab-notebook",
-        lab_vault_root="/old/lab_mgmt",
-    ))
-    u = hosts.update_host(
-        "lab-server", oracle_subfolder="orc", notebook_subfolder="nb",
-        lab_vault_root="/new/lab_mgmt",
-    )
-    assert (u.oracle_subfolder, u.notebook_subfolder, u.lab_vault_root) == (
-        "orc", "nb", "/new/lab_mgmt")
-
-    # Blank subfolder keeps current; blank lab_vault_root clears it.
-    u2 = hosts.update_host("lab-server", oracle_subfolder="  ",
-                           lab_vault_root="  ")
-    assert u2.oracle_subfolder == "orc"       # kept
-    assert u2.lab_vault_root == ""            # cleared
-
-
-def test_update_scan_dirs_preserves_vault_fields(isolated):
-    """Editing scan_dirs must not drop the #25 vault fields (they're rebuilt
-    on every update_scan_dirs write)."""
-    hosts.add(hosts.Host(
-        name="lab-server", kind="ssh", ssh_host="lab-server",
-        oracle_subfolder="orc", notebook_subfolder="nb",
-        lab_vault_root="/lab_mgmt",
-    ))
-    u = hosts.update_scan_dirs("lab-server", ["~/repos"])
-    assert u.oracle_subfolder == "orc"
-    assert u.notebook_subfolder == "nb"
-    assert u.lab_vault_root == "/lab_mgmt"

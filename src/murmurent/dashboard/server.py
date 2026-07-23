@@ -370,26 +370,28 @@ class RegistrarCollabEditBody(BaseModel):
 
 
 class HostAddBody(BaseModel):
-    """JSON body for ``POST /api/hosts`` (Item 3 R4, dashboard host CRUD)."""
+    """JSON body for ``POST /api/hosts`` — register a CONNECTION-ONLY machine.
+
+    Issue #80: ``hosts.yaml`` is now a thin target list for the repo-inventory
+    SSH scan, not a foreign-machine config editor. Only connection fields are
+    accepted + persisted: ``name`` + ``ssh_host`` (how to reach it),
+    ``remote_user``, ``mount_point``, ``description``, and ``scan_dirs`` (what
+    to scan). A machine's data-root / vault / project paths are edited ONLY on
+    that machine's own dashboard (``machine.yaml``). Any legacy param fields an
+    older client still sends (``wigamig_base``, ``lab_vm_root``, ``vault_root``,
+    ``project_root``, ``lab_vault_root``, subfolders) are accepted for
+    compatibility but IGNORED — never written to the registry.
+    """
 
     name: str
     ssh_host: str
     remote_user: str = ""
-    project_root: str = "~/repos"
-    # ``wigamig_base`` is the canonical 2026-05-14 name for the per-machine
-    # murmurent umbrella. ``lab_vm_root`` is kept as an alias on input for
-    # backwards-compat with older clients; new code writes ``wigamig_base``.
-    wigamig_base: str | None = None
-    lab_vm_root: str = "~/wigamig"
-    vault_root: str = "~/Obsidian"
-    # Personal-vault subfolders + lab-vault clone path on this machine
-    # (issue #25). Optional; conventions apply when omitted.
-    oracle_subfolder: str = "oracle"
-    notebook_subfolder: str = "lab-notebook"
-    lab_vault_root: str = ""
     mount_point: str = ""
     description: str = ""
     scan_dirs: list[str] = []
+
+    # Ignored legacy param fields (kept so old clients don't 422). Not persisted.
+    model_config = {"extra": "ignore"}
 
 
 class HostScanDirsBody(BaseModel):
@@ -399,23 +401,23 @@ class HostScanDirsBody(BaseModel):
 
 
 class HostUpdateBody(BaseModel):
-    """JSON body for ``PATCH /api/hosts/{name}`` — the Machines editor. Any
-    field left ``None`` is unchanged. Mirrors the Add-machine field set (minus
-    the immutable ``name``): ``ssh_host`` + ``remote_user`` (connection),
-    ``lab_vm_root`` (Files root), ``vault_root`` (Obsidian), ``description``,
-    and ``scan_dirs`` (Repo location(s))."""
+    """JSON body for ``PATCH /api/hosts/{name}`` — CONNECTION-ONLY (issue #80).
+
+    Any field left ``None`` is unchanged. The Machines editor no longer
+    configures a foreign machine's data-root / vault / project paths — those are
+    edited only on that machine's own dashboard (``machine.yaml``). What remains
+    editable here is what reaching the machine needs: ``ssh_host`` +
+    ``remote_user`` (connection), ``description``, and ``scan_dirs`` (the
+    repo-inventory SSH scan). Legacy param fields from older clients are ignored.
+    """
 
     ssh_host: str | None = None
     remote_user: str | None = None
-    lab_vm_root: str | None = None
-    vault_root: str | None = None
-    # Issue #25: personal-vault subfolders + the lab-mgmt clone path on this
-    # machine (the remote-machine editor's LAB-vault location field).
-    oracle_subfolder: str | None = None
-    notebook_subfolder: str | None = None
-    lab_vault_root: str | None = None
     description: str | None = None
     scan_dirs: list[str] | None = None
+
+    # Ignored legacy param fields (kept so old clients don't 422). Not persisted.
+    model_config = {"extra": "ignore"}
 
 
 class AdoptCloneBody(BaseModel):
@@ -3837,6 +3839,24 @@ def create_app() -> FastAPI:
         from ..core import hosts as _hosts
         return {"hosts": [_host_row(h) for h in _hosts.read().values()]}
 
+    @app.get("/api/machines/registry")
+    def get_machines_registry() -> dict:
+        """Read-only cross-machine VIEW (issue #80).
+
+        Returns every machine the member owns, mirrored to the synced
+        ``<vault>/machines/*.yaml`` registry (each machine writes only its own
+        entry), plus which entry is THIS machine. Display-only — foreign
+        machines are configured on their own dashboards, never edited from here.
+        Degrades to ``[]`` when no personal vault is registered.
+        """
+        from ..core import machine_registry as _mr
+        try:
+            machines = _mr.read_registry()
+            this_id = _mr.machine_id()
+        except Exception:  # noqa: BLE001 — never fail the view on a bad vault
+            machines, this_id = [], ""
+        return {"machines": machines, "this_machine_id": this_id}
+
     @app.post("/api/hosts")
     def post_host(body: HostAddBody) -> dict:
         """Register a new SSH host. Refuses duplicates.
@@ -3845,20 +3865,15 @@ def create_app() -> FastAPI:
         user can register lab-server without dropping to a terminal.
         """
         from ..core import hosts as _hosts
-        # Accept either ``wigamig_base`` (new canonical name) or
-        # ``lab_vm_root`` (legacy). Prefer the new name when both are set.
-        wb = body.wigamig_base if body.wigamig_base is not None else body.lab_vm_root
+        # Connection-only (issue #80): the registry stores how to REACH the
+        # machine (ssh_host + scan_dirs) plus friendly metadata. A machine's
+        # data-root / vault / project paths are NOT set here — they are edited
+        # on that machine's own dashboard via machine.yaml.
         host = _hosts.Host(
             name=body.name,
             kind="ssh" if body.ssh_host else "local",
             ssh_host=body.ssh_host,
             remote_user=body.remote_user,
-            project_root=body.project_root,
-            lab_vm_root=wb,
-            vault_root=body.vault_root,
-            oracle_subfolder=body.oracle_subfolder or "oracle",
-            notebook_subfolder=body.notebook_subfolder or "lab-notebook",
-            lab_vault_root=body.lab_vault_root,
             mount_point=body.mount_point,
             description=body.description,
             scan_dirs=tuple(body.scan_dirs),
@@ -3960,21 +3975,18 @@ def create_app() -> FastAPI:
 
     @app.patch("/api/hosts/{name}")
     def patch_host(name: str, body: HostUpdateBody) -> dict:
-        """Update a machine's editable fields from the dashboard Machines
-        editor — the same set the Add form writes (connection, Files root,
-        Obsidian vault, description, Repo locations). Any field left ``None``
-        is unchanged; ``name``/``kind`` are immutable."""
+        """Update a machine's CONNECTION-ONLY fields (issue #80): ``ssh_host`` +
+        ``remote_user`` (connection), ``description``, and ``scan_dirs`` (the
+        repo-inventory SSH scan). A machine's data-root / vault / project paths
+        are NOT edited here — only on that machine's own dashboard via
+        ``machine.yaml``. Any field left ``None`` is unchanged; ``name``/``kind``
+        are immutable, and legacy param fields are ignored."""
         from ..core import hosts as _hosts
         try:
             updated = _hosts.update_host(
                 name,
                 ssh_host=body.ssh_host,
                 remote_user=body.remote_user,
-                lab_vm_root=body.lab_vm_root,
-                vault_root=body.vault_root,
-                oracle_subfolder=body.oracle_subfolder,
-                notebook_subfolder=body.notebook_subfolder,
-                lab_vault_root=body.lab_vault_root,
                 description=body.description,
                 scan_dirs=(tuple(body.scan_dirs) if body.scan_dirs is not None else None),
             )
@@ -7750,10 +7762,28 @@ def create_app() -> FastAPI:
         except OSError:
             full = platform.node() or ""
         short = full.split(".", 1)[0] if full else ""
+        # Friendly machine name + stable id from machine.yaml (issue #80). These
+        # feed the always-visible machine-identity BADGE in the header so that,
+        # with a laptop dashboard and a tunneled server dashboard both open, each
+        # browser tab plainly says which machine it is. Best-effort — falls back
+        # to the hostname when machine.yaml isn't written yet.
+        machine_name = short
+        machine_id = short
+        try:
+            from . import machine_settings as _ms
+            from ..core import machine_registry as _mr
+            _s = _ms.load()
+            if _s.machine_name:
+                machine_name = _s.machine_name
+            machine_id = _mr.machine_id(_s)
+        except Exception:  # noqa: BLE001
+            pass
         return {
             "local_user": getpass.getuser(),
             "hostname": full,
             "short_hostname": short,
+            "machine_name": machine_name,
+            "machine_id": machine_id,
             "kind": "laptop" if short and not short.endswith("server") else "host",
             "platform": platform.system().lower(),
         }

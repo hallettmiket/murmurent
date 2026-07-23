@@ -44,7 +44,11 @@ VAULT_SUBDIRS: tuple[str, ...] = (
     # Canonical copies of forked commons agents + agent_forks.yaml (#80). In the
     # vault so a fork made on one machine reaches every other machine; hardlinked
     # into ~/.claude/agents by `murmurent agent relink`.
-    "agent_forks")
+    "agent_forks",
+    # Per-machine config mirror (#80): each machine writes its own
+    # <machine_id>.yaml here so every install shares a read-only cross-machine
+    # view. Single-writer-per-machine → conflict-free. See core.machine_registry.
+    "machines")
 
 GITKEEP = ".gitkeep"
 CLAUDE_MD = "CLAUDE.md"
@@ -253,7 +257,10 @@ MURMURENT_TRACKED_FOLDERS: tuple[str, ...] = (
     "oracle", "lab-notebook", "maps-legends", "murmurent_data",
     # Personal agents + commons-agent forks sync across the member's machines
     # via the vault (issue #80) — so both must survive the allowlist.
-    "agents", "agent_forks")
+    "agents", "agent_forks",
+    # Per-machine config mirror (issue #80): <vault>/machines/<id>.yaml, one
+    # file per machine, so the read-only cross-machine view syncs everywhere.
+    "machines")
 
 
 def _allowlist_gitignore_lines() -> list[str]:

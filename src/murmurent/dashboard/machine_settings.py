@@ -118,4 +118,25 @@ def write(settings: C.MachineSettings) -> Path:
         yaml.safe_dump(payload, sort_keys=False, allow_unicode=True),
         encoding="utf-8",
     )
+    # Mirror THIS machine's own entry to the synced per-machine registry in the
+    # personal vault (issue #80). Single-writer-per-machine, conflict-free. The
+    # local machine.yaml above stays the authoritative source; the mirror is for
+    # persistence + the dashboard's read-only cross-machine view. Best-effort:
+    # a no-op when no vault is registered, and never fails the save.
+    try:
+        from ..core import machine_registry as _mr
+
+        # Mirror the cleaned/derived values (what we actually persisted), not
+        # the raw request, so the synced entry matches machine.yaml.
+        _mr.mirror_this_machine(C.MachineSettings(
+            machine_name=settings.machine_name,
+            wigamig_base=base_path,
+            obsidian_vault_path=vault_path,
+            obsidian_vault_name=derived_name,
+            notebook_subfolder=settings.notebook_subfolder,
+            oracle_subfolder=settings.oracle_subfolder,
+            lab_base=settings.lab_base,
+        ))
+    except Exception:  # noqa: BLE001 — mirror is a convenience, never load-bearing
+        pass
     return MACHINE_FILE
