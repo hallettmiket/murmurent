@@ -51,6 +51,7 @@ from . import identity as _identity
 from . import lab_vm as _lab_vm
 from . import project_provision as _pp
 from . import repo as _repo
+from . import repo_content_scan as _rcs
 from . import repo_inventory as _inv
 from .frontmatter import parse_text as _parse_fm
 from .security_findings import (
@@ -75,8 +76,14 @@ AREA_REPOS = "repos"
 AREA_VAULT = "vault"
 AREA_NON_MM = "non-mm"
 AREA_AGENTS = "agents"
+# Phase 2 content scanners (issue #63 items 2ii-2iv), defined in
+# ``repo_content_scan`` and re-exported here so ``ALL_AREAS`` stays the single
+# source of truth the CLI + dashboard iterate.
+AREA_OUTPUT = _rcs.AREA_OUTPUT      # 2(ii) output-location
+AREA_NETWORK = _rcs.AREA_NETWORK    # 2(iii) network safety
+AREA_EGRESS = _rcs.AREA_EGRESS      # 2(iv) data-shipping / external APIs
 ALL_AREAS = (AREA_GITHUB, AREA_SLACK, AREA_CERT, AREA_REPOS, AREA_VAULT,
-             AREA_NON_MM, AREA_AGENTS)
+             AREA_NON_MM, AREA_AGENTS, AREA_OUTPUT, AREA_NETWORK, AREA_EGRESS)
 
 # The synthetic host for a local, no-SSH audit. Keeps the JSONL layout identical
 # to the SSH scanner's ``~/.murmurent/security/<host>/`` tree.
@@ -1164,6 +1171,31 @@ def check_agent_integrity(handle: str, env: dict | None) -> list[Finding]:
 
 
 # ===========================================================================
+# Items 2ii-2iv — local-repo content scanners (deterministic)
+# ===========================================================================
+
+
+def check_repo_content(handle: str, repos: list, env: dict | None) -> list[Finding]:
+    """Items 2(ii)-2(iv). For each LOCAL murmurent-ready repo, scan its source
+    files for out-of-root write sinks (``output``), insecure transports /
+    in-URL credentials (``network``), and outbound/API egress (``egress``).
+
+    Reuses the clinical-repo detection built for the ACL check
+    (:func:`_clinical_repo_index` + :func:`_repo_is_clinical`) so a clinical
+    repo escalates out-of-root writes and data-shipping egress to BLOCK. All
+    matching is read-only grep — no file is written and no network call is made.
+    The heavy lifting lives in :mod:`murmurent.core.repo_content_scan`; this
+    wrapper only supplies the clinical predicate and keeps the check-function
+    signature uniform with the rest of the audit."""
+    clinical_paths, clinical_slugs = _clinical_repo_index(env)
+
+    def _is_clinical(repo) -> bool:
+        return _repo_is_clinical(repo, clinical_paths, clinical_slugs)
+
+    return _rcs.scan_repos(handle, repos, env, _is_clinical)
+
+
+# ===========================================================================
 # Orchestrator
 # ===========================================================================
 
@@ -1248,6 +1280,7 @@ def run_personal_audit(handle: str | None = None,
     findings += check_clinical_containment(resolved, repos, env)
     findings += check_non_mm(resolved, repos, gh_repos, inventory_keys, env)
     findings += check_agent_integrity(resolved, env)
+    findings += check_repo_content(resolved, repos, env)
 
     return PersonalAuditReport(handle=resolved or "unknown",
                                generated_at=when, findings=findings)
@@ -1289,8 +1322,8 @@ __all__ = [
     "PersonalAuditReport", "run_personal_audit", "persist", "run_and_persist",
     "check_github", "check_slack", "check_cert", "check_repo_acls",
     "check_vault_acls", "check_clinical_containment", "check_non_mm",
-    "check_agent_integrity",
+    "check_agent_integrity", "check_repo_content",
     "ALL_AREAS", "AREA_GITHUB", "AREA_SLACK", "AREA_CERT", "AREA_REPOS",
-    "AREA_VAULT", "AREA_NON_MM", "AREA_AGENTS", "LOCAL_HOST", "CERT_WARN_DAYS",
-    "REB_WARN_DAYS",
+    "AREA_VAULT", "AREA_NON_MM", "AREA_AGENTS", "AREA_OUTPUT", "AREA_NETWORK",
+    "AREA_EGRESS", "LOCAL_HOST", "CERT_WARN_DAYS", "REB_WARN_DAYS",
 ]

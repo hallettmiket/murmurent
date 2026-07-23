@@ -473,6 +473,132 @@ def test_agent_commons_unresolvable_is_unverifiable(tmp_path, monkeypatch):
     assert f.verify_state == "unverifiable"
 
 
+# ---------------------------------------------------------------------------
+# items 2ii-2iv — local-repo content scanners (Phase 2)
+# ---------------------------------------------------------------------------
+
+from murmurent.core import lab_vm as LV
+
+
+def _content_repo(base, name, filename, text):
+    """Small fake murmurent-ready repo with one source file."""
+    d = base / name
+    d.mkdir(parents=True, exist_ok=True)
+    (d / filename).write_text(text, encoding="utf-8")
+    return d
+
+
+@pytest.fixture
+def data_root(monkeypatch, tmp_path):
+    """A resolvable data root so the output-location check runs."""
+    root = tmp_path / "dataroot"
+    (root / "append_only").mkdir(parents=True)
+    monkeypatch.setenv("MURMURENT_DATA_ROOT", str(root))
+    return root
+
+
+def test_output_out_of_root_write_warns(monkeypatch, tmp_path, data_root):
+    d = _content_repo(tmp_path, "proj", "run.py",
+                      "import pandas as pd\ndf.to_csv('/tmp/out.csv')\n")
+    (f,) = [x for x in PA.check_repo_content("alice", [_repo_on_host(d)], None)
+            if x.rule == "PERSONAL-OUTPUT-OUTSIDE-ROOT-01"]
+    assert f.severity == "warn"
+    assert f.category == "output"
+    assert "/tmp/out.csv" in f.current_state
+
+
+def test_output_clinical_out_of_root_write_blocks(monkeypatch, tmp_path, data_root):
+    d = _content_repo(tmp_path, "clin", "run.py",
+                      "open('/tmp/leak.txt', 'w').write(phi)\n")
+    cp = _proj(name="clin", sensitivity="clinical",
+               repos=(CP.RepoRef(name="clin", role="code", path=str(d)),))
+    monkeypatch.setattr(CP, "iter_projects", lambda env=None: [cp])
+    (f,) = [x for x in PA.check_repo_content("alice", [_repo_on_host(d)], None)
+            if x.rule == "PERSONAL-OUTPUT-OUTSIDE-ROOT-01"]
+    assert f.severity == "block"
+
+
+def test_output_in_root_write_is_clean(monkeypatch, tmp_path, data_root):
+    safe = data_root / "append_only" / "proj" / "x.csv"
+    d = _content_repo(tmp_path, "proj", "run.py",
+                      f"df.to_csv('{safe}')\n")
+    out = PA.check_repo_content("alice", [_repo_on_host(d)], None)
+    assert not [x for x in out if x.rule == "PERSONAL-OUTPUT-OUTSIDE-ROOT-01"]
+    assert any(x.rule == "PERSONAL-OUTPUT-CLEAN-01" for x in out)
+
+
+def test_network_http_warns(monkeypatch, tmp_path, data_root):
+    d = _content_repo(tmp_path, "proj", "fetch.py",
+                      "URL = 'http://data.example.com/set.csv'\n")
+    (f,) = [x for x in PA.check_repo_content("alice", [_repo_on_host(d)], None)
+            if x.rule == "PERSONAL-NET-INSECURE-HTTP-01"]
+    assert f.severity == "warn"
+    assert f.category == "network"
+
+
+def test_network_localhost_http_not_flagged(monkeypatch, tmp_path, data_root):
+    d = _content_repo(tmp_path, "proj", "srv.py",
+                      "URL = 'http://localhost:8080/health'\n")
+    out = PA.check_repo_content("alice", [_repo_on_host(d)], None)
+    assert not [x for x in out if x.rule == "PERSONAL-NET-INSECURE-HTTP-01"]
+
+
+def test_network_creds_in_url_blocks(monkeypatch, tmp_path, data_root):
+    d = _content_repo(tmp_path, "proj", "db.py",
+                      "DSN = 'postgres://user:hunter2@db.example.com/prod'\n")
+    (f,) = [x for x in PA.check_repo_content("alice", [_repo_on_host(d)], None)
+            if x.rule == "PERSONAL-NET-CRED-IN-URL-01"]
+    assert f.severity == "block"
+    assert "hunter2" not in f.current_state      # password is redacted
+
+
+def test_egress_anthropic_is_info(monkeypatch, tmp_path, data_root):
+    d = _content_repo(tmp_path, "proj", "ai.py",
+                      "import anthropic\nclient = anthropic.Anthropic()\n")
+    (f,) = [x for x in PA.check_repo_content("alice", [_repo_on_host(d)], None)
+            if x.rule == "PERSONAL-EGRESS-AI-01"]
+    assert f.severity == "info"
+    assert "expected-ai" in f.notes
+
+
+def test_egress_clinical_upload_escalates(monkeypatch, tmp_path, data_root):
+    d = _content_repo(tmp_path, "clin", "ship.py",
+                      "bucket.upload_file('phi.csv', 'remote')\n")
+    cp = _proj(name="clin", sensitivity="clinical",
+               repos=(CP.RepoRef(name="clin", role="code", path=str(d)),))
+    monkeypatch.setattr(CP, "iter_projects", lambda env=None: [cp])
+    (f,) = [x for x in PA.check_repo_content("alice", [_repo_on_host(d)], None)
+            if x.rule == "PERSONAL-EGRESS-TRANSFER-01"]
+    assert f.severity == "block"
+
+
+def test_egress_non_clinical_upload_is_info(monkeypatch, tmp_path, data_root):
+    d = _content_repo(tmp_path, "proj", "ship.py",
+                      "bucket.upload_file('x.csv', 'remote')\n")
+    (f,) = [x for x in PA.check_repo_content("alice", [_repo_on_host(d)], None)
+            if x.rule == "PERSONAL-EGRESS-TRANSFER-01"]
+    assert f.severity == "info"
+
+
+def test_output_data_root_unresolvable_is_unverifiable(monkeypatch, tmp_path):
+    # No env var + a non-existent default → the data root is unresolvable.
+    monkeypatch.delenv("MURMURENT_DATA_ROOT", raising=False)
+    monkeypatch.delenv("MURMURENT_LAB_VM_ROOT", raising=False)
+    monkeypatch.setattr(LV, "DEFAULT_LAB_VM_ROOT", tmp_path / "no_such_root")
+    d = _content_repo(tmp_path, "proj", "run.py", "df.to_csv('/tmp/out.csv')\n")
+    out = PA.check_repo_content("alice", [_repo_on_host(d)], None)
+    (f,) = [x for x in out if x.rule == "PERSONAL-OUTPUT-UNVERIFIABLE-01"]
+    assert f.verify_state == "unverifiable"
+    # ...and the out-of-root write is NOT flagged when the root is unknown.
+    assert not [x for x in out if x.rule == "PERSONAL-OUTPUT-OUTSIDE-ROOT-01"]
+
+
+def test_content_scan_skips_non_ready_repos(monkeypatch, tmp_path, data_root):
+    d = _content_repo(tmp_path, "plain", "run.py", "df.to_csv('/tmp/out.csv')\n")
+    out = PA.check_repo_content("alice", [_repo_on_host(d, ready=False)], None)
+    assert out == []                              # nothing ready → nothing scanned
+
+
 def test_persist_writes_jsonl_and_latest(monkeypatch, tmp_path):
     monkeypatch.setattr(CP, "iter_projects", lambda env=None: [])
     report = PA.run_personal_audit(env=None)
