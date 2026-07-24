@@ -61,21 +61,18 @@ def load(*, legacy_obsidian: dict | None = None) -> C.MachineSettings:
 
     wigamig_base = data.get("wigamig_base") or None
 
-    # Derived presentation names (issue #99 / #80 Part 1a): the machine window
-    # nests ``murmurent_data`` under each vault root, and the two governed
-    # children under the Files (data) root. The vault subfolder name is the
-    # fixed ``VAULT_SUBDIRS`` member; the Files children resolve against disk so
-    # a legacy raw/refined deployment renders its real names. Best-effort — the
-    # display falls back to the model defaults if resolution ever fails.
-    murmurent_data_subfolder = "murmurent_data"
-    try:
-        from ..core.vault_provision import VAULT_SUBDIRS as _SUBDIRS
+    # Personal vault reference-file subfolder (issue #99). User-editable +
+    # persisted, exactly like ``notebook_subfolder`` / ``oracle_subfolder`` —
+    # read it back from the stored yaml, falling back to the ``murmurent_data``
+    # default when unset.
+    murmurent_data_subfolder = _pick(
+        "murmurent_data_subfolder", "murmurent_data_subfolder", "murmurent_data"
+    )
 
-        if "murmurent_data" in _SUBDIRS:
-            murmurent_data_subfolder = "murmurent_data"
-    except Exception:  # noqa: BLE001
-        pass
-
+    # Derived presentation names (issue #99 / #80 Part 1a): the two governed
+    # children under the Files (data) root resolve against disk so a legacy
+    # raw/refined deployment renders its real names. Best-effort — the display
+    # falls back to the model defaults if resolution ever fails.
     data_immutable_name, data_append_only_name = "immutable", "append_only"
     try:
         from ..core import lab_vm as _lv
@@ -140,6 +137,7 @@ def write(settings: C.MachineSettings) -> Path:
         "obsidian_vault_name": derived_name,
         "notebook_subfolder": settings.notebook_subfolder,
         "oracle_subfolder": settings.oracle_subfolder,
+        "murmurent_data_subfolder": settings.murmurent_data_subfolder,
         "lab_base": settings.lab_base,
     }
     MACHINE_FILE.write_text(
@@ -163,6 +161,7 @@ def write(settings: C.MachineSettings) -> Path:
             obsidian_vault_name=derived_name,
             notebook_subfolder=settings.notebook_subfolder,
             oracle_subfolder=settings.oracle_subfolder,
+            murmurent_data_subfolder=settings.murmurent_data_subfolder,
             lab_base=settings.lab_base,
         ))
     except Exception:  # noqa: BLE001 — mirror is a convenience, never load-bearing

@@ -7553,6 +7553,7 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
     obsidian_vault_name: initial.obsidian_vault_name || "",
     notebook_subfolder:  initial.notebook_subfolder  || "lab-notebook",
     oracle_subfolder:    initial.oracle_subfolder    || "oracle",
+    murmurent_data_subfolder: initial.murmurent_data_subfolder || "murmurent_data",
   });
   // Repo location (scan_dirs) is stored on the host registry, not machine.yaml,
   // so it's a separate field + a second save call.
@@ -7697,6 +7698,11 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
           <input style={inputStyle} value={form.oracle_subfolder}
                  onChange={update("oracle_subfolder")} />
         </div>
+        <div style={{flex:1}}>
+          <div style={labelStyle}>murmurent_data subfolder</div>
+          <input style={inputStyle} value={form.murmurent_data_subfolder}
+                 onChange={update("murmurent_data_subfolder")} />
+        </div>
       </div>
       {/* Resolved personal-vault subfolders — the issue's #1 gripe was that
           these were invisible / repeated the full root on every line. Show the
@@ -7707,7 +7713,7 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
           <PathTree indent={0} root={form.obsidian_vault_path} children={[
             form.oracle_subfolder || "oracle",
             form.notebook_subfolder || "lab-notebook",
-            initial.murmurent_data_subfolder || "murmurent_data",
+            form.murmurent_data_subfolder || "murmurent_data",
           ]} />
         </div>
       )}
