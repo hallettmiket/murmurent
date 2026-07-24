@@ -75,6 +75,7 @@ nav:
       - Install & setup: setup.md
       - Preparing GitHub: github_setup.md
       - Firing up the dashboard: dashboard.md
+      - Remote dashboard access: remote_dashboard.md
       - The VSCode workflow: vscode-workflow.md
       - Your personal vault: vault-setup.md
   - Working day to day:
