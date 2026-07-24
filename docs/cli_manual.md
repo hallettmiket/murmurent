@@ -124,6 +124,29 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 | `murmurent project end <name> --reason <r>` *PI* | Terminal event |
 | `murmurent project archive <name>` *PI* | Archive repo + data |
 
+### Project-wide push + managed mirrors
+
+Back up **every** repo a project owns in one go, with the same per-repo safety
+pre-flight as `/murmurent-push` (secret scan, secret-shaped names, governed-data
++ large-file guards). A repo that fails is blocked; the rest proceed. Exit codes:
+**0** all clean · **1** partial · **2** nothing pushable / project not found.
+
+| Command | Effect |
+|---|---|
+| `murmurent project push [--project <name>] [-m <msg>] [--detail]` | Commit + push every repo of a project; one plain-language summary + one Slack note to the project channel |
+| `murmurent project mirror add <repo> <dest> [--project <name>]` | Record a GitHub mirror for a repo — an `org/name` shorthand (→ GitHub HTTPS) or a full git URL (e.g. `git@…`). Idempotent |
+| `murmurent project mirror remove <repo> <dest> [--project <name>]` | Drop a recorded mirror (the working clone's git remotes are left as-is) |
+| `murmurent project mirror list <repo> [--project <name>]` | List a repo's recorded mirrors |
+
+**Mirrors** are extra push destinations beyond the primary `origin` — the
+inter-group case where each lab's org wants its own copy. Each is managed as an
+explicit `mm-mirror-<slug>` git remote, created/synced idempotently at push time;
+`origin` is **never** touched, and no silent multiple-push-URLs are used, so each
+destination's success/failure is reported **separately** ("also backed up to
+labB: ✔ / ⚠ could not reach — tell your PI"). A mirror failure never rolls back
+or blocks the primary push; it only downgrades the exit code to **1**.
+Authentication is whatever your `git`/`gh` already has for that org.
+
 ### Repos (cross-machine inventory + adopt)
 
 Terminal twin of the dashboard's **Repos** panel. All three commands

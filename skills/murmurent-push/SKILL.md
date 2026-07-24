@@ -102,6 +102,9 @@ Use `mcp__claude_ai_Slack__slack_send_message`, NOT `mcp__slack__slack_post_mess
 - Does not run tests. Run them yourself before invoking, or chain with `/test`.
 - Does not bump version numbers, edit CHANGELOG, or tag releases.
 - Does not push to multiple remotes — only the current branch's tracking remote.
+  To back a project's repo up to a **second** GitHub account/org, use managed
+  mirrors: `murmurent project mirror add <repo> <org/name>`, then `/murmurent-project-push`
+  pushes `origin` **and** each mirror, reporting every destination separately.
 - Does not amend or squash existing commits.
 
 ## Examples

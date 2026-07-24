@@ -74,6 +74,12 @@ class RepoRef:
     overleaf: bool = False                 # manuscript repo synced with Overleaf
     repo_kind: str = "github"              # git origin kind: github | local (bare)
     local_repo_root: str = ""              # bare-repo root when repo_kind == "local"
+    # Managed GitHub mirrors (Phase 2, #95): extra push destinations beyond the
+    # primary ``origin`` — inter-group projects where each lab's org wants a copy.
+    # Each entry is an ``org/name`` shorthand (expanded to a GitHub HTTPS URL) or
+    # a full git URL. Managed as named ``mm-mirror-<slug>`` remotes at push time;
+    # ``origin`` is NEVER touched. Each mirror's push is reported separately.
+    mirrors: tuple[str, ...] = ()
 
     def to_dict(self) -> dict:
         d: dict = {"name": self.name, "role": self.role, "host": self.host,
@@ -88,6 +94,8 @@ class RepoRef:
             d["repo_kind"] = self.repo_kind
         if self.local_repo_root:
             d["local_repo_root"] = self.local_repo_root
+        if self.mirrors:
+            d["mirrors"] = list(self.mirrors)
         return d
 
     @staticmethod
@@ -101,7 +109,8 @@ class RepoRef:
             remote_url=str(d.get("remote_url") or ""),
             overleaf=bool(d.get("overleaf")),
             repo_kind=str(d.get("repo_kind") or "github").strip().lower() or "github",
-            local_repo_root=str(d.get("local_repo_root") or ""))
+            local_repo_root=str(d.get("local_repo_root") or ""),
+            mirrors=tuple(str(m).strip() for m in (d.get("mirrors") or []) if str(m).strip()))
 
 
 def _primary_repo(repos) -> "RepoRef | None":
@@ -557,6 +566,82 @@ def remove_repo(name: str, repo_name: str, *, env: dict | None = None) -> CertPr
     return upsert(name, lab=cur.lab, repos=kept, code_repo="", env=env)
 
 
+def _find_repo(cp: "CertProject", repo_name: str) -> "RepoRef | None":
+    """The RepoRef named ``repo_name`` on ``cp``. Matches the repo's ``name``
+    case-insensitively; falls back to the project's primary repo when the caller
+    passes the project name itself (the common single-repo case)."""
+    want = str(repo_name).strip().lower()
+    for r in cp.repos:
+        if (r.name or "").strip().lower() == want:
+            return r
+    if want == (cp.name or "").strip().lower():
+        return _primary_repo(cp.repos)
+    return None
+
+
+def add_mirror(name: str, repo_name: str, dest: str,
+               *, env: dict | None = None) -> "RepoRef":
+    """Add GitHub mirror ``dest`` (``org/name`` or a full git URL) to the repo
+    ``repo_name`` of cert-project ``name``. Idempotent: a mirror already present
+    (exact string match) is a no-op. Returns the updated RepoRef. Raises if the
+    project or the named repo doesn't exist."""
+    cur = get(name, env)
+    if cur is None:
+        raise CertProjectError(f"no cert-project named {name!r}")
+    ref = _find_repo(cur, repo_name)
+    if ref is None:
+        raise CertProjectError(
+            f"cert-project {name!r} has no repo named {repo_name!r}")
+    dest = str(dest).strip()
+    if not dest:
+        raise CertProjectError("mirror destination is empty")
+    from dataclasses import replace
+    if dest in ref.mirrors:
+        return ref                                     # already present — no-op
+    new_ref = replace(ref, mirrors=(*ref.mirrors, dest))
+    kept = [r for r in cur.repos if r.name != ref.name]
+    upsert(name, lab=cur.lab, repos=[*kept, new_ref], env=env)
+    return new_ref
+
+
+def remove_mirror(name: str, repo_name: str, dest: str,
+                  *, env: dict | None = None) -> "RepoRef":
+    """Remove GitHub mirror ``dest`` from repo ``repo_name`` of cert-project
+    ``name``. Only the project record changes — the working clone's git remotes
+    are left as-is (a stale ``mm-mirror-*`` remote is harmless and re-synced on
+    the next push). Raises if the project, repo, or mirror doesn't exist."""
+    cur = get(name, env)
+    if cur is None:
+        raise CertProjectError(f"no cert-project named {name!r}")
+    ref = _find_repo(cur, repo_name)
+    if ref is None:
+        raise CertProjectError(
+            f"cert-project {name!r} has no repo named {repo_name!r}")
+    dest = str(dest).strip()
+    if dest not in ref.mirrors:
+        raise CertProjectError(
+            f"repo {ref.name!r} has no mirror {dest!r}")
+    from dataclasses import replace
+    new_ref = replace(ref, mirrors=tuple(m for m in ref.mirrors if m != dest))
+    kept = [r for r in cur.repos if r.name != ref.name]
+    upsert(name, lab=cur.lab, repos=[*kept, new_ref], env=env)
+    return new_ref
+
+
+def list_mirrors(name: str, repo_name: str,
+                 *, env: dict | None = None) -> tuple[str, ...]:
+    """The mirror destinations recorded for repo ``repo_name`` of cert-project
+    ``name``. Raises if the project or the named repo doesn't exist."""
+    cur = get(name, env)
+    if cur is None:
+        raise CertProjectError(f"no cert-project named {name!r}")
+    ref = _find_repo(cur, repo_name)
+    if ref is None:
+        raise CertProjectError(
+            f"cert-project {name!r} has no repo named {repo_name!r}")
+    return ref.mirrors
+
+
 def register_from_summary(summary, *, code_repo: str = "", host: str = "local",
                           remote_path: str = "", env: dict | None = None,
                           today: str | None = None) -> str:
@@ -760,6 +845,7 @@ __all__ = ["CertProject", "RepoRef", "VALID_REPO_ROLES", "CertProjectError",
            "VALID_SENSITIVITY_TIERS", "VALID_CHOREOGRAPHIES", "CLINICAL_EXTRA_FIELDS",
            "REGISTRY_DIR", "registry_dir", "project_path", "get", "iter_projects",
            "projects_for_member", "upsert", "remove_member", "add_repo", "remove_repo",
+           "add_mirror", "remove_mirror", "list_mirrors",
            "set_status",
            "register_from_summary", "backfill_from_charter", "migrate_charters",
            "slack_channel_for", "project_name_for_cwd"]

@@ -753,6 +753,87 @@ def project_channel(project: str) -> None:
     click.echo(channel)
 
 
+@project_group.group("mirror",
+                     help="Manage a project repo's managed GitHub mirrors — extra "
+                          "push destinations (a second org/account) that `murmurent "
+                          "project push` backs each repo up to, reporting every "
+                          "destination separately.")
+def project_mirror_group() -> None:
+    pass
+
+
+def _resolve_mirror_project(project: str) -> str:
+    from .core import cert_projects as _cp
+    name = project or _cp.project_name_for_cwd()
+    if not name:
+        raise click.ClickException(
+            "not inside a project repo (no readiness marker / CHARTER found); "
+            "pass --project <name>.")
+    return name
+
+
+# TODO(#95 Phase 2): gate `mirror add`/`remove` to the project lead once a
+# reusable lead-gate helper exists. Today's PI-only project commands (admit,
+# release, …) are stubs with no shared gate, so — per the issue's guidance —
+# these are left ungated for now; a mirror a member can't authenticate to simply
+# surfaces as a per-remote failure at push time (never a silent or unsafe write).
+@project_mirror_group.command("add",
+                              help="Add a GitHub mirror (an `org/name` or a full "
+                                   "git URL) to REPO. Idempotent.")
+@click.argument("repo")
+@click.argument("dest")
+@click.option("--project", "project", default="", help="Project name (default: "
+              "the project repo you're in).")
+def project_mirror_add(repo: str, dest: str, project: str) -> None:
+    from .core import cert_projects as _cp
+    name = _resolve_mirror_project(project)
+    try:
+        ref = _cp.add_mirror(name, repo, dest)
+    except _cp.CertProjectError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"✓ {name}/{ref.name}: mirror '{dest}' recorded "
+               f"({len(ref.mirrors)} total). It will be backed up on the next "
+               f"`murmurent project push`.")
+
+
+@project_mirror_group.command("remove",
+                              help="Remove a GitHub mirror from REPO. The working "
+                                   "clone's git remotes are left untouched.")
+@click.argument("repo")
+@click.argument("dest")
+@click.option("--project", "project", default="", help="Project name (default: "
+              "the project repo you're in).")
+def project_mirror_remove(repo: str, dest: str, project: str) -> None:
+    from .core import cert_projects as _cp
+    name = _resolve_mirror_project(project)
+    try:
+        ref = _cp.remove_mirror(name, repo, dest)
+    except _cp.CertProjectError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"✓ {name}/{ref.name}: mirror '{dest}' removed "
+               f"({len(ref.mirrors)} remaining).")
+
+
+@project_mirror_group.command("list",
+                              help="List the GitHub mirrors recorded for REPO.")
+@click.argument("repo")
+@click.option("--project", "project", default="", help="Project name (default: "
+              "the project repo you're in).")
+def project_mirror_list(repo: str, project: str) -> None:
+    from .core import cert_projects as _cp
+    name = _resolve_mirror_project(project)
+    try:
+        mirrors = _cp.list_mirrors(name, repo)
+    except _cp.CertProjectError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not mirrors:
+        click.echo(f"{name}/{repo}: no mirrors — pushes go to origin only.")
+        return
+    click.echo(f"{name}/{repo}: {len(mirrors)} mirror(s):")
+    for m in mirrors:
+        click.echo(f"  • {m}")
+
+
 # ---------------------------------------------------------------------------
 # experiment
 # ---------------------------------------------------------------------------

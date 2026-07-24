@@ -100,11 +100,44 @@ leaves the commit local and is reported per repo — the other repos still push.
 Every line says the **exact next step** in plain language — no git jargon. Use
 `--detail` when a power user wants the branch + short hash + git-level reason.
 
+## Managed GitHub mirrors (multi-account backup)
+
+A project's repo can be backed up to **more than one** GitHub account/org — the
+inter-group case where each lab's org wants its own copy. Record the extra
+destinations once; every `murmurent project push` then updates them **in addition
+to** the primary `origin`, and reports **each destination separately**:
+
+```bash
+murmurent project mirror add code_repo labB/brca-code   # an org/name shorthand
+murmurent project mirror add code_repo git@github.com:labC/brca-code.git  # or a full URL
+murmurent project mirror list code_repo
+murmurent project mirror remove code_repo labB/brca-code
+```
+
+On the next push, each repo's branch goes to `origin` first, then to each mirror:
+
+```
+✔ brca_code — saved to GitHub.
+    ✔ also backed up to labB: backed up
+    ⚠ also backed up to labC: could not reach — tell your PI
+```
+
+How mirrors behave:
+
+- Each mirror is an explicit, named git remote (`mm-mirror-<slug>`) created and
+  kept in sync **idempotently** at push time — re-running never duplicates it.
+  **`origin` is never touched**, and no silent multiple-push-URLs are used, so
+  every destination's success/failure is reported on its own line.
+- A mirror the pusher can't authenticate to (or that's unreachable) is a
+  **per-remote failure** — it **never** rolls back or blocks the primary push.
+  The primary still reaches `origin`; the mirror line reads "could not reach —
+  tell your PI". A run with any mirror failure exits **1** (partial).
+- Authentication is whatever your `git`/`gh` already has for that org. An
+  `org/name` shorthand is expanded to a GitHub HTTPS URL (so your stored `gh`
+  credentials apply); pin a full `git@…` URL instead to force SSH.
+
 ## What this skill does NOT do
 
-- **No mirrors / multi-account push yet.** Pushing a repo to a second GitHub
-  account/org is Phase 2 of the project-push work (issue #95); this skill pushes
-  each repo to its single tracking remote only.
 - **No inter-group Slack guest invites** (Phase 3) and **no server-access checks**
   (Phase 4).
 - **Never** `--force`, `--amend`, or `--no-verify` — the lab's history is the audit

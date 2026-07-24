@@ -13,8 +13,13 @@ Input: a cert-project name (or the repo you're standing in) + its repo list.
 Output: per-repo commit/push side effects; a novice-friendly report; one Slack
         note; an exit code (0 all clean, 1 partial, 2 nothing pushable).
 
-This is Phase 1 of issue #95 (intra-group project push). No mirrors (Phase 2),
-no inter-group Slack guests (Phase 3), no Security-Guard access checks (Phase 4).
+This is Phase 1 of issue #95 (intra-group project push) plus Phase 2 (managed
+GitHub mirrors). After a repo's primary push to ``origin`` succeeds, the same
+branch is pushed to each managed mirror (``RepoRef.mirrors``) as an explicit
+named ``mm-mirror-<slug>`` remote, and each mirror's success/failure is reported
+SEPARATELY. A mirror failure never rolls back or blocks the primary push; it only
+downgrades the exit code to 1 (partial). ``origin`` is never touched. Still to
+come: inter-group Slack guests (Phase 3), Security-Guard access checks (Phase 4).
 """
 
 from __future__ import annotations
@@ -44,9 +49,16 @@ STATUS_BLOCKED_LARGE = "blocked_large"              # oversize in-repo file
 STATUS_PUSH_REJECTED = "push_rejected"              # commit ok, push refused
 STATUS_COMMITTED_LOCAL = "committed_local"          # commit ok, no remote to push to
 
+# Per-mirror statuses (Phase 2).
+MIRROR_PUSHED = "mirror_pushed"      # the branch reached this mirror
+MIRROR_FAILED = "mirror_failed"      # couldn't configure or push this mirror
+
 # Buckets.
 _SUCCESS = {STATUS_PUSHED, STATUS_UP_TO_DATE}
 _SKIPPED = {STATUS_NOT_CLONED, STATUS_REMOTE_HOST}
+# Primary statuses after which mirrors are attempted: the local branch is (or
+# already was) on origin, so the mirrors can be brought in line with it.
+_MIRROR_AFTER = {STATUS_PUSHED, STATUS_UP_TO_DATE}
 # everything else needs attention.
 
 
@@ -101,6 +113,30 @@ def _is_governed(path: str) -> bool:
 # ---------------------------------------------------------------------------
 
 @dataclass
+class MirrorResult:
+    """Outcome of pushing one repo's branch to ONE managed mirror remote."""
+
+    dest: str                  # the recorded mirror destination (org/name or URL)
+    remote_name: str           # the mm-mirror-<slug> git remote used
+    status: str                # MIRROR_PUSHED | MIRROR_FAILED
+    detail: str = ""           # plain-language phrasing
+    git_detail: str = ""       # git-level reason (shown under --detail)
+
+    @property
+    def ok(self) -> bool:
+        return self.status == MIRROR_PUSHED
+
+    @property
+    def label(self) -> str:
+        return _mirror_label(self.dest)
+
+    def to_dict(self) -> dict:
+        return {"dest": self.dest, "remote_name": self.remote_name,
+                "status": self.status, "detail": self.detail,
+                "git_detail": self.git_detail}
+
+
+@dataclass
 class RepoPushResult:
     """Outcome of the push attempt for ONE repo in a project."""
 
@@ -113,6 +149,7 @@ class RepoPushResult:
     branch: str = ""
     files: int = 0             # number of files staged/committed
     findings: tuple = ()       # redacted SecretHit dicts for blocked_secret
+    mirrors: list = field(default_factory=list)   # list[MirrorResult] (Phase 2)
 
     @property
     def ok(self) -> bool:
@@ -121,6 +158,13 @@ class RepoPushResult:
     @property
     def needs_attention(self) -> bool:
         return self.status not in _SUCCESS and self.status not in _SKIPPED
+
+    @property
+    def mirror_failed(self) -> bool:
+        """Any managed mirror this repo couldn't reach — surfaced per-remote and
+        (via the report) worth an exit code of 1, but it never blocks the
+        primary push."""
+        return any(m.status == MIRROR_FAILED for m in self.mirrors)
 
     @property
     def skipped(self) -> bool:
@@ -154,13 +198,19 @@ class ProjectPushReport:
         return [r for r in self.results if not r.skipped]
 
     @property
+    def mirror_failures(self) -> list:
+        """Repos whose primary push succeeded but at least one managed mirror
+        could not be reached (Phase 2)."""
+        return [r for r in self.results if r.mirror_failed]
+
+    @property
     def exit_code(self) -> int:
         if not self.found:
             return 2
         if not self.pushable:
             return 2            # nothing on this machine to push
-        if self.attention:
-            return 1            # partial — some blocked/failed
+        if self.attention or self.mirror_failures:
+            return 1            # partial — some blocked/failed, or a mirror unreachable
         return 0
 
 
@@ -208,6 +258,109 @@ def _current_branch(repo: Path) -> str:
 
 def _has_origin(repo: Path) -> bool:
     return _git(repo, ["remote", "get-url", "origin"]).returncode == 0
+
+
+# ---------------------------------------------------------------------------
+# Managed mirrors (Phase 2) — extra GitHub push destinations beyond origin
+# ---------------------------------------------------------------------------
+
+# ``org/name`` shorthand: exactly one slash, no leading slash, no scheme.
+_ORG_NAME_RE = re.compile(r"^[A-Za-z0-9][\w.-]*/[\w.-]+$")
+
+
+def _expand_dest(dest: str) -> str:
+    """Turn a recorded mirror destination into a git-pushable URL. An ``org/name``
+    shorthand becomes a GitHub HTTPS URL (so the user's existing gh/git credential
+    helper authenticates it); anything that already looks like a URL or filesystem
+    path (has a scheme, an ``scp``-style ``host:path``, a leading ``/``/``~``/``.``,
+    or ends in ``.git``) is used verbatim so a lab can pin an SSH remote."""
+    d = str(dest).strip()
+    if not d:
+        return d
+    looks_urlish = (
+        "://" in d or d.startswith(("/", "~", "./", "../", "git@"))
+        or d.endswith(".git") or ":" in d.split("/")[0]
+    )
+    if not looks_urlish and _ORG_NAME_RE.match(d):
+        return f"https://github.com/{d}.git"
+    return d
+
+
+def _mirror_slug(dest: str) -> str:
+    s = re.sub(r"[^a-z0-9]+", "-", str(dest).strip().lower()).strip("-")
+    return s or "mirror"
+
+
+def _mirror_remote_name(dest: str) -> str:
+    """The stable, per-destination git remote name. Derived from the ORIGINAL
+    recorded string so remote management stays idempotent regardless of how the
+    destination expands."""
+    return f"mm-mirror-{_mirror_slug(dest)}"
+
+
+def _mirror_label(dest: str) -> str:
+    """A short human label for a mirror — the org/account for an ``org/name``
+    destination, else the repo basename. Used in the novice-friendly summary."""
+    d = str(dest).strip()
+    m = _ORG_NAME_RE.match(d)
+    if m:
+        return d.split("/")[0]
+    base = d.rstrip("/").split("/")[-1]
+    return re.sub(r"\.git$", "", base) or d
+
+
+def _sync_mirror_remote(repo: Path, remote_name: str, url: str) -> str | None:
+    """Idempotently point the named git remote at ``url`` WITHOUT ever touching
+    ``origin``. Adds the remote if absent, updates its URL if it drifted, leaves
+    it untouched if already correct. Returns None on success, else a short error
+    string (a git-config failure is a per-mirror failure, never a crash)."""
+    if remote_name == "origin":                       # defensive: never happens
+        return "refusing to manage origin as a mirror"
+    cur = _git(repo, ["remote", "get-url", remote_name])
+    if cur.returncode != 0:
+        add = _git(repo, ["remote", "add", remote_name, url])
+        if add.returncode != 0:
+            return (add.stderr or "could not add remote").strip().splitlines()[-1]
+        return None
+    if cur.stdout.strip() != url:
+        setu = _git(repo, ["remote", "set-url", remote_name, url])
+        if setu.returncode != 0:
+            return (setu.stderr or "could not update remote").strip().splitlines()[-1]
+    return None
+
+
+def push_mirrors(ref, res: RepoPushResult) -> list:
+    """Push the repo's current branch to each managed mirror, reporting each
+    remote separately. Called only after the PRIMARY push has succeeded; a mirror
+    failure never rolls back or blocks the primary. Never raises."""
+    mirrors = tuple(getattr(ref, "mirrors", ()) or ())
+    if not mirrors:
+        return []
+    repo = Path(res.path)
+    branch = res.branch or _current_branch(repo)
+    out: list = []
+    for dest in mirrors:
+        remote = _mirror_remote_name(dest)
+        url = _expand_dest(dest)
+        cfg_err = _sync_mirror_remote(repo, remote, url)
+        if cfg_err:
+            out.append(MirrorResult(
+                dest=dest, remote_name=remote, status=MIRROR_FAILED,
+                detail="could not set up the backup — tell your PI",
+                git_detail=cfg_err))
+            continue
+        push = _git(repo, ["push", remote, branch])
+        if push.returncode != 0:
+            reason = (push.stderr or "push rejected").strip().splitlines()
+            out.append(MirrorResult(
+                dest=dest, remote_name=remote, status=MIRROR_FAILED,
+                detail="could not reach — tell your PI",
+                git_detail=reason[-1] if reason else "push rejected"))
+        else:
+            out.append(MirrorResult(
+                dest=dest, remote_name=remote, status=MIRROR_PUSHED,
+                detail="backed up"))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -391,7 +544,15 @@ def push_project(name: str, *, message: str | None = None,
     if cp is None:
         return ProjectPushReport(project=name, results=[], found=False)
 
-    results = [push_one_repo(ref, message=message) for ref in cp.repos]
+    results = []
+    for ref in cp.repos:
+        res = push_one_repo(ref, message=message)
+        # Managed mirrors (Phase 2): only after the primary reached (or already
+        # matched) origin. A mirror failure is surfaced per-remote, never rolls
+        # back the primary.
+        if res.status in _MIRROR_AFTER and getattr(ref, "mirrors", ()):
+            res.mirrors = push_mirrors(ref, res)
+        results.append(res)
     report = ProjectPushReport(project=name, results=results)
 
     if post_slack:
@@ -438,11 +599,16 @@ def summary_line(report: ProjectPushReport) -> str:
     n_ok = len(report.backed_up)
     n_att = len(report.attention)
     n_skip = len(report.skipped)
-    mark = "✔" if not n_att else "⚠"
+    n_mirror_fail = len(report.mirror_failures)
+    mark = "✔" if not (n_att or n_mirror_fail) else "⚠"
     parts = [f"{mark} {n_ok} of {total} repo{'s' if total != 1 else ''} "
              "safely backed up to GitHub."]
     if n_att:
         parts.append(f"{n_att} need{'s' if n_att == 1 else ''} attention.")
+    if n_mirror_fail:
+        copies = "copy" if n_mirror_fail == 1 else "copies"
+        parts.append(f"{n_mirror_fail} extra backup {copies} couldn't be "
+                     "reached — tell your PI.")
     if n_skip:
         parts.append(f"{n_skip} skipped.")
     return " ".join(parts)
@@ -463,6 +629,12 @@ def _repo_line(r: RepoPushResult, *, detail: bool) -> str:
         if r.short_hash:
             extra = f"{r.branch} {r.short_hash}" + (f"; {extra}" if extra else "")
         base += f"\n      ({extra})"
+    # Per-mirror sub-lines — each managed backup destination reported separately.
+    for m in r.mirrors:
+        mk = "✔" if m.ok else "⚠"
+        base += f"\n    {mk} also backed up to {m.label}: {m.detail}"
+        if detail and m.git_detail:
+            base += f"\n        ({m.git_detail})"
     return base
 
 
