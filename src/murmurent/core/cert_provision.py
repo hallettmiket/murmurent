@@ -33,50 +33,140 @@ def slack_channel_name(project: str) -> str:
     return s.strip("-_")[:80] or "project"
 
 
-def member_email_map(handles=None) -> dict[str, str]:
-    """``{bare-lowercased-handle: email}`` from the lab roster, optionally limited
-    to ``handles``. The roster is the source of truth for member email."""
+def cross_group_identity(handle, *, env: dict | None = None) -> dict | None:
+    """Resolve one member's identity across the CENTRE via the registrar — for a
+    member whose roster lives in ANOTHER group's lab-mgmt repo (the inter-group
+    case). Finds the member's group with
+    :func:`registrar.lab_mgmt_path_for_handle`, then reads that group's
+    ``members/<handle>.md`` for ``email`` / ``github`` / ``slack``.
+
+    Returns ``{handle, group, email, github, slack}`` on a hit, else ``None``
+    (registrar can't place the handle, or the member file is missing/unreadable).
+    Best-effort by design: an inter-group project must be able to resolve a
+    member defined in a different lab's governance repo, but a bare install with
+    no registry simply yields ``None`` and the local roster remains the source of
+    truth for same-lab members."""
+    norm = str(handle or "").strip().lstrip("@").lower()
+    if not norm:
+        return None
+    try:
+        from . import registrar as _reg
+        match = _reg.lab_mgmt_path_for_handle(norm, env)
+    except Exception:  # noqa: BLE001
+        return None
+    if match is None:
+        return None
+    group, path = match
+    from pathlib import Path as _Path
+    mf = _Path(path).expanduser() / "members" / f"{norm}.md"
+    if not mf.is_file():
+        return None
+    try:
+        from .frontmatter import parse_file as _pf
+        from . import git_providers as _gp
+        meta = _pf(mf).meta or {}
+    except Exception:  # noqa: BLE001
+        return None
+    github = (_gp.parse_logins(meta).get("github", "")
+              or str(meta.get("github") or "").strip().lstrip("@"))
+    return {"handle": norm, "group": group,
+            "email": str(meta.get("email") or "").strip(),
+            "github": github,
+            "slack": str(meta.get("slack") or "").strip().lstrip("@")}
+
+
+def _augment_cross_group(out: dict[str, str], want, key: str,
+                         *, env: dict | None = None) -> None:
+    """For each requested handle NOT already resolved from the LOCAL roster, try
+    the registrar cross-group lookup and fill ``out[handle] = ident[key]``. A
+    no-op when ``want`` is None (whole-roster query) — cross-group resolution is
+    only meaningful for an explicit member list. Keeps intra-group behaviour
+    byte-identical: the local roster is always consulted first."""
+    if want is None:
+        return
+    for h in want:
+        if h in out:
+            continue
+        ident = cross_group_identity(h, env=env)
+        if ident and ident.get(key):
+            out[h] = ident[key]
+
+
+def member_email_map(handles=None, *, env: dict | None = None) -> dict[str, str]:
+    """``{bare-lowercased-handle: email}`` for ``handles``. The LOCAL lab roster
+    is the source of truth; any handle absent from it is resolved centre-wide via
+    the registrar (so an inter-group project can invite a member defined in
+    another lab). Whole-roster queries (``handles=None``) stay local-only."""
     want = None if handles is None else {str(h).lstrip("@").lower() for h in handles}
     out: dict[str, str] = {}
     for m in _mem.iter_members():
         h = m.handle.lstrip("@").lower()
         if m.email and (want is None or h in want):
             out[h] = m.email
+    _augment_cross_group(out, want, "email", env=env)
     return out
 
 
-def member_slack_map(handles=None) -> dict[str, str]:
-    """``{bare-lowercased-handle: slack-user-id}`` from the lab roster, for members
-    with an explicit Slack id recorded (set for those onboarded before Slack
-    infra, or whose Slack email differs from their roster email). Preferred over
-    email lookup by the invite/DM paths."""
+def member_slack_map(handles=None, *, env: dict | None = None) -> dict[str, str]:
+    """``{bare-lowercased-handle: slack-user-id}`` for members with an explicit
+    Slack id recorded (set for those onboarded before Slack infra, or whose Slack
+    email differs from their roster email). Preferred over email lookup by the
+    invite/DM paths. LOCAL roster first, then the registrar cross-group lookup for
+    handles it doesn't cover — mirroring the group_reconcile fix that trusts a
+    recorded ``slack:`` id over an email round-trip."""
     want = None if handles is None else {str(h).lstrip("@").lower() for h in handles}
     out: dict[str, str] = {}
     for m in _mem.iter_members():
         h = m.handle.lstrip("@").lower()
         if m.slack and (want is None or h in want):
             out[h] = m.slack
+    _augment_cross_group(out, want, "slack", env=env)
     return out
 
 
-def member_github_map(handles=None) -> dict[str, str]:
-    """``{bare-lowercased-handle: github-login}`` from the lab roster, optionally
-    limited to ``handles``. The roster is the source of truth for github login."""
+def member_github_map(handles=None, *, env: dict | None = None) -> dict[str, str]:
+    """``{bare-lowercased-handle: github-login}`` for ``handles``. LOCAL roster
+    first, then the registrar cross-group lookup for members defined in another
+    group's lab-mgmt repo."""
     want = None if handles is None else {str(h).lstrip("@").lower() for h in handles}
     out: dict[str, str] = {}
     for m in _mem.iter_members():
         h = m.handle.lstrip("@").lower()
         if m.github and (want is None or h in want):
             out[h] = m.github
+    _augment_cross_group(out, want, "github", env=env)
     return out
+
+
+def lead_group(cp: "_cp.CertProject", *, env: dict | None = None) -> str:
+    """The group whose Slack workspace hosts ``cp`` by default: the group its
+    **lead** belongs to, resolved centre-wide via the registrar. An inter-group
+    project's channel + cert DMs live in the LEAD's workspace (the maintainer's
+    decision), so the lead's group is the default host when ``slack_workspace``
+    is unset. Empty string when the lead — or their group — can't be resolved
+    (bare single-lab install with no registry): callers then fall back to the
+    owning lab, preserving intra-group behaviour."""
+    lead = (cp.lead or "").strip().lstrip("@").lower()
+    if not lead:
+        return ""
+    try:
+        from . import registrar as _reg
+        match = _reg.lab_mgmt_path_for_handle(lead, env)
+    except Exception:  # noqa: BLE001 — registry trouble ⇒ fall back to owning lab
+        return ""
+    return match[0] if match else ""
 
 
 def resolve_project_slack(project: str, *, env: dict | None = None) -> tuple[str, str]:
     """Which Slack workspace hosts ``project``, and the bot token for it.
 
-    Returns ``(workspace, token)``. ``workspace`` is ``cp.slack_workspace``
-    when set (an inter-group project's agreed shared workspace) else the
-    owning lab. The token comes from the group-token mechanism
+    Returns ``(workspace, token)``. ``workspace`` resolution order:
+      1. ``cp.slack_workspace`` when set (an explicitly-agreed shared workspace);
+      2. else the **lead's** group (:func:`lead_group`) — for a cross-group
+         project the channel lives in the lead's workspace by default;
+      3. else the owning lab (the intra-group case, and the fallback when the
+         registrar can't place the lead).
+    The token comes from the group-token mechanism
     (``$MURMURENT_GROUP_SLACK_TOKEN`` /
     ``~/.config/murmurent/groups/<workspace>/slack-token``) — a shared
     workspace is just a named token dir. Empty token is NOT an error here
@@ -85,7 +175,7 @@ def resolve_project_slack(project: str, *, env: dict | None = None) -> tuple[str
     cp = _cp.get(project, env)
     if cp is None:
         raise CertProvisionError(f"no cert-project named {project!r}")
-    workspace = cp.slack_workspace or cp.lab
+    workspace = cp.slack_workspace or lead_group(cp, env=env) or cp.lab
     token = ""
     if workspace:
         try:
@@ -519,7 +609,202 @@ def workspace_check(project: str, *, env: dict | None = None,
             "no_email": no_email}
 
 
+# ---------------------------------------------------------------------------
+# Inter-group Slack — outside-group members join the LEAD's workspace as
+# single-channel guests where the plan/token supports it; on a free plan (no
+# guest API) or any failure we surface the workspace invite link and record the
+# member as "invite pending — ad hoc" rather than erroring. The maintainer
+# explicitly accepts this no-clean-solution fallback (issue #95 Phase 3).
+# ---------------------------------------------------------------------------
+
+INVITE_PENDING = "invite pending — ad hoc"
+
+
+def member_group(handle, *, env: dict | None = None) -> str:
+    """The home group of ``handle`` per the registrar, or ``""`` if unplaceable."""
+    norm = str(handle or "").strip().lstrip("@").lower()
+    if not norm:
+        return ""
+    try:
+        from . import registrar as _reg
+        match = _reg.lab_mgmt_path_for_handle(norm, env)
+    except Exception:  # noqa: BLE001
+        return ""
+    return match[0] if match else ""
+
+
+def outside_members(project: str, *, env: dict | None = None) -> list[str]:
+    """Members of ``project`` whose home group differs from the LEAD's group —
+    the members who are NOT native to the workspace that hosts the channel and so
+    need a single-channel-guest invite. A member the registrar can't place is
+    treated as inside (conservative: don't guest-invite someone we can't
+    classify). Returns bare handles (no ``@``)."""
+    cp = _cp.get(project, env)
+    if cp is None:
+        raise CertProvisionError(f"no cert-project named {project!r}")
+    home = cp.slack_workspace or lead_group(cp, env=env) or cp.lab
+    out: list[str] = []
+    for m in cp.members:
+        g = member_group(m, env=env)
+        if g and home and g != home:
+            out.append(m.lstrip("@"))
+    return out
+
+
+def _group_invite_link(workspace: str, *, env: dict | None = None) -> str:
+    """The ``slack_invite_url`` recorded on ``workspace``'s group profile — the
+    manual join link a PI hands an outside member when guest invites aren't
+    available. ``""`` when unknown."""
+    if not workspace:
+        return ""
+    try:
+        from . import registrar as _reg
+        prof = _reg.read_group_profile(workspace, env=env)
+    except Exception:  # noqa: BLE001
+        return ""
+    return str(prof.get("slack_invite_url") or "").strip()
+
+
+def _default_guest_inviter(channel_id: str, email: str, *, workspace: str = "",
+                           token: str | None = None):
+    """Invite ``email`` into ``channel_id`` as a single-channel guest
+    (``admin.users.invite`` with ``is_ultra_restricted``). Returns ``(ok, detail)``.
+
+    Requires a workspace **admin** token on a paid (Business+/Enterprise) plan —
+    Slack Free/Pro has no guest API at all. Any missing token, missing email, or
+    API rejection returns ``(False, <reason>)`` so the caller records the member
+    as invite-pending; it never raises."""
+    if not token:
+        return (False, "no slack admin token for guest invites")
+    if not email:
+        return (False, "no email on record for guest invite")
+    if not channel_id:
+        return (False, "no channel provisioned yet")
+    try:
+        import httpx
+        r = httpx.post(
+            "https://slack.com/api/admin.users.invite",
+            headers={"Authorization": f"Bearer {token}",
+                     "Content-Type": "application/json"},
+            json={"channel_ids": channel_id, "email": email,
+                  "is_ultra_restricted": True}, timeout=10)
+        j = r.json()
+        return (bool(j.get("ok")),
+                "guest invited" if j.get("ok") else j.get("error", "invite_failed"))
+    except Exception as exc:  # noqa: BLE001
+        return (False, str(exc))
+
+
+def invite_outside_members(project: str, *, env: dict | None = None,
+                           guest_inviter=None, invite_link: str | None = None) -> dict:
+    """Bring a project's OUTSIDE-group members into its channel as single-channel
+    guests in the LEAD's workspace. For each outside member: attempt a guest
+    invite; on success record it, on failure/free-plan record the member as
+    ``INVITE_PENDING`` with the workspace invite link to hand out manually —
+    never an error. Reports ``not_provisioned`` (still ``ok``) if the channel
+    doesn't exist yet, and a clean empty result when there are no outside members.
+
+    Injectable ``guest_inviter(channel_id, email, handle) -> (ok, detail)`` and
+    ``invite_link`` seams keep this unit-testable with no live Slack."""
+    cp = _cp.get(project, env)
+    if cp is None:
+        raise CertProvisionError(f"no cert-project named {project!r}")
+    workspace, token = resolve_project_slack(project, env=env)
+    channel_id = cp.slack_channel_id
+    link = (invite_link if invite_link is not None
+            else _group_invite_link(workspace, env=env))
+    outs = outside_members(project, env=env)
+    inviter = guest_inviter or (
+        lambda cid, email, handle: _default_guest_inviter(
+            cid, email, workspace=workspace, token=token or None))
+
+    invited: list[dict] = []
+    pending: list[dict] = []
+    for h in outs:
+        ident = cross_group_identity(h, env=env)
+        email = (ident or {}).get("email", "")
+        ok, detail = inviter(channel_id, email, h)
+        if ok:
+            invited.append({"handle": h, "email": email, "detail": detail})
+        else:
+            pending.append({"handle": h, "email": email, "status": INVITE_PENDING,
+                            "invite_link": link, "detail": detail})
+    return {"ok": True, "project": project, "workspace": workspace,
+            "channel_id": channel_id,
+            "error": None if channel_id else "not_provisioned",
+            "invited_guests": invited, "pending": pending}
+
+
+# ---------------------------------------------------------------------------
+# Cross-group project CREATION — the project record is OWNED BY THE LEAD's
+# governance repo (not scattered across whoever ran the create), and its roster
+# is resolved centre-wide via the registrar so members from other groups resolve.
+# ---------------------------------------------------------------------------
+
+def lead_lab_mgmt_path(lead: str, *, env: dict | None = None):
+    """Resolve the lab-mgmt repo path of ``lead``'s group via the registrar.
+    Returns ``(group, path)`` or ``None`` when the lead can't be placed."""
+    norm = str(lead or "").strip().lstrip("@").lower()
+    if not norm:
+        return None
+    try:
+        from . import registrar as _reg
+        return _reg.lab_mgmt_path_for_handle(norm, env)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def create_cross_group_project(name: str, *, lead: str, members=(),
+                               sensitivity: str = "standard",
+                               slack_workspace: str | None = None,
+                               env: dict | None = None):
+    """Create/upsert a cert-project whose record is OWNED BY THE LEAD's governance
+    repo, with its roster resolved across groups via the registrar.
+
+    Closes the two cross-group creation gaps (issue #95 Phase 3):
+      1. **Ownership** — the project file lands in the lead's lab-mgmt repo, so an
+         inter-group project has a single source of truth rather than being
+         scattered on the machine of whoever ran the create.
+      2. **Roster resolution** — a member defined in ANOTHER group's lab-mgmt repo
+         is accepted (their identity resolves via the registrar), so the roster
+         isn't limited to the local lab.
+
+    The record's ``lab`` is the lead's group and ``slack_workspace`` defaults to
+    it (the workspace that hosts the channel). Members are recorded UNCERTIFIED —
+    project cards certify them later via the existing collaboration/registrar
+    flow. Raises :class:`CertProvisionError` when the lead can't be placed at a
+    group with a governance repo. Returns the created :class:`CertProject`."""
+    placed = lead_lab_mgmt_path(lead, env=env)
+    if placed is None:
+        raise CertProvisionError(
+            f"cannot resolve a group + governance repo for lead {lead!r} via the "
+            f"registrar — an inter-group project's record is owned by the lead's "
+            f"lab-mgmt repo, so the lead must be a registered member.")
+    group, path = placed
+    if not path:
+        raise CertProvisionError(
+            f"lead {lead!r}'s group {group!r} has no lab-mgmt path on record.")
+    # Point cert_projects' writes at the LEAD's governance repo. Overlay only the
+    # lab-mgmt override so every other env lookup (registrar, etc.) is unchanged.
+    import os as _os
+    base = dict(env) if env is not None else dict(_os.environ)
+    base["MURMURENT_LAB_MGMT_REPO"] = str(path)
+    ws = (slack_workspace or "").strip() or group
+    lead_at = lead if str(lead).startswith("@") else f"@{str(lead).lstrip('@')}"
+    _cp.upsert(name, lab=group, lead=lead_at, sensitivity=sensitivity,
+               slack_workspace=ws, env=base)
+    for m in members:
+        if not str(m).strip():
+            continue
+        _cp.upsert(name, lab=group, member=m, env=base)
+    return _cp.get(name, base)
+
+
 __all__ = ["CertProvisionError", "slack_channel_name", "member_email_map",
-           "member_github_map", "provision_slack", "provision_github", "teardown",
+           "member_github_map", "member_slack_map", "provision_slack",
+           "provision_github", "teardown",
            "reconcile_slack", "reconcile_github", "workspace_check",
-           "resolve_project_slack", "is_inter_group"]
+           "resolve_project_slack", "lead_group", "is_inter_group",
+           "cross_group_identity", "member_group", "outside_members",
+           "invite_outside_members", "INVITE_PENDING",
+           "lead_lab_mgmt_path", "create_cross_group_project"]

@@ -438,3 +438,185 @@ def test_single_group_create_needs_no_workspace(monkeypatch, tmp_path):
     req = REQ.file_create_request(requester="@allie", project="yproj",
                                   proposed_members=["@allie", "@bob"])
     assert req.slack_workspace is None
+
+
+# ===========================================================================
+# Phase 3 (issue #95): inter-group projects — lead's-workspace resolution,
+# cross-group roster resolution, single-channel-guest / invite-pending fallback,
+# and lead-repo-owned cross-group creation. All registrar + Slack seams are
+# monkeypatched; nothing hits the network.
+# ===========================================================================
+
+import yaml as _yaml  # noqa: E402
+
+
+def _seed_group_member(root, group, handle, *, email="", github="", slack=""):
+    """Write ``<root>/<group>/members/<handle>.md`` with an identity block and
+    return that group's lab-mgmt path (``<root>/<group>``)."""
+    norm = handle.lstrip("@").lower()
+    gdir = root / group
+    (gdir / "members").mkdir(parents=True, exist_ok=True)
+    meta = {"handle": f"@{norm}", "status": "active", "lab": group}
+    if email:
+        meta["email"] = email
+    if github:
+        meta["github"] = github
+    if slack:
+        meta["slack"] = slack
+    front = _yaml.safe_dump(meta, sort_keys=False).strip()
+    (gdir / "members" / f"{norm}.md").write_text(
+        f"---\n{front}\n---\n\n# @{norm}\n", encoding="utf-8")
+    return str(gdir)
+
+
+def _patch_registrar_placement(monkeypatch, placement: dict):
+    """Monkeypatch registrar.lab_mgmt_path_for_handle to a fixed {handle:(grp,path)}."""
+    from murmurent.core import registrar as REG
+    norm_map = {k.lstrip("@").lower(): v for k, v in placement.items()}
+    monkeypatch.setattr(
+        REG, "lab_mgmt_path_for_handle",
+        lambda handle, env=None: norm_map.get(str(handle).lstrip("@").lower()))
+
+
+def test_resolve_project_slack_defaults_to_lead_group(monkeypatch, tmp_path):
+    """Lead in group A + a member in group B, slack_workspace unset → the channel
+    resolves to the LEAD's workspace (A) and A's token."""
+    a_path = _seed_group_member(tmp_path, "group_a", "@allie", email="a@x.edu")
+    b_path = _seed_group_member(tmp_path, "group_b", "@carlos", email="c@y.edu")
+    _patch_registrar_placement(monkeypatch, {
+        "allie": ("group_a", a_path), "carlos": ("group_b", b_path)})
+    CP.upsert("spatial_atlas", lab="group_a", lead="@allie", member="@allie")
+    CP.upsert("spatial_atlas", lab="group_a", member="@carlos")
+
+    def _tok(group, allow_file=True):
+        return "xoxb-A" if group == "group_a" else ""
+    from murmurent.core import group_reconcile as GR
+    monkeypatch.setattr(GR, "resolve_group_slack_token", _tok)
+
+    ws, tok = CPROV.resolve_project_slack("spatial_atlas")
+    assert ws == "group_a" and tok == "xoxb-A"
+
+
+def test_resolve_project_slack_explicit_workspace_still_wins(monkeypatch, tmp_path):
+    """An explicitly-agreed slack_workspace overrides the lead-group default."""
+    a_path = _seed_group_member(tmp_path, "group_a", "@allie")
+    _patch_registrar_placement(monkeypatch, {"allie": ("group_a", a_path)})
+    CP.upsert("p", lab="group_a", lead="@allie", slack_workspace="shared_ws")
+    from murmurent.core import group_reconcile as GR
+    monkeypatch.setattr(GR, "resolve_group_slack_token",
+                        lambda g, allow_file=True: f"tok-{g}")
+    ws, tok = CPROV.resolve_project_slack("p")
+    assert ws == "shared_ws" and tok == "tok-shared_ws"
+
+
+def test_cross_group_identity_resolves_via_registrar(monkeypatch, tmp_path):
+    """A member defined in ANOTHER group's lab-mgmt repo resolves centre-wide."""
+    b_path = _seed_group_member(tmp_path, "group_b", "@carlos",
+                                email="carlos@y.edu", github="carlos-gh",
+                                slack="U0CARLOS")
+    _patch_registrar_placement(monkeypatch, {"carlos": ("group_b", b_path)})
+    ident = CPROV.cross_group_identity("@carlos")
+    assert ident == {"handle": "carlos", "group": "group_b",
+                     "email": "carlos@y.edu", "github": "carlos-gh",
+                     "slack": "U0CARLOS"}
+    # and the invite maps fold it in for a handle absent from the LOCAL roster
+    assert CPROV.member_email_map(["@carlos"]) == {"carlos": "carlos@y.edu"}
+    assert CPROV.member_slack_map(["@carlos"]) == {"carlos": "U0CARLOS"}
+    assert CPROV.member_github_map(["@carlos"]) == {"carlos": "carlos-gh"}
+
+
+def test_cross_group_identity_unplaceable_is_none(monkeypatch):
+    _patch_registrar_placement(monkeypatch, {})       # registrar places nobody
+    assert CPROV.cross_group_identity("@ghost") is None
+
+
+def test_invite_outside_members_pending_when_no_guest_capability(monkeypatch, tmp_path):
+    """Outside member + no guest-invite capability (free plan) → 'invite pending'
+    with the workspace invite link surfaced, NOT an error."""
+    a_path = _seed_group_member(tmp_path, "group_a", "@allie")
+    b_path = _seed_group_member(tmp_path, "group_b", "@carlos", email="c@y.edu")
+    _patch_registrar_placement(monkeypatch, {
+        "allie": ("group_a", a_path), "carlos": ("group_b", b_path)})
+    from murmurent.core import group_reconcile as GR
+    monkeypatch.setattr(GR, "resolve_group_slack_token",
+                        lambda g, allow_file=True: "")   # free plan / no token
+    CP.upsert("spatial_atlas", lab="group_a", lead="@allie", member="@allie",
+              slack_channel_id="C_ATLAS")
+    CP.upsert("spatial_atlas", lab="group_a", member="@carlos")
+
+    def guest_inviter(cid, email, handle):
+        return (False, "method_not_supported")          # Slack Free: no guest API
+
+    out = CPROV.invite_outside_members("spatial_atlas", guest_inviter=guest_inviter,
+                                       invite_link="https://join.example/xyz")
+    assert out["ok"] is True and out["invited_guests"] == []
+    assert out["error"] is None                          # channel exists
+    assert [p["handle"] for p in out["pending"]] == ["carlos"]
+    p = out["pending"][0]
+    assert p["status"] == CPROV.INVITE_PENDING
+    assert p["invite_link"] == "https://join.example/xyz"
+
+
+def test_invite_outside_members_guest_success(monkeypatch, tmp_path):
+    """When the guest invite succeeds, the member is recorded as an invited guest."""
+    a_path = _seed_group_member(tmp_path, "group_a", "@allie")
+    b_path = _seed_group_member(tmp_path, "group_b", "@carlos", email="c@y.edu")
+    _patch_registrar_placement(monkeypatch, {
+        "allie": ("group_a", a_path), "carlos": ("group_b", b_path)})
+    from murmurent.core import group_reconcile as GR
+    monkeypatch.setattr(GR, "resolve_group_slack_token",
+                        lambda g, allow_file=True: "xoxb-admin")
+    CP.upsert("atlas", lab="group_a", lead="@allie", member="@allie",
+              slack_channel_id="C1")
+    CP.upsert("atlas", lab="group_a", member="@carlos")
+    seen = {}
+
+    def guest_inviter(cid, email, handle):
+        seen["args"] = (cid, email, handle)
+        return (True, "guest invited")
+
+    out = CPROV.invite_outside_members("atlas", guest_inviter=guest_inviter)
+    assert out["pending"] == []
+    assert [g["handle"] for g in out["invited_guests"]] == ["carlos"]
+    assert seen["args"] == ("C1", "c@y.edu", "carlos")
+
+
+def test_invite_outside_members_none_when_all_inside(monkeypatch, tmp_path):
+    """A project whose members are all in the lead's group → no guests, no pending."""
+    a_path = _seed_group_member(tmp_path, "group_a", "@allie")
+    a2 = _seed_group_member(tmp_path, "group_a", "@bob")
+    _patch_registrar_placement(monkeypatch, {
+        "allie": ("group_a", a_path), "bob": ("group_a", a2)})
+    CP.upsert("intra", lab="group_a", lead="@allie", member="@allie",
+              slack_channel_id="C1")
+    CP.upsert("intra", lab="group_a", member="@bob")
+    out = CPROV.invite_outside_members(
+        "intra", guest_inviter=lambda c, e, h: (False, "should not be called"))
+    assert out["invited_guests"] == [] and out["pending"] == []
+
+
+def test_create_cross_group_project_lands_in_lead_repo(monkeypatch, tmp_path):
+    """The cross-group create path writes the project file into the LEAD's
+    governance repo, and resolves a member from another group's roster."""
+    lead_repo = _seed_group_member(tmp_path, "group_a", "@allie", email="a@x.edu")
+    b_repo = _seed_group_member(tmp_path, "group_b", "@carlos", email="c@y.edu")
+    _patch_registrar_placement(monkeypatch, {
+        "allie": ("group_a", lead_repo), "carlos": ("group_b", b_repo)})
+
+    cp = CPROV.create_cross_group_project(
+        "spatial_atlas", lead="@allie", members=["@allie", "@carlos"])
+    assert cp is not None and cp.lab == "group_a" and cp.lead == "@allie"
+    assert cp.slack_workspace == "group_a"
+    assert {m.lstrip("@") for m in cp.members} == {"allie", "carlos"}
+    # the record physically lives under the LEAD's repo, not the local lab-mgmt
+    lead_file = tmp_path / "group_a" / "cert_projects" / "spatial_atlas.md"
+    assert lead_file.is_file()
+    # and it is NOT written to this machine's (autouse) local lab-mgmt repo
+    local_file = tmp_path / "lab_mgmt" / "cert_projects" / "spatial_atlas.md"
+    assert not local_file.exists()
+
+
+def test_create_cross_group_project_unplaceable_lead_raises(monkeypatch):
+    _patch_registrar_placement(monkeypatch, {})
+    with pytest.raises(CPROV.CertProvisionError, match="cannot resolve a group"):
+        CPROV.create_cross_group_project("p", lead="@nobody")
