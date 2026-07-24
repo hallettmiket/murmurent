@@ -157,7 +157,7 @@ use the same core modules as the panel (`core.repo_inventory`,
 
 | Command | Effect |
 |---|---|
-| `murmurent repo list [--host <name>]` | Every git clone on every registered machine (local included), grouped by host, each with its readiness verdict (`✓ ready` / `± partial` / `• clone`) |
+| `murmurent repo list [--host <name>]` | Every git clone on **this** machine, each with its readiness verdict (`✓ ready` / `± partial` / `• clone`). Issue #94: this-machine-only — remote hosts are skipped; view another machine's repos on its own dashboard ([Remote dashboard access](remote_dashboard.md)) |
 | `murmurent repo status <path-or-name> [--host <name>]` | Is this repo murmurent-ready? A path is checked directly (local, or on `--host` over SSH); a bare name is searched on every registered machine. Reports the `.murmurent.yaml` marker (or legacy `CHARTER.md`) + `.claude/agents/` components. Exit 0 = ready, 1 = not ready, 2 = not found (scriptable) |
 | `murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]` | Make an existing clone **murmurent-ready**: writes the `.murmurent.yaml` readiness marker and bootstraps `.claude/agents/`. Creates NO project, no lab_mgmt registry entry: a project is a set of repos + members, made via the dashboard's **New Project** flow (see [`project_intra.md`](project_intra.md)), which attaches already-ready repos |
 | `murmurent repo upgrade [<path> \| --all] [--add-agents a,b] [--all-agents]` | Bring ready repos up to the current Murmurent release: converts legacy `CHARTER.md` bootstraps to the marker, migrates the marker schema, re-links commons agents, re-stamps `bootstrap_version`. Agent *content* updates never need this: symlinks track the commons clone automatically |
@@ -276,7 +276,7 @@ Choreographies are CC skills, not CLI subcommands. Invoke them inside Claude Cod
 | `murmurent dashboard --pi` | Open the PI view (rejected if you're not a PI); adds escalated-from-members nags |
 | `murmurent dashboard --snapshot` | Print the latest markdown snapshot from the lab-management repo |
 | `murmurent dashboard --outstanding` | Print only the Outstanding analysis panel (terminal-friendly summary) |
-| `murmurent dashboard --tunnel you@host` | Open an SSH tunnel to `you@host` (or a name registered with `murmurent host add`) and forward its dashboard to `http://localhost:8770` on this machine; see [Remote dashboard access](remote_dashboard.md) |
+| `murmurent dashboard --tunnel you@host` | Open an SSH tunnel to `you@host` and forward its dashboard to `http://localhost:8770` on this machine. A literal `you@host` or `~/.ssh/config` alias works directly — no registration needed (a name in `hosts.yaml` is honoured as an optional fallback). See [Remote dashboard access](remote_dashboard.md) |
 | `murmurent dashboard --tunnel you@host --tunnel-port 8771` | Same, but forward to local port 8771, so a second tunnelled dashboard can run alongside the first |
 
 ### Onboarding

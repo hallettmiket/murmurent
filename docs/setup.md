@@ -299,8 +299,9 @@ To run Murmurent on a remote host as well (for example, a shared lab
 server):
 
 ```bash
-# Register the host as a CONNECTION target (dashboard Machines panel →
-# "Add machine (SSH host)", or ~/.murmurent/hosts.yaml directly).
+# Register the host as a CONNECTION target (CLI-only; edit
+# ~/.murmurent/hosts.yaml directly if you prefer). This is mainly a
+# `--tunnel` alias + a remote-deploy target — see below.
 murmurent host add my-server --ssh-host <my_server> --scan-dir repos
 
 # Clone murmurent on the remote so the commons agents resolve there.
@@ -309,18 +310,21 @@ scripts/install_remote.sh my-server
 
 `hosts.yaml` is a **connection-only registry** (issue #80): it records how to
 reach a machine (`ssh_host`, `remote_user`) and where its git clones live
-(`project_root` + `scan_dirs`) — exactly what the Repo Inventory SSH scan and
-remote deploy need. It does **not** hold a machine's data-root or vault paths.
-Each machine configures its own data-root + personal/lab vault on **its own
-dashboard** (This machine → edit → save, written to that machine's
+(`project_root` + `scan_dirs`). It does **not** hold a machine's data-root or
+vault paths. Each machine configures its own data-root + personal/lab vault on
+**its own dashboard** (This machine → edit → save, written to that machine's
 `~/.murmurent/machine.yaml`); reach a remote machine's dashboard over the SSH
 tunnel below. Every machine mirrors its own config to
 `<vault>/machines/<machine_id>.yaml`, which syncs via the personal vault, so
 each dashboard shows a read-only view of your other machines.
 
-After that, the Repos panel's **↑ adopt** action works for `• clone`
-rows on the remote host, over a single batched SSH session. See
-[`ready_vs_projects.md`](ready_vs_projects.md) for what adoption does.
+**The repo inventory is this-machine-only (issue #94).** The retired
+"add an SSH host from the dashboard and scan it for repos" flow is gone:
+the Repos panel lists **this** machine's clones cross-referenced against
+GitHub, and adoption acts on this machine. To see or adopt repos on the
+lab server, open **its own** dashboard over the tunnel below and use the
+Repos panel there. See [`ready_vs_projects.md`](ready_vs_projects.md) for
+what adoption does.
 
 ### Viewing a remote machine's dashboard
 

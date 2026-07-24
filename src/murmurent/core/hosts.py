@@ -29,6 +29,14 @@ Example ``hosts.yaml``::
 
 "local" is always defined — if the user removes it, ``read()`` re-adds
 the default. Other hosts (``ssh`` kind) are added by ``murmurent host add``.
+
+Issue #94 (retire remote SSH repo detection): the dashboard no longer WRITES
+foreign hosts — the "add machine / SSH repo scan" flow is gone, so nothing adds
+an ssh-kind row from the UI. This module stays because ``--tunnel`` resolves a
+host name here (see ``commands.dashboard_cmd``) and the local row still carries
+this machine's ``scan_dirs`` for the this-machine repo inventory. The ``add`` /
+``write`` path is kept for the CLI (``murmurent host add``) and for the local
+row; pre-existing ``hosts.yaml`` entries are read + honoured, never rewritten.
 """
 
 from __future__ import annotations

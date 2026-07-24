@@ -1,27 +1,28 @@
 """
-Purpose: Cross-machine + cross-GitHub git-repo inventory for the dashboard.
+Purpose: THIS-machine + cross-GitHub git-repo inventory for the dashboard.
 Author: Mike Hallett (with Claude Code)
-Date: 2026-05-15
-Input: Lab's GitHub org (``lab.md:github_org``), registered hosts
-       (``~/.murmurent/hosts.yaml``), each host's scan dirs (defaults to
-       ``~/repo`` + ``~/repos``; overridable per-host via the host's
-       ``scan_dirs:`` field, which accepts both ``$HOME``-relative and
-       absolute paths), and any existing murmurent install manifests at
-       ``~/.murmurent/installations/<project>.yaml``.
+Date: 2026-05-15 (this-machine-only since 2026-07, issue #94)
+Input: Lab's GitHub org (``lab.md:github_org``), this machine's scan dirs
+       (the ``local`` host's ``scan_dirs``, defaulting to ``~/repo`` +
+       ``~/repos``; both ``$HOME``-relative and absolute paths are accepted).
 Output: ``InventoryReport`` — list of rows keyed by canonical origin URL,
-        each row carrying per-host presence + murmurent-init signals.
+        each row carrying this-machine presence + murmurent-ready signals.
 
-Why this module exists: a lab member's repos sprawl across a laptop
-(``~/repos``), one or more shared lab servers (lab-server), and the
-GitHub org. The dashboard's "Repos" panel surfaces that whole picture
-so the user can see at a glance: which repos exist where, which are
-murmurent-initialized on which machine, which are GitHub-only (i.e.
-could be cloned to a new machine), which are local-only (i.e. at risk
-of loss because they have no GitHub remote).
+Why this module exists: the dashboard's "Repos" panel surfaces THIS
+machine's repos cross-referenced against the lab's GitHub org, so the
+user can see at a glance which repos are murmurent-ready here, which are
+GitHub-only (could be cloned to this machine), and which are local-only
+(at risk of loss because they have no GitHub remote).
 
-The inventory is **cheap to re-run** (one SSH session per host, one
-``gh repo list`` per org) so the dashboard's Refresh button can fire
-it on demand without paying for an agent loop.
+Scope (issue #94): the inventory is **this-machine-only**. The retired
+"SSH into every registered host and scan it" sweep is gone — under the
+per-machine model each machine runs its own dashboard, and you view
+another machine's repos by tunnelling to ITS dashboard
+(``docs/remote_dashboard.md``), not by driving it from here.
+
+The inventory is **cheap to re-run** (one local ``find`` pass, one
+``gh repo list`` per org) so the dashboard's Refresh button can fire it
+on demand without paying for an agent loop.
 """
 
 from __future__ import annotations
@@ -184,7 +185,7 @@ def list_github_repos(org: str, *, limit: int = 500) -> tuple[list[GitHubRepo], 
 
 
 # ---------------------------------------------------------------------------
-# Per-host scan — one batched SSH session per host produces all rows
+# Local scan — one local ``find`` pass produces all rows for THIS machine
 # ---------------------------------------------------------------------------
 
 
@@ -261,13 +262,19 @@ def _effective_scan_dirs(host: _hosts.Host) -> tuple[str, ...]:
     return host.scan_dirs or DEFAULT_SCAN_DIRS
 
 
-def list_machine_repos(host_name: str) -> tuple[list[RepoOnHost], str | None]:
-    """SSH (or local-shell) into ``host_name`` and list every git repo
-    under the conventional scan dirs.
+def list_machine_repos(host_name: str = _hosts.LOCAL_NAME) -> tuple[list[RepoOnHost], str | None]:
+    """List every git repo on THIS machine under the conventional scan dirs.
 
-    Returns ``(repos, error)``. ``error`` is non-None for connection
-    failures; an empty list with no error means the host genuinely has
-    no repos in the scan dirs.
+    Issue #94: this is a **local-only** scan. The retired cross-machine
+    sweep used to SSH into foreign hosts; it no longer does. A caller that
+    passes a remote (``ssh``-kind) host name gets an explanatory error
+    rather than an SSH round-trip — view that machine's repos on its own
+    dashboard instead (``docs/remote_dashboard.md``). The scan itself runs
+    the ``find`` script in a local shell (no network).
+
+    Returns ``(repos, error)``. ``error`` is non-None for a bad/remote host
+    or a scan failure; an empty list with no error means this machine
+    genuinely has no repos in the scan dirs.
     """
     try:
         host = _hosts.resolve(host_name)
@@ -275,6 +282,11 @@ def list_machine_repos(host_name: str) -> tuple[list[RepoOnHost], str | None]:
         return [], str(exc)
     except _hosts.HostError as exc:
         return [], str(exc)
+    if host.is_remote():
+        return [], (
+            f"cross-machine repo scan retired (issue #94): {host_name!r} is a "
+            "remote host — open its own dashboard (see docs/remote_dashboard.md)"
+        )
     remote = _remote.Remote(host)
     try:
         res = remote.run(_scan_script(_effective_scan_dirs(host)), check=False, timeout=60)
@@ -338,14 +350,16 @@ def _canonical_url(url: str) -> str:
 def build_inventory(
     *,
     github_org: str,
-    host_names: list[str],
 ) -> InventoryReport:
-    """Build the full cross-referenced report.
+    """Build the cross-referenced report for THIS machine.
 
-    Best-effort: when ``gh`` is offline or a host is unreachable, the
-    corresponding rows are simply missing from that side. Errors
-    accumulate in :attr:`InventoryReport.errors` so the UI can surface
-    them as a banner.
+    Issue #94: this-machine-only. GitHub repos seed the rows; the local
+    scan then attaches this machine's clones to matching keys (or creates
+    a new local-only row when no GitHub match exists).
+
+    Best-effort: when ``gh`` is offline the GitHub side is simply missing.
+    Errors accumulate in :attr:`InventoryReport.errors` so the UI can
+    surface them as a banner.
     """
     errors: list[str] = []
 
@@ -354,8 +368,9 @@ def build_inventory(
         errors.append(f"github: {gh_err}")
 
     # Build a key→row map keyed on canonical URLs. GitHub repos seed
-    # the map; host scans then attach their clones to matching keys
-    # (or create a new local-only row when no GitHub match exists).
+    # the map; the local scan then attaches this machine's clones to
+    # matching keys (or creates a new local-only row when no GitHub
+    # match exists).
     rows: dict[str, InventoryRow] = {}
     for gh in gh_repos:
         if gh.archived:
@@ -366,18 +381,17 @@ def build_inventory(
         rows[key] = InventoryRow(key=key, name=gh.name, github=gh)
 
     hosts_scanned: list[str] = []
-    for host_name in host_names:
-        clones, host_err = list_machine_repos(host_name)
-        if host_err:
-            errors.append(f"{host_name}: {host_err}")
-            continue
-        hosts_scanned.append(host_name)
+    clones, host_err = list_machine_repos(_hosts.LOCAL_NAME)
+    if host_err:
+        errors.append(f"{_hosts.LOCAL_NAME}: {host_err}")
+    else:
+        hosts_scanned.append(_hosts.LOCAL_NAME)
         for c in clones:
             key = _canonical_url(c.origin_url)
             if not key:
                 # Local-only repo (no origin). Synthesize a key from
                 # the path so the row stays distinct from other repos.
-                key = f"local-only:{host_name}:{c.path}"
+                key = f"local-only:{_hosts.LOCAL_NAME}:{c.path}"
                 rows.setdefault(key, InventoryRow(
                     key=key, name=Path(c.path).name, local_only=True,
                 ))
@@ -456,15 +470,15 @@ def report_is_stale(path: Path | None, *, max_age_days: int = SCAN_INTERVAL_DAYS
 # ---------------------------------------------------------------------------
 
 
-def scan_and_cache(*, github_org: str, host_names: list[str]) -> InventoryReport:
-    """Full pipeline: build inventory → write to cache → return.
+def scan_and_cache(*, github_org: str) -> InventoryReport:
+    """Full pipeline: build inventory (this machine) → write to cache → return.
 
     Don't pre-emptively wrap exceptions here — the discovery functions
     are best-effort and already accumulate their failures into
-    ``report.errors``. Callers see a complete report even when half
-    the hosts errored.
+    ``report.errors``. Callers see a complete report even when the local
+    scan or GitHub side errored.
     """
-    report = build_inventory(github_org=github_org, host_names=host_names)
+    report = build_inventory(github_org=github_org)
     try:
         write_report(report)
     except OSError as exc:

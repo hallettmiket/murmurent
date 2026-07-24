@@ -48,16 +48,16 @@ audit log records what changed.
 from __future__ import annotations
 
 import datetime as _dt
-import shlex
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from . import hosts as _hosts
-from . import remote as _remote
-from . import repo_inventory as _inv
+# Issue #94: reconcile is this-machine-only — the foreign-host SSH probes
+# (``core.hosts`` / ``core.remote``) and their module-level repo_inventory
+# import were removed. ``detect_unadopted_clones`` imports repo_inventory
+# lazily inside the function (kept monkeypatch-friendly for tests).
 from .frontmatter import parse_file, dump_document
 
 
@@ -163,42 +163,11 @@ def _is_local_path_alive(path_str: str) -> bool:
     return p.is_dir() and (p / ".git").exists()
 
 
-def _ssh_probe_paths(host: _hosts.Host, paths: list[str]) -> dict[str, bool]:
-    """Batch one SSH call per host that checks every supplied path
-    in a single round-trip. Result maps path → True (clone present)
-    or False (gone). Paths the SSH call couldn't decide about
-    (probe error) are reported as True (don't auto-deactivate on
-    ambiguous result — dry-run vs apply matters).
-    """
-    if not paths:
-        return {}
-    # Quote each path; the for-loop interpolates them safely.
-    quoted = " ".join(shlex.quote(p) for p in paths)
-    script = (
-        f'for p in {quoted}; do '
-        '  if [ -d "$p/.git" ]; then '
-        '    printf "%s\\n" "ALIVE:$p"; '
-        '  else '
-        '    printf "%s\\n" "GONE:$p"; '
-        '  fi; '
-        'done'
-    )
-    rem = _remote.Remote(host)
-    try:
-        res = rem.run(script, check=False, timeout=30)
-    except _remote.RemoteError:
-        # Probe failed (host unreachable, auth, etc.). Be conservative:
-        # report every path as alive so we don't auto-deactivate on
-        # a transient outage.
-        return {p: True for p in paths}
-    out: dict[str, bool] = {p: True for p in paths}  # default to conservative
-    for line in (res.stdout or "").splitlines():
-        line = line.strip()
-        if line.startswith("ALIVE:"):
-            out[line[len("ALIVE:"):]] = True
-        elif line.startswith("GONE:"):
-            out[line[len("GONE:"):]] = False
-    return out
+# NOTE (issue #94): ``_ssh_probe_paths`` — the batched SSH round-trip that
+# peeked at ``<project_root>/<project>`` on a foreign host — was removed with
+# the retired remote SSH repo detection. Reconcile now operates on the LOCAL
+# machine only; a manifest/registry entry that lives on another machine is that
+# machine's own reconcile to run (view it via ``docs/remote_dashboard.md``).
 
 
 # ---------------------------------------------------------------------------
@@ -207,18 +176,18 @@ def _ssh_probe_paths(host: _hosts.Host, paths: list[str]) -> dict[str, bool]:
 
 
 def detect_orphan_installations() -> list[DriftFinding]:
-    """For each installation manifest, verify the working tree is
-    still on the host it points to. Local installs check the
-    filesystem directly; SSH installs go via :func:`_ssh_probe_paths`
-    (batched, one call per host). Manifests already inside
-    ``.archive/`` are skipped."""
+    """For each LOCAL installation manifest, verify the working tree is
+    still present on this machine's filesystem.
+
+    Issue #94: reconcile is this-machine-only. Manifests that record an
+    ``ssh_remote`` (an install on another machine) are skipped — that
+    machine reconciles itself. Manifests already inside ``.archive/`` are
+    skipped."""
     findings: list[DriftFinding] = []
     inst_dir = _installations_dir()
     if not inst_dir.is_dir():
         return findings
 
-    # Group by host so we make at most one SSH call per host.
-    remote_targets: dict[str, list[tuple[str, str]]] = {}
     for manifest_path in sorted(inst_dir.glob("*.yaml")):
         if manifest_path.parent.name == ARCHIVE_SUBDIR:
             continue
@@ -226,93 +195,53 @@ def detect_orphan_installations() -> list[DriftFinding]:
         if data is None:
             continue
         project = data.get("project") or manifest_path.stem
-        ssh_remote = (data.get("ssh_remote") or "").strip()
-        if ssh_remote:
-            # Resolve the host's project_root; the clone lives at
-            # ``<project_root>/<project>`` by convention. We don't
-            # store the absolute remote path in the manifest today
-            # so we re-synthesize it.
-            try:
-                host_obj = _hosts.resolve(ssh_remote)
-                proot = (host_obj.project_root or "~/repos").rstrip("/")
-            except Exception:
-                proot = "~/repos"
-            remote_targets.setdefault(ssh_remote, []).append(
-                (project, f"{proot}/{project}")
-            )
-        else:
-            # Local install — check EACH of the project's repos the manifest
-            # records on this machine (a project may have code + manuscript + …).
-            # Legacy manifests have no ``repos`` block → fall back to the derived
-            # ~/repos/<project>. A single missing repo is a warn (install still
-            # lives); ALL gone archives the manifest.
-            repos = [r for r in (data.get("repos") or [])
-                     if isinstance(r, dict) and r.get("path")]
-            checks = [(str(r.get("name") or project), str(r.get("path"))) for r in repos] \
-                or [(project, f"~/repos/{project}")]
-            missing = [(nm, pth) for nm, pth in checks
-                       if not _is_local_path_alive(str(Path(pth).expanduser()))]
-            if missing and len(missing) == len(checks):
-                locs = ", ".join(p for _n, p in checks)
-                findings.append(DriftFinding(
-                    kind="orphan_installation",
-                    severity="actionable",
-                    target=project,
-                    host="local",
-                    detail=f"manifest points at {locs} but the clone(s) are gone",
-                    suggested_action="archive the installation manifest",
-                    artefact_path=str(manifest_path),
-                ))
-            else:
-                for nm, pth in missing:
-                    findings.append(DriftFinding(
-                        kind="orphan_installation",
-                        severity="warn",
-                        target=f"{project}/{nm}",
-                        host="local",
-                        detail=f"repo {nm!r} at {pth} is gone; {project} still has "
-                               "other clones here",
-                        suggested_action="re-clone it, or drop it from the project",
-                        artefact_path=str(manifest_path),
-                    ))
-
-    # Now resolve each remote group via one SSH call.
-    for ssh_remote, items in remote_targets.items():
-        try:
-            host_obj = _hosts.resolve(ssh_remote)
-        except _hosts.HostNotFound:
-            # Host disappeared from the registry; treat all its
-            # installations as orphaned by definition.
-            for project, remote_path in items:
-                findings.append(DriftFinding(
-                    kind="orphan_installation",
-                    severity="actionable",
-                    target=project,
-                    host=ssh_remote,
-                    detail=f"ssh host {ssh_remote!r} is not registered any more",
-                    suggested_action="archive the installation manifest",
-                    artefact_path=str(_installations_dir() / f"{project}.yaml"),
-                ))
+        if (data.get("ssh_remote") or "").strip():
+            # Install on another machine — reconciled on that machine, not here.
             continue
-        results = _ssh_probe_paths(host_obj, [p for _, p in items])
-        for project, remote_path in items:
-            if not results.get(remote_path, True):
+        # Local install — check EACH of the project's repos the manifest
+        # records on this machine (a project may have code + manuscript + …).
+        # Legacy manifests have no ``repos`` block → fall back to the derived
+        # ~/repos/<project>. A single missing repo is a warn (install still
+        # lives); ALL gone archives the manifest.
+        repos = [r for r in (data.get("repos") or [])
+                 if isinstance(r, dict) and r.get("path")]
+        checks = [(str(r.get("name") or project), str(r.get("path"))) for r in repos] \
+            or [(project, f"~/repos/{project}")]
+        missing = [(nm, pth) for nm, pth in checks
+                   if not _is_local_path_alive(str(Path(pth).expanduser()))]
+        if missing and len(missing) == len(checks):
+            locs = ", ".join(p for _n, p in checks)
+            findings.append(DriftFinding(
+                kind="orphan_installation",
+                severity="actionable",
+                target=project,
+                host="local",
+                detail=f"manifest points at {locs} but the clone(s) are gone",
+                suggested_action="archive the installation manifest",
+                artefact_path=str(manifest_path),
+            ))
+        else:
+            for nm, pth in missing:
                 findings.append(DriftFinding(
                     kind="orphan_installation",
-                    severity="actionable",
-                    target=project,
-                    host=ssh_remote,
-                    detail=f"manifest points at {ssh_remote}:{remote_path} but the clone is gone",
-                    suggested_action="archive the installation manifest",
-                    artefact_path=str(_installations_dir() / f"{project}.yaml"),
+                    severity="warn",
+                    target=f"{project}/{nm}",
+                    host="local",
+                    detail=f"repo {nm!r} at {pth} is gone; {project} still has "
+                           "other clones here",
+                    suggested_action="re-clone it, or drop it from the project",
+                    artefact_path=str(manifest_path),
                 ))
     return findings
 
 
 def detect_orphan_registries() -> list[DriftFinding]:
-    """For each active cert-project, verify EACH of its repos (a project may
-    have several — code + manuscript + …) is still on its recorded host.
-    Cert-only projects (no repos) and archived ones are skipped.
+    """For each active cert-project, verify each of its repos RECORDED ON THIS
+    MACHINE (``host == "local"``) is still present. A project may span several
+    repos (code + manuscript + …); repos recorded on other machines are their
+    machine's own reconcile (issue #94) and are not checked here. Cert-only
+    projects (no repos), archived ones, and projects with no local repos are
+    skipped.
 
     A single missing repo is a ``warn`` (the project still lives via its other
     clones — e.g. the code repo is present but a manuscript repo was removed);
@@ -341,9 +270,12 @@ def detect_orphan_registries() -> list[DriftFinding]:
         return r.path if r.host == "local" else \
             f"{r.host}:{r.remote_path or '~/repos/' + r.name}"
 
-    # 1. Local repos: aliveness now. Remote repos: queue for a batched SSH probe.
-    remote_targets: dict[str, list[tuple[str, str, str]]] = {}  # host → (proj, repo, path)
-    per_project: dict[str, dict] = {}    # name → {cp, entries: [[repo, alive|None]]}
+    # 1. LOCAL repos only (issue #94): check aliveness on this machine's
+    #    filesystem. Repos recorded on another machine are that machine's own
+    #    reconcile — we neither probe them over SSH nor treat them as gone. A
+    #    project whose repos are ALL on other machines has nothing to reconcile
+    #    here, so it is skipped.
+    per_project: dict[str, dict] = {}    # name → {cp, entries: [[repo, alive]]}
     for cp in projects:
         if cp.status == "archived" or not cp.repos:   # cert-only: nothing to reconcile
             continue
@@ -352,30 +284,12 @@ def detect_orphan_registries() -> list[DriftFinding]:
             if r.host == "local":
                 alive = _is_local_path_alive(r.path) if r.path else True
                 entries.append([r, alive])
-            else:
-                remote_targets.setdefault(r.host, []).append(
-                    (cp.name, r.name, r.remote_path or f"~/repos/{r.name}"))
-                entries.append([r, None])             # pending remote probe
+            # else: repo on another machine — not reconciled here.
+        if not entries:      # nothing on this machine to reconcile
+            continue
         per_project[cp.name] = {"cp": cp, "entries": entries}
 
-    # 2. Probe remotes, fill in aliveness (unreachable host → treat its repos gone).
-    remote_alive: dict[tuple[str, str], bool] = {}
-    for host_name, items in remote_targets.items():
-        try:
-            host_obj = _hosts.resolve(host_name)
-        except _hosts.HostNotFound:
-            for project, repo_name, _rp in items:
-                remote_alive[(project, repo_name)] = False
-            continue
-        results = _ssh_probe_paths(host_obj, [rp for _, _, rp in items])
-        for project, repo_name, rp in items:
-            remote_alive[(project, repo_name)] = results.get(rp, True)
-    for pname, info in per_project.items():
-        for e in info["entries"]:
-            if e[1] is None:
-                e[1] = remote_alive.get((pname, e[0].name), True)
-
-    # 3. Per project: a single missing repo is a WARN (the project still lives via
+    # 2. Per project: a single missing repo is a WARN (the project still lives via
     #    its other clones); ALL repos gone is ACTIONABLE (archive the project).
     for pname, info in per_project.items():
         cp = info["cp"]
@@ -422,7 +336,8 @@ def detect_missing_markers() -> list[DriftFinding]:
     if not inst_dir.is_dir():
         return findings
 
-    # Local installs first.
+    # Local installs only (issue #94): manifests recording an ``ssh_remote``
+    # are an install on another machine — reconciled there, not here.
     for manifest_path in sorted(inst_dir.glob("*.yaml")):
         if manifest_path.parent.name == ARCHIVE_SUBDIR:
             continue
@@ -431,7 +346,7 @@ def detect_missing_markers() -> list[DriftFinding]:
             continue
         project = data.get("project") or manifest_path.stem
         if (data.get("ssh_remote") or "").strip():
-            continue  # handled below
+            continue  # install on another machine — not our reconcile
         local_path = Path(f"~/repos/{project}").expanduser()
         if (local_path.is_dir()
                 and not (local_path / ".murmurent.yaml").exists()):
@@ -445,63 +360,6 @@ def detect_missing_markers() -> list[DriftFinding]:
                 suggested_action="re-adopt or remove from murmurent",
                 artefact_path=str(manifest_path),
             ))
-
-    # Remote: batch readiness-marker existence checks per host (same
-    # shape as the path-alive probe; only .murmurent.yaml counts now).
-    remote_groups: dict[str, list[tuple[str, str]]] = {}
-    for manifest_path in sorted(inst_dir.glob("*.yaml")):
-        if manifest_path.parent.name == ARCHIVE_SUBDIR:
-            continue
-        data = _load_manifest(manifest_path)
-        if not data:
-            continue
-        ssh_remote = (data.get("ssh_remote") or "").strip()
-        if not ssh_remote:
-            continue
-        project = data.get("project") or manifest_path.stem
-        try:
-            host_obj = _hosts.resolve(ssh_remote)
-            proot = (host_obj.project_root or "~/repos").rstrip("/")
-        except Exception:
-            proot = "~/repos"
-        remote_groups.setdefault(ssh_remote, []).append(
-            (project, f"{proot}/{project}")
-        )
-    for ssh_remote, items in remote_groups.items():
-        try:
-            host_obj = _hosts.resolve(ssh_remote)
-        except _hosts.HostNotFound:
-            continue
-        # One script: each path → "STATE:<path>:<alive>:<marker>"
-        quoted = " ".join(shlex.quote(p) for p, _ in [(p, p) for _, p in items])
-        script = (
-            f'for p in {quoted}; do '
-            '  if [ -d "$p/.git" ]; then '
-            '    if [ -f "$p/.murmurent.yaml" ]; '
-            '    then printf "%s\\n" "OK:$p"; '
-            '    else printf "%s\\n" "NOMARKER:$p"; fi; '
-            '  fi; '
-            'done'
-        )
-        try:
-            res = _remote.Remote(host_obj).run(script, check=False, timeout=30)
-        except _remote.RemoteError:
-            continue
-        no_marker: set[str] = set()
-        for line in (res.stdout or "").splitlines():
-            if line.startswith("NOMARKER:"):
-                no_marker.add(line[len("NOMARKER:"):].strip())
-        for project, remote_path in items:
-            if remote_path in no_marker:
-                findings.append(DriftFinding(
-                    kind="missing_marker",
-                    severity="warn",
-                    target=project,
-                    host=ssh_remote,
-                    detail=f"clone exists at {ssh_remote}:{remote_path} but .murmurent.yaml is missing",
-                    suggested_action="re-adopt or remove from murmurent",
-                    artefact_path=str(_installations_dir() / f"{project}.yaml"),
-                ))
     return findings
 
 

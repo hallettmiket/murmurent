@@ -6971,287 +6971,11 @@ function MemberProfileModal({ onClose }) {
   );
 }
 
-/* ───────── Hosts modal (R4: register + probe install targets) ─────────
-   Lets the user register a remote SSH host (lab-server is the canonical
-   first one), test connectivity, and remove. Once a host is registered
-   it shows up in the New Project modal's host dropdown. */
-function HostsModal({ onClose }) {
-  const [hosts, setHosts] = useState([]);
-  const [loadErr, setLoadErr] = useState(null);
-  const [showAdd, setShowAdd] = useState(false);
-  const [testing, setTesting] = useState({});  // {hostName: bool}
-  const [results, setResults] = useState({});  // {hostName: probeBlock}
-
-  const refresh = async () => {
-    try {
-      const r = await fetch("/api/hosts", { headers: { Accept: "application/json" } });
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      const j = await r.json();
-      setHosts(j.hosts || []);
-      setLoadErr(null);
-    } catch (ex) {
-      setLoadErr(String(ex.message || ex));
-    }
-  };
-  useEffect(() => { refresh(); }, []);
-
-  const runTest = async (name) => {
-    setTesting(t => ({ ...t, [name]: true }));
-    try {
-      const r = await fetch("/api/hosts/" + encodeURIComponent(name) + "/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-      });
-      const j = await r.json();
-      if (!r.ok) {
-        setResults(rs => ({ ...rs, [name]: {
-          overall: "fail", probes: [],
-          error: j.detail || ("HTTP " + r.status),
-        }}));
-      } else {
-        setResults(rs => ({ ...rs, [name]: j }));
-      }
-    } catch (ex) {
-      setResults(rs => ({ ...rs, [name]: {
-        overall: "fail", probes: [], error: String(ex.message || ex),
-      }}));
-    } finally {
-      setTesting(t => ({ ...t, [name]: false }));
-    }
-  };
-
-  const removeHost = async (name) => {
-    if (!window.confirm(`Remove host ${name}? (local cannot be removed)`)) return;
-    try {
-      const _actor = (window.DATA.member && window.DATA.member.handle) || "";
-      const r = await fetch("/api/hosts/" + encodeURIComponent(name)
-        + "?user=" + encodeURIComponent(_actor.replace(/^@/, "")),
-        { method: "DELETE" });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.detail || ("HTTP " + r.status));
-      }
-      setResults(rs => { const o = {...rs}; delete o[name]; return o; });
-      await refresh();
-    } catch (ex) {
-      alert("remove failed: " + (ex.message || ex));
-    }
-  };
-
-  return (
-    <div onClick={onClose} style={{
-      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
-      display:"flex", alignItems:"flex-start", justifyContent:"center",
-      zIndex:200, padding:"40px 20px", overflowY:"auto",
-    }}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        background:"var(--card)", border:"1px solid var(--rule-strong)",
-        borderRadius:2, padding:18, width:"min(720px, 96vw)",
-        display:"flex", flexDirection:"column", gap:10,
-      }}>
-        <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
-          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:20, color:"var(--purple-deep)"}}>
-            Install hosts
-          </h2>
-          <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
-        </div>
-        <p className="muted" style={{fontSize:12, margin:0}}>
-          Hosts you can install projects on. <code>local</code> is always this laptop;
-          register an SSH host (e.g. <code>lab-server</code>) to enable the
-          <em> New Project → host=&lt;name&gt;</em> deploy flow.
-          Saved to <code>~/.murmurent/hosts.yaml</code>.
-        </p>
-
-        {loadErr && (
-          <div style={{color:"var(--red)", fontSize:12}}>load failed: {loadErr}</div>
-        )}
-
-        <table className="dt" style={{marginTop:6}}>
-          <thead><tr>
-            <th>name</th><th>kind</th><th>target</th><th>project_root</th>
-            <th>lab_vm_root</th><th style={{width:200}}>actions</th>
-          </tr></thead>
-          <tbody>
-            {hosts.map(h => (
-              <React.Fragment key={h.name}>
-                <tr>
-                  <td><strong>{h.name}</strong></td>
-                  <td><Pill tone={h.kind === "ssh" ? "purple" : "green"}>{h.kind}</Pill></td>
-                  <td className="mono" style={{fontSize:11}}>
-                    {h.is_remote ? h.ssh_host : "(this laptop)"}
-                  </td>
-                  <td className="mono" style={{fontSize:11}}>{h.project_root}</td>
-                  <td className="mono" style={{fontSize:11}}>{h.lab_vm_root}</td>
-                  <td>
-                    <button className="btn sm" disabled={testing[h.name]}
-                            onClick={() => runTest(h.name)}>
-                      {testing[h.name] ? "…" : "test"}
-                    </button>
-                    {h.name !== "local" && (window.DATA.persona === "pi") && (
-                      <button className="btn sm" onClick={() => removeHost(h.name)}
-                              style={{marginLeft:4, color:"var(--red)"}}>remove</button>
-                    )}
-                  </td>
-                </tr>
-                {results[h.name] && (
-                  <tr>
-                    <td colSpan={6} style={{
-                      background:"var(--paper-2)", padding:"10px 14px",
-                      borderBottom:"1px solid var(--rule)",
-                    }}>
-                      {results[h.name].error ? (
-                        <div style={{color:"var(--red)", fontSize:12}}>
-                          {results[h.name].error}
-                        </div>
-                      ) : (
-                        <>
-                          <div style={{fontSize:12, marginBottom:6}}>
-                            overall: <Pill tone={results[h.name].overall === "ok" ? "green" : "red"}>
-                              {results[h.name].overall}
-                            </Pill>
-                          </div>
-                          {results[h.name].probes.map(p => (
-                            <div key={p.name} style={{fontSize:12, fontFamily:"var(--mono)", display:"flex", gap:8, alignItems:"baseline"}}>
-                              <span style={{
-                                color: p.status === "ok" ? "var(--green)" :
-                                       p.status === "warn" ? "var(--tiger)" : "var(--red)",
-                                width: 14,
-                              }}>
-                                {p.status === "ok" ? "✓" : p.status === "warn" ? "!" : "✗"}
-                              </span>
-                              <span style={{width:80, color:"var(--muted)"}}>{p.name}</span>
-                              <span style={{flex:1, color:"var(--ink)"}}>{p.detail}</span>
-                            </div>
-                          ))}
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-
-        <div style={{marginTop:8}}>
-          {showAdd ? (
-            <HostAddForm onCancel={() => setShowAdd(false)} onAdded={async () => {
-              setShowAdd(false);
-              await refresh();
-            }} />
-          ) : (
-            <button className="btn sm" onClick={() => setShowAdd(true)}>+ Add SSH host</button>
-          )}
-        </div>
-
-        <div className="muted" style={{fontSize:11, marginTop:10, lineHeight:1.55}}>
-          <strong>Once a host is registered:</strong>
-          <ol style={{margin:"4px 0 0 18px", padding:0}}>
-            <li>Run <code>bash scripts/install_remote.sh &lt;name&gt;</code> from the murmurent repo to install <code>uv</code> + <code>murmurent</code> on the host.</li>
-            <li>Click <strong>test</strong> above — the four probes should all be ✓ or warn.</li>
-            <li>Open <strong>New Project</strong> and pick the host from the dropdown.</li>
-          </ol>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HostAddForm({ onCancel, onAdded }) {
-  /* Issue #80 — CONNECTION-ONLY. hosts.yaml is now a thin target list for the
-     repo-inventory SSH scan, not a foreign-machine config editor. A machine's
-     data-root / vault / project paths are set ONLY on that machine's OWN
-     dashboard (This machine → save). So this form collects just what reaching
-     the machine + scanning it needs: name, SSH host, username, repo locations,
-     and a free-text note. */
-  const [form, setForm] = useState({
-    name: "", ssh_host: "", remote_user: "",
-    repos_text: "~/repos", description: "",
-  });
-  const [busy, setBusy] = useState(false);
-  const [err, setErr]   = useState(null);
-  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!form.name.trim() || !form.ssh_host.trim()) {
-      setErr("name and SSH host are required"); return;
-    }
-    setBusy(true); setErr(null);
-    try {
-      const repos = form.repos_text
-        .split("\n").map(s => s.trim()).filter(Boolean);
-      const r = await fetch("/api/hosts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          name: form.name.trim(),
-          ssh_host: form.ssh_host.trim(),
-          remote_user: form.remote_user.trim(),
-          scan_dirs: repos,
-          description: form.description.trim(),
-        }),
-      });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.detail || ("HTTP " + r.status));
-      }
-      onAdded();
-    } catch (ex) {
-      setErr(String(ex.message || ex));
-    } finally { setBusy(false); }
-  };
-
-  const inp = {padding:"5px 8px", border:"1px solid var(--rule-strong)", borderRadius:2,
-               fontFamily:"var(--mono)", fontSize:12, width:"100%", boxSizing:"border-box"};
-  const lbl = {fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
-               textTransform:"uppercase", color:"var(--muted)", marginTop:6, marginBottom:2};
-
-  return (
-    <form onSubmit={submit} style={{
-      border:"1px solid var(--rule-strong)", borderRadius:2,
-      padding:"10px 14px", background:"var(--paper)",
-    }}>
-      <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
-        <strong style={{fontFamily:"var(--serif)"}}>Add SSH machine (for repo scan)</strong>
-        <button type="button" className="btn sm ghost" onClick={onCancel}>cancel</button>
-      </div>
-      <p className="muted" style={{fontSize:11, margin:"4px 0 0"}}>
-        Registers a machine murmurent can reach over SSH so the Repo Inventory can
-        scan it. Its data-root / vault paths are configured on that machine's own
-        dashboard — not here.
-      </p>
-      <div className="row" style={{gap:10, marginTop:6}}>
-        <div style={{flex:1}}>
-          <div style={lbl}>name (short id)</div>
-          <input style={inp} value={form.name} onChange={set("name")}
-                 placeholder="lab-server" />
-        </div>
-        <div style={{flex:2}}>
-          <div style={lbl}>SSH host (alias in ~/.ssh/config or full hostname)</div>
-          <input style={inp} value={form.ssh_host} onChange={set("ssh_host")}
-                 placeholder="lab-server.example.edu" />
-        </div>
-      </div>
-      <div style={lbl}>username on host (optional)</div>
-      <input style={inp} value={form.remote_user} onChange={set("remote_user")}
-             placeholder="the_pi" />
-
-      <div style={lbl}>Repo locations to scan (one per line)</div>
-      <textarea style={{...inp, fontFamily:"var(--mono)", minHeight:54, resize:"vertical"}}
-                value={form.repos_text} onChange={set("repos_text")}
-                placeholder={"~/repos\n/srv/projects"} />
-      <div style={lbl}>description (free text, optional)</div>
-      <input style={inp} value={form.description} onChange={set("description")} />
-      <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:10, alignItems:"baseline"}}>
-        {err && <span style={{color:"var(--red)", fontSize:11, marginRight:"auto"}}>{err}</span>}
-        <button type="submit" className="btn sm primary" disabled={busy}>
-          {busy ? "…" : "add machine"}
-        </button>
-      </div>
-    </form>
-  );
-}
+/* Issue #94: HostsModal (the "Install hosts" register/probe/remove modal) and
+   HostAddForm (its "Add SSH host" form) were removed with the retired "add
+   machine / SSH repo scan" flow. They were the only callers of POST /api/hosts
+   and POST /api/hosts/{name}/test. The repo manager is this-machine-only now;
+   view another machine via its own dashboard (docs/remote_dashboard.md). */
 
 /* ───────── Read-only cross-machine view (issue #80) ─────────
    Each machine mirrors its OWN config to <vault>/machines/<id>.yaml; the vault
@@ -7315,14 +7039,15 @@ function OtherMachinesView() {
 }
 
 /* ───────── Machines modal ─────────
-   Unified per-machine view: lists the current machine plus every
-   registered SSH host as a card, lets the user edit wigamig_base and the
-   Obsidian vault for the current machine, and offers an "Add machine"
-   form (the same one HostsModal used to use under "Add SSH host").
+   THIS-machine view (issue #94): shows the current machine as a card and lets
+   the user edit its data-root + Obsidian vault. Other machines are shown
+   read-only via the vault mirror (OtherMachinesView) — the retired "add
+   machine / SSH repo scan" section is gone; view another machine on its own
+   dashboard (docs/remote_dashboard.md).
 
    Storage: the current machine's settings live in ~/.murmurent/machine.yaml
-   (loaded into window.DATA.machine_settings). Remote hosts live in
-   ~/.murmurent/hosts.yaml and are fetched from /api/hosts on mount. */
+   (loaded into window.DATA.machine_settings); its local row (scan_dirs) is
+   fetched from /api/hosts on mount. */
 
 function _joinUnder(base, sub) {
   if (!base) return "—";
@@ -7809,7 +7534,6 @@ function MachinesModal({ onClose }) {
   const [hosts, setHosts] = useState([]);
   const [loadErr, setLoadErr] = useState(null);
   const [editingThis, setEditingThis] = useState(false);
-  const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
     fetch("/api/environment/this_machine")
@@ -7830,23 +7554,6 @@ function MachinesModal({ onClose }) {
     }
   };
   useEffect(() => { refreshHosts(); }, []);
-
-  const removeHost = async (name) => {
-    if (!window.confirm(`Remove machine "${name}"?`)) return;
-    try {
-      const _actor = (window.DATA.member && window.DATA.member.handle) || "";
-      const r = await fetch("/api/hosts/" + encodeURIComponent(name)
-        + "?user=" + encodeURIComponent(_actor.replace(/^@/, "")),
-        { method: "DELETE" });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.detail || ("HTTP " + r.status));
-      }
-      await refreshHosts();
-    } catch (ex) {
-      alert("remove failed: " + (ex.message || ex));
-    }
-  };
 
   // Synthesise a card for "this machine" from machine_settings. The
   // local row from /api/hosts contributes scan_dirs (the only field
@@ -7877,29 +7584,6 @@ function MachinesModal({ onClose }) {
     scan_dirs: localHost ? (localHost.scan_dirs || []) : [],
   };
 
-  // Map remote hosts onto the same shape. The legacy hosts.yaml field
-  // ``lab_vm_root`` semantically corresponds to ``wigamig_base`` on the
-  // remote machine, so surface it under that name.
-  const remoteCards = hosts.filter(h => h.name !== "local").map(h => ({
-    name: h.name, kind: "ssh",
-    ssh_host: h.ssh_host, remote_user: h.remote_user || "",
-    wigamig_base: h.lab_vm_root || h.wigamig_base || "",
-    obsidian_vault_path: h.vault_root || "",
-    obsidian_vault_name: "",
-    // Issue #25: per-machine personal-vault subfolders + lab-mgmt clone path,
-    // so a remote card resolves both vaults' oracle/ + lab-notebook/ paths.
-    oracle_subfolder: h.oracle_subfolder || "oracle",
-    notebook_subfolder: h.notebook_subfolder || "lab-notebook",
-    // hosts.yaml carries no resolved child names for a remote machine — fall
-    // back to the canonical names (issue #99 / #80 Part 1a).
-    murmurent_data_subfolder: "murmurent_data",
-    data_immutable_name: "immutable",
-    data_append_only_name: "append_only",
-    lab_vault_path: h.lab_vault_root || "",
-    description: h.description || "",
-    scan_dirs: h.scan_dirs || [],
-  }));
-
   return (
     <div onClick={onClose} style={{
       position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
@@ -7921,8 +7605,7 @@ function MachinesModal({ onClose }) {
           This window configures <strong>this machine only</strong> (issue #80).
           Each install configures itself and mirrors its config to the synced
           vault; your other machines are shown read-only below. Stored in
-          <code>~/.murmurent/machine.yaml</code>; SSH scan targets in
-          <code>~/.murmurent/hosts.yaml</code>.
+          <code>~/.murmurent/machine.yaml</code>.
         </p>
 
         {editingThis ? (
@@ -7945,46 +7628,11 @@ function MachinesModal({ onClose }) {
           <div style={{color:"var(--red)", fontSize:12}}>load failed: {loadErr}</div>
         )}
 
-        {/* Read-only cross-machine view (synced <vault>/machines/*.yaml). */}
+        {/* Read-only cross-machine view (synced <vault>/machines/*.yaml).
+            Issue #94: this vault-mirror IS the cross-machine visibility now —
+            the retired "SSH scan targets / add machine" section was removed.
+            To act on another machine, open its own dashboard (docs/remote_dashboard.md). */}
         <OtherMachinesView />
-
-        <div style={{marginTop:12, borderTop:"1px solid var(--rule)", paddingTop:10}}>
-          <div style={{fontFamily:"var(--serif)", fontSize:14, marginBottom:4}}>
-            SSH scan targets <span className="muted" style={{fontSize:11}}>· connection only, for Repo Inventory</span>
-          </div>
-          {remoteCards.length === 0 && !showAdd && (
-            <p className="muted" style={{fontSize:11, margin:"2px 0"}}>
-              None registered.
-            </p>
-          )}
-          {remoteCards.map(m => (
-            <div key={m.name} className="row" style={{
-              justifyContent:"space-between", alignItems:"baseline",
-              padding:"6px 0", borderBottom:"1px solid var(--rule)",
-            }}>
-              <span style={{fontSize:12, fontFamily:"var(--mono)"}}>
-                <strong>{m.name}</strong> · {m.remote_user ? m.remote_user + "@" : ""}{m.ssh_host}
-                <span className="muted"> · scan {(m.scan_dirs && m.scan_dirs.length) ? m.scan_dirs.join(", ") : "default"}</span>
-              </span>
-              {(window.DATA.persona === "pi") && (
-                <button type="button" className="btn sm" onClick={() => removeHost(m.name)}
-                        style={{color:"var(--red)"}}>remove</button>
-              )}
-            </div>
-          ))}
-          <div style={{marginTop:8}}>
-            {showAdd ? (
-              <HostAddForm onCancel={() => setShowAdd(false)} onAdded={async () => {
-                setShowAdd(false);
-                await refreshHosts();
-              }} />
-            ) : (
-              <button type="button" className="btn sm" onClick={() => setShowAdd(true)}>
-                + Add machine (SSH host)
-              </button>
-            )}
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -7998,82 +7646,10 @@ const MachineSettingsModal = MachinesModal;
    sits next to Projects (below Installations). Replaces the old footer
    "⚙ machines" button — machines are conceptually part of the dashboard's
    content, not chrome. */
-/* Connection-only editor for a REMOTE SSH machine (issue #80). Edits ONLY what
-   the repo-inventory scan needs to reach + scan the machine: ssh_host,
-   remote_user, repo locations, description. A foreign machine's data-root /
-   vault / project paths are NOT editable from here — they are configured on
-   that machine's own dashboard. Saves via PATCH /api/hosts/<name>. */
-function HostEditForm({ host, onCancel, onSaved }) {
-  const [form, setForm] = useState({
-    ssh_host: host.ssh_host || "",
-    remote_user: host.remote_user || "",
-    repos_text: (host.scan_dirs || []).join("\n"),
-    description: host.description || "",
-  });
-  const [busy, setBusy] = useState(false);
-  const [err, setErr]   = useState(null);
-  const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
-
-  const submit = async (e) => {
-    e.preventDefault();
-    if (!form.ssh_host.trim()) { setErr("SSH host is required"); return; }
-    setBusy(true); setErr(null);
-    try {
-      const repos = form.repos_text.split("\n").map(s => s.trim()).filter(Boolean);
-      const res = await fetch("/api/hosts/" + encodeURIComponent(host.name), {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({
-          ssh_host: form.ssh_host.trim(),
-          remote_user: form.remote_user.trim(),
-          description: form.description.trim(),
-          scan_dirs: repos,
-        }),
-      });
-      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.detail || ("HTTP " + res.status)); }
-      await onSaved();
-    } catch (ex) { setErr(String(ex.message || ex)); }
-    finally { setBusy(false); }
-  };
-
-  const inp = {padding:"5px 8px", border:"1px solid var(--rule-strong)", borderRadius:2,
-               fontFamily:"var(--mono)", fontSize:12, width:"100%", boxSizing:"border-box"};
-  const lbl = {fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
-               textTransform:"uppercase", color:"var(--muted)", marginTop:6, marginBottom:2};
-  return (
-    <form onSubmit={submit} style={{
-      border:"1px solid var(--rule-strong)", borderRadius:2,
-      padding:"10px 14px", background:"var(--paper)",
-    }}>
-      <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
-        <strong style={{fontFamily:"var(--serif)"}}>Edit connection · {host.name}</strong>
-        <button type="button" className="btn sm ghost" onClick={onCancel}>cancel</button>
-      </div>
-      <p className="muted" style={{fontSize:11, margin:"4px 0 0"}}>
-        Connection only — how murmurent reaches + scans this machine. Its
-        data-root / vault paths are configured on its own dashboard.
-      </p>
-      <div style={lbl}>SSH host (alias in ~/.ssh/config or full hostname)</div>
-      <input style={inp} value={form.ssh_host} onChange={set("ssh_host")}
-             placeholder="lab-server.example.edu" />
-      <div style={lbl}>username on host (optional)</div>
-      <input style={inp} value={form.remote_user} onChange={set("remote_user")}
-             placeholder="the_pi" />
-      <div style={lbl}>Repo locations to scan (one per line)</div>
-      <textarea style={{...inp, fontFamily:"var(--mono)", minHeight:54, resize:"vertical"}}
-                value={form.repos_text} onChange={set("repos_text")}
-                placeholder={"~/repos\n/srv/projects"} />
-      <div style={lbl}>description (free text, optional)</div>
-      <input style={inp} value={form.description} onChange={set("description")} />
-      <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:10, alignItems:"baseline"}}>
-        {err && <span style={{color:"var(--red)", fontSize:11, marginRight:"auto"}}>{err}</span>}
-        <button type="submit" className="btn sm primary" disabled={busy}>
-          {busy ? "…" : "save changes"}
-        </button>
-      </div>
-    </form>
-  );
-}
+/* Issue #94: HostEditForm (the connection editor for a foreign SSH machine)
+   was removed with the retired "add machine / SSH repo scan" flow. Other
+   machines are viewed read-only via the vault mirror (OtherMachinesView) and
+   configured on their own dashboards (docs/remote_dashboard.md). */
 
 function MachinesPanel({ span = "c-5" }) {
   const ms = window.DATA.machine_settings || {};
@@ -8081,8 +7657,6 @@ function MachinesPanel({ span = "c-5" }) {
   const [hosts, setHosts] = useState([]);
   const [loadErr, setLoadErr] = useState(null);
   const [editingThis, setEditingThis] = useState(false);
-  const [editingHost, setEditingHost] = useState(null);   // remote machine being edited
-  const [showAdd, setShowAdd] = useState(false);
 
   useEffect(() => {
     fetch("/api/environment/this_machine")
@@ -8103,23 +7677,6 @@ function MachinesPanel({ span = "c-5" }) {
     }
   };
   useEffect(() => { refreshHosts(); }, []);
-
-  const removeHost = async (name) => {
-    if (!window.confirm(`Remove machine "${name}"?`)) return;
-    try {
-      const _actor = (window.DATA.member && window.DATA.member.handle) || "";
-      const r = await fetch("/api/hosts/" + encodeURIComponent(name)
-        + "?user=" + encodeURIComponent(_actor.replace(/^@/, "")),
-        { method: "DELETE" });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.detail || ("HTTP " + r.status));
-      }
-      await refreshHosts();
-    } catch (ex) {
-      alert("remove failed: " + (ex.message || ex));
-    }
-  };
 
   const localHost = hosts.find(h => h.name === "local");
   const thisCard = {
@@ -8143,36 +7700,10 @@ function MachinesPanel({ span = "c-5" }) {
                  + "OS user: " + (thisMachine.local_user || "?"),
     scan_dirs: localHost ? (localHost.scan_dirs || []) : [],
   };
-  const remoteCards = hosts.filter(h => h.name !== "local").map(h => ({
-    name: h.name, kind: "ssh",
-    ssh_host: h.ssh_host, remote_user: h.remote_user || "",
-    wigamig_base: h.lab_vm_root || h.wigamig_base || "",
-    obsidian_vault_path: h.vault_root || "",
-    obsidian_vault_name: "",
-    // Issue #25: per-machine personal-vault subfolders + lab-mgmt clone path,
-    // so a remote card resolves both vaults' oracle/ + lab-notebook/ paths.
-    oracle_subfolder: h.oracle_subfolder || "oracle",
-    notebook_subfolder: h.notebook_subfolder || "lab-notebook",
-    // hosts.yaml carries no resolved child names for a remote machine — fall
-    // back to the canonical names (issue #99 / #80 Part 1a).
-    murmurent_data_subfolder: "murmurent_data",
-    data_immutable_name: "immutable",
-    data_append_only_name: "append_only",
-    lab_vault_path: h.lab_vault_root || "",
-    description: h.description || "",
-    scan_dirs: h.scan_dirs || [],
-  }));
-  const sshTargets = remoteCards;
-
   return (
     <div className={"panel " + span}>
       <header>
         <h2>This machine</h2>
-        <div className="row" style={{gap:6}}>
-          <span className="meta">
-            {sshTargets.length} SSH scan target{sshTargets.length === 1 ? "" : "s"}
-          </span>
-        </div>
       </header>
       <div style={{padding:"10px 14px"}}>
         {loadErr && (
@@ -8198,69 +7729,11 @@ function MachinesPanel({ span = "c-5" }) {
                        onEditClick={() => setEditingThis(true)} />
         )}
 
-        {/* Read-only cross-machine view (synced <vault>/machines/*.yaml). */}
+        {/* Read-only cross-machine view (synced <vault>/machines/*.yaml).
+            Issue #94: this vault-mirror IS the cross-machine visibility now —
+            the retired "SSH scan targets / add machine" section was removed.
+            To act on another machine, open its own dashboard (docs/remote_dashboard.md). */}
         <OtherMachinesView />
-
-        {/* Connection-only SSH targets for the Repo Inventory scan. Not a
-            foreign-machine config editor — only ssh_host + scan dirs. */}
-        <div style={{marginTop:16, borderTop:"1px solid var(--rule)", paddingTop:12}}>
-          <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
-            <div style={{fontFamily:"var(--serif)", fontSize:14}}>
-              SSH scan targets <span className="muted" style={{fontSize:11}}>· connection only, for Repo Inventory</span>
-            </div>
-            <button className="btn sm" onClick={() => setShowAdd(s => !s)}>
-              {showAdd ? "× cancel" : "＋ add machine"}
-            </button>
-          </div>
-          {editingHost ? (
-            <HostEditForm
-              host={sshTargets.find(m => m.name === editingHost) || {}}
-              onCancel={() => setEditingHost(null)}
-              onSaved={async () => { setEditingHost(null); await refreshHosts(); }}
-            />
-          ) : sshTargets.length === 0 ? (
-            <p className="muted" style={{fontSize:11, margin:"4px 0"}}>
-              None. Add an SSH machine so the Repo Inventory can scan it.
-            </p>
-          ) : (
-            <div style={{marginTop:6, display:"flex", flexDirection:"column", gap:6}}>
-              {sshTargets.map(m => (
-                <div key={m.name} style={{
-                  border:"1px solid var(--rule-strong)", borderRadius:2,
-                  padding:"8px 10px", background:"var(--paper)",
-                }}>
-                  <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
-                    <div>
-                      <strong style={{fontFamily:"var(--serif)", fontSize:14}}>{m.name}</strong>{" "}
-                      <Pill tone="purple">SSH</Pill>
-                      <span style={{fontSize:11, fontFamily:"var(--mono)", color:"var(--muted)", marginLeft:6}}>
-                        {m.remote_user ? m.remote_user + "@" : ""}{m.ssh_host}
-                      </span>
-                    </div>
-                    <div style={{display:"flex", gap:6}}>
-                      <button type="button" className="btn sm" onClick={() => setEditingHost(m.name)}>edit</button>
-                      {(window.DATA.persona === "pi") && (
-                        <button type="button" className="btn sm" onClick={() => removeHost(m.name)}
-                                style={{color:"var(--red)"}}>remove</button>
-                      )}
-                    </div>
-                  </div>
-                  <div style={{marginTop:4, fontSize:11, fontFamily:"var(--mono)", color:"var(--muted)"}}>
-                    scan → {(m.scan_dirs && m.scan_dirs.length) ? m.scan_dirs.join(", ") : "default (~/repo + ~/repos)"}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {showAdd && (
-            <div style={{marginTop:8}}>
-              <HostAddForm onCancel={() => setShowAdd(false)} onAdded={async () => {
-                setShowAdd(false);
-                await refreshHosts();
-              }} />
-            </div>
-          )}
-        </div>
       </div>
     </div>
   );

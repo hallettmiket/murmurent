@@ -49,31 +49,11 @@ def env(monkeypatch, tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_post_host_ignores_param_fields(env):
-    """A POST that still sends the retired param fields succeeds but persists
-    only the connection info — no data-root / vault / project keys land."""
-    client = TestClient(create_app())
-    res = client.post("/api/hosts", json={
-        "name": "lab-server", "ssh_host": "lab-server", "remote_user": "the_pi",
-        "scan_dirs": ["repos"],
-        # Retired param fields an older client might still send:
-        "lab_vm_root": "/data/lab_vm", "wigamig_base": "/data/lab_vm",
-        "vault_root": "/home/the_pi/Obsidian", "project_root": "/home/the_pi/repos",
-        "lab_vault_root": "/home/the_pi/lab_mgmt", "oracle_subfolder": "orc",
-    })
-    assert res.status_code == 200, res.text
-    text = (env["tmp"] / "hosts.yaml").read_text(encoding="utf-8")
-    # The per-machine CONFIG params must never be persisted.
-    for banned in ("lab_vm_root", "vault_root", "lab_vault_root",
-                   "oracle_subfolder"):
-        assert banned not in text, f"{banned} should not be persisted"
-    h = _hosts.resolve("lab-server")
-    assert h.ssh_host == "lab-server" and h.remote_user == "the_pi"
-    assert h.scan_dirs == ("repos",)
-    # The retired config params fell back to dataclass defaults (not the POSTed
-    # values) — proof they were ignored, not stored.
-    assert h.lab_vm_root == "~/lab_vm/data"
-    assert h.vault_root == "~/Documents/Obsidian"
+# Issue #94: test_post_host_ignores_param_fields was removed — POST /api/hosts
+# (register a foreign host) is gone with the retired add-machine flow. The
+# "hosts.yaml is connection-only, never stores CONFIG params" contract is still
+# pinned on the write path by test_patch_host_ignores_param_fields below and by
+# test_hosts.py's core-level coverage.
 
 
 def test_patch_host_ignores_param_fields(env):
@@ -96,8 +76,10 @@ def test_patch_host_ignores_param_fields(env):
 
 
 def test_repo_inventory_scan_still_reads_connection_fields(env):
-    """The connection registry still carries exactly what the repo_inventory
-    SSH scan needs: ssh_host + scan_dirs."""
+    """A pre-existing foreign row still round-trips its connection metadata
+    (ssh_host + scan_dirs). The cross-machine SSH scan is retired (#94), but
+    these fields remain for --tunnel resolution and any legacy hosts.yaml
+    entries."""
     _hosts.add(_hosts.Host(
         name="lab-server", kind="ssh", ssh_host="lab-server.edu",
         scan_dirs=("repos", "/srv/projects"),

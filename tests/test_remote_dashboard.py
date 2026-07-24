@@ -98,17 +98,9 @@ def test_hosts_endpoint_includes_scan_dirs(world):
     assert by_name["local"]["scan_dirs"] == []
 
 
-def test_post_host_accepts_scan_dirs(world):
-    """``POST /api/hosts`` must accept ``scan_dirs`` so the Add-Machine
-    form can register a host with custom repo locations in one round-trip."""
-    client = TestClient(create_app())
-    res = client.post("/api/hosts", json={
-        "name": "lab-server", "ssh_host": "lab-server",
-        "scan_dirs": ["repos", "/srv/projects"],
-    })
-    assert res.status_code == 200, res.text
-    # And the value really did land in hosts.yaml.
-    assert _hosts.resolve("lab-server").scan_dirs == ("repos", "/srv/projects")
+# Issue #94: test_post_host_accepts_scan_dirs was removed — POST /api/hosts (the
+# Add-Machine form's endpoint) is gone. Foreign rows are seeded via
+# core.hosts.add; the PATCH .../scan-dirs round-trip below still applies.
 
 
 def test_patch_host_scan_dirs_round_trip(world):
