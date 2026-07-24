@@ -176,7 +176,7 @@ def _git(repo: Path, args: list[str]) -> subprocess.CompletedProcess:
 def _porcelain_paths(repo: Path) -> list[str]:
     """Repo-relative paths with any change (modified/added/deleted/untracked/
     renamed). Rename lines contribute the NEW path."""
-    out = _git(repo, ["status", "--porcelain=v1", "-z"]).stdout
+    out = _git(repo, ["status", "--porcelain=v1", "-uall", "-z"]).stdout
     paths: list[str] = []
     tokens = out.split("\0")
     i = 0
