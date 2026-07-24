@@ -90,7 +90,7 @@ Expected hits: many. Most fall into three categories:
 
 ### "HQP" vs "member"
 
-- **HQP** (Highly Qualified Personnel) is the term Canadian funding agencies (CIHR, NSERC, CFI) use in grant reporting and is what your TCPS_2 / chair-renewal materials use.
+- **HQP** (Highly Qualified Personnel) is the term Canadian funding agencies (CIHR, NSERC, CFI) use in grant reporting and is what TCPS_2 and grant-reporting materials use.
 - **Member** is the broader, friendlier term that works across academic / industry / government contexts and is what Murmurent already uses internally.
 
 **Recommendation:** use **"member"** as Murmurent's canonical word, and surface **"HQP"** only where it aligns with grant-reporting context (e.g., the training-compliance panel, certification reports). The two are not synonyms but the overlap is ~90%; collapsing them simplifies UX.
