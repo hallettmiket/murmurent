@@ -294,6 +294,26 @@ def test_render_report_and_detail(monkeypatch, tmp_path):
     assert report.results[0].short_hash not in plain
 
 
+def test_renamed_file_pushes_cleanly(monkeypatch, tmp_path):
+    """A rename (git mv) is staged at BOTH ends and pushed — the remote reflects
+    the move with nothing left behind in the working tree."""
+    r1, b1 = _make_repo(tmp_path, "mv_repo")
+    _change(r1, "old.txt", "content\n")
+    _run(["git", "add", "-A"], r1)
+    _run(["git", "commit", "-m", "add old"], r1)
+    _run(["git", "push", "-q", "origin", "main"], r1)
+    _run(["git", "mv", "old.txt", "new.txt"], r1)
+    _install_project(monkeypatch, "proj", [_ref(r1, "mv_repo")])
+
+    report = pp.push_project("proj", post_slack=False)
+
+    assert report.results[0].status == pp.STATUS_PUSHED
+    assert _remote_head(b1) == _local_head(r1)
+    assert _run(["git", "status", "--porcelain"], r1).stdout.strip() == ""
+    committed = _run(["git", "show", "--name-status", "--format=", "HEAD"], r1).stdout
+    assert "new.txt" in committed and "old.txt" in committed
+
+
 def test_slack_note_posts_once_when_channel_present(monkeypatch, tmp_path):
     """With a channel configured + a token available, exactly one Slack note is
     posted after the loop, ending with the required footer."""

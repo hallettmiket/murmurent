@@ -185,16 +185,20 @@ def _porcelain_paths(repo: Path) -> list[str]:
         if not entry:
             i += 1
             continue
-        # "XY <path>"; rename/copy (R/C in either column) consumes the next token
-        # as the ORIGINAL path — we keep the destination (this entry's path).
+        # "XY <path>"; rename/copy (R/C in either column) emits the paired
+        # ORIGINAL path as the next NUL token. Keep BOTH ends so selective
+        # staging catches the whole rename (source deletion + destination add).
         xy = entry[:2]
         path = entry[3:] if len(entry) > 3 else ""
-        if ("R" in xy or "C" in xy):
-            i += 2  # skip the paired origin token
-        else:
-            i += 1
         if path:
             paths.append(path)
+        if ("R" in xy or "C" in xy) and i + 1 < len(tokens):
+            origin = tokens[i + 1]
+            if origin:
+                paths.append(origin)
+            i += 2
+        else:
+            i += 1
     return paths
 
 
