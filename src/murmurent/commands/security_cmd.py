@@ -198,6 +198,56 @@ def cmd_audit_me(*, json_out: bool = False) -> int:
     return 1 if report.counts()["block"] else 0
 
 
+def _render_project_access(report) -> None:
+    """Render a :class:`ProjectAccessReport` headline-first as a grouped table."""
+    console = Console()
+    counts = report.counts()
+    # Headline-first (rules/headline_first.md): the verdict line comes first.
+    console.print(f"[bold]{report.headline()}[/]\n")
+    console.print(
+        f"[bold]Summary[/] · "
+        f"[red]{counts['block']} BLOCK[/] · "
+        f"[yellow]{counts['concern']} CONCERN[/] · "
+        f"[green]{counts['ok']} OK[/] · "
+        f"[dim]{counts['unverifiable']} could-not-verify[/]\n"
+    )
+    if not report.findings:
+        console.print("[dim]No projects led by you, or nothing to check.[/]\n")
+        return
+    color = {SEVERITY_BLOCK: "red", SEVERITY_WARN: "yellow", SEVERITY_INFO: "blue"}
+    table = Table(show_lines=False)
+    table.add_column("sev")
+    table.add_column("verify")
+    table.add_column("project", style="cyan")
+    table.add_column("finding", overflow="fold")
+    table.add_column("fix", style="dim", overflow="fold")
+    for f in report.findings:
+        c = color.get(f.severity, "white")
+        vs = "[dim]?[/]" if f.verify_state != "verified" else "[green]✓[/]"
+        table.add_row(f"[{c}]{f.severity}[/]", vs, f.project or "-",
+                      f.current_state, f.suggested_fix)
+    console.print(table)
+    console.print()
+
+
+def cmd_project_access(*, json_out: bool = False) -> int:
+    """Run the PROJECT-LEVEL access check (issue #95 Phase 4) for the projects
+    you LEAD: does every member still have read/write to the project's governed
+    data directories + repos? Returns 1 if any BLOCK finding, else 0. Read-only:
+    stat + getfacl parsing only, never chmods."""
+    from ..core import project_access as _paccess
+
+    report, path = _paccess.run_and_persist()
+    if json_out:
+        payload = report.to_dict()
+        payload["persisted"] = str(path)
+        click.echo(json.dumps(payload, indent=2))
+    else:
+        _render_project_access(report)
+        click.echo(f"Persisted to: {path}", err=True)
+    return 1 if report.counts()["block"] else 0
+
+
 def _render_secret_hits(hits, scope_desc: str) -> None:
     """Render redacted secret hits grouped by file, headline-first."""
     from ..core.secret_scan import SEVERITY_BLOCK, SEVERITY_WARN
@@ -311,6 +361,14 @@ def add_to_cli(cli_group: click.Group) -> None:
     def _audit_me(json_out: bool) -> None:
         sys.exit(cmd_audit_me(json_out=json_out))
 
+    @_security.command(
+        "project-access",
+        help="(Lead/PI) Check every project member can read/write the project's "
+             "governed data dirs + repos on a shared server (no SSH).")
+    @click.option("--json", "json_out", is_flag=True, help="Emit JSON instead of a table.")
+    def _project_access(json_out: bool) -> None:
+        sys.exit(cmd_project_access(json_out=json_out))
+
     @_security.command("scan", help="Run the Tier-1 scanner on a host (unprivileged).")
     @click.option("--host", required=True, help="Registered host name (see `murmurent host list`).")
     @click.option("--json", "json_out", is_flag=True, help="Emit JSON instead of a Rich table.")
@@ -356,4 +414,5 @@ def add_to_cli(cli_group: click.Group) -> None:
         sys.exit(rc)
 
 
-__all__ = ["cmd_scan", "cmd_audit_me", "cmd_secrets_scan", "add_to_cli"]
+__all__ = ["cmd_scan", "cmd_audit_me", "cmd_project_access", "cmd_secrets_scan",
+           "add_to_cli"]

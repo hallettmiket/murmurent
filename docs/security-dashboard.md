@@ -128,6 +128,38 @@ short id in its `project` field. Categories: `core_raw` and
 | <a id="CORE-REFINED-EXCEPTION-DETECTED-01"></a>`CORE-REFINED-EXCEPTION-DETECTED-01` | info | A subdir of a core's `append_only/` has a locked-down pattern. Surfaced for the core leader to vet. |
 | <a id="CORE-ACL-UNEXPECTED-PRINCIPAL-01"></a>`CORE-ACL-UNEXPECTED-PRINCIPAL-01` | info | A directory under a core's tree names a principal outside the standard allowlist. |
 
+### Project-level access checks (lead/PI standing check)
+
+<a id="project-access"></a>
+A lead/PI-scoped, unprivileged check (issue #95 Phase 4; also the deferred
+project-level slice of #63 item 2/3): for every project the viewer **leads**,
+does each project **member** still have read (and, for the `append_only/` tree
+and local repo clones, write) access to the project's governed data
+directories? Run it with `murmurent security project-access`; findings persist
+to `~/.murmurent/security/local/project-access-<date>.jsonl` and surface on this
+dashboard alongside the personal-audit rows. Access is evaluated from POSIX
+owner/group/other mode bits, refined by the NFSv4 ACL (authoritative) when
+`nfs4_getfacl` output is available. Read-only: `stat` + ACL parsing only, never
+a `chmod`. On a clinical project a locked-out member escalates from warn to
+**block**.
+
+Member→OS-user mapping: an explicit `os_user` (or `posix_user`) key in the
+member file's frontmatter takes priority, else the member's `official_handle`
+(institutional netname, which on the shared institutional NFS servers murmurent
+targets is the login name). When neither is known the row is `unverifiable`
+(never a false "access ok"), so the PI knows to record the member's server
+login.
+
+| Rule | Severity | Description |
+|---|---|---|
+| <a id="PROJECT-ACCESS-NO-READ-01"></a>`PROJECT-ACCESS-NO-READ-01` | warn / block | A project member cannot READ one of the project's governed directories. **Block** on a clinical project. PI must fix the member's group/ACL membership. |
+| <a id="PROJECT-ACCESS-NO-WRITE-01"></a>`PROJECT-ACCESS-NO-WRITE-01` | warn / block | A member can read but cannot WRITE the `append_only/` tree or a local repo clone they need. **Block** on a clinical project. |
+| <a id="PROJECT-ACCESS-OK-01"></a>`PROJECT-ACCESS-OK-01` | info | A member has correct access to a project directory (records whether the verdict came via POSIX mode or NFSv4 ACL). |
+| <a id="PROJECT-ACCESS-UNVERIFIABLE-01"></a>`PROJECT-ACCESS-UNVERIFIABLE-01` | info (unverifiable) | The member's OS-user mapping is unknown (no `os_user`/`official_handle`) or the resolved login does not exist on this host. Not a clean result. |
+| <a id="PROJECT-ACCESS-DIR-MISSING-01"></a>`PROJECT-ACCESS-DIR-MISSING-01` | info (unverifiable) | A governed directory does not exist on this host: run the check on the data host, or provision the directory. |
+| <a id="PROJECT-ACCESS-STAT-FAILED-01"></a>`PROJECT-ACCESS-STAT-FAILED-01` | info (unverifiable) | The directory could not be `stat`ed for a member (transient FS/permission error). |
+| <a id="PROJECT-ACCESS-NO-HANDLE-01"></a>`PROJECT-ACCESS-NO-HANDLE-01` | info (unverifiable) | Could not resolve the viewer's murmurent handle, so no led projects could be scoped. |
+
 ---
 
 ## Tier 2 setup
