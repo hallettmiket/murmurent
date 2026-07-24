@@ -76,8 +76,15 @@ you can work from whichever you prefer. A few concrete pairs:
 | Dashboard action | CLI equivalent |
 |---|---|
 | Repos panel, **↑ adopt** button | `murmurent repo adopt` |
-| Machines panel, add a machine | `murmurent host add` |
+| Machines panel, **edit this machine** | edit `~/.murmurent/machine.yaml` |
 | **New Project** flow | how projects get created (created here; see [`ready_vs_projects.md`](ready_vs_projects.md) and [`project_intra.md`](project_intra.md)) |
+
+The Machines panel is **this-machine-only** (issue #94): it edits the current
+machine and shows your other machines read-only (mirrored through the personal
+vault). There is no "add machine / scan an SSH host" button — to view another
+machine, open **its own** dashboard over a tunnel (see
+[`remote_dashboard.md`](remote_dashboard.md)). `murmurent host add` still exists
+as a CLI-only way to register a `--tunnel` alias.
 
 See [`ready_vs_projects.md`](ready_vs_projects.md) for what "repo readiness"
 means, and [`project_intra.md`](project_intra.md) for how a project is
