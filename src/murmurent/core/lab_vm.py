@@ -107,6 +107,24 @@ def append_only_root(env: dict[str, str] | None = None) -> Path:
     return _resolve_subdir(data_root(env), APPEND_ONLY_SUBDIR, LEGACY_APPEND_ONLY_SUBDIR)
 
 
+def data_child_names(
+    base: str | Path | None = None, env: dict[str, str] | None = None
+) -> tuple[str, str]:
+    """Return the resolved (immutable, append_only) child *folder names*.
+
+    Presentation helper (issue #99 / #80 Part 1a): the machine window shows the
+    data root once, then its two governed children nested underneath. A migrated
+    deployment resolves to ``("immutable", "append_only")``; a legacy one where
+    only ``raw/``/``refined/`` exist on disk resolves to those instead. When
+    ``base`` is given (e.g. the machine's ``wigamig_base``) the check is made
+    against that root; otherwise the ambient data root is used.
+    """
+    root = Path(base).expanduser() if base else data_root(env)
+    immutable = _resolve_subdir(root, IMMUTABLE_SUBDIR, LEGACY_IMMUTABLE_SUBDIR).name
+    append_only = _resolve_subdir(root, APPEND_ONLY_SUBDIR, LEGACY_APPEND_ONLY_SUBDIR).name
+    return immutable, append_only
+
+
 def raw_root(env: dict[str, str] | None = None) -> Path:
     """Legacy alias for :func:`immutable_root`."""
     return immutable_root(env)
