@@ -402,29 +402,10 @@ class RegistrarCollabEditBody(BaseModel):
     oracle_vault: str | None = None
 
 
-class HostAddBody(BaseModel):
-    """JSON body for ``POST /api/hosts`` — register a CONNECTION-ONLY machine.
-
-    Issue #80: ``hosts.yaml`` is now a thin target list for the repo-inventory
-    SSH scan, not a foreign-machine config editor. Only connection fields are
-    accepted + persisted: ``name`` + ``ssh_host`` (how to reach it),
-    ``remote_user``, ``mount_point``, ``description``, and ``scan_dirs`` (what
-    to scan). A machine's data-root / vault / project paths are edited ONLY on
-    that machine's own dashboard (``machine.yaml``). Any legacy param fields an
-    older client still sends (``wigamig_base``, ``lab_vm_root``, ``vault_root``,
-    ``project_root``, ``lab_vault_root``, subfolders) are accepted for
-    compatibility but IGNORED — never written to the registry.
-    """
-
-    name: str
-    ssh_host: str
-    remote_user: str = ""
-    mount_point: str = ""
-    description: str = ""
-    scan_dirs: list[str] = []
-
-    # Ignored legacy param fields (kept so old clients don't 422). Not persisted.
-    model_config = {"extra": "ignore"}
+# NOTE (issue #94): ``HostAddBody`` (body for the removed ``POST /api/hosts``)
+# was deleted with the retired "add machine / SSH repo scan" flow. Foreign hosts
+# are no longer registered from the UI. ``HostScanDirsBody`` / ``HostUpdateBody``
+# below remain — they serve the this-machine editor's ``PATCH /api/hosts/local``.
 
 
 class HostScanDirsBody(BaseModel):
@@ -668,8 +649,9 @@ def create_app() -> FastAPI:
     # Weekly repo-inventory refresh. Murmurent-internal cron: at startup
     # we check the cached report's mtime; if it's stale, fire a fresh
     # scan in a daemon thread so the user's first dashboard load isn't
-    # blocked on SSH + ``gh repo list``. The scan writes to
+    # blocked on the local ``find`` + ``gh repo list``. The scan writes to
     # ``~/.murmurent/inventory/`` and the dashboard reads from there.
+    # Issue #94: this-machine-only — no foreign-host SSH sweep.
     @app.on_event("startup")
     def _schedule_inventory_refresh() -> None:  # pragma: no cover (timing)
         import logging as _logging
@@ -677,17 +659,12 @@ def create_app() -> FastAPI:
         _log = _logging.getLogger(__name__)
         try:
             from ..core import repo_inventory as _inv
-            from ..core import hosts as _hosts
             if not _inv.report_is_stale(_inv.latest_report_path()):
                 return
             def _run() -> None:
                 try:
                     lab = snap_mod._current_lab_settings()
-                    host_names = [h.name for h in _hosts.read().values()]
-                    _inv.scan_and_cache(
-                        github_org=lab.github_org,
-                        host_names=host_names,
-                    )
+                    _inv.scan_and_cache(github_org=lab.github_org)
                     _log.info("repo inventory: weekly refresh complete")
                 except Exception as exc:  # noqa: BLE001 — best-effort
                     _log.warning("repo inventory background scan failed: %s", exc)
@@ -2173,31 +2150,22 @@ def create_app() -> FastAPI:
     # Repo inventory — cross-machine + GitHub git-repo audit
     # -----------------------------------------------------------------
 
-    def _inventory_host_names() -> list[str]:
-        """Return every registered host name (incl. ``local``).
-
-        Hosts that haven't been registered via Member Profile → ⚙
-        machines aren't scanned — lab-server-style remotes need an
-        explicit ssh_host alias to reach them.
-        """
-        try:
-            from ..core import hosts as _hosts
-            return [h.name for h in _hosts.read().values()]
-        except Exception:
-            return ["local"]
-
     @app.get("/api/inventory/repos")
     def get_inventory(
         refresh: bool = Query(False, description="Run a fresh scan instead of returning the cached report."),
     ) -> dict:
-        """Return the cross-machine + GitHub repo inventory.
+        """Return THIS machine's repo inventory, cross-referenced against
+        the lab's GitHub org.
+
+        Issue #94: this-machine-only. The retired cross-machine SSH sweep
+        is gone — to see another machine's repos, tunnel to its own
+        dashboard (``docs/remote_dashboard.md``).
 
         Default mode reads the most recent cached report from
         ``~/.murmurent/inventory/`` so the panel loads instantly. Pass
-        ``?refresh=true`` to force a live re-scan — that hits ``gh
-        repo list`` plus one SSH session per registered host. The
-        result is also written to the cache so subsequent reads are
-        cheap.
+        ``?refresh=true`` to force a live re-scan — that hits ``gh repo
+        list`` plus one local ``find`` pass. The result is also written to
+        the cache so subsequent reads are cheap.
         """
         from ..core import repo_inventory as _inv
         lab_settings = snap_mod._current_lab_settings()
@@ -2208,35 +2176,26 @@ def create_app() -> FastAPI:
 
         cached_path = _inv.latest_report_path()
         if refresh or cached_path is None:
-            report = _inv.scan_and_cache(
-                github_org=org,
-                host_names=_inventory_host_names(),
-            )
+            report = _inv.scan_and_cache(github_org=org)
             return {"from_cache": False, **report.to_dict()}
         cached = _inv.load_report(cached_path)
         if cached is None:
             # Cache corrupt — re-scan rather than fail the request.
-            report = _inv.scan_and_cache(
-                github_org=org,
-                host_names=_inventory_host_names(),
-            )
+            report = _inv.scan_and_cache(github_org=org)
             return {"from_cache": False, **report.to_dict()}
         return {"from_cache": True, "cache_path": str(cached_path), **cached}
 
     @app.post("/api/inventory/repos/refresh")
     def post_inventory_refresh() -> dict:
-        """Explicit live re-scan. Same as GET with ?refresh=true; kept
-        as a separate POST so the JSX can disable the button while it
-        runs without worrying about caching.
+        """Explicit live re-scan (this machine). Same as GET with
+        ?refresh=true; kept as a separate POST so the JSX can disable the
+        button while it runs without worrying about caching.
         """
         from ..core import repo_inventory as _inv
         lab_settings = snap_mod._current_lab_settings()
         # Empty org is intentional — see the GET handler above.
         org = lab_settings.github_org
-        report = _inv.scan_and_cache(
-            github_org=org,
-            host_names=_inventory_host_names(),
-        )
+        report = _inv.scan_and_cache(github_org=org)
         return {"from_cache": False, **report.to_dict()}
 
     @app.post("/api/inventory/adopt")
@@ -3963,36 +3922,14 @@ def create_app() -> FastAPI:
             machines, this_id = [], ""
         return {"machines": machines, "this_machine_id": this_id}
 
-    @app.post("/api/hosts")
-    def post_host(body: HostAddBody) -> dict:
-        """Register a new SSH host. Refuses duplicates.
-
-        Item 3 R4: dashboard equivalent of ``murmurent host add`` so the
-        user can register lab-server without dropping to a terminal.
-        """
-        from ..core import hosts as _hosts
-        # Connection + repo-location only (issue #80): how to REACH the machine
-        # (ssh_host + scan_dirs) + where clones live. The first repo location
-        # doubles as project_root (where new remote clones land). A machine's
-        # data-root / vault CONFIG is NOT set here — it is edited on that
-        # machine's own dashboard via machine.yaml.
-        host = _hosts.Host(
-            name=body.name,
-            kind="ssh" if body.ssh_host else "local",
-            ssh_host=body.ssh_host,
-            remote_user=body.remote_user,
-            project_root=(body.scan_dirs[0] if body.scan_dirs else "~/repos"),
-            mount_point=body.mount_point,
-            description=body.description,
-            scan_dirs=tuple(body.scan_dirs),
-        )
-        try:
-            _hosts.add(host)
-        except _hosts.HostAlreadyExists as exc:
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-        except _hosts.HostError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return {"ok": True, "host": _host_row(host)}
+    # NOTE (issue #94): ``POST /api/hosts`` (register a foreign SSH host) was
+    # removed with the retired "add machine / SSH repo scan" flow. Under the
+    # per-machine model each machine runs its own dashboard; you view another
+    # machine by tunnelling to it (``docs/remote_dashboard.md``), not by
+    # registering it here. ``hosts.yaml`` is no longer written from the UI —
+    # pre-existing entries stay readable, and the local row is still edited via
+    # ``PATCH /api/hosts/local``. ``murmurent host add`` remains for any CLI
+    # user who still wants a hosts.yaml entry (e.g. a ``--tunnel`` alias).
 
     @app.delete("/api/hosts/{name}")
     def delete_host(
@@ -4104,106 +4041,10 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return {"ok": True, "host": _host_row(updated)}
 
-    @app.post("/api/hosts/{name}/test")
-    def post_host_test(name: str) -> dict:
-        """Run the four probes against a registered host.
-
-        Each probe returns ``ok``, ``warn``, or ``fail``:
-          - ssh (required): can we authenticate non-interactively?
-          - murmurent (required): is `murmurent --version` reachable on host?
-          - lab_vm (warn-only): do /data/lab_vm/{raw,refined} exist?
-          - gh_auth (warn-only): is `gh auth status` happy?
-
-        Returns a structured dict the UI can render row-by-row.
-        """
-        from ..core import hosts as _hosts
-        from ..core import remote as _remote
-        try:
-            host = _hosts.resolve(name)
-        except _hosts.HostNotFound as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-
-        results: list[dict] = []
-        remote = _remote.Remote(host)
-
-        # Local hosts skip ssh — they're always reachable.
-        if host.is_remote():
-            res = remote.probe()
-            results.append({
-                "name": "ssh",
-                "status": "ok" if res.ok else "fail",
-                "detail": res.stderr.strip() or ("connected" if res.ok else "connection failed"),
-                "required": True,
-            })
-            if not res.ok:
-                # No point running the rest — they'll all time out.
-                return {"host": name, "overall": "fail", "probes": results}
-        else:
-            results.append({"name": "ssh", "status": "ok", "detail": "local host", "required": True})
-
-        try:
-            version = remote.murmurent_version()
-            results.append({
-                "name": "murmurent",
-                "status": "ok",
-                "detail": version,
-                "required": True,
-            })
-        except _remote.RemoteError as exc:
-            err_text = exc.stderr.strip() or str(exc)
-            results.append({
-                "name": "murmurent",
-                "status": "fail",
-                "detail": f"{err_text} — run scripts/install_remote.sh {name}",
-                "required": True,
-            })
-
-        # lab_vm dirs (warn-only)
-        lab_vm = host.lab_vm_root
-        try:
-            res = remote.run(
-                f"test -d {lab_vm}/raw && test -d {lab_vm}/refined",
-                check=False, timeout=10,
-            )
-            results.append({
-                "name": "lab_vm",
-                "status": "ok" if res.ok else "warn",
-                "detail": (
-                    f"{lab_vm}/{{raw,refined}} present" if res.ok else
-                    f"{lab_vm}/{{raw,refined}} missing — murmurent will mkdir on first project"
-                ),
-                "required": False,
-            })
-        except _remote.RemoteError as exc:
-            results.append({
-                "name": "lab_vm", "status": "warn",
-                "detail": str(exc), "required": False,
-            })
-
-        # gh auth (warn-only)
-        try:
-            res = remote.run(
-                "command -v gh >/dev/null 2>&1 && gh auth status 2>&1",
-                check=False, timeout=15,
-            )
-            results.append({
-                "name": "gh_auth",
-                "status": "ok" if res.ok else "warn",
-                "detail": (
-                    "authenticated" if res.ok else
-                    "run `gh auth login` on the host before --repo-kind github"
-                ),
-                "required": False,
-            })
-        except _remote.RemoteError as exc:
-            results.append({
-                "name": "gh_auth", "status": "warn",
-                "detail": str(exc), "required": False,
-            })
-
-        required_failed = any(p["status"] == "fail" and p["required"] for p in results)
-        overall = "fail" if required_failed else "ok"
-        return {"host": name, "overall": overall, "probes": results}
+    # NOTE (issue #94): ``POST /api/hosts/{name}/test`` (the four connectivity
+    # probes) was removed with the retired "add machine / install hosts" flow —
+    # its only caller was that UI. Remote reachability is now the concern of the
+    # machine you tunnel to, not something this dashboard probes over SSH.
 
     # -----------------------------------------------------------------
     # Login / role-selection landing (Item 1)

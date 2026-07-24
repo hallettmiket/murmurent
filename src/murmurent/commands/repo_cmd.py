@@ -47,19 +47,30 @@ def _clone_verdict(clone: _inv.RepoOnHost) -> str:
 
 
 def cmd_list(host_filter: str | None) -> int:
-    """Print every clone on every registered machine (local included),
-    grouped by host, with its readiness verdict."""
+    """Print every clone on THIS machine, with its readiness verdict.
+
+    Issue #94: the cross-machine SSH scan is retired — this lists the local
+    machine only. Remote (``ssh``-kind) hosts in a pre-existing ``hosts.yaml``
+    are skipped; to see another machine's repos, open its own dashboard
+    (see ``docs/remote_dashboard.md``)."""
     registry = _hosts.read()
     if host_filter:
         if host_filter not in registry:
             raise click.ClickException(
                 f"unknown host {host_filter!r} — see `murmurent host list`"
             )
+        if registry[host_filter].is_remote():
+            raise click.ClickException(
+                f"host {host_filter!r} is a remote machine — the cross-machine "
+                "repo scan is retired (issue #94). Open its own dashboard "
+                "instead (see docs/remote_dashboard.md)."
+            )
         registry = {host_filter: registry[host_filter]}
 
     for name, host in registry.items():
-        target = host.ssh_host if host.is_remote() else "(this machine)"
-        click.echo(f"{name}  {target}")
+        if host.is_remote():
+            continue   # local-only inventory (issue #94)
+        click.echo(f"{name}  (this machine)")
         clones, err = _inv.list_machine_repos(name)
         if err:
             click.echo(f"  ! scan failed: {err}")
@@ -92,9 +103,13 @@ def cmd_status(target: str, host_name: str | None) -> int:
     """Report whether a repo is murmurent-ready.
 
     ``target`` is either a path (checked directly, on ``--host`` or
-    local) or a bare repo name (searched across every registered
-    machine's scan dirs). Exit code: 0 = every clone found is ready,
-    1 = found but not (fully) ready, 2 = not found.
+    local) or a bare repo name (searched across THIS machine's scan
+    dirs). Exit code: 0 = every clone found is ready, 1 = found but
+    not (fully) ready, 2 = not found.
+
+    Issue #94: this searches the local machine only. Remote (``ssh``-kind)
+    hosts are skipped — view another machine's repos on its own dashboard
+    (see ``docs/remote_dashboard.md``).
     """
     statuses: list[_adopt.AdoptionStatus] = []
 
@@ -112,8 +127,16 @@ def cmd_status(target: str, host_name: str | None) -> int:
                 raise click.ClickException(
                     f"unknown host {host_name!r} — see `murmurent host list`"
                 )
+            if registry[host_name].is_remote():
+                raise click.ClickException(
+                    f"host {host_name!r} is a remote machine — the cross-machine "
+                    "repo scan is retired (issue #94). Open its own dashboard "
+                    "instead (see docs/remote_dashboard.md)."
+                )
             registry = {host_name: registry[host_name]}
-        for name in registry:
+        for name, host in registry.items():
+            if host.is_remote():
+                continue   # local-only inventory (issue #94)
             clones, err = _inv.list_machine_repos(name)
             if err:
                 click.echo(f"! {name}: scan failed: {err}", err=True)
@@ -121,18 +144,11 @@ def cmd_status(target: str, host_name: str | None) -> int:
             for c in clones:
                 if Path(c.path).name != target:
                     continue
-                if name == "local":
-                    statuses.append(_adopt.adoption_status(c.path, host="local"))
-                else:
-                    statuses.append(_adopt.AdoptionStatus(
-                        host=name, path=c.path, exists=True, is_git=True,
-                        has_marker=c.has_marker, legacy_charter=False,
-                        has_claude_agents=c.has_claude_dir,
-                    ))
+                statuses.append(_adopt.adoption_status(c.path, host="local"))
 
     found = [s for s in statuses if s.exists]
     if not found:
-        click.echo(f"{target}: not found on any registered machine")
+        click.echo(f"{target}: not found on this machine")
         return 2
     for st in found:
         _print_status(st)
