@@ -6996,6 +6996,9 @@ function OtherMachinesView() {
   }, []);
   const others = machines.filter(m => (m.machine_id || "") !== thisId);
   if (!loaded) return null;
+  // Hide this section entirely when no other machines are mirrored yet — no
+  // verbose empty-state placeholder (maintainer request).
+  if (others.length === 0) return null;
   const lbl = {fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
                textTransform:"uppercase", color:"var(--muted)", width:96,
                display:"inline-block"};
@@ -7004,13 +7007,7 @@ function OtherMachinesView() {
       <div style={{fontFamily:"var(--serif)", fontSize:14, marginBottom:2}}>
         Your other machines <span className="muted" style={{fontSize:11}}>· synced, read-only</span>
       </div>
-      {others.length === 0 ? (
-        <p className="muted" style={{fontSize:11, margin:"2px 0"}}>
-          No other machines mirrored yet. Each machine publishes its own entry to
-          <code> &lt;vault&gt;/machines/</code> when you save its settings, and the
-          vault syncs it here. Configure each machine on its own dashboard.
-        </p>
-      ) : (
+      {(
         <div style={{display:"flex", flexWrap:"wrap", gap:10}}>
           {others.map(m => (
             <div key={m.machine_id} style={{

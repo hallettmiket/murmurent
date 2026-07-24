@@ -1871,9 +1871,20 @@ def group_reconcile_cmd(group: str, apply: bool) -> None:
     for line in (res.lab_mgmt or ["  (nothing to check)"]):
         click.echo(f"  {line}")
     click.echo("\nGroup GitHub repo:")
-    for line in (res.github or ["  (no github repo set — `murmurent group-setup "
-                                f"{group} --set github=<org>/<repo>`)"]):
-        click.echo(f"  {line}")
+    if res.github:
+        for line in res.github:
+            click.echo(f"  {line}")
+    else:
+        _gh_org = str((_R.read_group_profile(group) or {}).get("github_org") or "").strip()
+        if _gh_org:
+            click.echo(f"  the lab's GitHub org is {_gh_org} — the governance repo and "
+                       f"per-project repos live there and are reconciled separately. No single "
+                       f"shared group-wide code repo is configured (that is optional; set one "
+                       f"with `murmurent group-setup {group} --set github=<org>/<repo>` if you "
+                       f"want a lab-wide repo).")
+        else:
+            click.echo(f"  (no github repo set — `murmurent group-setup {group} "
+                       f"--set github=<org>/<repo>`)")
     if not apply and (res.github or res.lab_mgmt):
         click.echo("\n  Re-run with --apply to apply the GitHub grants.")
 

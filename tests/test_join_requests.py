@@ -561,6 +561,30 @@ def test_group_reconcile_reports_and_applies(world):
     assert any("in the group workspace" in s for s in res2.slack)
 
 
+def test_group_reconcile_trusts_recorded_slack_id(world):
+    """A member with a recorded Slack user id is reported IN the workspace
+    without an email lookup -- no bogus 'send them an invite' for someone we can
+    already DM (regression: group_roster used to drop the slack field)."""
+    from murmurent.core import group_reconcile as GR
+    from murmurent.core.frontmatter import parse_file, dump_document
+    import pathlib
+    R.create_lab(name="dcis2", display_name="dcis2", pi_handle="@allie", pi_email="a@x")
+    R.update_group_profile("dcis2", {"slack_workspace": "T0DCIS"})
+    R.add_group_member("dcis2", handle="@carol", email="carol@x.edu")
+    lab = next(l for l in R.read_registry().labs if l.name == "dcis2")
+    mf = pathlib.Path(lab.lab_mgmt_path) / "members" / "carol.md"
+    doc = parse_file(mf); meta = dict(doc.meta); meta["slack"] = "U0CAROL"
+    mf.write_text(dump_document(meta, doc.body))
+
+    called = []
+    res = GR.group_reconcile(
+        "dcis2", token="xoxb-x",
+        workspace_checker=lambda email: called.append(email) or False)  # would say NOT in
+    assert any("in the group workspace ✓" in s and "U0CAROL" in s for s in res.slack)
+    assert not any("NOT in the group workspace" in s for s in res.slack)
+    assert called == []   # the recorded slack id short-circuits the email lookup
+
+
 def test_resolve_group_slack_token_env_then_file(monkeypatch, tmp_path):
     from murmurent.core import group_reconcile as GR
     monkeypatch.delenv("MURMURENT_GROUP_SLACK_TOKEN", raising=False)

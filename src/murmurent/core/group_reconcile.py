@@ -101,6 +101,7 @@ def group_roster(group: str, *, env: dict[str, str] | None = None) -> dict[str, 
         out[handle] = {
             "email": str(meta.get("email") or "").strip(),
             "github": _gp.parse_logins(meta).get("github", ""),
+            "slack": str(meta.get("slack") or "").strip(),
         }
     return out
 
@@ -362,10 +363,16 @@ def group_reconcile(
 
     for handle, m in sorted(roster.items()):
         email, ghlogin = m["email"], m["github"]
+        slack_id = (m.get("slack") or "").strip()
 
         # --- group Slack workspace membership (read-only) ---
         if not prof.get("slack_workspace"):
             pass  # no group workspace configured — nothing to reconcile
+        elif slack_id:
+            # A recorded Slack user id IS proof of workspace membership — you
+            # only get a ``U…`` id for a member of the workspace. Trust it and
+            # do NOT email-lookup or tell the PI to "invite" someone we can DM.
+            res.slack.append(f"@{handle}: in the group workspace ✓ (slack {slack_id})")
         elif not tok:
             res.slack.append(f"@{handle}: no group Slack token "
                              "(~/.config/murmurent/groups/{}/slack-token) — skipped".format(group))
