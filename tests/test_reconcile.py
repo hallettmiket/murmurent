@@ -11,8 +11,8 @@ What we pin:
     ``installations/.archive/<name>_<date>.yaml`` and flips
     ``status: archived`` in the registry frontmatter (without
     deleting the file).
-  * SSH probes are mocked at the Remote layer so the tests don't
-    touch a real network.
+  * Issue #94: reconcile is this-machine-only — ``ssh_remote`` manifests
+    and non-local registry repos are skipped (no SSH probe at all).
   * The CLI exits 1 when actionable drift is found and ``--apply``
     wasn't passed, so cron / CI can branch on it.
 """
@@ -23,9 +23,7 @@ import yaml
 import pytest
 from pathlib import Path
 
-from murmurent.core import hosts as _hosts
 from murmurent.core import reconcile as _rec
-from murmurent.core import remote as _remote
 from murmurent.dashboard import snapshot as _snap
 
 
@@ -127,56 +125,15 @@ def test_alive_local_install_no_finding(world):
     assert findings == []
 
 
-def test_detect_orphan_installation_unknown_ssh_host(world):
-    """If a manifest references an SSH host that's been removed from
-    the registry, we treat the install as orphaned (the user can't
-    reach the clone any more, so murmurent shouldn't list it)."""
+def test_ssh_remote_install_is_skipped(world):
+    """Issue #94: reconcile is this-machine-only. A manifest that records an
+    ``ssh_remote`` (an install on another machine) is skipped entirely — that
+    machine reconciles itself. No SSH probe, no orphan finding here, even when
+    the host isn't in this machine's registry."""
     _write_manifest(world["installations"], "stranded", ssh_remote="ghost_host")
+    _write_manifest(world["installations"], "on_lab_server", ssh_remote="lab-server")
     findings = _rec.detect_orphan_installations()
-    assert len(findings) == 1
-    assert findings[0].host == "ghost_host"
-    assert "not registered" in findings[0].detail
-
-
-def test_detect_orphan_installation_remote_ssh_probe(world, monkeypatch):
-    """SSH-resident installs: one batched SSH call per host, results
-    parsed into ALIVE/GONE. Mocked at the Remote layer."""
-    _hosts.add(_hosts.Host(name="lab-server", kind="ssh", ssh_host="lab-server",
-                           project_root="/home/u/repos"))
-    _write_manifest(world["installations"], "still_here", ssh_remote="lab-server")
-    _write_manifest(world["installations"], "deleted_there", ssh_remote="lab-server")
-
-    def fake_run(self, command, *, check=True, timeout=30):
-        # The batched probe checks two paths in one call.
-        stdout = (
-            "ALIVE:/home/u/repos/still_here\n"
-            "GONE:/home/u/repos/deleted_there\n"
-        )
-        return _remote.RemoteResult(host="lab-server", command=command,
-                                    returncode=0, stdout=stdout, stderr="")
-    monkeypatch.setattr(_remote.Remote, "run", fake_run)
-
-    findings = _rec.detect_orphan_installations()
-    targets = [f.target for f in findings]
-    assert "deleted_there" in targets
-    assert "still_here" not in targets
-
-
-def test_ssh_probe_failure_is_conservative(world, monkeypatch):
-    """If the SSH probe itself fails (host down, auth issue), we
-    must NOT report every install on that host as orphaned — a
-    transient outage shouldn't auto-trigger deactivations."""
-    _hosts.add(_hosts.Host(name="lab-server", kind="ssh", ssh_host="lab-server",
-                           project_root="/home/u/repos"))
-    _write_manifest(world["installations"], "maybe_alive", ssh_remote="lab-server")
-
-    def fake_run(self, command, *, check=True, timeout=30):
-        raise _remote.RemoteError("network unreachable", returncode=255,
-                                  stdout="", stderr="ssh: connect failed")
-    monkeypatch.setattr(_remote.Remote, "run", fake_run)
-
-    findings = _rec.detect_orphan_installations()
-    assert findings == [], "transient SSH failure must not orphan installs"
+    assert findings == []
 
 
 def test_detect_orphan_registry_local(world):

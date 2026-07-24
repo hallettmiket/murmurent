@@ -203,13 +203,19 @@ def test_no_github_org_fails_safe_not_hallettmiket(world, monkeypatch):
     assert repos == []
     assert "no GitHub org configured" in err
 
-    # Guard: if anything tried to shell out with an empty org, fail loudly.
+    # Isolate the GitHub concern: the local this-machine scan (issue #94) is a
+    # legitimate subprocess and irrelevant here, so stub it out. What must NOT
+    # happen is a ``gh repo list`` shell-out against a stranger's org — and
+    # ``list_github_repos("")`` short-circuits before any subprocess, so the
+    # guard below (which would trip on a gh call) never fires.
+    monkeypatch.setattr(inv, "list_machine_repos", lambda *a, **k: ([], None))
+
     def _no_subprocess(*a, **k):  # pragma: no cover - only runs on regression
         raise AssertionError("subprocess must not run when github_org is empty")
 
     monkeypatch.setattr(inv.subprocess, "run", _no_subprocess)
 
-    report = inv.build_inventory(github_org="", host_names=[])
+    report = inv.build_inventory(github_org="")
     assert any("no GitHub org configured" in e for e in report.errors)
     # No row references the historic hardcoded org.
     assert all("hallettmiket" not in r.key for r in report.rows)

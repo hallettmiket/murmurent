@@ -1,25 +1,27 @@
-"""Tests for Item 3 R4 — dashboard host CRUD + remote workspace launch.
+"""Tests for Item 3 R4 — dashboard host registry + remote workspace launch.
 
 Covers:
-  - POST /api/hosts adds a host; refuses duplicate (409)
-  - DELETE /api/hosts/{name} removes; 400 on 'local'; 404 on unknown
-  - POST /api/hosts/{name}/test runs probes and returns structured rows
-    (mocked SSH so no real network)
+  - DELETE /api/hosts/{name} removes; 403 non-PI; 400 on 'local'; 404 unknown
+  - PATCH /api/hosts/{name} is connection-only (ignores vault CONFIG params)
   - POST /api/workspace/launch for a remote-pointer project returns a
     vscode-remote URL (and doesn't invoke start_workspace.sh)
-  - POST /api/workspace/launch for a local project still requires agents
+  - POST /api/workspace/launch for a local project uses open_murmurent.sh
+
+Issue #94: ``POST /api/hosts`` (register a foreign SSH host) and
+``POST /api/hosts/{name}/test`` (connectivity probes) were removed with the
+retired "add machine / SSH repo scan" flow. Foreign hosts are no longer added
+from the UI; the DELETE / PATCH endpoints still operate on pre-existing
+``hosts.yaml`` entries, so those tests seed rows directly via ``core.hosts.add``.
 """
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from murmurent.core import hosts as _hosts
-from murmurent.core import remote as _remote
 from murmurent.dashboard.server import create_app
 
 
@@ -49,66 +51,28 @@ def world(monkeypatch, tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# POST /api/hosts
+# Host registry endpoints (issue #94)
+#
+# POST /api/hosts (add a foreign SSH host) and POST /api/hosts/{name}/test
+# (connectivity probes) were removed with the retired "add machine / SSH repo
+# scan" flow. Foreign hosts are seeded directly via core.hosts.add — the same
+# pre-existing hosts.yaml rows that --tunnel / DELETE / PATCH still operate on.
 # ---------------------------------------------------------------------------
 
 
-def test_post_host_adds(world):
-    client = TestClient(create_app())
-    res = client.post("/api/hosts", json={
-        "name": "lab-server",
-        "ssh_host": "lab-server",
-        "remote_user": "the_pi",
-        "project_root": "~/repos",
-        "lab_vm_root": "/data/lab_vm",
-    })
-    assert res.status_code == 200, res.text
-    body = res.json()
-    assert body["ok"] is True
-    assert body["host"]["name"] == "lab-server"
-    # And it shows up in subsequent GETs.
-    listing = client.get("/api/hosts").json()
-    names = {h["name"] for h in listing["hosts"]}
-    assert {"local", "lab-server"} <= names
-
-
-def test_post_host_duplicate_409(world):
-    client = TestClient(create_app())
-    body = {"name": "lab-server", "ssh_host": "lab-server"}
-    res1 = client.post("/api/hosts", json=body)
-    assert res1.status_code == 200
-    res2 = client.post("/api/hosts", json=body)
-    assert res2.status_code == 409
-
-
-def test_post_host_ignores_vault_config_params(world):
-    """Issue #80: hosts.yaml is connection-only. The retired per-machine CONFIG
-    params (personal/lab vault paths + subfolders) sent to POST /api/hosts are
-    IGNORED — they never persist; the machine is configured on its own
-    dashboard via machine.yaml instead."""
-    client = TestClient(create_app())
-    res = client.post("/api/hosts", json={
-        "name": "lab-server",
-        "ssh_host": "lab-server",
-        "vault_root": "/home/the_pi/murmurent_vault",
-        "oracle_subfolder": "orc",
-        "notebook_subfolder": "nb",
-        "lab_vault_root": "/home/the_pi/murmurent_lab_mgmt_mh",
-    })
-    assert res.status_code == 200, res.text
-    row = next(h for h in client.get("/api/hosts").json()["hosts"]
-               if h["name"] == "lab-server")
-    # Connection info survives; the config params fell back to defaults/empty.
-    assert row["ssh_host"] == "lab-server"
-    assert row["vault_root"] != "/home/the_pi/murmurent_vault"
-    assert row["lab_vault_root"] == ""
+def _seed_host(name: str = "lab-server", **kw) -> None:
+    """Write a foreign ssh host straight into the registry (the UI no longer
+    adds these; #94)."""
+    _hosts.add(_hosts.Host(name=name, kind="ssh",
+                           ssh_host=kw.pop("ssh_host", name), **kw))
 
 
 def test_patch_host_ignores_vault_config_params(world):
     """Issue #80: PATCH /api/hosts is connection-only — the retired vault CONFIG
-    fields are ignored, never persisted."""
+    fields are ignored, never persisted. (The this-machine editor uses this
+    endpoint for the local row; here we exercise a pre-existing foreign row.)"""
+    _seed_host("lab-server")
     client = TestClient(create_app())
-    client.post("/api/hosts", json={"name": "lab-server", "ssh_host": "lab-server"})
     res = client.patch("/api/hosts/lab-server", json={
         "description": "compute node",
         "vault_root": "/srv/murmurent_vault",
@@ -125,24 +89,14 @@ def test_patch_host_ignores_vault_config_params(world):
     assert row["vault_root"] != "/srv/murmurent_vault"
 
 
-def test_post_host_local_is_re_derivable(world):
-    """The built-in 'local' row is always re-derivable — posting it again
-    is a no-op rather than a 409. This matches the core hosts.add() rule
-    that lets read() always synthesise 'local' regardless of what's
-    been written to the file."""
-    client = TestClient(create_app())
-    res = client.post("/api/hosts", json={"name": "local", "ssh_host": ""})
-    assert res.status_code == 200
-
-
 # ---------------------------------------------------------------------------
-# DELETE /api/hosts/{name}
+# DELETE /api/hosts/{name} — kept; operates on pre-existing entries
 # ---------------------------------------------------------------------------
 
 
 def test_delete_host_removes(world):
+    _seed_host("lab-server")
     client = TestClient(create_app())
-    client.post("/api/hosts", json={"name": "lab-server", "ssh_host": "lab-server"})
     res = client.delete("/api/hosts/lab-server")
     assert res.status_code == 200
     listing = client.get("/api/hosts").json()
@@ -154,8 +108,8 @@ def test_delete_host_requires_pi(world, monkeypatch):
     refused and the host survives (regression for the missing-auth gap that was
     silently writing '@unknown' decommission reports)."""
     monkeypatch.delenv("MURMURENT_USER", raising=False)   # no PI fallback
+    _seed_host("lab-server")
     client = TestClient(create_app())
-    client.post("/api/hosts", json={"name": "lab-server", "ssh_host": "lab-server"})
     res = client.delete("/api/hosts/lab-server?user=intruder")
     assert res.status_code == 403
     listing = client.get("/api/hosts").json()
@@ -172,103 +126,6 @@ def test_delete_unknown_404(world):
     client = TestClient(create_app())
     res = client.delete("/api/hosts/nope")
     assert res.status_code == 404
-
-
-# ---------------------------------------------------------------------------
-# POST /api/hosts/{name}/test
-# ---------------------------------------------------------------------------
-
-
-def _ok(stdout: str = "ok") -> subprocess.CompletedProcess:
-    return subprocess.CompletedProcess([], 0, stdout=stdout, stderr="")
-
-
-def _fail(rc: int = 1, stderr: str = "boom") -> subprocess.CompletedProcess:
-    return subprocess.CompletedProcess([], rc, stdout="", stderr=stderr)
-
-
-def test_host_test_all_ok(world, monkeypatch):
-    client = TestClient(create_app())
-    client.post("/api/hosts", json={
-        "name": "lab-server", "ssh_host": "lab-server", "lab_vm_root": "/data/lab_vm",
-    })
-
-    # Probe sequence: ssh (true), murmurent --version, test -d lab_vm dirs, gh auth status
-    sequence = iter([
-        _ok(),                            # ssh probe (true)
-        _ok("murmurent 1.0.0"),           # murmurent --version
-        _ok(),                            # lab_vm test -d
-        _ok("Logged in to github.com"),   # gh auth status
-    ])
-    monkeypatch.setattr(_remote.subprocess, "run", lambda *a, **k: next(sequence))
-
-    res = client.post("/api/hosts/lab-server/test")
-    assert res.status_code == 200, res.text
-    body = res.json()
-    assert body["overall"] == "ok"
-    statuses = {p["name"]: p["status"] for p in body["probes"]}
-    assert statuses == {"ssh": "ok", "murmurent": "ok", "lab_vm": "ok", "gh_auth": "ok"}
-
-
-def test_host_test_murmurent_missing_fails(world, monkeypatch):
-    client = TestClient(create_app())
-    client.post("/api/hosts", json={"name": "lab-server", "ssh_host": "lab-server"})
-    sequence = iter([
-        _ok(),                              # ssh probe
-        _fail(127, "murmurent: command not found"),  # murmurent --version
-        _ok(),                              # lab_vm
-        _fail(1, "not authenticated"),      # gh auth
-    ])
-    monkeypatch.setattr(_remote.subprocess, "run", lambda *a, **k: next(sequence))
-
-    body = client.post("/api/hosts/lab-server/test").json()
-    assert body["overall"] == "fail"
-    by_name = {p["name"]: p for p in body["probes"]}
-    assert by_name["murmurent"]["status"] == "fail"
-    assert by_name["murmurent"]["required"] is True
-    assert "install_remote.sh" in by_name["murmurent"]["detail"]
-    # lab_vm and gh_auth are warn-only — their failures don't change overall=fail
-    # but their statuses are reported correctly.
-    assert by_name["gh_auth"]["status"] == "warn"
-
-
-def test_host_test_ssh_fails_short_circuits(world, monkeypatch):
-    client = TestClient(create_app())
-    client.post("/api/hosts", json={"name": "lab-server", "ssh_host": "lab-server"})
-
-    call_count = {"n": 0}
-
-    def fake_run(*a, **k):
-        call_count["n"] += 1
-        return _fail(255, "permission denied (publickey)")
-
-    monkeypatch.setattr(_remote.subprocess, "run", fake_run)
-    body = client.post("/api/hosts/lab-server/test").json()
-    # Only the ssh probe was issued — no point continuing.
-    assert call_count["n"] == 1
-    assert body["overall"] == "fail"
-    assert body["probes"][0]["name"] == "ssh"
-    assert body["probes"][0]["status"] == "fail"
-
-
-def test_host_test_local_returns_ok_without_ssh_call(world, monkeypatch):
-    """The local host has nothing to ssh into, but the test endpoint
-    still runs murmurent --version + the lab_vm/gh probes via bash -lc."""
-    client = TestClient(create_app())
-    sequence = iter([
-        _ok("murmurent 1.0.0"),
-        _fail(),  # lab_vm missing locally — warn
-        _ok("Logged in"),
-    ])
-    monkeypatch.setattr(_remote.subprocess, "run", lambda *a, **k: next(sequence))
-
-    body = client.post("/api/hosts/local/test").json()
-    # No required failure, even though lab_vm is warn — overall ok.
-    assert body["overall"] == "ok"
-    statuses = {p["name"]: p["status"] for p in body["probes"]}
-    assert statuses["ssh"] == "ok"          # synthetic "local host"
-    assert statuses["murmurent"] == "ok"
-    assert statuses["lab_vm"] == "warn"
 
 
 # ---------------------------------------------------------------------------

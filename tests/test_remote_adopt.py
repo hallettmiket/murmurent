@@ -276,8 +276,8 @@ def test_remote_adopt_refuses_non_git(world, monkeypatch):
 
 def test_remote_adopt_refuses_unknown_host(world, monkeypatch):
     """A 404 — not 400 — because the host name itself is the missing
-    resource. Same status the GET /api/hosts/<name>/test path uses
-    for unregistered hosts."""
+    resource (the same status DELETE /api/hosts/<name> returns for an
+    unregistered host)."""
     client = TestClient(create_app())
     res = client.post("/api/inventory/adopt", json={
         "clone_path": "/anywhere",
