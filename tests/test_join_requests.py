@@ -580,9 +580,13 @@ def test_group_reconcile_trusts_recorded_slack_id(world):
     res = GR.group_reconcile(
         "dcis2", token="xoxb-x",
         workspace_checker=lambda email: called.append(email) or False)  # would say NOT in
-    assert any("in the group workspace ✓" in s and "U0CAROL" in s for s in res.slack)
-    assert not any("NOT in the group workspace" in s for s in res.slack)
-    assert called == []   # the recorded slack id short-circuits the email lookup
+    # Scope to carol: the PI (no slack id) legitimately still uses the lookup.
+    carol = [s for s in res.slack if "@carol" in s]
+    assert carol and all(
+        "in the group workspace ✓" in s and "U0CAROL" in s for s in carol)
+    assert not any("NOT in the group workspace" in s for s in carol)
+    # carol's recorded slack id short-circuits the email lookup for her
+    assert "carol@x.edu" not in called
 
 
 def test_resolve_group_slack_token_env_then_file(monkeypatch, tmp_path):
