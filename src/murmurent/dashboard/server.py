@@ -181,6 +181,7 @@ class MachineSettingsBody(BaseModel):
     obsidian_vault_name: str | None = None
     notebook_subfolder: str = "lab-notebook"
     oracle_subfolder: str = "oracle"
+    murmurent_data_subfolder: str = "murmurent_data"
     lab_base: str | None = None
 
 

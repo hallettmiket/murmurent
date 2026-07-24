@@ -165,6 +165,10 @@ class MachineSettings(BaseModel):
     obsidian_vault_name: str | None = None      # for obsidian:// URLs
     notebook_subfolder: str = "lab-notebook"    # personal notebook subfolder
     oracle_subfolder: str = "oracle"            # personal oracle subfolder
+    # personal vault reference-file subfolder — user-editable + persisted,
+    # exactly like ``notebook_subfolder`` / ``oracle_subfolder``. Shown nested
+    # under BOTH the personal and lab vault roots (issue #99).
+    murmurent_data_subfolder: str = "murmurent_data"
     # Legacy field: the server-side lab_base value as seen from this
     # machine. Retained so the install wizard's old fallback still
     # works; new code should use ``wigamig_base``.
@@ -173,14 +177,10 @@ class MachineSettings(BaseModel):
     # machine window shows each root ONCE and then nests its governed children
     # as bare folder names. These are NOT user-editable knobs — they are the
     # resolved child names the UI cannot derive on its own:
-    #   • ``murmurent_data_subfolder`` — the fixed vault reference-file folder
-    #     (``murmurent_data``), a member of ``VAULT_SUBDIRS``. Shown nested
-    #     under BOTH the personal and lab vault roots.
     #   • ``data_immutable_name`` / ``data_append_only_name`` — the two
     #     governed children under the Files (data) root, resolved against disk
     #     so a legacy deployment shows ``raw``/``refined`` and a migrated one
     #     shows ``immutable``/``append_only`` (see ``core.lab_vm``).
-    murmurent_data_subfolder: str = "murmurent_data"
     data_immutable_name: str = "immutable"
     data_append_only_name: str = "append_only"
 
