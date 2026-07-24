@@ -65,24 +65,26 @@ def test_data_child_names_default(monkeypatch, tmp_path):
     assert lab_vm.data_child_names() == ("immutable", "append_only")
 
 
-def test_data_child_names_legacy(monkeypatch, tmp_path):
-    """Un-migrated deployment resolves to the real raw/refined names on disk."""
+def test_data_child_names_legacy_shows_canonical(monkeypatch, tmp_path):
+    """A data root that still uses raw/refined on disk shows the CANONICAL
+    synonyms. Murmurent standardises the display on immutable/append_only while
+    the hooks + immutable_root/append_only_root keep resolving the real dirs."""
     _clear_env(monkeypatch)
     monkeypatch.setenv("MURMURENT_DATA_ROOT", str(tmp_path))
     (tmp_path / "raw").mkdir()
     (tmp_path / "refined").mkdir()
-    assert lab_vm.data_child_names() == ("raw", "refined")
+    assert lab_vm.data_child_names() == ("immutable", "append_only")
 
 
 def test_data_child_names_explicit_base(monkeypatch, tmp_path):
-    """An explicit base overrides the ambient data root; legacy-aware per base."""
+    """An explicit base is accepted for compatibility; the display always
+    reports the canonical names regardless of on-disk raw/refined."""
     _clear_env(monkeypatch)
     monkeypatch.setenv("MURMURENT_DATA_ROOT", str(tmp_path / "elsewhere"))
     base = tmp_path / "wigamig"
     (base / "raw").mkdir(parents=True)
     (base / "refined").mkdir()
-    assert lab_vm.data_child_names(base=str(base)) == ("raw", "refined")
-    # A sibling base with no dirs yet resolves to the canonical names.
+    assert lab_vm.data_child_names(base=str(base)) == ("immutable", "append_only")
     assert lab_vm.data_child_names(base=str(tmp_path / "fresh")) == (
         "immutable", "append_only")
 
