@@ -66,6 +66,53 @@ function _joinPath(root, project) {
   return trimmed + tail;
 }
 
+// A path is "unset" when empty or an explicit NA marker (matches the vault
+// editor's convention). Used to decide whether to render a subfolder tree or a
+// single "no <thing> on this machine" line (issue #99 §4).
+function _pathUnset(p) {
+  if (!p) return true;
+  const s = String(p).trim().toLowerCase();
+  return s === "" || s === "na" || s === "n/a" || s === "none" || s === "n.a.";
+}
+
+// Render a directory ROOT once (by the caller), then its children as bare,
+// indented folder NAMES under a light tree glyph (issue #99). The repeated
+// full-path lines the maintainer flagged as "a mess" are replaced by this:
+// show the root once, then ``├─ oracle`` / ``└─ murmurent_data`` extensions.
+// The full resolved path stays available on hover (title=) for copy-paste,
+// per the #80 design. ``children`` is a list of bare folder names; the full
+// path is _joinPath(root, name).
+function PathTree({ root, children, indent = 120 }) {
+  const kids = (children || []).filter(Boolean);
+  if (kids.length === 0) return null;
+  return (
+    <div style={{marginLeft:indent, fontSize:11, color:"var(--muted)",
+                 fontFamily:"var(--mono)", lineHeight:1.6}}>
+      {kids.map((name, i) => {
+        const last = i === kids.length - 1;
+        const full = _joinPath(root, name);
+        return (
+          <div key={name}>
+            <span style={{opacity:0.55}}>{last ? "└─ " : "├─ "}</span>
+            <span title={full}>{name}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// One-line "no <thing> on this machine" fallback (issue #99 §4) — shown in
+// place of a tree when a root is unset / NA.
+function NoRootLine({ label, indent = 120 }) {
+  return (
+    <div style={{marginLeft:indent, fontSize:11, color:"var(--muted)",
+                 fontStyle:"italic"}}>
+      No {label} on this machine
+    </div>
+  );
+}
+
 /* Phase 4: POST /api/sea/{project}/{id}/{action}, refetch on success.
  * Caller is the signed-in user (passed via ?user= if set on the URL,
  * otherwise the server resolves from $MURMURENT_USER). */
@@ -7378,25 +7425,42 @@ function MachineCard({ machine, isCurrent, onEditClick, onRemove, onScanDirsSave
           The personal vault is editable here; the lab vault clone location is
           the lab-mgmt clone, managed at install / via the lab_mgmt pin. */}
       <div style={{marginTop:8, fontSize:12, lineHeight:1.7}}>
+        {/* Personal vault — root shown ONCE, then oracle/ + lab-notebook/ +
+            murmurent_data/ as bare indented extensions (issue #99 §1–2). */}
         <div><span style={labelStyle}>Personal vault</span>
-          <code className="mono">{machine.obsidian_vault_path || machine.obsidian_vault_name || "—"}</code></div>
-        {machine.obsidian_vault_path && (
-          <div style={{marginLeft:120, fontSize:11, color:"var(--muted)"}}>
-            <div>oracle → <code className="mono">{_joinPath(machine.obsidian_vault_path, machine.oracle_subfolder || "oracle")}</code></div>
-            <div>lab-notebook → <code className="mono">{_joinPath(machine.obsidian_vault_path, machine.notebook_subfolder || "lab-notebook")}</code></div>
-          </div>
-        )}
+          <code className="mono">{!_pathUnset(machine.obsidian_vault_path)
+            ? machine.obsidian_vault_path
+            : (machine.obsidian_vault_name || <span className="muted">—</span>)}</code></div>
+        {_pathUnset(machine.obsidian_vault_path)
+          ? <NoRootLine label="personal vault" />
+          : <PathTree root={machine.obsidian_vault_path} children={[
+              machine.oracle_subfolder || "oracle",
+              machine.notebook_subfolder || "lab-notebook",
+              machine.murmurent_data_subfolder || "murmurent_data",
+            ]} />}
+        {/* Lab (group) vault — the lab-mgmt clone; same root-once + tree. */}
         <div><span style={labelStyle}>Lab vault</span>
-          <code className="mono">{machine.lab_vault_path || <span className="muted">—</span>}</code>
-          {machine.lab_vault_path && <span className="muted" style={{fontSize:10, marginLeft:6}}>(lab-mgmt clone)</span>}</div>
-        {machine.lab_vault_path && (
-          <div style={{marginLeft:120, fontSize:11, color:"var(--muted)"}}>
-            <div>oracle → <code className="mono">{_joinPath(machine.lab_vault_path, "oracle")}</code></div>
-            <div>lab-notebook → <code className="mono">{_joinPath(machine.lab_vault_path, "lab-notebook")}</code></div>
-          </div>
-        )}
+          <code className="mono">{!_pathUnset(machine.lab_vault_path)
+            ? machine.lab_vault_path : <span className="muted">—</span>}</code>
+          {!_pathUnset(machine.lab_vault_path) &&
+            <span className="muted" style={{fontSize:10, marginLeft:6}}>(lab-mgmt clone)</span>}</div>
+        {_pathUnset(machine.lab_vault_path)
+          ? <NoRootLine label="lab vault" />
+          : <PathTree root={machine.lab_vault_path} children={[
+              "oracle", "lab-notebook",
+              machine.murmurent_data_subfolder || "murmurent_data",
+            ]} />}
+        {/* Files (data root) — its two governed children (resolved
+            immutable/append_only, or legacy raw/refined) nested underneath
+            (issue #80 Part 1a). */}
         <div><span style={labelStyle}>Files</span>
-          <code className="mono">{wb || "—"}</code></div>
+          <code className="mono">{!_pathUnset(wb) ? wb : <span className="muted">—</span>}</code></div>
+        {_pathUnset(wb)
+          ? <NoRootLine label="data root" />
+          : <PathTree root={wb} children={[
+              machine.data_immutable_name || "immutable",
+              machine.data_append_only_name || "append_only",
+            ]} />}
         <div><span style={labelStyle}>Repo location</span>
           <code className="mono">{scanDirs.length === 0
             ? <span className="muted">default (~/repo + ~/repos)</span>
@@ -7596,6 +7660,17 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
       <div style={labelStyle}>Large file location</div>
       <input style={inputStyle} value={form.wigamig_base}
              onChange={update("wigamig_base")} placeholder="~/wigamig" />
+      {/* Files (data root) governed children, shown once as a tree (issue #80
+          Part 1a). Names resolve server-side on save; the preview shows the
+          canonical immutable/append_only. */}
+      {!_pathUnset(form.wigamig_base) && (
+        <div style={{marginTop:4}}>
+          <PathTree indent={0} root={form.wigamig_base} children={[
+            initial.data_immutable_name || "immutable",
+            initial.data_append_only_name || "append_only",
+          ]} />
+        </div>
+      )}
 
       <div style={labelStyle}>Repo locations (one per line; where clones live)</div>
       <textarea style={{...inputStyle, minHeight:54, resize:"vertical"}} value={repos}
@@ -7623,12 +7698,17 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
                  onChange={update("oracle_subfolder")} />
         </div>
       </div>
-      {/* Resolved personal-vault subfolder paths — the issue's #1 gripe was
-          that these were invisible. Show them live as the user types. */}
-      {form.obsidian_vault_path && String(form.obsidian_vault_path).trim().toLowerCase() !== "na" && (
-        <div style={{marginTop:4, fontSize:11, color:"var(--muted)", fontFamily:"var(--mono)"}}>
-          <div>oracle → {_joinPath(form.obsidian_vault_path, form.oracle_subfolder || "oracle")}</div>
-          <div>lab-notebook → {_joinPath(form.obsidian_vault_path, form.notebook_subfolder || "lab-notebook")}</div>
+      {/* Resolved personal-vault subfolders — the issue's #1 gripe was that
+          these were invisible / repeated the full root on every line. Show the
+          bare extensions as a tree (root is the input above); full path on
+          hover. murmurent_data is included per issue #99 §2. */}
+      {!_pathUnset(form.obsidian_vault_path) && (
+        <div style={{marginTop:4}}>
+          <PathTree indent={0} root={form.obsidian_vault_path} children={[
+            form.oracle_subfolder || "oracle",
+            form.notebook_subfolder || "lab-notebook",
+            initial.murmurent_data_subfolder || "murmurent_data",
+          ]} />
         </div>
       )}
       {/* One-click sync + divergence banner (issue #80 Wave 3). Reads the live
@@ -7651,9 +7731,13 @@ function ThisMachineEditor({ initial, onSaved, onCancel }) {
           padding:"6px 8px", background:"var(--paper-2)",
           border:"1px solid var(--rule)", borderRadius:2,
         }}>
-          <div>clone → {labVaultPath}</div>
-          <div>oracle → {_joinPath(labVaultPath, "oracle")}</div>
-          <div>lab-notebook → {_joinPath(labVaultPath, "lab-notebook")}</div>
+          {/* Clone root shown once, then its subfolders as bare extensions
+              (issue #99 §1–2 — includes murmurent_data). */}
+          <div title={labVaultPath}>{labVaultPath}</div>
+          <PathTree indent={0} root={labVaultPath} children={[
+            "oracle", "lab-notebook",
+            initial.murmurent_data_subfolder || "murmurent_data",
+          ]} />
         </div>
       ) : (
         <div style={{fontSize:11, color:"var(--muted)"}}>
@@ -7774,6 +7858,11 @@ function MachinesModal({ onClose }) {
     obsidian_vault_name: ms.obsidian_vault_name || "",
     oracle_subfolder:    ms.oracle_subfolder    || "oracle",
     notebook_subfolder:  ms.notebook_subfolder  || "lab-notebook",
+    // Derived, read-only display names (issue #99 / #80 Part 1a): the fixed
+    // murmurent_data vault subfolder + the resolved Files children.
+    murmurent_data_subfolder: ms.murmurent_data_subfolder || "murmurent_data",
+    data_immutable_name:      ms.data_immutable_name      || "immutable",
+    data_append_only_name:    ms.data_append_only_name    || "append_only",
     // Lab (group) vault clone = the lab-mgmt clone (issue #25); its path is
     // the resolved lab_mgmt_path from lab settings, not a machine.yaml field.
     lab_vault_path: (window.DATA.lab_settings || {}).lab_mgmt_path || "",
@@ -7795,6 +7884,11 @@ function MachinesModal({ onClose }) {
     // so a remote card resolves both vaults' oracle/ + lab-notebook/ paths.
     oracle_subfolder: h.oracle_subfolder || "oracle",
     notebook_subfolder: h.notebook_subfolder || "lab-notebook",
+    // hosts.yaml carries no resolved child names for a remote machine — fall
+    // back to the canonical names (issue #99 / #80 Part 1a).
+    murmurent_data_subfolder: "murmurent_data",
+    data_immutable_name: "immutable",
+    data_append_only_name: "append_only",
     lab_vault_path: h.lab_vault_root || "",
     description: h.description || "",
     scan_dirs: h.scan_dirs || [],
@@ -8031,6 +8125,11 @@ function MachinesPanel({ span = "c-5" }) {
     obsidian_vault_name: ms.obsidian_vault_name || "",
     oracle_subfolder:    ms.oracle_subfolder    || "oracle",
     notebook_subfolder:  ms.notebook_subfolder  || "lab-notebook",
+    // Derived, read-only display names (issue #99 / #80 Part 1a): the fixed
+    // murmurent_data vault subfolder + the resolved Files children.
+    murmurent_data_subfolder: ms.murmurent_data_subfolder || "murmurent_data",
+    data_immutable_name:      ms.data_immutable_name      || "immutable",
+    data_append_only_name:    ms.data_append_only_name    || "append_only",
     // Lab (group) vault clone = the lab-mgmt clone (issue #25); its path is
     // the resolved lab_mgmt_path from lab settings, not a machine.yaml field.
     lab_vault_path: (window.DATA.lab_settings || {}).lab_mgmt_path || "",
@@ -8048,6 +8147,11 @@ function MachinesPanel({ span = "c-5" }) {
     // so a remote card resolves both vaults' oracle/ + lab-notebook/ paths.
     oracle_subfolder: h.oracle_subfolder || "oracle",
     notebook_subfolder: h.notebook_subfolder || "lab-notebook",
+    // hosts.yaml carries no resolved child names for a remote machine — fall
+    // back to the canonical names (issue #99 / #80 Part 1a).
+    murmurent_data_subfolder: "murmurent_data",
+    data_immutable_name: "immutable",
+    data_append_only_name: "append_only",
     lab_vault_path: h.lab_vault_root || "",
     description: h.description || "",
     scan_dirs: h.scan_dirs || [],

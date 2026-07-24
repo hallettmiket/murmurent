@@ -58,6 +58,35 @@ def test_subdirs_honor_legacy_dirs_until_migrated(monkeypatch, tmp_path):
     assert lab_vm.append_only_root() == tmp_path / "refined"
 
 
+def test_data_child_names_default(monkeypatch, tmp_path):
+    """Fresh deployment (issue #99 / #80 Part 1a): canonical child names."""
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("MURMURENT_DATA_ROOT", str(tmp_path))
+    assert lab_vm.data_child_names() == ("immutable", "append_only")
+
+
+def test_data_child_names_legacy(monkeypatch, tmp_path):
+    """Un-migrated deployment resolves to the real raw/refined names on disk."""
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("MURMURENT_DATA_ROOT", str(tmp_path))
+    (tmp_path / "raw").mkdir()
+    (tmp_path / "refined").mkdir()
+    assert lab_vm.data_child_names() == ("raw", "refined")
+
+
+def test_data_child_names_explicit_base(monkeypatch, tmp_path):
+    """An explicit base overrides the ambient data root; legacy-aware per base."""
+    _clear_env(monkeypatch)
+    monkeypatch.setenv("MURMURENT_DATA_ROOT", str(tmp_path / "elsewhere"))
+    base = tmp_path / "wigamig"
+    (base / "raw").mkdir(parents=True)
+    (base / "refined").mkdir()
+    assert lab_vm.data_child_names(base=str(base)) == ("raw", "refined")
+    # A sibling base with no dirs yet resolves to the canonical names.
+    assert lab_vm.data_child_names(base=str(tmp_path / "fresh")) == (
+        "immutable", "append_only")
+
+
 def test_experiment_dirs_new_names(monkeypatch, tmp_path):
     _clear_env(monkeypatch)
     monkeypatch.setenv("MURMURENT_DATA_ROOT", str(tmp_path))

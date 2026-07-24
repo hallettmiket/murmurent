@@ -59,9 +59,34 @@ def load(*, legacy_obsidian: dict | None = None) -> C.MachineSettings:
             return value
         return default
 
+    wigamig_base = data.get("wigamig_base") or None
+
+    # Derived presentation names (issue #99 / #80 Part 1a): the machine window
+    # nests ``murmurent_data`` under each vault root, and the two governed
+    # children under the Files (data) root. The vault subfolder name is the
+    # fixed ``VAULT_SUBDIRS`` member; the Files children resolve against disk so
+    # a legacy raw/refined deployment renders its real names. Best-effort — the
+    # display falls back to the model defaults if resolution ever fails.
+    murmurent_data_subfolder = "murmurent_data"
+    try:
+        from ..core.vault_provision import VAULT_SUBDIRS as _SUBDIRS
+
+        if "murmurent_data" in _SUBDIRS:
+            murmurent_data_subfolder = "murmurent_data"
+    except Exception:  # noqa: BLE001
+        pass
+
+    data_immutable_name, data_append_only_name = "immutable", "append_only"
+    try:
+        from ..core import lab_vm as _lv
+
+        data_immutable_name, data_append_only_name = _lv.data_child_names(base=wigamig_base)
+    except Exception:  # noqa: BLE001
+        pass
+
     return C.MachineSettings(
         machine_name=data.get("machine_name") or None,
-        wigamig_base=data.get("wigamig_base") or None,
+        wigamig_base=wigamig_base,
         obsidian_vault_path=_pick("obsidian_vault_path", "vault_path"),
         obsidian_vault_name=_pick("obsidian_vault_name", "vault_name"),
         notebook_subfolder=_pick("notebook_subfolder", "notebook_subfolder", "lab-notebook"),
@@ -70,6 +95,9 @@ def load(*, legacy_obsidian: dict | None = None) -> C.MachineSettings:
         # collected per-installation. ``None`` here is fine; the
         # dashboard surfaces the install-wizard value as a fallback.
         lab_base=data.get("lab_base") or None,
+        murmurent_data_subfolder=murmurent_data_subfolder,
+        data_immutable_name=data_immutable_name,
+        data_append_only_name=data_append_only_name,
     )
 
 
