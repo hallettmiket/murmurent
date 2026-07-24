@@ -1,10 +1,13 @@
 # Inter-group (cross-lab) projects
 
-!!! warning "Work in progress"
-    Cross-lab project creation is still maturing. The certificate and
-    enrollment flow below is implemented, but the surrounding tooling (in
-    particular the shared-workspace and multi-org repository handling) is
-    under active development.
+!!! note "State of play"
+    The certificate and enrollment flow below is implemented. The project
+    channel lives in the **lead's** Slack workspace, and outside-group members
+    are brought in as single-channel guests where the workspace plan and token
+    support it. On a free Slack plan (no guest API), murmurent surfaces the
+    workspace invite link and records the member as *invite pending — ad hoc*
+    rather than failing. Multi-org repository handling (managed mirrors) is
+    covered separately.
 
 A project's basics (the definition, the certificate model, and the full
 command reference) live on [`project_intra.md`](project_intra.md). This page
@@ -31,11 +34,13 @@ field, and if she omits it, creation halts:
 This is deliberate: the shared workspace is where the project channel lives
 and where certificates are DM'd, so it must exist before the project does.
 
-**2. The groups decide.** The two PIs agree which of their labs' registered
-workspaces hosts the project (say the Rao lab's): what matters is that
-the workspace's bot token is on file. (A dedicated stand-alone workspace works
-too, once it's registered as a group with the registrar: `group-slack-setup`
-refuses unregistered names.)
+**2. The groups decide.** By default the project channel lives in the **lead's**
+workspace: `slack_workspace` defaults to the group the project lead belongs to,
+resolved centre-wide through the registrar. The two PIs may still name a
+different registered workspace explicitly; what matters is that the chosen
+workspace's bot token is on file. (A dedicated stand-alone workspace works too,
+once it's registered as a group with the registrar: `group-slack-setup` refuses
+unregistered names.)
 
 ```bash
 # one-time, on the machine that will provision the project:

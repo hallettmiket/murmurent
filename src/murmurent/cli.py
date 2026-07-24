@@ -636,6 +636,20 @@ def project_provision_slack(name: str) -> None:
         click.echo(f"  already in: {', '.join(out['already_in'])}")
     for u in out["unresolved"]:
         click.echo(f"  ! {u.get('handle')}: {u.get('reason')}")
+    # Inter-group: bring outside-group members in as single-channel guests in the
+    # LEAD's workspace. Free plan / no admin token → surface the invite link and
+    # mark them "invite pending — ad hoc" (never an error).
+    try:
+        g = _cprov.invite_outside_members(name)
+    except _cprov.CertProvisionError:
+        g = None
+    if g and (g["invited_guests"] or g["pending"]):
+        click.echo(f"  workspace: {g['workspace']}")
+        for gi in g["invited_guests"]:
+            click.echo(f"  ✓ guest invited: {gi['handle']} ({gi['email']})")
+        for p in g["pending"]:
+            link = f" — {p['invite_link']}" if p.get("invite_link") else ""
+            click.echo(f"  ⏳ {p['handle']}: {p['status']}{link} [{p['detail']}]")
 
 
 @project_group.command("provision-github",
@@ -658,6 +672,32 @@ def project_provision_github(name: str, org: str) -> None:
         mark = {"ok": "✓", "fail": "!", "no_github": "·"}.get(c.get("status"), "·")
         who = c.get("login") or c.get("handle")
         click.echo(f"  {mark} {c.get('handle')} → {who}: {c.get('detail', c.get('status'))}")
+
+
+@project_group.command("invite-guests",
+                       help="(PI) Invite a cross-group project's OUTSIDE-group "
+                            "members into its channel as single-channel guests in "
+                            "the lead's workspace. Where guests aren't supported "
+                            "(free plan / no admin token), surfaces the invite "
+                            "link and marks them 'invite pending — ad hoc'.")
+@click.argument("name")
+def project_invite_guests(name: str) -> None:
+    from .core import cert_provision as _cprov
+    try:
+        out = _cprov.invite_outside_members(name)
+    except _cprov.CertProvisionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if out.get("error") == "not_provisioned":
+        click.echo("  (no channel provisioned yet — run provision-slack first)")
+    if not (out["invited_guests"] or out["pending"]):
+        click.echo(f"project {name} — no outside-group members to invite.")
+        return
+    click.echo(f"project {name} — outside members (workspace: {out['workspace']})")
+    for gi in out["invited_guests"]:
+        click.echo(f"  ✓ guest invited: {gi['handle']} ({gi['email']})")
+    for p in out["pending"]:
+        link = f" — {p['invite_link']}" if p.get("invite_link") else ""
+        click.echo(f"  ⏳ {p['handle']}: {p['status']}{link} [{p['detail']}]")
 
 
 @project_group.command("reconcile",
