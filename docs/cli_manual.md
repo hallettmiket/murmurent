@@ -276,6 +276,8 @@ Choreographies are CC skills, not CLI subcommands. Invoke them inside Claude Cod
 | `murmurent dashboard --pi` | Open the PI view (rejected if you're not a PI); adds escalated-from-members nags |
 | `murmurent dashboard --snapshot` | Print the latest markdown snapshot from the lab-management repo |
 | `murmurent dashboard --outstanding` | Print only the Outstanding analysis panel (terminal-friendly summary) |
+| `murmurent dashboard --tunnel you@host` | Open an SSH tunnel to `you@host` (or a name registered with `murmurent host add`) and forward its dashboard to `http://localhost:8770` on this machine; see [Remote dashboard access](remote_dashboard.md) |
+| `murmurent dashboard --tunnel you@host --tunnel-port 8771` | Same, but forward to local port 8771, so a second tunnelled dashboard can run alongside the first |
 
 ### Onboarding
 

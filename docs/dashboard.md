@@ -25,8 +25,9 @@ The dashboard binds to loopback, so each machine's dashboard is visible
 on that machine alone. To view a remote server's dashboard from your
 laptop, use an SSH port-forward, either by hand or via
 `murmurent dashboard --tunnel you@host`; see
-[`setup.md`](setup.md#viewing-a-remote-machines-dashboard) for the
-recipe (including the VS Code Remote-SSH auto-forward route).
+[Remote dashboard access](remote_dashboard.md) for the full recipe
+(including first-time server setup and the VS Code Remote-SSH
+auto-forward route).
 
 ## Installing a desktop launcher (menu icon)
 

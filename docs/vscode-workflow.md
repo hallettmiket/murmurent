@@ -3,6 +3,12 @@
 The Murmurent repo ships a launcher + workspace config so VSCode opens
 in a consistent 4-quadrant layout with live agent reporting.
 
+!!! note "Working on a remote server through VS Code?"
+    This page covers the local 4-quadrant editor layout. To view a
+    remote server's dashboard, including the VS Code Remote-SSH
+    auto-forward route, see
+    [Remote dashboard access](remote_dashboard.md).
+
 ## Opening a project
 
 ```bash
