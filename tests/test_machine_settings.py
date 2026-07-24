@@ -83,16 +83,18 @@ def test_data_children_default_names(pinned_machine_file, monkeypatch):
     assert settings.data_append_only_name == "append_only"
 
 
-def test_data_children_resolve_legacy_from_wigamig_base(pinned_machine_file, monkeypatch):
-    """When the machine's wigamig_base is a legacy raw/refined tree on disk, the
-    display names resolve to the REAL folder names (issue #80 Part 1a)."""
+def test_data_children_show_canonical_even_when_legacy_on_disk(pinned_machine_file, monkeypatch):
+    """Even when the machine's wigamig_base still uses raw/refined on disk, the
+    display shows the CANONICAL immutable/append_only terms murmurent is
+    standardising on (raw/refined are recognised synonyms; the hooks keep
+    resolving the real dirs)."""
     _clear_data_env(monkeypatch)
     base = pinned_machine_file / "wigamig"
     (base / "raw").mkdir(parents=True)
     (base / "refined").mkdir()
     MS.write(MachineSettings(wigamig_base=str(base)))
     settings = MS.load()
-    assert settings.data_immutable_name == "raw"
-    assert settings.data_append_only_name == "refined"
+    assert settings.data_immutable_name == "immutable"
+    assert settings.data_append_only_name == "append_only"
     # The vault subfolder name is unaffected by the Files-root migration state.
     assert settings.murmurent_data_subfolder == "murmurent_data"

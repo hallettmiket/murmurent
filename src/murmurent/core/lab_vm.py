@@ -110,19 +110,18 @@ def append_only_root(env: dict[str, str] | None = None) -> Path:
 def data_child_names(
     base: str | Path | None = None, env: dict[str, str] | None = None
 ) -> tuple[str, str]:
-    """Return the resolved (immutable, append_only) child *folder names*.
+    """Return the canonical governed-child folder names for display.
 
     Presentation helper (issue #99 / #80 Part 1a): the machine window shows the
-    data root once, then its two governed children nested underneath. A migrated
-    deployment resolves to ``("immutable", "append_only")``; a legacy one where
-    only ``raw/``/``refined/`` exist on disk resolves to those instead. When
-    ``base`` is given (e.g. the machine's ``wigamig_base``) the check is made
-    against that root; otherwise the ambient data root is used.
+    data root once, then its two governed children nested underneath. Murmurent
+    is standardising on the terms ``immutable`` / ``append_only``, and ``raw`` /
+    ``refined`` are recognised synonyms during the transition. So this always
+    reports the canonical pair -- a lab whose data root still uses ``raw/`` /
+    ``refined/`` on disk sees the new terms in the dashboard, while the hooks and
+    ``immutable_root()`` / ``append_only_root()`` keep resolving the real legacy
+    dirs. ``base`` / ``env`` are accepted for call-site compatibility.
     """
-    root = Path(base).expanduser() if base else data_root(env)
-    immutable = _resolve_subdir(root, IMMUTABLE_SUBDIR, LEGACY_IMMUTABLE_SUBDIR).name
-    append_only = _resolve_subdir(root, APPEND_ONLY_SUBDIR, LEGACY_APPEND_ONLY_SUBDIR).name
-    return immutable, append_only
+    return IMMUTABLE_SUBDIR, APPEND_ONLY_SUBDIR
 
 
 def raw_root(env: dict[str, str] | None = None) -> Path:
