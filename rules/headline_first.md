@@ -39,6 +39,7 @@ vocabulary:
 | `cable_guy` | `Provisioned / Skipped / Failed — <one-line on what>` |
 | `registrar` | `Recorded / Conflict / Skipped — <one-line on what>` |
 | `judge` | `Presented / Split / Insufficient — <one-line on the combined result>` |
+| `teacher` | `Explained / Gap — <one-line on what was/wasn't understood>` |
 
 Then a blank line. Then the detail. Example:
 

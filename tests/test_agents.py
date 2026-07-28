@@ -37,6 +37,7 @@ EXPECTED_AGENTS = {
     "registrar",
     "lawyer",
     "security_guard",
+    "teacher",
 }
 
 # Commons-agent categories (#38). The rest default to "member".
