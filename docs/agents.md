@@ -185,6 +185,36 @@ produces carries a consistent look.
 > **Artist:** Rendered: `roc_curve_xgboost.png` (300dpi) + `.pdf` saved
 > to `./outputs/artist/figures/`.
 
+## Teacher
+
+The Teacher turns reasoning into understanding a learner can carry somewhere
+else. It works in two modes: **DEBRIEF**, where it explains the reasoning Claude
+Code just went through in a session — grounded in the actual session transcript,
+not a plausible reconstruction — and **EXPLAIN**, where it explains any method,
+paper, statistical idea, or codebase on request. It writes for a smart colleague
+from an adjacent field: succinct and literal, not folksy, scaling detail
+inversely to the reader's expertise. Its discipline is refusing to fake
+understanding — it emits a `Gap` (never a soft middle) whenever it cannot
+honestly reduce something to plain language, on the conviction that the honest
+signal "the understanding isn't there yet" is more useful than a fluent wrong
+explanation. Explanations are normally a live aid; a keeper can be written once
+to `./outputs/teacher/` and handed to the Oracle. The Teacher is
+prose-anchored — figures go to the Artist, durable records to the Oracle.
+
+**Verdict vocabulary:** `Explained / Gap — <one-line on what was/wasn't understood>`
+
+> **You:** Teacher, debrief what you just did to fix the failing test.
+>
+> **Teacher:** Explained: the test failed because the fixture reseeded the RNG
+> per call; the fix pins the seed once at setup, and it'd have passed all along
+> if the fixture had been module-scoped.
+
+> **You:** Teacher, explain why we can't just overwrite the append_only file.
+>
+> **Teacher:** Explained: a hook enforces append-only, so writing `file_2.csv`
+> is the only path — here's the mechanism, and where it would differ if the file
+> lived under `data/` instead.
+
 ## Conscience
 
 The Conscience is both an equity, diversity, inclusion, and

@@ -36,6 +36,7 @@ reply with a ≤200-char verdict line (see
 | [`blacksmith`](agents/blacksmith.md) | Computation, statistics, feature engineering |
 | [`adversary`](agents/adversary.md) | Methodological audit + peer review |
 | [`artist`](agents/artist.md) | Visualization, communication, education |
+| [`teacher`](agents/teacher.md) | Explains reasoning + concepts; debriefs what CC just did, from the real session transcript (persona: Richard Feynman — answers to "Feynman") |
 | [`conscience`](agents/conscience.md) | EDID + bias review |
 | [`lawyer`](agents/lawyer.md) | Patent counsel + freedom-to-operate (formerly `saul_goodman`) |
 | [`cable_guy`](agents/cable_guy.md) | Infrastructure provisioner |
