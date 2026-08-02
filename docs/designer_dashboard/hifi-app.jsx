@@ -717,7 +717,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
                  title="murmurent's own repos (murmurent, murmurent_*) — infrastructure, pinned to the top when shown">
             <input type="checkbox" checked={showInfra}
                    onChange={e => setShowInfra(e.target.checked)} />
-            show {infraCount} murmurent infra
+            show Murmurent repos
           </label>
         </div>
       </header>
@@ -789,6 +789,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
               {knownHosts.map(h => (
                 <th key={h} style={{textAlign:"left", whiteSpace:"nowrap"}}>{h}</th>
               ))}
+              <th style={{width:28}}></th>
             </tr></thead>
             <tbody>
               {visibleRows.map((r, i) => (
@@ -1006,18 +1007,22 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading, onRe
         {gh && gh.archived && (
           <span className="muted" style={{fontSize:10, marginLeft:6}}>(archived)</span>
         )}
-        {canRemove && (
-          <button className="btn sm"
-            style={{marginLeft:8, fontSize:11, padding:"2px 8px", whiteSpace:"nowrap",
-                    color:"var(--red)", borderColor:"var(--red)"}}
-            title={"Remove the local clone of " + row.name + " (" + localClone.path + ")"}
-            onClick={() => onRemove({ name: row.name, path: localClone.path })}>
-            Remove
-          </button>
-        )}
       </td>
       <td>{ghCell}</td>
       {knownHosts.map(h => <td key={h}>{hostCell(h)}</td>)}
+      <td style={{textAlign:"right", width:28, paddingRight:8}}>
+        {canRemove && (
+          <button
+            title={"Remove the local clone of " + row.name + " (" + localClone.path + ")"}
+            onClick={() => onRemove({ name: row.name, path: localClone.path })}
+            style={{background:"none", border:0, cursor:"pointer", color:"var(--muted)",
+                    fontSize:15, lineHeight:1, padding:"0 2px"}}
+            onMouseOver={e => (e.currentTarget.style.color = "var(--red)")}
+            onMouseOut={e => (e.currentTarget.style.color = "var(--muted)")}>
+            ×
+          </button>
+        )}
+      </td>
     </tr>
   );
 }
