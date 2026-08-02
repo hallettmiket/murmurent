@@ -1070,7 +1070,7 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
             disabled={ccBusy}
             title={"Launch a Claude Code session in " + localClone.path}
             onClick={launchCC}>
-            {ccBusy ? "…" : "▶ CC"}
+            {ccBusy ? "…" : "launch"}
           </button>
         )}
         {ccMsg && (
