@@ -2279,6 +2279,109 @@ def create_app() -> FastAPI:
         report = _inv.scan_and_cache(github_org=org)
         return {"from_cache": False, **report.to_dict()}
 
+    @app.delete("/api/inventory/repos/{name}")
+    def delete_inventory_repo(
+        name: str,
+        confirm: str = Query("", description="Typed repo name; must equal {name} to proceed."),
+        host: str = Query("local", description="Which host's clone to remove (only 'local' supported)."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Remove a repo's LOCAL working clone (moved to a recoverable trash).
+
+        Danger-zone gated like GitHub's repo deletion: the caller must re-type
+        the repo name (``confirm``) exactly. Refusals:
+
+        - **murmurent-infra repos** (``murmurent``, ``murmurent_*``) are never
+          removable here — they are infrastructure, not disposable working
+          repos (matches the make-ready suppression, #41 pt 5).
+        - a mismatched ``confirm`` is refused (the double-check).
+
+        The clone is **moved** to ``~/.murmurent/trash/repos/<name>-<UTCstamp>/``
+        rather than hard-deleted, so an accidental removal is recoverable; the
+        trash path (and the ``mv`` to undo it) is returned. Only the local
+        working clone is touched — never GitHub, never another host, never the
+        governed data root.
+        """
+        import shutil as _sh
+        from datetime import datetime, timezone
+        from ..core import repo_inventory as _inv
+        from ..core.repo_inventory import is_murmurent_infra_repo as _is_infra
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+
+        if host != "local":
+            raise HTTPException(
+                status_code=400,
+                detail="only the local clone can be removed here; tunnel to the "
+                       "host's own dashboard to manage its repos.",
+            )
+        if confirm.strip() != name:
+            raise HTTPException(
+                status_code=400,
+                detail=f"confirmation mismatch: type the repo name '{name}' exactly to remove it.",
+            )
+        if _is_infra(name):
+            raise HTTPException(
+                status_code=409,
+                detail=f"'{name}' is murmurent infrastructure — it can't be removed here.",
+            )
+
+        # Resolve the local clone path from the cached inventory (server-side —
+        # we never trust a client-supplied path for a destructive move).
+        cached_path = _inv.latest_report_path()
+        report = _inv.load_report(cached_path) if cached_path else None
+        if report is not None and hasattr(report, "to_dict"):
+            report = report.to_dict()
+        clone_path: str | None = None
+        if isinstance(report, dict):
+            for row in report.get("rows", []):
+                if row.get("name") != name:
+                    continue
+                for c in row.get("clones", []):
+                    if c.get("host") == "local":
+                        if c.get("is_murmurent_infra"):
+                            raise HTTPException(
+                                status_code=409,
+                                detail=f"'{name}' is murmurent infrastructure — it can't be removed here.",
+                            )
+                        clone_path = c.get("path")
+                break
+        if not clone_path:
+            raise HTTPException(
+                status_code=404,
+                detail=f"no local clone of '{name}' found in the inventory — Refresh the repos panel and retry.",
+            )
+
+        src = Path(clone_path).expanduser()
+        if not src.is_dir():
+            raise HTTPException(status_code=404, detail=f"clone path does not exist: {src}")
+
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        trash_dir = Path.home() / ".murmurent" / "trash" / "repos"
+        trash_dir.mkdir(parents=True, exist_ok=True)
+        dest = trash_dir / f"{name}-{stamp}"
+        try:
+            _sh.move(str(src), str(dest))
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"could not move clone to trash: {exc}")
+
+        # Best-effort: refresh the cached inventory so the row disappears on the
+        # next load. A scan failure here doesn't undo the removal.
+        try:
+            lab_settings = snap_mod._current_lab_settings()
+            _inv.scan_and_cache(github_org=lab_settings.github_org)
+        except Exception:  # noqa: BLE001 — cache refresh is non-critical
+            pass
+
+        return {
+            "ok": True,
+            "name": name,
+            "removed_from": str(src),
+            "trash": str(dest),
+            "note": f"Moved the local clone of '{name}' to trash. Undo with: mv '{dest}' '{src}'",
+        }
+
     @app.post("/api/inventory/adopt")
     def post_inventory_adopt(
         body: AdoptCloneBody,

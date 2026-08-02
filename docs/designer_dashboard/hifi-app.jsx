@@ -672,6 +672,11 @@ function RepoInventoryPanel({ span = "c-12" }) {
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState(null);
   const [showAllGithub, setShowAllGithub] = useState(false);
+  // murmurent-infra repos (murmurent, murmurent_*) are pinned to the top of the
+  // list but hidden by default — they're infrastructure, not working repos the
+  // user manages day-to-day. This toggle reveals them.
+  const [showInfra,  setShowInfra]  = useState(false);
+  const [removeCtx,  setRemoveCtx]  = useState(null);  // {name, path} for the remove modal
   const [adoptCtx,   setAdoptCtx]   = useState(null);  // {name, path, origin}
   const [upgrading,  setUpgrading]  = useState(null);  // clone_path being upgraded
   const [upgraded,   setUpgraded]   = useState(null);  // {name, verdict, version}
@@ -735,14 +740,20 @@ function RepoInventoryPanel({ span = "c-12" }) {
       })()
     : null;
 
-  // Display order: show rows with at least one clone first, then any
-  // GitHub-only rows (only when the user toggles them in — usually a
-  // long list).
+  const infraCount = report ? (report.rows || []).filter(rowIsMurmurentInfra).length : 0;
+
+  // Display order:
+  //   1. murmurent-infra rows FIRST, but only when showInfra is on (hidden by
+  //      default — they're infrastructure, not day-to-day working repos).
+  //   2. then working repos: cloned rows, plus GitHub-only rows when toggled.
   const visibleRows = (() => {
     if (!report) return [];
     const rows = report.rows || [];
-    if (showAllGithub) return rows;
-    return rows.filter(r => r.clones && r.clones.length > 0);
+    const infra = rows.filter(rowIsMurmurentInfra);
+    const rest  = rows.filter(r => !rowIsMurmurentInfra(r));
+    const restVisible = showAllGithub ? rest : rest.filter(r => r.clones && r.clones.length > 0);
+    const infraVisible = showInfra ? infra : [];
+    return [...infraVisible, ...restVisible];  // infra pinned to the top
   })();
 
   return (
@@ -769,6 +780,12 @@ function RepoInventoryPanel({ span = "c-12" }) {
             <input type="checkbox" checked={showAllGithub}
                    onChange={e => setShowAllGithub(e.target.checked)} />
             include {stats ? stats.ghOnly : "?"} GitHub-only rows
+          </label>
+          <label style={{fontSize:11, display:"inline-flex", alignItems:"center", gap:4}}
+                 title="murmurent's own repos (murmurent, murmurent_*) — infrastructure, pinned to the top when shown">
+            <input type="checkbox" checked={showInfra}
+                   onChange={e => setShowInfra(e.target.checked)} />
+            show Murmurent repos
           </label>
         </div>
       </header>
@@ -840,6 +857,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
               {knownHosts.map(h => (
                 <th key={h} style={{textAlign:"left", whiteSpace:"nowrap"}}>{h}</th>
               ))}
+              <th style={{width:28}}></th>
             </tr></thead>
             <tbody>
               {visibleRows.map((r, i) => (
@@ -850,6 +868,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
                   onAdopt={(ctx) => setAdoptCtx(ctx)}
                   onUpgrade={doUpgrade}
                   upgrading={upgrading}
+                  onRemove={(ctx) => setRemoveCtx(ctx)}
                 />
               ))}
             </tbody>
@@ -862,6 +881,15 @@ function RepoInventoryPanel({ span = "c-12" }) {
           onClose={(adopted) => {
             setAdoptCtx(null);
             if (adopted) load(true);
+          }}
+        />
+      )}
+      {removeCtx && (
+        <RemoveRepoModal
+          repo={removeCtx}
+          onClose={(removed) => {
+            setRemoveCtx(null);
+            if (removed) load(true);
           }}
         />
       )}
@@ -905,11 +933,15 @@ function rowIsMurmurentInfra(row) {
   return false;
 }
 
-function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
+function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading, onRemove }) {
   const gh = row.github;
   const cloneByHost = {};
   for (const c of (row.clones || [])) cloneByHost[c.host] = c;
   const rowInfra = rowIsMurmurentInfra(row);
+  // Remove is offered only for a NON-infra repo that has a LOCAL clone to
+  // remove. murmurent infrastructure is never removable here.
+  const localClone = cloneByHost["local"];
+  const canRemove = !rowInfra && localClone && onRemove;
 
   // Per-repo launch: open a Claude Code CLI session in this repo's LOCAL clone.
   // Only offered when the repo is cloned on this machine (host "local") — a
@@ -1082,6 +1114,19 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
       </td>
       <td>{ghCell}</td>
       {knownHosts.map(h => <td key={h}>{hostCell(h)}</td>)}
+      <td style={{textAlign:"right", width:28, paddingRight:8}}>
+        {canRemove && (
+          <button
+            title={"Remove the local clone of " + row.name + " (" + localClone.path + ")"}
+            onClick={() => onRemove({ name: row.name, path: localClone.path })}
+            style={{background:"none", border:0, cursor:"pointer", color:"var(--muted)",
+                    fontSize:15, lineHeight:1, padding:"0 2px"}}
+            onMouseOver={e => (e.currentTarget.style.color = "var(--red)")}
+            onMouseOut={e => (e.currentTarget.style.color = "var(--muted)")}>
+            ×
+          </button>
+        )}
+      </td>
     </tr>
   );
 }
@@ -1429,6 +1474,96 @@ function InstallationsBox({ span = "c-12" }) {
       {cleanup && (
         <InstallCleanupModal cleanup={cleanup} onClose={() => setCleanup(null)} />
       )}
+    </div>
+  );
+}
+
+/* RemoveRepoModal — danger-zone removal of a repo's LOCAL clone.
+   Mirrors GitHub's "type the name to confirm" gate: the delete button stays
+   disabled until the typed text exactly matches the repo name. Server-side the
+   clone is MOVED to ~/.murmurent/trash/repos/ (recoverable), murmurent-infra
+   repos are refused, and only the local clone is ever touched. */
+function RemoveRepoModal({ repo, onClose }) {
+  const [typed, setTyped] = useState("");
+  const [busy,  setBusy]  = useState(false);
+  const [err,   setErr]   = useState(null);
+  const [done,  setDone]  = useState(null);   // {trash, note} on success
+  const match = typed.trim() === repo.name;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!match) return;
+    setBusy(true); setErr(null);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const userParam = params.get("user");
+      const url = "/api/inventory/repos/" + encodeURIComponent(repo.name)
+                + "?confirm=" + encodeURIComponent(typed.trim())
+                + "&host=local"
+                + (userParam ? "&user=" + encodeURIComponent(userParam) : "");
+      const r = await fetch(url, { method: "DELETE", headers: { Accept: "application/json" } });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(body.detail || ("HTTP " + r.status));
+      setDone({ trash: body.trash, note: body.note });
+      setTimeout(() => onClose(true), 1800);
+    } catch (ex) {
+      setErr(String(ex.message || ex));
+    } finally { setBusy(false); }
+  };
+
+  return (
+    <div onClick={() => onClose(false)} style={{
+      position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+      display:"flex", alignItems:"flex-start", justifyContent:"center",
+      zIndex:200, padding:"40px 20px", overflowY:"auto",
+    }}>
+      <form onSubmit={submit} onClick={(e) => e.stopPropagation()} style={{
+        background:"var(--card)", border:"1px solid var(--red)",
+        borderRadius:2, padding:18, width:"min(520px, 96vw)",
+        display:"flex", flexDirection:"column", gap:8,
+      }}>
+        <div className="row" style={{justifyContent:"space-between", alignItems:"baseline"}}>
+          <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--red)"}}>
+            Remove repo
+          </h2>
+          <button type="button" onClick={() => onClose(false)}
+            style={{background:"none", border:0, fontSize:18, cursor:"pointer", color:"var(--muted)"}}>×</button>
+        </div>
+
+        {done ? (
+          <div style={{fontSize:12.5, color:"var(--green)"}}>
+            Removed <strong>{repo.name}</strong>. {done.note}
+          </div>
+        ) : (
+          <>
+            <p style={{margin:0, fontSize:12.5, lineHeight:1.5}}>
+              This removes the <strong>local clone</strong> of{" "}
+              <strong>{repo.name}</strong> at{" "}
+              <span className="mono" style={{fontSize:11}}>{repo.path}</span>.
+              It is <strong>moved to trash</strong> (~/.murmurent/trash/repos/),
+              not permanently deleted — recoverable — and GitHub is untouched.
+            </p>
+            <label style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
+                           textTransform:"uppercase", color:"var(--muted)", marginTop:4}}>
+              Type <span style={{color:"var(--red)"}}>{repo.name}</span> to confirm
+            </label>
+            <input autoFocus value={typed} onChange={e => setTyped(e.target.value)}
+              placeholder={repo.name}
+              style={{fontFamily:"var(--mono)", fontSize:13, padding:"7px 9px",
+                      border:"1px solid var(--rule-strong)", borderRadius:2}} />
+            {err && <div style={{color:"var(--red)", fontSize:12}}>{err}</div>}
+            <div className="row" style={{justifyContent:"flex-end", gap:8, marginTop:6}}>
+              <button type="button" className="btn sm" onClick={() => onClose(false)}>Cancel</button>
+              <button type="submit" className="btn sm"
+                disabled={!match || busy}
+                style={{background: match ? "var(--red)" : "var(--rule)",
+                        color: match ? "white" : "var(--muted)", borderColor:"var(--red)"}}>
+                {busy ? "removing…" : "Remove repo"}
+              </button>
+            </div>
+          </>
+        )}
+      </form>
     </div>
   );
 }
