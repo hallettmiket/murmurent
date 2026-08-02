@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from ..core.identity import resolve as resolve_identity
 from ..core.repo import lab_mgmt_repo_root
 from . import contract as C
+from . import launchers as _launchers
 from . import notebook_actions
 from . import request_actions
 from . import sea_actions
@@ -142,6 +143,18 @@ class WorkspaceLaunchBody(BaseModel):
     project: str
     agents: list[str] = []
     sea_id: int | None = None
+
+
+class ClaudeSessionBody(BaseModel):
+    """JSON body for ``POST /api/workspace/claude-session``.
+
+    Everything is optional: a bare CC session needs no repo. Precedence for the
+    terminal's working dir: ``cwd`` (an explicit local path, used by the repos
+    list) > ``project`` (a registered project's clone) > ``$HOME``.
+    """
+
+    project: str | None = None
+    cwd: str | None = None
 
 
 class WorkspaceInitializeBody(BaseModel):
@@ -1403,44 +1416,112 @@ def create_app() -> FastAPI:
                 ),
             }
 
-        # ---- Local project: open via scripts/open_murmurent.sh ----
-        # The newer launcher (2026-05-17) detects monitors via JXA+AppKit
-        # and positions the window at 80% of the chosen display
-        # (external if attached, else laptop). It does NOT spawn iTerm
-        # agent-tail windows — that role moved into VSCode's BR pane
-        # via the murmurent agent-reporter hook. The old
-        # start_workspace.sh remains in the tree for the iTerm-windows
-        # workflow but is no longer the dashboard's default.
+        # ---- Local project ----
         project_dir = project_path(body.project)
+
+        # macOS: prefer the positioned launcher (scripts/open_murmurent.sh).
+        # It detects monitors via JXA+AppKit and sizes the window to 80% of the
+        # chosen display. It is macOS-ONLY (osascript/AppKit), so on Linux and
+        # other platforms we fall through to the portable ``code`` CLI path
+        # below — otherwise the script would fail silently (Popen returns before
+        # the osascript error) and the button would look like it worked while
+        # nothing opened.
+        import platform as _platform
+
         script = murmurent_repo_root() / "scripts" / "open_murmurent.sh"
-        if not script.is_file():
-            raise HTTPException(status_code=500, detail=f"launcher missing: {script}")
+        if _platform.system() == "Darwin" and script.is_file():
+            cmd: list[str] = [str(script), str(project_dir)]
+            try:
+                subprocess.Popen(  # noqa: S603 — args are list, never shelled
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    close_fds=True,
+                )
+            except OSError as exc:
+                raise HTTPException(status_code=500, detail=f"launcher failed: {exc}")
+            return {
+                "ok": True,
+                "project": body.project,
+                "project_dir": str(project_dir),
+                "launcher": str(script),
+                "agents": body.agents,
+                "sea_id": body.sea_id,
+                "cmd": cmd,
+                "note": (
+                    "Launched via open_murmurent.sh — VSCode opens at 80% of "
+                    "the chosen display. Arrange the 4 quadrants once and "
+                    "VSCode persists the layout per folder."
+                ),
+            }
 
-        cmd: list[str] = [str(script), str(project_dir)]
-        try:
-            subprocess.Popen(  # noqa: S603 — args are list, never shelled
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                close_fds=True,
+        # Linux / other: open the repo directly with the ``code`` CLI.
+        res = _launchers.open_in_vscode(project_dir)
+        if not res["launched"]:
+            raise HTTPException(
+                status_code=500,
+                detail=res["error"] or "could not launch VS Code",
             )
-        except OSError as exc:
-            raise HTTPException(status_code=500, detail=f"launcher failed: {exc}")
-
         return {
             "ok": True,
             "project": body.project,
             "project_dir": str(project_dir),
-            "launcher": str(script),
+            "launcher": res["launcher"],
+            "launched": True,
             "agents": body.agents,
             "sea_id": body.sea_id,
-            "cmd": cmd,
-            "note": (
-                "Launched via open_murmurent.sh — VSCode opens at 80% of "
-                "the chosen display. Arrange the 4 quadrants once and "
-                "VSCode persists the layout per folder."
-            ),
+            "note": res["note"],
+        }
+
+    @app.post("/api/workspace/claude-session")
+    def workspace_claude_session(
+        body: ClaudeSessionBody,
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Open a bare Claude Code CLI session in a native terminal.
+
+        The "launch app → work in Claude Code" flow when there is no specific
+        repo to open (or the user just wants a scratch session). Spawns a
+        terminal running ``claude``; no browser/PTY wrapper is involved — the
+        dashboard is a local desktop app, so the terminal opens in the signed-in
+        user's session. If ``project`` is given and resolves to a local clone,
+        the session starts in that repo's directory; otherwise ``$HOME``.
+        """
+        from ..core.projects import find_project as _find_project, project_path
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+
+        cwd: str | None = None
+        if body.cwd:
+            # Explicit local directory (e.g. a repo path from the repos list).
+            p = Path(body.cwd).expanduser()
+            if not p.is_dir():
+                raise HTTPException(status_code=404, detail=f"directory not found: {body.cwd}")
+            cwd = str(p)
+        elif body.project:
+            if _find_project(body.project) is None:
+                raise HTTPException(status_code=404, detail=f"project not found: {body.project}")
+            cwd = str(project_path(body.project))
+
+        res = _launchers.launch_claude_session(cwd=cwd)
+        # ``already_open`` is a success: an existing session was raised instead
+        # of spawning a duplicate. Only a genuine failure (no terminal, spawn
+        # error) has neither flag set.
+        if not res.get("launched") and not res.get("already_open"):
+            raise HTTPException(
+                status_code=500,
+                detail=res.get("error") or "could not launch a terminal for Claude Code",
+            )
+        return {
+            "ok": True,
+            "project": body.project,
+            "cwd": cwd or str(Path.home()),
+            "launcher": res.get("launcher"),
+            "launched": bool(res.get("launched")),
+            "already_open": bool(res.get("already_open")),
+            "note": res["note"],
         }
 
     @app.post("/api/workspace/initialize")

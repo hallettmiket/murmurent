@@ -582,6 +582,74 @@ async function postWorkspaceLaunch(body) {
   return res.json();
 }
 
+/* Launch a bare Claude Code CLI session in a native terminal — no repo
+   required. Pass { project } to start the session in that repo's dir, or
+   {} for a scratch session in $HOME. POST /api/workspace/claude-session. */
+async function postClaudeSession(body) {
+  const params = new URLSearchParams(window.location.search);
+  const userParam = params.get("user");
+  const url = "/api/workspace/claude-session" + (userParam ? "?user=" + encodeURIComponent(userParam) : "");
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body || {}),
+  });
+  if (!res.ok) {
+    let detail = "HTTP " + res.status;
+    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    throw new Error(detail);
+  }
+  return res.json();
+}
+
+/* CCLaunchBar: prominent top-level "launch Claude Code" entry point, placed
+   ABOVE the repos list. Opens a bare CC session (no repo) — the "just launch
+   Claude Code from the dashboard" flow. Per-repo sessions live in the repos
+   list below (each row's "▶ CC" button). */
+function CCLaunchBar({ span = "c-12" }) {
+  const [busy, setBusy] = useState(false);
+  const [msg,  setMsg]  = useState(null);
+  const launch = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await postClaudeSession({});
+      setMsg(r.already_open
+        ? "already open — brought to front"
+        : "opened Claude Code — check your terminal");
+      setTimeout(() => setMsg(null), 4000);
+    } catch (ex) {
+      setMsg(String(ex.message || ex));
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className={"card " + span}
+         style={{display:"flex", alignItems:"center", justifyContent:"space-between",
+                 gap:14, padding:"12px 16px"}}>
+      <div style={{display:"flex", flexDirection:"column", gap:2}}>
+        <strong style={{fontSize:14}}>Claude Code</strong>
+        <span className="muted" style={{fontSize:11}}>
+          Launch a Claude Code CLI session in a new terminal — no repo needed.
+          Per-repo sessions are in the list below.
+        </span>
+      </div>
+      <div style={{display:"flex", alignItems:"center", gap:10}}>
+        {msg && (
+          <span style={{fontSize:11, color:/open/i.test(msg) ? "var(--muted)" : "var(--red)"}}>
+            {msg}
+          </span>
+        )}
+        <button className="btn primary" onClick={launch} disabled={busy}
+          title="Open a Claude Code CLI session in a new terminal">
+          {busy ? "launching…" : "▶ Launch Claude Code"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /* Infrastructure checklist items for the initialization wizard. */
 const INFRA_ITEMS = [
   { id: "git",         label: "git",             note: "version control (required)" },
@@ -843,6 +911,27 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
   for (const c of (row.clones || [])) cloneByHost[c.host] = c;
   const rowInfra = rowIsMurmurentInfra(row);
 
+  // Per-repo launch: open a Claude Code CLI session in this repo's LOCAL clone.
+  // Only offered when the repo is cloned on this machine (host "local") — a
+  // GitHub-only or remote-host repo has no local dir to cd into.
+  const localClone = cloneByHost["local"];
+  const [ccBusy, setCcBusy] = useState(false);
+  const [ccMsg,  setCcMsg]  = useState(null);
+  const launchCC = async () => {
+    if (!localClone) return;
+    setCcBusy(true);
+    setCcMsg(null);
+    try {
+      const r = await postClaudeSession({ cwd: localClone.path });
+      setCcMsg(r.already_open ? "already open" : "opened");
+      setTimeout(() => setCcMsg(null), 3000);
+    } catch (ex) {
+      setCcMsg(String(ex.message || ex));
+    } finally {
+      setCcBusy(false);
+    }
+  };
+
   // GitHub cell: a link to the repo, labelled with its visibility.
   // (Was "✓ {visibility[0]}" — the first letter of "public" and "private" is
   // the same "p", so every repo rendered an identical, meaningless "✓ p".)
@@ -974,6 +1063,21 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading }) {
         )}
         {gh && gh.archived && (
           <span className="muted" style={{fontSize:10, marginLeft:6}}>(archived)</span>
+        )}
+        {localClone && (
+          <button className="btn sm"
+            style={{marginLeft:8, fontSize:11, padding:"2px 8px", whiteSpace:"nowrap"}}
+            disabled={ccBusy}
+            title={"Launch a Claude Code session in " + localClone.path}
+            onClick={launchCC}>
+            {ccBusy ? "…" : "▶ CC"}
+          </button>
+        )}
+        {ccMsg && (
+          <span style={{marginLeft:6, fontSize:10,
+                        color:/open/i.test(ccMsg) ? "var(--muted)" : "var(--red)"}}>
+            {ccMsg}
+          </span>
         )}
       </td>
       <td>{ghCell}</td>
@@ -1139,7 +1243,9 @@ function InstallationsBox({ span = "c-12" }) {
       // Local project: backend returns agents = list of panes opened.
       const msg = r.vscode_url
         ? `opened VSCode Remote-SSH on ${r.host}`
-        : `opened ${(r.agents || []).length} pane(s)`;
+        : r.launched                                   // Linux/other: single code window
+        ? "opened VS Code"
+        : `opened ${(r.agents || []).length} pane(s)`; // macOS 4-quadrant launcher
       setRowMsg(m => ({ ...m, [i]: msg }));
       setTimeout(() => setRowMsg(m => ({ ...m, [i]: null })), 3000);
     } catch (ex) {
@@ -8328,14 +8434,26 @@ function App() {
                           labFolder={D.lab_oracle_folder} span="c-4" />
         </div>
 
+        {/* Launch Claude Code — prominent entry point above the repos list. */}
+        <div className="grid" style={{marginBottom:14}}>
+          <CCLaunchBar span="c-12" />
+        </div>
+
         {/* Repo inventory: cross-machine + GitHub audit — one column per
             registered machine (local included). Cached weekly, on-demand
             refresh. Per-row "↑ adopt" / "Install on <machine>" pre-fill
-            the adopt/install wizards. Sits above the live agent feed and
-            Inventory: repos are the more frequently-consulted. Terminal
+            the adopt/install wizards. Each cloned-locally row also has a
+            "▶ CC" button to open a Claude Code session in that repo. Terminal
             twin: `murmurent repo {list,status,adopt}`. */}
         <div className="grid" style={{marginBottom:14}}>
           <RepoInventoryPanel span="c-12" />
+        </div>
+
+        {/* Installations: this machine's provisioned environments + the launch
+            actions. Per-row "open workspace" opens the repo in VS Code; the
+            header "▶ Claude Code" opens a bare CC session (no repo). */}
+        <div className="grid" style={{marginBottom:14}}>
+          <InstallationsBox span="c-12" />
         </div>
 
         {/* Live subagent feed — the browser equivalent of the tmux BR pane. */}
