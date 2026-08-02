@@ -1543,7 +1543,11 @@ function RemoveRepoModal({ repo, onClose }) {
             </p>
             <label style={{fontFamily:"var(--mono)", fontSize:10, letterSpacing:1,
                            textTransform:"uppercase", color:"var(--muted)", marginTop:4}}>
-              Type <span style={{color:"var(--red)"}}>{repo.name}</span> to confirm
+              Type{" "}
+              {/* textTransform:none so the repo name shows its REAL casing — the
+                  uppercased label made a lowercase name look like it needed caps. */}
+              <span style={{color:"var(--red)", textTransform:"none"}}>{repo.name}</span>
+              {" "}to confirm
             </label>
             <input autoFocus value={typed} onChange={e => setTyped(e.target.value)}
               placeholder={repo.name}
