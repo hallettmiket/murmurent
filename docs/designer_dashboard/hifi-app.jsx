@@ -943,10 +943,8 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading, onRe
   const localClone = cloneByHost["local"];
   const canRemove = !rowInfra && localClone && onRemove;
 
-  // Per-repo launch: open a Claude Code CLI session in this repo's LOCAL clone.
-  // Only offered when the repo is cloned on this machine (host "local") — a
-  // GitHub-only or remote-host repo has no local dir to cd into.
-  const localClone = cloneByHost["local"];
+  // Per-repo launch: open a Claude Code CLI session in this repo's LOCAL clone
+  // (localClone above). Only offered when the repo is cloned on this machine.
   const [ccBusy, setCcBusy] = useState(false);
   const [ccMsg,  setCcMsg]  = useState(null);
   const launchCC = async () => {
