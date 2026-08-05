@@ -36,7 +36,7 @@ reply with a ≤200-char verdict line (see
 | [`blacksmith`](agents/blacksmith.md) | Computation, statistics, feature engineering |
 | [`adversary`](agents/adversary.md) | Methodological audit + peer review |
 | [`artist`](agents/artist.md) | Visualization, communication, education |
-| [`teacher`](agents/teacher.md) | Three modes, one entry point — `teacher debrief` \| `explain` \| `course` (see below). Debriefs what CC just did from the real session transcript, explains any method or paper, or recognises a subject and hands it to the course skill. Renders a self-contained HTML explainer you annotate in `lavish-axi`: "wait, what?" gets a re-pitch of that exact sentence, then a second dispatch returns the opening questions and the session asks the follow-ups. Bullet-led and jargon-light. (persona: Richard Feynman — answers to "Feynman") |
+| [`teacher`](agents/teacher.md) | Three modes, one entry point — `teacher debrief` \| `explain` \| `course` (see below). Debriefs what CC just did from the real session transcript, explains any method or paper, or recognises a subject and hands it to the course skill. Answers in chat by default — fast, no file — and renders a self-contained HTML explainer only when you ask, which you annotate in `lavish-axi`: "wait, what?" gets a re-pitch of that exact sentence. Bullet-led and jargon-light. (persona: Richard Feynman — answers to "Feynman") |
 | [`pm`](agents/pm.md) | Project status against the project's own stated goals; renders the dated HTML status overview whose `<style>` block is the **house design system** for murmurent HTML artifacts |
 | [`conscience`](agents/conscience.md) | EDID + bias review |
 | [`lawyer`](agents/lawyer.md) | Patent counsel + freedom-to-operate (formerly `saul_goodman`) |
@@ -103,11 +103,15 @@ If the main session mis-routes a course request to the subagent, **mode 3 catche
 returns `Gap — this is a course, not an explanation` and names the skill, and the session
 invokes it on the rebound. Primary and fallback, not redundancy.
 
-**After a debrief, the session keeps asking.** Teacher writes only the opening questions,
-because it replies once and never hears the answers. When those answers come back from
-`lavish`, the session continues the questioning in the chat — following up on what was actually
-said — until the decisions are settled. Filing the answers and stopping leaves the job half
-done; the back-and-forth is the part only a conversation can do.
+**A debrief answers in chat and stops.** No file, one dispatch, seconds rather than minutes —
+it is normally read mid-task by someone who wants to keep working. Ask for a page when you
+actually want to annotate one or come back to it; that is worth minutes and tens of thousands
+of tokens, and "what did you just do" is not.
+
+**A debrief does not ask you planning questions.** Deciding what to do next is a back-and-forth,
+and a subagent replies once and never hears your answer. Use the
+[`grilling`](https://github.com/mattpocock/skills) skill for that — it runs in your session, so
+it can actually follow up.
 
 ## Linked references (loaded on-demand)
 
