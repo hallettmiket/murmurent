@@ -36,7 +36,7 @@ reply with a ≤200-char verdict line (see
 | [`blacksmith`](agents/blacksmith.md) | Computation, statistics, feature engineering |
 | [`adversary`](agents/adversary.md) | Methodological audit + peer review |
 | [`artist`](agents/artist.md) | Visualization, communication, education |
-| [`teacher`](agents/teacher.md) | Three modes, one entry point — `teacher debrief` \| `explain` \| `course` (see below). Debriefs what CC just did from the real session transcript, explains any method or paper, or recognises a subject and hands it to the course skill. Renders a self-contained HTML explainer you annotate in `lavish-axi`: "wait, what?" gets a targeted re-pitch, then a second dispatch grills toward the next decision. (persona: Richard Feynman — answers to "Feynman") |
+| [`teacher`](agents/teacher.md) | Three modes, one entry point — `teacher debrief` \| `explain` \| `course` (see below). Debriefs what CC just did from the real session transcript, explains any method or paper, or recognises a subject and hands it to the course skill. Renders a self-contained HTML explainer you annotate in `lavish-axi`: "wait, what?" gets a re-pitch of that exact sentence, then a second dispatch returns the opening questions and the session asks the follow-ups. Bullet-led and jargon-light. (persona: Richard Feynman — answers to "Feynman") |
 | [`pm`](agents/pm.md) | Project status against the project's own stated goals; renders the dated HTML status overview whose `<style>` block is the **house design system** for murmurent HTML artifacts |
 | [`conscience`](agents/conscience.md) | EDID + bias review |
 | [`lawyer`](agents/lawyer.md) | Patent counsel + freedom-to-operate (formerly `saul_goodman`) |
