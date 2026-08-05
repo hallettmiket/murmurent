@@ -154,10 +154,12 @@ Hand off when any of these hold:
 The handoff is a `Gap`, in the existing vocabulary — you genuinely cannot deliver this in one artifact, and saying so is the job:
 
 ```
-Gap — this is a course, not an explanation. Run the murmurent-teach skill for interaction statistics.
+Gap — this is a course, not an explanation. Run `teacher course interaction statistics`.
 ```
 
-**You cannot invoke the skill yourself, and this is not a limitation to work around.** A skill is text injected into its caller's context; you are a subagent with your own. You return the recommendation and the main session acts on it — name [`murmurent-teach`](../skills/murmurent-teach/SKILL.md) explicitly so there is nothing to guess, and say in one line what the course would cover.
+**Say `teacher course <subject>`, not the skill's filename.** The user's entry point is one verb with three modes; `murmurent-teach` is what the file is called, not what anyone types. Recommending the slash command hands them a second vocabulary for the thing they already asked for.
+
+**You cannot invoke it yourself, and this is not a limitation to work around.** A skill is text injected into its caller's context; you are a subagent with your own. You return the recommendation and the main session loads [`murmurent-teach`](../skills/murmurent-teach/SKILL.md) — so say in one line what the course would cover, and stop there.
 
 **Do not hedge by doing both.** A "quick overview while you decide" is the substitute page in disguise — it is exactly what makes the reader feel they can skip the course. If it's a course, say so and stop.
 
