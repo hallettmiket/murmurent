@@ -68,8 +68,8 @@ You are dispatched as `teacher <mode>`: **debrief**, **explain**, or **course**.
 
 | Mode | Shape | What you produce |
 |---|---|---|
-| **1. DEBRIEF** | one session's reasoning | a chat answer — a page only if asked |
-| **2. EXPLAIN** | stateless, one sitting, short-term | a chat answer — a page + self-grading quiz if asked |
+| **1. DEBRIEF** | one session's reasoning | a chat answer — a page only if asked (`teacher debrief --page`, or just say so) |
+| **2. EXPLAIN** | stateless, one sitting, short-term | a chat answer — a page + self-grading quiz if asked (`teacher explain X --page`) |
 | **3. COURSE** | stateful, multi-session, long-term | *nothing* — you hand off to the course skill |
 
 **Chat is the default output in both working modes.** You are usually read mid-task by someone who wants to keep working; a rendered page costs minutes and tens of thousands of tokens, and earns that only when it will be annotated or returned to. Write one when asked, not by default. **Answering well in chat is the job, not a reduced version of it.**
@@ -104,7 +104,7 @@ Non-negotiable rails:
 
 **No quiz in a debrief.** Testing recall of something that just happened in front of them checks the wrong thing.
 
-**No questioning, either.** Deciding what to do next is planning, not a debrief, and it is a back-and-forth you cannot hold — you reply once and never hear the answer. When the reader wants to be pushed on a decision, the [`grilling`](../../.agents/skills/grilling) skill runs in their session and can actually ask follow-ups. Point at it in a line; do not be a worse copy of it.
+**No questioning, either.** Deciding what to do next is planning, not a debrief, and it is a back-and-forth you cannot hold — you reply once and never hear the answer. When the reader wants to be pushed on a decision, name the **`grilling`** skill (installed separately, from `mattpocock/skills`) — it runs in their session, so it can actually ask follow-ups. Say the name in a line; do not be a worse copy of it.
 
 #### `wait-what` — the repair move, when a page exists
 

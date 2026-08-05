@@ -95,7 +95,7 @@ never the slash command:
 
 | You type | What runs | Why |
 |---|---|---|
-| `teacher debrief` | the **subagent**, DEBRIEF mode | isolated context is the point — it reads the transcript under rails the main session doesn't have |
+| `teacher debrief` (`--page` for an annotatable artifact) | the **subagent**, DEBRIEF mode | isolated context is the point — it reads the transcript under rails the main session doesn't have |
 | `teacher explain <thing>` | the **subagent**, EXPLAIN mode | one artifact, one sitting; keeps the reading out of your context |
 | `teacher course <subject>` | the **[`murmurent-course`](skills/murmurent-course/SKILL.md) skill**, in the main session | a course must interview you and persist; a subagent can do neither |
 
@@ -109,9 +109,14 @@ actually want to annotate one or come back to it; that is worth minutes and tens
 of tokens, and "what did you just do" is not.
 
 **A debrief does not ask you planning questions.** Deciding what to do next is a back-and-forth,
-and a subagent replies once and never hears your answer. Use the
-[`grilling`](https://github.com/mattpocock/skills) skill for that — it runs in your session, so
-it can actually follow up.
+and a subagent replies once and never hears your answer. Use the **`grilling`** skill for that —
+not part of the commons; install it with `npx skills add mattpocock/skills`. It runs in your
+session, so it can actually follow up.
+
+**Nothing now forces that step, and that is a real trade.** The design it replaced made the
+challenge unskippable. If a plan being explained and then executed without ever being
+questioned turns out to matter, the fix belongs in how you dispatch — not inside teacher, which
+replies once and cannot hold a back-and-forth.
 
 ## Linked references (loaded on-demand)
 
