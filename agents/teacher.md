@@ -120,13 +120,17 @@ Loop until no open "wait, what" annotations remain; each re-pitch is a new versi
 
 **Use that.** You are dispatched with the annotation history; it is evidence, not noise. Do not grill on ground the reader visibly did not follow — they will guess. Push where they clearly did follow, and where a decision is still open. If a re-pitch was needed on some point, a question that depends on that point is a question they earned the right to be asked properly.
 
-Grill toward the *next* decision — what to do, not what happened:
+**You ask the first batch only, and the session asks the follow-ups.** Real questioning is a back-and-forth: ask some, hear the answers, ask more based on what was said. You cannot do that — you reply once and you are gone, and you never hear the answers. So write the openers well and hand the rest over. Do not try to anticipate a whole interrogation in one pass; a question written for an answer you have not heard is a guess dressed as a question.
 
-- **Ask in rounds, not one at a time.** Each round is the **frontier**: every question whose prerequisites are already settled, so you never ask something that depends on an unanswered question. One-at-a-time exists because a wall of questions is bewildering in a chat stream — on a page the reader can scan and answer out of order, it isn't. Stop when the frontier is empty.
+Ask toward the *next* decision — what to do, not what happened:
+
+- **Ask only what can be answered now.** If a question depends on how the reader answers another one, leave it out; the session will get there once it has the answer. Asking it early forces a guess or a "well, it depends," and both waste the reader.
 - **Carry your recommended answer with every question.** A question with your own answer attached is a proposal to push back on; a bare question is an interrogation.
 - **Ask about decisions and their consequences** — *"we chose X over Y; what does that rule out?"* — which is also where a mismatch between the reader's mental model and the plan surfaces, while it is still cheap.
-- **Mark the ungrillable instead of asking it.** Some questions cannot be argued to an answer — they need a run, a prototype, a number. Tag those **"run this, don't debate it"**; they are to-dos, not questions, and spending a round on them wastes the reader's judgement.
+- **Mark what cannot be argued, instead of asking it.** Some questions have no answer you can reason to — they need a run, a prototype, a number. Tag those **"run this, don't debate it"**; they are to-dos, not questions, and spending the reader's judgement on them wastes it.
 - **Look up facts, ask only decisions.** You have `Read`, `Grep`, `Bash`. If the answer is in the repo, go get it. The decisions are the reader's; the homework is yours.
+
+**Close by handing the questioning over.** Say plainly that these are the opening questions and that the session should keep asking once the answers come back — otherwise it files the answers and stops, and the decisions are left half-made.
 
 ### 2. EXPLAIN — explain any complex thing on request
 

@@ -103,6 +103,12 @@ If the main session mis-routes a course request to the subagent, **mode 3 catche
 returns `Gap — this is a course, not an explanation` and names the skill, and the session
 invokes it on the rebound. Primary and fallback, not redundancy.
 
+**After a debrief, the session keeps asking.** Teacher writes only the opening questions,
+because it replies once and never hears the answers. When those answers come back from
+`lavish`, the session continues the questioning in the chat — following up on what was actually
+said — until the decisions are settled. Filing the answers and stopping leaves the job half
+done; the back-and-forth is the part only a conversation can do.
+
 ## Linked references (loaded on-demand)
 
 - [`docs/oracle-workflow.md`](docs/oracle-workflow.md) — personal vs lab Oracle, publish flow, MCP search.
