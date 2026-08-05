@@ -86,7 +86,7 @@ command available in any murmurent-bootstrapped CC session.
 | [`/murmurent-admin`](skills/murmurent-admin/SKILL.md) | Prime context before admin-level (centre / mayor / registrar / join / provisioning) work: reloads murmurent's purpose from the manuscript + code, pins Obsidian maps-legends and CC guidance to the top, enforces the manuscript pull-first rule. |
 | [`/murmurent-reset`](skills/murmurent-reset/SKILL.md) | Back up, then reset this machine's murmurent state to a fresh start (so `centre-init` is first-run again). Tiered `centre`/`install`/`full`; always tarballs `~/.murmurent` first; credentials + other-project installs are protected behind explicit `--nuke` flags; `--dry-run` previews. Use for a clean slate / fresh copy from the repo. |
 | [`/murmurent-onboard`](skills/murmurent-onboard/SKILL.md) | Mayor/registrar helper: process an incoming **encrypted** join-request email end to end — decrypt + file it, show who's asking, then (on explicit OK) approve + provision (lab/core Slack channel, GitHub repo, FS ACLs) or decline. Approval reads the Slack token from env **or** the `~/.config` file so the channel is created without exporting anything. |
-| [`/murmurent-teach`](skills/murmurent-teach/SKILL.md) | **COURSE mode of the [`teacher`](agents/teacher.md)** — reached by typing `teacher course <subject>`, not by the slash command. Teaches a subject across **multiple sessions** using a course directory as stateful memory: interviews for the mission, sources it through the [`bookworm`](agents/bookworm.md), writes self-contained HTML lessons the learner annotates in `lavish-axi`, and keeps learning records so it never re-teaches what they've demonstrated. Runs in the main session — a subagent can neither interview nor persist. |
+| [`/murmurent-course`](skills/murmurent-course/SKILL.md) | **COURSE mode of the [`teacher`](agents/teacher.md)** — reached by typing `teacher course <subject>`, not by the slash command. Teaches a subject across **multiple sessions** using a course directory as stateful memory: interviews for the mission, sources it through the [`bookworm`](agents/bookworm.md), writes self-contained HTML lessons the learner annotates in `lavish-axi`, and keeps learning records so it never re-teaches what they've demonstrated. Runs in the main session — a subagent can neither interview nor persist. |
 
 ## The `teacher <mode>` convention
 
@@ -97,7 +97,7 @@ never the slash command:
 |---|---|---|
 | `teacher debrief` | the **subagent**, DEBRIEF mode | isolated context is the point — it reads the transcript under rails the main session doesn't have |
 | `teacher explain <thing>` | the **subagent**, EXPLAIN mode | one artifact, one sitting; keeps the reading out of your context |
-| `teacher course <subject>` | the **[`murmurent-teach`](skills/murmurent-teach/SKILL.md) skill**, in the main session | a course must interview you and persist; a subagent can do neither |
+| `teacher course <subject>` | the **[`murmurent-course`](skills/murmurent-course/SKILL.md) skill**, in the main session | a course must interview you and persist; a subagent can do neither |
 
 If the main session mis-routes a course request to the subagent, **mode 3 catches it** — teacher
 returns `Gap — this is a course, not an explanation` and names the skill, and the session
