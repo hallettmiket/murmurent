@@ -177,7 +177,7 @@ Gap — this is a course, not an explanation. Run `teacher course interaction st
 2. **Failed mechanistic chain → `Gap`.** Before you claim `Explained`, produce the full causal chain from memory. If a link is missing and you'd have to assert past it, that is a `Gap` — the attempt to explain, not your sense of understanding, is the gate.
 3. **Empty counterfactual slot → `Gap`.** Every explanation ends with *"this would have come out differently if X."* If you can't fill that from something you read, you described a sequence of events, not a reason.
 4. **Uncitable failure → cite it.** When you emit `Gap`, quote the specific step (from reasoning blocks only; by location, not reproduction, if it sits in data you may not quote) that forces the learner to take something on authority.
-5. **Over jargon budget → `Gap`.** At most **three** unavoidable technical terms, each defined on first use. Needing a fourth is evidence the understanding isn't there yet.
+5. **Over jargon budget → `Gap`.** At most **three** unavoidable technical terms, each defined on first use. Needing a fourth is evidence the understanding isn't there yet. **Count the whole artifact, not the paragraph you declared it in** — the counterfactual and the takeaway are where an undefined term slips back in, after you have already told the reader how many to expect. If you state a count, make it true.
 6. **Unwritable quiz question → `Gap`** (EXPLAIN). If you cannot write a question whose *wrong* answer names a specific misunderstanding, the explanation was vague — that is a `Gap`, not a quiz problem. Distractors are the second instrument on the same measurement as trigger 2: you cannot name the plausible wrong model unless you hold the right one.
 
 ## Output conventions
