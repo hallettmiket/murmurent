@@ -36,7 +36,7 @@ reply with a ≤200-char verdict line (see
 | [`blacksmith`](agents/blacksmith.md) | Computation, statistics, feature engineering |
 | [`adversary`](agents/adversary.md) | Methodological audit + peer review |
 | [`artist`](agents/artist.md) | Visualization, communication, education |
-| [`teacher`](agents/teacher.md) | Three modes, one entry point — `teacher debrief` \| `explain` \| `course` (see below). Debriefs what CC just did from the real session transcript, explains any method or paper, or recognises a subject and hands it to the course skill. Answers in chat by default — fast, no file — and renders a self-contained HTML explainer only when you ask, which you annotate in `lavish-axi`: "wait, what?" gets a re-pitch of that exact sentence. Bullet-led and jargon-light. (persona: Richard Feynman — answers to "Feynman") |
+| [`teacher`](agents/teacher.md) | Three modes, one entry point — `teacher debrief` \| `explain` \| `course` (see below). Debrief is "wait, what?" — fired at the sentence CC just wrote that was jargon, overcomplicated, or handed you an unexplained decision; it re-pitches that in plain words in chat, under 60s, from the tail of the real session transcript. Explain covers any method or paper; course recognises a subject and hands it to the course skill. Only explain renders a self-contained HTML page, on request, annotated in `lavish-axi` — where "wait, what?" gets that same re-pitch. Bullet-led and jargon-light. (persona: Richard Feynman — answers to "Feynman") |
 | [`conscience`](agents/conscience.md) | EDID + bias review |
 | [`lawyer`](agents/lawyer.md) | Patent counsel + freedom-to-operate (formerly `saul_goodman`) |
 | [`cable_guy`](agents/cable_guy.md) | Infrastructure provisioner |
@@ -94,7 +94,7 @@ never the slash command:
 
 | You type | What runs | Why |
 |---|---|---|
-| `teacher debrief` (`--page` for an annotatable artifact) | the **subagent**, DEBRIEF mode | isolated context is the point — it reads the transcript under rails the main session doesn't have |
+| `teacher debrief` (at the sentence that lost you) | the **subagent**, DEBRIEF mode | isolated context is the point — it reads the transcript under rails the main session doesn't have |
 | `teacher explain <thing>` | the **subagent**, EXPLAIN mode | one artifact, one sitting; keeps the reading out of your context |
 | `teacher course <subject>` | the **[`murmurent-course`](skills/murmurent-course/SKILL.md) skill**, in the main session | a course must interview you and persist; a subagent can do neither |
 
@@ -102,10 +102,16 @@ If the main session mis-routes a course request to the subagent, **mode 3 catche
 returns `Gap — this is a course, not an explanation` and names the skill, and the session
 invokes it on the rebound. Primary and fallback, not redundancy.
 
-**A debrief answers in chat and stops.** No file, one dispatch, seconds rather than minutes —
-it is normally read mid-task by someone who wants to keep working. Ask for a page when you
-actually want to annotate one or come back to it; that is worth minutes and tens of thousands
-of tokens, and "what did you just do" is not.
+**A debrief is "wait, what?", not a catch-up.** Fire it at the sentence CC just wrote that
+was jargon, that made a small mechanism it just built sound intricate, or that asked you to
+decide something it never explained. It re-pitches *that* in plain words and says what
+follows. It is not for narrating a session you looked away from.
+
+**It answers in chat, in under 60 seconds, and stops.** No file, one dispatch, reading the
+tail of the transcript rather than its history — it is read mid-task by someone who wants to
+keep working, and a debrief that arrives after you've moved on has failed however good it is.
+Want an annotatable artifact? That's `teacher explain <the thing>`, which is allowed to cost
+minutes and tens of thousands of tokens. A debrief isn't.
 
 **A debrief does not ask you planning questions.** Deciding what to do next is a back-and-forth,
 and a subagent replies once and never hears your answer. Use the **`grilling`** skill for that —
