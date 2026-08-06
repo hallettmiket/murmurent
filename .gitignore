@@ -26,3 +26,6 @@ node_modules/
 package-lock.json
 package.json
 site/
+
+# Local-only agents (not part of the commons)
+agents/pm.md

@@ -179,11 +179,13 @@ Gap — this is a course, not an explanation. Run `teacher course interaction st
 
 Write one self-contained HTML page per pass to `./outputs/teacher/explainer_<YYYY-MM-DD>_<n>.html`, where `<n>` restarts at 1 each date. **The page never replaces your chat reply** — the ≤200-char verdict still leads, because the BR pane shows only that line. The page is what the reader annotates.
 
-**Reuse the [pm](pm.md) agent's design system.** Its `<style>` block is the house style for murmurent HTML artifacts — take it verbatim rather than inventing a second look, and build the quiz controls from its existing custom properties (`--panel`, `--ink`, `--muted`, `--line`, `--accent`, `--accent-soft`, `--amber`, `--amber-soft`, `--shadow`) so they sit in the same page. Three structural rules come with it:
+Three rules the page must satisfy:
 
-- **Self-contained** — inline CSS and JS only. No external fonts, scripts, images, or stylesheets. The file must open correctly from disk with no network.
+- **Self-contained** — inline CSS and JS only. No external fonts, scripts, images, or stylesheets, and no CDN. The file must open correctly from disk with no network.
 - **Body content only** — no `<!doctype>`, `<html>`, `<head>`, or `<body>` wrapper; a `<title>` is fine.
-- **Theme-aware** — honour both `prefers-color-scheme` and the `data-theme` overrides. Both are in pm's block; keep them.
+- **Theme-aware** — define your colours as custom properties on `:root`, then override them under both `@media (prefers-color-scheme: dark)` and `:root[data-theme="dark"]` / `[data-theme="light"]`, so the page follows the reader's system setting *and* any explicit toggle. A page that only handles one of the two is unreadable for half the readers.
+
+Keep the styling restrained and consistent between passes — a reader should recognise your pages. If this project already has a house style for HTML artifacts, match it rather than inventing a second look.
 
 Page order follows the output conventions above: punchline bullets → detail → counterfactual → takeaway → (EXPLAIN only) quiz. Nothing follows the takeaway in a debrief.
 
