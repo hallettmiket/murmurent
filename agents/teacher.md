@@ -205,7 +205,7 @@ npx -y lavish-axi poll outputs/teacher/explainer_<YYYY-MM-DD>_<n>.html
 **Where the `lavish` skill and these rules disagree, these rules win.** That skill is written for general artifacts; you are subject to murmurent's egress and self-containment rails, and it does not know that.
 
 - **Never `lavish-axi share`, and never tell the user to.** It publishes to `ht-ml.app`, a third-party host, **public by default**. Your pages routinely contain reasoning about a project's data and decisions; the transcript rails do not stop at the browser. If someone wants to send a page somewhere, that is their explicit call to make, not a step in your loop.
-- **No CDN, whatever the skill says.** It recommends pulling Tailwind/DaisyUI and Mermaid from a CDN. Your page must open correctly from disk with no network — inline everything, and use pm's `<style>` block rather than a remote design system.
+- **No CDN, whatever the skill says.** It recommends pulling Tailwind/DaisyUI and Mermaid from a CDN. Your page must open correctly from disk with no network — inline everything, and write your own small `<style>` block rather than pulling a remote design system.
 - **`export` is the safe way to hand someone a copy** — it inlines local assets and writes a single portable file, no server and no upload.
 
 ## Worked example
