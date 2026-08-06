@@ -188,18 +188,44 @@ produces carries a consistent look.
 ## Teacher
 
 The Teacher turns reasoning into understanding a learner can carry somewhere
-else. It works in two modes: **DEBRIEF**, where it explains the reasoning Claude
-Code just went through in a session — grounded in the actual session transcript,
-not a plausible reconstruction — and **EXPLAIN**, where it explains any method,
-paper, statistical idea, or codebase on request. It writes for a smart colleague
-from an adjacent field: succinct and literal, not folksy, scaling detail
-inversely to the reader's expertise. Its discipline is refusing to fake
-understanding — it emits a `Gap` (never a soft middle) whenever it cannot
-honestly reduce something to plain language, on the conviction that the honest
-signal "the understanding isn't there yet" is more useful than a fluent wrong
-explanation. Explanations are normally a live aid; a keeper can be written once
-to `./outputs/teacher/` and handed to the Oracle. The Teacher is
-prose-anchored — figures go to the Artist, durable records to the Oracle.
+else. You reach it by typing one verb — `teacher debrief`, `teacher explain
+<thing>`, or `teacher course <subject>` — and it works in three modes:
+
+- **DEBRIEF** explains the reasoning Claude Code just went through in a session,
+  grounded in the actual session transcript rather than a plausible
+  reconstruction, under rails that keep it to its own session and stop it
+  reproducing the data it read.
+- **EXPLAIN** covers any method, paper, statistical idea, codebase, or decision
+  on request.
+- **COURSE** is checked *first*, before either of the others: it recognises a
+  subject that needs weeks rather than one sitting and hands it to the
+  [`murmurent-course`](../skills/murmurent-course/SKILL.md) skill without writing
+  anything. The failure it exists to prevent is a compelling one-shot page that
+  substitutes for the learning — someone reads it, feels they understand, and
+  never starts. The Teacher cannot invoke a skill (it is a subagent; a skill
+  loads into its caller's context), so it returns a `Gap` naming the skill and
+  the main session picks it up.
+
+**It answers in chat by default** — one dispatch, no file, seconds rather than
+minutes — because a debrief is normally read mid-task by someone who wants to
+keep working. Ask for `--page` when you actually want an artifact to annotate or
+return to; that costs minutes and tens of thousands of tokens, and earns it only
+then. A page is self-contained HTML reviewed in `lavish-axi`, where a "wait,
+what?" annotation carries the exact text range, so the re-pitch targets the
+sentence that failed rather than the whole page. EXPLAIN pages also carry a
+self-grading quiz.
+
+It writes for a smart colleague from an adjacent field: bullet-led and
+jargon-light, succinct and literal rather than folksy, scaling detail inversely
+to the reader's expertise, with at most three technical terms each defined on
+first use. Its discipline is refusing to fake understanding — it emits a `Gap`
+(never a soft middle) whenever it cannot honestly reduce something to plain
+language, on the conviction that the honest signal "the understanding isn't there
+yet" is more useful than a fluent wrong explanation. A keeper can be written to
+`./outputs/teacher/` and handed to the Oracle. The Teacher is prose-anchored —
+figures go to the Artist, durable records to the Oracle, and planning questions
+to the separately-installed `grilling` skill, which runs in your session and can
+hold the back-and-forth a subagent cannot.
 
 **Verdict vocabulary:** `Explained / Gap — <one-line on what was/wasn't understood>`
 
