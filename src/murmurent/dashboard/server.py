@@ -32,6 +32,7 @@ from pydantic import BaseModel
 from ..core.identity import resolve as resolve_identity
 from ..core.repo import lab_mgmt_repo_root
 from . import contract as C
+from . import launchers as _launchers
 from . import notebook_actions
 from . import request_actions
 from . import sea_actions
@@ -142,6 +143,18 @@ class WorkspaceLaunchBody(BaseModel):
     project: str
     agents: list[str] = []
     sea_id: int | None = None
+
+
+class ClaudeSessionBody(BaseModel):
+    """JSON body for ``POST /api/workspace/claude-session``.
+
+    Everything is optional: a bare CC session needs no repo. Precedence for the
+    terminal's working dir: ``cwd`` (an explicit local path, used by the repos
+    list) > ``project`` (a registered project's clone) > ``$HOME``.
+    """
+
+    project: str | None = None
+    cwd: str | None = None
 
 
 class WorkspaceInitializeBody(BaseModel):
@@ -1403,44 +1416,112 @@ def create_app() -> FastAPI:
                 ),
             }
 
-        # ---- Local project: open via scripts/open_murmurent.sh ----
-        # The newer launcher (2026-05-17) detects monitors via JXA+AppKit
-        # and positions the window at 80% of the chosen display
-        # (external if attached, else laptop). It does NOT spawn iTerm
-        # agent-tail windows — that role moved into VSCode's BR pane
-        # via the murmurent agent-reporter hook. The old
-        # start_workspace.sh remains in the tree for the iTerm-windows
-        # workflow but is no longer the dashboard's default.
+        # ---- Local project ----
         project_dir = project_path(body.project)
+
+        # macOS: prefer the positioned launcher (scripts/open_murmurent.sh).
+        # It detects monitors via JXA+AppKit and sizes the window to 80% of the
+        # chosen display. It is macOS-ONLY (osascript/AppKit), so on Linux and
+        # other platforms we fall through to the portable ``code`` CLI path
+        # below — otherwise the script would fail silently (Popen returns before
+        # the osascript error) and the button would look like it worked while
+        # nothing opened.
+        import platform as _platform
+
         script = murmurent_repo_root() / "scripts" / "open_murmurent.sh"
-        if not script.is_file():
-            raise HTTPException(status_code=500, detail=f"launcher missing: {script}")
+        if _platform.system() == "Darwin" and script.is_file():
+            cmd: list[str] = [str(script), str(project_dir)]
+            try:
+                subprocess.Popen(  # noqa: S603 — args are list, never shelled
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    close_fds=True,
+                )
+            except OSError as exc:
+                raise HTTPException(status_code=500, detail=f"launcher failed: {exc}")
+            return {
+                "ok": True,
+                "project": body.project,
+                "project_dir": str(project_dir),
+                "launcher": str(script),
+                "agents": body.agents,
+                "sea_id": body.sea_id,
+                "cmd": cmd,
+                "note": (
+                    "Launched via open_murmurent.sh — VSCode opens at 80% of "
+                    "the chosen display. Arrange the 4 quadrants once and "
+                    "VSCode persists the layout per folder."
+                ),
+            }
 
-        cmd: list[str] = [str(script), str(project_dir)]
-        try:
-            subprocess.Popen(  # noqa: S603 — args are list, never shelled
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                close_fds=True,
+        # Linux / other: open the repo directly with the ``code`` CLI.
+        res = _launchers.open_in_vscode(project_dir)
+        if not res["launched"]:
+            raise HTTPException(
+                status_code=500,
+                detail=res["error"] or "could not launch VS Code",
             )
-        except OSError as exc:
-            raise HTTPException(status_code=500, detail=f"launcher failed: {exc}")
-
         return {
             "ok": True,
             "project": body.project,
             "project_dir": str(project_dir),
-            "launcher": str(script),
+            "launcher": res["launcher"],
+            "launched": True,
             "agents": body.agents,
             "sea_id": body.sea_id,
-            "cmd": cmd,
-            "note": (
-                "Launched via open_murmurent.sh — VSCode opens at 80% of "
-                "the chosen display. Arrange the 4 quadrants once and "
-                "VSCode persists the layout per folder."
-            ),
+            "note": res["note"],
+        }
+
+    @app.post("/api/workspace/claude-session")
+    def workspace_claude_session(
+        body: ClaudeSessionBody,
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Open a bare Claude Code CLI session in a native terminal.
+
+        The "launch app → work in Claude Code" flow when there is no specific
+        repo to open (or the user just wants a scratch session). Spawns a
+        terminal running ``claude``; no browser/PTY wrapper is involved — the
+        dashboard is a local desktop app, so the terminal opens in the signed-in
+        user's session. If ``project`` is given and resolves to a local clone,
+        the session starts in that repo's directory; otherwise ``$HOME``.
+        """
+        from ..core.projects import find_project as _find_project, project_path
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+
+        cwd: str | None = None
+        if body.cwd:
+            # Explicit local directory (e.g. a repo path from the repos list).
+            p = Path(body.cwd).expanduser()
+            if not p.is_dir():
+                raise HTTPException(status_code=404, detail=f"directory not found: {body.cwd}")
+            cwd = str(p)
+        elif body.project:
+            if _find_project(body.project) is None:
+                raise HTTPException(status_code=404, detail=f"project not found: {body.project}")
+            cwd = str(project_path(body.project))
+
+        res = _launchers.launch_claude_session(cwd=cwd)
+        # ``already_open`` is a success: an existing session was raised instead
+        # of spawning a duplicate. Only a genuine failure (no terminal, spawn
+        # error) has neither flag set.
+        if not res.get("launched") and not res.get("already_open"):
+            raise HTTPException(
+                status_code=500,
+                detail=res.get("error") or "could not launch a terminal for Claude Code",
+            )
+        return {
+            "ok": True,
+            "project": body.project,
+            "cwd": cwd or str(Path.home()),
+            "launcher": res.get("launcher"),
+            "launched": bool(res.get("launched")),
+            "already_open": bool(res.get("already_open")),
+            "note": res["note"],
         }
 
     @app.post("/api/workspace/initialize")
@@ -2197,6 +2278,109 @@ def create_app() -> FastAPI:
         org = lab_settings.github_org
         report = _inv.scan_and_cache(github_org=org)
         return {"from_cache": False, **report.to_dict()}
+
+    @app.delete("/api/inventory/repos/{name}")
+    def delete_inventory_repo(
+        name: str,
+        confirm: str = Query("", description="Typed repo name; must equal {name} to proceed."),
+        host: str = Query("local", description="Which host's clone to remove (only 'local' supported)."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """Remove a repo's LOCAL working clone (moved to a recoverable trash).
+
+        Danger-zone gated like GitHub's repo deletion: the caller must re-type
+        the repo name (``confirm``) exactly. Refusals:
+
+        - **murmurent-infra repos** (``murmurent``, ``murmurent_*``) are never
+          removable here — they are infrastructure, not disposable working
+          repos (matches the make-ready suppression, #41 pt 5).
+        - a mismatched ``confirm`` is refused (the double-check).
+
+        The clone is **moved** to ``~/.murmurent/trash/repos/<name>-<UTCstamp>/``
+        rather than hard-deleted, so an accidental removal is recoverable; the
+        trash path (and the ``mv`` to undo it) is returned. Only the local
+        working clone is touched — never GitHub, never another host, never the
+        governed data root.
+        """
+        import shutil as _sh
+        from datetime import datetime, timezone
+        from ..core import repo_inventory as _inv
+        from ..core.repo_inventory import is_murmurent_infra_repo as _is_infra
+
+        actor = _resolve_actor(user)
+        _require_active(actor)
+
+        if host != "local":
+            raise HTTPException(
+                status_code=400,
+                detail="only the local clone can be removed here; tunnel to the "
+                       "host's own dashboard to manage its repos.",
+            )
+        if confirm.strip() != name:
+            raise HTTPException(
+                status_code=400,
+                detail=f"confirmation mismatch: type the repo name '{name}' exactly to remove it.",
+            )
+        if _is_infra(name):
+            raise HTTPException(
+                status_code=409,
+                detail=f"'{name}' is murmurent infrastructure — it can't be removed here.",
+            )
+
+        # Resolve the local clone path from the cached inventory (server-side —
+        # we never trust a client-supplied path for a destructive move).
+        cached_path = _inv.latest_report_path()
+        report = _inv.load_report(cached_path) if cached_path else None
+        if report is not None and hasattr(report, "to_dict"):
+            report = report.to_dict()
+        clone_path: str | None = None
+        if isinstance(report, dict):
+            for row in report.get("rows", []):
+                if row.get("name") != name:
+                    continue
+                for c in row.get("clones", []):
+                    if c.get("host") == "local":
+                        if c.get("is_murmurent_infra"):
+                            raise HTTPException(
+                                status_code=409,
+                                detail=f"'{name}' is murmurent infrastructure — it can't be removed here.",
+                            )
+                        clone_path = c.get("path")
+                break
+        if not clone_path:
+            raise HTTPException(
+                status_code=404,
+                detail=f"no local clone of '{name}' found in the inventory — Refresh the repos panel and retry.",
+            )
+
+        src = Path(clone_path).expanduser()
+        if not src.is_dir():
+            raise HTTPException(status_code=404, detail=f"clone path does not exist: {src}")
+
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        trash_dir = Path.home() / ".murmurent" / "trash" / "repos"
+        trash_dir.mkdir(parents=True, exist_ok=True)
+        dest = trash_dir / f"{name}-{stamp}"
+        try:
+            _sh.move(str(src), str(dest))
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"could not move clone to trash: {exc}")
+
+        # Best-effort: refresh the cached inventory so the row disappears on the
+        # next load. A scan failure here doesn't undo the removal.
+        try:
+            lab_settings = snap_mod._current_lab_settings()
+            _inv.scan_and_cache(github_org=lab_settings.github_org)
+        except Exception:  # noqa: BLE001 — cache refresh is non-critical
+            pass
+
+        return {
+            "ok": True,
+            "name": name,
+            "removed_from": str(src),
+            "trash": str(dest),
+            "note": f"Moved the local clone of '{name}' to trash. Undo with: mv '{dest}' '{src}'",
+        }
 
     @app.post("/api/inventory/adopt")
     def post_inventory_adopt(
