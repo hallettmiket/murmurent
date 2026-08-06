@@ -150,7 +150,8 @@ general artifacts and does not know murmurent's rails:
   material; that is not a decision to make inside a teaching loop. `lavish-axi export`
   writes a portable single-file copy locally if the learner wants one to keep.
 - **No CDN, whatever it recommends.** Lessons must open from disk with no network. Inline
-  everything; use pm's `<style>` block rather than a remote design system.
+  everything; write a small `<style>` block into the lesson rather than pulling a remote
+  design system.
 
 ## 7. Record what they demonstrated
 
