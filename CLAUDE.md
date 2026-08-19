@@ -36,7 +36,7 @@ reply with a ≤200-char verdict line (see
 | [`blacksmith`](agents/blacksmith.md) | Computation, statistics, feature engineering |
 | [`adversary`](agents/adversary.md) | Methodological audit + peer review |
 | [`artist`](agents/artist.md) | Visualization, communication, education |
-| [`teacher`](agents/teacher.md) | Explains reasoning + concepts; debriefs what CC just did, from the real session transcript (persona: Richard Feynman — answers to "Feynman") |
+| [`teacher`](agents/teacher.md) | Three modes, one entry point — `teacher debrief` \| `explain` \| `course` (see below). Debrief is "wait, what?" — fired at the sentence CC just wrote that was jargon, overcomplicated, or handed you an unexplained decision; it re-pitches that in plain words in chat, under 60s, from the tail of the real session transcript. Explain covers any method or paper; course recognises a subject and hands it to the course skill. Only explain renders a self-contained HTML page, on request, annotated in `lavish-axi` — where "wait, what?" gets that same re-pitch. Bullet-led and jargon-light. (persona: Richard Feynman — answers to "Feynman") |
 | [`conscience`](agents/conscience.md) | EDID + bias review |
 | [`lawyer`](agents/lawyer.md) | Patent counsel + freedom-to-operate (formerly `saul_goodman`) |
 | [`cable_guy`](agents/cable_guy.md) | Infrastructure provisioner |
@@ -85,6 +85,43 @@ command available in any murmurent-bootstrapped CC session.
 | [`/murmurent-admin`](skills/murmurent-admin/SKILL.md) | Prime context before admin-level (centre / mayor / registrar / join / provisioning) work: reloads murmurent's purpose from the manuscript + code, pins Obsidian maps-legends and CC guidance to the top, enforces the manuscript pull-first rule. |
 | [`/murmurent-reset`](skills/murmurent-reset/SKILL.md) | Back up, then reset this machine's murmurent state to a fresh start (so `centre-init` is first-run again). Tiered `centre`/`install`/`full`; always tarballs `~/.murmurent` first; credentials + other-project installs are protected behind explicit `--nuke` flags; `--dry-run` previews. Use for a clean slate / fresh copy from the repo. |
 | [`/murmurent-onboard`](skills/murmurent-onboard/SKILL.md) | Mayor/registrar helper: process an incoming **encrypted** join-request email end to end — decrypt + file it, show who's asking, then (on explicit OK) approve + provision (lab/core Slack channel, GitHub repo, FS ACLs) or decline. Approval reads the Slack token from env **or** the `~/.config` file so the channel is created without exporting anything. |
+| [`/murmurent-course`](skills/murmurent-course/SKILL.md) | **COURSE mode of the [`teacher`](agents/teacher.md)** — reached by typing `teacher course <subject>`, not by the slash command. Teaches a subject across **multiple sessions** using a course directory as stateful memory: interviews for the mission, sources it through the [`bookworm`](agents/bookworm.md), writes self-contained HTML lessons the learner annotates in `lavish-axi`, and keeps learning records so it never re-teaches what they've demonstrated. Runs in the main session — a subagent can neither interview nor persist. |
+
+## The `teacher <mode>` convention
+
+The [`teacher`](agents/teacher.md) has **three modes**, and one entry point. Type the verb;
+never the slash command:
+
+| You type | What runs | Why |
+|---|---|---|
+| `teacher debrief` (at the sentence that lost you) | the **subagent**, DEBRIEF mode | isolated context is the point — it reads the transcript under rails the main session doesn't have |
+| `teacher explain <thing>` | the **subagent**, EXPLAIN mode | one artifact, one sitting; keeps the reading out of your context |
+| `teacher course <subject>` | the **[`murmurent-course`](skills/murmurent-course/SKILL.md) skill**, in the main session | a course must interview you and persist; a subagent can do neither |
+
+If the main session mis-routes a course request to the subagent, **mode 3 catches it** — teacher
+returns `Gap — this is a course, not an explanation` and names the skill, and the session
+invokes it on the rebound. Primary and fallback, not redundancy.
+
+**A debrief is "wait, what?", not a catch-up.** Fire it at the sentence CC just wrote that
+was jargon, that made a small mechanism it just built sound intricate, or that asked you to
+decide something it never explained. It re-pitches *that* in plain words and says what
+follows. It is not for narrating a session you looked away from.
+
+**It answers in chat, in under 60 seconds, and stops.** No file, one dispatch, reading the
+tail of the transcript rather than its history — it is read mid-task by someone who wants to
+keep working, and a debrief that arrives after you've moved on has failed however good it is.
+Want an annotatable artifact? That's `teacher explain <the thing>`, which is allowed to cost
+minutes and tens of thousands of tokens. A debrief isn't.
+
+**A debrief does not ask you planning questions.** Deciding what to do next is a back-and-forth,
+and a subagent replies once and never hears your answer. Use the **`grilling`** skill for that —
+not part of the commons; install it with `npx skills add mattpocock/skills`. It runs in your
+session, so it can actually follow up.
+
+**Nothing now forces that step, and that is a real trade.** The design it replaced made the
+challenge unskippable. If a plan being explained and then executed without ever being
+questioned turns out to matter, the fix belongs in how you dispatch — not inside teacher, which
+replies once and cannot hold a back-and-forth.
 
 ## Linked references (loaded on-demand)
 
