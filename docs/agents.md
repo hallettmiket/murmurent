@@ -203,7 +203,7 @@ else. You reach it by typing one verb — `teacher debrief`, `teacher explain
   on request.
 - **COURSE** is checked *first*, before either of the others: it recognises a
   subject that needs weeks rather than one sitting and hands it to the
-  [`murmurent-course`](../skills/murmurent-course/SKILL.md) skill without writing
+  [`murmurent-course`](https://github.com/hallettmiket/murmurent/blob/main/skills/murmurent-course/SKILL.md) skill without writing
   anything. The failure it exists to prevent is a compelling one-shot page that
   substitutes for the learning — someone reads it, feels they understand, and
   never starts. The Teacher cannot invoke a skill (it is a subagent; a skill
