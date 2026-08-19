@@ -26,7 +26,7 @@
 .mm-brand-footer img { display: block; width: auto !important; max-width: none; }
 .mm-brand-footer img.mm-logo-lab      { height: 30px !important; border-radius: 2px; }
 .mm-brand-footer img.mm-logo-schulich { height: 22px !important; filter: brightness(0) invert(1); opacity: 0.85; }
-.mm-brand-footer img.mm-logo-western  { height: 18px !important; }
+.mm-brand-footer img.mm-logo-western  { height: 18px !important; filter: brightness(0) invert(1); opacity: 0.85; }
 
 .mm-dept {
   color: rgba(255, 255, 255, 0.72);
