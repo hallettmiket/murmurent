@@ -29,3 +29,7 @@ site/
 
 # Local-only agents (not part of the commons)
 agents/pm.md
+
+## Local doc render artefacts (R Markdown / pandoc)
+.Rhistory
+docs/*.html

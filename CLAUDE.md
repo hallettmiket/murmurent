@@ -145,6 +145,10 @@ replies once and cannot hold a back-and-forth.
 - [`docs/style/documentation.md`](docs/style/documentation.md) — script-header + README conventions.
 - [`docs/group_level.md`](docs/group_level.md) — group-level architecture notes.
 - [`docs/cli_manual.md`](docs/cli_manual.md) — CLI command reference.
+- [`docs/keyring.md`](docs/keyring.md) — the `murmurent keyring`: sync a centre's
+  shared secrets across a principal's machines (per-machine `age` identities +
+  multi-recipient boxes in `lab_info`, locked per role); deploy + test runbooks
+  in [`docs/keyring_deploy.md`](docs/keyring_deploy.md).
 - [`docs/project_creation.md`](docs/project_creation.md) — vignettes: creating
   intra- and inter-group projects (lead-signed certificates, private channel,
   shared-workspace gate).

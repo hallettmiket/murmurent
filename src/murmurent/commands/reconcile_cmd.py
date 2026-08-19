@@ -48,10 +48,35 @@ def cmd_reconcile(*, apply: bool, slack_body: bool) -> int:
     if slack_body:
         click.echo("\n--- slack body (copy into #claude-test) ---")
         click.echo(_build_slack_body(report, applied=apply))
+    _keyring_autosync(apply=apply)
     actionable = [f for f in report.findings if f.severity == "actionable"]
     if actionable and not apply:
         return 1
     return 0
+
+
+def _keyring_autosync(*, apply: bool) -> None:
+    """Best-effort keyring self-heal: if this machine participates in the keyring,
+    pull the latest boxes and (re)sync its secrets as part of the reconcile loop,
+    so a rotation on another machine lands here without a manual `keyring sync`.
+    Never fatal — a keyring problem must not break centre reconciliation."""
+    try:
+        from ..core import keyring as _kr
+        if not _kr.has_identity() or _kr.this_machine() is None:
+            return
+        from .keyring_cmd import _git_pull
+        _git_pull()                        # fetch the latest boxes before syncing
+        if not _kr.load_manifest().get("secrets"):
+            return
+        acted = [i for i in _kr.sync(apply=apply)
+                 if i.action in ("write", "would-write", "error")]
+        if not acted:
+            return
+        click.echo("\n[keyring] " + ("synced" if apply else "would sync (dry-run)") + ":")
+        for i in acted:
+            click.echo(f"  {i.name}: {i.action}" + (f" ({i.detail})" if i.detail else ""))
+    except Exception as exc:  # noqa: BLE001 — self-heal must never break reconcile
+        click.echo(f"\n[keyring] auto-sync skipped: {exc}")
 
 
 def _render_table(report: _rec.ReconcileReport) -> None:
