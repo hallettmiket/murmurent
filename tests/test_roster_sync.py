@@ -128,3 +128,39 @@ def test_roster_endpoints(lab_mgmt):
     assert res.status_code == 200
     body = res.json()
     assert body["ok"] is True and body["is_git"] is False
+
+
+# ---------------------------------------------------------------------------
+# Issue #112: an absent lab_mgmt clone and an empty roster are different
+# problems, and `murmurent member list` used to report both as "No members."
+# ---------------------------------------------------------------------------
+
+def test_member_list_explains_a_missing_lab_mgmt_clone(monkeypatch, tmp_path):
+    """No clone on this machine → say where it belongs, not "No members."."""
+    from click.testing import CliRunner
+    from murmurent.cli import cli
+
+    missing = tmp_path / "not-cloned"
+    monkeypatch.setenv("MURMURENT_LAB_MGMT_REPO", str(missing))
+
+    result = CliRunner().invoke(cli, ["member", "list"])
+
+    assert result.exit_code == 0, result.output
+    assert "No roster on this machine." in result.output
+    assert str(missing) in result.output          # where to put the clone
+    assert "git clone" in result.output           # how to get it
+    assert "No members." not in result.output     # the old, misleading line
+
+
+def test_member_list_says_no_members_when_the_clone_is_present_but_empty(
+    lab_mgmt, monkeypatch
+):
+    """Clone present, roster genuinely empty → the plain message stands."""
+    from click.testing import CliRunner
+    from murmurent.cli import cli
+
+    result = CliRunner().invoke(cli, ["member", "list"])
+
+    assert result.exit_code == 0, result.output
+    assert "No members." in result.output
+    assert "git clone" not in result.output

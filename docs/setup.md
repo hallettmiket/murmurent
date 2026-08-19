@@ -62,6 +62,27 @@ grep murmurent-oracle ~/.claude/settings.json   # MCP server registered
 murmurent --version
 ```
 
+### Members: clone your lab's governance repository
+
+Installing Murmurent and importing your membership card establishes *who
+you are*. It does not bring the lab's shared records onto your machine.
+The roster of your fellow members, the lab's projects, its compliance
+records, and the Lab Oracle all live in the lab's private governance
+repository, which every member holds a read-only clone of. Ask your PI
+for its name and clone it to the canonical path:
+
+```bash
+git clone git@github.com:<org>/murmurent_lab_mgmt_<lab>.git \
+    ~/repos/murmurent_lab_mgmt_<lab>
+murmurent member list   # the whole lab, not just you
+```
+
+Until you do, `murmurent member list` and the dashboard's members panel
+have no roster to read; both will say so rather than showing an empty
+lab. Keep the clone current with `git pull`, or the **update** button on
+the dashboard's members panel — the PI pushes roster changes there. See
+[`lab_mgmt.md`](lab_mgmt.md).
+
 ## What Murmurent installs on your machine
 
 For reference, or for auditing what Murmurent touches, here is what it

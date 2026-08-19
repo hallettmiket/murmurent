@@ -8127,17 +8127,29 @@ def create_app() -> FastAPI:
             return FileResponse(str(_MURMURATION), media_type="text/html",
                                 headers=_NO_CACHE)
 
+        # The browser-tab icon (issue #116). Generated from the same brand
+        # monogram as the desktop launcher icon by
+        # ``assets/murmurent_app_icon.py``; regenerate with:
+        #     python assets/murmurent_app_icon.py \
+        #         docs/designer_dashboard/assets/favicon.ico
+        _FAVICON = STATIC_DIR / "assets" / "favicon.ico"
+
         @app.get("/favicon.ico")
         def favicon():
-            # 204 = "No Content" — body MUST be empty. Returning
-            # ``JSONResponse({}, status_code=204)`` was a protocol
-            # violation: the response carried Content-Length=2 (for
-            # ``{}``) but uvicorn refuses to ship a body on 204, so
-            # the bytes-sent vs Content-Length mismatch crashed every
-            # favicon request. ``Response(status_code=204)`` sends
-            # the right empty body with Content-Length=0.
+            # Served explicitly as well as via the /assets mount, because
+            # browsers request /favicon.ico at the root on their own — a
+            # page that forgets the <link rel="icon"> tag still gets it.
             from fastapi.responses import Response
-            return Response(status_code=204)
+            if not _FAVICON.is_file():
+                # No icon on disk: 204 = "No Content", whose body MUST be
+                # empty. ``JSONResponse({}, status_code=204)`` was a protocol
+                # violation — the response carried Content-Length=2 (for
+                # ``{}``) but uvicorn refuses to ship a body on 204, so the
+                # bytes-sent vs Content-Length mismatch crashed every favicon
+                # request. ``Response(status_code=204)`` sends the right
+                # empty body with Content-Length=0.
+                return Response(status_code=204)
+            return FileResponse(str(_FAVICON), media_type="image/x-icon")
 
     else:  # pragma: no cover
 

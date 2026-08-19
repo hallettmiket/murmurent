@@ -1931,8 +1931,27 @@ def member_group() -> None:
 @member_group.command("list", help="List every member with their status.")
 def member_list_cmd() -> None:
     from .core import membership as _m
+    from .core import roster_sync as _rs
     members = _m.iter_members()
     if not members:
+        # The roster is not local state — it lives in the lab's governance
+        # repo, which every member holds a read-only clone of. An absent
+        # clone and an empty roster are very different problems, and
+        # reporting both as "No members." sent members hunting for a
+        # permissions bug that was never there (issue #112).
+        info = _rs.roster_info()
+        if not info.is_git and not info.ok:
+            click.echo(
+                "No roster on this machine.\n\n"
+                "The lab roster lives in your lab's governance repository, "
+                f"expected at:\n  {info.path}\n\n"
+                "Clone it there (ask your PI for the repository name if you "
+                "don't have it):\n"
+                "  git clone git@github.com:<org>/murmurent_lab_mgmt_<lab>.git "
+                f"{info.path}\n\n"
+                "See docs/lab_mgmt.md."
+            )
+            return
         click.echo("No members.")
         return
     console = Console()

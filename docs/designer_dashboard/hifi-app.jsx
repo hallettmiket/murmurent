@@ -3549,6 +3549,20 @@ function LabMembersPanel({ peers, span="c-6" }) {
             <button className="btn sm ghost" style={{marginLeft:8}} onClick={() => setAudit(null)}>dismiss</button>}
         </div>
       )}
+      {roster && !roster.is_git && !roster.ok && (
+        <div style={{margin:"0 14px 8px", padding:"8px 10px", borderRadius:2, fontSize:12.5,
+             lineHeight:1.5, border:"1px solid var(--amber, #b8860b)",
+             background:"rgba(184,134,11,0.07)"}}>
+          <strong>This machine has no clone of the governance repository for
+          your {groupNoun().toLowerCase()}, so the roster below is incomplete.</strong>
+          <div className="muted" style={{marginTop:4}}>
+            Members are read from <code className="mono">members/</code> in that
+            repo, not from local state. Clone it at{" "}
+            <code className="mono">{roster.path}</code> — ask your PI for the
+            repository name — then press <em>update</em>.
+          </div>
+        </div>
+      )}
       <div className="body" style={{padding:"6px 0"}}>
         {peers.map(p => (
           <div key={p.handle} style={{
@@ -4170,6 +4184,10 @@ function AgentGroup({ title, hint, agents }) {
 const WIZ_INPUT = {width:"100%", padding:"6px 8px", border:"1px solid var(--rule-strong)",
                    borderRadius:2, fontFamily:"var(--sans)", fontSize:13, boxSizing:"border-box"};
 const WIZ_MONO  = {...WIZ_INPUT, fontFamily:"var(--mono)", fontSize:12};
+// Free-text boxes: readable line spacing and a drag handle, because the rows
+// below are a floor rather than a cap — these fields are where an agent's
+// behaviour actually gets described (issue #110).
+const WIZ_TEXT  = {...WIZ_INPUT, lineHeight:1.5, resize:"vertical", minHeight:64};
 const WIZ_LABEL = {display:"block", marginBottom:10};
 const WIZ_CAP   = {fontSize:11, marginBottom:3};
 
@@ -4210,13 +4228,13 @@ function AgentWizardFields({ form, set, locked }) {
       {more && (
         <div>
           <WizField label="Responsibilities" hint="one per line; defaults to the role">
-            <textarea value={form.responsibilities} onChange={set("responsibilities")} rows={3}
-                      placeholder={"load data\ntrain models\nreport metrics"} style={WIZ_INPUT} />
+            <textarea value={form.responsibilities} onChange={set("responsibilities")} rows={6}
+                      placeholder={"load data\ntrain models\nreport metrics"} style={WIZ_TEXT} />
           </WizField>
           <WizField label="Scope & non-goals" hint="what it must NOT do — highest-leverage box">
-            <textarea value={form.non_goals} onChange={set("non_goals")} rows={2}
+            <textarea value={form.non_goals} onChange={set("non_goals")} rows={4}
                       placeholder="e.g. does not visualise — hand that to the artist"
-                      style={WIZ_INPUT} />
+                      style={WIZ_TEXT} />
           </WizField>
           <WizField label="Tools it MAY use" hint="comma-separated; blank inherits all">
             <input value={form.required_tools} onChange={set("required_tools")}
@@ -4239,12 +4257,12 @@ function AgentWizardFields({ form, set, locked }) {
                    placeholder="Done / Failed / Partial" style={WIZ_MONO} />
           </WizField>
           <WizField label="Guardrails / safety" hint="always-do / ask-first / never-do">
-            <textarea value={form.guardrails} onChange={set("guardrails")} rows={2}
-                      placeholder="e.g. never write outside outputs/" style={WIZ_INPUT} />
+            <textarea value={form.guardrails} onChange={set("guardrails")} rows={4}
+                      placeholder="e.g. never write outside outputs/" style={WIZ_TEXT} />
           </WizField>
           <WizField label="Worked example" hint="one request + ideal response, to anchor behaviour">
-            <textarea value={form.example} onChange={set("example")} rows={3}
-                      placeholder="Request: … → Response: …" style={WIZ_INPUT} />
+            <textarea value={form.example} onChange={set("example")} rows={5}
+                      placeholder="Request: … → Response: …" style={WIZ_TEXT} />
           </WizField>
           <WizField label="Model" hint="big model for hard reasoning, small for cheap/fast">
             <select value={form.model} onChange={set("model")}
@@ -4297,7 +4315,7 @@ function NewPersonalAgentModal({ onClose }) {
   };
   return (
     <div onClick={onClose} style={MODAL_BACKDROP_STYLE}>
-      <div onClick={e => e.stopPropagation()} style={{...MODAL_PANEL_STYLE, maxWidth:520, maxHeight:"85vh", overflowY:"auto"}}>
+      <div onClick={e => e.stopPropagation()} style={{...MODAL_PANEL_STYLE, maxWidth:640, maxHeight:"85vh", overflowY:"auto"}}>
         <div style={{background:"var(--paper-2)", borderBottom:"1px solid var(--rule)", padding:"12px 16px"}}>
           <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:17, color:"var(--purple-deep)"}}>
             New personal agent
@@ -4376,7 +4394,7 @@ function ModifyAgentModal({ name, onClose }) {
   const locked = ctx && !ctx.editable;
   return (
     <div onClick={onClose} style={MODAL_BACKDROP_STYLE}>
-      <div onClick={e => e.stopPropagation()} style={{...MODAL_PANEL_STYLE, maxWidth:560, maxHeight:"85vh", overflowY:"auto"}}>
+      <div onClick={e => e.stopPropagation()} style={{...MODAL_PANEL_STYLE, maxWidth:640, maxHeight:"85vh", overflowY:"auto"}}>
         <div style={{background:"var(--paper-2)", borderBottom:"1px solid var(--rule)", padding:"12px 16px"}}>
           <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:17, color:"var(--purple-deep)"}}>
             Modify agent · <code className="mono">{name}</code>
