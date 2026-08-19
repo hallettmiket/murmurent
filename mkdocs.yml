@@ -113,6 +113,8 @@ nav:
       - What a centre is: centre_overview.md
       - Membership IDs & the trust chain: identity.md
       - The centre root key: centre_root_key.md
+      - "Keyring: secrets across your machines": keyring.md
+      - Deploying the keyring: keyring_deploy.md
       - "Security Guard & Cable Guy (centre)": centre_guardians.md
       - Slack:
           - Centre Slack setup (mayor): slack_setup.md

@@ -17,6 +17,17 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+### Added
+- **`murmurent keyring`** — distribute a centre's shared secrets (the Slack token,
+  and later the onboarding age key) across a principal's machines via per-machine
+  `age` identities and multi-recipient `age` boxes committed to the `lab_info`
+  repo, locked **per role** so a `server` machine cannot open a `mayor`-only box
+  (e.g. the root CA). Commands: `init`, `authorize`, `set-secret`,
+  `rotate-secret`, `revoke`, `sync`, `status`, `check`, `verify`. Self-heals via
+  `murmurent reconcile`. Introduces a `.keyring/` store under `lab_info`. Design
+  and runbooks in [`docs/keyring.md`](docs/keyring.md) /
+  [`docs/keyring_deploy.md`](docs/keyring_deploy.md).
+
 ## [2026.7.0] — 2026-07-16
 
 First numbered release. Establishes version tracking itself (issue #24):

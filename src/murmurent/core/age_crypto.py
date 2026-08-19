@@ -81,6 +81,28 @@ def encrypt(recipient: str, plaintext: str) -> str:
     return r.stdout
 
 
+def encrypt_multi(recipients: list[str], plaintext: str) -> str:
+    """Return ASCII-armored ciphertext of ``plaintext`` encrypted to **every**
+    recipient in ``recipients`` — any one of the matching private keys can
+    decrypt it. This is the primitive the keyring uses to lock a secret so that
+    several machines can open it. Raises ``AgeError`` if none are valid."""
+    if shutil.which("age") is None:
+        raise AgeError("age not found; install age (https://age-encryption.org).")
+    recips = [r for r in recipients if (r or "").startswith("age1")]
+    if not recips:
+        raise AgeError("no valid age recipients to encrypt to")
+    args = ["age", "-a"]
+    for r in recips:
+        args += ["-r", r]
+    try:
+        r = subprocess.run(args, input=plaintext, capture_output=True, text=True, check=False)
+    except OSError as exc:
+        raise AgeError(f"age encrypt failed: {exc}") from exc
+    if r.returncode != 0:
+        raise AgeError(f"age encrypt failed: {r.stderr.strip()}")
+    return r.stdout
+
+
 def decrypt(ciphertext: str, key_path: Path | None = None) -> str:
     """Decrypt armored ``ciphertext`` with the private key at ``key_path``
     (default: the mayor key). Returns the plaintext."""
@@ -100,4 +122,4 @@ def decrypt(ciphertext: str, key_path: Path | None = None) -> str:
 
 
 __all__ = ["AgeError", "age_available", "default_key_path",
-           "keygen", "encrypt", "decrypt"]
+           "keygen", "encrypt", "encrypt_multi", "decrypt"]
