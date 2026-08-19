@@ -97,6 +97,20 @@ PI. You will also need the official name of your lab or core.
    `import-card` stores the verified card locally, so from now on Murmurent
    knows you're a member of the lab. 
 
+5. Clone your lab's governance repository. Your card proves *who you are*;
+   the roster of everyone else — and the lab's projects, compliance records,
+   and shared Oracle — lives in a separate private repository that every
+   member holds a read-only clone of. Ask your PI for its name, then:
+   ```bash
+   git clone git@github.com:<org>/murmurent_lab_mgmt_<lab>.git \
+       ~/repos/murmurent_lab_mgmt_<lab>
+   murmurent member list   # should now show the whole lab, not just you
+   ```
+   Without this clone, `murmurent member list` and the dashboard's members
+   panel have nothing to read and will tell you so. Keep it current with
+   `git pull` (or the dashboard's **update** button); the PI pushes roster
+   changes there. See [`docs/lab_mgmt.md`](docs/lab_mgmt.md).
+
 
 ## [PIs] If you are a PI of a lab or core ...
 

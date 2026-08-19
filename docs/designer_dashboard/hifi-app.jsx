@@ -3549,6 +3549,20 @@ function LabMembersPanel({ peers, span="c-6" }) {
             <button className="btn sm ghost" style={{marginLeft:8}} onClick={() => setAudit(null)}>dismiss</button>}
         </div>
       )}
+      {roster && !roster.is_git && !roster.ok && (
+        <div style={{margin:"0 14px 8px", padding:"8px 10px", borderRadius:2, fontSize:12.5,
+             lineHeight:1.5, border:"1px solid var(--amber, #b8860b)",
+             background:"rgba(184,134,11,0.07)"}}>
+          <strong>This machine has no clone of the governance repository for
+          your {groupNoun().toLowerCase()}, so the roster below is incomplete.</strong>
+          <div className="muted" style={{marginTop:4}}>
+            Members are read from <code className="mono">members/</code> in that
+            repo, not from local state. Clone it at{" "}
+            <code className="mono">{roster.path}</code> — ask your PI for the
+            repository name — then press <em>update</em>.
+          </div>
+        </div>
+      )}
       <div className="body" style={{padding:"6px 0"}}>
         {peers.map(p => (
           <div key={p.handle} style={{
