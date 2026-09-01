@@ -17,6 +17,24 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.9.3] — 2026-09-01
+
+### Added
+- **`uv tool install murmurent` is now a complete install.** The wheel
+  force-includes the commons (`agents/`, `rules/`, `skills/`, `templates/`,
+  `CLAUDE.md`) under `murmurent/commons/`; `core/commons.py` resolves them, and
+  a new `murmurent setup` wires them into `~/.claude/`. No clone and no
+  `curl | bash` required. A clone still wins over the packaged copy, decided by
+  content rather than by name, so editing an agent in a clone takes effect at
+  once and an empty directory from a failed clone cannot win.
+
+### Changed
+- **`murmurent install` with no flags now performs the whole install** (wire
+  the commons, then register hooks) instead of printing "not yet implemented in
+  v1". `--hooks` still means hooks only, so `scripts/bootstrap.sh` and existing
+  callers are unaffected.
+- Licence metadata is Apache-2.0 throughout, with a matching PyPI classifier.
+
 ## [2026.9.2] — 2026-09-01
 
 ### Added

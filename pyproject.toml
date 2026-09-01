@@ -13,6 +13,12 @@ authors = [
     { name = "Mike Hallett", email = "michael.hallett@uwo.ca" },
 ]
 license = { text = "Apache-2.0" }
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3.12",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
 dependencies = [
     "click>=8.1",
     "pyyaml>=6.0",
@@ -80,6 +86,45 @@ path = "src/murmurent/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/murmurent"]
+# rules/local/ is this deployment's own rules (private repos, Slack IDs). It is
+# withheld from the public repo, but a wheel built from the DEV clone would
+# otherwise embed it via the force-include below. Exclude it in both places.
+exclude = ["rules/local", "rules/local/**"]
+
+# Ship the commons INSIDE the wheel. Without this, `uv tool install murmurent`
+# gives you the CLI but none of the agents, rules or skills it exists to wire
+# up, so a PyPI install could not stand on its own and always needed a clone.
+# They land under murmurent/commons/ and are found by core.commons.commons_root().
+[tool.hatch.build.targets.wheel.force-include]
+"agents" = "murmurent/commons/agents"
+"rules" = "murmurent/commons/rules"
+"skills" = "murmurent/commons/skills"
+"templates" = "murmurent/commons/templates"
+# CLAUDE.md is what tells a Claude Code session what murmurent is. A package
+# install that omits it leaves the agents wired but unexplained.
+"CLAUDE.md" = "murmurent/commons/CLAUDE.md"
+
+[tool.hatch.build.targets.sdist]
+# The sdist is what PyPI keeps as the buildable source, so it needs the same
+# commons the wheel force-includes.
+include = [
+    "src/murmurent",
+    "agents",
+    "rules",
+    "skills",
+    "templates",
+    "scripts",
+    "docs",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "CLAUDE.md",
+    "pyproject.toml",
+]
+exclude = [
+    "rules/local",
+    "rules/local/**",
+]
 
 [tool.black]
 line-length = 100

@@ -19,7 +19,7 @@ from rich.table import Table
 from . import __version__
 from .commands import dashboard_cmd as dashboard_impl
 from .commands import data_cmd
-from .commands import experiment_cmd, install_cmd, project_cmd
+from .commands import experiment_cmd, install_cmd, project_cmd, setup_cmd
 from .commands import push_cmd as push_impl
 from .commands import reconcile_cmd as reconcile_impl
 from .commands import sea_cmd
@@ -63,10 +63,22 @@ def cli(ctx: click.Context) -> None:
 )
 @click.option("--no-backup", is_flag=True, help="Skip the .bak copy of settings.json.")
 def install_command(hooks: bool, settings_path: Path | None, no_backup: bool) -> None:
+    """Bare ``murmurent install`` is the whole install: wire the commons, then
+    register the hooks. It used to say "not yet implemented in v1", which left
+    the obvious command as a dead end and made a clone plus setup.sh the only
+    way in. ``--hooks`` still means hooks only, so existing callers and
+    scripts/bootstrap.sh are unaffected."""
     if not hooks:
-        click.echo("not yet implemented in v1 (use --hooks to install hooks + MCP).")
-        return
-    install_cmd.cmd_install(hooks=hooks, settings_path=settings_path, backup=not no_backup)
+        rc = setup_cmd.cmd_setup()
+        if rc != 0:
+            raise SystemExit(rc)
+        click.echo()
+    install_cmd.cmd_install(hooks=True, settings_path=settings_path, backup=not no_backup)
+
+
+@cli.command("setup", help="Wire the murmurent commons (agents, rules, skills) into ~/.claude/.")
+def setup_command() -> None:
+    raise SystemExit(setup_cmd.cmd_setup())
 
 
 @cli.command("onboard", help="One-shot setup for a new member (clone, key, profile, PR).")

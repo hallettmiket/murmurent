@@ -17,11 +17,24 @@ a centre or University.
 
 ## [Everyone] Download Murmurent
 
-Start by installing murmurent. The code is public; one command does it (you only need `git`):
+Start by installing murmurent. Either way works; pick one.
+
+**From PyPI** (nothing to clone, and you never pipe a script into your shell):
+
+```bash
+uv tool install murmurent
+murmurent install
+```
+
+**Or one command** (you only need `git`; it installs `uv` for you if missing):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts/bootstrap.sh | bash
 ```
+
+Either needs Python 3.12+; `uv` downloads one if your system has none. If you
+want to read the installer before running it, clone the repo first and run
+`scripts/bootstrap.sh` from inside it.
 
 This installs the `murmurent` command, wires the shared agents/rules/skills into `~/.claude/`, and
 registers the data-governance hooks. On your first run it mints your **identity
