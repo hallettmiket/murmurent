@@ -77,4 +77,4 @@ lab_mgmt repo so other group members see the restoration.
 
 - [`src/murmurent/core/reconcile.py`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/core/reconcile.py): detection + repair logic.
 - [`src/murmurent/commands/reconcile_cmd.py`](https://github.com/hallettmiket/murmurent/blob/main/src/murmurent/commands/reconcile_cmd.py): CLI wrapper + Slack body formatter.
-- [`tests/test_reconcile.py`](https://github.com/hallettmiket/murmurent/blob/main/tests/test_reconcile.py): drift-detection contract pins.
+- `tests/test_reconcile.py` (in the development repository): drift-detection contract pins.

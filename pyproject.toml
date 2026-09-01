@@ -10,9 +10,9 @@ description = "Multi-group agentic infrastructure for a bioconvergence centre â€
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [
-    { name = "Mike Hallett", email = "hallett.mike.t@gmail.com" },
+    { name = "Mike Hallett", email = "michael.hallett@uwo.ca" },
 ]
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 dependencies = [
     "click>=8.1",
     "pyyaml>=6.0",

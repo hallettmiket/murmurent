@@ -17,6 +17,16 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.9.1] — 2026-09-01
+
+### Fixed
+- **Author email in the package metadata was wrong** (`hallett.mike.t@gmail.com`);
+  it is `michael.hallett@uwo.ca`. This shipped in 2026.9.0 and would have been
+  the contact address on PyPI.
+- **Licence metadata contradicted the licence.** `pyproject.toml` declared MIT
+  while `LICENSE` is, and has always been, Apache-2.0. The metadata now matches
+  the file. No licence has changed; the declaration was wrong.
+
 ## [2026.9.0] — 2026-09-01
 
 **First public release.** Development moves to `murmurent_dev`; this repo now

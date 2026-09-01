@@ -134,7 +134,7 @@ MEMBER_SPECS: dict[str, dict] = {
     "the_pi": dict(
         full_name="Mike Hallett",
         role="lead", lab="hallett",
-        email="hallett.mike.t@gmail.com",
+        email="michael.hallett@uwo.ca",
         orcid="0000-0003-1234-5678",
         github="hallettmiket",
         office="SSC-2418",
