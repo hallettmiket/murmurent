@@ -17,6 +17,20 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.9.2] — 2026-09-01
+
+### Added
+- **PyPI publishing** via `.github/workflows/publish.yml`, using trusted
+  publishing (no stored token). The build job runs on every release; the
+  upload job is gated on the `PYPI_ENABLED` repository variable so it is
+  visibly skipped rather than silently absent until PyPI is configured.
+- **`DEVELOPING.md`** (development repository only): the dev setup, what
+  `rules/local/` is for, the pre-push checks, and how a release is cut.
+
+### Changed
+- `README.md` now says plainly that this repository carries released versions
+  only, and points bug reports at the development repository's issues.
+
 ## [2026.9.1] — 2026-09-01
 
 ### Fixed

@@ -1,0 +1,54 @@
+# Publish the package to PyPI when a GitHub Release is published.
+#
+# Uses PyPI Trusted Publishing (OIDC): no API token is stored anywhere, and
+# nothing needs to be added to repository secrets. It requires a one-time
+# setup on PyPI, described in DEVELOPING.md; until that is done this workflow
+# runs and fails at the publish step, which is the intended, visible outcome
+# rather than a silent skip.
+name: publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Build sdist and wheel
+        run: uv build --out-dir dist
+      - name: Show what will be published
+        run: ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    # Gated on an explicit repository variable rather than left to fail. Set
+    # PYPI_ENABLED=true (Settings -> Variables -> Actions) once the trusted
+    # publisher is configured on PyPI. Until then this job is SKIPPED, which
+    # shows plainly in the run; the build job above still runs every time, so a
+    # release that could not be packaged is still caught.
+    if: vars.PYPI_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    # The environment name must match the one configured on PyPI for the
+    # trusted publisher.
+    environment: pypi
+    permissions:
+      id-token: write   # required for trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

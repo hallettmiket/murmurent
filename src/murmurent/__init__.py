@@ -8,4 +8,4 @@
 # .murmurent.yaml as bootstrap_version. MICRO increments for a second release
 # in the same month. NOT the same as the on-disk schema versions
 # (MARKER_SCHEMA / CARD_VERSION / SIGNED_CARD_VERSION), which bump independently.
-__version__ = "2026.9.1"
+__version__ = "2026.9.2"

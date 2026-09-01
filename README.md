@@ -29,6 +29,17 @@ key** (your unique ID). Then set your personal info — `murmurent whoami` shows
 handle + key.
 
 
+## Working on murmurent itself
+
+This repository carries **released versions only** — one commit per release, no
+development history. Development, issues and design discussion happen in
+[murmurent_dev](https://github.com/hallettmiket/murmurent_dev); its
+`DEVELOPING.md` covers the dev setup, the allowlist, and how a release is cut.
+
+Bug reports and feature requests belong in
+[murmurent_dev's issues](https://github.com/hallettmiket/murmurent_dev/issues).
+
+
 ## [Everyone] Set up your identity
 
 ```bash
