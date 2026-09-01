@@ -1,0 +1,454 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Teacher Agent</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#f7f5f0;
+    --fg:#201e1a;
+    --muted:#5c584e;
+    --panel-bg:#ffffff;
+    --panel-border:#d7d1c2;
+    --debrief:#2f6fa8;
+    --debrief-bg:#e3edf7;
+    --explain:#3f8f6f;
+    --explain-bg:#e2f1e9;
+    --course:#8a4fae;
+    --course-bg:#f1e6f8;
+    --warn:#b5581c;
+    --warn-bg:#fbe8d8;
+    --sticky-bg:#fdf6d8;
+    --sticky-border:#c3a83a;
+    --marker-bg:#201e1a;
+    --marker-fg:#f7f5f0;
+    --lesson-bg:#f4f1ea;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#15130f;
+      --fg:#e9e5da;
+      --muted:#b0a999;
+      --panel-bg:#211e18;
+      --panel-border:#463f30;
+      --debrief:#82b8e8;
+      --debrief-bg:#1b2a38;
+      --explain:#82d3ab;
+      --explain-bg:#15301f;
+      --course:#cd9eef;
+      --course-bg:#2c1f3c;
+      --warn:#f0a25c;
+      --warn-bg:#3a2412;
+      --sticky-bg:#3a3216;
+      --sticky-border:#8f7a2c;
+      --marker-bg:#e9e5da;
+      --marker-fg:#15130f;
+      --lesson-bg:#221f19;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#15130f;
+    --fg:#e9e5da;
+    --muted:#b0a999;
+    --panel-bg:#211e18;
+    --panel-border:#463f30;
+    --debrief:#82b8e8;
+    --debrief-bg:#1b2a38;
+    --explain:#82d3ab;
+    --explain-bg:#15301f;
+    --course:#cd9eef;
+    --course-bg:#2c1f3c;
+    --warn:#f0a25c;
+    --warn-bg:#3a2412;
+    --sticky-bg:#3a3216;
+    --sticky-border:#8f7a2c;
+    --marker-bg:#e9e5da;
+    --marker-fg:#15130f;
+    --lesson-bg:#221f19;
+    color-scheme: dark;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.45;
+  }
+  .wrap{ max-width: 1760px; margin: 0 auto; padding: 28px 20px 60px; }
+  header{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
+    flex-wrap:wrap;
+    border-bottom: 2px solid var(--panel-border);
+    padding-bottom: 14px; margin-bottom: 6px;
+  }
+  h1{ font-size: 1.9rem; margin:0 0 4px; letter-spacing:-0.01em; }
+  .subtitle{ color: var(--muted); font-size: 0.95rem; margin:0; }
+  .provenance{ color: var(--muted); font-size: 0.82rem; text-align:right; font-style:italic; }
+  #theme-toggle{
+    font: inherit; font-size:0.78rem; cursor:pointer;
+    background: var(--panel-bg); color: var(--fg);
+    border:1px solid var(--panel-border); border-radius:6px;
+    padding:5px 10px;
+  }
+  figure{ margin: 18px 0 8px; }
+  .diagram-scroll{
+    overflow-x: auto;
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    background: var(--panel-bg);
+    padding: 6px;
+  }
+  svg{ display:block; width:100%; min-width: 1000px; height:auto; }
+  figcaption{
+    color: var(--muted); font-size: 0.85rem; margin-top: 8px;
+  }
+  svg text{ fill: var(--fg); font-family: inherit; }
+  .muted-text{ fill: var(--muted) !important; }
+  .flow-arrow{ stroke: var(--fg); stroke-width: 2; fill:none; opacity:0.75; }
+  .loop-arrow{ stroke: var(--fg); stroke-width: 2; fill:none; opacity:0.55; stroke-dasharray: 2 5; }
+  .dispatch-arrow{ stroke: var(--course); stroke-width: 2; fill:none; opacity:0.85; stroke-dasharray: 6 5; }
+  .misroute-arrow{ stroke: var(--warn); stroke-width: 1.8; fill:none; opacity:0.85; stroke-dasharray: 4 4; }
+  .marker-circle{ fill: var(--marker-bg); }
+  .marker-num{ fill: var(--marker-fg); font-weight:700; font-size:12px; text-anchor:middle; }
+
+  .legend{
+    margin-top: 30px;
+  }
+  .legend h2{ font-size:1.05rem; margin: 0 0 4px; }
+  .legend p.lede{ color:var(--muted); font-size:0.85rem; margin:0 0 14px; }
+  .legend-grid{
+    display:grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr));
+    gap: 14px;
+  }
+  .legend-card{
+    background: var(--panel-bg); border:1px solid var(--panel-border);
+    border-radius:10px; padding:12px 14px;
+  }
+  .legend-card h3{
+    display:flex; align-items:center; gap:8px;
+    font-size:0.92rem; margin: 0 0 6px;
+  }
+  .legend-card p{ font-size: 0.83rem; margin:0; color: var(--fg); }
+  .legend-card code{
+    background: var(--bg); border:1px solid var(--panel-border);
+    border-radius:4px; padding:0 4px; font-size:0.8em;
+  }
+  .badge{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:22px; height:22px; border-radius:50%;
+    background: var(--marker-bg); color: var(--marker-fg);
+    font-weight:700; font-size:0.78rem; flex:none;
+  }
+  footer{
+    margin-top: 34px; padding-top: 12px; border-top:1px solid var(--panel-border);
+    font-size:0.78rem; color: var(--muted);
+  }
+  footer code{ background: var(--panel-bg); border:1px solid var(--panel-border); border-radius:4px; padding:0 4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Teacher Agent</h1>
+      <p class="subtitle">Three modes, one entry point: <code>teacher &lt;mode&gt;</code></p>
+    </div>
+    <div style="display:flex; align-items:flex-end; gap:12px;">
+      <p class="provenance">Whiteboard sketch, transcribed<br>Tuesday, August&nbsp;18, 2026 · 3:42&nbsp;PM</p>
+      <button id="theme-toggle" type="button" title="Cycle theme">theme: system</button>
+    </div>
+  </header>
+
+  <figure>
+    <div class="diagram-scroll">
+      <svg viewBox="0 0 2760 1420" role="img"
+           aria-label="Teacher sits at the left edge, vertically centred, and fans rightward into three lanes read top to bottom: Debrief, Explain, Course. Each lane then flows left to right. Debrief and Explain run as the stateless teacher subagent, answering only in chat within one session: Debrief for a sentence that just landed wrong, Explain for a source that needs understanding, with a page only on request, and that page ends in a self-grading quiz just like every Course lesson. Explain ends its reply with the lavish-axi and poll commands for the main session to run, since poll blocks until a human acts in a browser and a subagent cannot sit on a blocked poll. Course, checked first so it cannot be misrouted into a one-shot explainer, hands off to the stateful murmurent-course skill running in the user's own session: it interviews for a mission, sources through the bookworm agent, then loops through picking the next topic, writing a self-contained versioned HTML lesson with a quiz, dispatching the teacher subagent back in for a cold-read check, reviewing in lavish-axi itself in the foreground, recording what the learner demonstrated, and opening the next session with retrieval instead of new content. The Debrief lane is short and ends almost immediately at chat; the Explain lane is medium; the Course lane runs the full width because its seven-step loop lives there.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <!-- ============ TEACHER (root, left edge, vertically centred) ============ -->
+        <g>
+          <rect x="30" y="640" width="260" height="140" rx="12" fill="var(--panel-bg)" stroke="var(--fg)" stroke-width="2.5"></rect>
+          <text x="160" y="676" text-anchor="middle" font-size="21" font-weight="700">TEACHER</text>
+          <text x="160" y="700" text-anchor="middle" font-size="10.5" class="muted-text">dispatched as <tspan font-family="monospace">teacher &lt;mode&gt;</tspan></text>
+          <text x="160" y="719" text-anchor="middle" font-size="9.8" class="muted-text">verdicts: Explained · Gap (Feynman)</text>
+        </g>
+        <circle class="marker-circle" cx="304" cy="650" r="11"></circle>
+        <text class="marker-num" style="fill:var(--marker-fg);font-weight:700;font-size:12px;text-anchor:middle;" x="304" y="654">5</text>
+
+        <!-- ============ three fan-out arrows, top to bottom: Debrief, Explain, Course ============ -->
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M290,660 C 300,460 300,220 310,177"></path>
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M290,710 C 300,600 300,520 310,495"></path>
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M290,760 C 300,778 300,792 310,805"></path>
+
+        <text x="450" y="116" text-anchor="middle" font-size="10.5" font-style="italic" class="muted-text">short-term · stateless · one session</text>
+        <text x="450" y="436" text-anchor="middle" font-size="10.5" font-style="italic" class="muted-text">short-term · stateless · one session</text>
+        <text x="450" y="746" text-anchor="middle" font-size="11" font-style="italic" font-weight="600" class="muted-text">long-term · stateful (multi-session)</text>
+
+        <!-- ============ trigger sticky notes ============ -->
+        <g>
+          <rect x="310" y="142" width="280" height="56" rx="8" fill="var(--sticky-bg)" stroke="var(--sticky-border)" stroke-width="1.5" stroke-dasharray="3 3"></rect>
+          <text x="450" y="163" text-anchor="middle" font-size="11" font-style="italic">“CC overcomplicates simple ideas</text>
+          <text x="450" y="180" text-anchor="middle" font-size="11" font-style="italic">with language it created”</text>
+        </g>
+        <g>
+          <rect x="310" y="462" width="280" height="56" rx="8" fill="var(--sticky-bg)" stroke="var(--sticky-border)" stroke-width="1.5" stroke-dasharray="3 3"></rect>
+          <text x="450" y="483" text-anchor="middle" font-size="11" font-style="italic">“you want to understand</text>
+          <text x="450" y="500" text-anchor="middle" font-size="11" font-style="italic">a concept better”</text>
+        </g>
+        <g>
+          <rect x="310" y="772" width="280" height="56" rx="8" fill="var(--sticky-bg)" stroke="var(--sticky-border)" stroke-width="1.5" stroke-dasharray="3 3"></rect>
+          <text x="450" y="793" text-anchor="middle" font-size="11" font-style="italic">“you want to learn a skill</text>
+          <text x="450" y="810" text-anchor="middle" font-size="11" font-style="italic">or a knowledge base”</text>
+        </g>
+
+        <!-- arrows sticky -> mode box -->
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M590,170 L630,170"></path>
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M590,490 L630,490"></path>
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M590,800 L630,800"></path>
+
+        <!-- ============ mode boxes ============ -->
+        <rect x="630" y="130" width="280" height="80" rx="12" fill="var(--debrief-bg)" stroke="var(--debrief)" stroke-width="2.5"></rect>
+        <text x="770" y="166" text-anchor="middle" font-size="20" font-weight="700">DEBRIEF</text>
+        <text x="770" y="188" text-anchor="middle" font-size="12" font-style="italic">“wait, what?”</text>
+
+        <rect x="630" y="450" width="280" height="80" rx="12" fill="var(--explain-bg)" stroke="var(--explain)" stroke-width="2.5"></rect>
+        <text x="770" y="486" text-anchor="middle" font-size="20" font-weight="700">EXPLAIN</text>
+        <text x="770" y="508" text-anchor="middle" font-size="12" font-style="italic">make the mechanism land</text>
+
+        <rect x="630" y="760" width="280" height="80" rx="12" fill="var(--course-bg)" stroke="var(--course)" stroke-width="2.5"></rect>
+        <text x="770" y="796" text-anchor="middle" font-size="20" font-weight="700">COURSE</text>
+        <text x="770" y="818" text-anchor="middle" font-size="12" font-style="italic">recognise → hand off</text>
+
+        <!-- misroute fallback: Explain mode box down to Course mode box -->
+        <path class="misroute-arrow" style="stroke:var(--warn);stroke-width:1.8;fill:none;opacity:0.85;" fill="none" stroke-dasharray="4 4" marker-end="url(#arrow)" d="M770,530 C 855,600 855,700 772,758"></path>
+        <circle class="marker-circle" cx="845" cy="595" r="11"></circle>
+        <text class="marker-num" style="fill:var(--marker-fg);font-weight:700;font-size:12px;text-anchor:middle;" x="845" y="599">4</text>
+        <text x="905" y="632" text-anchor="middle" font-size="10" font-style="italic" fill="var(--warn)">misroute lands here:</text>
+        <text x="905" y="646" text-anchor="middle" font-size="10" font-style="italic" fill="var(--warn)">→ Gap, names the skill</text>
+
+        <!-- arrows mode -> pill -->
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M910,170 L950,170"></path>
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M910,490 L950,490"></path>
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M910,800 L950,800"></path>
+
+        <!-- ============ subagent / skill pills ============ -->
+        <rect x="950" y="152" width="220" height="36" rx="18" fill="var(--panel-bg)" stroke="var(--debrief)" stroke-width="1.8" stroke-dasharray="5 3"></rect>
+        <text x="1060" y="175" text-anchor="middle" font-size="11" font-weight="700">SUBAGENT · isolated context</text>
+        <circle class="marker-circle" cx="938" cy="152" r="11"></circle>
+        <text class="marker-num" style="fill:var(--marker-fg);font-weight:700;font-size:12px;text-anchor:middle;" x="938" y="156">3</text>
+
+        <rect x="950" y="472" width="220" height="36" rx="18" fill="var(--panel-bg)" stroke="var(--explain)" stroke-width="1.8" stroke-dasharray="5 3"></rect>
+        <text x="1060" y="495" text-anchor="middle" font-size="11" font-weight="700">SUBAGENT · isolated context</text>
+
+        <rect x="950" y="782" width="220" height="36" rx="18" fill="var(--course-bg)" stroke="var(--course)" stroke-width="3"></rect>
+        <text x="1060" y="805" text-anchor="middle" font-size="11" font-weight="700">SKILL · runs in YOUR session</text>
+
+        <!-- arrows pill -> downstream -->
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M1170,170 L1210,170"></path>
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M1170,490 L1210,490"></path>
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M1170,800 L1210,800"></path>
+
+        <!-- ============ DEBRIEF downstream: ends here, lane is short ============ -->
+        <rect x="1210" y="138" width="220" height="64" rx="32" fill="var(--panel-bg)" stroke="var(--fg)" stroke-width="2"></rect>
+        <text x="1320" y="178" text-anchor="middle" font-size="18" font-weight="700">chat</text>
+        <circle class="marker-circle" cx="1452" cy="150" r="11"></circle>
+        <text class="marker-num" style="fill:var(--marker-fg);font-weight:700;font-size:12px;text-anchor:middle;" x="1452" y="154">1</text>
+
+        <!-- ============ EXPLAIN downstream: medium lane ============ -->
+        <text x="1215" y="424" text-anchor="start" font-size="10" font-style="italic" class="muted-text">HTML + lavish</text>
+
+        <rect x="1210" y="435" width="240" height="110" rx="8" fill="var(--panel-bg)" stroke="var(--fg)" stroke-width="2"></rect>
+        <polygon points="1415,435 1450,435 1450,470" fill="var(--panel-border)"></polygon>
+        <rect x="1230" y="460" width="170" height="50" rx="8" fill="var(--explain-bg)" stroke="var(--explain)" stroke-width="1.5"></rect>
+        <polygon points="1230,502 1230,514 1245,502" fill="var(--explain-bg)" stroke="var(--explain)" stroke-width="1.5"></polygon>
+        <text x="1315" y="490" text-anchor="middle" font-size="11">chat in HTML + quiz</text>
+        <text x="1330" y="562" text-anchor="middle" font-size="10.5" class="muted-text">a page, on request</text>
+
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M1450,490 L1500,490"></path>
+        <rect x="1500" y="463" width="300" height="54" rx="8" fill="var(--warn-bg)" stroke="var(--warn)" stroke-width="2.5"></rect>
+        <text x="1650" y="485" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--warn)">HTML ON REQUEST</text>
+        <text x="1650" y="504" text-anchor="middle" font-size="13.5" font-weight="700" fill="var(--warn)">NOT BY DEFAULT</text>
+        <circle class="marker-circle" cx="1786" cy="473" r="11"></circle>
+        <text class="marker-num" style="fill:var(--marker-fg);font-weight:700;font-size:12px;text-anchor:middle;" x="1786" y="477">2</text>
+
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M1330,545 L1330,575"></path>
+        <rect x="1210" y="575" width="440" height="58" rx="8" fill="var(--panel-bg)" stroke="var(--explain)" stroke-width="1.5" stroke-dasharray="4 3"></rect>
+        <text x="1430" y="595" text-anchor="middle" font-size="10" font-family="monospace">ends reply with `lavish-axi &lt;file&gt;` + `poll`</text>
+        <text x="1430" y="610" text-anchor="middle" font-size="10" class="muted-text">for the MAIN session to run: poll blocks until a</text>
+        <text x="1430" y="624" text-anchor="middle" font-size="10" class="muted-text">human acts in a browser; a subagent can't wait on it</text>
+
+        <!-- ============ COURSE downstream: full-width lane, wraps to a second row ============ -->
+
+        <!-- row 1: skill hand-off, curriculum framing, interview gate, steps 1-2 -->
+        <rect x="1210" y="773" width="260" height="54" rx="8" fill="var(--panel-bg)" stroke="var(--course)" stroke-width="2"></rect>
+        <text x="1340" y="805" text-anchor="middle" font-size="13" font-weight="700">murmurent-course skill</text>
+
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M1470,800 L1500,800"></path>
+        <rect x="1500" y="765" width="260" height="70" rx="8" fill="var(--panel-bg)" stroke="var(--course)" stroke-width="2"></rect>
+        <text x="1630" y="792" text-anchor="middle" font-size="12.5" font-weight="700">multi-session curriculum</text>
+        <text x="1630" y="811" text-anchor="middle" font-size="9.5" class="muted-text">chunked lessons, quizzes, progress tracking</text>
+
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M1760,800 L1790,800"></path>
+        <rect x="1790" y="755" width="260" height="90" rx="8" fill="var(--course-bg)" stroke="var(--course)" stroke-width="3"></rect>
+        <text x="1920" y="782" text-anchor="middle" font-size="13" font-weight="700">INTERVIEW FIRST</text>
+        <text x="1920" y="802" text-anchor="middle" font-size="10">concrete mission, not topic → MISSION.md</text>
+        <text x="1920" y="819" text-anchor="middle" font-size="9.5" font-style="italic" class="muted-text">never a lesson in an empty directory</text>
+
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M2050,800 L2080,800"></path>
+        <rect x="2080" y="760" width="260" height="80" rx="8" fill="var(--panel-bg)" stroke="var(--fg)" stroke-width="1.75"></rect>
+        <text x="2210" y="785" text-anchor="middle" font-size="12" font-weight="700">1 · Source via bookworm</text>
+        <text x="2210" y="803" text-anchor="middle" font-size="10" class="muted-text">→ RESOURCES.md; every lesson cites,</text>
+        <text x="2210" y="818" text-anchor="middle" font-size="10" class="muted-text">names one primary source to read</text>
+
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M2340,800 L2370,800"></path>
+        <rect x="2370" y="760" width="260" height="80" rx="8" fill="var(--panel-bg)" stroke="var(--fg)" stroke-width="1.75"></rect>
+        <text x="2500" y="785" text-anchor="middle" font-size="12" font-weight="700">2 · Pick smallest next topic</text>
+        <text x="2500" y="803" text-anchor="middle" font-size="10" class="muted-text">from MISSION.md + learning records;</text>
+        <text x="2500" y="818" text-anchor="middle" font-size="10" class="muted-text">never re-teach what they demonstrated</text>
+
+        <!-- wrap connector: row 1 end -> row 2 start, reads like a wrapped line of text -->
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M2500,840 C 2500,900 1340,900 1340,945"></path>
+        <text x="1920" y="895" text-anchor="middle" font-size="9.5" font-style="italic" class="muted-text">lane continues below</text>
+
+        <!-- row 2: steps 3-7 -->
+        <rect x="1210" y="945" width="260" height="100" rx="8" fill="var(--panel-bg)" stroke="var(--fg)" stroke-width="1.75"></rect>
+        <text x="1340" y="968" text-anchor="middle" font-size="12" font-weight="700">3 · Write the lesson</text>
+        <text x="1340" y="986" text-anchor="middle" font-size="9.8" class="muted-text">self-contained HTML, lesson_&lt;n&gt;.html,</text>
+        <text x="1340" y="1001" text-anchor="middle" font-size="9.8" class="muted-text">integer-versioned, never overwritten;</text>
+        <text x="1340" y="1016" text-anchor="middle" font-size="9.8" class="muted-text">ends in a self-grading quiz on mechanism</text>
+
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M1340,1045 L1340,1085"></path>
+        <text x="1370" y="1070" text-anchor="start" font-size="9.5" font-style="italic" class="muted-text">writes</text>
+
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M1470,990 L1500,990"></path>
+        <rect x="1500" y="950" width="260" height="90" rx="8" fill="var(--panel-bg)" stroke="var(--fg)" stroke-width="1.75"></rect>
+        <text x="1630" y="975" text-anchor="middle" font-size="12" font-weight="700">4 · Cold-read check</text>
+        <text x="1630" y="993" text-anchor="middle" font-size="9.8" class="muted-text">dispatch teacher subagent: explain the</text>
+        <text x="1630" y="1008" text-anchor="middle" font-size="9.8" class="muted-text">mechanism back from the page alone</text>
+        <text x="1630" y="1058" text-anchor="middle" font-size="9" font-style="italic" fill="var(--course)">Gap → fix &amp; recheck · Explained → ship</text>
+
+        <!-- cold-read return: shortened to a labelled marker rather than a path all the way back to Teacher -->
+        <path class="dispatch-arrow" style="stroke:var(--course);stroke-width:2;fill:none;opacity:0.85;" fill="none" stroke-dasharray="6 5" marker-end="url(#arrow)" d="M1610,950 C 1610,905 1500,905 1478,933"></path>
+        <text x="1544" y="898" text-anchor="middle" font-size="9.5" fill="var(--course)">↩ returns to TEACHER</text>
+        <text x="1544" y="911" text-anchor="middle" font-size="9.5" fill="var(--course)">(cold-read dispatch)</text>
+
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M1760,990 L1790,990"></path>
+        <rect x="1790" y="940" width="260" height="110" rx="8" fill="var(--panel-bg)" stroke="var(--fg)" stroke-width="1.75"></rect>
+        <text x="1920" y="963" text-anchor="middle" font-size="12" font-weight="700">5 · Review in lavish-axi</text>
+        <text x="1920" y="981" text-anchor="middle" font-size="9.6" class="muted-text">lavish-axi &lt;file&gt;, then poll (blocks);</text>
+        <text x="1920" y="996" text-anchor="middle" font-size="9.6" class="muted-text">“wait-what” annotations + quiz answers</text>
+        <text x="1920" y="1011" text-anchor="middle" font-size="9.6" class="muted-text">revision ships as lesson_&lt;n+1&gt;.html</text>
+        <text x="1920" y="1026" text-anchor="middle" font-size="9.2" font-style="italic" fill="var(--course)">runs both itself, in the foreground</text>
+        <circle class="marker-circle" cx="2036" cy="950" r="11"></circle>
+        <text class="marker-num" style="fill:var(--marker-fg);font-weight:700;font-size:12px;text-anchor:middle;" x="2036" y="954">2</text>
+
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M2050,990 L2080,990"></path>
+        <rect x="2080" y="950" width="260" height="80" rx="8" fill="var(--panel-bg)" stroke="var(--fg)" stroke-width="1.75"></rect>
+        <text x="2210" y="975" text-anchor="middle" font-size="12" font-weight="700">6 · Learning record</text>
+        <text x="2210" y="993" text-anchor="middle" font-size="9.8" class="muted-text">record_&lt;n&gt;.md, specific and honest:</text>
+        <text x="2210" y="1008" text-anchor="middle" font-size="9.8" class="muted-text">demonstrated vs needed walked through</text>
+
+        <path class="flow-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.75;" fill="none" marker-end="url(#arrow)" d="M2340,990 L2370,990"></path>
+        <rect x="2370" y="950" width="260" height="80" rx="8" fill="var(--panel-bg)" stroke="var(--fg)" stroke-width="1.75"></rect>
+        <text x="2500" y="975" text-anchor="middle" font-size="12" font-weight="700">7 · Next session: retrieval first</text>
+        <text x="2500" y="993" text-anchor="middle" font-size="9.8" class="muted-text">spaced questions from the records,</text>
+        <text x="2500" y="1008" text-anchor="middle" font-size="9.8" class="muted-text">weighted to what they fumbled</text>
+
+        <!-- loop back: step 7 (retrieval) -> step 2 (pick next topic), kept off to the right margin so it crosses nothing -->
+        <path class="loop-arrow" style="stroke:var(--fg);stroke-width:2;fill:none;opacity:0.55;" fill="none" stroke-dasharray="2 5" marker-end="url(#arrow)" d="M2630,990 C 2705,990 2705,800 2632,800"></path>
+        <text x="2716" y="899" text-anchor="middle" font-size="10" font-style="italic" class="muted-text" transform="rotate(-90 2716 899)">↺ loop: back to “pick next topic”</text>
+
+        <!-- ============ lesson stack, branching down from step 3 ============ -->
+        <rect x="1210" y="1085" width="180" height="55" rx="8" fill="var(--lesson-bg)" stroke="var(--fg)" stroke-width="1.6"></rect>
+        <text x="1300" y="1108" text-anchor="middle" font-size="11" font-weight="700">lesson_1.html</text>
+        <text x="1300" y="1124" text-anchor="middle" font-size="9.8" class="muted-text">HTML + Quiz</text>
+
+        <line x1="1300" y1="1140" x2="1300" y2="1160" stroke="var(--fg)" stroke-width="1.4" opacity="0.5"></line>
+
+        <rect x="1210" y="1160" width="180" height="55" rx="8" fill="var(--lesson-bg)" stroke="var(--fg)" stroke-width="1.6"></rect>
+        <text x="1300" y="1183" text-anchor="middle" font-size="11" font-weight="700">lesson_2.html</text>
+        <text x="1300" y="1199" text-anchor="middle" font-size="9.8" class="muted-text">HTML + Quiz</text>
+
+        <text x="1300" y="1250" text-anchor="middle" font-size="22" class="muted-text">⋮</text>
+
+        <rect x="1210" y="1278" width="180" height="55" rx="8" fill="var(--lesson-bg)" stroke="var(--fg)" stroke-width="1.6" stroke-dasharray="5 3"></rect>
+        <text x="1300" y="1301" text-anchor="middle" font-size="11" font-weight="700">lesson_&lt;n&gt;.html</text>
+        <text x="1300" y="1317" text-anchor="middle" font-size="9.8" font-style="italic" class="muted-text">current</text>
+
+      </svg>
+    </div>
+    <figcaption>
+      Debrief and Explain, the top two lanes, are short answers from the same stateless subagent. Course, the bottom lane, is a long-running stateful skill that runs in your own session and loops: interview once, then source, pick topic, write, cold-read, review, record, retrieve, again. Lane length is the point: a longer lane is a longer process.
+    </figcaption>
+  </figure>
+
+  <div class="legend">
+    <h2>Legend</h2>
+    <p class="lede">Numbered circles on the diagram point to the notes below: the claims the drawing doesn't have room to spell out.</p>
+    <div class="legend-grid">
+
+      <div class="legend-card">
+        <h3><span class="badge">1</span> Debrief's rails</h3>
+        <p>Chat only, under 60 seconds, one dispatch. Reads only the <em>tail</em> of this session's transcript; never globs <code>~/.claude/projects/</code>, never quotes <code>tool_result</code>/<code>tool_use</code> blocks, writes no file. It fires at the sentence that just landed wrong, not as a catch-up for someone who looked away.</p>
+      </div>
+
+      <div class="legend-card">
+        <h3><span class="badge">2</span> The lavish-axi review loop</h3>
+        <p><code>npx lavish-axi &lt;file&gt;</code> then <code>poll</code> (blocks) returns “wait-what” text-range annotations and quiz answers; a wrong answer means the lesson failed, not the reader. Revisions land as a new integer-versioned file, never overwritten. Never <code>lavish-axi share</code> (publishes public, third-party); no CDN, pages must open from disk with zero network. Explain's page carries the same self-grading quiz as every Course lesson; debriefs ban it outright, since testing recall of something that just landed checks the wrong thing. The two commands are not run the same way: Explain ends its reply with them for the <strong>main session</strong> to run, because <code>poll</code> blocks until a human acts in a browser and a subagent sitting on a blocked poll never returns its verdict. Course runs both itself, in the foreground, because it is a skill already running in your own session.</p>
+      </div>
+
+      <div class="legend-card">
+        <h3><span class="badge">3</span> Subagent vs. skill-in-session</h3>
+        <p>Debrief and Explain run as the <strong>teacher subagent</strong>; isolated context is the point, which is exactly why neither can interview you or remember last week. Course runs as a <strong>skill inside your own session</strong>, the only place that can ask a question and hold state (<code>MISSION.md</code>, <code>RESOURCES.md</code>, <code>learning-records/</code>) across sessions days apart.</p>
+      </div>
+
+      <div class="legend-card">
+        <h3><span class="badge">4</span> Course is evaluated first</h3>
+        <p>If a course request lands in Debrief or Explain by mistake, teacher doesn't attempt it; it returns <code>Gap: this is a course, not an explanation</code> and names <code>teacher course &lt;subject&gt;</code>. Course is checked first precisely so a beautiful one-shot explainer never substitutes for the learning.</p>
+      </div>
+
+      <div class="legend-card">
+        <h3><span class="badge">5</span> Teacher's vocabulary</h3>
+        <p>Exactly two verdicts, no middle ground: <code>Explained</code> or <code>Gap</code>. Persona is Richard Feynman (answers to “Feynman” too). Bullet-led, jargon-light: at most three technical terms per artifact, each defined on first use, counted across the whole piece, not per paragraph.</p>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>
+    Sources: <code>agents/teacher.md</code> · <code>skills/murmurent-course/SKILL.md</code> · the “teacher &lt;mode&gt;” table in <code>CLAUDE.md</code>. Structure and annotations follow a whiteboard sketch by Mike Hallett, Tue Aug 18 2026, 3:42&nbsp;PM; the Course branch's loop (interview → source → pick → write → cold-read → review → record → retrieve) is expanded from the skill's own steps. Pass 3 re-lays pass 1's content left to right, Teacher on the left fanning into three horizontal lanes, at Mike's request.
+  </footer>
+
+</div>
+
+<script>
+  (function(){
+    var order = ["system","light","dark"];
+    var btn = document.getElementById("theme-toggle");
+    var root = document.documentElement;
+    var i = 0;
+    function apply(){
+      var mode = order[i];
+      if(mode === "system"){ root.removeAttribute("data-theme"); }
+      else { root.setAttribute("data-theme", mode); }
+      btn.textContent = "theme: " + mode;
+    }
+    btn.addEventListener("click", function(){
+      i = (i + 1) % order.length;
+      apply();
+    });
+    apply();
+  })();
+</script>
+
+</body>
+</html>

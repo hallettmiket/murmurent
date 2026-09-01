@@ -1,0 +1,13 @@
+# murmurent join request — fill in the value after each colon, then encrypt this
+# file with murmurent-join.sh and email the result to your institution's
+# registrar (address + key are in the directory at the repo root).
+#
+# Lines starting with # are ignored. Nothing here is sent anywhere until you
+# encrypt it and choose to email it.
+
+kind:            # lab | core   (your existing group; you stay its PI / leader)
+institution:     # the institution you're joining (from the directory)
+name:            # your group's short name — the one you used at init, e.g. mh
+pi:              # your handle = your netname (you are the PI), e.g. @jsmith
+email:           # how the registrar reaches you
+justification:   # a sentence: who you are and what this group is

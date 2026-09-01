@@ -1,0 +1,33 @@
+/* Purpose: Which of the teacher's three modes to reach for, and what each gives you.
+   Author:  Mike Hallett (with Claude Code)
+   Date:    2026-08-27
+   Input:   none (hand-authored)
+   Output:  teacher_modes.svg + teacher_modes.png via scripts/render_diagrams.sh */
+
+digraph teacher_modes {
+  bgcolor    = "#FAF8F5";
+  rankdir    = TB;
+  nodesep    = 0.7;
+  ranksep    = 1.1;
+  fontname   = "EB Garamond";
+
+  node [shape=box, style="rounded,filled", fontname="EB Garamond",
+        fillcolor="#F1ECE3", color="#4F2683", penwidth=2,
+        fontcolor="#1A1A1A", fontsize=15, margin="0.25,0.18"];
+  edge [color="#4F2683", penwidth=2, fontname="EB Garamond",
+        fontcolor="#5B5B5B", fontsize=13];
+
+  ask [label="What are you stuck on?\nHow much of it?",
+       shape=box, style="rounded", fillcolor="none",
+       fontcolor="#4F2683", fontsize=16];
+
+  debrief [label=<<b>Debrief</b><br/><font point-size="13" color="#5B5B5B">Answers in chat,<br/>under a minute</font>>];
+  explain [label=<<b>Explain</b><br/><font point-size="13" color="#5B5B5B">Chat; a page with<br/>a quiz if you ask</font>>];
+  course  [label=<<b>Course</b><br/><font point-size="13" color="#5B5B5B">Lessons and quizzes<br/>over several sittings</font>>];
+
+  ask -> debrief [label="one sentence "];
+  ask -> explain [label="one paper "];
+  ask -> course  [label="one subject "];
+
+  { rank=same; debrief; explain; course; }
+}

@@ -1,0 +1,5 @@
+# Local-only: publisher PDFs are not redistributed from this repo.
+# Only the CC BY-NC-ND paper below is committed; see README.md.
+*.pdf
+!traditional_ancient_egyptian_medicine_2021.pdf
+!trc_2015_calls_to_action.pdf

@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Teacher Agent</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{
+    --bg:#f7f5f0;
+    --fg:#201e1a;
+    --muted:#5c584e;
+    --panel-bg:#ffffff;
+    --panel-border:#d7d1c2;
+    --debrief:#2f6fa8;
+    --debrief-bg:#e3edf7;
+    --explain:#3f8f6f;
+    --explain-bg:#e2f1e9;
+    --course:#8a4fae;
+    --course-bg:#f1e6f8;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#15130f;
+      --fg:#e9e5da;
+      --muted:#b0a999;
+      --panel-bg:#211e18;
+      --panel-border:#463f30;
+      --debrief:#82b8e8;
+      --debrief-bg:#1b2a38;
+      --explain:#82d3ab;
+      --explain-bg:#15301f;
+      --course:#cd9eef;
+      --course-bg:#2c1f3c;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#15130f;
+    --fg:#e9e5da;
+    --muted:#b0a999;
+    --panel-bg:#211e18;
+    --panel-border:#463f30;
+    --debrief:#82b8e8;
+    --debrief-bg:#1b2a38;
+    --explain:#82d3ab;
+    --explain-bg:#15301f;
+    --course:#cd9eef;
+    --course-bg:#2c1f3c;
+    color-scheme: dark;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.45;
+  }
+  .wrap{ max-width: 1100px; margin: 0 auto; padding: 32px 20px 50px; }
+  header{
+    display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
+    flex-wrap:wrap;
+    border-bottom: 2px solid var(--panel-border);
+    padding-bottom: 14px; margin-bottom: 6px;
+  }
+  h1{ font-size: 2.1rem; margin:0 0 4px; letter-spacing:-0.01em; }
+  .subtitle{ color: var(--muted); font-size: 1rem; margin:0; }
+  .provenance{ color: var(--muted); font-size: 0.82rem; text-align:right; font-style:italic; }
+  #theme-toggle{
+    font: inherit; font-size:0.78rem; cursor:pointer;
+    background: var(--panel-bg); color: var(--fg);
+    border:1px solid var(--panel-border); border-radius:6px;
+    padding:5px 10px;
+  }
+  figure{ margin: 26px 0 8px; }
+  .diagram-scroll{
+    overflow-x: auto;
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    background: var(--panel-bg);
+    padding: 8px;
+  }
+  svg{ display:block; width:100%; min-width: 760px; height:auto; }
+  figcaption{
+    color: var(--muted); font-size: 0.88rem; margin-top: 10px;
+    text-align:center;
+  }
+  svg text{ fill: var(--fg); font-family: inherit; }
+  .muted-text{ fill: var(--muted) !important; }
+  .flow-arrow{ stroke: var(--fg); stroke-width: 2.25; fill:none; opacity:0.7; }
+  footer{
+    margin-top: 30px; padding-top: 12px; border-top:1px solid var(--panel-border);
+    font-size:0.78rem; color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>Teacher Agent</h1>
+      <p class="subtitle">Three modes, one entry point: <code>teacher &lt;mode&gt;</code></p>
+    </div>
+    <div style="display:flex; align-items:flex-end; gap:12px;">
+      <p class="provenance">Whiteboard sketch, transcribed<br>Tuesday, August&nbsp;18, 2026</p>
+      <button id="theme-toggle" type="button" title="Cycle theme">theme: system</button>
+    </div>
+  </header>
+
+  <figure>
+    <div class="diagram-scroll">
+      <svg viewBox="0 0 1200 500" role="img"
+           aria-label="Teacher fans into three modes. Debrief: when Claude Code overcomplicated something, it answers in chat under a minute. Explain: when you want to understand a concept better, it explains a source, with an HTML page and quiz on request. Course: when you want to learn a skill or knowledge base, it runs a multi-session course of lessons and quizzes.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <!-- ============ TEACHER (root) ============ -->
+        <rect x="470" y="14" width="260" height="64" rx="14" fill="var(--panel-bg)" stroke="var(--fg)" stroke-width="2.5"></rect>
+        <text x="600" y="54" text-anchor="middle" font-size="24" font-weight="700">TEACHER</text>
+
+        <!-- fan-out arrows -->
+        <path class="flow-arrow" marker-end="url(#arrow)" d="M500,78 C420,100 260,110 200,128"></path>
+        <path class="flow-arrow" marker-end="url(#arrow)" d="M600,78 L600,128"></path>
+        <path class="flow-arrow" marker-end="url(#arrow)" d="M700,78 C780,100 940,110 1000,128"></path>
+
+        <!-- ============ DEBRIEF ============ -->
+        <g>
+          <rect x="30" y="128" width="340" height="330" rx="16" fill="var(--debrief-bg)" stroke="var(--debrief)" stroke-width="3"></rect>
+          <text x="200" y="173" text-anchor="middle" font-size="30" font-weight="800" fill="var(--debrief)">DEBRIEF</text>
+          <line x1="60" y1="193" x2="340" y2="193" stroke="var(--debrief)" stroke-width="1.5" opacity="0.5"></line>
+
+          <text x="200" y="223" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="1.5" class="muted-text">WHEN</text>
+          <text x="200" y="248" text-anchor="middle" font-size="16">Claude Code overcomplicated</text>
+          <text x="200" y="272" text-anchor="middle" font-size="16">something</text>
+
+          <text x="200" y="308" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="1.5" class="muted-text">WHAT</text>
+          <text x="200" y="333" text-anchor="middle" font-size="16">Answers in chat,</text>
+          <text x="200" y="357" text-anchor="middle" font-size="16">under a minute</text>
+
+          <rect x="145" y="415" width="110" height="38" rx="19" fill="var(--debrief)"></rect>
+          <text x="200" y="440" text-anchor="middle" font-size="14" font-weight="700" fill="var(--bg)">sentence</text>
+        </g>
+
+        <!-- ============ EXPLAIN ============ -->
+        <g>
+          <rect x="430" y="128" width="340" height="330" rx="16" fill="var(--explain-bg)" stroke="var(--explain)" stroke-width="3"></rect>
+          <text x="600" y="173" text-anchor="middle" font-size="30" font-weight="800" fill="var(--explain)">EXPLAIN</text>
+          <line x1="460" y1="193" x2="740" y2="193" stroke="var(--explain)" stroke-width="1.5" opacity="0.5"></line>
+
+          <text x="600" y="223" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="1.5" class="muted-text">WHEN</text>
+          <text x="600" y="248" text-anchor="middle" font-size="16">You want to understand</text>
+          <text x="600" y="272" text-anchor="middle" font-size="16">a concept better</text>
+
+          <text x="600" y="308" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="1.5" class="muted-text">WHAT</text>
+          <text x="600" y="333" text-anchor="middle" font-size="16">Explains a source; a page</text>
+          <text x="600" y="357" text-anchor="middle" font-size="16">and quiz on request</text>
+
+          <rect x="535" y="415" width="130" height="38" rx="19" fill="var(--explain)"></rect>
+          <text x="600" y="440" text-anchor="middle" font-size="14" font-weight="700" fill="var(--bg)">source</text>
+        </g>
+
+        <!-- ============ COURSE ============ -->
+        <g>
+          <rect x="830" y="128" width="340" height="330" rx="16" fill="var(--course-bg)" stroke="var(--course)" stroke-width="3"></rect>
+          <text x="1000" y="173" text-anchor="middle" font-size="30" font-weight="800" fill="var(--course)">COURSE</text>
+          <line x1="860" y1="193" x2="1140" y2="193" stroke="var(--course)" stroke-width="1.5" opacity="0.5"></line>
+
+          <text x="1000" y="223" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="1.5" class="muted-text">WHEN</text>
+          <text x="1000" y="248" text-anchor="middle" font-size="16">You want to learn a skill</text>
+          <text x="1000" y="272" text-anchor="middle" font-size="16">or knowledge base</text>
+
+          <text x="1000" y="308" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="1.5" class="muted-text">WHAT</text>
+          <text x="1000" y="333" text-anchor="middle" font-size="16">Runs a multi-session course</text>
+          <text x="1000" y="357" text-anchor="middle" font-size="16">of lessons and quizzes</text>
+
+          <rect x="915" y="415" width="170" height="38" rx="19" fill="var(--course)"></rect>
+          <text x="1000" y="440" text-anchor="middle" font-size="14" font-weight="700" fill="var(--bg)">subject</text>
+        </g>
+
+      </svg>
+    </div>
+    <figcaption>
+      Same question, three sizes of answer: a sentence, a source, a subject.
+    </figcaption>
+  </figure>
+
+  <footer>
+    Companion to the fuller schematic (<code>teacher_agent_schematic_1.html</code>) in this directory; screenshots supply the detail this version leaves out.
+  </footer>
+
+</div>
+
+<script>
+  (function(){
+    var order = ["system","light","dark"];
+    var btn = document.getElementById("theme-toggle");
+    var root = document.documentElement;
+    var i = 0;
+    function apply(){
+      var mode = order[i];
+      if(mode === "system"){ root.removeAttribute("data-theme"); }
+      else { root.setAttribute("data-theme", mode); }
+      btn.textContent = "theme: " + mode;
+    }
+    btn.addEventListener("click", function(){
+      i = (i + 1) % order.length;
+      apply();
+    });
+    apply();
+  })();
+</script>
+
+</body>
+</html>

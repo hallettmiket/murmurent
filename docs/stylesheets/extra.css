@@ -1,0 +1,71 @@
+/* Branded footer — mirrors the Murmurent dashboard footer look and feel:
+   dark-purple bar, tiger top accent, Hallett Lab + Schulich + Western logos. */
+
+.mm-brand-footer {
+  width: 100%;
+  background: #201436;                 /* --purple-deep */
+  border-top: 3px solid #F0A757;       /* --tiger */
+  color: rgba(255, 255, 255, 0.85);
+  padding: 16px 24px;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+
+.mm-brand-bar {
+  max-width: 1220px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.mm-brand-bar a { border-bottom: 0; line-height: 0; }
+/* Blanket cap so nothing renders at the logos' native size (the lab mark
+   is 1000x1000). Scoped + !important to beat the theme's image rules. */
+.mm-brand-footer img { display: block; width: auto !important; max-width: none; }
+.mm-brand-footer img.mm-logo-lab      { height: 30px !important; border-radius: 2px; }
+.mm-brand-footer img.mm-logo-schulich { height: 22px !important; filter: brightness(0) invert(1); opacity: 0.85; }
+.mm-brand-footer img.mm-logo-western  { height: 18px !important; filter: brightness(0) invert(1); opacity: 0.85; }
+
+.mm-dept {
+  color: rgba(255, 255, 255, 0.72);
+  flex-grow: 1;
+}
+
+.mm-ack {
+  max-width: 1220px;
+  margin: 10px auto 0;
+  font-style: italic;
+  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Let the branded bar span the full footer-meta width. */
+.md-footer-meta__inner { flex-wrap: wrap; }
+.md-copyright { width: 100%; margin: 0; }
+.md-copyright__highlight { color: inherit; }
+
+/* ── Sidebar: visually separate the top-level nav sections ──────────────────
+   The theme uses navigation.sections, so each top-level group (Getting
+   started, Working day to day, Labs & cores, Centres, Reference) renders as a
+   section label. Give each one a coloured, ruled header so the sections read
+   as distinct blocks. Direct-child combinators keep this to top-level
+   sections only, leaving nested groups (Slack, vignettes, ...) untouched. */
+.md-nav--primary > .md-nav__list > .md-nav__item--section > .md-nav__link {
+  margin-top: 1.1rem;
+  padding-top: 0.7rem;
+  border-top: 2px solid rgba(79, 38, 131, 0.25);   /* Western purple, faint */
+  color: #4F2683;                                   /* Western purple */
+  font-weight: 700;
+  font-size: 0.66rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Dark scheme: lighter accent so the labels stay legible. */
+[data-md-color-scheme="slate"]
+  .md-nav--primary > .md-nav__list > .md-nav__item--section > .md-nav__link {
+  color: #C9A6F0;
+  border-top-color: rgba(201, 166, 240, 0.28);
+}

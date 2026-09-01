@@ -1,0 +1,32 @@
+name: adversary-stub
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Post stub adversary review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = [
+              "### adversary (stub)",
+              "",
+              "This is a phase-3 stub. The real `adversary` agent will:",
+              "- read the diff,",
+              "- challenge methodology and statistical claims,",
+              "- demand cross-validation where missing,",
+              "- flag data leakage.",
+              "",
+              "Replace this stub with the live adversary integration in v2."
+            ].join("\n");
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body
+            });
