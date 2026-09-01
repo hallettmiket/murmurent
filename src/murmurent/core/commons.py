@@ -46,6 +46,21 @@ def packaged_commons_root() -> Path:
     return Path(__file__).resolve().parent.parent / "commons"
 
 
+def editable_clone_root() -> Path:
+    """The clone this module is running from, for an editable install.
+
+    ``uv tool install -e .`` leaves the package inside the clone, so this file
+    sits at ``<clone>/src/murmurent/core/commons.py`` and the clone is four
+    levels up. Without this, a developer who clones to any directory other than
+    the hardcoded ``~/repos/murmurent`` — ``~/repos/murmurent_dev``, say, which
+    is exactly what DEVELOPING.md tells them to do — would silently read the
+    PACKAGED commons instead of their own, edit an agent, and see no effect.
+    For a wheel install this resolves inside site-packages and fails the
+    content check below, so it costs nothing.
+    """
+    return Path(__file__).resolve().parents[3]
+
+
 def commons_root() -> Path:
     """Where to read agents, rules and skills from.
 
@@ -55,9 +70,11 @@ def commons_root() -> Path:
        unusual installs. Honoured even if it does not look like the commons,
        because an override that is silently ignored is worse than one that
        fails loudly downstream.
-    2. The murmurent clone (``$MURMURENT_REPO_ROOT`` or ``~/repos/murmurent``),
+    2. The clone this package is running from, when installed editable — so a
+       clone at any path, not only ``~/repos/murmurent``, is picked up.
+    3. The murmurent clone (``$MURMURENT_REPO_ROOT`` or ``~/repos/murmurent``),
        **if it actually contains the commons**.
-    3. The copy inside the installed package.
+    4. The copy inside the installed package.
 
     Falls back to (2) when nothing qualifies, so error messages still name the
     clone people expect rather than a path inside site-packages.
@@ -65,6 +82,13 @@ def commons_root() -> Path:
     override = os.environ.get("MURMURENT_COMMONS_ROOT")
     if override:
         return Path(override).expanduser()
+
+    # The clone you are running from wins over the one you happen to have at
+    # the conventional path: if you installed this editable, that is the copy
+    # you are working on.
+    editable = editable_clone_root()
+    if _looks_like_commons(editable):
+        return editable
 
     clone = murmurent_repo_root()
     if _looks_like_commons(clone):

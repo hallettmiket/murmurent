@@ -69,7 +69,7 @@ def install_command(hooks: bool, settings_path: Path | None, no_backup: bool) ->
     way in. ``--hooks`` still means hooks only, so existing callers and
     scripts/bootstrap.sh are unaffected."""
     if not hooks:
-        rc = setup_cmd.cmd_setup()
+        rc = setup_cmd.cmd_setup(show_next_step=False)
         if rc != 0:
             raise SystemExit(rc)
         click.echo()

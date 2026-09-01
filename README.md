@@ -17,24 +17,40 @@ a centre or University.
 
 ## [Everyone] Download Murmurent
 
-Start by installing murmurent. Either way works; pick one.
+Two ways in. Both end up in the same place; pick one.
 
-**From PyPI** (nothing to clone, and you never pipe a script into your shell):
+### A. From PyPI (recommended)
+
+Nothing to clone, and you never pipe a script into your shell. If you don't
+have [uv](https://docs.astral.sh/uv/) yet, install it first — one line:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh     # skip if you have uv
+```
+
+Then:
 
 ```bash
 uv tool install murmurent
 murmurent install
 ```
 
-**Or one command** (you only need `git`; it installs `uv` for you if missing):
+If your shell can't find `murmurent` afterwards, close and reopen your terminal
+(uv puts it in `~/.local/bin`).
+
+### B. One command
+
+Only needs `git`. This one installs uv for you if it's missing:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts/bootstrap.sh | bash
 ```
 
-Either needs Python 3.12+; `uv` downloads one if your system has none. If you
-want to read the installer before running it, clone the repo first and run
+To read the installer before running it, clone the repo first and run
 `scripts/bootstrap.sh` from inside it.
+
+Either way you need **Python 3.12 or newer**; uv downloads one automatically if
+your system hasn't got it, so you don't need to install Python yourself.
 
 This installs the `murmurent` command, wires the shared agents/rules/skills into `~/.claude/`, and
 registers the data-governance hooks. On your first run it mints your **identity
@@ -42,15 +58,28 @@ key** (your unique ID). Then set your personal info — `murmurent whoami` shows
 handle + key.
 
 
-## Working on murmurent itself
+## Two repositories: which one am I looking at?
 
-This repository carries **released versions only** — one commit per release, no
-development history. Development, issues and design discussion happen in
-[murmurent_dev](https://github.com/hallettmiket/murmurent_dev); its
-`DEVELOPING.md` covers the dev setup, the allowlist, and how a release is cut.
+| | |
+|---|---|
+| [**`murmurent`**](https://github.com/hallettmiket/murmurent) | **Releases.** One commit per release, no development history. This is what you install, and what the instructions above clone. |
+| [**`murmurent_dev`**](https://github.com/hallettmiket/murmurent_dev) | **Development.** All history, issues, pull requests and design discussion. Has a `DEVELOPING.md` the release does not. |
 
-Bug reports and feature requests belong in
-[murmurent_dev's issues](https://github.com/hallettmiket/murmurent_dev/issues).
+They share this README, so the quickest way to tell them apart is the file
+list: if you can see `DEVELOPING.md` and a `tests/` directory, you are in
+`murmurent_dev`.
+
+- **Using murmurent?** Install from either the PyPI or the one-command route
+  above; both give you the latest release.
+- **Reporting a bug or asking for a feature?**
+  [Open an issue on `murmurent_dev`](https://github.com/hallettmiket/murmurent_dev/issues).
+  The release repo has issues turned off, because the discussion belongs where
+  the work happens.
+- **Working on murmurent itself?** Clone `murmurent_dev` and read its
+  [`DEVELOPING.md`](https://github.com/hallettmiket/murmurent_dev/blob/main/DEVELOPING.md):
+  dev setup, what `rules/local/` is for, the pre-push checks, and how a release
+  is cut. **Do not** develop against the release repo — it has no tests and no
+  history.
 
 
 ## [Everyone] Set up your identity

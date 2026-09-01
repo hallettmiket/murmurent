@@ -63,8 +63,13 @@ def _link_dir(src_dir: Path, dest_dir: Path, pattern: str, kind: str) -> tuple[i
     return (created, repointed, preserved)
 
 
-def cmd_setup(*, force: bool = False) -> int:
-    """Wire agents, rules, skills and CLAUDE.md into ~/.claude/."""
+def cmd_setup(*, force: bool = False, show_next_step: bool = True) -> int:
+    """Wire agents, rules, skills and CLAUDE.md into ~/.claude/.
+
+    ``show_next_step`` is False when called from ``murmurent install``, which
+    registers the hooks itself a moment later. Telling someone to run a command
+    that has already run is how a working install gets reported as broken.
+    """
     root = commons_root()
     source = commons_source()
     cc = _cc_dir()
@@ -131,5 +136,6 @@ def cmd_setup(*, force: bool = False) -> int:
     click.echo(
         f"\n{created} created, {repointed} re-pointed, {preserved} of your own files left alone."
     )
-    click.echo("\nNext: murmurent install --hooks   (registers hooks + MCP servers)")
+    if show_next_step:
+        click.echo("\nNext: murmurent install --hooks   (registers hooks + MCP servers)")
     return 0

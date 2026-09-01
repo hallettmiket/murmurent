@@ -17,6 +17,24 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.9.4] — 2026-09-01
+
+### Fixed
+- **An editable clone at any path is now found.** `commons_root()` only
+  consulted `~/repos/murmurent`, so a developer who cloned to
+  `~/repos/murmurent_dev` — which `DEVELOPING.md` tells them to do — silently
+  read the packaged commons instead of their own clone, edited an agent and saw
+  no effect, with no error anywhere.
+- `murmurent install` no longer prints "Next: murmurent install --hooks" and
+  then immediately runs the hooks itself.
+
+### Changed
+- README: the PyPI route now says to install `uv` first (the one-command route
+  does that for you; the PyPI route did not, and `uv: command not found` was
+  the first thing a new user would hit).
+- README: the two-repository section now reads correctly from **either** repo,
+  since both share this file, and says where to file issues.
+
 ## [2026.9.3] — 2026-09-01
 
 ### Added
