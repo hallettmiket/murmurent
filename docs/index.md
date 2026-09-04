@@ -42,6 +42,7 @@ memory and infrastructure on top, when you want it.
 | A mayor bootstrapping a centre | [Centre Slack setup](slack_setup.md) · [Public directory setup](hub_setup.md) |
 | Wondering how the trust model works | [Membership IDs & the trust chain](identity.md) |
 | Looking for a command | [CLI manual](cli_manual.md) |
+| Looking for a published choreography to install | The [`murmurent_public`](https://github.com/hallettmiket/murmurent_public) directory keeps the index of all public choreographies in [`choreographies.tsv`](https://github.com/hallettmiket/murmurent_public/blob/main/choreographies.tsv); see [Choreographies](choreography.md) |
 
 ## How a centre is organized
 

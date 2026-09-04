@@ -17,6 +17,14 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.9.8] — 2026-09-04
+
+### Changed
+- README (shared by the release and development repositories) and the
+  documentation home page now point at `murmurent_public` as the directory that
+  holds the **index of all published choreographies** (`choreographies.tsv`),
+  alongside the institution list, and name the two commands that read it.
+
 ## [2026.9.7] — 2026-09-04
 
 ### Fixed

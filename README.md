@@ -104,9 +104,10 @@ place or stops with `Package 'murmurent' requires a different Python`.
 |---|---|
 | [**`murmurent`**](https://github.com/hallettmiket/murmurent) | **Releases.** One commit per release, no development history. This is what you install, and what the instructions above clone. |
 | [**`murmurent_dev`**](https://github.com/hallettmiket/murmurent_dev) | **Development.** All history, issues, pull requests and design discussion. Has a `DEVELOPING.md` the release does not. |
+| [**`murmurent_public`**](https://github.com/hallettmiket/murmurent_public) | **The public directory.** The list of every institution running Murmurent and how to join it, and the **index of all published choreographies** ([`choreographies.tsv`](https://github.com/hallettmiket/murmurent_public/blob/main/choreographies.tsv)): the shared workflows you can install by name with `murmurent choreography list` and `murmurent choreography install <name>`. |
 
-They share this README, so the quickest way to tell them apart is the file
-list: if you can see `DEVELOPING.md` and a `tests/` directory, you are in
+The first two share this README, so the quickest way to tell them apart is the
+file list: if you can see `DEVELOPING.md` and a `tests/` directory, you are in
 `murmurent_dev`.
 
 - **Using murmurent?** Install from either the PyPI or the one-command route

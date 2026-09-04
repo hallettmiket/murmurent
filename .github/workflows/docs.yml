@@ -20,7 +20,7 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false   # a release push and the explicit dispatch must both finish, never cancel each other
 
 jobs:
   build:
