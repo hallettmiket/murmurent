@@ -1,6 +1,6 @@
 # Why the conscience is not a persona
 
-A design note for [`agents/conscience.md`](../agents/conscience.md). The spec
+A design note for [`agents/conscience.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/conscience.md). The spec
 carries one line; the argument is here.
 
 An earlier draft made **bell hooks** the agent's persona — first person, in her

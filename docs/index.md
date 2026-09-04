@@ -36,6 +36,7 @@ memory and infrastructure on top, when you want it.
 |---|---|
 | New: what does this add over plain Claude Code? | [Getting started](getting_started.md) |
 | Installing on your machine | [Install & setup](setup.md) |
+| Using Murmurent in a directory you already have | [Making a repo Murmurent-ready](ready_vs_projects.md) |
 | Starting a project (in your lab, or across labs) | [Creating a project](project_intra.md) |
 | A PI setting up your lab | [Group Slack setup](group_slack_setup.md) · [The lab-mgmt repo](lab_mgmt.md) |
 | A mayor bootstrapping a centre | [Centre Slack setup](slack_setup.md) · [Public directory setup](hub_setup.md) |

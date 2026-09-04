@@ -63,6 +63,31 @@ def _link_dir(src_dir: Path, dest_dir: Path, pattern: str, kind: str) -> tuple[i
     return (created, repointed, preserved)
 
 
+def _prune_dangling(dest_dir: Path, root: Path, kind: str) -> int:
+    """Remove symlinks in ``dest_dir`` that point INTO the commons at a file
+    that is gone: an agent retired from the commons, a rule renamed.
+
+    Only links into the commons are candidates. A link into someone's personal
+    vault, or anywhere else, is theirs and stays whatever it points at. Returns
+    the number removed.
+    """
+    removed = 0
+    if not dest_dir.is_dir():
+        return 0
+    root_s = str(root)
+    for p in sorted(dest_dir.iterdir()):
+        if not p.is_symlink() or p.exists():
+            continue
+        import os
+
+        target = os.readlink(p)
+        if target.startswith(root_s):
+            p.unlink()
+            click.echo(f"  - removed dangling {kind}/{p.name} (it left the commons)")
+            removed += 1
+    return removed
+
+
 def cmd_setup(*, force: bool = False, show_next_step: bool = True) -> int:
     """Wire agents, rules, skills and CLAUDE.md into ~/.claude/.
 
@@ -132,9 +157,12 @@ def cmd_setup(*, force: bool = False, show_next_step: bool = True) -> int:
                 click.echo("  ! preserved your own CLAUDE.md (not a symlink)")
             break
 
+    pruned = sum(_prune_dangling(cc / sub, root, sub) for sub in ("agents", "rules", "skills"))
+
     created, repointed, preserved = totals
     click.echo(
-        f"\n{created} created, {repointed} re-pointed, {preserved} of your own files left alone."
+        f"\n{created} created, {repointed} re-pointed, {pruned} dangling removed, "
+        f"{preserved} of your own files left alone."
     )
     if show_next_step:
         click.echo("\nNext: murmurent install --hooks   (registers hooks + MCP servers)")

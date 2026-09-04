@@ -284,7 +284,7 @@ Choreographies are CC skills, not CLI subcommands. Invoke them inside Claude Cod
 | Command | Effect |
 |---|---|
 | `murmurent onboard <group> --profile <profile>` | One-shot setup for a new member: clone Murmurent, install agents per profile, configure MCP, generate age key, push key + member profile via PR |
-| `murmurent doctor` | Verify local install is healthy: agents present, MCP servers reachable, age key registered, group memberships visible |
+| `murmurent doctor` | Check the local install and print the one command that fixes each problem: Python version, whether `pip`/`python` on PATH match the interpreter murmurent runs under, agent/rule/skill links into the commons (including dangling ones), registered hooks and their interpreter, and whether a clone's `origin` can still `git pull`. Exit 0 = healthy (warnings allowed), 1 = something failed |
 | `murmurent offboard --member @<handle>` *PI* | Mirror of onboard: revoke roles, release from projects, archive age key, mark profile alumni |
 
 ### Verbs (day-to-day)

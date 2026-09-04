@@ -19,6 +19,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
 ]
+
 dependencies = [
     "click>=8.1",
     "pyyaml>=6.0",
@@ -42,6 +43,15 @@ dependencies = [
     # chain must be available in every install, not gated behind an extra.
     "cryptography>=42",
 ]
+
+[project.urls]
+Homepage = "https://github.com/hallettmiket/murmurent"
+Documentation = "https://hallettmiket.github.io/murmurent/"
+# Issues are disabled on the release repo on purpose; bug reports and feature
+# requests go to the development repo, where the history and the PRs are.
+Issues = "https://github.com/hallettmiket/murmurent_dev/issues"
+Source = "https://github.com/hallettmiket/murmurent"
+Changelog = "https://github.com/hallettmiket/murmurent/blob/main/CHANGELOG.md"
 
 [project.optional-dependencies]
 dev = [

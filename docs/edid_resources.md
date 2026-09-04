@@ -1,10 +1,10 @@
 # EDID resources — the conscience's source of authority
 
-These are the resources the [conscience](../agents/conscience.md) cites from. The
+These are the resources the [conscience](https://github.com/hallettmiket/murmurent/blob/main/agents/conscience.md) cites from. The
 agent does not browse: `WebFetch` and `WebSearch` are denied in its
 frontmatter, which is what makes its `freeze: frozen` guardian posture
 machine-checkable. Everything it can cite is here, and this file is
-maintained by the [bookworm](../agents/bookworm.md).
+maintained by the [bookworm](https://github.com/hallettmiket/murmurent/blob/main/agents/bookworm.md).
 
 **Provenance.** Compiled by hand as `EDID Resources for Murmurent.odt`
 and transcribed here 2026-08-28. Section descriptions and the *How to
@@ -20,7 +20,7 @@ to educate the public — FNESC's First Peoples Principles of Learning, Pass The
 Feather, Native Land Digital, the Two-Eyed Seeing site — prefer it over a
 third-party description of the same thing, and say who authored it. Where they
 hold only an outside account, mark it, so the agent knows it is citing a
-description rather than a source. The [bookworm](../agents/bookworm.md) should
+description rather than a source. The [bookworm](https://github.com/hallettmiket/murmurent/blob/main/agents/bookworm.md) should
 weight community-authored material above commentary when filling any gap.
 
 **Regional by design.** The resources are deliberately Canadian, Ontarian, and
@@ -402,7 +402,7 @@ nothing to cite on this route and must say so rather than guess a name or a
 URL.
 
 For this deployment — Western, Ontario, Canada — the catalogues for the
-[bookworm](../agents/bookworm.md) to fetch and list here are the university's
+[bookworm](https://github.com/hallettmiket/murmurent/blob/main/agents/bookworm.md) to fetch and list here are the university's
 own EDI and research training offerings, and the openly available federal
 ones (Gender-Based Analysis Plus; the Canada School of Public Service
 Indigenous learning material). A deployment elsewhere replaces both rows with
@@ -425,7 +425,7 @@ agent's credibility doing it.
 **The centre-wide list is [`edid_gap_decisions.md`](edid_gap_decisions.md)**,
 with each promoted gap marked `open`, `filled`, or `declined`.
 
-**Recording happens locally.** The [conscience](../agents/conscience.md) ends
+**Recording happens locally.** The [conscience](https://github.com/hallettmiket/murmurent/blob/main/agents/conscience.md) ends
 every report with its own gap table; the `murmurent.hooks.conscience_gaps` hook
 appends those rows to `~/.murmurent/edid_gaps/gap_log.md` on that member's own
 machine and regenerates a ranked register beside it. Nothing is written to this
@@ -439,7 +439,7 @@ people learn to skip.
 
 **Nothing automatic touches this file.** The hook writes only a local ledger and
 a local summary, neither of which is citable. The
-[bookworm](../agents/bookworm.md) works the promoted list and a person approves
+[bookworm](https://github.com/hallettmiket/murmurent/blob/main/agents/bookworm.md) works the promoted list and a person approves
 before anything becomes a source here — the same dry-run-then-apply split
 [`docs/reconcile.md`](reconcile.md) uses, and for the same reason: a process
 that silently rewrites shared state is worse than a gap that stays visible.
@@ -447,7 +447,7 @@ that silently rewrites shared state is worse than a gap that stays visible.
 ## Ingestion backlog
 
 Items referenced here but not yet citable as a citable source. The
-[bookworm](../agents/bookworm.md) closes these; the conscience must not
+[bookworm](https://github.com/hallettmiket/murmurent/blob/main/agents/bookworm.md) closes these; the conscience must not
 cite an entry still on this list.
 
 **Closed 2026-08-29.** The four *submit PDF* items are done — full texts now live in [`docs/edid_pdfs/`](edid_pdfs/), linked from their entries. Two are committed — the CC BY-NC-ND paper and the public-domain TRC Calls to Action; the other three are gitignored because `hallettmiket/murmurent` is public and republishing subscription or all-rights-reserved PDFs from it would be redistribution. On a machine without them the entries still carry DOI and URL — the source is verifiable, just not readable in place.

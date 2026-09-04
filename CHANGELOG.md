@@ -17,6 +17,87 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.9.7] — 2026-09-04
+
+### Fixed
+- **The author email in README was still the placeholder on the release
+  repository.** The development repository had it right since 2026.9.6, and no
+  release had gone out since, so the public page never changed. This release
+  carries it, and the test fixture that used a real name with the placeholder
+  domain now uses `@the_pi`.
+- **README links go to the documentation website**
+  (<https://hallettmiket.github.io/murmurent/>) instead of to the raw
+  Markdown under `docs/` on GitHub. The public site itself had never built: its
+  strict MkDocs build failed on 2026-09-01 over relative `agents/` links that
+  were fixed in development on 2026-09-02 and ship here for the first time.
+  `release/make_release.sh` now asks the public repository to rebuild the docs
+  after every push, since a squashed release commit does not reliably trigger
+  the path-filtered workflow on its own.
+
+### Added
+- **`murmurent doctor` is real.** It checks the Python version, whether the
+  `pip` and `python` on PATH belong to the interpreter murmurent runs under,
+  the agent/rule/skill links in `~/.claude/` (dangling ones included), the
+  registered hooks and the interpreter they call, and whether a clone's
+  `origin` can still `git pull`. Each failure prints the one command that
+  fixes it. Every check corresponds to a way a real install went wrong
+  silently: a `pip install -e .` from a conda `base` shell refused with
+  "requires a different Python"; a development clone left pointing at the
+  release repository after the split; a symlink to an agent that had left the
+  commons.
+- **Initializing a directory is documented from the status check down.**
+  README, `docs/setup.md` and `docs/ready_vs_projects.md` now open with
+  `murmurent repo status` and a verdict table (plain folder, plain clone,
+  ready-but-old, ready), so nothing assumes the directory is or is not already
+  ready. README and `docs/setup.md` gain an **Upgrading** section;
+  `DEVELOPING.md` gains one for a development clone.
+
+### Changed
+- `murmurent setup` and `scripts/setup.sh` remove symlinks in `~/.claude/`
+  that point into the commons at a file that no longer exists (an agent
+  retired from the commons). Links into a personal vault or anywhere else are
+  left as they are.
+- `murmurent repo adopt` on a folder without `.git/` now says to run
+  `git init` first, instead of only reporting that it is not a working tree.
+
+## [2026.9.6] — 2026-09-04
+
+### Added
+- **The public choreography index is published**, which was the third piece of
+  #136 and was waiting on a choreography having a public release. It lives at
+  `choreographies.tsv` in `murmurent_public` and carries **locations only**:
+  one `name<TAB>git_url` row, no titles or summaries, because everything a
+  reader is shown is read from the choreography's own `.murmurent.yaml` and a
+  second copy would drift. First entry: `inhibition`
+  ([tt8804/inhibition_public](https://github.com/tt8804/inhibition_public)).
+- **`murmurent choreography install <name>`** now resolves a published
+  choreography's name through that index. A bare name used to be refused
+  outright, which left `list` showing things that could not then be installed
+  the way they were named.
+
+### Changed
+- Every failure to read the index now names the URL route, not only the 404
+  case. Offline, or inside one lab with a choreography that was never
+  published, the index is not needed and should not be in the way.
+- An index row with a name but no URL is dropped rather than listed, so a
+  half-filled row can never be offered as something to install.
+
+## [2026.9.5] — 2026-09-02
+
+### Added
+- **`murmurent choreography install <git-url>`** — clone a choreography, read
+  what it says about itself, report any agent it needs that this machine has
+  not got, and make it murmurent-ready. Thin by design: it hands the clone to
+  the existing `repo adopt` path rather than re-implementing readiness.
+- **`murmurent choreography list`** — read the public index. The index is not
+  published yet, so it says so and points at the URL route instead of failing.
+- **A choreography declares itself** in `.murmurent.yaml` with
+  `kind: choreography`. A repository that does not is refused, with a pointer
+  to `murmurent repo adopt`: treating any cloned repository as a choreography
+  would install arbitrary code as one.
+- `docs/choreography.md` documents discovery and installation, which it did not
+  mention at all.
+
 ## [2026.9.4] — 2026-09-01
 
 ### Fixed

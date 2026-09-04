@@ -6,7 +6,7 @@ decided about each. This is the only gap list in the repo, and it is
 human-curated.
 
 **What this is not.** It is not where gaps are recorded. The
-[conscience](../agents/conscience.md) ends every report with its own gap table;
+[conscience](https://github.com/hallettmiket/murmurent/blob/main/agents/conscience.md) ends every report with its own gap table;
 the `murmurent.hooks.conscience_gaps` hook appends those to
 `~/.murmurent/edid_gaps/gap_log.md` — **on that member's own machine, never
 here.** Gap text is free prose the agent wrote about whatever it just reviewed,

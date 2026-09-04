@@ -1,0 +1,17 @@
+# The template chooser needs issues enabled, so this file is only reachable on
+# `murmurent_dev`. The release repo (`murmurent`) has issues turned off on
+# purpose: discussion belongs where the work happens. Third parties are routed
+# to `murmurent_dev` from the release README, from TUTORIAL.md and from
+# TROUBLESHOOTING.md, and from the PyPI page's Issues link ([project.urls] in
+# pyproject.toml).
+blank_issues_enabled: true
+contact_links:
+  - name: Installation or setup trouble
+    url: https://github.com/hallettmiket/murmurent/blob/main/TROUBLESHOOTING.md
+    about: Check TROUBLESHOOTING.md first. The common install, hook and MCP failures are already written up there.
+  - name: Documentation
+    url: https://hallettmiket.github.io/murmurent/
+    about: The full docs, including the CLI manual, the data-governance rules, and the agent reference.
+  - name: Code of conduct concern
+    url: https://github.com/hallettmiket/murmurent/blob/main/CODE_OF_CONDUCT.md
+    about: Conduct reports go by email to the maintainer, not into a public issue.

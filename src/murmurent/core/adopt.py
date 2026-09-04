@@ -120,7 +120,11 @@ def adopt_clone(
             code="bad_request",
         )
     if not (clone / ".git").exists():
-        raise AdoptError(f"not a git working tree: {clone}", code="bad_request")
+        raise AdoptError(
+            f"not a git working tree: {clone}. Murmurent tracks a directory through "
+            f"git, so run `git -C {clone} init` first, then adopt it again.",
+            code="bad_request",
+        )
     # A legacy CHARTER.md is no longer a readiness marker (issue #28), so a
     # repo carrying one is NOT already-ready — adopting it is the migration:
     # make_ready stamps .murmurent.yaml and leaves the CHARTER.md untouched
@@ -192,7 +196,8 @@ def _adopt_remote(*, clone_path: str, lab: str,
             f"path does not exist on {host}: {clone_path}", code="bad_request")
     if verdict == "NOGIT":
         raise AdoptError(
-            f"not a git working tree on {host}: {clone_path}", code="bad_request")
+            f"not a git working tree on {host}: {clone_path}. Run `git init` in it "
+            "on that host first, then adopt it again.", code="bad_request")
     if verdict != "OK":
         raise AdoptError(
             f"unexpected probe verdict {verdict!r}: {res.stderr or ''}",

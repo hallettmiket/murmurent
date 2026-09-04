@@ -19,6 +19,32 @@ A git clone under `~/repos/<name>` is **murmurent-ready** when it carries:
 Readiness means Claude Code sessions opened in that repo have the commons
 agents and rules wired in.
 
+## Start here: any directory
+
+The same procedure covers a brand-new folder, a repository you have worked in
+for years, and one that an older Murmurent release set up. Ask first, because
+the verdict decides the step:
+
+```bash
+murmurent repo status ~/repos/<directory>
+```
+
+| Verdict | What it means | Do this |
+|---|---|---|
+| `not a git repo` | a plain folder | `git -C ~/repos/<directory> init`, then the next row |
+| `plain clone` or `partial` | git, and Murmurent has never set it up | `murmurent repo adopt ~/repos/<directory>` |
+| `ready`, bootstrapped by an older version | ready, and newer agents are missing | `murmurent repo upgrade ~/repos/<directory> --all-agents` |
+| `ready`, current version | finished | open Claude Code in it |
+
+Murmurent tracks a directory through git, so the plain-folder row comes first:
+`repo adopt` on a folder without a `.git/` directory stops and says so. The
+directory has to live under `~/repos/` (or the folder named by
+`MURMURENT_REPOS_ROOT`), which is where the inventory looks.
+
+Adopting writes the two things readiness consists of, the `.murmurent.yaml`
+marker and the `.claude/agents/` symlinks, and leaves every other file as it
+was. Commit both, so each clone of the repository is ready as well.
+
 ## Adopting a repo
 
 You make a repo ready with:

@@ -1,6 +1,6 @@
 # EDID PDF store
 
-Full texts for pool entries the [conscience](../../agents/conscience.md)
+Full texts for pool entries the [conscience](https://github.com/hallettmiket/murmurent/blob/main/agents/conscience.md)
 cannot reach. The agent does not browse — `WebFetch` and `WebSearch` are
 denied in its frontmatter — so a source behind a bot block, a captcha, or a
 paywall is unciteable until its text is here.

@@ -88,9 +88,14 @@ def onboard_cmd(group: str, profile: str) -> None:
     _stub()
 
 
-@cli.command("doctor", help="Verify the local install is healthy.")
+@cli.command(
+    "doctor",
+    help="Check the local install (Python, PATH, commons links, hooks, clone remote) "
+         "and print the one command that fixes each problem found. Exit 1 if anything failed.",
+)
 def doctor_cmd() -> None:
-    _stub()
+    from .commands import doctor_cmd as _doctor
+    raise SystemExit(_doctor.cmd_doctor())
 
 
 @cli.command("offboard", help="PI-only mirror of onboard.")
@@ -2195,6 +2200,38 @@ def contribution_spec_validate(path: str) -> None:
 def choreography_group() -> None:
     """A choreography poses a question; contributors offer contributions whose output
     contracts must all join on the choreography's candidate-identity key."""
+
+
+@choreography_group.command(
+    "install",
+    help="Clone a choreography by name or git URL and make it murmurent-ready.")
+@click.argument("source")
+@click.option("--dest", default=None, type=click.Path(),
+              help="Where to clone it (default: <repos root>/<repo name>).")
+@click.option("--branch", default="", help="Branch or tag to clone.")
+@click.option("--lab", default="", help="Lab to adopt it under.")
+@click.option("--no-adopt", "no_adopt", is_flag=True,
+              help="Clone and describe it, but do not make it murmurent-ready.")
+@click.option("--index-url", "index_url", default=None,
+              help="Override the index location (mostly for tests).")
+def choreography_install(source: str, dest: str | None, branch: str,
+                         lab: str, no_adopt: bool,
+                         index_url: str | None) -> None:
+    """SOURCE is a published choreography's name, or any git URL."""
+    from .commands import choreography_install_cmd as _ci
+    kwargs = {"index_url": index_url} if index_url else {}
+    raise SystemExit(_ci.cmd_install(source=source, dest=dest, branch=branch,
+                                     lab=lab, adopt=not no_adopt, **kwargs))
+
+
+@choreography_group.command(
+    "list", help="List choreographies published in the public index.")
+@click.option("--index-url", "index_url", default=None,
+              help="Override the index location (mostly for tests).")
+def choreography_list(index_url: str | None) -> None:
+    from .commands import choreography_install_cmd as _ci
+    kwargs = {"index_url": index_url} if index_url else {}
+    raise SystemExit(_ci.cmd_list(**kwargs))
 
 
 @choreography_group.command("new", help="Pose a new choreography (a question).")

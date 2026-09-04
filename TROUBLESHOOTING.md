@@ -12,6 +12,37 @@ uv run murmurent <args>
 uv pip install -e ~/repos/murmurent
 ```
 
+## `Package 'murmurent' requires a different Python`
+
+`pip install -e .` was run with a `pip` that belongs to an older Python than the
+one murmurent runs under (a conda `base` at 3.11 while murmurent lives in a
+3.12+ environment, for example). `murmurent doctor` shows which interpreter
+runs murmurent and warns when PATH puts another one first. Reinstall through
+uv, which uses its own interpreter:
+
+```bash
+uv tool install --python 3.12 --reinstall -e ~/repos/murmurent
+```
+
+or through the interpreter the doctor names:
+
+```bash
+<that-python> -m pip install -e ~/repos/murmurent
+```
+
+## `git pull` in `~/repos/murmurent` fails with unrelated histories
+
+The clone has full development history but its `origin` is the release
+repository, which carries one commit per release. Clones made before the
+two repositories were split (2026-09-01) are in this state. `murmurent doctor`
+reports it under `clone`; the fix is to point the clone at the development
+repository:
+
+```bash
+git -C ~/repos/murmurent remote set-url origin git@github.com:hallettmiket/murmurent_dev.git
+git -C ~/repos/murmurent pull
+```
+
 ## Hooks don't fire in Claude Code
 
 1. Did you run `murmurent install --hooks`? Check `~/.claude/settings.json` —
@@ -135,6 +166,12 @@ If you don't have access to the private repos, run
 
 ## Still stuck?
 
-File a smoke-test issue with the template at
-[.github/ISSUE_TEMPLATE/smoke_test.md](.github/ISSUE_TEMPLATE/smoke_test.md).
-Include the exact command, the error output, and what you expected.
+Open an issue on **[`murmurent_dev`](https://github.com/hallettmiket/murmurent_dev/issues)**.
+The release repo has issues turned off, because the discussion belongs where the
+work happens. Use the
+[bug report template](.github/ISSUE_TEMPLATE/bug_report.md); it asks for the
+exact command, the error output, what you expected, and `murmurent doctor`.
+
+Running the five-day smoke test? Use
+[`smoke_test.md`](.github/ISSUE_TEMPLATE/smoke_test.md) instead, since it is
+keyed to the tutorial's personas and days.

@@ -56,6 +56,13 @@ Each step, in order:
 ### Verify the installation
 
 ```bash
+murmurent doctor           # Python, PATH, links, hooks, clone remote; prints the fix for anything wrong
+```
+
+The doctor covers everything below. The manual checks remain for anyone who
+wants to see the files themselves:
+
+```bash
 ls -la ~/.claude/agents/   # symlinks into ~/repos/murmurent/agents/
 ls -la ~/.claude/rules/    # symlinks into ~/repos/murmurent/rules/
 grep murmurent-oracle ~/.claude/settings.json   # MCP server registered
@@ -103,19 +110,37 @@ creates or modifies locally:
 - your Obsidian personal vault (the `murmurent_vault` clone) and, on the lab
   server, the bulk-data root `$MURMURENT_DATA_ROOT/{immutable,append_only}/`.
 
-## Making a repository Murmurent-aware
+## Initializing a directory for Murmurent
 
 A **repository** (or "repo") is a folder of code and files tracked by git,
 living under `~/repos/` on your machine (for example, `~/repos/brca_wgs`).
 Your day-to-day research work happens inside repositories.
 
 Installing Murmurent (above) prepares your machine. The next step is to make
-each repository you want to use with Murmurent **ready**: this wires the
-commons agents and rules into that repository, so Claude Code sessions opened
-in it can use them. A ready repository can then be attached to a **project**.
-Both steps have their own pages:
+each directory you want to use with Murmurent **ready**: this wires the
+commons agents and rules into it, so Claude Code sessions opened there can use
+them. The procedure is the same for a brand-new folder, a repository you have
+worked in for years, and one that an older Murmurent release set up. Start
+with the status check, because its verdict decides the step:
 
-- [`ready_vs_projects.md`](ready_vs_projects.md): making a repository ready.
+```bash
+murmurent repo status ~/repos/<directory>
+```
+
+| Verdict | What it means | Do this |
+|---|---|---|
+| `not a git repo` | a plain folder | `git -C ~/repos/<directory> init`, then the next row |
+| `plain clone` or `partial` | git, and Murmurent has never set it up | `murmurent repo adopt ~/repos/<directory>` |
+| `ready`, bootstrapped by an older version | ready, and newer agents are missing | `murmurent repo upgrade ~/repos/<directory> --all-agents` |
+| `ready`, current version | finished | open Claude Code in it |
+
+Adopting writes a `.murmurent.yaml` marker and a `.claude/agents/` folder of
+symlinks into the commons, and leaves every other file as it was. Commit
+both, so each clone of the repository is ready as well. A ready repository
+can then be attached to a **project**. Both topics have their own pages:
+
+- [`ready_vs_projects.md`](ready_vs_projects.md): readiness in full, the
+  verdicts, and upgrading after a release.
 - [`project_intra.md`](project_intra.md): what a project is and how one is
   created.
 
@@ -357,6 +382,41 @@ shortcut, or automatically through VS Code Remote-SSH). See
 step-by-step recipe, including first-time server setup with
 `ssh-copy-id`, viewing two dashboards at once, the identity badge that
 tells tabs apart, and troubleshooting.
+
+## Upgrading Murmurent
+
+Installed from PyPI:
+
+```bash
+uv tool upgrade murmurent
+murmurent install
+```
+
+Installed from a clone:
+
+```bash
+cd ~/repos/murmurent && git pull
+uv tool install --python 3.12 --reinstall -e .
+murmurent install
+```
+
+Then, either way:
+
+```bash
+murmurent doctor                 # confirms the upgrade landed
+murmurent repo upgrade --all     # brings every ready repository up to the new release
+```
+
+Use `uv` for the reinstall. It installs into the interpreter Murmurent already
+runs under. The `pip` on your PATH can belong to a different Python (a conda
+`base` environment, for example), and then it either installs into the wrong
+place or stops with `Package 'murmurent' requires a different Python`. The
+doctor's `path` check reports exactly this situation.
+
+Agent prompt edits reach every ready repository through the symlinks as soon
+as the clone is pulled. `repo upgrade` is for the structural part of a
+release: a new commons agent, or a change to the `.murmurent.yaml` marker. See
+[`versioning.md`](versioning.md) for when a release is structural.
 
 ## Resetting a machine
 

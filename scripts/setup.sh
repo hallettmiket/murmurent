@@ -206,6 +206,30 @@ else
   warn "no skills/ dir in murmurent — skipping"
 fi
 
+# ── Dangling commons links ────────────────────────────────────────────────────
+# An agent retired from the commons, or a rule renamed, leaves a symlink in
+# ~/.claude/ that points at nothing, and Claude Code loads the broken link every
+# session. Only links INTO this clone are removed; a link into a personal vault
+# or anywhere else is the member's own and stays as it is.
+echo
+echo "Dangling commons links:"
+pruned=0
+for sub in agents rules skills; do
+  [[ -d "$CC_DIR/$sub" ]] || continue
+  for dest in "$CC_DIR/$sub"/*; do
+    [[ -L "$dest" && ! -e "$dest" ]] || continue
+    target="$(readlink "$dest")"
+    case "$target" in
+      "$REPO_DIR"/*)
+        rm -f "$dest"
+        ok "removed dangling $sub/$(basename "$dest") (it left the commons)"
+        pruned=$((pruned + 1))
+        ;;
+    esac
+  done
+done
+[[ $pruned -eq 0 ]] && ok "none"
+
 # ── Personal vault agents + forks (issue #80) ─────────────────────────────────
 # After the commons symlinks, re-materialise this member's OWN agents from
 # their personal vault: <vault>/agents/*.md (symlinked) and

@@ -174,13 +174,20 @@ What to check:
 
 ```bash
 gh issue create \
-    --repo hallettmiket/murmurent \
+    --repo hallettmiket/murmurent_dev \
     --label smoke-test \
     --title "Smoke test feedback: <one-line summary>" \
     --body-file <(cat .github/ISSUE_TEMPLATE/smoke_test.md)
 ```
 
 Use the issue template at [.github/ISSUE_TEMPLATE/smoke_test.md](.github/ISSUE_TEMPLATE/smoke_test.md) for structured feedback. One issue per finding; group similar feedback.
+
+Note the repo: issues live on **`murmurent_dev`**, not on the release repo,
+which has them turned off. If you are not running the smoke test, use
+[`bug_report.md`](.github/ISSUE_TEMPLATE/bug_report.md) or
+[`feature_request.md`](.github/ISSUE_TEMPLATE/feature_request.md) instead,
+because the smoke-test template asks which fake persona you were, which only
+makes sense inside this tutorial.
 
 ## Reference: command map
 

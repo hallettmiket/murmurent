@@ -2,9 +2,9 @@
 
 Shared agentic-AI infrastructure for academic researchers, labs cores and research centers. 
 It lets research groups work independently, pool agents and data when collaboration helps, and
-accumulate institutional knowledge across every project. See
-[`CLAUDE.md`](CLAUDE.md) for the architectural overview and [`docs/`](docs/) for
-the full design.
+accumulate institutional knowledge across every project. **Documentation: <https://hallettmiket.github.io/murmurent/>** (install,
+getting-started vignettes, the agents, labs and centres, the CLI manual).
+[`CLAUDE.md`](CLAUDE.md) is the architectural overview Claude Code itself loads.
 
 Murmurent can be used as a standalone agentic AI OS environment, as a means to integrate
 members of the same lab, or as a means of integrating labs and core facilities across
@@ -57,6 +57,46 @@ registers the data-governance hooks. On your first run it mints your **identity
 key** (your unique ID). Then set your personal info — `murmurent whoami` shows your
 handle + key.
 
+### Check the install, any time
+
+```bash
+murmurent doctor
+```
+
+It checks the Python version, that `pip` and `python` on your PATH belong to the
+same interpreter Murmurent runs under, the agent/rule/skill links in `~/.claude/`,
+the registered hooks, and (for a clone) that `git pull` will work. Every problem
+it finds comes with the one command that fixes it.
+
+### Upgrading
+
+Installed from PyPI:
+
+```bash
+uv tool upgrade murmurent
+murmurent install
+```
+
+Installed from a clone:
+
+```bash
+cd ~/repos/murmurent && git pull
+uv tool install --python 3.12 --reinstall -e .
+murmurent install
+```
+
+Then, either way:
+
+```bash
+murmurent doctor                 # confirms the upgrade landed
+murmurent repo upgrade --all     # brings every Murmurent-ready directory up to the new release
+```
+
+Use `uv` for the reinstall. It installs into the interpreter Murmurent already
+runs under. The `pip` on your PATH can belong to a different Python (a conda
+`base` environment, for example), and then it either installs into the wrong
+place or stops with `Package 'murmurent' requires a different Python`.
+
 
 ## Two repositories: which one am I looking at?
 
@@ -96,7 +136,35 @@ a lab or core facility, or (iii) a mayor who runs a centre (which consists of mu
 and cores). You have to specify one of these three options during the `init` procedure.
 
 You're ready to run Murmurent locally. Several vignettes can help get you started
-[`docs/getting_started.md`](docs/getting_started.md).
+[Getting started](https://hallettmiket.github.io/murmurent/getting_started/).
+
+
+## [Everyone] Initialize a directory for Murmurent
+
+Murmurent works inside a **repository**: a directory tracked by git, kept under
+`~/repos/`. Making a directory **Murmurent-ready** wires the shared agents and
+rules into it, so Claude Code sessions opened there can use them. The same
+procedure covers a brand-new folder, a repository you have worked in for years,
+and one that an older Murmurent release set up. Start by asking, because the
+answer decides the step:
+
+```bash
+murmurent repo status ~/repos/<directory>
+```
+
+| Verdict | What it means | Do this |
+|---|---|---|
+| `not a git repo` | a plain folder | `git -C ~/repos/<directory> init`, then the next row |
+| `plain clone` or `partial` | git, and Murmurent has never set it up | `murmurent repo adopt ~/repos/<directory>` |
+| `ready`, bootstrapped by an older version | ready, and newer agents are missing | `murmurent repo upgrade ~/repos/<directory> --all-agents` |
+| `ready`, current version | finished | open Claude Code in it |
+
+Adopting writes a `.murmurent.yaml` marker and a `.claude/agents/` folder of
+symlinks into the commons, and leaves every other file as it was. Commit both,
+so each clone of the repository is ready as well. `murmurent repo list` shows
+the verdict for every repository on the machine, and `murmurent repo upgrade
+--all` upgrades all of them at once. Details, and how ready repositories are
+attached to a project: [Making a repo Murmurent-ready](https://hallettmiket.github.io/murmurent/ready_vs_projects/).
 
 
 ## Federating individuals, groups and centres 
@@ -162,7 +230,7 @@ PI. You will also need the official name of your lab or core.
    Without this clone, `murmurent member list` and the dashboard's members
    panel have nothing to read and will tell you so. Keep it current with
    `git pull` (or the dashboard's **update** button); the PI pushes roster
-   changes there. See [`docs/lab_mgmt.md`](docs/lab_mgmt.md).
+   changes there. See [The lab-mgmt repo](https://hallettmiket.github.io/murmurent/lab_mgmt/).
 
 
 ## [PIs] If you are a PI of a lab or core ...
@@ -176,7 +244,7 @@ for your members.
    murmurent group-slack-setup <your-lab>
    ```
    Full details regarding creating the Slack app with security scopes, etc.:
-   [`docs/group_slack_setup.md`](docs/group_slack_setup.md).
+   [Group Slack setup](https://hallettmiket.github.io/murmurent/group_slack_setup/).
 2. Accept members by issuing them IDs. A member runs `murmurent enroll
    --group <your-lab>` and gets instructions to send you the resulting
    request (e.g. a Slack DM). Once you have it:
@@ -188,7 +256,7 @@ for your members.
    to skip Slack and just print the bundle. The member finishes
    with `murmurent import-card <bundle> --trust-root <your-trust-root>`.
 
-Full identity flow (enroll → issue → import → revoke): [`docs/identity.md`](docs/identity.md).
+Full identity flow (enroll → issue → import → revoke): [Membership IDs and the trust chain](https://hallettmiket.github.io/murmurent/identity/).
 
 
 ## [PIs] If you are a PI registering your lab or core with an existing centre
@@ -293,16 +361,16 @@ The next steps are as follows:
    `murmurent centre-age-keygen`.
 2. Root signing key (the identity CA). `murmurent centre-root-keygen` — signs PI
    IDs + the revocation list. Back it up offline (see
-   [`docs/centre_root_key.md`](docs/centre_root_key.md)).
+   [The centre root key](https://hallettmiket.github.io/murmurent/centre_root_key/)).
 3. List your centre in the implementations directory: `murmurent centre-hub-publish`
    clones [`murmurent_public`](https://github.com/hallettmiket/murmurent_public),
    writes your directory row, and publishes your signing key + revocation list
    so members can verify IDs. It prints a `git push` for you to run.
 4. Set up Slack. Create a `murmurent-<unique-name>` workspace + bot token and
    smoke-test with `murmurent centre-slack-smoke`. Guide:
-   [`docs/slack_setup.md`](docs/slack_setup.md).
+   [Centre Slack setup](https://hallettmiket.github.io/murmurent/slack_setup/).
 
 
 ## Authors
 
-Mike Hallett &mdash; michael.hallett@example.edu
+Mike Hallett &mdash; michael.hallett@uwo.ca

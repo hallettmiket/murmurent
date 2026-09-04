@@ -8,6 +8,112 @@ A **choreography** is a documented multi-actor pattern: a recipe for how
 several people, and the agents they run, work together, in what order,
 producing what artefacts. A choreography runs in one of two modes.
 
+## Getting a choreography
+
+A choreography lives in its own repository. Published ones are in a public
+index, so you can find one by name:
+
+```bash
+murmurent choreography list                  # what is published
+murmurent choreography install inhibition    # by name, via the index
+```
+
+A git URL works too, and needs no index at all:
+
+```bash
+murmurent choreography install https://github.com/<owner>/<repo>.git
+```
+
+Either way it clones under your repos root, prints what the choreography says
+about itself, tells you whether any agent it needs is missing from your commons,
+and makes the clone murmurent-ready. Add `--no-adopt` to look before committing
+to it.
+
+**The index carries locations only** ([`choreographies.tsv`][index] in the
+public hub: one `name<TAB>git_url` row per choreography). It holds no titles,
+summaries or counts, because everything you are shown is read from the
+choreography's own `.murmurent.yaml` at install time and a second copy here
+would drift. The index is a convenience for *finding* one, never a gate in
+front of it: every failure to read it says so and names the URL route, so being
+offline, or working inside one lab on a choreography that was never published,
+costs nothing.
+
+To publish yours, declare it (below), then open a pull request adding one row.
+
+[index]: https://github.com/hallettmiket/murmurent_public/blob/main/choreographies.tsv
+
+**Data is never included.** A choreography repository carries code, decision
+records and documentation. Its data lives under the centre's governed data root
+and is not public, so installing a choreography gives you the method, not the
+results.
+
+### Releasing a choreography: the written substrate ships
+
+**A choreography's decision records and its failure catalogue are part of the
+published result, not internal notes. They ship.** This is the opposite of the
+rule for murmurent itself, and the difference is deliberate.
+
+For murmurent, build notes are process: planning documents, phase prompts and
+backlogs describe how the software got made, which nobody installing it needs.
+They are withheld.
+
+For a choreography, the written substrate **is** the science. The decision log
+records what was decided, by whom, on what evidence, and what was withdrawn
+when the evidence moved. The failure catalogue records every defect found and
+how it was caught. A reader who cannot see those cannot check the method, and
+for *Dance with Inhibition* they are quoted directly as evidence in the
+manuscript's appendix: one table is a census of `decisions/`, two more are
+computed from `how_this_project_breaks.md`. Withhold them and those tables
+become unverifiable.
+
+So for a choreography release:
+
+| ships | withheld |
+|---|---|
+| `decisions/`, the failure catalogue, the README, the code, configs, tests | live working state (a "state of the project" document), publication audits, manuscript-change lists, handover and retrospective notes |
+
+The line is **evidence for the method versus notes about the writing**. A
+document that supports a claim in the record ships. A document that tracks what
+the authors were doing this month does not, because it goes stale and was never
+part of the result.
+
+What must not ship, in either case: server paths, account names, channel and
+token IDs, and anything under the governed data root. Data is not part of a
+choreography release at all.
+
+### Declaring a choreography
+
+A repository is only installed as a choreography if it says it is one, in a
+`.murmurent.yaml` at its root:
+
+```yaml
+kind: choreography
+name: inhibition
+title: Dance with Inhibition
+summary: >
+  Four independent approaches generate candidate covalent and non-covalent
+  Pin1 inhibitors, are judged against one shared control, and are combined
+  by the judge.
+mode: compositional
+target: Pin1 (PPIase, Cys113)
+approaches: [t1_de_novo, t2_atra_crem, t3_reinvent, t4_combinatorial]
+agents: [blacksmith, adversary, bookworm, artist, judge, lawyer]
+data:
+  root_subdir: inhibition
+  scale: ~54k molecules docked and ranked
+requires:
+  murmurent: ">=2026.9.0"
+  gpu: true
+```
+
+A repository without this file is refused, with a pointer to
+`murmurent repo adopt` for adopting it as an ordinary repo instead. Guessing
+would mean treating any cloned repository as a choreography.
+
+**Everything a reader is shown comes from this file, never from the index.** An
+index carrying its own copies of titles and summaries would drift, and a stale
+entry advertises a choreography as something it is not.
+
 ## Two modes
 
 - **Coordination mode**: an administrative pattern that sequences people,
