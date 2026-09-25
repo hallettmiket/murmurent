@@ -22,7 +22,7 @@ VALID_FREEZE_VALUES = {"frozen", "personal"}
 # Commons-agent category (orthogonal to ``freeze``, which is about editability).
 # Groups the shared agents in the dashboard: the per-member/per-lab science
 # toolkit (``member``), the centre-level singletons that act above a single lab
-# (``administrative`` — registrar, centre_cable_guy, and eventually a
+# (``administrative`` — registrar, centre_millwright, and eventually a
 # centre_security_guard), and the agents that specifically support building
 # compositional choreographies (``choreography-support`` — the judge, plus the
 # data-shaping / filtering / chaining agents to come).

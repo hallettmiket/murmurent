@@ -1670,6 +1670,7 @@ def _choreographies() -> list[C.ChoreographyRow]:
             attached=attached, joinable=joinable,
             all_join=all(a.joins for a in attached),
             path=str(path),
+            repo=str(ch.repo or ""),
         ))
     return rows
 

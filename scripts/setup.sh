@@ -35,6 +35,7 @@ CC_DIR="$HOME/.claude"
 AGENTS_SRC="$REPO_DIR/agents"
 RULES_SRC="$REPO_DIR/rules"
 SKILLS_SRC="$REPO_DIR/skills"
+STYLES_SRC="$REPO_DIR/output_styles"
 CLAUDE_MD_SRC="$REPO_DIR/CLAUDE.md"
 
 # Traffic-light helpers — match the dashboard's probe pill semantics
@@ -87,6 +88,18 @@ for src in "$AGENTS_SRC"/*.md; do
     ok "created $name → murmurent"
     created=$((created + 1))
   fi
+done
+# Remove links left behind when an agent is renamed or retired
+# (e.g. cable_guy -> millwright): they point into this repo's agents/
+# but the file they name no longer exists.
+for dest in "$CC_DIR/agents"/*.md; do
+  [[ -L "$dest" && ! -e "$dest" ]] || continue
+  case "$(readlink "$dest")" in
+    "$AGENTS_SRC"/*)
+      rm -f "$dest"
+      ok "removed stale link $(basename "$dest") (agent renamed or retired)"
+      ;;
+  esac
 done
 echo "  -- migrated $swept_legacy generic_cc symlinks, created $created new, preserved $preserved user files."
 
@@ -206,6 +219,39 @@ else
   warn "no skills/ dir in murmurent — skipping"
 fi
 
+echo
+echo "Wiring ~/.claude/output-styles/ → $STYLES_SRC/"
+# Output styles change how Claude Code WRITES, as distinct from what it knows.
+# murmurent ships one, "Plain English", because every document this project
+# produces is read by researchers rather than by software engineers, and the
+# default register is the wrong one for that audience. Linking it only makes it
+# available; selecting it is per-machine, via `/config` -> Output style.
+if [[ -d "$STYLES_SRC" ]]; then
+  mkdir -p "$CC_DIR/output-styles"
+  styles_created=0
+  styles_preserved=0
+  for src in "$STYLES_SRC"/*.md; do
+    [[ -f "$src" ]] || continue
+    name="$(basename "$src")"
+    dest="$CC_DIR/output-styles/$name"
+    if [[ -L "$dest" ]]; then
+      ln -sfn "$src" "$dest"
+      ok "re-pointed output-styles/$name → murmurent"
+    elif [[ -f "$dest" ]]; then
+      warn "preserved user-authored output-styles/$name (not a symlink)"
+      styles_preserved=$((styles_preserved + 1))
+    else
+      ln -sfn "$src" "$dest"
+      ok "created output-styles/$name → murmurent"
+      styles_created=$((styles_created + 1))
+    fi
+  done
+  echo "  -- created $styles_created new output styles, preserved $styles_preserved user files."
+  echo "  -- select one with /config -> Output style, then restart Claude Code."
+else
+  warn "no output_styles/ dir in murmurent — skipping"
+fi
+
 # ── Dangling commons links ────────────────────────────────────────────────────
 # An agent retired from the commons, or a rule renamed, leaves a symlink in
 # ~/.claude/ that points at nothing, and Claude Code loads the broken link every
@@ -214,7 +260,7 @@ fi
 echo
 echo "Dangling commons links:"
 pruned=0
-for sub in agents rules skills; do
+for sub in agents rules skills output-styles; do
   [[ -d "$CC_DIR/$sub" ]] || continue
   for dest in "$CC_DIR/$sub"/*; do
     [[ -L "$dest" && ! -e "$dest" ]] || continue
@@ -286,5 +332,6 @@ esac
 echo
 echo "Done. Verify with:"
 echo "  ls -la ~/.claude/agents/   # should show symlinks into $AGENTS_SRC"
-echo "  ls -la ~/.claude/skills/   # should show symlinks into $SKILLS_SRC"
+echo "  ls -la ~/.claude/skills/   # should show symlinks into $SKILLS_SRC
+  ls -la ~/.claude/output-styles/   # should show symlinks into $STYLES_SRC"
 echo "  grep -c murmurent.hooks ~/.claude/settings.json   # should be > 0"

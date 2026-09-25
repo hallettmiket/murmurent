@@ -35,7 +35,7 @@ from pathlib import Path
 import yaml
 
 from .preflight import Probe
-from .repo import murmurent_repo_root
+from .commons import commons_root
 
 MARKER_FILENAME = ".murmurent.yaml"
 # Versions the SHAPE of the .murmurent.yaml marker — independent of the
@@ -104,8 +104,22 @@ def readiness(repo: Path) -> Readiness:
     )
 
 
+#: The marker fields readiness owns. Every other field belongs to someone else
+#: (a choreography's ``kind: choreography`` declaration, for one) and is kept.
+READINESS_FIELDS: tuple[str, ...] = (
+    "murmurent", "lab", "ready_since", "bootstrap_version", "agents",
+)
+
+
 def _write_marker(repo: Path, *, lab: str, agents: list[str],
                   ready_since: str | None = None) -> Path:
+    """Write the readiness fields, keeping every other field already there.
+
+    This used to write the five readiness fields and nothing else, so
+    ``repo upgrade`` (and ``adopt --all-agents`` on a ready repo) silently
+    erased a choreography's declaration, after which ``choreography install``
+    refused the repo as not being one.
+    """
     marker = {
         "murmurent": MARKER_SCHEMA,
         "lab": lab or "",
@@ -113,7 +127,31 @@ def _write_marker(repo: Path, *, lab: str, agents: list[str],
         "bootstrap_version": _version(),
         "agents": sorted(set(agents or [])),
     }
+    for key, value in (read_marker(repo) or {}).items():
+        if key not in READINESS_FIELDS:
+            marker[key] = value
     f = Path(repo) / MARKER_FILENAME
+    f.write_text(yaml.safe_dump(marker, sort_keys=False), encoding="utf-8")
+    return f
+
+
+def update_marker(repo: Path, fields: dict) -> Path:
+    """Merge ``fields`` into an existing marker, leaving readiness fields alone.
+
+    For a caller that owns fields other than readiness, such as the choreography
+    declaration. Refuses to create a marker: a repo is made ready by
+    :func:`make_ready`, not by acquiring unrelated fields.
+    """
+    repo = Path(repo).expanduser()
+    marker = read_marker(repo)
+    if marker is None:
+        raise FileNotFoundError(
+            f"{repo / MARKER_FILENAME} does not exist; make the repo ready first")
+    clash = sorted(set(fields) & set(READINESS_FIELDS))
+    if clash:
+        raise ValueError(f"readiness owns these marker fields: {', '.join(clash)}")
+    marker.update(fields)
+    f = repo / MARKER_FILENAME
     f.write_text(yaml.safe_dump(marker, sort_keys=False), encoding="utf-8")
     return f
 
@@ -145,6 +183,18 @@ def make_ready(clone_path: Path, *, lab: str = "",
                murmurent_root: Path | None = None) -> list[Probe]:
     """Make ``clone_path`` murmurent-ready: marker + CC bootstrap.
 
+    The agent symlinks point into :func:`commons.commons_root` — the same
+    commons ``murmurent setup``, ``install`` and ``doctor`` read, which is the
+    clone you installed rather than whatever sits at ``~/repos/murmurent``.
+    This used to call ``repo.murmurent_repo_root()`` instead, and the two
+    disagree on a machine holding both a release clone and a development one:
+    ``doctor`` would report the commons coming from ``~/repos/murmurent_dev``
+    while the repo adopted a moment earlier was linked into
+    ``~/repos/murmurent``. An agent edited in the clone you are working on was
+    then live in ``~/.claude/agents/`` and silently absent from the repo, which
+    is the worst shape a failure like this can take: no error, and the thing
+    you just changed appears not to work.
+
     Deliberately does NOT create a project, write a charter, or touch
     the lab registry — attach the repo to a project separately. ``lab``
     is recorded so multi-lab machines know whose commons this repo
@@ -170,7 +220,7 @@ def make_ready(clone_path: Path, *, lab: str = "",
         probes.append(Probe(name="marker", status="ok",
                             detail=f"wrote {f}", required=False))
 
-    root = murmurent_root or murmurent_repo_root()
+    root = murmurent_root or commons_root()
     probes.extend(_cci.bootstrap_local(repo, root, agents=picked,
                                        project_name=repo.name))
     return probes
@@ -224,7 +274,7 @@ def upgrade(clone_path: Path, *, add_agents: list[str] | None = None,
                                    "CHARTER.md bootstrap (CHARTER.md preserved)",
                             required=False))
 
-    root = murmurent_root or murmurent_repo_root()
+    root = murmurent_root or commons_root()
     if all_agents:
         commons = root / "agents"
         if commons.is_dir():

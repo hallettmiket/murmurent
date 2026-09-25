@@ -45,8 +45,8 @@ re-implementing it:
 - `src/murmurent/core/join_requests.py` — the join queue + approve dispatch.
 - `src/murmurent/core/centre_provision.py` — Slack/GitHub/FS provisioning.
 - `src/murmurent/core/registrar.py` — the registry + `is_registrar`.
-- `agents/registrar.md`, `agents/security_guard.md`, `agents/cable_guy.md`,
-  `agents/centre_cable_guy.md` — the admin-layer agents.
+- `agents/registrar.md`, `agents/security_guard.md`, `agents/millwright.md`,
+  `agents/centre_millwright.md` — the admin-layer agents.
 
 ## 3. The three repos + the public hub
 

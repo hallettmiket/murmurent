@@ -1,7 +1,7 @@
-# Security Guard & Cable Guy (centre level)
+# Security Guard & Millwright (centre level)
 
 Murmurent ships two distinct levels of the Security Guard role and two
-distinct levels of the Cable Guy role. This page covers the **centre
+distinct levels of the Millwright role. This page covers the **centre
 level**: the analogues that watch over the whole institution rather
 than a single lab. The lab-level copies, which run per-project checks
 a PI triggers directly, are covered in
@@ -18,7 +18,7 @@ independent of which PI happens to be looking.
 There is currently **no dedicated `centre_security_guard` agent file**
 in [`agents/`](https://github.com/hallettmiket/murmurent/tree/main/agents).
 The commons ships thirteen reference agents; of those, only
-`centre_cable_guy` operates at centre scope (see
+`centre_millwright` operates at centre scope (see
 [`agents.md`](agents.md)). The role described here is the natural
 centre-scope extension of the lab-level Security Guard, and pieces of
 its intended function already exist as separate mechanisms without yet
@@ -49,7 +49,7 @@ being unified under a single agent:
 
 !!! warning "Work in progress"
     A centre-wide Security Guard singleton, analogous to
-    `centre_cable_guy`, is designed but not yet implemented. The
+    `centre_millwright`, is designed but not yet implemented. The
     institution-wide policies it would enforce (SSH login-method
     compliance across every registered host, password-rotation
     cadence, and a single permission baseline that every lab's ACL
@@ -59,10 +59,10 @@ being unified under a single agent:
 
 ---
 
-## Centre Cable Guy
+## Centre Millwright
 
-The **Centre Cable Guy** is, by contrast, a real, shipped agent:
-[`agents/centre_cable_guy.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/centre_cable_guy.md).
+The **Centre Millwright** is, by contrast, a real, shipped agent:
+[`agents/centre_millwright.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/centre_millwright.md).
 It is a singleton, one copy for the whole centre, living on the
 registrar's machine rather than any individual PI's. Its job is
 reconciliation across labs rather than onboarding within one:
@@ -71,26 +71,26 @@ reconciliation across labs rather than onboarding within one:
   span more than one lab, it grants and audits ACLs on
   `<lab_vm_root>/{raw,refined}/<project>/` via a narrowly-scoped
   sudo-only script (`murmurent_project_acl.sh`), rather than the ad
-  hoc directory creation the lab-level Cable Guy does for a
+  hoc directory creation the lab-level Millwright does for a
   single-lab project.
 - **Cross-lab project provisioning.** `PROVISION_PROJECT` creates the
   project's Slack channel in its primary lab's workspace, issues
   single-channel guest invites for members from other labs, and calls
-  the same GitHub-provisioning logic the lab-level Cable Guy uses
+  the same GitHub-provisioning logic the lab-level Millwright uses
   (`core.project_provision.provision_project_remote`) rather than
   duplicating it.
 - **Membership-drift reconciliation.** `RECONCILE` diffs a project's
   declared member set (`<lab_info>/projects/<project>.md`) against
   actual Slack channel membership, actual GitHub collaborators, and
   actual filesystem ACLs, and reports or applies the deltas. This is
-  the centre-scope counterpart to the lab-level Cable Guy's
+  the centre-scope counterpart to the lab-level Millwright's
   `CHECK_HEALTH`, but it reconciles against shared, cross-lab
   infrastructure rather than one lab's own installation records.
 
-The Centre Cable Guy never edits a per-lab `lab_mgmt` repo (member
+The Centre Millwright never edits a per-lab `lab_mgmt` repo (member
 rosters stay authored by each lab's own PI) and it always requests
 registrar sign-off before a write action on shared infrastructure, the
-same dry-run-first discipline the lab-level Cable Guy applies before
+same dry-run-first discipline the lab-level Millwright applies before
 touching a single lab's infrastructure.
 
 !!! warning "Work in progress"
@@ -108,7 +108,7 @@ touching a single lab's infrastructure.
 
 | You want to… | Read |
 |---|---|
-| See the lab-level Security Guard and Cable Guy | [`guardians.md`](guardians.md) |
+| See the lab-level Security Guard and Millwright | [`guardians.md`](guardians.md) |
 | See both agents in the full commons roster | [`agents.md`](agents.md) |
 | Read the centre root key runbook | [`centre_root_key.md`](centre_root_key.md) |
 | Read the periodic security-scan rule catalog | [`security-dashboard.md`](security-dashboard.md) |

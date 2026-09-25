@@ -1423,7 +1423,7 @@ def whoami() -> None:
                 help="Check whether newly-approved PIs have joined the Slack "
                      "workspace yet; for any who have, add them to their group "
                      "channel and DM them the step-by-step onboarding "
-                     "(registrar -> cable_guy -> security_guard -> dashboard). "
+                     "(registrar -> millwright -> security_guard -> dashboard). "
                      "Run this after approving a lab/core (or on a schedule); "
                      "it converges and never double-reports.")
 @click.argument("group", required=False, default="")
@@ -1842,7 +1842,7 @@ def group_slack_setup(group: str, token: str, invite_url: str, workspace: str,
 
 
 @click.command("group-reconcile",
-                help="Group-level cable_guy (the PI runs this): propagate the "
+                help="Group-level millwright (the PI runs this): propagate the "
                      "group's members into its OWN Slack workspace and GitHub "
                      "repo. Reports Slack workspace membership (free/Pro can't "
                      "API-invite — it surfaces the invite link) and, with "

@@ -63,17 +63,36 @@ def cli(ctx: click.Context) -> None:
 )
 @click.option("--no-backup", is_flag=True, help="Skip the .bak copy of settings.json.")
 def install_command(hooks: bool, settings_path: Path | None, no_backup: bool) -> None:
-    """Bare ``murmurent install`` is the whole install: wire the commons, then
-    register the hooks. It used to say "not yet implemented in v1", which left
-    the obvious command as a dead end and made a clone plus setup.sh the only
-    way in. ``--hooks`` still means hooks only, so existing callers and
-    scripts/bootstrap.sh are unaffected."""
+    """Bare ``murmurent install`` is the whole install: wire the commons,
+    register the hooks, then re-link every murmurent-ready repo on the machine.
+    It used to say "not yet implemented in v1", which left the obvious command
+    as a dead end and made a clone plus setup.sh the only way in. ``--hooks``
+    still means hooks only, so existing callers and scripts/bootstrap.sh are
+    unaffected.
+
+    The third step is what makes an UPGRADE complete rather than half-done.
+    Agent, rule and skill text reaches a ready repo by itself, because its
+    ``.claude/agents/`` holds symlinks; what does not is a marker whose schema
+    moved, or links into a commons that is no longer the installed one. Leaving
+    that to a command the user has to know about meant an upgrade silently
+    landed everywhere except the repos they actually work in.
+
+    It re-links the roster each repo already chose; it does NOT add agents that
+    are new in this release. Adding an agent to a repo changes what that repo
+    is, and an install should not make that choice on the user's behalf — the
+    readiness notice in ``hooks.context_inject`` tells them a new agent exists,
+    and ``repo upgrade --all-agents`` opts in.
+    """
     if not hooks:
         rc = setup_cmd.cmd_setup(show_next_step=False)
         if rc != 0:
             raise SystemExit(rc)
         click.echo()
     install_cmd.cmd_install(hooks=True, settings_path=settings_path, backup=not no_backup)
+    if not hooks:
+        from .commands import repo_cmd as _repo_cmd
+        _repo_cmd.cmd_upgrade(path=None, all_repos=True, add_agents_csv=None,
+                              all_agents=False, quiet=True, marker_only=True)
 
 
 @cli.command("setup", help="Wire the murmurent commons (agents, rules, skills) into ~/.claude/.")
@@ -324,16 +343,20 @@ def repo_status_cmd(target: str, host_name: str | None) -> None:
 @click.argument("path")
 @click.option("--lab", default=None,
               help="Owning lab slug (default: this machine's lab).")
+@click.option("--all-agents", is_flag=True,
+              help="Link every agent in the commons (the usual choice).")
 @click.option("--agents", "agents_csv", default=None,
               help="Comma-separated commons agents to symlink into .claude/agents/.")
 @click.option("--host", "host_name", default="local", show_default=True,
               help="'local' or a registered SSH host; remote adopts bootstrap "
                    "over one batched SSH session.")
 def repo_adopt_cmd(path: str, lab: str | None, agents_csv: str | None,
+                   all_agents: bool,
                    host_name: str) -> None:
     from .commands import repo_cmd as _repo_cmd
     raise SystemExit(_repo_cmd.cmd_adopt(
-        path=path, lab=lab, agents_csv=agents_csv, host_name=host_name))
+        path=path, lab=lab, agents_csv=agents_csv, host_name=host_name,
+        all_agents=all_agents))
 
 
 @repo_group.command(
@@ -2232,6 +2255,50 @@ def choreography_list(index_url: str | None) -> None:
     from .commands import choreography_install_cmd as _ci
     kwargs = {"index_url": index_url} if index_url else {}
     raise SystemExit(_ci.cmd_list(**kwargs))
+
+
+@choreography_group.command(
+    "init",
+    help="Start a new choreography from nothing: create its repository, make it "
+         "murmurent-ready, declare it, pose its question, make the first commit "
+         "and ask the PI to make it a project. Asks for anything you leave out.")
+@click.argument("name")
+@click.option("--title", default=None, help="The choreography's title, in one line.")
+@click.option("--summary", default=None,
+              help="What the approaches are and how they are combined.")
+@click.option("--mode", type=click.Choice(["compositional", "coordination"]),
+              default=None, help="Default: compositional.")
+@click.option("--approaches", default=None, help="Comma-separated approach names.")
+@click.option("--agents", default=None,
+              help="Comma-separated agents it uses (default: blacksmith, adversary, "
+                   "bookworm, artist, judge).")
+@click.option("--question", default=None,
+              help="Question slug (default: the repository name).")
+@click.option("--candidate-key", "candidate_key", default=None,
+              help="What every approach reports on: inchikey | smiles | gene_symbol "
+                   "| uniprot | other:<text>. Leave out to pose the question later.")
+@click.option("--criteria", default=None,
+              help="How the judge ranks results (text, or @file to read).")
+@click.option("--members", default=None,
+              help="Project members besides you, comma-separated handles.")
+@click.option("--sensitivity", type=click.Choice(["standard", "restricted", "clinical"]),
+              default="standard", show_default=True)
+@click.option("--lab", default="", help="Owning lab (default: this machine's lab).")
+@click.option("--no-project", "no_project", is_flag=True,
+              help="Do not file a project request.")
+@click.option("--yes", "-y", "assume_yes", is_flag=True,
+              help="Ask nothing; fail if a required value is missing.")
+def choreography_init(name: str, title: str | None, summary: str | None,
+                      mode: str | None, approaches: str | None, agents: str | None,
+                      question: str | None, candidate_key: str | None,
+                      criteria: str | None, members: str | None, sensitivity: str,
+                      lab: str, no_project: bool, assume_yes: bool) -> None:
+    from .commands import choreography_cmd as _ch_cmd
+    raise SystemExit(_ch_cmd.cmd_init(
+        name=name, title=title, summary=summary, mode=mode, approaches=approaches,
+        agents=agents, question=question, candidate_key=candidate_key,
+        criteria=criteria, members=members, sensitivity=sensitivity, lab=lab,
+        request_project=not no_project, assume_yes=assume_yes))
 
 
 @choreography_group.command("new", help="Pose a new choreography (a question).")

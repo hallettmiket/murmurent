@@ -39,8 +39,8 @@ reply with a ≤200-char verdict line (see
 | [`teacher`](agents/teacher.md) | Three modes, one entry point — `teacher debrief` \| `explain` \| `course` (see below). Debrief is "wait, what?" — fired at the sentence CC just wrote that was jargon, overcomplicated, or handed you an unexplained decision; it re-pitches that in plain words in chat, under 60s, from the tail of the real session transcript. Explain covers any method or paper; course recognises a subject and hands it to the course skill. Only explain renders a self-contained HTML page, on request, annotated in `lavish-axi` — where "wait, what?" gets that same re-pitch. Bullet-led and jargon-light, and it makes things **visual — reusing before drawing**: first a real image it found and may reuse (inlined with its licence, captioned with what to notice), then a video it actually loaded, and only then something hand-drawn (inline SVG, mermaid, a slider) when nothing suitable exists or the reader needs a knob to drag. Figures needing real data still go to the [`artist`](agents/artist.md). It has `WebSearch`/`WebFetch` for exactly this, **scoped: `debrief` is offline entirely**, since a search query is outbound text and session transcripts are not public. It never emits a URL, title, or attribution it did not load; citations it cannot verify escalate to the [`bookworm`](agents/bookworm.md). (persona: Richard Feynman — answers to "Feynman") |
 | [`conscience`](agents/conscience.md) | EDID + bias review. **Reviewing is the default and is not a mode** — located, line-by-line findings, every one with a citation, and its rules bind whatever else the agent is doing. One entry point, no mode to select: it is pointed at something and infers from it whether one of two other things is wanted instead, each inferred rather than named: **explain** fires on a flag the author disputed or missed, and re-pitches that one flag — in chat, or on request as an HTML page annotated in `lavish-axi`; it either teaches the concept or names an existing training module. and **design** fires when nothing has been built yet, returning the equitable blueprint — the design itself, not objections to one already built. Never speaks for — or as — a marginalized community; doesn't browse — the [`bookworm`](agents/bookworm.md) curates its resources. **No persona:** it works in a tradition (bell hooks, Freire, Lorde, Baldwin) and cites it rather than impersonating it. |
 | [`lawyer`](agents/lawyer.md) | Patent counsel + freedom-to-operate (formerly `saul_goodman`); reached on request **or** by automatic referral from the [`adversary`](agents/adversary.md) mid-audit — triages first, so a referral with no IP surface costs one step, not six database searches |
-| [`cable_guy`](agents/cable_guy.md) | Infrastructure provisioner |
-| [`centre_cable_guy`](agents/centre_cable_guy.md) | Centre-wide infrastructure reconciler (cross-lab ACLs, drift loop) |
+| [`millwright`](agents/millwright.md) | Infrastructure provisioner |
+| [`centre_millwright`](agents/centre_millwright.md) | Centre-wide infrastructure reconciler (cross-lab ACLs, drift loop) |
 | [`judge`](agents/judge.md) | Combines and presents member contributions in a compositional choreography |
 | [`registrar`](agents/registrar.md) | Centre-wide registry of labs/cores/collaborations |
 | [`security_guard`](agents/security_guard.md) | Secrets, PHI, world-accessible files audit |
@@ -73,12 +73,40 @@ Auto-loaded into every CC session via `~/.claude/rules/`:
 - [`rules/slack.md`](rules/slack.md) — Slack-posting protocol (after
   every `git push`, post to the group's own channel). Which channel,
   workspace and bot is a deployment fact and lives in `rules/local/`.
+- [`rules/voice.md`](rules/voice.md) — read the voice guidelines at the start
+  of every session, before writing anything a person will read. Points at
+  [`output_styles/plain_english.md`](output_styles/plain_english.md) for the
+  general voice, and at a repository's own `CLAUDE.md` where it is stricter.
 
 **Deployment-specific rules.** A centre may add its own rules under
 `rules/local/`, which `scripts/setup.sh` symlinks alongside the shared
 ones when the directory exists. That is where private repos, Slack IDs
 and local conventions belong, so that nothing tied to one centre reaches
 another. A fresh clone has no `rules/local/` and simply skips it.
+
+## Output style: how murmurent writes
+
+[`output_styles/plain_english.md`](output_styles/plain_english.md), symlinked
+into `~/.claude/output-styles/` by [`scripts/setup.sh`](scripts/setup.sh).
+
+An output style replaces Claude Code's default instructions about how to
+write. Murmurent ships one because **every document this project produces is
+read by working researchers, not by software engineers**, and the default
+register is written for the latter. It sets: as little jargon as possible with
+every term defined where it is first used; **no em dashes**; plain, direct
+sentences; the answer before the detail; one way to do a thing, with the
+alternatives in the documentation.
+
+It sets `keep-coding-instructions: true`, so code is written exactly as
+before. Only prose changes.
+
+**Read it at the start of every session.** [`rules/voice.md`](rules/voice.md)
+is auto-loaded and says so, because the style file itself is only active when
+a member has selected it, and subagents never inherit it.
+
+Linking it makes it available; it is not automatic. Select it per machine with
+`/config` -> Output style, then restart Claude Code. It applies to the main
+conversation, not to subagents, which each carry their own instructions.
 
 ## User-invocable skills (the commons)
 

@@ -262,11 +262,19 @@ The finalisation choreography runs at SEA / experiment / project scope. `<scope>
 
 ### Choreographies
 
-Choreographies are CC skills, not CLI subcommands. Invoke them inside Claude Code:
+| Command | Effect |
+|---|---|
+| `murmurent choreography init <name>` | Start a choreography from nothing: create its repository, make it ready, declare it, pose its question, commit, and ask the PI to make it a project. Asks for anything left out; `--yes` asks nothing. See [Starting a choreography](starting_a_choreography.md) |
+| `murmurent choreography list` | List choreographies published in the public hub |
+| `murmurent choreography install <name-or-git-url>` | Clone a choreography and make it murmurent-ready |
+| `murmurent choreography new --question … --poser … --title … --candidate-key … --criteria …` | Pose a question on its own |
+| `murmurent choreography offer <question.md> --contribution <slug>` | Attach a contribution to a question |
+| `murmurent choreography validate <question.md>` | Check every attached contribution reports on the question's candidate key |
+| `murmurent choreography show <question.md>` | Print the question, its criteria and its contributions |
+| `murmurent choreography prepare-run <question.md>` | Gather everything the judge needs into one run package |
+| `murmurent choreography freeze-run <question.md> --result <file>` | Keep a permanent record of a run and the judge's result |
 
-- `choreography:list`: list available choreographies in centre, guild, and project scope.
-- `choreography:apply <name> --to <project>`: scaffold a project against a choreography recipe.
-- `choreography:status <project>`: report progress against the recipe.
+The full workflow is in [Assembling a choreography](assembling_choreographies.md).
 
 ### Dashboard
 

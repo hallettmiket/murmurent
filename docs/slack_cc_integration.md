@@ -147,7 +147,7 @@ member's session, filtered to the channels they're certified for. Requires
 - Tests: cert issuance/revoke for projects, provisioning membership sync, relay
   attribution + card verification, onboarding workspace-check branches, archive on
   delete, reconcile drift.
-- Agent duties: `cable_guy` provisions/tears down channel+repo; `security_guard`
+- Agent duties: `millwright` provisions/tears down channel+repo; `security_guard`
   audits the bot token + relay; `registrar`/PI issues + revokes project certs.
 - Docs: `docs/slack_cc_integration.md` + the scope ledger.
 

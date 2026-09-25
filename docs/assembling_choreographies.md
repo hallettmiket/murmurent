@@ -347,6 +347,10 @@ a path pointing at the table, relative to the spec file, so
 
 ### 4. Pose the choreography
 
+If the choreography was started with `murmurent choreography init` (see
+[Starting a choreography](starting_a_choreography.md)) and given a candidate key,
+its question is already posed and this step is done.
+
 The poser states the question, the shared candidate-identity space, and
 the criteria the judge should apply. `--criteria` accepts either a
 literal string or `@<file>` to load criteria text from a file.

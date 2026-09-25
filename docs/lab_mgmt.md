@@ -110,7 +110,7 @@ murmurent_lab_mgmt_<lab>/
 ├── audit/                    Compliance + decommission records;
 │                             never deleted, only appended.
 ├── onboarding/               Reusable member profiles (student,
-│                             postdoc, pi-collab) the cable_guy
+│                             postdoc, pi-collab) the millwright
 │                             clones into a new member.md.
 ├── dashboards/               Auto-generated per-member dashboard
 │                             snapshots (markdown).
@@ -130,7 +130,7 @@ murmurent_lab_mgmt_<lab>/
 | Mayor (bootstrap) | no | uses `~/.murmurent/lab_info/` instead |
 | External customer | no | only sees the dashboard surfaces, not the underlying repo |
 
-If you're a new lab member, the cable_guy agent's `PROVISION_MEMBER`
+If you're a new lab member, the millwright agent's `PROVISION_MEMBER`
 flow will tell you to clone it during onboarding. If you're a brand-
 new PI joining a centre, the registrar will tell you to create one,
 populate `lab.md`, and push it to your lab's GitHub org during the
@@ -208,7 +208,7 @@ and daily reconcile track what the PI pushes.
 | Path under `lab_mgmt/` | Read | Write |
 |---|---|---|
 | `lab.md` | everyone | PI |
-| `members/*.md` | everyone | PI (or `cable_guy` via PI delegation) |
+| `members/*.md` | everyone | PI (or `millwright` via PI delegation) |
 | `inventory/*.md` | everyone | `lab_manager` role via the inventory MCP |
 | `oracle/*.md` | everyone | `oracle_curator` role via the oracle publish flow |
 | `cert_projects/*.md` | everyone | project lead + PI (written by the dashboard's New Project flow / `core.cert_projects`) |
@@ -249,7 +249,7 @@ profiles into the roster is the durable follow-up to this staging store.)
 | **GitHub home** | the lab's own org | a private centre org (or none, can stay local + git-push to a private remote) |
 | **First clone** | each lab member runs `git clone` once during onboarding | the mayor's machine creates it on `murmurent centre-init` |
 | **Cross-lab visibility** | no: one lab's repo, period | yes: the registry lists every lab and core in the centre |
-| **What writes here** | `cable_guy` (per-member onboarding), inventory MCP, oracle MCP, PI's hand-edits | `centre_cable_guy` (lab/core onboarding), `registrar.create_lab` / `create_core`, join-request approvals, common-SEA submissions |
+| **What writes here** | `millwright` (per-member onboarding), inventory MCP, oracle MCP, PI's hand-edits | `centre_millwright` (lab/core onboarding), `registrar.create_lab` / `create_core`, join-request approvals, common-SEA submissions |
 
 To decide where something belongs, ask whether it concerns one lab
 specifically or how labs relate to each other. One-lab specifics
@@ -263,5 +263,5 @@ belong in `lab_mgmt`. Inter-lab relations belong in `lab_info`.
   document for group-scope Murmurent operations.
 - A core's own `lab_mgmt` (yes, cores have one too, parallel to labs)
   mounts inside `~/.murmurent/lab_info/cores/<core>/lab-mgmt/`.
-- [`agents/cable_guy.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/cable_guy.md): the per-lab
-  cable_guy that owns most of the read/write surface on this repo.
+- [`agents/millwright.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/millwright.md): the per-lab
+  millwright that owns most of the read/write surface on this repo.

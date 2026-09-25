@@ -238,13 +238,13 @@ def notify_decision(
 def pi_onboarding_messages(group: str, *, centre_name: str = "your centre",
                            channel_name: str = "") -> list[str]:
     """The step-by-step DMs a PI receives once they join the workspace — one per
-    line of the flow (registrar -> cable_guy -> security_guard -> dashboard).
+    line of the flow (registrar -> millwright -> security_guard -> dashboard).
     Shared so the messages stay consistent wherever they're sent."""
     ch = channel_name or group
     return [
         f"👋 Welcome to {centre_name}! You're now in the Slack workspace as PI of *{group}*.",
         f"📋 *registrar*: you're recorded as the PI of *{group}* in the centre registry.",
-        f"🔌 *cable_guy*: your group's private channel *#{ch}* is ready and you've been added. "
+        f"🔌 *millwright*: your group's private channel *#{ch}* is ready and you've been added. "
         f"Your members will be added here as they join.",
         f"🛡️ *security_guard*: registered for *{group}* — it audits your group's shared "
         f"files + secrets on every push, so nothing sensitive leaks.",

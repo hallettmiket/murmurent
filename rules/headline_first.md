@@ -37,8 +37,8 @@ vocabulary:
 | `artist` | `Rendered / Skipped / Failed — <one-line what>` |
 | `conscience` | `OK / Flagged — <one-line concern>` |
 | `lawyer` | `Clear / Conflict / Unknown — <one-line on patent landscape>` |
-| `cable_guy` | `Provisioned / Skipped / Failed — <one-line on what>` |
-| `centre_cable_guy` | `Reconciled / Drift / BLOCKED — <one-line on what changed or what is blocking>` |
+| `millwright` | `Provisioned / Skipped / Failed — <one-line on what>` |
+| `centre_millwright` | `Reconciled / Drift / BLOCKED — <one-line on what changed or what is blocking>` |
 | `registrar` | `Recorded / Conflict / Skipped — <one-line on what>` |
 | `judge` | `Presented / Split / Insufficient — <one-line on the combined result>` |
 | `teacher` | `Explained / Gap — <one-line on what was/wasn't understood>` |
@@ -59,7 +59,7 @@ Verdict: CLEAR
 ## Adding an agent
 
 **This table must list every agent in [`agents/`](../agents/).** It went two
-agents out of date (`centre_cable_guy`, `lab_oracle`) because nothing tied the
+agents out of date (`centre_millwright`, `lab_oracle`) because nothing tied the
 two together: both agents declared their verdicts in their own files, so
 nothing was broken and nothing complained. If you add an agent, add its row
 here in the same commit, and take the vocabulary from the agent's own

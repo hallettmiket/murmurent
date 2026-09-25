@@ -10,9 +10,9 @@ fall into three categories:
 
 - **Member** — the per-member/per-lab science toolkit (Oracle, Lab
   Oracle, Bookworm, Blacksmith, Adversary, Artist, Conscience, Lawyer,
-  Cable Guy, Security Guard).
+  Millwright, Security Guard).
 - **Administrative** — centre-level singletons that act above any single
-  lab (`registrar`, `centre_cable_guy`; a centre security guard will
+  lab (`registrar`, `centre_millwright`; a centre security guard will
   join them).
 - **Choreography-support** — agents that specifically support building
   compositional choreographies (`judge`, plus data-shaping / filtering /
@@ -53,6 +53,33 @@ discipline-specific agents (a medchem specialist, an image segmenter, a
 cohort curator, …) that compose against this same reference set, the
 same hard rules, and the same verdict protocol. This corresponds to the
 so-called "commons-plus-toolkit" pattern described in the manuscript.
+
+## All of them at a glance
+
+**Scope** names the social unit whose state the agent reads and writes.
+**Verdict** is the fixed set of words that agent's conclusion is drawn from,
+and with which it must open its reply.
+
+| Agent | What it does | Scope | Verdict |
+|---|---|---|---|
+| *Research and production* | | | |
+| Blacksmith | Data handling, feature engineering, statistical modelling and evaluation; tailored per group to local tools and protocols | member | Done / Partial / Failed |
+| Bookworm | Literature search and biomedical-database queries; annotates results with published knowledge | member | Found *n* sources |
+| Artist | Figures, plots and presentation material for publication and communication | member | Rendered / Skipped / Failed |
+| Teacher | Explains methods, papers and decisions for a technically competent, adjacent-field audience | member | Explained / Gap |
+| *Memory* | | | |
+| Oracle | Personal research memory: findings, hypotheses and experimental context across a member's projects | member | Found / Not found / Unsure |
+| Lab Oracle | Group memory of reviewed findings | group | Found / Not found / Unsure |
+| *Review and adjudication* | | | |
+| Adversary | Methodological audit: validates design, checks for data leakage, demands cross-validation | member | Pass / Questions / Reject |
+| Conscience | EDID and SGBA+ review of design, language, literature selection and presentation | member | OK / Flagged |
+| Lawyer | Patent landscape and freedom-to-operate assessment | member | Clear / Conflict / Unknown |
+| Security Guard | Scans diffs and outgoing data objects for credentials, protected health information and permission errors | member | Clear / Concerns / Blocked |
+| Judge | Combines contributions to one choreography on a shared key, shows disagreement, and computes a consensus only where the contributions share a metric | project | Presented / Split / Insufficient |
+| *Infrastructure and administration* | | | |
+| Millwright | Provisions and health-checks member environments, repositories, storage and communication channels for one group | group | Provisioned / Skipped / Failed |
+| Centre Millwright | Centre-wide reconciler: cross-group permissions, membership drift and shared-infrastructure differences | centre | Reconciled / Drift / BLOCKED |
+| Registrar | Registry of groups, cores and collaborations; the centre-level administrative view | centre | Recorded / Conflict / Skipped |
 
 ---
 
@@ -316,7 +343,7 @@ decision-making during the work, not after.
 > **Lawyer:** Clear: no active composition-of-matter patents on MMP11
 > inhibition found across USPTO/EPO/WIPO; nearest filing expired 2019.
 
-## Cable Guy
+## Millwright
 
 Infrastructure provisioner and environment wrangler for a single lab.
 It onboards new members (SSH keys, repo clone, CC config, Obsidian
@@ -333,16 +360,16 @@ that channels, repos, disk space, and membership stay correctly wired.
 
 **Verdict vocabulary:** `Provisioned / Skipped / Failed — <one-line on what>`
 
-> **You:** Cable Guy, provision @didi for brca_imaging_genomics on
+> **You:** Millwright, provision @didi for brca_imaging_genomics on
 > lab-server.
 >
-> **Cable Guy:** "Wired. @didi is ready to connect on lab-server for
+> **Millwright:** "Wired. @didi is ready to connect on lab-server for
 > brca_imaging_genomics."
 
-## Centre Cable Guy
+## Centre Millwright
 
-The centre-wide analogue of Cable Guy. Every lab runs its own copy of
-Cable Guy, but there is exactly one Centre Cable Guy for the whole
+The centre-wide analogue of the Millwright. Every lab runs its own copy of
+the Millwright, but there is exactly one Centre Millwright for the whole
 centre (a **singleton**) running on the registrar's machine rather
 than any PI's. It reconciles cross-lab infrastructure: per-project
 filesystem ACLs on shared servers and cross-lab Slack/GitHub
@@ -358,12 +385,12 @@ one that operates at centre scope rather than individual/group/lab
 scope.
 
 **Verdict vocabulary:** `Provisioned / Skipped / Failed — <one-line on what>`
-(shares Cable Guy's vocabulary; also emits `Reconciled — N deltas
+(shares the Millwright's vocabulary; also emits `Reconciled — N deltas
 applied.` after a reconcile pass)
 
-> **You:** Centre Cable Guy, reconcile example_core × brca-imaging.
+> **You:** Centre Millwright, reconcile example_core × brca-imaging.
 >
-> **Centre Cable Guy:** "Reconciled example_core × brca-imaging: 2 ACL
+> **Centre Millwright:** "Reconciled example_core × brca-imaging: 2 ACL
 > grants, 1 Slack invite. 0 unresolved."
 
 ## Registrar
@@ -405,7 +432,7 @@ Guard helps enforce that rule at the data-folder level by refusing any
 PR that would modify `immutable/`, complementing the `raw_guard` hook that
 blocks the same kind of change at the tool layer (before a write even
 reaches disk). Always invoked on PRs that touch shared code or data, and
-jointly maintains identity-key hygiene alongside the Cable Guy.
+jointly maintains identity-key hygiene alongside the Millwright.
 
 **Verdict vocabulary:** `Clear / Concerns / Blocked — <one-line why>`
 

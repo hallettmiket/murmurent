@@ -422,7 +422,7 @@ def provision_lab_onboarding(
         ))
 
     # 2. GitHub repo — deliberately NOT created here.
-    #    The group's repo belongs to the PI (the group-level cable_guy), who
+    #    The group's repo belongs to the PI (the group-level millwright), who
     #    decides its org, name, and visibility and owns it thereafter. The
     #    centre/registrar never creates a repo on the PI's behalf. We only note
     #    that the PI must, and point at the group-side command.

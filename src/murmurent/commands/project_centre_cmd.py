@@ -1,5 +1,5 @@
 """
-Purpose: ``murmurent project`` — centre_cable_guy's CLI front door for
+Purpose: ``murmurent project`` — centre_millwright's CLI front door for
          project declarations + reconcile.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-05-26
@@ -39,7 +39,7 @@ from ..core import centre_provision as _cp
 
 
 @click.group(name="centre-project",
-              help="Centre project declarations + reconcile (centre_cable_guy front door).")
+              help="Centre project declarations + reconcile (centre_millwright front door).")
 def centre_project() -> None:
     pass
 

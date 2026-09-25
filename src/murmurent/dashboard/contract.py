@@ -493,6 +493,7 @@ class ChoreographyRow(BaseModel):
     joinable: list[ChoreographyContributionRow] = []
     all_join: bool = True     # every attached contribution joins → ready to compose
     path: str = ""
+    repo: str = ""            # the choreography repository, when there is one
 
 
 class PersonalOracleBlock(BaseModel):

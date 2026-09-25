@@ -1,4 +1,4 @@
-"""Group-level member propagation — the PI's cable_guy.
+"""Group-level member propagation — the PI's millwright.
 
 When someone joins a group, the CENTRE side (mayor) already puts them in the
 centre Slack workspace + its channel. The GROUP side — owned by the **PI** —

@@ -8,6 +8,16 @@ A **choreography** is a documented multi-actor pattern: a recipe for how
 several people, and the agents they run, work together, in what order,
 producing what artefacts. A choreography runs in one of two modes.
 
+## Starting one
+
+```bash
+murmurent choreography init <name>
+```
+
+or **＋ new choreography** in the dashboard's Choreographies panel. Either one
+creates the repository, declares it, poses its question and asks your PI to make
+it a project. See [Starting a choreography](starting_a_choreography.md).
+
 ## Getting a choreography
 
 A choreography lives in its own repository. Published ones are in a public
@@ -84,7 +94,9 @@ choreography release at all.
 ### Declaring a choreography
 
 A repository is only installed as a choreography if it says it is one, in a
-`.murmurent.yaml` at its root:
+`.murmurent.yaml` at its root. `murmurent choreography init` writes this for you;
+to declare an existing repository by hand, add these lines below the ones
+`murmurent repo adopt` wrote:
 
 ```yaml
 kind: choreography
@@ -105,6 +117,10 @@ requires:
   murmurent: ">=2026.9.0"
   gpu: true
 ```
+
+`agents` is shared with readiness: it is the list of agents linked into the
+repository, and `repo upgrade --all-agents` replaces it with every agent in the
+commons. Every other line survives `repo adopt` and `repo upgrade`.
 
 A repository without this file is refused, with a pointer to
 `murmurent repo adopt` for adopting it as an ordinary repo instead. Guessing

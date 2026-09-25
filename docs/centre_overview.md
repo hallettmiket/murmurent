@@ -58,6 +58,90 @@ For how members, groups, and projects relate to the centre, see
   [security dashboard](security-dashboard.md): keeping the centre's
   registry, permissions, and shared state consistent.
 
+## Starting a new centre
+
+This moved here from the README, which is now limited to what every user
+needs. It is for a mayor setting up a centre for the first time.
+
+You need [Claude Code](https://claude.com/claude-code), installed and logged
+in once; the [GitHub CLI `gh`](https://cli.github.com/), authenticated with
+`gh auth login`, for the centre's repositories; and
+[uv](https://docs.astral.sh/uv/), which the installer adds if it is missing.
+
+One command creates the centre and makes you its founding registrar:
+
+```bash
+murmurent centre-init
+```
+
+Only `--name` and `--institution` are required. Everything else can be
+supplied later, from the dashboard or with `murmurent centre-set`. A complete
+example:
+
+```bash
+murmurent centre-init \
+  --name "Example Bioconvergence Centre" \
+  --institution "Example University" \
+  --mayor @the_mayor \
+  --unique-name example \
+  --join-email murmurent-join@example.edu \
+  --slack-workspace T0EXAMPLE \
+  --github-org centre-example \
+  --public-hub github.com/hallettmiket/murmurent_public#example \
+  --server-host lab-server.example.edu \
+  --server-account murmurent \
+  --cc-install-path /opt/claude \
+  --mayor-root /mayor/example \
+  --obsidian-vault /mayor/obsidian \
+  --raw-root /data/example/raw \
+  --refined-root /data/example/refined
+murmurent centre-status      # confirms you are the founding registrar
+```
+
+| Flag | What it is | Example |
+|---|---|---|
+| `--name` *(required)* | Display name of the centre | `"Example Bioconvergence Centre"` |
+| `--institution` *(required)* | Hosting institution | `"Example University"` |
+| `--mayor` | Your `@handle`. Defaults to `$MURMURENT_USER`, then the operating system user | `@the_mayor` |
+| `--unique-name` | Short identifier, not tied to an institution name. Used to name repositories, Slack channels and groups | `example` |
+| `--join-email` | Public address that PIs send join requests to. Listed in the public directory | `murmurent-join@example.edu` |
+| `--slack-workspace` | Your Slack workspace identifier, the one beginning with `T` | `T0EXAMPLE` |
+| `--github-org` | The centre's GitHub organisation or dedicated account | `centre-example` |
+| `--public-hub` | The public directory, plus this centre's label in it | `github.com/hallettmiket/murmurent_public#example` |
+| `--server-host` | The always-online server, reachable over SSH | `lab-server.example.edu` |
+| `--server-account` | SSH login account on that server | `murmurent` |
+| `--cc-install-path` | Where Claude Code is installed on that server | `/opt/claude` |
+| `--mayor-root` | Top-level mayor directory, which can be mirrored to GitHub | `/mayor/example` |
+| `--obsidian-vault` | Centre-level Obsidian vault | `/mayor/obsidian` |
+| `--raw-root` | Root of the centre's raw data on the data server | `/data/example/raw` |
+| `--refined-root` | Root of the centre's refined data | `/data/example/refined` |
+
+`--data-server` is an older name for `--server-host` and still works. Add
+`--no-prompt` for scripted runs on a server, and `--no-sentinel` when running
+under `sudo` or in continuous integration.
+
+### Making the centre joinable
+
+A prospective member cannot be assumed to belong to the centre's Slack
+workspace already, so four further steps make the centre reachable from
+outside.
+
+1. **The encryption key for join requests.** `centre-init` generates an `age`
+   keypair automatically, which PIs encrypt their join requests to. Recreate
+   it with `murmurent centre-age-keygen`.
+2. **The root signing key**, which is the centre's certificate authority. Run
+   `murmurent centre-root-keygen`. It signs PI identity cards and the list of
+   revoked ones. Back it up offline; see
+   [The centre root key](centre_root_key.md).
+3. **List the centre publicly.** `murmurent centre-hub-publish` writes your
+   entry in the public directory and publishes your signing key and revocation
+   list, so members elsewhere can verify identity cards. It prints a `git push`
+   command for you to run.
+4. **Set up Slack.** Create a `murmurent-<unique-name>` workspace and a bot
+   token, then test it with `murmurent centre-slack-smoke`. See
+   [Centre Slack setup](slack_setup.md).
+
+
 ## The centre vault (work in progress)
 
 !!! warning "Work in progress"

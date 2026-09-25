@@ -33,3 +33,10 @@ agents/pm.md
 ## Local doc render artefacts (R Markdown / pandoc)
 .Rhistory
 docs/*.html
+
+## Agent working output. NEVER commit: this repository is public, and agent
+## reports quote whatever they were asked about, including unpublished and
+## IP-sensitive work. Two files under outputs/bookworm/ were tracked before
+## this rule and remain in the public history; ignoring a path does not
+## untrack what is already in it.
+outputs/

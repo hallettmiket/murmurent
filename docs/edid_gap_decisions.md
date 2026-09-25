@@ -37,8 +37,8 @@ something it carries instead of something you re-make.
 
 | Gap | State | Reason |
 |---|---|---|
-| Research ethics + data governance: REB / TCPS 2 Ch. 9, SAGER | `open` | governs the two artefacts the agent sees most. Candidate sources verified 2026-08-29 and **offered to the compiler, not yet added**: TCPS 2 (2022) Ch. 9, OCAP® (FNIGC), SAGER (EASE), CIHR sex-and-gender guidance, the Ontario HEIA tool, and Ontario Health's HEIA Indigenous Lens supplement. Adding them means a sixth domain, which is the compiler's call. |
-| OCAP® | `open` | Still open, but **no longer blocked**: `www.fnigc.ca` 403s, while [`fnigc.ca/ocap-training/`](https://fnigc.ca/ocap-training/) returns 200 (checked 2026-08-29). The earlier 403s were the `www.` host, not the resource. Awaiting the decision on the clinical/health-equity set below. |
+| Research ethics + data governance: REB / TCPS 2 Ch. 9, SAGER | `filled` | **Filled 2026-09-16** without waiting on the sixth-domain question: TCPS 2 (2022) Ch. 9 and OCAP® went into Domain 3 (`Indigenous data governance`), SAGER and the CIHR sex-and-gender requirement went into Domain 1. The Ontario HEIA tool and its Indigenous Lens supplement were **not** added — not re-verified this round, still absent. Whether these deserve their own sixth domain with its own directive, rather than sitting inside Domains 1 and 3, is still the compiler's call. |
+| OCAP® | `filled` | **Filled 2026-09-16** using the working `fnigc.ca/ocap-training/` link (the `www.` 403 confirmed as a host-specific quirk, not a resource problem). Now in Domain 3, tagged `[voice]` and `[binds CA]`. |
 | Disability as a design constraint | `open` | the resources reach disability only as the word *ableism* in a language list, so no flag on an access barrier is possible |
 | Intersectionality (Crenshaw) | `open` | findings that exist only at an intersection can be observed but not cited |
 | Citation and authorship diversity | `open` | the agent is told to check author lists; nothing supports it |

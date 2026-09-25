@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Purpose: Apply per-project NFSv4 ACLs on a lab server's murmurent tree.
-#          Designed to be called via sudo from `centre_cable_guy`'s
+#          Designed to be called via sudo from `centre_millwright`'s
 #          provision/reconcile loop.
 #
 # Install:

@@ -74,6 +74,9 @@ class Choreography:
     criteria: str
     contributions: list[str] = field(default_factory=list)
     notes: str = ""
+    #: The choreography repository this question belongs to, by repo name.
+    #: Optional: a question can be posed without a repository behind it.
+    repo: str = ""
     #: Set by :meth:`from_file`; base dir for resolving contribution references.
     source: Path | None = field(default=None, compare=False)
 
@@ -178,6 +181,9 @@ class Choreography:
             "candidate_key": self.candidate_key,
             "criteria": self.criteria,
             "contributions": list(self.contributions),
+            # Written only when set, so a question with no repository behind it
+            # round-trips exactly as it did before the field existed.
+            **({"repo": self.repo} if self.repo else {}),
         }
 
     def to_markdown(self) -> str:
@@ -205,6 +211,7 @@ class Choreography:
             criteria=str(meta.get("criteria", "") or ""),
             contributions=contributions,
             notes=body.strip(),
+            repo=str(meta.get("repo", "") or ""),
             source=source,
         )
 

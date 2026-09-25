@@ -1,7 +1,7 @@
-# Security Guard & Cable Guy (lab level)
+# Security Guard & Millwright (lab level)
 
 Murmurent ships two distinct levels of the Security Guard role and two
-distinct levels of the Cable Guy role. This page covers the **lab
+distinct levels of the Millwright role. This page covers the **lab
 level**: the copies of each agent a PI runs against their own group,
 their own servers, and their own project rosters. The centre-wide
 counterparts, which enforce institution-wide policy rather than
@@ -70,15 +70,15 @@ It has two separate ways of running:
     against its certified member roster or flag departed members
     still holding access. Those checks belong conceptually to the
     Security Guard's periodic-audit role; today they live, if at all,
-    in the separate `murmurent reconcile` / Cable Guy machinery,
+    in the separate `murmurent reconcile` / Millwright machinery,
     outside the Security Guard's own rule catalog.
 
 ---
 
-## Cable Guy (lab)
+## Millwright (lab)
 
-The lab-level Cable Guy is defined in
-[`agents/cable_guy.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/cable_guy.md).
+The lab-level Millwright is defined in
+[`agents/millwright.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/millwright.md).
 It runs on the PI's own machine (`freeze: frozen`, so members never
 invoke it directly) and is responsible for making sure every member of
 the lab has the access they need, and no more:
@@ -87,7 +87,7 @@ the lab has the access they need, and no more:
   collaborator access to the lab's `lab_mgmt` repo (read-only), a
   generated SSH-key checklist, a Slack channel, and a personal
   Obsidian vault, then writes an installation record and reports to
-  the PI. The member runs the checklist themselves; the Cable Guy
+  the PI. The member runs the checklist themselves; the Millwright
   never generates or transmits a private key on their behalf.
 - **Scaffolding.** `SCAFFOLD_PROJECT` creates the project's GitHub
   repo, its Slack channel, and its `immutable/`/`append_only/` directories on
@@ -128,5 +128,5 @@ not just agent prompt instructions.
 |---|---|
 | See both agents in the full commons roster | [`agents.md`](agents.md) |
 | Read the periodic security-scan rule catalog in full | [`security-dashboard.md`](security-dashboard.md) |
-| Read the drift-detection routine behind Cable Guy's health checks | [`reconcile.md`](reconcile.md) |
+| Read the drift-detection routine behind Millwright's health checks | [`reconcile.md`](reconcile.md) |
 | See the centre-wide analogues of both roles | [`centre_guardians.md`](centre_guardians.md) |

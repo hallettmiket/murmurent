@@ -54,3 +54,45 @@ is the public key the join script encrypts to.
 
 **Don't see your institution?** It may not run murmurent yet — ask your PI or lab
 manager. (Registrars add their row here when they go live.)
+
+## Published choreographies
+
+A **choreography** is one recurring multi-actor workflow: a question several
+people attack, each with their own approach, with the agents they run, the
+order they run in, and the artefacts that come out. Published ones are listed
+in [`choreographies.tsv`](choreographies.tsv), and you install one with
+murmurent itself:
+
+```bash
+murmurent choreography list                  # what is published
+murmurent choreography install inhibition    # or a git URL directly
+```
+
+| Name | What it does | Repository |
+|---|---|---|
+| `inhibition` | *Dance with Inhibition.* Four independent approaches generate candidate covalent and non-covalent Pin1 inhibitors, are judged against one shared control, and are presented side by side for a medicinal chemist to adjudicate. The deliverable is the method, not the molecule. | [tt8804/inhibition_public](https://github.com/tt8804/inhibition_public) |
+
+The table above is a courtesy for people reading this page in a browser. The
+index itself carries **locations only**, and everything `install` shows you is
+read from the choreography's own `.murmurent.yaml`, so no description here can
+drift away from the repository it describes.
+
+**Data is never included.** A choreography repository carries code, decision
+records and documentation. Its data lives under a centre's own governed data
+root, so installing one gives you the method, not the results.
+
+### Starting your own
+
+One command creates a choreography's repository, poses its question, and asks
+your PI to make it a project. You do not need a repository first:
+
+```bash
+murmurent choreography init pin1_inhibition   # asks for anything you leave out
+```
+
+Or click **＋ new choreography** in the Choreographies panel of your dashboard.
+Step by step, including what happens after your PI approves:
+[Starting a choreography](https://hallettmiket.github.io/murmurent/starting_a_choreography/).
+
+**Publishing yours:** push the repository, then open a pull request adding one
+row to `choreographies.tsv`: the name, a tab, and the repository's git address.

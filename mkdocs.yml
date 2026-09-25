@@ -101,8 +101,9 @@ nav:
       - "Overview: members, groups, projects": overview.md
       - Group-level architecture: group_level.md
       - "Choreographies 🚧": choreography.md
+      - "Starting a choreography 🚧": starting_a_choreography.md
       - "Assembling a choreography 🚧": assembling_choreographies.md
-      - "Security Guard & Cable Guy (lab)": guardians.md
+      - "Security Guard & Millwright (lab)": guardians.md
       - What Murmurent creates: what_mm_creates.md
       - The lab-mgmt repo: lab_mgmt.md
       - "Contributions 🚧": contributions.md
@@ -115,7 +116,7 @@ nav:
       - The centre root key: centre_root_key.md
       - "Keyring: secrets across your machines": keyring.md
       - Deploying the keyring: keyring_deploy.md
-      - "Security Guard & Cable Guy (centre)": centre_guardians.md
+      - "Security Guard & Millwright (centre)": centre_guardians.md
       - Slack:
           - Centre Slack setup (mayor): slack_setup.md
           - "Slack integration 🚧": slack_integration.md

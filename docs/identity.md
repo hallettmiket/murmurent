@@ -327,6 +327,21 @@ murmurent issue-pi-card enroll.json --actor @the_mayor --out pi_card.json
 
 ### The PI's side
 
+**First, find your centre.** The public directory,
+[murmurent_public](https://github.com/hallettmiket/murmurent_public), lists
+every institution running Murmurent, the address to send join requests to, and
+the key your request is encrypted to. If your institution is not listed, it may
+not be running Murmurent yet.
+
+A script asks a few questions, encrypts your request to your centre's key, and
+opens your email program ready to send. Only the mayor can read the result, and
+nothing about you is posted publicly.
+
+```bash
+curl -fsSL -O https://raw.githubusercontent.com/hallettmiket/murmurent_public/main/join/murmurent-join.sh
+sh murmurent-join.sh
+```
+
 You request your centre-level identity card the same way a member requests a
 group card. First, prove you hold your key:
 

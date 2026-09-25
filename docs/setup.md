@@ -335,9 +335,9 @@ until it passes.
 Once the centre is live, anyone at the institution visits
 `https://murmurent.<your-domain>.edu/join` and submits a request. The
 registrar reviews it from the "Pending join requests" panel at
-`/registrar` and approves it; `centre_cable_guy` auto-provisions Slack,
+`/registrar` and approves it; `centre_millwright` auto-provisions Slack,
 GitHub, and filesystem ACLs. Per-member onboarding inside an approved lab
-remains the responsibility of the per-lab `cable_guy` agent.
+remains the responsibility of the per-lab `millwright` agent.
 
 ## Remote host setup
 

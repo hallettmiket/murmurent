@@ -4,7 +4,7 @@ After a lab/core is approved and the PI is emailed the workspace invite, the
 mayor runs ``murmurent onboard-check``. For each group whose PI has not been
 onboarded yet it looks the PI up in the Slack workspace by email; once they have
 joined it (a) adds them to the group's channel, (b) DMs them a step-by-step
-acknowledgement (registrar -> cable_guy -> security_guard -> dashboard), and
+acknowledgement (registrar -> millwright -> security_guard -> dashboard), and
 (c) marks them onboarded so it never double-reports.
 
 Polling by design: no Slack Events webhook to stand up. The mayor runs the

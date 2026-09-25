@@ -4,20 +4,71 @@ A **repo** (repository) is a folder of code and files tracked by git,
 living under `~/repos/` on your machine. Your day-to-day research work
 happens inside repositories.
 
-A **Murmurent-ready** repo is a git clone that has the commons agents and
-rules wired in, so Claude Code sessions opened in it can use Murmurent.
-This page covers how to make a repo ready, check its status, and upgrade
-it after a release. A project is a separate, higher-level thing built on
-top of ready repos; see [`project_intra.md`](project_intra.md).
+A **Murmurent-ready** repo is a git clone Murmurent has registered, by
+writing a `.murmurent.yaml` marker at its root. This page covers how to make
+a repo ready, check its status, and upgrade it after a release. A project is a
+separate, higher-level thing built on top of ready repos; see
+[`project_intra.md`](project_intra.md).
 
-A git clone under `~/repos/<name>` is **murmurent-ready** when it carries:
+## What readiness does and does not do
 
-1. a `.murmurent.yaml` marker at its root (schema version, owning lab,
-   the agents picked, and the Murmurent version that last bootstrapped it), and
-2. a `.claude/agents/` directory: symlinks into the Murmurent commons.
+**It does not give you the agents.** `murmurent setup` (run by `murmurent
+install`) links the whole commons into `~/.claude/agents/`, and Claude Code
+loads those in *every* directory on the machine. Every agent is therefore
+available in every folder, ready or not. Documentation that said otherwise was
+wrong, and this section exists because that error survived several rewrites.
 
-Readiness means Claude Code sessions opened in that repo have the commons
-agents and rules wired in.
+What readiness does buy, all of it keyed on that marker file:
+
+1. **The PHI check runs.** `hooks/phi_check.py` inspects outbound tool calls
+   (`WebFetch`, `WebSearch`, `Bash`) for patient identifiers — health-card and
+   medical-record numbers, SINs, a name adjacent to a date of birth — and
+   redacts them. It resolves the project by walking up for the marker
+   (`core.repo.find_project_repo`) and returns early when there is none: *"not
+   inside a project repo → no PHI context to guard"*. In a folder that is not
+   ready, **the check does nothing**. This is the reason to make a folder
+   ready, and the only one that can cost you something real.
+2. **The audit log attributes activity to a project.** `hooks/audit.py` names
+   the project the same way; without a marker the entry is recorded without it.
+3. **The repo can be attached to a project.** `core.cert_projects` finds a
+   project's code repo through the marker, and stamps one if a legacy
+   `CHARTER.md` repo is being migrated, precisely so the repo stays
+   discoverable.
+4. **The repo can declare itself clinical.** `sensitivity: clinical` in the
+   marker makes `core.personal_audit` treat it as holding patient data
+   regardless of what the project registry says.
+5. **It appears as ready** in `murmurent repo list` and the dashboard's Repos
+   panel.
+
+Note what is *not* on that list: the read-only guarantees on the governed data
+directories (`hooks/raw_guard.py`, `hooks/protected_paths.py`) are keyed on
+paths, not on readiness, so they apply everywhere.
+
+## The per-repo `.claude/agents/` directory
+
+`adopt` creates this directory, and populates it only if you name agents with
+`--agents`, or all of them with `--all-agents`. Since access comes from
+`~/.claude/agents/` regardless, a repo's own copies do exactly one thing:
+**Claude Code prefers a directory's own agent file over the machine-wide one**,
+so a link here pins that agent, for this repo, to whatever it points at.
+
+That is occasionally useful — pinning one project to a particular version of an
+agent — and twice a liability:
+
+- **The links are absolute paths to one machine.** Git stores
+  `.claude/agents/oracle.md` as a symlink whose content is, for example,
+  `/home/mike/repos/murmurent_dev/agents/oracle.md`. Commit it, and on a
+  colleague's machine — different home directory, or Murmurent installed from
+  PyPI with no clone at all — every one of those links dangles. The portable
+  record is the marker's own `agents:` list, which `repo adopt`/`repo upgrade`
+  read to recreate the links locally.
+- **A wrong link is silent.** A repo whose links point into a second Murmurent
+  clone runs a different version of those agents from the rest of the machine,
+  with no error. `murmurent repo status` reports this as a `follows commons`
+  line, and the `UserPromptSubmit` hook warns in-session.
+
+If you have no reason to pin an agent to a single repo, run `adopt` with
+neither option and leave the directory empty.
 
 ## Start here: any directory
 
@@ -31,10 +82,12 @@ murmurent repo status ~/repos/<directory>
 
 | Verdict | What it means | Do this |
 |---|---|---|
-| `not a git repo` | a plain folder | `git -C ~/repos/<directory> init`, then the next row |
-| `plain clone` or `partial` | git, and Murmurent has never set it up | `murmurent repo adopt ~/repos/<directory>` |
-| `ready`, bootstrapped by an older version | ready, and newer agents are missing | `murmurent repo upgrade ~/repos/<directory> --all-agents` |
-| `ready`, current version | finished | open Claude Code in it |
+| `✗ no such folder` | the path is wrong | check the path |
+| `✗ not tracked by git` | a plain folder | `git -C ~/repos/<directory> init`, then the next row |
+| `• not set up yet` | git, and Murmurent has never set it up | `murmurent repo adopt ~/repos/<directory>` |
+| `± half set up` | a marker without agent links, or the reverse | the same `adopt` — it completes the setup |
+| `✓ ready`, bootstrapped by an older version | ready, set up by an earlier release | `murmurent repo upgrade ~/repos/<directory>` |
+| `✓ ready`, current version | finished | open Claude Code in it |
 
 Murmurent tracks a directory through git, so the plain-folder row comes first:
 `repo adopt` on a folder without a `.git/` directory stops and says so. The
