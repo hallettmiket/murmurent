@@ -1,6 +1,6 @@
 """
 Purpose: wire the murmurent commons into ~/.claude/ (agents, rules, skills,
-         CLAUDE.md) from a clone OR from the installed package.
+         output styles, CLAUDE.md) from a clone OR from the installed package.
 Author: Mike Hallett (with Claude Code)
 Date: 2026-09-01
 Input: the commons (see core.commons.commons_root)
@@ -120,6 +120,12 @@ def cmd_setup(*, force: bool = False, show_next_step: bool = True) -> int:
         c, r, p = _link_dir(root / sub, cc / sub, pattern, kind)
         totals = [totals[0] + c, totals[1] + r, totals[2] + p]
 
+    # Output styles. The source folder is output_styles/ and Claude Code reads
+    # ~/.claude/output-styles/ (hyphen): the names differ on purpose. Linking
+    # them is what makes the style selectable in /config (#159).
+    c, r, p = _link_dir(root / "output_styles", cc / "output-styles", "*.md", "output-styles")
+    totals = [totals[0] + c, totals[1] + r, totals[2] + p]
+
     # Deployment-specific rules, when the commons came from a clone that has
     # them. A package install has no rules/local by construction.
     c, r, p = _link_dir(root / "rules" / "local", cc / "rules", "*.md", "rules")
@@ -157,7 +163,10 @@ def cmd_setup(*, force: bool = False, show_next_step: bool = True) -> int:
                 click.echo("  ! preserved your own CLAUDE.md (not a symlink)")
             break
 
-    pruned = sum(_prune_dangling(cc / sub, root, sub) for sub in ("agents", "rules", "skills"))
+    pruned = sum(
+        _prune_dangling(cc / sub, root, sub)
+        for sub in ("agents", "rules", "skills", "output-styles")
+    )
 
     created, repointed, preserved = totals
     click.echo(

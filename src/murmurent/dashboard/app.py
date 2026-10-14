@@ -523,7 +523,7 @@ def _section_browse(snap: dashboard.DashboardSnapshot) -> None:
     _back_button()
     st.subheader("Browse all local projects, experiment folders, SEAs")
     st.caption(
-        "Pulldowns scan every local project repo (anything in `~/repos` with a "
+        "Pulldowns scan every local project repo (anything in your repositories folder with a "
         "`CHARTER.md`).  \n"
         "**SEA** = a tracked unit of work (kind: `skill` / `experiment` / `analysis`) "
         "with a request → claim → complete → examined → concluded lifecycle, stored "

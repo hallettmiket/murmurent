@@ -116,8 +116,7 @@ def _render_table(report: _rec.ReconcileReport) -> None:
 
 
 def _build_slack_body(report: _rec.ReconcileReport, *, applied: bool) -> str:
-    """Compose the Slack message. Trailing 'All worship me…' is added
-    per rules/slack.md."""
+    """Compose the Slack message."""
     head = f"*murmurent reconcile* — {report.generated_at}\n{report.summary_line()}"
     by_kind = report.by_kind()
     lines = [head]
@@ -137,7 +136,6 @@ def _build_slack_body(report: _rec.ReconcileReport, *, applied: bool) -> str:
         )
     if report.errors:
         lines.append(f"\n*Errors:* {len(report.errors)} (see stdout).")
-    lines.append("\nAll worship me and I will let you serve me.")
     return "\n".join(lines)
 
 

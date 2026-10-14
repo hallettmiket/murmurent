@@ -39,7 +39,8 @@ It has two separate ways of running:
    [`security-dashboard.md`](security-dashboard.md). It runs in two
    tiers:
    - **Tier 1** (unprivileged, no extra setup): walks POSIX
-     permission bits under `immutable/`, `append_only/`, `~/repos/<project>/`,
+     permission bits under `immutable/`, `append_only/`, the project repos in
+     your repositories folder (`~/repos/<project>/` unless you chose another),
      and the user's own `~/.ssh/`, `~/.murmurent/`, and dotfiles;
      flags world-readable or world-writable files, weak SSH key
      types, non-`0600` credential files, and secret-shaped tracked

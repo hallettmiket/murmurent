@@ -153,6 +153,10 @@ vision is in
 
 ## Where to go next
 
+To see your projects, repositories and lab in one place, click the
+**Murmurent Dashboard** icon that the install created (in Applications on a
+Mac, in the applications menu on Linux). See [the dashboard](dashboard.md).
+
 | You want to… | Read |
 |---|---|
 | See every CLI command | [`cli_manual.md`](cli_manual.md) |

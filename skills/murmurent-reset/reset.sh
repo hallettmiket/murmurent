@@ -61,8 +61,15 @@ WIG="$HOME/.murmurent"
 CFG="$HOME/.config/murmurent"
 CFG_LEGACY="$HOME/.config/wigamig"        # pre-rename config dir on older machines
 BACKUPS="$HOME/.murmurent_backups"
-REPO="${MURMURENT_REPO:-$HOME/repos/murmurent}"
-REPOS_ROOT="${MURMURENT_REPOS_ROOT:-$HOME/repos}"
+# This machine's repositories folder (#166): MURMURENT_REPOS_ROOT, else
+# repos_root in ~/.murmurent/machine.yaml, else ~/repos.
+_configured_repos="$(sed -n 's/^repos_root:[[:space:]]*//p' "$HOME/.murmurent/machine.yaml" 2>/dev/null | head -1 | tr -d "\"'")"
+case "$_configured_repos" in
+  "~")   _configured_repos="$HOME" ;;
+  "~/"*) _configured_repos="$HOME/${_configured_repos#"~/"}" ;;
+esac
+REPOS_ROOT="${MURMURENT_REPOS_ROOT:-${_configured_repos:-$HOME/repos}}"
+REPO="${MURMURENT_REPO:-$REPOS_ROOT/murmurent}"
 
 usage() { grep '^#' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 

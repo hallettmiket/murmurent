@@ -49,22 +49,17 @@ What to check:
 - Bob's compliance section shows TCPS_2 expiring (yellow); Cassie's shows TCPS_2 missing (red).
 - `sea list --incoming` for Bob shows SEA #1 (claimed) and SEA #5 (declined).
 
-Open the live Streamlit view. Easiest path: in Finder, double-click
-**`Open Dashboard.command`** at the top of the repo. It picks your username
-from (in order) `$MURMURENT_USER` or `~/.murmurent/user`. If neither is set,
-the dashboard prompts you to type a handle in the sidebar (e.g. `the_pi`)
-and saves it for next time. There is no fallback to your Mac login name —
-that almost always disagrees with your institutional username.
-To run it as Bob for the tutorial, set the env var first:
+Open the dashboard: click the **Murmurent Dashboard** icon that
+`murmurent install` created (in Applications on a Mac, in the applications menu
+on Linux). It picks your username from `$MURMURENT_USER` or
+`~/.murmurent/user`. If neither is set, the dashboard asks for a handle (e.g.
+`the_pi`) and saves it for next time. There is no fallback to your login name,
+which almost always disagrees with your institutional username.
+
+To run it as Bob for the tutorial, start it from the command line instead:
 
 ```bash
-MURMURENT_USER=bob open "Open Dashboard.command"
-```
-
-Or stay on the command line:
-
-```bash
-MURMURENT_USER=bob uv run murmurent dashboard
+MURMURENT_USER=bob murmurent dashboard --hifi
 ```
 
 ## Day 2 — claim, work, push

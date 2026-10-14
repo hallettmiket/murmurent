@@ -8,6 +8,9 @@ values.
 
 ## 1. Update the Murmurent CLI
 
+Run this in your copy of Murmurent, shown here in your repositories folder
+(`~/repos` unless you chose another; `murmurent config repos-root` shows it):
+
 ```bash
 cd ~/repos/murmurent && git pull && uv tool install --reinstall .
 ```

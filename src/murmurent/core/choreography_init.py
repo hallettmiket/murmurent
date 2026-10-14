@@ -189,7 +189,10 @@ def init_choreography(plan: ChoreographyPlan, *, actor: str = "") -> InitResult:
     the project request) is reported and the run carries on.
     """
     problems = plan.problems()
-    repo_path = _repo.repos_root() / plan.name
+    from . import repo_paths as _rp
+    # An existing copy anywhere on this machine wins; a new project goes where
+    # this machine's layout puts it (#166: a project folder by default).
+    repo_path = _rp.find(plan.name) or _rp.new_project_repo(plan.name)
     existing = _rr.read_marker(repo_path)
     if existing and existing.get("kind") == _ch.KIND:
         problems.append(f"{repo_path} is already a choreography")

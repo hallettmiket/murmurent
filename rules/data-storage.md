@@ -13,7 +13,8 @@ guardrails, not a security perimeter, and the trees are writable on disk.
 - **``append_only/<project>/<experiment>/``**: outputs of analyses run by
   the project. New files may be added, but existing files are never
   overwritten or deleted. Mirrors the structure of
-  ``~/repos/<project>/exp/<experiment>/`` so the relationship between code
+  ``<repos>/<project>/exp/<experiment>/`` (``<repos>`` is this machine's
+  repositories folder; ``murmurent config repos-root`` prints it) so the relationship between code
   and its data is obvious.
 
 By convention, ``immutable/`` holds original source data and

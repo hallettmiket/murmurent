@@ -17,6 +17,85 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.10.0] - 2026-10-14
+
+**To upgrade:** `uv tool upgrade murmurent`, then `murmurent install`, then
+restart Claude Code. Then run `murmurent repo upgrade --all` once, which keeps
+your folders' agent links out of git (#150). If you installed from a copy of
+the repository, `git pull` there instead of the first command.
+
+### Fixed
+- **Agent links in a project folder are no longer committed** (#150). The
+  links `murmurent repo adopt` makes in `.claude/agents/` point into your own
+  home folder, so a committed link broke those agents for everyone else in the
+  project. `adopt` now lists each link in `.gitignore`, both push commands leave
+  them out, and `murmurent repo status` names any already committed and how to
+  repair them. Run `murmurent repo upgrade <folder>` in each folder you have set
+  up to add the `.gitignore` lines. Also fixed: adopting a folder replaced a
+  group's own agent file with a link when the two had the same name.
+- **A fresh install from PyPI now works fully** (#159). Three problems are
+  fixed. The four murmurent data services (Oracle, data, core data and
+  inventory) failed to start because a fresh install picked up version 2 of
+  the `mcp` library, which they do not support yet; murmurent now asks for
+  version 1. The agent activity log looked for a script in
+  `~/repos/murmurent`, which only exists if you copied the repository; the
+  script now ships inside the package. And the plain-English writing style
+  was not installed; `murmurent setup` now links it. If you installed with
+  `uv`, run `uv tool upgrade murmurent`, then `murmurent install`, then
+  restart Claude Code.
+
+### Added
+- **`/murmurent-update-me` posts a status update for any project** (#152). It
+  reports what is running, what finished since the last update, what is blocked
+  and on whom, and the next steps, to the project's Slack channel. Built and used
+  in the survival project first; most projects need no settings, and an
+  optional `update_me:` block in `.murmurent.yaml` changes the defaults.
+- **The adversary checks written-up prediction models and marker studies
+  against TRIPOD+AI, PROBAST+AI and REMARK** (#155). Missing reporting items
+  get their own section and never on their own fail a method; a high risk of
+  bias does count. Work that predicts nothing about a person is left alone.
+  The checklists ship as a reference page, [Reporting
+  checklists](https://hallettmiket.github.io/murmurent/reporting_guidelines/).
+- **Every install now gets a Murmurent Dashboard icon** (#156). `murmurent
+  install` creates it: in Applications on a Mac, in the applications menu on
+  Linux. Until now only installs from a copy of the repository got one, and
+  nobody was told. A new command, `murmurent launcher`, re-creates it, and
+  `murmurent launcher --remove` deletes it. `murmurent doctor` says whether it
+  is there. Windows has no icon yet. `Open Dashboard.command` is retired; use
+  the icon.
+
+### Changed
+- **You choose where your repositories live** (#166). Murmurent no longer
+  assumes `~/repos`: `murmurent init` asks, `murmurent config repos-root`
+  shows or changes it, the dashboard's "this machine" settings have a field
+  for it, and `murmurent doctor` reports it. Nothing changes for anyone
+  already using `~/repos`.
+- **A project's repositories can sit in one folder** (#166). New projects go in
+  a project folder, `<repositories>/<project>/<project>`, with the manuscript
+  and seminar repositories beside the code; `seminar` is a new repository
+  role. The flat layout stays fully supported and nobody has to move.
+  `murmurent config project-layout flat` keeps new projects flat;
+  `murmurent project gather <project>` moves an existing project into a folder
+  (it shows its plan first and moves nothing without `--yes`).
+- **Project records no longer hold one member's folder paths** (#166). Each
+  computer finds its own copy of a project's repositories, so a path recorded
+  by one member no longer sends everyone else's tools into that member's home
+  folder.
+- **"Ready" now means the folder has a `.murmurent.yaml` file, and nothing
+  else** (from PR #167, found by emucaki). The check also required a
+  `.claude/agents/` folder, which `adopt` always creates, so it could never
+  fail. Agents in that folder make no difference: every agent already works in
+  every folder. "Half set up" now means only a folder set up by a very old
+  Murmurent; `murmurent repo upgrade` finishes it. The help for `--agents` and
+  `--all-agents` now says they pin agents to one folder and are rarely needed.
+- **Project Slack channels are named `proj-<project>`** (#157). Projects made
+  with certificates were getting a channel named after the project alone. A
+  new command, `murmurent project rename-slack <project>`, renames an existing
+  channel to the `proj-` name, or to any name with `--to`.
+- **`murmurent install` turns off Claude Code's feedback survey** (#154), which
+  interrupted sessions to ask for a rating. A member who has set
+  `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` themselves keeps their own setting.
+
 ## [2026.9.9] - 2026-09-25
 
 ### Changed

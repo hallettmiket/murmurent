@@ -29,6 +29,7 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ..core import agent_links as _al
 from ..core import cert_projects as _cp
 from ..core import secret_scan as _ss
 
@@ -369,17 +370,18 @@ def push_mirrors(ref, res: RepoPushResult) -> list:
 
 def _resolve_clone(ref) -> Path | None:
     """Local clone path for ``ref`` (a RepoRef), or None if not on this machine.
-    Prefers the record's explicit ``path``; falls back to ``<repos_root>/<name>``."""
-    from ..core.repo import repos_root
-    cand = None
-    if ref.path:
-        cand = Path(ref.path).expanduser()
-    elif ref.name:
-        cand = repos_root() / ref.name
-    if cand is None:
+
+    Found on THIS machine (#166): its own record, the repositories folder flat
+    or inside a project folder, or a repository with the same GitHub origin.
+    ``ref.path`` is only a hint; a path in another account's home is ignored.
+    """
+    from ..core import repo_paths as _rp
+    name = ref.name or (Path(ref.path).name if ref.path else "")
+    if not name:
         return None
-    if cand.is_dir() and (cand / ".git").exists():
-        return cand
+    found = _rp.find(name, hint=ref.path or "", remote_url=getattr(ref, "remote_url", "") or "")
+    if found is not None and (found / ".git").exists():
+        return found
     return None
 
 
@@ -449,8 +451,11 @@ def push_one_repo(ref, *, message: str | None) -> RepoPushResult:
                        "move it to the project's data area, then run this again",
                 git_detail=f"{p} = {size} bytes")
 
-    # 6. Select files to stage (drop the always-skip list).
-    to_stage = [p for p in changed if p not in _SKIP_ALWAYS]
+    # 6. Select files to stage. Drop the always-skip list, and any link under
+    #    .claude/agents/ that points outside the repo: it names this member's
+    #    own home folder and breaks those agents for everyone else (#150).
+    to_stage = [p for p in changed
+                if p not in _SKIP_ALWAYS and not _al.is_machine_link(repo, p)]
     settings_changed = any(p in _SKIP_ALWAYS for p in changed)
     if settings_changed:
         _ensure_gitignored(repo, ".claude/settings.json")
@@ -582,8 +587,6 @@ def _slack_body(name: str, report: ProjectPushReport) -> str:
     lines = [f"*Project backup — {name}*", "", summary_line(report)]
     for r in report.results:
         lines.append(f"• {_repo_line(r, detail=False)}")
-    lines.append("")
-    lines.append("All worship me and I will let you serve me.")
     return "\n".join(lines)
 
 

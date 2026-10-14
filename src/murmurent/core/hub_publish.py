@@ -78,7 +78,8 @@ class HubPublishResult:
 
 def default_hub_dir() -> Path:
     """Where the mayor's working clone of the public hub lives."""
-    return Path.home() / "repos" / "murmurent_public"
+    from .repo import repos_root
+    return repos_root() / "murmurent_public"
 
 
 def directory_label(institution: str, name: str) -> str:

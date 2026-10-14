@@ -84,6 +84,9 @@ Slack admin UI.
 
 ## Storage layout in lab-mgmt
 
+The lab-mgmt repo sits in your repositories folder (`~/repos` unless you chose
+another; `murmurent config repos-root` shows it):
+
 ```
 ~/repos/murmurent_lab_mgmt_<lab>/
 ├── slack/

@@ -44,8 +44,20 @@ Effects:
 - Symlinks `frozen` agents from the group registry; copies `personal` agents.
 - Configures `~/.claude/settings.json` with group-derived permissions and MCP servers.
 - Initialises `~/.claude/agent-memory/` for the agents installed.
+- Links the plain-English writing style into `~/.claude/output-styles/` (select it with `/config` → *Output style*).
+- Turns off Claude Code's feedback survey in `~/.claude/settings.json`, unless you set `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY` yourself.
+- Creates the **Murmurent Dashboard** icon (skip with `--no-launcher`). `murmurent launcher` re-creates it; `murmurent launcher --remove` deletes it; `--user <handle>` makes it always open as that handle.
 
 `murmurent install` does **not** generate an age key or push a member profile: those are one-time onboarding events.
+
+### This computer's settings
+
+Stored in `~/.murmurent/machine.yaml`. Each applies to this computer only.
+
+| Command | Effect |
+|---|---|
+| `murmurent config repos-root [FOLDER]` | Show, or set, the folder where this computer keeps its git repositories (default `~/repos`). Setting it moves nothing |
+| `murmurent config project-layout [nested\|flat]` | Show, or set, where new projects go: `nested` (one project folder holding its code, manuscript and seminar repositories; the default) or `flat` (each repository directly in the repositories folder). Existing projects are not moved |
 
 ## Command reference
 
@@ -123,6 +135,9 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 | `murmurent project resume <name>` *PI* | Mark active |
 | `murmurent project end <name> --reason <r>` *PI* | Terminal event |
 | `murmurent project archive <name>` *PI* | Archive repo + data |
+| `murmurent project gather <name> [--yes]` | Move a project's repositories on this computer into one project folder. Shows the plan and moves nothing without `--yes`; never overwrites; lists anything to fix by hand |
+| `murmurent project provision-slack <name>` *PI* | Create the project's private Slack channel, named `proj-<name>`, and invite its certified members. Idempotent |
+| `murmurent project rename-slack <name> [--to <channel>]` *PI* | Rename the project's Slack channel to `proj-<name>`, or to the name given. For channels made before 2026.10.0 without the `proj-` prefix (#157) |
 
 ### Project-wide push + managed mirrors
 
@@ -157,9 +172,9 @@ use the same core modules as the panel (`core.repo_inventory`,
 
 | Command | Effect |
 |---|---|
-| `murmurent repo list [--host <name>]` | Every git clone on **this** machine, each with its readiness verdict (`✓ ready` / `± partial` / `• clone`). Issue #94: this-machine-only — remote hosts are skipped; view another machine's repos on its own dashboard ([Remote dashboard access](remote_dashboard.md)) |
-| `murmurent repo status <path-or-name> [--host <name>]` | Is this repo murmurent-ready? A path is checked directly (local, or on `--host` over SSH); a bare name is searched on every registered machine. Reports the `.murmurent.yaml` marker (or legacy `CHARTER.md`) + `.claude/agents/` components. Exit 0 = ready, 1 = not ready, 2 = not found (scriptable) |
-| `murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]` | Make an existing clone **murmurent-ready**: writes the `.murmurent.yaml` readiness marker and bootstraps `.claude/agents/`. Creates NO project, no lab_mgmt registry entry: a project is a set of repos + members, made via the dashboard's **New Project** flow (see [`project_intra.md`](project_intra.md)), which attaches already-ready repos |
+| `murmurent repo list [--host <name>]` | Every git clone on **this** machine, each with its readiness verdict (`✓ ready` when it has a `.murmurent.yaml` marker, otherwise `• not set up yet`). Issue #94: this machine only, so remote hosts are skipped; view another machine's repos on its own dashboard ([Remote dashboard access](remote_dashboard.md)) |
+| `murmurent repo status <path-or-name> [--host <name>]` | Is this repo murmurent-ready? A path is checked directly (local, or on `--host` over SSH); a bare name is searched on every registered machine. Ready means the `.murmurent.yaml` marker is present; `.claude/agents/` plays no part. `partial` means only a legacy `CHARTER.md` setup (run `repo upgrade`). Also lists agent links that git tracks, with the repair (#150). Exit 0 = ready, 1 = not ready, 2 = not found (scriptable) |
+| `murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]` | Make an existing clone **murmurent-ready**: writes the `.murmurent.yaml` readiness marker. `--agents` pins named agents to this repo as links (rarely needed: every agent works in every folder); those links are listed in the repo's `.gitignore` so they are never committed. Creates NO project, no lab_mgmt registry entry: a project is a set of repos + members, made via the dashboard's **New Project** flow (see [`project_intra.md`](project_intra.md)), which attaches already-ready repos |
 | `murmurent repo upgrade [<path> \| --all] [--add-agents a,b] [--all-agents]` | Bring ready repos up to the current Murmurent release: converts legacy `CHARTER.md` bootstraps to the marker, migrates the marker schema, re-links commons agents, re-stamps `bootstrap_version`. Agent *content* updates never need this: symlinks track the commons clone automatically |
 
 ### Experiments
@@ -292,7 +307,7 @@ The full workflow is in [Assembling a choreography](assembling_choreographies.md
 | Command | Effect |
 |---|---|
 | `murmurent onboard <group> --profile <profile>` | One-shot setup for a new member: clone Murmurent, install agents per profile, configure MCP, generate age key, push key + member profile via PR |
-| `murmurent doctor` | Check the local install and print the one command that fixes each problem: Python version, whether `pip`/`python` on PATH match the interpreter murmurent runs under, agent/rule/skill links into the commons (including dangling ones), registered hooks and their interpreter, and whether a clone's `origin` can still `git pull`. Exit 0 = healthy (warnings allowed), 1 = something failed |
+| `murmurent doctor` | Check the local install and print the one command that fixes each problem: Python version, whether `pip`/`python` on PATH match the interpreter murmurent runs under, agent/rule/skill links into the commons (including dangling ones), registered hooks and their interpreter, whether a clone's `origin` can still `git pull`, and whether the Murmurent Dashboard icon exists. Exit 0 = healthy (warnings allowed), 1 = something failed |
 | `murmurent offboard --member @<handle>` *PI* | Mirror of onboard: revoke roles, release from projects, archive age key, mark profile alumni |
 
 ### Verbs (day-to-day)

@@ -18,6 +18,7 @@ from __future__ import annotations
 import datetime as _dt
 from pathlib import Path
 
+from ..core import repo_paths as _repo_paths
 from ..core import dashboard as core_dashboard
 from ..core import inventory as inventory_core
 from ..core.dashboard import DashboardSnapshot, _load_member_meta, _parse_certifications
@@ -147,8 +148,7 @@ def build_response(
     all_project_summaries = [
         ProjectSummary(
             name=cp.name,
-            path=(Path(cp.code_repo).expanduser() if cp.code_repo
-                  else Path(f"~/repos/{cp.name}").expanduser()),
+            path=_repo_paths.find_or_default(cp.name, hint=cp.code_repo or ""),
             sensitivity=cp.sensitivity or "standard",
             lead=cp.lead or _pi_handle(),
             members=tuple(cp.members),
@@ -1158,7 +1158,7 @@ def _projects(
             else None
         )
         # Read Slack ID, repo_kind, and remote_url from CHARTER.md if present.
-        charter_path = Path(f"~/repos/{p.name}/CHARTER.md").expanduser()
+        charter_path = _repo_paths.find_or_default(p.name) / "CHARTER.md"
         slack_channel_id: str | None = None
         repo_kind: str = "github"
         charter_remote_url: str | None = None
@@ -1178,7 +1178,7 @@ def _projects(
                 pass
         # Remote presence: ``git remote get-url origin`` works for both
         # github- and local-kind projects; the URL form just differs.
-        local_repo = Path(f"~/repos/{p.name}").expanduser()
+        local_repo = _repo_paths.find_or_default(p.name)
         github_pushed = False
         remote_url: str | None = None
         if (local_repo / ".git").is_dir():
@@ -1470,7 +1470,8 @@ def _agents() -> list[C.AgentRow]:
     category) plus this member's own personal (member-created) agents."""
     rows: list[C.AgentRow] = []
     try:
-        registry = load_agent_registry(murmurent_repo_root() / "agents")
+        from ..core.commons import commons_root as _commons_root
+        registry = load_agent_registry(_commons_root() / "agents")
     except Exception:
         registry = []
     for record in registry:

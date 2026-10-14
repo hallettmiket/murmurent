@@ -75,8 +75,9 @@ murmurent vault init
 ```
 
 It creates `murmurent_vault`, scaffolds `oracle/ lab-notebook/ murmurent_data/ maps-legends/`,
-clones it (default `~/repos/murmurent_vault`, or pass `--path` for an iCloud
-folder), and pins it.
+clones it (by default to `murmurent_vault` in your repositories folder, which is
+`~/repos` unless you chose another; or pass `--path` for an iCloud folder), and
+pins it.
 
 **You already have an Obsidian vault with notes.** Adopt it. First preview it
 (this changes nothing and pushes nothing):

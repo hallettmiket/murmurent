@@ -24,7 +24,9 @@ MEMBERS_SUBDIR = "members"
 # Marks a lab-mgmt dir as a synthesized card-import fallback rather than a real
 # clone (see ``identity_card.import_card`` + ``is_card_import_stub``).
 CARD_STUB_MARKER = ".murmurent_card_stub"
-DEFAULT_MURMURENT_REPO = Path("~/repos/murmurent").expanduser()
+# Kept for older callers; murmurent_repo_root() reads repos_root() at call time,
+# so a machine's own repositories folder is honoured (#166).
+DEFAULT_MURMURENT_REPO = Path.home() / "repos" / "murmurent"
 # The canonical lab-mgmt clone is ``~/repos/murmurent_lab_mgmt_<group>`` (see
 # ``lab_repo_path``). ``DEFAULT_LAB_MGMT_REPO`` is ONLY the honest last-resort
 # return for a machine where nothing resolves — it is group-less and never
@@ -38,10 +40,10 @@ DEFAULT_MURMURENT_REPO = Path("~/repos/murmurent").expanduser()
 # ``~/repos/lab_mgmt`` folder still resolves — ``_discover_lab_mgmt_clone``
 # finds it by SHAPE (lab.md + members/) — but murmurent no longer falls back to
 # it by NAME.
-DEFAULT_LAB_MGMT_REPO = Path("~/repos/murmurent_lab_mgmt").expanduser()
+DEFAULT_LAB_MGMT_REPO = Path.home() / "repos" / "murmurent_lab_mgmt"  # never exists; see above
 # Retained for the (now shape-discovered, not name-matched) older clones and for
 # tests that force the defaults to miss. No longer consulted by name.
-LEGACY_LAB_MGMT_REPO  = Path("~/repos/hallett-lab-mgmt").expanduser()
+LEGACY_LAB_MGMT_REPO  = Path.home() / "repos" / "hallett-lab-mgmt"
 
 # Per-request lab-mgmt override. FastAPI dispatches sync handlers into a
 # threadpool, so thread-local state is request-scoped without env-var
@@ -68,7 +70,9 @@ class ProjectRepo:
 def murmurent_repo_root(env: dict[str, str] | None = None) -> Path:
     """Resolve the murmurent repo root, honouring ``$MURMURENT_REPO_ROOT`` if set."""
     env = os.environ if env is None else env
-    return Path(env.get("MURMURENT_REPO_ROOT", DEFAULT_MURMURENT_REPO)).expanduser()
+    if env.get("MURMURENT_REPO_ROOT"):
+        return Path(env["MURMURENT_REPO_ROOT"]).expanduser()
+    return repos_root() / "murmurent"
 
 
 def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
@@ -197,8 +201,18 @@ def _discover_lab_mgmt_clone() -> Path | None:
         entries = sorted(p for p in root.iterdir() if p.is_dir())
     except OSError:
         return None
+    # The lab records repository belongs to a lab, not a project, so it
+    # normally sits at the top. One level down is searched too (#166): a clone
+    # moved into a project folder by mistake is found rather than missed.
+    nested = []
+    for p in entries:
+        if not (p / ".git").exists():
+            try:
+                nested += sorted(c for c in p.iterdir() if c.is_dir())
+            except OSError:
+                pass
 
-    candidates = [p for p in entries if _looks_like_lab_mgmt_clone(p)]
+    candidates = [p for p in entries + nested if _looks_like_lab_mgmt_clone(p)]
     if not candidates:
         return None
 
@@ -348,10 +362,90 @@ def _pinned_lab_mgmt_path() -> Path | None:
     return Path(txt).expanduser() if txt else None
 
 
+#: Where this machine's own settings live (also written by the dashboard).
+MACHINE_SETTINGS_FILE = Path.home() / ".murmurent" / "machine.yaml"
+#: Folder names people commonly use, in the order `suggest_repos_root` tries them.
+COMMON_REPOS_FOLDERS = ("repos", "repo", "repositories")
+
+
+def _machine_repos_root() -> str:
+    """``repos_root`` from this machine's ``machine.yaml``, or ""."""
+    try:
+        import yaml
+        data = yaml.safe_load(MACHINE_SETTINGS_FILE.read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001 - a missing or broken file means "not set"
+        return ""
+    value = data.get("repos_root") if isinstance(data, dict) else None
+    return str(value).strip() if value else ""
+
+
+def repos_root_and_source() -> tuple[Path, str]:
+    """This machine's repositories folder, and where that answer came from.
+
+    Order (issue #166): ``$MURMURENT_REPOS_ROOT`` (tests, unusual installs),
+    then ``repos_root`` in ``~/.murmurent/machine.yaml`` (set by
+    ``murmurent init``, ``murmurent config repos-root`` or the dashboard), then
+    ``~/repos``. People use ``~/repo``, ``~/repositories`` and others, so this
+    is a choice per machine, never an assumption.
+    """
+    env = os.environ.get("MURMURENT_REPOS_ROOT", "").strip()
+    if env:
+        return Path(env).expanduser(), "the MURMURENT_REPOS_ROOT environment variable"
+    configured = _machine_repos_root()
+    if configured:
+        return Path(configured).expanduser(), f"repos_root in {MACHINE_SETTINGS_FILE}"
+    return Path.home() / "repos", "the default (nothing set)"
+
+
 def repos_root() -> Path:
-    """The base directory for working clones — ``~/repos`` by default, overridable
-    with ``$MURMURENT_REPOS_ROOT`` (tests isolate it)."""
-    return Path(os.environ.get("MURMURENT_REPOS_ROOT", str(Path.home() / "repos"))).expanduser()
+    """The base directory for working clones on this machine.
+
+    Every path to a repository on this machine must be built from this, never
+    from a literal ``~/repos``: ``tests/test_repos_root_guard.py`` fails on a
+    new one.
+    """
+    return repos_root_and_source()[0]
+
+
+def suggest_repos_root() -> Path:
+    """The folder to offer when asking: the first common name that exists
+    (``~/repos``, ``~/repo``, ``~/repositories``), else ``~/repos``."""
+    for name in COMMON_REPOS_FOLDERS:
+        candidate = Path.home() / name
+        if candidate.is_dir():
+            return candidate
+    return Path.home() / COMMON_REPOS_FOLDERS[0]
+
+
+def set_repos_root(folder: str | Path) -> Path:
+    """Record ``folder`` as this machine's repositories folder in machine.yaml.
+
+    Every other line of the file is kept. Returns the folder as stored. The
+    folder need not exist yet; it is created on first use.
+    """
+    import yaml
+    target = Path(str(folder)).expanduser()
+    try:
+        stored = "~/" + str(target.relative_to(Path.home())) if target != Path.home() else "~"
+    except ValueError:
+        stored = str(target)
+    data: dict = {}
+    if MACHINE_SETTINGS_FILE.is_file():
+        loaded = yaml.safe_load(MACHINE_SETTINGS_FILE.read_text(encoding="utf-8"))
+        data = loaded if isinstance(loaded, dict) else {}
+    data["repos_root"] = stored
+    MACHINE_SETTINGS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    MACHINE_SETTINGS_FILE.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    return target
+
+
+def repos_root_for_display() -> str:
+    """The repositories folder written as a person would type it (``~/repos``)."""
+    root = repos_root()
+    try:
+        return "~/" + str(root.relative_to(Path.home()))
+    except ValueError:
+        return str(root)
 
 
 def lab_repo_path(group: str) -> Path:

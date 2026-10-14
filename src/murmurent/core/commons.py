@@ -67,7 +67,8 @@ def commons_root() -> Path:
     Resolution order, first hit wins:
 
     1. ``$MURMURENT_COMMONS_ROOT`` — an explicit override, for tests and for
-       unusual installs. Honoured even if it does not look like the commons,
+       unusual installs. Then ``$MURMURENT_REPO_ROOT`` when it is set and holds
+       the commons, for the same reason. Honoured even if it does not look like the commons,
        because an override that is silently ignored is worse than one that
        fails loudly downstream.
     2. The clone this package is running from, when installed editable — so a
@@ -82,6 +83,13 @@ def commons_root() -> Path:
     override = os.environ.get("MURMURENT_COMMONS_ROOT")
     if override:
         return Path(override).expanduser()
+
+    # An explicitly set MURMURENT_REPO_ROOT is a deliberate choice, so it
+    # outranks the clone this package happens to run from. Without a variable
+    # set, the conventional clone path stays below the editable clone (3. below).
+    explicit_clone = os.environ.get("MURMURENT_REPO_ROOT")
+    if explicit_clone and (Path(explicit_clone).expanduser() / "agents").is_dir():
+        return Path(explicit_clone).expanduser()
 
     # The clone you are running from wins over the one you happen to have at
     # the conventional path: if you installed this editable, that is the copy

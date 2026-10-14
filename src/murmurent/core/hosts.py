@@ -41,6 +41,8 @@ row; pre-existing ``hosts.yaml`` entries are read + honoured, never rewritten.
 
 from __future__ import annotations
 
+import dataclasses
+
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -70,6 +72,18 @@ class InvalidHost(HostError):
     """Refused: host payload violates a schema rule (kind, ssh_host, etc.)."""
 
 
+#: A remote host's repositories folder when its record names none (#166). It is
+#: the OTHER machine's convention, so it stays a literal; this machine's own
+#: folder always comes from core.repo.repos_root().
+DEFAULT_REMOTE_PROJECT_ROOT = "~/repos"
+
+
+def _local_project_root() -> str:
+    """This machine's repositories folder, written as a person would type it."""
+    from .repo import repos_root_for_display
+    return repos_root_for_display()
+
+
 @dataclass(frozen=True)
 class Host:
     """One row in ``hosts.yaml``.
@@ -83,7 +97,7 @@ class Host:
     kind: str = "local"
     ssh_host: str = ""
     remote_user: str = ""
-    project_root: str = "~/repos"
+    project_root: str = DEFAULT_REMOTE_PROJECT_ROOT
     lab_vm_root: str = "~/lab_vm/data"
     # PERSONAL vault (issue #25): ``vault_root`` is the personal-vault clone
     # path on THIS machine (the member's ``murmurent_vault``); its oracle/ +
@@ -162,7 +176,7 @@ def _coerce_host(name: str, raw: dict[str, Any]) -> Host:
         kind=kind,
         ssh_host=ssh_host,
         remote_user=_str(raw.get("remote_user")),
-        project_root=_str(raw.get("project_root"), "~/repos") or "~/repos",
+        project_root=_str(raw.get("project_root"), DEFAULT_REMOTE_PROJECT_ROOT) or DEFAULT_REMOTE_PROJECT_ROOT,
         lab_vm_root=_str(raw.get("lab_vm_root"), "~/lab_vm/data") or "~/lab_vm/data",
         vault_root=_str(raw.get("vault_root"), "~/Documents/Obsidian") or "~/Documents/Obsidian",
         oracle_subfolder=_str(raw.get("oracle_subfolder"), "oracle") or "oracle",
@@ -179,7 +193,7 @@ def _default_local() -> Host:
     return Host(
         name=LOCAL_NAME,
         kind="local",
-        project_root="~/repos",
+        project_root=_local_project_root(),
         lab_vm_root="~/lab_vm/data",
         vault_root="~/Documents/Obsidian",
         description="this laptop",
@@ -219,6 +233,10 @@ def read(env: dict[str, str] | None = None) -> dict[str, Host]:
             host = _coerce_host(str(name), payload)
         except InvalidHost:
             continue
+        if host.name == LOCAL_NAME:
+            # This machine's folder is the repos_root setting (#166), whatever an
+            # older hosts.yaml recorded, so the two can never disagree.
+            host = dataclasses.replace(host, project_root=_local_project_root())
         out[host.name] = host
     return out
 
@@ -265,7 +283,9 @@ def write(hosts: dict[str, Host], env: dict[str, str] | None = None) -> Path:
         row: dict[str, Any] = {"kind": host.kind}
         if host.ssh_host:    row["ssh_host"]    = host.ssh_host
         if host.remote_user: row["remote_user"] = host.remote_user
-        row["project_root"]  = host.project_root
+        if name != LOCAL_NAME:
+            # This machine's folder is the repos_root setting (#166), not stored here.
+            row["project_root"] = host.project_root
         if host.mount_point: row["mount_point"] = host.mount_point
         if host.description: row["description"] = host.description
         if host.scan_dirs:   row["scan_dirs"]   = list(host.scan_dirs)

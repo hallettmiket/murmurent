@@ -12,6 +12,8 @@ Output: HTTP POST to Slack; silent no-op when token is absent.
 
 from __future__ import annotations
 
+from ..core import repo_paths as _repo_paths
+
 import logging
 import os
 import re
@@ -116,7 +118,7 @@ def _token() -> str | None:
 
 def _project_channel_id(project_slug: str) -> str:
     """Return the Slack channel ID stored in the project's CHARTER.md, or the default lab channel."""
-    charter_path = Path(f"~/repos/{project_slug}/CHARTER.md").expanduser()
+    charter_path = _repo_paths.find_or_default(project_slug) / "CHARTER.md"
     if charter_path.is_file():
         try:
             text = charter_path.read_text(encoding="utf-8")
@@ -143,7 +145,7 @@ def _write_charter_channel_id(
     necessary when the lab opted for a non-conventional name at
     create time.
     """
-    charter_path = Path(f"~/repos/{project_slug}/CHARTER.md").expanduser()
+    charter_path = _repo_paths.find_or_default(project_slug) / "CHARTER.md"
     if not charter_path.is_file():
         return
     try:
@@ -184,7 +186,7 @@ def _read_charter_channel_name(project_slug: str) -> str | None:
     ``None`` when missing / unreadable. Used so a re-run of channel
     creation/recovery targets the same name that was provisioned the
     first time."""
-    charter_path = Path(f"~/repos/{project_slug}/CHARTER.md").expanduser()
+    charter_path = _repo_paths.find_or_default(project_slug) / "CHARTER.md"
     if not charter_path.is_file():
         return None
     try:

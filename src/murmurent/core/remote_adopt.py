@@ -28,6 +28,8 @@ calls would be 4-5× slower than one ``bash -lc`` doing all of it.
 
 from __future__ import annotations
 
+from . import remote_install as _ri
+
 import re
 import shlex
 from dataclasses import dataclass
@@ -87,6 +89,7 @@ def build_remote_adopt_script(
     agents: list[str],
     lab: str = "",
     bootstrap_version: str = "",
+    repos_dir: str = "",
 ) -> str:
     """Render the batched bash that runs over SSH for a remote adopt.
 
@@ -172,20 +175,26 @@ def build_remote_adopt_script(
         # murmurent commons is checked out on the host. Mirrors the
         # equivalent block in remote_install._build_script so behaviour
         # is identical to the install-wizard path.
-        'WIG="$HOME/repos/wigamig"',
+        *_ri.commons_lines(repos_dir or _hosts.DEFAULT_REMOTE_PROJECT_ROOT),
         'if [ -d "$DEST/.git" ] && [ -d "$WIG/agents" ]; then',
         '  mkdir -p "$DEST/.claude/agents"',
         '  for f in "$DEST/.claude/agents"/*.md; do',
         '    [ -L "$f" ] || continue',
         '    target=$(readlink "$f")',
         '    case "$target" in',
-        '      */repos/wigamig/agents/*) rm -f "$f" ;;',
+        '      "$WIG"/agents/*) rm -f "$f" ;;',
         '    esac',
         '  done',
         f'  for a in {agents_csv}; do',
         '    src="$WIG/agents/$a.md"',
-        '    if [ -f "$src" ]; then',
+        # A real file is the group's own agent: keep it. Each link made
+        # points into this member's home, so list it in .gitignore (#150).
+        '    if [ -e "$DEST/.claude/agents/$a.md" ] && [ ! -L "$DEST/.claude/agents/$a.md" ]; then',
+        '      echo "cc_agent:ok:$a (kept your own file)"',
+        '    elif [ -f "$src" ]; then',
         '      ln -sfn "$src" "$DEST/.claude/agents/$a.md"',
+        '      grep -qxF ".claude/agents/$a.md" "$DEST/.gitignore" 2>/dev/null \\',
+        '        || echo ".claude/agents/$a.md" >> "$DEST/.gitignore"',
         '      echo "cc_agent:ok:$a -> wigamig/agents/$a.md"',
         '    else',
         '      echo "cc_agent:warn:$a (no $a.md in murmurent commons)"',
@@ -201,12 +210,12 @@ def build_remote_adopt_script(
         '',
         '## Agents wired up for this project',
         '',
-        'See `.claude/agents/` — symlinks into `~/repos/wigamig/agents/`.',
+        'See `.claude/agents/` — symlinks into `$WIG/agents/`.',
         f'Selected at adopt time: {agents_csv or "(none)"}.',
         '',
         '## murmurent commons',
         '',
-        'Lab-wide agents + rules live in `~/repos/wigamig/`. This project',
+        'Lab-wide agents + rules live in `$WIG/`. This project',
         'inherits from there; project-specific overrides go in `.claude/`.',
         '__CLAUDE_MD_EOF__',
         '    echo "cc_claude_md:ok:created $DEST/CLAUDE.md"',
@@ -272,8 +281,8 @@ def _vscode_settings_for_ssh() -> str:
 
 def _cc_settings_for_ssh_template() -> str:
     """JSON for ``.claude/settings.json`` with the hooks block. Written
-    via an *unquoted* heredoc on the remote so ``$WIG`` expands to
-    ``$HOME/repos/wigamig`` at runtime — the script sets ``WIG`` just
+    via an *unquoted* heredoc on the remote so ``$WIG`` expands to the
+    remote's copy of the commons at runtime — the script sets ``WIG`` just
     above this block. The hook path therefore comes out as e.g.
     ``/home/UWO/the_pi/repos/wigamig/scripts/murmurent_log_agent_event.sh``,
     which is what we want on every host."""
@@ -354,6 +363,7 @@ def adopt_remote_clone(
         agents=agents,
         lab=lab,
         bootstrap_version=bootstrap_version,
+        repos_dir=getattr(host, "project_root", "") or "",
     )
     remote = _remote.Remote(host)
     try:

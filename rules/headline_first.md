@@ -36,6 +36,7 @@ vocabulary:
 | `blacksmith` | `Done / Failed / Partial — <one-line what>` |
 | `artist` | `Rendered / Skipped / Failed — <one-line what>` |
 | `conscience` | `OK / Flagged — <one-line concern>` |
+| `scribe` | `Revised / Drafted / Gap — <one-line on what was written or what is missing>` |
 | `lawyer` | `Clear / Conflict / Unknown — <one-line on patent landscape>` |
 | `millwright` | `Provisioned / Skipped / Failed — <one-line on what>` |
 | `centre_millwright` | `Reconciled / Drift / BLOCKED — <one-line on what changed or what is blocking>` |

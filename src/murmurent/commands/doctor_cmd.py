@@ -286,11 +286,36 @@ def check_packaged_commons() -> Check:
                  "reinstall: uv tool install --reinstall murmurent")
 
 
+def check_repos_root() -> Check:
+    """Where this computer keeps its repositories, and where that came from (#166)."""
+    from ..core import repo as _repo
+
+    root, source = _repo.repos_root_and_source()
+    note = "" if root.is_dir() else "; does not exist yet, created on first use"
+    return Check("repositories folder", OK, f"{root} (from {source}{note})")
+
+
+def check_launcher() -> Check:
+    """The dashboard icon (#156): present, missing with the fix, or not
+    available on this platform. Missing is a warning, never a failure."""
+    from ..core import launcher as _launcher
+
+    st = _launcher.status()
+    if not st.supported:
+        return Check("dashboard icon", OK,
+                     "not available on this platform; start it with `murmurent dashboard --hifi`")
+    if st.present:
+        return Check("dashboard icon", OK, str(st.location))
+    return Check("dashboard icon", WARN, "no Murmurent Dashboard icon", "murmurent launcher")
+
+
 def run_checks() -> list[Check]:
     checks: list[Check] = [check_python(), check_path_tools(), check_version(), check_clone_remote()]
     checks.extend(check_links())
     checks.append(check_hooks())
     checks.append(check_packaged_commons())
+    checks.append(check_repos_root())
+    checks.append(check_launcher())
     return checks
 
 

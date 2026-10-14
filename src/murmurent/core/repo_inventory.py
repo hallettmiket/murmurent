@@ -422,7 +422,15 @@ def _effective_scan_dirs(host: _hosts.Host) -> tuple[str, ...]:
     configured, so existing registries keep their current behaviour
     without an explicit ``scan_dirs:`` field.
     """
-    return host.scan_dirs or DEFAULT_SCAN_DIRS
+    dirs = host.scan_dirs or DEFAULT_SCAN_DIRS
+    if host.name == _hosts.LOCAL_NAME:
+        # This machine's chosen repositories folder (#166) is always scanned,
+        # so ~/repositories or any other choice is found without extra setup.
+        from .repo import repos_root_for_display
+        mine = repos_root_for_display()
+        if mine not in dirs and mine.removeprefix("~/") not in dirs:
+            dirs = (mine, *dirs)
+    return tuple(dirs)
 
 
 def list_machine_repos(host_name: str = _hosts.LOCAL_NAME) -> tuple[list[RepoOnHost], str | None]:

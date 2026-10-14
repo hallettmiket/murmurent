@@ -259,6 +259,10 @@ $ murmurent pi-init example_lab
   joining a centre, and your members' cards keep working throughout.
 ```
 
+The management repo is created in your repositories folder (`~/repos` unless
+you chose another; `murmurent config repos-root` shows it), and the paths it
+prints use that folder.
+
 Add `--core` instead of a bare lab name if this group is a core facility
 (`murmurent pi-init example_core --core`). Once you have your trust root,
 issue member cards as below; members import with `murmurent import-card

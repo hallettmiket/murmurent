@@ -10,7 +10,7 @@ one lab, and some live only on your own machine.
 | [`hallettmiket/murmurent_public`](https://github.com/hallettmiket/murmurent_public) | GitHub (public) | the global directory of institutions running Murmurent, plus registrar contacts for join requests | the centre; public |
 | `<your-org>/murmurent_lab_mgmt_<lab>` | GitHub (private) | your lab or core's governance repo: roster, project registry (`cert_projects/`), inventory, the lab oracle (curated shared findings), audit records | the PI; members get read access |
 | `<you>/murmurent_vault` | GitHub (private) | your personal vault: `oracle/` (your findings), `lab-notebook/` (daily notes), `murmurent_data/` (reference files: PDFs, spreadsheets), `maps-legends/` (your vault index) | you, alone |
-| `~/repos/murmurent` | your machine | the working clone of the commons; `~/.claude/agents` and `~/.claude/rules` symlink into it | you, per machine |
+| `~/repos/murmurent` (`~/repos` is your repositories folder unless you chose another; `murmurent config repos-root` shows it) | your machine | the working clone of the commons; `~/.claude/agents` and `~/.claude/rules` symlink into it | you, per machine |
 | `~/repos/murmurent_lab_mgmt_<lab>` | your machine | the working clone of your lab's governance repo | you, per machine |
 | `~/.claude/agents/`, `~/.claude/rules/`, `~/.claude/skills/` | your machine | symlinks into the commons clone, put there by `scripts/setup.sh` | you, per machine |
 | `~/.claude/settings.json` | your machine | registered hooks (raw_guard, protected_paths, …) and MCP servers (`murmurent-oracle`, `murmurent-inventory`, …) | you, per machine |
@@ -32,7 +32,7 @@ directory of institutions running Murmurent). Every other GitHub repo above
 is private: a lab's governance repo grants read access only to that lab's
 members, and a personal vault grants access to no one but its owner.
 
-Everything under `~/repos/`, `~/.claude/`, and `~/.murmurent/` lives on a
+Everything in your repositories folder, `~/.claude/`, and `~/.murmurent/` lives on a
 single machine and gets set up fresh on each machine you use Murmurent from
 (see [`setup.md`](setup.md) for per-machine wiring). The GitHub repos are
 what carry your Oracle, notebook, and lab knowledge between machines: clone

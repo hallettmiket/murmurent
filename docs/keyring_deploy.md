@@ -103,7 +103,7 @@ murmurent centre-slack-smoke        # the server USES the synced token → creat
 |---|---|
 | **Rotate a secret** | On any authorised machine: `keyring set-secret <name> --file … --target … --consumers …` → commit + push. Peers converge on next `keyring sync`. |
 | **Add a machine** | Repeat Parts B–D. |
-| **Health monitoring** | Cron on each machine: `@hourly cd ~/repos/murmurent && scripts/keyring_check.sh || <alert>`. |
+| **Health monitoring** | Cron on each machine: `@hourly cd ~/repos/murmurent && scripts/keyring_check.sh || <alert>` (use the machine's own repositories folder; `murmurent config repos-root` prints it). |
 | **Decommission a machine** (manual, Phase 1) | Remove it from `.keyring/recipients.yaml`, **rotate the value of every secret it could read** (new values), re-lock, push. Rotation is mandatory because **git history is permanent** — the old box stays decryptable by the removed key forever. |
 
 ## What the keyring never carries

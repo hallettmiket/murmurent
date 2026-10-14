@@ -29,14 +29,14 @@ HOOK_REGISTRATIONS: list[dict[str, Any]] = [
         # entrypoint.
         "event": "PreToolUse",
         "matcher": "Agent",
-        "command": "<MURMURENT_REPO>/scripts/murmurent_log_agent_event.sh",
+        "command": "bash <MURMURENT_COMMONS>/scripts/murmurent_log_agent_event.sh",
         "env": {},
         "label": "murmurent-agent-report-pre",
     },
     {
         "event": "SubagentStop",
         "matcher": None,
-        "command": "<MURMURENT_REPO>/scripts/murmurent_log_agent_event.sh",
+        "command": "bash <MURMURENT_COMMONS>/scripts/murmurent_log_agent_event.sh",
         "env": {},
         "label": "murmurent-agent-report-stop",
     },
@@ -133,6 +133,19 @@ MCP_REGISTRATIONS: dict[str, dict[str, Any]] = {
 }
 
 
+def _expand_placeholders(text: str) -> str:
+    """Replace ``<MURMURENT_COMMONS>`` with this machine's commons root.
+
+    Resolved through :func:`commons_root` rather than the clone path, because a
+    ``uv tool install`` has no clone: the hook used to point at
+    ``~/repos/murmurent/scripts/``, which did not exist there (#159).
+    """
+    if "<MURMURENT_COMMONS>" not in text:
+        return text
+    from ..core.commons import commons_root
+    return text.replace("<MURMURENT_COMMONS>", str(commons_root()))
+
+
 def _resolve_command(reg: dict[str, Any]) -> str:
     """Render the shell command for a hook registration.
 
@@ -141,14 +154,14 @@ def _resolve_command(reg: dict[str, Any]) -> str:
         with optional env-var prefixes (the historic shape; covers
         raw_guard, phi_check, audit, etc.).
       - ``command``: a literal shell command — typically a path to a
-        bash script. Use ``<MURMURENT_REPO>`` as a placeholder for the
-        murmurent clone root; it's expanded at install time so the
-        resulting absolute path is correct on this machine.
+        bash script. Use ``<MURMURENT_COMMONS>`` as a placeholder for the
+        commons root (a clone, or the copy inside the installed package);
+        it's expanded at install time so the resulting absolute path is
+        correct on this machine.
     """
     env = reg.get("env") or {}
     if "command" in reg:
-        from ..core.repo import murmurent_repo_root
-        cmd = str(reg["command"]).replace("<MURMURENT_REPO>", str(murmurent_repo_root()))
+        cmd = _expand_placeholders(str(reg["command"]))
         parts = [f"{k}={v}" for k, v in env.items()] + [cmd]
         return " ".join(parts)
     parts = [f"{k}={v}" for k, v in env.items()]
@@ -169,12 +182,15 @@ def _matches_existing(entry: dict[str, Any], reg: dict[str, Any]) -> bool:
     # ``matcher: null`` and the new shape omits the key.
     if (entry.get("matcher") or None) != (reg.get("matcher") or None):
         return False
-    body = reg.get("module") or reg.get("command") or ""
-    if "<MURMURENT_REPO>" in body:
-        from ..core.repo import murmurent_repo_root
-        body = body.replace("<MURMURENT_REPO>", str(murmurent_repo_root()))
+    body = _expand_placeholders(reg.get("module") or reg.get("command") or "")
     hooks = entry.get("hooks") or []
     for h in hooks:
+        # The label is written as the hook's ``name``. Matching on it lets a
+        # re-install replace an entry whose path has since moved (a clone path
+        # on a machine that now runs from the package) instead of leaving the
+        # broken one in place beside the new one.
+        if reg.get("label") and h.get("name") == reg["label"]:
+            return True
         cmd = h.get("command", "")
         if isinstance(cmd, list):
             cmd = " ".join(cmd)
@@ -224,6 +240,29 @@ def _ensure_hook(settings: dict[str, Any], reg: dict[str, Any]) -> bool:
             return True
     bucket.append(new_entry)
     return True
+
+
+#: Environment settings murmurent sets in ``settings.json`` for every member,
+#: unless the member has already chosen a value. The feedback survey interrupts
+#: a working session to ask for a rating; the lab asked for it off (#154).
+DEFAULT_ENV: dict[str, str] = {
+    "CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY": "1",
+}
+
+
+def _ensure_env(settings: dict[str, Any]) -> bool:
+    """Add each ``DEFAULT_ENV`` entry to ``settings.env`` if it is not there.
+
+    A value the member already set is left alone, even if it differs: this is
+    a default, not a policy. Returns True if anything changed.
+    """
+    env = settings.setdefault("env", {})
+    changed = False
+    for key, value in DEFAULT_ENV.items():
+        if key not in env:
+            env[key] = value
+            changed = True
+    return changed
 
 
 def _ensure_mcp(settings: dict[str, Any]) -> bool:
@@ -298,6 +337,8 @@ def cmd_install(
     for reg in HOOK_REGISTRATIONS:
         if _ensure_hook(settings, reg):
             changed = True
+    if _ensure_env(settings):
+        changed = True
     if _ensure_mcp(settings):
         changed = True
     # ALSO write MCP entries to ~/.claude.json — that's where Claude Code

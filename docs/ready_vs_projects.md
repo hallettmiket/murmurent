@@ -1,7 +1,8 @@
 # Making a repo Murmurent-ready
 
 A **repo** (repository) is a folder of code and files tracked by git,
-living under `~/repos/` on your machine. Your day-to-day research work
+living in your repositories folder (`~/repos` unless you chose another;
+`murmurent config repos-root` shows it). Your day-to-day research work
 happens inside repositories.
 
 A **Murmurent-ready** repo is a git clone Murmurent has registered, by
@@ -9,6 +10,13 @@ writing a `.murmurent.yaml` marker at its root. This page covers how to make
 a repo ready, check its status, and upgrade it after a release. A project is a
 separate, higher-level thing built on top of ready repos; see
 [`project_intra.md`](project_intra.md).
+
+A project often owns several repos, each with a role: `code`, `manuscript`,
+`seminar` (talks and slides), `data` or `infra`. On your machine they can sit
+together in one project folder, for example `~/repos/brca/brca`,
+`~/repos/brca/brca_manuscript` and `~/repos/brca/brca_seminar`, or each
+directly in your repositories folder. Murmurent finds them either way; see
+[Projects with several repositories](setup.md#projects-with-several-repositories).
 
 ## What readiness does and does not do
 
@@ -61,7 +69,15 @@ agent — and twice a liability:
   colleague's machine — different home directory, or Murmurent installed from
   PyPI with no clone at all — every one of those links dangles. The portable
   record is the marker's own `agents:` list, which `repo adopt`/`repo upgrade`
-  read to recreate the links locally.
+  read to recreate the links locally. To stop the links being committed, `adopt`
+  names each one in a block at the end of the repo's `.gitignore`, and both push
+  commands leave them out. A file you wrote yourself in `.claude/agents/` is not
+  a link: it is never replaced, and you commit it as usual.
+
+  If links were committed before this, `murmurent repo status` lists them and
+  prints the repair: stop tracking them with `git rm --cached`, commit and
+  push, then everyone else runs `murmurent repo upgrade <repo>` straight after
+  their next pull to re-create their own links.
 - **A wrong link is silent.** A repo whose links point into a second Murmurent
   clone runs a different version of those agents from the rest of the machine,
   with no error. `murmurent repo status` reports this as a `follows commons`
@@ -85,14 +101,14 @@ murmurent repo status ~/repos/<directory>
 | `✗ no such folder` | the path is wrong | check the path |
 | `✗ not tracked by git` | a plain folder | `git -C ~/repos/<directory> init`, then the next row |
 | `• not set up yet` | git, and Murmurent has never set it up | `murmurent repo adopt ~/repos/<directory>` |
-| `± half set up` | a marker without agent links, or the reverse | the same `adopt` — it completes the setup |
+| `± half set up` | set up by a very old Murmurent (a `CHARTER.md` but no `.murmurent.yaml`) | `murmurent repo upgrade ~/repos/<directory>` |
 | `✓ ready`, bootstrapped by an older version | ready, set up by an earlier release | `murmurent repo upgrade ~/repos/<directory>` |
 | `✓ ready`, current version | finished | open Claude Code in it |
 
 Murmurent tracks a directory through git, so the plain-folder row comes first:
 `repo adopt` on a folder without a `.git/` directory stops and says so. The
-directory has to live under `~/repos/` (or the folder named by
-`MURMURENT_REPOS_ROOT`), which is where the inventory looks.
+directory has to live in your repositories folder, directly or inside a
+project folder, which is where the inventory looks.
 
 Adopting writes the two things readiness consists of, the `.murmurent.yaml`
 marker and the `.claude/agents/` symlinks, and leaves every other file as it
@@ -133,19 +149,19 @@ Example `repo list` output:
 ```
 NAME       PATH                    VERDICT
 brca_wgs   ~/repos/brca_wgs        ready
-brca_sc    ~/repos/brca_sc         partial
 scratch    ~/repos/scratch         plain clone
 old_proj   ~/repos/old_proj        missing
 ```
 
 Verdicts:
 
-- **ready**: has both the `.murmurent.yaml` marker and `.claude/agents/`.
-- **partial**: has one but not the other (for example agents linked but
-  no marker yet). Run `murmurent repo adopt` (or the Upgrade button) to
-  finish.
-- **plain clone**: an ordinary git repo with neither marker, outside
-  Murmurent's configuration.
+- **ready**: has the `.murmurent.yaml` marker. Whether `.claude/agents/`
+  holds anything makes no difference: every agent works in every folder.
+- **partial**: set up by a very old Murmurent, with a `CHARTER.md` but no
+  `.murmurent.yaml`. Run `murmurent repo upgrade` (or the Upgrade button).
+- **plain clone**: an ordinary git repo with no marker, outside
+  Murmurent's configuration. A `.claude/agents/` folder on its own does not
+  change this: that is Claude Code's feature, not Murmurent's.
 - **not a git repo** / **missing**: the path is not a git checkout, or
   does not exist.
 
@@ -171,7 +187,7 @@ murmurent repo upgrade --all [--add-agents a,b] [--all-agents]
 `--add-agents` links specific new agents into an already-ready repo
 without touching the ones already linked; `--all-agents` links every
 commons agent (new releases included). `--all` applies the upgrade to
-every ready repo under `~/repos` instead of a single path. Neither flag
+every ready repo in your repositories folder instead of a single path. Neither flag
 is needed just to pick up prompt edits to agents already linked; that
 part is automatic.
 

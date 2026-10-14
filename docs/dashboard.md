@@ -29,36 +29,26 @@ laptop, use an SSH port-forward, either by hand or via
 (including first-time server setup and the VS Code Remote-SSH
 auto-forward route).
 
-## Installing a desktop launcher (menu icon)
+## The dashboard icon
 
-Rather than typing the command each time, you can install a desktop icon
-that starts the dashboard and opens it in your browser with one click. Run
-the script for your platform once, after cloning or reinstalling Murmurent.
+You probably have it already. `murmurent install` creates a **Murmurent
+Dashboard** icon that starts the dashboard and opens it in your browser:
 
-**macOS:**
+- **Mac:** in your Applications folder. Drag it to your Dock for one-click
+  access.
+- **Linux:** in your applications menu. Search for "murmurent".
+- **Windows:** not available yet. Start the dashboard with the command above.
 
-```bash
-bash scripts/create_mac_app.sh
-```
-
-This creates `~/Applications/Murmurent Dashboard.app`, which appears in
-Launchpad and Spotlight. Pass `--dest <dir>` to write the bundle
-elsewhere.
-
-**Linux:**
+To make the icon again (after moving or reinstalling murmurent), or to remove it:
 
 ```bash
-bash scripts/create_linux_launcher.sh
+murmurent launcher            # create it, replacing any earlier one
+murmurent launcher --remove   # delete it
 ```
 
-This writes a freedesktop `.desktop` entry to
-`~/.local/share/applications/murmurent-dashboard.desktop`, so "Murmurent
-Dashboard" appears in the applications menu. The entry follows the XDG
-specification and shows up on Cinnamon, GNOME, KDE, XFCE, and MATE.
-
-Both launchers start the dashboard on port 8770 (starting it only if it is
-not already running) and then open `http://127.0.0.1:8770/`. They run the
-same `murmurent dashboard --hifi` command shown above.
+`murmurent doctor` says whether the icon is there. The icon opens
+`http://127.0.0.1:8770/`, starting the dashboard first if it is not already
+running.
 
 ## What the dashboard shows
 

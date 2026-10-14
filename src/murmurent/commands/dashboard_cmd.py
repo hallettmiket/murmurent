@@ -80,11 +80,12 @@ def _launch_hifi(*, host: str, port: int) -> int:
     try:
         from ..dashboard import server as hifi_server  # noqa: F401
     except ModuleNotFoundError as exc:  # pragma: no cover
+        from ..core.repo import murmurent_repo_root
         raise click.ClickException(
             "hi-fi dashboard deps missing (fastapi/uvicorn). Reinstall murmurent "
             "editable from the clone (the deps are hard deps, so this is all it "
             "takes):\n"
-            "    cd ~/repos/murmurent && uv tool install --force --python 3.12 -e .\n"
+            f"    cd {murmurent_repo_root()} && uv tool install --force --python 3.12 -e .\n"
             "Or run the /murmurent-reset skill at --level install."
         ) from exc
 

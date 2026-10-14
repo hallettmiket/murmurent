@@ -16,6 +16,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
+from .core.hosts import DEFAULT_REMOTE_PROJECT_ROOT as _DEFAULT_REMOTE_PROJECT_ROOT
+from .core.repo import repos_root_for_display as _repos_display
 from . import __version__
 from .commands import dashboard_cmd as dashboard_impl
 from .commands import data_cmd
@@ -62,7 +64,10 @@ def cli(ctx: click.Context) -> None:
     help="Override the settings.json target path (mostly for tests).",
 )
 @click.option("--no-backup", is_flag=True, help="Skip the .bak copy of settings.json.")
-def install_command(hooks: bool, settings_path: Path | None, no_backup: bool) -> None:
+@click.option("--no-launcher", is_flag=True,
+              help="Don't create the Murmurent Dashboard icon.")
+def install_command(hooks: bool, settings_path: Path | None, no_backup: bool,
+                    no_launcher: bool) -> None:
     """Bare ``murmurent install`` is the whole install: wire the commons,
     register the hooks, then re-link every murmurent-ready repo on the machine.
     It used to say "not yet implemented in v1", which left the obvious command
@@ -93,6 +98,103 @@ def install_command(hooks: bool, settings_path: Path | None, no_backup: bool) ->
         from .commands import repo_cmd as _repo_cmd
         _repo_cmd.cmd_upgrade(path=None, all_repos=True, add_agents_csv=None,
                               all_agents=False, quiet=True, marker_only=True)
+        if not no_launcher:
+            _make_launcher_quietly()
+
+
+def _make_launcher_quietly() -> None:
+    """Create the dashboard icon as the last step of ``murmurent install`` (#156).
+
+    By default rather than on request: an icon nobody knows to ask for was the
+    problem. A failure here never fails the install; it says so in one line.
+    """
+    from .core import launcher as _launcher
+
+    click.echo()
+    try:
+        res = _launcher.create()
+    except OSError as exc:
+        click.echo(f"  ! could not create the dashboard icon: {exc}. "
+                   "Try again later with: murmurent launcher")
+        return
+    click.echo(f"  {_launcher.where_to_find(res)}")
+
+
+@cli.command("launcher",
+             help="Create the Murmurent Dashboard icon: an app in Applications on a "
+                  "Mac, an applications-menu entry on Linux. Run it again to "
+                  "re-create the icon; --remove deletes it.")
+@click.option("--remove", is_flag=True, help="Delete the icon.")
+@click.option("--user", "user", default="",
+              help="Always open the dashboard as this handle (for a shared demo "
+                   "machine). Default: whoever `murmurent init` recorded.")
+def launcher_command(remove: bool, user: str) -> None:
+    from .core import launcher as _launcher
+
+    if remove:
+        res = _launcher.remove()
+        if not res.supported:
+            click.echo("There is no dashboard icon on this platform.")
+        elif res.files:
+            click.echo(f"Removed the dashboard icon ({res.files[0]}).")
+        else:
+            click.echo("There was no dashboard icon to remove.")
+        return
+    res = _launcher.create(user=user.lstrip("@"))
+    if res.supported:
+        click.echo(f"Created {res.location}" + (f" ({res.note})" if res.note else "") + ".")
+    click.echo(_launcher.where_to_find(res))
+
+
+@cli.group("config", help="Settings for this computer.")
+def config_group() -> None:
+    pass
+
+
+@config_group.command("repos-root",
+                      help="Show or set where this computer keeps its git repositories "
+                           "(for example repos, repo or repositories in your home "
+                           "folder). Stored in "
+                           "~/.murmurent/machine.yaml.")
+@click.argument("folder", required=False)
+def config_repos_root(folder: str | None) -> None:
+    from .core import repo as _repo
+
+    if not folder:
+        root, source = _repo.repos_root_and_source()
+        click.echo(f"{root}  (from {source})")
+        return
+    stored = _repo.set_repos_root(folder)
+    click.echo(f"Repositories folder set to {stored}.")
+    if not stored.is_dir():
+        click.echo("  It does not exist yet; it will be created when a repository is first put there.")
+    click.echo("  Repositories already elsewhere are not moved.")
+
+
+@config_group.command("project-layout",
+                      help="Show or set where NEW projects go: 'nested' (a project folder "
+                           "holding its code, manuscript and seminar repositories; the "
+                           "default) or 'flat' (each repository directly in your "
+                           "repositories folder). Existing projects are not moved.")
+@click.argument("layout", required=False, type=click.Choice(["nested", "flat"]))
+def config_project_layout(layout: str | None) -> None:
+    from .core import repo as _repo
+    from .core import repo_paths as _rp
+
+    if not layout:
+        click.echo(_rp.project_layout())
+        return
+    import yaml
+    path = _repo.MACHINE_SETTINGS_FILE
+    data = {}
+    if path.is_file():
+        loaded = yaml.safe_load(path.read_text(encoding="utf-8"))
+        data = loaded if isinstance(loaded, dict) else {}
+    data["project_layout"] = layout
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+    click.echo(f"New projects will be {layout}. Existing projects are not moved "
+               "(to move one: murmurent project gather <name>).")
 
 
 @cli.command("setup", help="Wire the murmurent commons (agents, rules, skills) into ~/.claude/.")
@@ -256,7 +358,7 @@ def host_list_cmd() -> None:
     help="Alias in ~/.ssh/config (e.g. 'lab-server'). Omit to register a local host.",
 )
 @click.option("--remote-user", default="", help="Username on the remote host.")
-@click.option("--project-root", default="~/repos", show_default=True,
+@click.option("--project-root", default=_DEFAULT_REMOTE_PROJECT_ROOT, show_default=True,
               help="Where projects live on the remote host (first repo location).")
 @click.option("--scan-dir", "scan_dirs", multiple=True,
               help="Repo location to scan on the host (repeatable). "
@@ -344,9 +446,12 @@ def repo_status_cmd(target: str, host_name: str | None) -> None:
 @click.option("--lab", default=None,
               help="Owning lab slug (default: this machine's lab).")
 @click.option("--all-agents", is_flag=True,
-              help="Link every agent in the commons (the usual choice).")
+              help="Pin every commons agent to this repo. Rarely needed: every "
+                   "agent already works in every folder.")
 @click.option("--agents", "agents_csv", default=None,
-              help="Comma-separated commons agents to symlink into .claude/agents/.")
+              help="Comma-separated agents to pin to this repo. Default: none. "
+                   "Pinning only matters if this repo must use a specific copy "
+                   "of an agent.")
 @click.option("--host", "host_name", default="local", show_default=True,
               help="'local' or a registered SSH host; remote adopts bootstrap "
                    "over one batched SSH session.")
@@ -370,11 +475,12 @@ def repo_adopt_cmd(path: str, lab: str | None, agents_csv: str | None,
 )
 @click.argument("path", required=False)
 @click.option("--all", "all_repos", is_flag=True,
-              help="Upgrade every murmurent-ready repo under ~/repos.")
+              help="Upgrade every murmurent-ready repo in your repositories folder.")
 @click.option("--add-agents", "add_agents_csv", default=None,
               help="Comma-separated commons agents to ADD to the repo's links.")
 @click.option("--all-agents", is_flag=True,
-              help="Link every agent in the commons (new releases included).")
+              help="Pin every commons agent to this repo (new releases included). "
+                   "Rarely needed: every agent already works in every folder.")
 def repo_upgrade_cmd(path: str | None, all_repos: bool,
                      add_agents_csv: str | None, all_agents: bool) -> None:
     from .commands import repo_cmd as _repo_cmd
@@ -541,7 +647,7 @@ def project_describe(name: str) -> None:
     show_default=True,
     help="Install target. 'local' = this laptop; any other registered host (see "
          "`murmurent host list`) scaffolds the project on that machine over SSH "
-         "and leaves a remote-pointer placeholder in ~/repos/<name>/.",
+         "and leaves a remote-pointer placeholder in your repositories folder.",
 )
 def project_new(
     name: str,
@@ -630,6 +736,44 @@ def project_end(name: str, reason: str) -> None:
     _stub()
 
 
+@project_group.command("gather",
+                       help="Move a project's repositories (code, manuscript, seminar, ...) "
+                            "into one project folder in your repositories folder. Shows the "
+                            "plan; moves nothing without --yes. This computer only.")
+@click.argument("name")
+@click.option("--yes", is_flag=True, help="Carry out the plan shown.")
+def project_gather(name: str, yes: bool) -> None:
+    from .core import project_gather as _pg
+
+    try:
+        plan = _pg.plan(name)
+    except _pg.GatherError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Project folder: {plan.folder}")
+    for move in plan.moves:
+        click.echo(f"  move  {move.source}  ->  {move.target}")
+    for repo_name in plan.already_inside:
+        click.echo(f"  ok    {repo_name} is already inside")
+    for repo_name in plan.not_found:
+        click.echo(f"  skip  {repo_name} is not on this computer")
+    if plan.to_fix_by_hand:
+        click.echo("\nAfter the move, fix these by hand (murmurent cannot update them):")
+        for note in dict.fromkeys(plan.to_fix_by_hand):
+            click.echo(f"  - {note}")
+    if not plan.moves:
+        click.echo("\nNothing to move.")
+        return
+    if not yes:
+        click.echo("\nNothing was moved. Run again with --yes to move these folders.")
+        return
+    try:
+        for line in _pg.apply(plan):
+            click.echo(f"moved {line}")
+    except (_pg.GatherError, OSError) as exc:
+        raise click.ClickException(f"stopped: {exc}") from exc
+    click.echo("Done. Other members' copies are not affected; murmurent finds each copy on its own machine.")
+
+
 @project_group.command("archive", help="(PI) Archive a project repo + data.")
 @click.argument("name")
 def project_archive(name: str) -> None:
@@ -659,14 +803,14 @@ def project_backfill() -> None:
     except _cp.CertProjectError as exc:
         raise click.ClickException(str(exc)) from exc
     if not names:
-        click.echo("No CHARTER projects found under ~/repos to backfill.")
+        click.echo(f"No CHARTER projects found under {_repos_display()} to backfill.")
         return
     click.echo(f"✓ backfilled {len(names)} project(s) into the cert-project "
                f"registry: {', '.join(sorted(names))}")
 
 
 @project_group.command("migrate-charters",
-                       help="One-shot: backfill every ~/repos/*/CHARTER.md into the "
+                       help="One-shot: backfill every CHARTER.md in your repositories folder into the "
                             "cert-project registry, then delete the CHARTER files "
                             "whose migration is verified. --keep skips deletion.")
 @click.option("--keep", is_flag=True, default=False,
@@ -678,7 +822,7 @@ def project_migrate_charters(keep: bool) -> None:
     except _cp.CertProjectError as exc:
         raise click.ClickException(str(exc)) from exc
     if not out["migrated"]:
-        click.echo("No CHARTER projects found under ~/repos to migrate.")
+        click.echo(f"No CHARTER projects found under {_repos_display()} to migrate.")
         return
     click.echo(f"✓ migrated {len(out['migrated'])} project(s) into the "
                f"cert-project registry: {', '.join(sorted(out['migrated']))}")
@@ -727,6 +871,31 @@ def project_provision_slack(name: str) -> None:
         for p in g["pending"]:
             link = f" — {p['invite_link']}" if p.get("invite_link") else ""
             click.echo(f"  ⏳ {p['handle']}: {p['status']}{link} [{p['detail']}]")
+
+
+@project_group.command("rename-slack",
+                       help="(PI) Rename the cert-project's Slack channel. With no "
+                            "--to, renames it to the standard proj-<project> name.")
+@click.argument("name")
+@click.option("--to", "new_name", default="",
+              help="The new channel name. Default: proj-<project>.")
+def project_rename_slack(name: str, new_name: str) -> None:
+    from .core import cert_provision as _cprov
+    try:
+        out = _cprov.rename_slack(name, new_name or None)
+    except _cprov.CertProvisionError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not out["ok"]:
+        hint = ""
+        if out["detail"] in ("not_in_channel", "channel_not_found"):
+            hint = " The bot must be in the channel; invite it once, then retry."
+        elif out["detail"] == "missing_scope":
+            hint = " Add the channels:manage and groups:write scopes to the bot."
+        elif out["detail"] == "name_taken":
+            hint = " Another channel already has that name; pick one with --to."
+        raise click.ClickException(
+            f"could not rename the channel ({out['detail']}).{hint}")
+    click.echo(f"✓ channel renamed to #{out['name']} ({out['channel_id']}).")
 
 
 @project_group.command("provision-github",

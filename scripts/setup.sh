@@ -302,32 +302,19 @@ else
 fi
 
 # ── One-click dashboard launcher (every member: mayor, PI, member) ────────────
-# Gives anyone a menu/Dock icon that starts the dashboard and opens it in their
-# browser. macOS gets a ~/Applications/*.app bundle; Linux gets a freedesktop
-# .desktop entry in the applications menu — distro-agnostic, so it works on
-# Linux Mint, Ubuntu, Fedora, and any XDG-compliant desktop. Best-effort;
-# other platforms skip with a note.
+# `murmurent launcher` makes the icon on every install route (#156): an app in
+# ~/Applications on a Mac, an applications-menu entry on Linux.
 echo
 echo "Dashboard launcher:"
-case "$(uname -s)" in
-  Darwin)
-    if bash "$REPO_DIR/scripts/create_mac_app.sh" >/dev/null 2>&1; then
-      ok "created ~/Applications/Murmurent Dashboard.app — drag it to your Dock for one-click access"
-    else
-      warn "couldn't create the launcher app (run scripts/create_mac_app.sh manually)"
-    fi
-    ;;
-  Linux)
-    if bash "$REPO_DIR/scripts/create_linux_launcher.sh" >/dev/null 2>&1; then
-      ok "added \"Murmurent Dashboard\" to your applications menu (search \"murmurent\")"
-    else
-      warn "couldn't create the launcher (run scripts/create_linux_launcher.sh manually)"
-    fi
-    ;;
-  *)
-    warn "unrecognised platform — skipping the launcher (create one for your OS manually)"
-    ;;
-esac
+if command -v murmurent >/dev/null 2>&1; then
+  if murmurent launcher; then
+    :
+  else
+    warn "couldn't create the dashboard icon (run: murmurent launcher)"
+  fi
+else
+  warn "murmurent CLI not found; skipping the dashboard icon (later: murmurent launcher)"
+fi
 
 echo
 echo "Done. Verify with:"

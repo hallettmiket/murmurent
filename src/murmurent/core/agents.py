@@ -46,7 +46,11 @@ class AgentRecord:
 
 def agents_dir(repo_root: Path | None = None) -> Path:
     """Return the path to the agents directory inside the murmurent repo."""
-    base = repo_root if repo_root is not None else murmurent_repo_root()
+    if repo_root is not None:
+        base = repo_root
+    else:
+        from .commons import commons_root
+        base = commons_root()
     return base / AGENTS_DIRNAME
 
 

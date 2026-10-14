@@ -1,0 +1,418 @@
+1
+00:00:02,000 --> 00:00:03,350
+Welcome to Murmurent.
+
+2
+00:00:03,400 --> 00:00:07,210
+In the next few minutes, you'll install it, tell it who you are,
+
+3
+00:00:07,260 --> 00:00:12,840
+and see how members, labs, and whole research centres connect
+through the public hub.
+
+4
+00:00:14,390 --> 00:00:20,760
+Murmurent is shared agentic AI infrastructure for research, built on top
+of Claude Code.
+
+5
+00:00:20,810 --> 00:00:26,490
+At its heart is a village of AI agents: specialists that live side by side,
+
+6
+00:00:26,540 --> 00:00:29,850
+follow shared rules, and work for every member.
+
+7
+00:00:29,900 --> 00:00:33,310
+The people stay organised the way they already are.
+
+8
+00:00:33,360 --> 00:00:38,070
+Individual members belong to groups: a lab, or a core facility,
+
+9
+00:00:38,120 --> 00:00:42,330
+each led by a PI Groups come together on projects.
+
+10
+00:00:42,380 --> 00:00:46,460
+And a centre's administration, run by a mayor, keeps the registry.
+
+11
+00:00:46,510 --> 00:00:50,630
+Every group keeps authority over its own people and its own data.
+
+12
+00:00:50,680 --> 00:00:54,020
+We call that choreography, not orchestration.
+
+13
+00:00:55,570 --> 00:00:56,770
+Here's the plan.
+
+14
+00:00:56,820 --> 00:00:59,070
+Install Murmurent, and check it.
+
+15
+00:00:59,120 --> 00:01:00,560
+Tell it who you are.
+
+16
+00:01:00,610 --> 00:01:04,360
+Make a project folder Murmurent-ready, and meet the agents.
+
+17
+00:01:04,410 --> 00:01:09,330
+Then join a lab or a centre, and find shared workflows in the public hub.
+
+18
+00:01:10,880 --> 00:01:15,050
+Before you start, you'll need a terminal on a Mac or Linux machine,
+
+19
+00:01:15,100 --> 00:01:18,920
+git, and Claude Code, installed and signed in.
+
+20
+00:01:18,970 --> 00:01:21,690
+You don't need to install Python yourself.
+
+21
+00:01:21,740 --> 00:01:26,730
+The installer fetches Python 3.12 if your system doesn't have it.
+
+22
+00:01:28,280 --> 00:01:30,450
+Step one: install.
+
+23
+00:01:30,500 --> 00:01:34,276
+The recommended route uses uv, a fast Python tool installer.
+
+24
+00:01:34,326 --> 00:01:37,000
+If you don't have it yet, one line installs it.
+
+25
+00:01:37,050 --> 00:01:39,760
+Then run: uv tool install murmurent.
+
+26
+00:01:39,810 --> 00:01:43,370
+Followed by: murmurent install.
+
+27
+00:01:43,420 --> 00:01:47,152
+That wires the shared agents, rules, and skills into Claude Code,
+
+28
+00:01:47,202 --> 00:01:54,290
+registers the data-governance hooks, and creates your personal
+identity key.
+
+29
+00:01:54,340 --> 00:01:59,090
+If your shell can't find the command afterwards, just open a new
+terminal.
+
+30
+00:02:00,640 --> 00:02:03,350
+Step two: check the install.
+
+31
+00:02:03,400 --> 00:02:07,380
+murmurent doctor checks your Python, the agent, rule,
+
+32
+00:02:07,430 --> 00:02:11,190
+and skill links in Claude Code, and the registered hooks.
+
+33
+00:02:11,240 --> 00:02:15,200
+Every problem it finds comes with the one command that fixes it.
+
+34
+00:02:15,250 --> 00:02:19,370
+Run it any time, and again after every upgrade.
+
+35
+00:02:20,920 --> 00:02:24,160
+Step three: tell Murmurent who you are.
+
+36
+00:02:24,210 --> 00:02:31,090
+murmurent init records your handle, name, email, institutional handle,
+GitHub, and Slack.
+
+37
+00:02:31,140 --> 00:02:33,390
+You'll pick one of three roles.
+
+38
+00:02:33,440 --> 00:02:35,923
+A member, who works in a lab or core.
+
+39
+00:02:35,973 --> 00:02:37,720
+A PI, who leads one.
+
+40
+00:02:37,770 --> 00:02:42,800
+Or a mayor, who runs a centre made of many labs and cores.
+
+41
+00:02:42,850 --> 00:02:46,670
+murmurent whoami shows your handle and key, any time.
+
+42
+00:02:48,220 --> 00:02:54,270
+Step four: Murmurent works inside git repositories, kept under your
+repos folder.
+
+43
+00:02:54,320 --> 00:02:56,240
+Ask first, with: murmurent repo status.
+
+44
+00:02:56,290 --> 00:02:59,940
+A plain clone gets: repo adopt.
+
+45
+00:02:59,990 --> 00:03:05,190
+That adds a small marker file and links to the shared agents,
+
+46
+00:03:05,240 --> 00:03:07,510
+and leaves everything else untouched.
+
+47
+00:03:07,560 --> 00:03:10,760
+Commit both, so every clone is ready too.
+
+48
+00:03:10,810 --> 00:03:14,990
+A folder set up by an older release gets: repo upgrade.
+
+49
+00:03:15,040 --> 00:03:18,520
+When the verdict says ready, open Claude Code there.
+
+50
+00:03:20,070 --> 00:03:24,310
+Inside Claude Code, you'll meet the village itself: the commons,
+
+51
+00:03:24,360 --> 00:03:29,070
+a set of reference agents every member shares, each addressed by
+name.
+
+52
+00:03:29,120 --> 00:03:32,080
+The Oracle is your personal research memory.
+
+53
+00:03:32,130 --> 00:03:35,140
+The Bookworm handles literature and databases.
+
+54
+00:03:35,190 --> 00:03:38,480
+The Blacksmith does computation and statistics.
+
+55
+00:03:38,530 --> 00:03:40,510
+The Artist makes figures.
+
+56
+00:03:40,560 --> 00:03:42,850
+The Adversary audits your methods.
+
+57
+00:03:42,900 --> 00:03:45,610
+The Teacher explains things in plain words.
+
+58
+00:03:45,660 --> 00:03:50,040
+And the Conscience, the Lawyer, and the Security Guard review equity,
+
+59
+00:03:50,090 --> 00:03:52,670
+intellectual property, and secrets.
+
+60
+00:03:52,720 --> 00:03:56,540
+Every agent opens its reply with a one-line verdict.
+
+61
+00:03:58,090 --> 00:04:02,850
+If your PI already runs Murmurent, joining their lab takes a few
+commands.
+
+62
+00:04:02,900 --> 00:04:05,860
+You'll need to be in your lab's Slack workspace.
+
+63
+00:04:05,910 --> 00:04:08,930
+Run murmurent enroll, with your lab's name,
+
+64
+00:04:08,980 --> 00:04:12,750
+and send the request file to your PI by direct message.
+
+65
+00:04:12,800 --> 00:04:17,670
+They issue a signed member card, and send it back.
+
+66
+00:04:17,720 --> 00:04:20,990
+Before you import it, confirm the trust root, a short public key,
+
+67
+00:04:21,040 --> 00:04:25,800
+with your PI in person or by phone, not in the same message.
+
+68
+00:04:25,850 --> 00:04:31,620
+Then run import-card with that trust root, and whoami will show your
+lab and role.
+
+69
+00:04:31,670 --> 00:04:36,470
+Finally, clone your lab's governance repository to see the whole roster.
+
+70
+00:04:38,020 --> 00:04:42,950
+PIs joining a centre start at the public hub: murmurent_public, on
+GitHub.
+
+71
+00:04:43,000 --> 00:04:45,350
+Find your institution in the directory.
+
+72
+00:04:45,400 --> 00:04:47,420
+Download and run the join script.
+
+73
+00:04:47,470 --> 00:04:53,250
+It asks a few questions, encrypts your request to the centre's key, and
+opens your email app.
+
+74
+00:04:53,300 --> 00:04:55,180
+Just press Send.
+
+75
+00:04:55,230 --> 00:04:59,200
+Only the mayor can read it, and nothing about you is posted publicly.
+
+76
+00:04:59,250 --> 00:05:02,990
+Once they approve, you receive your PI ID Import it,
+
+77
+00:05:03,040 --> 00:05:07,710
+and you become your lab's certificate authority, issuing cards to your
+own members.
+
+78
+00:05:09,260 --> 00:05:12,760
+Mayors set up a centre once, with murmurent centre-init,
+
+79
+00:05:12,810 --> 00:05:15,500
+giving just a name and an institution.
+
+80
+00:05:15,550 --> 00:05:19,120
+Then, centre-hub-publish lists the centre in the directory,
+
+81
+00:05:19,170 --> 00:05:25,390
+along with its signing key and revocation list, so anyone can verify the
+IDs it issues.
+
+82
+00:05:26,940 --> 00:05:35,010
+The hub also indexes choreographies: recurring workflows that several
+people carry out together, each in its own repository.
+
+83
+00:05:35,060 --> 00:05:38,720
+murmurent choreography list shows what's published.
+
+84
+00:05:38,770 --> 00:05:41,500
+Choreography install, followed by a name,
+
+85
+00:05:41,550 --> 00:05:45,370
+like the example, inhibition, sets one up for you.
+
+86
+00:05:45,420 --> 00:05:47,960
+Start your own with choreography init.
+
+87
+00:05:48,010 --> 00:05:50,510
+To publish it, push the repository,
+
+88
+00:05:50,560 --> 00:05:54,560
+and open a pull request that adds one row to the hub's index.
+
+89
+00:05:54,610 --> 00:05:58,140
+Choreographies hold code and documentation only.
+
+90
+00:05:58,190 --> 00:06:01,460
+Data stays in your centre's governed data root.
+
+91
+00:06:03,010 --> 00:06:03,840
+Stuck?
+
+92
+00:06:03,890 --> 00:06:05,950
+Just ask Claude Code.
+
+93
+00:06:06,000 --> 00:06:09,887
+Murmurent wires its own docs and commands into every session,
+
+94
+00:06:09,937 --> 00:06:13,510
+so: walk me through installing Murmurent, really works.
+
+95
+00:06:13,560 --> 00:06:17,070
+Run murmurent doctor whenever something feels off.
+
+96
+00:06:17,120 --> 00:06:21,400
+Report bugs and request features on the murmurent_dev repository.
+
+97
+00:06:21,450 --> 00:06:24,550
+Issues on the public hub are turned off on purpose,
+
+98
+00:06:24,600 --> 00:06:29,030
+so never post personal details, or a join request, there.
+
+99
+00:06:30,580 --> 00:06:34,300
+To recap: install, run doctor, init, and adopt a repository.
+
+100
+00:06:34,350 --> 00:06:42,580
+Then enroll as a member, or join a centre as a PI The full documentation
+is linked on screen.
+
+101
+00:06:42,630 --> 00:06:44,850
+Now, go and meet your agents.

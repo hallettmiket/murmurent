@@ -75,7 +75,7 @@ the lab's data root.
 | <a id="RAW-LAB-ONLY-01"></a>`RAW-LAB-ONLY-01` | warn | File under `immutable/` is world-readable. Same caveat. |
 | <a id="REFINED-LAB-WRITE-01"></a>`REFINED-LAB-WRITE-01` | warn / block | File in `append_only/` is world-readable (warn) or world-writable (block). Same caveat. |
 | <a id="REFINED-NO-TOOLS-01"></a>`REFINED-NO-TOOLS-01` | info | Executable bit set on an `append_only/` file: tools should live under a tools/ or db/ area, not `append_only/`. |
-| <a id="HOME-REPO-PRIVATE-01"></a>`HOME-REPO-PRIVATE-01` | warn | File in `~/repos/<project>/` is group/world-readable on a shared host. |
+| <a id="HOME-REPO-PRIVATE-01"></a>`HOME-REPO-PRIVATE-01` | warn | File in a project repo in your repositories folder (`~/repos/<project>/` unless you chose another folder) is group/world-readable on a shared host. |
 | <a id="HOME-REPO-LARGE-01"></a>`HOME-REPO-LARGE-01` | warn | Tracked file > `--repo-large-mb` (default 50 MB) and not in `.gitignore`. |
 | <a id="HOME-REPO-GIT-SECRET-01"></a>`HOME-REPO-GIT-SECRET-01` | block | Tracked filename matches a secret pattern (`*.env`, `*.pem`, `*_rsa`, `*.key`, `id_*`, etc.). |
 | <a id="GITHUB-PUBLIC-01"></a>`GITHUB-PUBLIC-01` | info | A Murmurent project's GitHub origin is `public`: verify intentional. *(Implemented dashboard-side, not in the bash scanner.)* |

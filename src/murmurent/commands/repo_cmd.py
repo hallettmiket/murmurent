@@ -44,11 +44,9 @@ def _looks_like_path(target: str) -> bool:
 
 
 def _clone_verdict(clone: _inv.RepoOnHost) -> str:
-    if clone.has_marker and clone.has_claude_dir:
-        return "ready"
-    if clone.has_marker or clone.has_claude_dir:
-        return "partial"
-    return "plain clone"
+    # The marker alone decides (PR #167). The machine scan does not look for a
+    # legacy CHARTER.md, so there is no "partial" here.
+    return "ready" if clone.has_marker else "plain clone"
 
 
 def cmd_list(host_filter: str | None) -> int:
@@ -99,10 +97,30 @@ def _print_status(st: _adopt.AdoptionStatus) -> None:
     click.echo(f"  readiness marker  {mark(st.has_marker)}"
                + ("  (legacy CHARTER.md — run `murmurent repo upgrade`)"
                   if st.legacy_charter and not st.has_marker else ""))
-    click.echo(f"  .claude/agents/   {mark(st.has_claude_agents)}")
+    click.echo(f"  pinned agents     {mark(st.has_claude_agents)}"
+               "  (optional; every agent works here anyway)")
     if st.bootstrap_version:
         click.echo(f"  bootstrapped by   murmurent {st.bootstrap_version}")
     _print_follows(Path(st.path))
+    _print_committed_links(Path(st.path))
+
+
+def _print_committed_links(repo: Path) -> None:
+    """Flag agent links that git tracks (issue #150).
+
+    Each link points into one member's own home folder, so once committed it
+    breaks those agents for everyone else working in the repo.
+    """
+    from ..core import agent_links as _al
+
+    committed = _al.tracked_machine_links(repo)
+    if not committed:
+        return
+    click.echo(f"  ! committed links {len(committed)} agent link(s) are in git and "
+               "point into one person's home folder:")
+    for path, target in committed:
+        click.echo(f"      {path} -> {target}")
+    click.echo(f"  fix:              {_al.repair_hint(repo)}")
 
 
 def _print_follows(repo: Path) -> None:
@@ -271,8 +289,13 @@ def cmd_upgrade(*, path: str | None, all_repos: bool,
                   if add_agents_csv else None)
     targets: list[Path] = []
     if all_repos:
-        repos_root = Path.home() / "repos"
-        for child in sorted(repos_root.iterdir()) if repos_root.is_dir() else []:
+        from ..core.repo import repos_root as _repos_root
+        repos_root = _repos_root()
+        # A project folder (#166) holds repositories one level down; include them.
+        tops = sorted(repos_root.iterdir()) if repos_root.is_dir() else []
+        nested = [g for t in tops if t.is_dir() and not (t / ".git").exists()
+                  for g in sorted(t.iterdir()) if g.is_dir() and (g / ".git").exists()]
+        for child in tops + nested:
             if not child.is_dir():
                 continue
             r = _rr.readiness(child)
@@ -280,7 +303,7 @@ def cmd_upgrade(*, path: str | None, all_repos: bool,
                 targets.append(child)
         if not targets:
             if not quiet:
-                click.echo("no murmurent-ready repos found under ~/repos")
+                click.echo(f"no murmurent-ready repos found under {repos_root}")
             return 0
     elif path:
         targets = [Path(path).expanduser()]

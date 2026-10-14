@@ -40,7 +40,9 @@ graph view in Obsidian resolves them.
 
 ## Lab Oracle
 
-Lives in `~/repos/murmurent_lab_mgmt_<lab>/oracle/` (the lab-mgmt git repo). The
+Lives in `~/repos/murmurent_lab_mgmt_<lab>/oracle/` (the lab-mgmt git repo, in
+your repositories folder: `~/repos` unless you chose another;
+`murmurent config repos-root` shows it). The
 [`lab_oracle` agent](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md) is read-only: its
 toolset excludes Write by design. Entries arrive only via the
 publish flow.

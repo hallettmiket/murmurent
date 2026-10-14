@@ -38,7 +38,11 @@ dependencies = [
     "sse-starlette>=2.0",
     "slack-sdk>=3.30",
     "anthropic>=0.40",
-    "mcp>=1.0",
+    # Held below 2.0: mcp 2.x renamed FastMCP (mcp.server.fastmcp), which all
+    # four murmurent MCP servers import, so a fresh install that resolved mcp
+    # 2.x got servers that crashed on start (issue #159). Lift the cap only
+    # together with a port of the servers to the 2.x API.
+    "mcp>=1.0,<2",
     # ed25519 identity-card signing (core/idkeys.py). Hard dep — the identity
     # chain must be available in every install, not gated behind an extra.
     "cryptography>=42",
@@ -63,7 +67,7 @@ docs = [
     "mkdocs-material>=9.5",
 ]
 mcp = [
-    "mcp>=1.0",
+    "mcp>=1.0,<2",
 ]
 dashboard = [
     "streamlit>=1.30",
@@ -113,6 +117,19 @@ exclude = ["rules/local", "rules/local/**"]
 # CLAUDE.md is what tells a Claude Code session what murmurent is. A package
 # install that omits it leaves the agents wired but unexplained.
 "CLAUDE.md" = "murmurent/commons/CLAUDE.md"
+# The plain-English output style, linked into ~/.claude/output-styles/ by
+# `murmurent setup`. Missing from the wheel until #159, so a PyPI install had
+# no style to select in /config.
+"output_styles" = "murmurent/commons/output_styles"
+# The agent-activity hook is a bash script. Without it in the wheel, the hook
+# pointed at ~/repos/murmurent/scripts/, which a PyPI install never has (#159).
+"scripts/murmurent_log_agent_event.sh" = "murmurent/commons/scripts/murmurent_log_agent_event.sh"
+# The dashboard icon's image, read by core/launcher.py (#156). Without it a
+# PyPI install made the icon with a generic picture, or could not make it at all.
+"assets/murmurent_app_icon.png" = "murmurent/commons/assets/murmurent_app_icon.png"
+# The adversary's only source for TRIPOD+AI, PROBAST+AI and REMARK items (#155).
+# It may not browse, so a PyPI install without this file could not run the check.
+"docs/reporting_guidelines.md" = "murmurent/commons/docs/reporting_guidelines.md"
 
 [tool.hatch.build.targets.sdist]
 # The sdist is what PyPI keeps as the buildable source, so it needs the same
@@ -123,6 +140,8 @@ include = [
     "rules",
     "skills",
     "templates",
+    "output_styles",
+    "assets/murmurent_app_icon.png",
     "scripts",
     "docs",
     "README.md",

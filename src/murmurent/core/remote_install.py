@@ -23,6 +23,8 @@ zero additional auth handshakes.
 
 from __future__ import annotations
 
+import re
+
 import shlex
 from dataclasses import dataclass
 
@@ -30,6 +32,32 @@ from . import hosts as _hosts
 from . import remote as _remote
 from .preflight import Probe
 
+
+
+_SHELL_DIR_RE = re.compile(r"^[A-Za-z0-9_./~-]+$")
+
+
+def shell_dir(path: str) -> str:
+    """A remote folder as the remote shell should see it: ``~/repos`` becomes
+    ``$HOME/repos`` so the remote expands it. Only plain path characters are
+    allowed, so the value can sit inside double quotes safely (#166)."""
+    p = (path or "").strip().rstrip("/") or "~"
+    if not _SHELL_DIR_RE.match(p) or ".." in p.split("/"):
+        raise ValueError(f"unsafe folder for a remote shell: {path!r}")
+    if p == "~":
+        return "$HOME"
+    if p.startswith("~/"):
+        return "$HOME/" + p[2:]
+    return p
+
+
+#: Shell lines that set REPOS (the remote's repositories folder) and WIG (its
+#: copy of the murmurent commons). The commons is looked for as ``murmurent``
+#: first, then under its former name ``wigamig``, so existing servers keep working.
+def commons_lines(repos_dir: str) -> list[str]:
+    return [f'REPOS="{shell_dir(repos_dir)}"',
+            'WIG="$REPOS/murmurent"',
+            '[ -d "$WIG/agents" ] || WIG="$REPOS/wigamig"']
 
 @dataclass
 class InstallTargets:
@@ -53,6 +81,9 @@ class InstallTargets:
     # validated against ``[A-Za-z0-9_-]+`` to keep them safe to inline
     # into the shell snippet.
     agents: list[str] | None = None
+    # The remote's repositories folder, from its host record (#166). Never
+    # assume ~/repos for a machine that recorded something else.
+    repos_dir: str = _hosts.DEFAULT_REMOTE_PROJECT_ROOT
 
 
 def build_script(t: InstallTargets) -> str:
@@ -115,13 +146,14 @@ def build_script(t: InstallTargets) -> str:
     if t.repo_url:
         url_q = shlex.quote(t.repo_url)
         lines.append(
-            f'DEST="$HOME/repos/{project}"; '
+            "; ".join(commons_lines(t.repos_dir)) + "; "
+            f'DEST="$REPOS/{project}"; '
             f'if [ -d "$DEST/.git" ]; then '
             f'  echo "repo:ok:already cloned at $DEST"; '
             # First attempt: ensure parent + clone, capturing combined
             # stdout/stderr so we can show the real failure reason on
             # the no-luck branch instead of swallowing it.
-            f'elif mkdir -p "$HOME/repos" && '
+            f'elif mkdir -p "$REPOS" && '
             f'     CLONE_LOG=$(git clone {url_q} "$DEST" 2>&1) && '
             f'     [ -d "$DEST/.git" ]; then '
             f'  echo "repo:ok:cloned {t.repo_url} into $DEST"; '
@@ -146,8 +178,8 @@ def build_script(t: InstallTargets) -> str:
         # name is safe (validated above). Keep it terse — a minimum
         # viable stub that the user / agents can expand later.
         lines.append(
-            f'DEST="$HOME/repos/{project}"; '
-            f'WIG="$HOME/repos/wigamig"; '
+            "; ".join(commons_lines(t.repos_dir)) + "; "
+            f'DEST="$REPOS/{project}"; '
             f'if [ -d "$DEST/.git" ] && [ -d "$WIG/agents" ]; then '
             f'  mkdir -p "$DEST/.claude/agents"; '
             # Sweep stale agent symlinks. Re-install with a different
@@ -159,13 +191,19 @@ def build_script(t: InstallTargets) -> str:
             f'    [ -L "$f" ] || continue; '
             f'    target=$(readlink "$f"); '
             f'    case "$target" in '
-            f'      */repos/wigamig/agents/*) rm -f "$f" ;; '
+            f'      "$WIG"/agents/*) rm -f "$f" ;; '
             f'    esac; '
             f'  done; '
             f'  for a in {agents_csv}; do '
             f'    src="$WIG/agents/$a.md"; '
-            f'    if [ -f "$src" ]; then '
+            # A real file is the group's own agent: keep it. Each link made
+            # points into this member's home, so list it in .gitignore (#150).
+            f'    if [ -e "$DEST/.claude/agents/$a.md" ] && [ ! -L "$DEST/.claude/agents/$a.md" ]; then '
+            f'      echo "cc_agent:ok:$a (kept your own file)"; '
+            f'    elif [ -f "$src" ]; then '
             f'      ln -sfn "$src" "$DEST/.claude/agents/$a.md"; '
+            f'      grep -qxF ".claude/agents/$a.md" "$DEST/.gitignore" 2>/dev/null '
+            f'        || echo ".claude/agents/$a.md" >> "$DEST/.gitignore"; '
             f'      echo "cc_agent:ok:$a -> wigamig/agents/$a.md"; '
             f'    else '
             f'      echo "cc_agent:warn:$a (no $a.md in murmurent commons)"; '
@@ -181,7 +219,7 @@ def build_script(t: InstallTargets) -> str:
             f'\n'
             f'## Agents wired up for this project\n'
             f'\n'
-            f'See `.claude/agents/` — symlinks into `~/repos/wigamig/agents/`.\n'
+            f'See `.claude/agents/` — symlinks into `$WIG/agents/`.\n'
             f'Selected at install time: {agents_csv or "(none)"}.\n'
             f'\n'
             f'## Data locations\n'
@@ -192,7 +230,7 @@ def build_script(t: InstallTargets) -> str:
             f'\n'
             f'## murmurent commons\n'
             f'\n'
-            f'Lab-wide agents + rules live in `~/repos/wigamig/`. This project\n'
+            f'Lab-wide agents + rules live in `$WIG/`. This project\n'
             f'inherits from there; project-specific overrides go in `.claude/`.\n'
             f'__EOF__\n'
             f'    echo "cc_claude_md:ok:created $DEST/CLAUDE.md"; '

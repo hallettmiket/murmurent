@@ -94,7 +94,7 @@ that ingests curated entries through a reviewed publication step.
 
 | | Personal Oracle | Lab Oracle |
 |---|---|---|
-| Where it lives | `<vault>/oracle/` (the member's own Obsidian vault) | `~/repos/murmurent_lab_mgmt_<lab>/oracle/` (the lab-mgmt git repo) |
+| Where it lives | `<vault>/oracle/` (the member's own Obsidian vault) | `~/repos/murmurent_lab_mgmt_<lab>/oracle/` (the lab-mgmt git repo, in your repositories folder: `~/repos` unless you chose another; `murmurent config repos-root` shows it) |
 | Agent | [`oracle`](https://github.com/hallettmiket/murmurent/blob/main/agents/oracle.md), reads and writes | [`lab_oracle`](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md), **read-only** (`Write` excluded from its toolset) |
 | Audience | The member alone | Every lab member, across personnel turnover |
 | Lifetime | As long as the member keeps the vault | Indefinite; version-controlled, reviewed |

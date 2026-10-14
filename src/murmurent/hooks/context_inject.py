@@ -159,7 +159,7 @@ def _readiness_notice(start: str | None = None) -> str | None:
         if not foreign:
             return None
 
-        return "\n".join([
+        lines = [
             "<system-reminder>",
             "murmurent readiness (auto-injected):",
             "- this folder's agent files point into "
@@ -169,11 +169,33 @@ def _readiness_notice(start: str | None = None) -> str | None:
               "is using a different version of those agents from the rest of "
               "the machine.",
             f"- fix: murmurent repo upgrade {repo} --all-agents",
-            "</system-reminder>",
-        ])
+        ]
+        # A link into someone else's home folder almost always means another
+        # member committed their own links and this copy pulled them (#150).
+        # Relinking alone will not stick: git will keep offering the links
+        # back. `repo status` names the committed links and the repair.
+        home = Path.home().resolve()
+        if any(not _is_under(f, home) for f in foreign):
+            lines.append(
+                "- these links lead into another person's home folder, which "
+                "usually means someone committed their agent links to git. "
+                f"Run `murmurent repo status {repo}` for the repair."
+            )
+        lines.append("</system-reminder>")
+        return "\n".join(lines)
     except Exception:  # noqa: BLE001
         # A hook that throws blocks the prompt. Nothing here is worth that.
         return None
+
+
+def _is_under(path: Path, parent: Path) -> bool:
+    """True if ``path`` is ``parent`` or inside it. Never touches the disk
+    beyond normalising, because the other person's folder is often unreadable."""
+    try:
+        Path(os.path.normpath(path)).relative_to(parent)
+    except ValueError:
+        return False
+    return True
 
 
 def _resolve_role(at_handle: str, meta: dict[str, Any], members: list[str]) -> str:

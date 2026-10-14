@@ -92,6 +92,22 @@ def _offer_vault_init(
     return {"status": "created", "result": out}
 
 
+def _ask_repos_root() -> None:
+    """Ask once where this machine keeps its git repositories, and record it."""
+    from ..core import repo as _repo
+
+    current, source = _repo.repos_root_and_source()
+    default = current if "default" not in source else _repo.suggest_repos_root()
+    try:
+        shown = "~/" + str(default.relative_to(Path.home()))
+    except ValueError:
+        shown = str(default)
+    answer = click.prompt(
+        "\nWhere do you keep your git repositories on this computer?", default=shown).strip()
+    stored = _repo.set_repos_root(answer or shown)
+    click.echo(f"✓ repositories folder: {stored} (change it later with: murmurent config repos-root <folder>)")
+
+
 def run_init() -> None:
     from ..core import idkeys as _k
     from ..core import identity as _id
@@ -146,6 +162,11 @@ def run_init() -> None:
 
     profile_path().write_text(yaml.safe_dump(profile, sort_keys=False), encoding="utf-8")
     click.echo(f"\n✓ saved your profile to {profile_path()}")
+
+    # 5a. Where this machine keeps repositories (#166). Asked before the vault
+    # step, whose default location is built from it. People use ~/repos,
+    # ~/repo, ~/repositories and others; murmurent should not assume.
+    _ask_repos_root()
 
     # 5b. Offer to create the member's PERSONAL vault (murmurent_vault) now —
     # PROMPTED, never silent (it needs their gh auth + the location is a personal

@@ -13,7 +13,7 @@ You do not need a repository first.
 
 | Step | What happens |
 |---|---|
-| Folder | Creates `~/repos/<name>/` with `exp/`, `src/`, `obsolete/`, `data/` and `decisions/`, plus a README, a decision-log guide and a failure catalogue (`how_this_project_breaks.md`) |
+| Folder | Creates the repository in a project folder in your repositories folder, `~/repos/<name>/<name>/` by default (your repositories folder may differ; `murmurent config repos-root` shows it), with `exp/`, `src/`, `obsolete/`, `data/` and `decisions/`, plus a README, a decision-log guide and a failure catalogue (`how_this_project_breaks.md`) |
 | Git | Starts tracking the folder with git |
 | Ready | Makes it murmurent-ready, so the patient-data check runs inside it |
 | Declared | Writes the choreography's description into `.murmurent.yaml`, which is what `murmurent choreography install` reads |

@@ -124,7 +124,8 @@ def clone_choreography(url: str, *, dest: Path | None = None,
     name = _name_from_url(url)
     if not name:
         raise ChoreographyError(f"cannot work out a directory name from {url!r}")
-    target = Path(dest) if dest else _repo.repos_root() / name
+    from . import repo_paths as _rp
+    target = Path(dest) if dest else (_rp.find(name) or _rp.new_project_repo(name))
     if target.exists():
         raise ChoreographyError(
             f"{target} already exists. Move it aside, or point --dest elsewhere."

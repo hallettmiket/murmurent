@@ -64,6 +64,7 @@ exclude_docs: |
   backlog.md
   cores_plan.md
   cores_smoke_runbook.md
+  scientific_writing.md
   designer_dashboard/
   murmurent_public/
   diagrams/README.md
@@ -73,6 +74,7 @@ nav:
   - Getting started:
       - Why Murmurent? (five vignettes): getting_started.md
       - Install & setup: setup.md
+      - "Installing: special cases": install_special_cases.md
       - Preparing GitHub: github_setup.md
       - Firing up the dashboard: dashboard.md
       - Remote dashboard access: remote_dashboard.md
@@ -128,6 +130,7 @@ nav:
       - Security dashboard: security-dashboard.md
   - Reference:
       - CLI manual: cli_manual.md
+      - "Reporting checklists (TRIPOD+AI, PROBAST+AI, REMARK)": reporting_guidelines.md
       - Architecture diagrams: diagrams.md
       - Versioning: versioning.md
       - Code style: style/code-style.md

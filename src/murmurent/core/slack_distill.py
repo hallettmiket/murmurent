@@ -162,7 +162,8 @@ def make_llm() -> LLMLike:
 
 def oracle_system_prompt() -> str:
     """Read agents/oracle.md as the LLM's system prompt."""
-    path = murmurent_repo_root() / ORACLE_AGENT_FILE
+    from .commons import commons_root
+    path = commons_root() / ORACLE_AGENT_FILE
     if not path.is_file():
         return "You are the Oracle agent. Distill carefully."
     return parse_file(path).body

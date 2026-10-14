@@ -66,7 +66,8 @@ Once `gh auth status` shows you logged in, two things get you fully set up:
    [`vault-setup.md`](vault-setup.md).
 2. **Your lab's governance repo.** Your PI (say, `@the_pi`) grants you
    read access to `murmurent_lab_mgmt_<lab>` on GitHub. Accept the
-   invitation email, then clone it:
+   invitation email, then clone it into your repositories folder (`~/repos`
+   unless you chose another; `murmurent config repos-root` shows it):
 
    ```bash
    git clone git@github.com:example_org/murmurent_lab_mgmt_example_lab.git \

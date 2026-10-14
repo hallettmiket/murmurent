@@ -373,7 +373,7 @@ def add_to_cli(cli_group: click.Group) -> None:
     @click.option("--host", required=True, help="Registered host name (see `murmurent host list`).")
     @click.option("--json", "json_out", is_flag=True, help="Emit JSON instead of a Rich table.")
     @click.option("--timeout", default=600, type=int, help="SSH timeout in seconds.")
-    @click.option("--projects-root", default=None, help="Override remote ~/repos.")
+    @click.option("--projects-root", default=None, help="Override the remote's repositories folder.")
     @click.option("--lab-vm-root", default=None, help="Override remote /data/lab_vm.")
     @click.option("--lab-group", default=None, help="Lab Unix group (e.g. labgroup).")
     @click.option("--home-warn-gb", default=100, type=int, help="HOME-SIZE-01 threshold.")

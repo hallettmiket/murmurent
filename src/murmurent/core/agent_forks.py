@@ -75,7 +75,10 @@ class AgentForkError(RuntimeError):
 
 def commons_agents_dir() -> Path:
     """The commons agents dir inside the murmurent clone (``<repo>/agents``)."""
-    return murmurent_repo_root() / "agents"
+    # The commons wherever it is installed (a clone or the packaged copy), not
+    # only a clone at the conventional path (#166; emucaki's note in #167).
+    from .commons import commons_root
+    return commons_root() / "agents"
 
 
 def installed_agents_dir() -> Path:

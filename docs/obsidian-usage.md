@@ -119,7 +119,7 @@ exposes three tiers, queryable separately or together:
 | Tier | Path | Writable by |
 |---|---|---|
 | **`personal`** | `<personal-vault>/oracle/<YYYY-MM-DD>_<slug>.md` | the `oracle` agent, on your machine. Yours alone until you explicitly publish (see below). |
-| **`lab`** | `~/repos/murmurent_lab_mgmt_<lab>/oracle/<YYYY-MM-DD>_<slug>.md` | `murmurent oracle publish` only, gated by PI review |
+| **`lab`** | `~/repos/murmurent_lab_mgmt_<lab>/oracle/<YYYY-MM-DD>_<slug>.md` (`~/repos` is your repositories folder unless you chose another; `murmurent config repos-root` shows it) | `murmurent oracle publish` only, gated by PI review |
 | **`notebook`** | `<vault>/<notebook_subfolder>/`, default `lab-notebook/` | you, by hand |
 
 Notebook entries skip the Oracle frontmatter (see "The entry schema"

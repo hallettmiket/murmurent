@@ -392,7 +392,8 @@ def evaluate(payload: dict[str, Any], store: Path | None = None,
         return {"status": "skip"}
     if repo_docs is None:
         from ..core.repo import murmurent_repo_root
-        repo_docs = murmurent_repo_root() / "docs"
+        from ..core.commons import commons_root
+        repo_docs = commons_root() / "docs"
     return harvest(
         Path(target),
         Path(store) if store is not None else local_store(),

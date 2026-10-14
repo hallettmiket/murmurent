@@ -77,7 +77,10 @@ posting rights) should ever run you.
 ## Files you manage
 
 All records live inside the lab-management repo — canonically
-`~/repos/murmurent_lab_mgmt_<lab>` (`$MURMURENT_LAB_MGMT_REPO` overrides it).
+`<repos>/murmurent_lab_mgmt_<lab>` (`$MURMURENT_LAB_MGMT_REPO` overrides it).
+`<repos>` is this machine's repositories folder, not always `~/repos`:
+`murmurent config repos-root` prints it. Build every repository path from it,
+and on another server use that host's own `project_root`.
 Never invent a different name for it: `murmurent pi-init <lab>` scaffolds this
 exact path, and both the GitHub repo and the local clone use it. See
 [`docs/lab_mgmt.md`](../docs/lab_mgmt.md) § Naming.
@@ -168,13 +171,14 @@ Steps:
    once they have SSH access. Include:
    - [ ] Verify SSH key is accepted: `ssh <username>@<hostname> whoami`
    - [ ] Accept the lab_mgmt GitHub invitation (emailed by step 4)
-   - [ ] Clone the roster repo (read-only) under its canonical name: `git clone git@github.com:<owner>/murmurent_lab_mgmt_<lab>.git ~/repos/murmurent_lab_mgmt_<lab>` (auto-discovered + pinned on first dashboard load)
-   - [ ] Clone project repo: `git clone git@github.com:hallettmiket/<project>.git ~/repos/<project>`
+   - [ ] Check the member's repositories folder: `murmurent config repos-root` (written as `<repos>` below; `~/repos` unless they chose another)
+   - [ ] Clone the roster repo (read-only) under its canonical name, directly in `<repos>`: `git clone git@github.com:<owner>/murmurent_lab_mgmt_<lab>.git <repos>/murmurent_lab_mgmt_<lab>` (auto-discovered + pinned on first dashboard load)
+   - [ ] Clone project repo: `git clone git@github.com:<owner>/<project>.git <repos>/<project>/<project>` (the project folder; `<repos>/<project>` also works)
    - [ ] Install GitHub CLI: `gh auth login`
    - [ ] Install VS Code (link to download)
    - [ ] Install Claude Code: `npm install -g @anthropic-ai/claude-code`
    - [ ] Set Claude API key in shell profile
-   - [ ] Run Murmurent CC setup: `bash ~/repos/murmurent/scripts/setup.sh`
+   - [ ] Run Murmurent CC setup: `bash <repos>/murmurent/scripts/setup.sh`
    - [ ] Install Obsidian (link to download)
    - [ ] Create Obsidian vault at `<notebook_path>` and register it in Obsidian
    - [ ] Create your **personal vault** (`murmurent_vault`, a private repo on your

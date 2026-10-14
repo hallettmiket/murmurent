@@ -25,7 +25,9 @@ tree is owned by the registrar; it is not the property of any single lab.
 
 **The repo is named `murmurent_lab_mgmt_<lab>`, where `<lab>` is your
 group's registry slug** (e.g. `mh`, `bioinformatics`). Both the GitHub
-repo and the local clone directory use this exact name:
+repo and the local clone directory use this exact name. The local clone sits
+directly in your repositories folder (`~/repos` unless you chose another;
+`murmurent config repos-root` shows it), not inside a project folder:
 
 ```
 GitHub:      <your-account-or-org>/murmurent_lab_mgmt_<lab>   (private)
@@ -52,7 +54,7 @@ registrar's laptop, a shared server) get collision-free directories
 for free.
 
 Deviant names still work (member-side resolution auto-discovers any
-clone under `~/repos` that has the lab_mgmt shape (`lab.md` +
+clone in your repositories folder that has the lab_mgmt shape (`lab.md` +
 `members/`) and pins it), but stick to the canonical name; discovery
 refuses to guess when two candidate clones both match.
 
@@ -156,7 +158,7 @@ using this order:
    canonical default — returned **even if the clone isn't on disk yet**
    (the honest answer; panels render empty until it's cloned). This is
    what replaced the old hardcoded `~/repos/lab_mgmt` fallback.
-5. **Discovery**: scans `~/repos` for a directory with the lab_mgmt
+5. **Discovery**: scans your repositories folder for a directory with the lab_mgmt
    shape (`lab.md` + `members/`), preferring one whose roster contains
    your handle, and **pins** an unambiguous hit so this runs once. It
    matches on shape, not name, so a pre-convention `~/repos/lab_mgmt`

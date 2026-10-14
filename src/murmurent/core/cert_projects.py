@@ -40,7 +40,9 @@ def _norm(handle: str) -> str:
     return str(handle or "").strip().lstrip("@").lower()
 
 
-VALID_REPO_ROLES = ("code", "manuscript", "data", "infra")
+# ``seminar``: slides for a talk (PowerPoint, HTML, LaTeX beamer), kept beside
+# the code and manuscript in the project's folder (#166).
+VALID_REPO_ROLES = ("code", "manuscript", "seminar", "data", "infra")
 
 # ---------------------------------------------------------------------------
 # Governance validation — moved here from ``core/charter.py`` (which is being
@@ -66,7 +68,7 @@ class RepoRef:
     and ``path`` is a local pointer."""
 
     name: str
-    role: str = "code"                     # code | manuscript | data | infra
+    role: str = "code"                     # code | manuscript | seminar | data | infra
     host: str = "local"
     path: str = ""                         # local clone / pointer path
     remote_path: str = ""                  # path on `host` when host != local
@@ -111,6 +113,53 @@ class RepoRef:
             repo_kind=str(d.get("repo_kind") or "github").strip().lower() or "github",
             local_repo_root=str(d.get("local_repo_root") or ""),
             mirrors=tuple(str(m).strip() for m in (d.get("mirrors") or []) if str(m).strip()))
+
+
+def _shared_repo_dict(r: "RepoRef") -> dict:
+    """A repo entry as written to the SHARED project record (#166).
+
+    A local repository's folder is one member's path on one machine, so it is
+    not written here: every other member's lookup would go into that folder.
+    It is kept in this machine's own record (core.repo_paths) instead, and each
+    machine finds its copy when the record is read.
+    """
+    d = r.to_dict()
+    if (r.host or "local") == "local":
+        local = d.pop("path", "")
+        if local:
+            from . import repo_paths as _rp
+            name = r.name or Path(local).name
+            if Path(local).expanduser().exists():
+                _rp.record(name, local)
+    return d
+
+
+def _localize_repos(repos: tuple) -> tuple:
+    """Fill each local repo's path with THIS machine's copy (#166).
+
+    Order: this machine's record and a search of its repositories folder; a
+    path stored in the shared record, only as a hint and never when it lies in
+    another account's home; else where a new copy would go here. So a stored
+    ``/home/<someone-else>/repos/x`` is never used by anyone but them.
+    """
+    import dataclasses as _dc
+    from . import repo_paths as _rp
+    from .repo import repos_root
+    out = []
+    for r in repos:
+        if (r.host or "local") != "local":
+            out.append(r)
+            continue
+        name = r.name or (Path(r.path).name if r.path else "")
+        found = _rp.find(name, hint=r.path, remote_url=r.remote_url) if name else None
+        if found:
+            path = str(found)
+        elif r.path and _rp.is_mine(r.path):
+            path = r.path
+        else:
+            path = str(repos_root() / name) if name else ""
+        out.append(_dc.replace(r, path=path))
+    return tuple(out)
 
 
 def _primary_repo(repos) -> "RepoRef | None":
@@ -294,6 +343,11 @@ def _parse(path: Path) -> CertProject:
         name, str(meta.get("code_repo") or ""),
         str(meta.get("host") or "local") or "local",
         str(meta.get("remote_path") or ""), raw_repos)
+    # Each machine finds its own copy; a path in this shared file is a hint only.
+    repos = _localize_repos(repos)
+    primary = _primary_repo(repos)
+    if primary is not None and (primary.host or "local") == "local":
+        code_repo = primary.path
     return CertProject(
         name=name,
         lab=str(meta.get("lab") or ""),
@@ -385,7 +439,7 @@ def _render(p: CertProject) -> str:
     # longer written (stage 6). Old files that still carry them read fine: _parse
     # synthesizes a code RepoRef from them, and cp.code_repo is derived on read.
     if p.repos:
-        meta["repos"] = [r.to_dict() for r in p.repos]
+        meta["repos"] = [_shared_repo_dict(r) for r in p.repos]
     meta["members"] = list(p.members)
     meta["certs"] = [dict(c) for c in p.certs]
     front = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).strip()

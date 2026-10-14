@@ -4,9 +4,10 @@
 
 A Murmurent **project** is three coordinated sets:
 
-- a set of **repos**: *existing* clones picked from your machines' repo
-  folders (`~/repos` etc.; the folders themselves are configured on the
-  Machines panel under *Repo location*). Creating a project attaches
+- a set of **repos**: *existing* clones picked from your machines'
+  repositories folders (`~/repos` unless you chose another;
+  `murmurent config repos-root` shows it, and the dashboard's settings for
+  this machine have a *Repositories folder* field). Creating a project attaches
   existing clones: clone or `git init` the repo first, then group it into
   a project;
 - a set of **machines** (your laptop, the lab VM, …),
@@ -22,6 +23,9 @@ project should exist; the lead controls who's in it.
 
 Every project also gets a **private Slack channel**: certificates are DM'd
 through Slack, members are invited when they join and removed when they leave.
+The channel is named `proj-<project>`. To rename it, run
+`murmurent project rename-slack <project>` (add `--to <name>` for a name of
+your own).
 
 A project is a higher-level construct than a repo being
 **murmurent-ready** (having the commons agents wired in via `murmurent repo
@@ -35,7 +39,7 @@ distinction between the two.
 
 Allie (a member of the Rao lab) wants to start `brca_17` with Bob. She
 already has the two repos that make up the work (`brca_code` and
-`brca_manuscript`) cloned under `~/repos` on her laptop.
+`brca_manuscript`) cloned in her repositories folder on her laptop.
 
 **1. Propose.** On her dashboard, Allie clicks **＋ new project** and picks:
 
@@ -104,3 +108,20 @@ same command underneath.
 Deeper background: the certificate chain and trust model are in
 [`identity.md`](identity.md); the full command reference is in
 [`cli_manual.md`](cli_manual.md).
+
+## Posting a status update
+
+Type `/murmurent-update-me` in a Claude Code session opened in one of the
+project's repositories. It gathers the facts (what is running on every lab
+account, what finished since the last update, quality-gate results, git, and the
+project's open progress issues on GitHub), writes a short plain-English summary
+naming what is blocked and on whom, and posts it to the project's Slack channel.
+Type `/murmurent-update-me dry-run` to see the text without posting.
+
+It never posts a credential, a path inside a `publication/` folder, or a count
+under six of people or events. Most projects need no settings. To change where
+it looks (another outputs folder, a manuscript repository, quality gates to
+report, the channel for a project without its own), add an `update_me:` block to
+the repository's `.murmurent.yaml`; the keys are listed in the skill's
+[`SKILL.md`](https://github.com/hallettmiket/murmurent/blob/main/skills/murmurent-update-me/SKILL.md).
+

@@ -32,6 +32,8 @@ the Repos panel's "+ install" on a bare clone went nowhere.
 
 from __future__ import annotations
 
+from .commons import commons_root as _commons_root_pz
+
 import datetime as _dt
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -198,9 +200,17 @@ def make_wigamig_project(
     remote_path = ""
     if ssh_remote:
         rh = (remote_home or "").rstrip("/")
-        # Match cmd_new_remote's convention: remote clones live at
-        # <project_root>/<name>; project_root defaults to ~/repos.
-        remote_path = f"{rh}/repos/{project}" if rh else f"~/repos/{project}"
+        # Remote clones live at <that host's project_root>/<name> (#166): take
+        # the folder from its host record instead of assuming ~/repos.
+        from . import hosts as _hosts_pz
+        try:
+            root = _hosts_pz.resolve(ssh_remote).project_root or _hosts_pz.DEFAULT_REMOTE_PROJECT_ROOT
+        except _hosts_pz.HostNotFound:
+            root = _hosts_pz.DEFAULT_REMOTE_PROJECT_ROOT
+        root = root.rstrip("/")
+        if rh and (root == "~" or root.startswith("~/")):
+            root = rh + root[1:]
+        remote_path = f"{root}/{project}"
     try:
         from . import cert_projects as _cp
         _cp.register_from_summary(summary, code_repo=str(clone_path),
@@ -302,7 +312,7 @@ def make_wigamig_project(
                 name="marker", status="warn",
                 detail=f"skipped: {exc}", required=False))
         for p in _cci.bootstrap_local(
-            clone_path, murmurent_repo_root(),
+            clone_path, _commons_root_pz(),
             agents=agents,
             project_name=project,
             raw_path=raw_path,

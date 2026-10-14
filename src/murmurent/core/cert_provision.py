@@ -25,12 +25,23 @@ class CertProvisionError(RuntimeError):
     """A cert-project provisioning step could not be completed."""
 
 
+#: Every project channel starts with this, so project channels sort together in
+#: Slack and are not mistaken for a lab's own channels. The dashboard flow
+#: (``slack_notify.default_channel_name``) always used it; this flow left it off
+#: until #157.
+CHANNEL_PREFIX = "proj-"
+
+
 def slack_channel_name(project: str) -> str:
-    """Slack channel name for a cert-project: the project name, lowercased and
-    reduced to Slack's allowed charset (a–z, 0–9, ``-``, ``_``), capped at 80.
-    ``_`` is preserved (matches murmurent's identifier convention)."""
+    """Slack channel name for a cert-project: ``proj-`` plus the project name,
+    lowercased and reduced to Slack's allowed charset (a–z, 0–9, ``-``, ``_``),
+    capped at 80. ``_`` is preserved (matches murmurent's identifier
+    convention). A project already named ``proj-…`` is not prefixed twice."""
     s = "".join(c if (c.isalnum() or c in "-_") else "-" for c in str(project).lower())
-    return s.strip("-_")[:80] or "project"
+    s = s.strip("-_") or "project"
+    if not s.startswith(CHANNEL_PREFIX):
+        s = CHANNEL_PREFIX + s
+    return s[:80]
 
 
 def cross_group_identity(handle, *, env: dict | None = None) -> dict | None:
@@ -363,6 +374,60 @@ def provision_github(project: str, *, org: str | None = None, lab: str | None = 
         results.append({"handle": h, "login": login,
                         "status": "ok" if cok else "fail", "detail": cdetail})
     return {"ok": True, "repo": repo, "collaborators": results}
+
+
+def _default_channel_renamer(channel_id: str, name: str, *, token: str | None = None):
+    """Slack ``conversations.rename``. Returns ``(ok, detail)``.
+
+    The bot can rename a channel it created with the scopes it already needs to
+    create one (``channels:manage`` / ``groups:write``).
+    """
+    from ..dashboard import slack_notify as _sn
+    tok = token or _sn._token()
+    if not tok:
+        return (False, "no slack token configured")
+    try:
+        import httpx
+        r = httpx.post("https://slack.com/api/conversations.rename",
+                       headers={"Authorization": f"Bearer {tok}"},
+                       json={"channel": channel_id, "name": name}, timeout=10)
+        j = r.json()
+        return (bool(j.get("ok")), "renamed" if j.get("ok")
+                else j.get("error", "rename_failed"))
+    except Exception as exc:  # noqa: BLE001
+        return (False, str(exc))
+
+
+def rename_slack(project: str, new_name: str | None = None, *,
+                 env: dict | None = None, renamer=None) -> dict:
+    """Rename cert-project ``project``'s Slack channel.
+
+    ``new_name`` defaults to the convention (:func:`slack_channel_name`), which
+    is how a channel created without the ``proj-`` prefix is put right (#157).
+    Before this there was no way to change the name from murmurent: the channel
+    id is stamped on the record once, and every later call reuses it, so a
+    workspace where only a channel's creator (the bot) may rename it left the
+    name stuck. Returns ``{"ok", "channel_id", "name", "detail"}``.
+    """
+    cp = _cp.get(project, env)
+    if cp is None:
+        raise CertProvisionError(f"no cert-project named {project!r}")
+    if not cp.slack_channel_id:
+        raise CertProvisionError(
+            f"project {project!r} has no Slack channel yet; run "
+            f"`murmurent project provision-slack {project}` first")
+    from ..dashboard import slack_notify as _sn
+    target = slack_channel_name(project) if not new_name else _sn.normalize_channel_name(new_name)
+    if not target:
+        raise CertProvisionError(
+            f"{new_name!r} is not a valid Slack channel name: use lowercase letters, "
+            "digits, '-' or '_', at most 80 characters, starting with a letter or digit")
+    if renamer is None:
+        _ws, _tok = resolve_project_slack(project, env=env)
+        renamer = lambda cid, name: _default_channel_renamer(cid, name, token=_tok or None)  # noqa: E731
+    ok, detail = renamer(cp.slack_channel_id, target)
+    return {"ok": bool(ok), "channel_id": cp.slack_channel_id, "name": target,
+            "detail": detail}
 
 
 # ---------------------------------------------------------------------------

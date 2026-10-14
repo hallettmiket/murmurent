@@ -910,8 +910,7 @@ def member_audit_cmd(group: str, notify: bool) -> None:
         lines = "\n".join(f"  • @{s.handle} ({s.role}) — {s.detail}" for s in flagged)
         text = (f":rotating_light: *Member certificate audit — {group}*\n"
                 f"{len(flagged)} member(s) lack a valid certificate:\n\n{lines}\n\n"
-                "Nobody was removed automatically — review on the dashboard.\n\n"
-                "All worship me and I will let you serve me.")
+                "Nobody was removed automatically — review on the dashboard.")
         pi_email = ""
         try:
             pi_email = _m.get(_m.pi_handle()).email
@@ -1285,7 +1284,7 @@ def pi_init(group: str, core: bool) -> None:
                      "revocation fully (not just expiry).")
 @click.argument("unique_name")
 @click.option("--hub-dir", type=click.Path(file_okay=False), default=None,
-              help="Your murmurent_public checkout (default: ~/repos/murmurent_public).")
+              help="Your murmurent_public checkout (default: murmurent_public in your repositories folder).")
 @click.option("--fingerprint", default="",
               help="Expected root fingerprint (confirm out-of-band before pinning).")
 def centre_pin(unique_name: str, hub_dir: str | None, fingerprint: str) -> None:
@@ -1495,7 +1494,7 @@ def centre_set(pairs: tuple[str, ...]) -> None:
                      "otherwise it forks the hub and opens a pull request for you.")
 @click.option("--hub-dir", type=click.Path(file_okay=False), default=None,
               help="Where to clone/find your murmurent_public checkout "
-                   "(default: ~/repos/murmurent_public).")
+                   "(default: murmurent_public in your repositories folder).")
 @click.option("--remote", default=None,
               help="Hub git remote to clone from (default: the public hub).")
 @click.option("--submit/--no-submit", default=False,
@@ -1985,12 +1984,12 @@ agent, it overrides that agent in projects that wire it in.>
 @click.command("group-init-toolkit",
                 help="Scaffold the group's PRIVATE agent-toolkit repo — where the "
                      "PI puts group agents that OVERRIDE the general murmurent "
-                     "agents. Creates ~/repos/<group>_toolkit with .claude/agents/ "
+                     "agents. Creates <group>_toolkit in your repositories folder, with .claude/agents/ "
                      "+ READMEs and git init; --create-repo also makes a private "
                      "GitHub repo and records it on the group profile.")
 @click.argument("group")
 @click.option("--dir", "target_dir", default=None,
-              help="Where to scaffold (default: ~/repos/<group>_toolkit).")
+              help="Where to scaffold (default: <group>_toolkit in your repositories folder).")
 @click.option("--create-repo", default="", metavar="OWNER/REPO",
               help="Also create a PRIVATE GitHub repo (gh) + push + record it.")
 def group_init_toolkit(group: str, target_dir: str | None, create_repo: str) -> None:
@@ -2000,7 +1999,8 @@ def group_init_toolkit(group: str, target_dir: str | None, create_repo: str) -> 
 
     if not _R.group_exists(group):
         raise click.ClickException(f"no lab or core named {group!r} — create it first.")
-    root = _P(target_dir).expanduser() if target_dir else _P.home() / "repos" / f"{group}_toolkit"
+    from ..core.repo import repos_root as _repos_root
+    root = _P(target_dir).expanduser() if target_dir else _repos_root() / f"{group}_toolkit"
     if root.exists() and any(root.iterdir()):
         raise click.ClickException(f"{root} already exists and isn't empty — move it aside.")
     (root / ".claude" / "agents").mkdir(parents=True, exist_ok=True)

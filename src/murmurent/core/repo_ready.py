@@ -60,7 +60,7 @@ class Readiness:
     path: Path
     marker: dict | None = None          # parsed .murmurent.yaml, if present
     legacy_charter: bool = False        # CHARTER.md present (pre-split bootstrap)
-    has_agents_dir: bool = False        # .claude/agents/ exists
+    has_agents_dir: bool = False        # .claude/agents/ exists (informational only)
 
     @property
     def ready(self) -> bool:
@@ -69,7 +69,14 @@ class Readiness:
         # document (project/lead/members), not a bootstrap marker. Repos that
         # only carry a CHARTER migrate via `murmurent repo upgrade`, which
         # stamps a marker and PRESERVES the CHARTER.
-        return self.marker is not None and self.has_agents_dir
+        #
+        # .claude/agents/ plays no part (PR #167). It used to be required to
+        # EXIST, which said nothing: adopt creates it before linking anything.
+        # Counting links instead would be wrong too. Every agent already works
+        # in every folder from ~/.claude/agents/; a link here only pins one,
+        # and the marker is what turns on what readiness is for: the PHI check,
+        # activity attribution, and joining a project.
+        return self.marker is not None
 
     @property
     def needs_upgrade(self) -> bool:
@@ -223,6 +230,10 @@ def make_ready(clone_path: Path, *, lab: str = "",
     root = murmurent_root or commons_root()
     probes.extend(_cci.bootstrap_local(repo, root, agents=picked,
                                        project_name=repo.name))
+    # Note where this repository is on this machine (#166), so it is found
+    # wherever it sits, including inside a project folder.
+    from . import repo_paths as _rp
+    _rp.record(repo.name, repo)
     return probes
 
 

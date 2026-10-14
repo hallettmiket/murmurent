@@ -17,7 +17,7 @@ independent of which PI happens to be looking.
 
 There is currently **no dedicated `centre_security_guard` agent file**
 in [`agents/`](https://github.com/hallettmiket/murmurent/tree/main/agents).
-The commons ships thirteen reference agents; of those, only
+Of the commons' reference agents, only
 `centre_millwright` operates at centre scope (see
 [`agents.md`](agents.md)). The role described here is the natural
 centre-scope extension of the lab-level Security Guard, and pieces of

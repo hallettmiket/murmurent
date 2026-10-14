@@ -92,6 +92,7 @@ def load(*, legacy_obsidian: dict | None = None) -> C.MachineSettings:
         # collected per-installation. ``None`` here is fine; the
         # dashboard surfaces the install-wizard value as a fallback.
         lab_base=data.get("lab_base") or None,
+        repos_root=data.get("repos_root") or None,
         murmurent_data_subfolder=murmurent_data_subfolder,
         data_immutable_name=data_immutable_name,
         data_append_only_name=data_append_only_name,
@@ -130,6 +131,9 @@ def write(settings: C.MachineSettings) -> Path:
     vault_path = _clean(settings.obsidian_vault_path) or None
     base_path = _clean(settings.wigamig_base) or None
     derived_name = _derive_vault_name(vault_path)
+    # A client that does not send repos_root (an older dashboard page) must not
+    # erase it: keep what the file already holds (#166).
+    repos_root = _clean(settings.repos_root) if settings.repos_root else (_read_yaml(MACHINE_FILE).get("repos_root") or None)
     payload = {
         "machine_name": settings.machine_name,
         "wigamig_base": base_path,
@@ -139,6 +143,9 @@ def write(settings: C.MachineSettings) -> Path:
         "oracle_subfolder": settings.oracle_subfolder,
         "murmurent_data_subfolder": settings.murmurent_data_subfolder,
         "lab_base": settings.lab_base,
+        "repos_root": repos_root,
+        # Not edited in the dashboard; kept so a save never drops it (#166).
+        "project_layout": _read_yaml(MACHINE_FILE).get("project_layout") or None,
     }
     MACHINE_FILE.write_text(
         yaml.safe_dump(payload, sort_keys=False, allow_unicode=True),
@@ -163,6 +170,7 @@ def write(settings: C.MachineSettings) -> Path:
             oracle_subfolder=settings.oracle_subfolder,
             murmurent_data_subfolder=settings.murmurent_data_subfolder,
             lab_base=settings.lab_base,
+            repos_root=repos_root,
         ))
     except Exception:  # noqa: BLE001 — mirror is a convenience, never load-bearing
         pass

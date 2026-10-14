@@ -47,6 +47,9 @@ audit log records what changed.
 
 from __future__ import annotations
 
+from . import repo_paths as _repo_paths
+from . import hosts as _hosts_rc
+
 import datetime as _dt
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -206,7 +209,7 @@ def detect_orphan_installations() -> list[DriftFinding]:
         repos = [r for r in (data.get("repos") or [])
                  if isinstance(r, dict) and r.get("path")]
         checks = [(str(r.get("name") or project), str(r.get("path"))) for r in repos] \
-            or [(project, f"~/repos/{project}")]
+            or [(project, str(_repo_paths.find_or_default(project)))]
         missing = [(nm, pth) for nm, pth in checks
                    if not _is_local_path_alive(str(Path(pth).expanduser()))]
         if missing and len(missing) == len(checks):
@@ -268,7 +271,7 @@ def detect_orphan_registries() -> list[DriftFinding]:
 
     def _loc(r) -> str:
         return r.path if r.host == "local" else \
-            f"{r.host}:{r.remote_path or '~/repos/' + r.name}"
+            f"{r.host}:{r.remote_path or _hosts_rc.DEFAULT_REMOTE_PROJECT_ROOT + '/' + r.name}"
 
     # 1. LOCAL repos only (issue #94): check aliveness on this machine's
     #    filesystem. Repos recorded on another machine are that machine's own
@@ -347,7 +350,7 @@ def detect_missing_markers() -> list[DriftFinding]:
         project = data.get("project") or manifest_path.stem
         if (data.get("ssh_remote") or "").strip():
             continue  # install on another machine — not our reconcile
-        local_path = Path(f"~/repos/{project}").expanduser()
+        local_path = _repo_paths.find_or_default(project)
         if (local_path.is_dir()
                 and not (local_path / ".murmurent.yaml").exists()):
             findings.append(DriftFinding(

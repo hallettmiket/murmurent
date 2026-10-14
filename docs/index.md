@@ -1,5 +1,8 @@
 # Murmurent
 
+**▶ [Watch the 7-minute getting-started video](https://mikehallett.science/assets/videos/murmurent_getting_started.html)**
+(install, the agents, and joining a lab or a centre).
+
 Murmurent is an agentic AI operating system that provides:
 
 - **Reference agents**: a set of specialist agents (literature search,

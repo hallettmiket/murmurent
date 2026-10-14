@@ -323,7 +323,8 @@ def _show_plan(plan, actor: str) -> None:
     from ..core import repo as _repo
 
     click.echo("\nThis will:")
-    click.echo(f"  - create {_repo.repos_root() / plan.name} with exp, src, obsolete, "
+    from ..core import repo_paths as _rp
+    click.echo(f"  - create {_rp.find(plan.name) or _rp.new_project_repo(plan.name)} with exp, src, obsolete, "
                "data and decisions folders, tracked by git")
     click.echo("  - make it murmurent-ready and declare it a choreography "
                f"({plan.mode})")

@@ -173,6 +173,10 @@ class MachineSettings(BaseModel):
     # machine. Retained so the install wizard's old fallback still
     # works; new code should use ``wigamig_base``.
     lab_base: str | None = None
+    # Where this machine keeps its git repositories (issue #166): ``~/repos``,
+    # ``~/repo``, ``~/repositories`` or anything else. ``None`` = not set, so
+    # core.repo.repos_root() falls back to ``~/repos``.
+    repos_root: str | None = None
     # Derived, read-only presentation names (issue #99 / #80 Part 1a). The
     # machine window shows each root ONCE and then nests its governed children
     # as bare folder names. These are NOT user-editable knobs — they are the
@@ -850,7 +854,7 @@ class InstalledRepo(BaseModel):
     manuscript + …), each of which may or may not be cloned here."""
 
     name: str
-    role: str = "code"                         # code | manuscript | data | infra
+    role: str = "code"                         # code | manuscript | seminar | data | infra
     path: str = ""                             # clone/pointer path on this machine
     present: bool = False                      # is it actually cloned here?
 

@@ -167,8 +167,18 @@ def bootstrap_local(
                 required=False,
             ))
             continue
+        if dest.exists() and not dest.is_symlink():
+            # A real file is the group's own version of this agent (the toolkit
+            # pattern). It used to be deleted and replaced by a link here,
+            # despite the promise above that non-symlinks survive.
+            probes.append(Probe(
+                name=f"cc_agent: {a}", status="ok",
+                detail=f"kept your own {dest} (not replaced by a link)",
+                required=False,
+            ))
+            continue
         try:
-            if dest.is_symlink() or dest.exists():
+            if dest.is_symlink():
                 dest.unlink()
             dest.symlink_to(src)
             probes.append(Probe(
@@ -182,6 +192,39 @@ def bootstrap_local(
                 detail=f"symlink {dest}: {exc}",
                 required=False,
             ))
+
+    # The links just made point into THIS member's commons by absolute path,
+    # so they must never be committed (#150). Name each in .gitignore; a
+    # pattern would also hide the group's own agent files, which are real files
+    # in the same folder and must stay committable.
+    from . import agent_links as _al
+    linked = sorted(
+        f.stem for f in claude_agents.glob("*.md")
+        if f.is_symlink() and _al.is_machine_link(project_dir, f"{_al.AGENTS_REL}/{f.name}")
+    )
+    try:
+        if _al.update_gitignore(project_dir, linked):
+            probes.append(Probe(
+                name="gitignore: agent links", status="ok",
+                detail=f"listed {len(linked)} agent link(s) in .gitignore so they stay on this machine",
+                required=False,
+            ))
+    except OSError as exc:
+        probes.append(Probe(
+            name="gitignore: agent links", status="warn",
+            detail=f"could not update .gitignore: {exc}",
+            required=False,
+        ))
+    committed = _al.tracked_machine_links(project_dir)
+    if committed:
+        probes.append(Probe(
+            name="committed agent links", status="warn",
+            detail=(f"{len(committed)} agent link(s) were committed to git, so they "
+                    "point into one person's home folder for everyone: "
+                    + ", ".join(path for path, _ in committed) + ". "
+                    + _al.repair_hint(project_dir)),
+            required=False,
+        ))
 
     # VSCode chrome — same settings murmurent uses for itself, so every
     # murmurent project opens with the title template, activity bar on
@@ -363,7 +406,7 @@ def _stub(
         "\n"
         "## Agents wired up for this project\n"
         "\n"
-        "See `.claude/agents/` — symlinks into `~/repos/murmurent/agents/`.\n"
+        "See `.claude/agents/` — links to murmurent's shared agents, if any were pinned.\n"
         f"Selected: {selected}.\n"
         "\n"
         "## Data locations\n"
@@ -372,7 +415,7 @@ def _stub(
         "\n"
         "## murmurent commons\n"
         "\n"
-        "Lab-wide agents + rules live in `~/repos/murmurent/`. This project\n"
+        "Lab-wide agents + rules live in murmurent's shared folder. This project\n"
         "inherits from `~/.claude/` (Layer 1) AND overrides via `.claude/`\n"
         "here (Layer 2). See [[project-cc-commons-layered]] in lab oracle.\n"
     )

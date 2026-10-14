@@ -18,7 +18,9 @@ from .charter import validate_charter
 from .frontmatter import parse_file
 from .repo import CHARTER_FILENAME, MEMBERS_FILENAME, ProjectRepo, lab_mgmt_repo_root, read_members
 
-DEFAULT_PROJECTS_ROOT = Path("~/repos").expanduser()
+# Kept for older callers; projects_root() uses this machine's repositories
+# folder (core.repo.repos_root, #166) when no override is set.
+DEFAULT_PROJECTS_ROOT = None
 PROJECTS_ROOT_ENV = "MURMURENT_PROJECTS_ROOT"
 PROJECT_REGISTRY_DIR = "projects"
 
@@ -47,9 +49,13 @@ class ProjectSummary:
 
 
 def projects_root(env: dict[str, str] | None = None) -> Path:
-    """Return ``~/repos`` (or ``$MURMURENT_PROJECTS_ROOT``) — where local project repos live."""
+    """Where local project repos live: ``$MURMURENT_PROJECTS_ROOT``, else this
+    machine's repositories folder (``murmurent config repos-root``)."""
     source = os.environ if env is None else env
-    return Path(source.get(PROJECTS_ROOT_ENV, DEFAULT_PROJECTS_ROOT)).expanduser()
+    if source.get(PROJECTS_ROOT_ENV):
+        return Path(source[PROJECTS_ROOT_ENV]).expanduser()
+    from .repo import repos_root
+    return repos_root()
 
 
 def project_path(name: str, env: dict[str, str] | None = None) -> Path:

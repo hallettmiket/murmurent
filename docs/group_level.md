@@ -727,7 +727,7 @@ The required-vs-elected distinction is enforced: a member cannot opt out of a co
 ## Glossary
 
 - **Project**: highest unit of work in the group. Has a single lead, a charter, and one or more repos. Multi-person, multi-experiment, accumulates semi-structured data. (Replaces the earlier term "investigation".)
-- **Repo**: a lab-convention repository (`~/repos/<name>/` with `exp/<n>_<slug>/` inside). One or more per project.
+- **Repo**: a lab-convention repository (`<name>/` in your repositories folder, which is `~/repos` unless you chose another, with `exp/<n>_<slug>/` inside). One or more per project, optionally grouped in one project folder.
 - **Experiment**: a unit of work within a project repo. Lives in `exp/<integer>_<good_name>/` (per the lab's project-structure convention); date is in the notebook frontmatter. Has its own `notebook.md` entry.
 - **SEA**: Skill, Experiment, or Analysis. Atomic, callable unit of service exchanged between people, groups, factories. Multiple per experiment; sometimes free-standing.
 - **SEA verbs**: `request`, `claim`, `complete`, `decline`.

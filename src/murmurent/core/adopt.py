@@ -255,9 +255,8 @@ class AdoptionStatus:
 
     @property
     def ready(self) -> bool:
-        return (self.exists and self.is_git
-                and self.has_marker
-                and self.has_claude_agents)
+        # The marker alone, as in core.repo_ready.Readiness.ready (PR #167).
+        return self.exists and self.is_git and self.has_marker
 
     @property
     def verdict(self) -> str:
@@ -270,7 +269,10 @@ class AdoptionStatus:
             return "not a git repo"
         if self.ready:
             return "ready"
-        if self.has_marker or self.legacy_charter or self.has_claude_agents:
+        # "partial" is now only the legacy CHARTER.md bootstrap, which
+        # `murmurent repo upgrade` finishes. A .claude/agents/ folder without a
+        # marker is Claude Code's own feature, not a half-done murmurent setup.
+        if self.legacy_charter:
             return "partial"
         return "plain clone"
 

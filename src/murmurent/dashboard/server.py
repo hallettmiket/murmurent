@@ -19,6 +19,8 @@ Open `http://localhost:8770/` in a browser.
 
 from __future__ import annotations
 
+from ..core import repo_paths as _repo_paths_srv
+
 import datetime as _dt
 import os
 from pathlib import Path
@@ -196,6 +198,7 @@ class MachineSettingsBody(BaseModel):
     oracle_subfolder: str = "oracle"
     murmurent_data_subfolder: str = "murmurent_data"
     lab_base: str | None = None
+    repos_root: str | None = None
 
 
 class NewPersonalAgentBody(BaseModel):
@@ -1219,7 +1222,7 @@ def create_app() -> FastAPI:
             # github/local synthesized provider when the id matches
             # those literals — keeps pre-refactor charters working.
             from ..core import git_providers as _gpr2
-            local_repo = Path(f"~/repos/{req.project}").expanduser()
+            local_repo = _repo_paths_srv.find_or_default(req.project)
             kind_or_id = req.repo_kind or "github"
             lab_settings = snap_mod._current_lab_settings()
             provider = _gpr2.find_provider(
@@ -1341,9 +1344,9 @@ def create_app() -> FastAPI:
                 from ..core import hosts as _hosts_lp
                 try:
                     h = _hosts_lp.resolve(ssh_r)
-                    project_root = h.project_root or "~/repos"
+                    project_root = h.project_root or _hosts_lp.DEFAULT_REMOTE_PROJECT_ROOT
                 except Exception:
-                    project_root = "~/repos"
+                    project_root = _hosts_lp.DEFAULT_REMOTE_PROJECT_ROOT
                 rp = f"{project_root.rstrip('/')}/{body.project}"
                 # VSCode Remote-SSH needs an absolute path — tildes don't
                 # expand. Use the ``remote_home`` we captured at install
@@ -1660,7 +1663,7 @@ def create_app() -> FastAPI:
             except Exception:
                 host_obj = _hosts.Host(
                     name=body.ssh_remote, kind="ssh", ssh_host=body.ssh_remote,
-                    remote_user="", project_root="~/repos", lab_vm_root=body.lab_base or "~/wigamig",
+                    remote_user="", project_root=_hosts.DEFAULT_REMOTE_PROJECT_ROOT, lab_vm_root=body.lab_base or "~/wigamig",
                     vault_root="~/Obsidian", mount_point=body.mount_point or "",
                     description="ad-hoc workspace_initialize target",
                 )
@@ -1673,7 +1676,7 @@ def create_app() -> FastAPI:
             repo_url: str | None = None
             kind = "github"
             try:
-                charter = Path(f"~/repos/{body.project}/CHARTER.md").expanduser()
+                charter = _repo_paths_srv.find_or_default(body.project) / "CHARTER.md"
                 if charter.is_file():
                     meta = _parse_charter(charter).meta or {}
                     kind = str(meta.get("repo_kind") or "github")
@@ -1710,6 +1713,7 @@ def create_app() -> FastAPI:
                 notebook_path=body.notebook_path,
                 repo_url=repo_url,
                 agents=list(body.agents or []),
+                repos_dir=host_obj.project_root,
             )
             for p in _ri.install(host_obj, targets):
                 probes.append(p)
@@ -1799,9 +1803,9 @@ def create_app() -> FastAPI:
             from ..core import hosts as _hosts_for_clone
             try:
                 _h = _hosts_for_clone.resolve(body.ssh_remote)
-                _proot = (_h.project_root or "~/repos").rstrip("/")
+                _proot = (_h.project_root or _hosts_for_clone.DEFAULT_REMOTE_PROJECT_ROOT).rstrip("/")
             except _hosts_for_clone.HostNotFound:
-                _proot = "~/repos"
+                _proot = _hosts_for_clone.DEFAULT_REMOTE_PROJECT_ROOT
             clone_dir = Path(f"{_proot}/{body.project}")
         else:
             clone_dir = _pp_for_proj(body.project)
@@ -2808,8 +2812,7 @@ def create_app() -> FastAPI:
             f"{len(flagged)} member(s) do not hold a valid identity certificate:\n\n"
             f"{lines}\n\n"
             "Review them on the dashboard (Lab members → Audit). Nobody has been "
-            "removed automatically — deactivate any that shouldn't have access.\n\n"
-            "All worship me and I will let you serve me.")
+            "removed automatically — deactivate any that shouldn't have access.")
         pi_email = ""
         try:
             pi_email = _m.get(pi).email
@@ -3517,7 +3520,7 @@ def create_app() -> FastAPI:
         from ..commands import project_cmd as _project_cmd
 
         _require_pi(user)
-        local_repo = Path(f"~/repos/{project}").expanduser()
+        local_repo = _repo_paths_srv.find_or_default(project)
         if not (local_repo / ".git").is_dir():
             raise HTTPException(status_code=404, detail=f"No local git repo at {local_repo}")
         try:
@@ -3611,7 +3614,7 @@ def create_app() -> FastAPI:
         from ..core.repo import lab_mgmt_repo_root as _lmgmt
 
         _require_pi(user)
-        local_repo = Path(f"~/repos/{project}").expanduser()
+        local_repo = _repo_paths_srv.find_or_default(project)
         if not (local_repo / ".git").is_dir():
             raise HTTPException(status_code=404, detail=f"No local git repo at {local_repo}")
 
@@ -6409,7 +6412,8 @@ def create_app() -> FastAPI:
                 detail=f"set_model needs ?model={'|'.join(sorted(VALID_MODELS))}",
             )
 
-        registry_dir = murmurent_repo_root() / "agents"
+        from ..core.commons import commons_root as _commons_root
+        registry_dir = _commons_root() / "agents"
         try:
             registry = agents_core.load_registry(registry_dir)
         except Exception as exc:

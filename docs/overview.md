@@ -59,8 +59,9 @@ flowchart TB
 
 ## How repos and projects combine
 
-A member's work lives in **repositories** (for example, git clones under
-`~/repos/`). A Murmurent-ready repository has the commons agents and rules
+A member's work lives in **repositories** (git clones in their repositories
+folder: `~/repos` unless they chose another; `murmurent config repos-root`
+shows it). A Murmurent-ready repository has the commons agents and rules
 wired in; see [Making a repo Murmurent-ready](ready_vs_projects.md).
 
 A **project** is a higher-level construct: a set of existing repositories,

@@ -13,6 +13,13 @@ The heavy lifting is in `reset.sh` (next to this file). Your job is to pick the
 level from what the user asked, **preview with `--dry-run`, get confirmation,
 then run for real**.
 
+## The repositories folder
+
+Paths below are written with `~/repos`, the default. This machine's
+repositories folder may be different (`~/repo`, `~/repositories`, ...):
+`murmurent config repos-root` prints it, and `reset.sh` reads the same
+setting, so nothing extra is needed.
+
 ## Levels
 
 | Level | Removes | Keeps |

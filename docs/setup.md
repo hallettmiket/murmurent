@@ -16,6 +16,11 @@ curl -fsSL https://raw.githubusercontent.com/hallettmiket/murmurent/main/scripts
 That is the entire installation. It installs the `murmurent` command and
 symlinks the shared agents, rules, and skills into `~/.claude/`.
 
+The command ends by asking you to run `murmurent init`, which records who you
+are. It also asks where you keep your git repositories on this computer, for
+example `~/repos`, `~/repo` or `~/repositories`. To see or change that folder
+later, run `murmurent config repos-root` (give a folder to change it).
+
 !!! note "You are finished after the command above"
     You do **not** need to run any of the steps that follow. They are shown
     only for transparency, and for the rare case of installing by hand. If
@@ -69,6 +74,12 @@ grep murmurent-oracle ~/.claude/settings.json   # MCP server registered
 murmurent --version
 ```
 
+### The dashboard icon
+
+The install also creates a **Murmurent Dashboard** icon: on a Mac, in your
+Applications folder (drag it to your Dock); on Linux, in your applications
+menu. See [the dashboard page](dashboard.md#the-dashboard-icon).
+
 ### Members: clone your lab's governance repository
 
 Installing Murmurent and importing your membership card establishes *who
@@ -76,7 +87,8 @@ you are*. It does not bring the lab's shared records onto your machine.
 The roster of your fellow members, the lab's projects, its compliance
 records, and the Lab Oracle all live in the lab's private governance
 repository, which every member holds a read-only clone of. Ask your PI
-for its name and clone it to the canonical path:
+for its name and clone it into your repositories folder (`~/repos` unless
+you chose another; `murmurent config repos-root` shows it):
 
 ```bash
 git clone git@github.com:<org>/murmurent_lab_mgmt_<lab>.git \
@@ -96,9 +108,18 @@ For reference, or for auditing what Murmurent touches, here is what it
 creates or modifies locally:
 
 - `~/.claude/agents/`, `~/.claude/rules/`, `~/.claude/skills/`: the commons
-  agents, rules, and skills, symlinked in by `scripts/setup.sh`.
+  agents, rules, and skills, linked in by `murmurent install` (or
+  `scripts/setup.sh` from a copy of the repository).
+- `~/.claude/output-styles/`: the plain-English writing style. Select it once
+  per machine in Claude Code with `/config`, then *Output style*, then restart
+  Claude Code. It changes how Claude Code writes prose to you, not code.
 - `~/.claude/settings.json`: where Murmurent registers its hooks and MCP
-  servers.
+  servers (the four data services: Oracle, data, core data, inventory). It
+  also turns off Claude Code's feedback survey
+  (`CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY=1`), which interrupts sessions to ask
+  for a rating; a value you set yourself is kept.
+- The **Murmurent Dashboard** icon: in `~/Applications` on a Mac, in the
+  applications menu on Linux (see [the dashboard page](dashboard.md#the-dashboard-icon)).
 - `~/.claude/agent-memory/`: per-agent working memory.
 - `~/.claude/murmurent-preferences.yaml`: your personal preference profile.
 - `~/.murmurent/`, this machine's Murmurent state: `machine.yaml`, your
@@ -113,15 +134,17 @@ creates or modifies locally:
 ## Initializing a directory for Murmurent
 
 A **repository** (or "repo") is a folder of code and files tracked by git,
-living under `~/repos/` on your machine (for example, `~/repos/brca_wgs`).
+living in your repositories folder (for example, `~/repos/brca_wgs`).
 Your day-to-day research work happens inside repositories.
 
-Installing Murmurent (above) prepares your machine. The next step is to make
-each directory you want to use with Murmurent **ready**: this wires the
-commons agents and rules into it, so Claude Code sessions opened there can use
-them. The procedure is the same for a brand-new folder, a repository you have
-worked in for years, and one that an older Murmurent release set up. Start
-with the status check, because its verdict decides the step:
+Installing Murmurent (above) prepares your machine, and every agent then works
+in every folder on it. Making a directory **ready** does something different:
+it turns on the check that removes patient identifiers from anything leaving
+your machine (a web search, a fetched page), records which project activity
+belongs to, and lets the directory join a project. **That check does not run
+in a directory that is not ready**, so do this for every directory holding
+research data. Start with the status check, because its verdict decides the
+step:
 
 ```bash
 murmurent repo status ~/repos/<directory>
@@ -130,19 +153,45 @@ murmurent repo status ~/repos/<directory>
 | Verdict | What it means | Do this |
 |---|---|---|
 | `not a git repo` | a plain folder | `git -C ~/repos/<directory> init`, then the next row |
-| `plain clone` or `partial` | git, and Murmurent has never set it up | `murmurent repo adopt ~/repos/<directory>` |
-| `ready`, bootstrapped by an older version | ready, and newer agents are missing | `murmurent repo upgrade ~/repos/<directory> --all-agents` |
+| `plain clone` | git, and Murmurent has never set it up | `murmurent repo adopt ~/repos/<directory>` |
+| `partial` | set up by a very old Murmurent (`CHARTER.md`, no `.murmurent.yaml`) | `murmurent repo upgrade ~/repos/<directory>` |
+| `ready`, bootstrapped by an older version | ready; the marker predates this release | `murmurent repo upgrade ~/repos/<directory>` |
 | `ready`, current version | finished | open Claude Code in it |
 
-Adopting writes a `.murmurent.yaml` marker and a `.claude/agents/` folder of
-symlinks into the commons, and leaves every other file as it was. Commit
-both, so each clone of the repository is ready as well. A ready repository
-can then be attached to a **project**. Both topics have their own pages:
+Adopting writes a `.murmurent.yaml` marker and leaves every other file as it
+was. Commit it, so each clone of the repository is ready as well. It adds no
+agent links unless you ask for them with `--agents`, which you rarely need. A
+ready repository can then be attached to a **project**. Both topics have their
+own pages:
 
 - [`ready_vs_projects.md`](ready_vs_projects.md): readiness in full, the
   verdicts, and upgrading after a release.
 - [`project_intra.md`](project_intra.md): what a project is and how one is
   created.
+
+## Projects with several repositories
+
+A project often has more than one repository: its code, a manuscript, a
+seminar (talks and slides). Murmurent puts a new project's repositories
+together in one project folder, each keeping its full name:
+
+```text
+~/repos/brca/                 the project folder
+├── brca/                     the code
+├── brca_manuscript/
+└── brca_seminar/
+```
+
+The older flat layout, with each repository directly in your repositories
+folder (`~/repos/brca`, `~/repos/brca_manuscript`), stays fully valid, and
+Murmurent finds repositories in either. To choose where new projects go, run
+`murmurent config project-layout nested` or `flat` (nested is the default).
+To move an existing project into a project folder, run
+`murmurent project gather <project>`: it shows what it would move, and moves
+nothing until you add `--yes`. It only changes this computer, never
+overwrites a folder, and lists anything you must fix by hand afterwards (for
+example a VS Code workspace file that names the old path). Your lab's records repository
+(`murmurent_lab_mgmt_<lab>`) always stays directly in your repositories folder.
 
 ## For PIs: setting up a lab
 
@@ -356,7 +405,8 @@ scripts/install_remote.sh my-server
 
 `hosts.yaml` is a **connection-only registry** (issue #80): it records how to
 reach a machine (`ssh_host`, `remote_user`) and where its git clones live
-(`project_root` + `scan_dirs`). It does **not** hold a machine's data-root or
+(`project_root` + `scan_dirs`). Murmurent uses a host's own `project_root` as
+its repositories folder, or `~/repos` if the host records none. It does **not** hold a machine's data-root or
 vault paths. Each machine configures its own data-root + personal/lab vault on
 **its own dashboard** (This machine → edit → save, written to that machine's
 `~/.murmurent/machine.yaml`); reach a remote machine's dashboard over the SSH
