@@ -88,7 +88,9 @@ silently overwritten.
 Each project's ``src/`` directory should contain a ``ready_to_delete.md``
 listing append_only files and obsolete code considered safe to
 garbage-collect. This is the manifest the reconciliation routine reads
-before sweeping.
+before sweeping. ``murmurent space scan`` also reads it: each file listed
+there that still exists becomes a row in the project's space table, so the
+PI can decide on it with everything else (see ``docs/space_table.md``).
 
 ## Data tiering & residency
 

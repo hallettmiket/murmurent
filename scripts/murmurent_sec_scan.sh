@@ -6,7 +6,7 @@
 #
 # Runs as the invoking user; reports only what that user can see. Never
 # attempts to read paths it doesn't have permission for. Never modifies
-# any file under /data/lab_vm/raw or /data/lab_vm/refined (CC rule 9).
+# any file under the governed data folders (CC rule 9).
 #
 # Usage:
 #   murmurent_sec_scan.sh [--lab-vm-root /data/lab_vm]
@@ -70,7 +70,7 @@ fi
 
 # Detect whether POSIX bits on ``$LAB_VM_ROOT`` are authoritative or
 # a synthesized projection over NFSv4 ACLs (the enterprise-NAS-over-NFSv3
-# case). Used to decide whether to skip raw/refined POSIX
+# case). Used to decide whether to skip the data-folder POSIX
 # walks — see POSIX-NOT-AUTHORITATIVE-01 in docs/security-dashboard.md.
 #
 # Returns one of:
@@ -222,11 +222,23 @@ scan_one_repo() {
     fi
 }
 
-scan_lab_vm_raw() {
-    local root="$LAB_VM_ROOT/raw"
+# The governed data folders under $LAB_VM_ROOT (rules/data-storage.md).
+# Read-only on disk: immutable/ and its legacy name raw/. A file is saved there
+# once and never changed. Lab-shared (group r+w, others nothing): append_only/,
+# its legacy name refined/, and modifiable/. Both names are scanned during the
+# transition, so data in either is checked (#185).
+READONLY_DIRS=(immutable raw)
+SHARED_DIRS=(append_only refined modifiable)
+
+# scan_lab_vm_readonly <folder>: files under $LAB_VM_ROOT/<folder> must carry
+# no write bit and must not be readable by everyone. The finding category is
+# the folder name; the rule ids keep their historical RAW- prefix.
+scan_lab_vm_readonly() {
+    local kind="$1"
+    local root="$LAB_VM_ROOT/$kind"
     [[ -d "$root" ]] || return 0
-    progress "scanning $root for writable files (raw is immutable)"
-    # RAW-IMMUTABLE-01: any file with any write bit set anywhere under raw/.
+    progress "scanning $root for writable files ($kind is read-only)"
+    # RAW-IMMUTABLE-01: any file with any write bit set anywhere under it.
     # Cap hits per project to keep output bounded; roll-up happens in Python.
     local proj_dir
     for proj_dir in "$root"/*/; do
@@ -238,23 +250,23 @@ scan_lab_vm_raw() {
             [[ -n "$f" ]] || continue
             local mode
             mode=$(stat -c '%a %U:%G' "$f" 2>/dev/null) || continue
-            emit_finding "block" "raw" "RAW-IMMUTABLE-01" \
+            emit_finding "block" "$kind" "RAW-IMMUTABLE-01" \
                 "$f" "$mode" "0440 (or 0444) — read-only" \
                 "chmod a-w '$f'   # never run wholesale; verify intent first" \
                 "$proj"
             hits=$((hits + 1))
-            [[ $hits -ge 200 ]] && { progress "  truncated raw/$proj at 200 hits"; break; }
+            [[ $hits -ge 200 ]] && { progress "  truncated $kind/$proj at 200 hits"; break; }
         done < <($BOUND find "$proj_dir" -type f -perm /222 2>/dev/null)
 
-        # RAW-LAB-ONLY-01: world-readable files under raw/.
+        # RAW-LAB-ONLY-01: world-readable files.
         hits=0
         while IFS= read -r f; do
             [[ -n "$f" ]] || continue
             local mode
             mode=$(stat -c '%a %U:%G' "$f" 2>/dev/null) || continue
-            emit_finding "warn" "raw" "RAW-LAB-ONLY-01" \
+            emit_finding "warn" "$kind" "RAW-LAB-ONLY-01" \
                 "$f" "$mode" "lab-group readable, not world-readable" \
-                "chmod o-r '$f'   # verify before running on raw" \
+                "chmod o-r '$f'   # verify before running on $kind" \
                 "$proj"
             hits=$((hits + 1))
             [[ $hits -ge 200 ]] && break
@@ -262,8 +274,11 @@ scan_lab_vm_raw() {
     done
 }
 
-scan_lab_vm_refined() {
-    local root="$LAB_VM_ROOT/refined"
+# scan_lab_vm_shared <folder>: files under $LAB_VM_ROOT/<folder> are for the
+# lab group only, never other users on the machine, and are data, not tools.
+scan_lab_vm_shared() {
+    local kind="$1"
+    local root="$LAB_VM_ROOT/$kind"
     [[ -d "$root" ]] || return 0
     progress "scanning $root (lab-group r+w only)"
     local proj_dir
@@ -278,23 +293,27 @@ scan_lab_vm_refined() {
             local mode
             mode=$(stat -c '%a %U:%G' "$f" 2>/dev/null) || continue
             local sev="warn"
-            [[ "$mode" =~ \ [0-9]?[0-9]?[2367]$ ]] && sev="block"  # world-writable
-            emit_finding "$sev" "refined" "REFINED-LAB-WRITE-01" \
+            # world-writable when the "others" digit of the octal mode has the
+            # write bit (2, 3, 6, 7). The old test matched the end of the whole
+            # "mode user:group" string, so it never fired (#185).
+            local perm="${mode%% *}"
+            [[ "${perm: -1}" =~ [2367] ]] && sev="block"
+            emit_finding "$sev" "$kind" "REFINED-LAB-WRITE-01" \
                 "$f" "$mode" "lab-group r+w; others none" \
-                "chmod o-rwx '$f'   # verify before bulk apply on refined" \
+                "chmod o-rwx '$f'   # verify before bulk apply on $kind" \
                 "$proj"
             hits=$((hits + 1))
-            [[ $hits -ge 200 ]] && { progress "  truncated refined/$proj at 200 hits"; break; }
+            [[ $hits -ge 200 ]] && { progress "  truncated $kind/$proj at 200 hits"; break; }
         done < <($BOUND find "$proj_dir" -type f \( -perm -004 -o -perm -002 \) 2>/dev/null)
 
-        # REFINED-NO-TOOLS-01: executable bit set on refined files.
+        # REFINED-NO-TOOLS-01: executable bit set on data files.
         hits=0
         while IFS= read -r f; do
             [[ -n "$f" ]] || continue
             # Skip directories' execute bit (needed to traverse).
             local mode
             mode=$(stat -c '%a' "$f" 2>/dev/null) || continue
-            emit_finding "info" "refined" "REFINED-NO-TOOLS-01" \
+            emit_finding "info" "$kind" "REFINED-NO-TOOLS-01" \
                 "$f" "$mode (exec)" "non-executable; move tools to $LAB_VM_ROOT/tools/" \
                 "chmod a-x '$f'   # or move to tools/" \
                 "$proj"
@@ -449,7 +468,7 @@ scan_tmp_leaks() {
                 "moved or deleted; sensitive lab content should not live in /tmp" \
                 "rm '$f'  # or move to a protected dir"
         done < <(find "$d" -maxdepth 3 -user "$ME" -type f -perm -004 \
-            \( -name '*lab_vm*' -o -name '*raw*' -o -name '*refined*' \) 2>/dev/null | head -20)
+            \( -name '*lab_vm*' -o -name '*raw*' -o -name '*refined*' -o -name '*immutable*' -o -name '*append_only*' -o -name '*modifiable*' \) 2>/dev/null | head -20)
     done
 }
 
@@ -540,7 +559,7 @@ progress "starting scan as $MY_HANDLE on $HOST_NAME at $NOW_ISO"
 # Detect whether POSIX bits are meaningful on $LAB_VM_ROOT. On an
 # enterprise NAS served over NFSv3, they aren't — see
 # POSIX-NOT-AUTHORITATIVE-01 in docs/security-dashboard.md. Skip the
-# raw/refined POSIX walks in that case to avoid a flood of
+# data-folder POSIX walks in that case to avoid a flood of
 # false-positive findings; the Tier 2 sudo dump is where the real
 # answer lives.
 ACL_CAP=$(detect_acl_capability "$LAB_VM_ROOT")
@@ -555,8 +574,8 @@ fi
 
 scan_repos
 if [[ "$ACL_CAP" != "synthesized_posix" ]]; then
-    scan_lab_vm_raw
-    scan_lab_vm_refined
+    for d in "${READONLY_DIRS[@]}"; do scan_lab_vm_readonly "$d"; done
+    for d in "${SHARED_DIRS[@]}"; do scan_lab_vm_shared "$d"; done
 fi
 scan_ssh
 scan_dotfiles

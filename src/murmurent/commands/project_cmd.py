@@ -521,6 +521,227 @@ def cmd_members(name: str) -> int:
 
 
 # ---------------------------------------------------------------------------
+# status and migrate: the project as the unit (issue #151, step 0)
+# ---------------------------------------------------------------------------
+
+
+def _home_path(path: Path) -> str:
+    """``path`` written with ``~`` for the home folder, as a person would type it."""
+    p = Path(path)
+    try:
+        return "~/" + str(p.relative_to(Path.home()))
+    except ValueError:
+        return str(p)
+
+
+def _under_data_root(path: Path, data_root: Path) -> str:
+    """``path`` relative to the data root when inside it, else in full."""
+    try:
+        return str(Path(path).relative_to(data_root))
+    except ValueError:
+        return str(path)
+
+
+def _rows(rows: list[tuple[str, ...]], indent: str = "  ") -> list[str]:
+    """Rows of text as aligned columns."""
+    if not rows:
+        return []
+    widths = [max(len(r[i]) for r in rows) for i in range(len(rows[0]))]
+    return [indent + "  ".join(c.ljust(w) for c, w in zip(r, widths)).rstrip() for r in rows]
+
+
+def cmd_status(name: str | None) -> int:
+    """``murmurent project status [name]``: one project, as the unit of work.
+
+    Shows its repositories, its data folders, what it reads without owning,
+    its keep-until date, when it was last used and its activity. With no
+    name, the project of the repository you are in.
+    """
+    from ..core import cert_projects as _cp
+    from ..core import lab_vm as _lv
+    from ..core import project_unit as _pu
+
+    if not name:
+        name = _cp.project_name_for_cwd()
+        if not name:
+            raise click.ClickException(
+                "this folder is not inside a repository murmurent knows. "
+                "Name the project: murmurent project status <name>")
+    cp = _cp.get(name)
+    if cp is None:
+        cp = _pu.owning_project(name)          # the name of one of its repositories
+    if cp is None:
+        raise click.ClickException(
+            f"no project named {name!r}. To list repositories that are in no "
+            "project, run: murmurent project migrate")
+
+    policy = _pu.load_activity_policy()
+    evidence = _pu.usage_evidence(cp)
+    last = evidence[0] if evidence else None
+    activity = _pu.activity_for(last, policy=policy)
+
+    click.echo(f"Project {cp.name}")
+    click.echo(f"  lab:       {cp.lab or '(not set)'}")
+    click.echo(f"  lead:      {cp.lead or '(not set; the lab PI)'}")
+    click.echo(f"  status:    {cp.status}")
+    if last is None:
+        click.echo(f"  activity:  {activity}: nothing on this computer shows it being used")
+    else:
+        click.echo(f"  activity:  {activity}, last used {last.when.date().isoformat()} "
+                   f"({last.detail})")
+    click.echo(f"             quiet after {policy.quiet_after_months} months without use, "
+               f"dormant after {policy.dormant_after_months}")
+
+    click.echo(f"\nRepositories ({len(cp.repos)})")
+    repo_rows: list[tuple[str, ...]] = []
+    for r in cp.repos:
+        if (r.host or "local") != "local":
+            repo_rows.append((r.name, r.role, f"on {r.host}", r.remote_path or ""))
+            continue
+        path = Path(r.path).expanduser() if r.path else None
+        if path is None or not (path / ".git").exists():
+            repo_rows.append((r.name, r.role, "not on this computer", ""))
+            continue
+        when = _pu.newest_commit(path)
+        repo_rows.append((r.name, r.role, _home_path(path),
+                          f"newest commit {when.date().isoformat()}" if when else "no commits yet"))
+    for line in _rows(repo_rows) or ["  (none)"]:
+        click.echo(line)
+
+    data_root = _lv.data_root()
+    which = "the default pair" if not cp.data_folders else "named in the record"
+    click.echo(f"\nData folders ({which}), in {data_root}")
+    folder_rows = [(_under_data_root(f, data_root), "here" if f.is_dir() else "not found")
+                   for f in _pu.effective_data_folders(cp)]
+    for line in _rows(folder_rows):
+        click.echo(line)
+
+    reads = _pu.resolve_reads_from(cp)
+    click.echo("\nReads from, without owning (never offered for clean-up)")
+    read_rows = [(_under_data_root(f, data_root), "folder") for f in reads.folders]
+    read_rows += [(r, "repository") for r in reads.repos]
+    for line in _rows(read_rows) or ["  (nothing)"]:
+        click.echo(line)
+
+    click.echo("\nKeep until")
+    if not cp.retain_until:
+        click.echo("  (not set)")
+    elif _pu.parse_iso_date(cp.retain_until) is None:
+        click.echo(f"  {cp.retain_until!r} is not a date (YYYY-MM-DD), so nothing in this "
+                   "project is suggested for deletion until it is corrected.")
+    elif _pu.retention_blocks_deletion(cp):
+        click.echo(f"  {cp.retain_until}: nothing in this project may be suggested for "
+                   "deletion before then.")
+    else:
+        click.echo(f"  {cp.retain_until} (passed)")
+
+    click.echo("\nUse is counted from commits, from `murmurent run` job records, and from "
+               "the data scan's record of changed files where the lab runs one. The "
+               "shared data drive does not record when a file is read, so reading data "
+               "counts only through a job record.")
+    return 0
+
+
+def _print_migrate_plan(plan) -> None:
+    """Print what ``project migrate`` found and would write, as tables."""
+    click.echo(f"Repositories folder: {_home_path(plan.repos_root)}")
+    click.echo(f"Data root:           {plan.data_root}")
+
+    rows = plan.repo_rows
+    click.echo(f"\nRepositories in no project ({len(rows)})")
+    if rows:
+        table = [("REPOSITORY", "PROJECT", "ROLE", "WHAT WOULD HAPPEN")]
+        for p in plan.proposals:
+            what = "new project" if p.action == "new" else "added to the existing project"
+            table += [(r.name, p.name, r.role, what) for r in p.repos]
+        for line in _rows(table):
+            click.echo(line)
+        for r in rows:
+            if r.has_charter:
+                click.echo(f"  ! {r.name} has a CHARTER.md. Run `murmurent project backfill` "
+                           "as well, to keep the members and lead it lists.")
+    else:
+        click.echo("  (none: every repository here is in a project)")
+
+    for p in plan.new_projects:
+        if p.sensitivity != "standard":
+            click.echo(f"  ! {p.name} would be recorded as {p.sensitivity}, because a "
+                       "repository's .murmurent.yaml says so.")
+    if plan.new_projects:
+        lead = f"@{plan.new_projects[0].lead}" if plan.new_projects[0].lead else \
+            "not set (the lab PI is shown until one is)"
+        lab = plan.new_projects[0].lab or "not set"
+        click.echo(f"  New projects are recorded with lead {lead}, lab {lab}.")
+
+    click.echo(f"\nData folders no project claims ({len(plan.folders)})")
+    if plan.folders:
+        table = [("FOLDER", "PROJECT", "NOTE")]
+        table += [(_under_data_root(f.path, plan.data_root), f.project or "(none)", f.note)
+                  for f in plan.folders]
+        for line in _rows(table):
+            click.echo(line)
+    elif not Path(plan.data_root).is_dir():
+        click.echo(f"  (no data root at {plan.data_root}; only repositories were checked)")
+    else:
+        click.echo("  (none)")
+
+    if plan.left_out:
+        click.echo(f"\nLeft out ({len(plan.left_out)})")
+        for line in _rows([(_home_path(x.path), x.reason) for x in plan.left_out]):
+            click.echo(line)
+    if plan.unreadable:
+        click.echo("\nCould not read")
+        for u in plan.unreadable:
+            click.echo(f"  {u}")
+
+
+def cmd_migrate(*, apply: bool, yes: bool) -> int:
+    """``murmurent project migrate [--apply] [--yes]``.
+
+    Shows every repository and data folder that no project claims, and the
+    project records that would claim them. Writes only with ``--apply``, and
+    then only after asking (``--yes`` skips the question, for scripts). It
+    never moves, renames or deletes anything.
+    """
+    from ..core import cert_projects as _cp
+    from ..core import project_migrate as _pm
+
+    try:
+        plan = _pm.plan()
+    except _pm.MigrateError as exc:
+        raise click.ClickException(str(exc)) from exc
+    _print_migrate_plan(plan)
+
+    n_new = len(plan.new_projects)
+    n_add = sum(len(p.repos) for p in plan.additions)
+    if not plan.has_writes():
+        click.echo("\nNothing to write. Nothing was moved, renamed or deleted.")
+        return 0
+    parts = []
+    if n_new:
+        parts.append(f"write {n_new} new project record{'s' if n_new != 1 else ''}")
+    if n_add:
+        parts.append(f"add {n_add} repositor{'ies' if n_add != 1 else 'y'} to "
+                     "existing projects")
+    click.echo(f"\nThis would {' and '.join(parts)}. Nothing is moved, renamed or deleted.")
+    if not apply:
+        click.echo("Nothing was written. To write these records, run: "
+                   "murmurent project migrate --apply")
+        return 0
+    if not yes and not click.confirm("Write these project records now?", default=False):
+        click.echo("Nothing was written.")
+        return 0
+    try:
+        lines = _pm.apply(plan)
+    except (_cp.CertProjectError, OSError) as exc:
+        raise click.ClickException(f"stopped: {exc}") from exc
+    for line in lines:
+        click.echo(line)
+    click.echo("Done. Nothing was moved, renamed or deleted.")
+    return 0
+
+
+# ---------------------------------------------------------------------------
 # helpers
 # ---------------------------------------------------------------------------
 

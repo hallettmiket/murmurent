@@ -30,8 +30,12 @@ your own).
 A project is a higher-level construct than a repo being
 **murmurent-ready** (having the commons agents wired in via `murmurent repo
 adopt`): readiness is the configuration a repo needs before it can be used
-in a project. See [`ready_vs_projects.md`](ready_vs_projects.md) for the
-distinction between the two.
+in a project. Every repository is in a project: adopting one that no project
+lists records a one-repository project for it. When a project like the one
+below takes in that repository, the one-repository project is archived (kept,
+not deleted), so the repository still has a single owning project. See
+[`ready_vs_projects.md`](ready_vs_projects.md) for the distinction between the
+two.
 
 ---
 

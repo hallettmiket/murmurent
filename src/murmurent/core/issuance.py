@@ -28,6 +28,8 @@ from __future__ import annotations
 
 import json
 import os
+from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from . import centre_init as _ci
@@ -1093,7 +1095,120 @@ def verify_local_identity(*, env: dict | None = None, now=None) -> tuple[str, st
     return ("ok", "") if v.ok else ("reject", v.reason)
 
 
+#: Days before a card expires that sign-in starts saying so.
+CARD_WARNING_DAYS = 14
+
+
+@dataclass(frozen=True)
+class CardHealth:
+    """This machine's identity card, explained for the person signing in.
+
+    ``status`` is :func:`verify_local_identity`'s (``no_card``, ``ok`` or
+    ``reject``). ``kind`` is ``pi`` or ``member``. ``expires_on`` is the date
+    the earliest card in the chain runs out, and ``limited_by`` says whose card
+    that is (``yours`` or ``your PI's``). ``message`` explains a refusal and how
+    to fix it; ``warning`` is set when a card runs out within
+    :data:`CARD_WARNING_DAYS`.
+    """
+
+    status: str
+    reason: str = ""
+    kind: str = ""
+    expires_on: str = ""
+    limited_by: str = ""
+    days_left: int | None = None
+    message: str = ""
+    warning: str = ""
+
+
+def _valid_until(card: object) -> datetime | None:
+    try:
+        return _cert._parse(card["payload"]["valid_until"])  # type: ignore[index]
+    except Exception:  # noqa: BLE001 - a malformed card has no date to report
+        return None
+
+
+def _lab_name() -> str:
+    try:
+        from .lab import load_lab_config
+        return str(load_lab_config().lab or "")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def local_card_health(*, env: dict | None = None, now=None) -> CardHealth:
+    """Whether this machine's card lets its owner in, and what to do if not.
+
+    Used by the dashboard's sign-in, so a refused card is explained instead of
+    sending the person back to the sign-in page with no reason.
+
+    A member's card is checked together with the copy of their PI's card it
+    carries, and both must be in date. So a member is also refused when the
+    PI's copy has run out, even after the PI renewed their own card.
+    """
+    now = now or datetime.now(timezone.utc)
+    status, reason = verify_local_identity(env=env, now=now)
+    if status == "no_card":
+        return CardHealth(status=status)
+    local = _ic.local_card(env=env) or {}
+    centre = local.get("centre") or ""
+    member_p = cards_dir() / f"{_safe(centre)}_member.json"
+    pi_p = cards_dir() / f"{_safe(centre)}_pi.json"
+    kind, dates = "", []
+    try:
+        if member_p.is_file():
+            kind = "member"
+            bundle = json.loads(member_p.read_text(encoding="utf-8"))
+            dates = [(_valid_until(bundle.get("member_card")), "yours"),
+                     (_valid_until(bundle.get("pi_card")), "your PI's")]
+        elif pi_p.is_file():
+            kind = "pi"
+            dates = [(_valid_until(json.loads(pi_p.read_text(encoding="utf-8"))), "yours")]
+    except (OSError, ValueError):
+        pass
+    known = [(d, who) for d, who in dates if d is not None]
+    first, who = min(known, key=lambda t: t[0]) if known else (None, "")
+    expires_on = first.date().isoformat() if first else ""
+    days_left = (first - now).days if first else None
+    lab = _lab_name() or "<your lab>"
+
+    if kind == "pi":
+        renew = f"Renew it on this computer with:  murmurent pi-init {lab}"
+    elif who == "your PI's":
+        renew = ("Ask your PI to renew their card and issue you a new one: run "
+                 "murmurent enroll, send them the file, then import what they send "
+                 "back with:  murmurent import-card <file>")
+    else:
+        renew = ("Ask your PI for a new card: run murmurent enroll, send them the "
+                 "file, then import what they send back with:  "
+                 "murmurent import-card <file>")
+
+    message = warning = ""
+    if status == "reject":
+        if "expired" in reason and expires_on:
+            card = "Your PI's card, which yours depends on," if who == "your PI's" \
+                else "Your murmurent identity card"
+            message = (f"{card} expired on {expires_on}, so the dashboard cannot let "
+                       f"you in. {renew}")
+        elif "revoked" in reason:
+            message = ("Your murmurent identity card has been withdrawn, so the "
+                       "dashboard cannot let you in. Ask your PI.")
+        else:
+            message = (f"Your murmurent identity card could not be checked ({reason}), "
+                       "so the dashboard cannot let you in. Ask your PI.")
+    elif days_left is not None and days_left <= CARD_WARNING_DAYS:
+        card = "Your PI's card, which yours depends on," if who == "your PI's" \
+            else "Your murmurent identity card"
+        when = "today" if days_left <= 0 else \
+            f"in {days_left} day{'s' if days_left != 1 else ''}"
+        warning = f"{card} expires on {expires_on} ({when}). {renew}"
+    return CardHealth(status=status, reason=reason, kind=kind, expires_on=expires_on,
+                      limited_by=who, days_left=days_left, message=message,
+                      warning=warning)
+
+
 __all__ = [
+    "CARD_WARNING_DAYS", "CardHealth", "local_card_health",
     "IssuanceError", "NoRecordedKey",
     "issue_pi_card", "self_issue_pi_card", "make_enrollment",
     "verify_and_import_pi_card", "issue_member_card",

@@ -2243,6 +2243,7 @@ def _render_core_member_md(
     role: str,
     core_name: str,
     status: str = "active",
+    email: str = "",
 ) -> str:
     """Render members/<handle>.md for a (non-leader) core staff member."""
     meta: dict[str, Any] = {
@@ -2252,6 +2253,8 @@ def _render_core_member_md(
         "status": status,
         "lab": core_name,
     }
+    if (email or "").strip():
+        meta["email"] = email.strip()
     yaml_text = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).rstrip() + "\n"
     return f"---\n{yaml_text}---\n\n# {handle_at}\n"
 
@@ -2262,12 +2265,16 @@ def add_core_member(
     handle: str,
     full_name: str | None = None,
     role: str = "staff",
+    email: str = "",
     env: dict[str, str] | None = None,
 ) -> Path:
     """Add a member to ``core_name``. Writes the member's .md file in
     the core's lab-mgmt/members/ dir + commits via the registrar's
     audit-trail git. Idempotent: re-adding an existing handle is a
     no-op (returns the existing path) rather than an error.
+
+    ``email`` is recorded so the member can be found in Slack and added to
+    the core's channel (#188).
 
     Raises:
       LabNotFound — no such core.
@@ -2288,7 +2295,7 @@ def add_core_member(
     member_path.write_text(
         _render_core_member_md(
             handle_at=handle_at, full_name=full_name,
-            role=role, core_name=core_name,
+            role=role, core_name=core_name, email=email,
         ),
         encoding="utf-8",
     )

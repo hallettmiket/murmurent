@@ -1,0 +1,489 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Murmurent · Sign in</title>
+    <link rel="icon" type="image/x-icon" href="/assets/favicon.ico" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700&family=Courier+Prime:ital,wght@0,400;0,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --purple:        #4F2683;
+        --purple-deep:   #201436;
+        --purple-soft:   #6F4DA8;
+        --tiger:         #F0A757;
+        --paper:         #FAF8F5;
+        --paper-2:       #F1ECE3;
+        --card:          #FFFFFF;
+        --rule:          #E0DAD0;
+        --rule-strong:   #C7BFB1;
+        --ink:           #1A1A1A;
+        --muted:         #5B5B5B;
+        --green:         #4F6B3A;
+        --red:           #B23A2B;
+        --serif: "EB Garamond", Georgia, serif;
+        --mono:  "Courier Prime", "IBM Plex Mono", Menlo, monospace;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body {
+        margin: 0; min-height: 100vh;
+        background: var(--paper); color: var(--ink);
+        font-family: var(--serif);
+      }
+      /* Column layout so the brand footer sits at the bottom of a short
+         page instead of floating directly under the sign-in card. */
+      body { display: flex; flex-direction: column; }
+      .banner {
+        background: var(--purple); color: white;
+        padding: 12px 28px; display: flex; align-items: baseline;
+        justify-content: space-between; gap: 24px;
+        border-bottom: 4px solid var(--tiger);
+      }
+      .banner h1 { margin: 0; font-size: 22px; font-weight: 600; }
+      .banner h1 small {
+        font-family: var(--mono); font-size: 11px; font-weight: 400;
+        letter-spacing: 1px; opacity: 0.75; margin-left: 6px;
+      }
+      .banner .meta {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+        text-transform: uppercase; opacity: 0.9;
+      }
+
+      .wrap {
+        max-width: 560px; margin: 48px auto; padding: 0 28px;
+        width: 100%; flex: 1 0 auto;      /* absorbs the spare height */
+      }
+      .card {
+        background: var(--card); border: 1px solid var(--rule-strong);
+        border-radius: 2px; padding: 24px 28px;
+      }
+      .card h2 {
+        margin: 0 0 4px; font-size: 22px; color: var(--purple-deep);
+        font-weight: 600;
+      }
+      .card .lede {
+        margin: 0 0 18px; color: var(--muted); font-size: 14px;
+        line-height: 1.5;
+      }
+      .field {
+        margin: 14px 0;
+      }
+      .field label {
+        display: block; font-family: var(--mono); font-size: 10px;
+        letter-spacing: 1.2px; text-transform: uppercase;
+        color: var(--muted); margin-bottom: 6px;
+      }
+      .field input[type=text] {
+        width: 100%; padding: 8px 10px;
+        font-family: var(--mono); font-size: 13px;
+        border: 1px solid var(--rule-strong); border-radius: 2px;
+        background: var(--paper);
+      }
+      .field input[type=text]:focus {
+        outline: none; border-color: var(--purple);
+        box-shadow: 0 0 0 2px rgba(79, 38, 131, 0.18);
+      }
+      .roles {
+        margin-top: 6px; display: flex; flex-direction: column; gap: 8px;
+      }
+      .role-row {
+        border: 1px solid var(--rule); border-radius: 2px;
+        padding: 10px 14px; display: flex; align-items: center; gap: 12px;
+        cursor: pointer; background: var(--paper);
+        transition: border-color 0.12s, background 0.12s;
+      }
+      .role-row:hover  { border-color: var(--purple-soft); }
+      .role-row.active { border-color: var(--purple); background: #fff; }
+      .role-row.disabled {
+        opacity: 0.45; cursor: not-allowed; background: transparent;
+      }
+      .role-row .label { font-size: 16px; color: var(--purple-deep); }
+      .role-row .why {
+        margin-left: auto; font-family: var(--mono); font-size: 10px;
+        letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
+      }
+      .role-row .why.ok { color: var(--green); }
+      .role-row .why.deny { color: var(--red); }
+      .remember {
+        margin-top: 6px; font-size: 13px; color: var(--muted);
+        display: flex; align-items: center; gap: 6px;
+      }
+      .actions {
+        margin-top: 18px; display: flex; justify-content: flex-end; gap: 8px;
+        align-items: center;
+      }
+      .btn {
+        padding: 7px 16px; font-family: var(--mono); font-size: 12px;
+        letter-spacing: 0.5px; cursor: pointer; border-radius: 2px;
+        border: 1px solid var(--rule-strong); background: var(--card);
+      }
+      .btn:hover { border-color: var(--purple); color: var(--purple); }
+      .btn.primary {
+        background: var(--purple); color: white; border-color: var(--purple);
+      }
+      .btn.primary:hover { background: var(--purple-deep); }
+      .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+      .msg { font-size: 12px; margin-right: auto; }
+      .msg.error { color: var(--red); }
+      .msg.ok { color: var(--green); }
+      /* Why sign-in cannot continue (an expired identity card, say), or a
+         card that runs out soon. Shown above the form so it is read first. */
+      .card-notice {
+        margin: 0 0 16px; padding: 10px 12px; border-radius: 3px;
+        border-left: 4px solid var(--tiger); background: #FDF3E7;
+        font-size: 13px; line-height: 1.5; color: var(--ink);
+      }
+      .card-notice.error { border-left-color: var(--red); background: #F8E7E4; }
+      .card-notice code {
+        display: inline-block; margin-top: 4px; font-family: var(--mono);
+        font-size: 12px; background: var(--card); padding: 2px 6px; border-radius: 2px;
+        user-select: all;
+      }
+      .footer-note {
+        max-width: 560px; margin: 12px auto 0; padding: 0 28px;
+        color: var(--muted); font-size: 12px; line-height: 1.55;
+      }
+      .footer-note code {
+        font-family: var(--mono); font-size: 11px;
+        background: var(--paper-2); padding: 1px 4px; border-radius: 2px;
+      }
+
+      /* Dark-purple brand footer, mirrors the user + registrar pages. */
+      .footer {
+        margin-top: 36px;
+        padding: 14px 28px;
+        background: var(--purple-deep);
+        color: rgba(255,255,255,0.85);
+        border-top: 3px solid var(--tiger);
+        font-family: var(--serif); font-size: 13px;
+      }
+      .footer .bar {
+        max-width: 1200px; margin: 0 auto;
+        display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+      }
+      .footer img.lab-logo-mini { height: 28px; border-radius: 2px; }
+      .footer img.schulich-mini {
+        height: 22px; filter: brightness(0) invert(1); opacity: 0.85;
+      }
+      .footer img.western-mini {
+        height: 18px; filter: brightness(0) invert(1); opacity: 0.85;
+      }
+      .footer .dept {
+        font-size: 12px; color: rgba(255,255,255,0.7); flex-grow: 1;
+      }
+      .footer .links { display: flex; gap: 18px; }
+      .footer a {
+        color: var(--tiger); border-bottom: 1px dotted var(--tiger);
+        text-decoration: none;
+      }
+      .footer .links a {
+        font-size: 12px; color: rgba(255,255,255,0.85); border-bottom: 0;
+      }
+      .footer .links a:hover { color: var(--tiger); }
+      .footer .ack {
+        max-width: 1200px; margin: 10px auto 0;
+        font-style: italic; font-size: 12px;
+        color: rgba(255,255,255,0.75); line-height: 1.55;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="banner">
+      <h1>Murmurent <small>v{{MM_VERSION}}</small> &middot; Sign in</h1>
+      <div class="meta" id="lab-meta"></div>
+    </div>
+
+    <div class="wrap">
+      <div class="card">
+        <h2>Who is using this dashboard?</h2>
+        <p class="lede">
+          Signed in as <code id="inferred-handle">…</code>. Use a different
+          netname if you're not that person, then pick the lens you want to
+          work in.
+        </p>
+
+        <div class="card-notice" id="card-notice" role="alert" hidden></div>
+
+        <form id="login-form" autocomplete="off">
+          <div class="field">
+            <label>Western netname</label>
+            <input type="text" id="handle-input" name="handle"
+                   placeholder="e.g. the_pi" />
+          </div>
+
+          <div class="field">
+            <label>Log in as</label>
+            <div class="roles" id="roles">
+              <!-- populated by renderRoles() -->
+            </div>
+          </div>
+
+          <label class="remember">
+            <input type="checkbox" id="remember" checked />
+            Remember this netname on this machine
+          </label>
+
+          <div class="actions">
+            <span class="msg" id="msg"></span>
+            <button type="submit" class="btn primary" id="submit" disabled>
+              Continue &rarr;
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+    <footer class="footer">
+      <div class="bar">
+        <a href="https://mikehallett.science" target="_blank" rel="noopener">
+          <img class="lab-logo-mini" src="assets/lab-logo-hi-res.jpg" alt="Hallett Lab" />
+        </a>
+        <a href="https://www.schulich.uwo.ca/" target="_blank" rel="noopener">
+          <img class="schulich-mini" src="assets/Schulich_horizontal_CMYK.png" alt="Schulich School of Dentristy and Medicine" />
+        </a>
+        <a href="https://www.uwo.ca/" target="_blank" rel="noopener">
+          <img class="western-mini" src="assets/western_longWhite.png" alt="Western University" />
+        </a>
+        <span class="dept">Department of Biochemistry &middot; London, ON, Canada</span>
+      </div>
+      <div class="ack">
+        We acknowledge that Western University is located on the traditional lands of
+        the Anishinaabek, Haudenosaunee, Lūnaapéewak and Attawandaron peoples.
+      </div>
+    </footer>
+
+    <script>
+    "use strict";
+
+    // Three lenses only: a PI leads either a lab or a core — same lens
+    // for both (issue #18), so there is no separate core-leader view.
+    const ROLE_LABELS = {
+      member:      "Member view",
+      pi:          "PI view",
+      registrar:   "Registrar view",
+    };
+    const ROLE_DESCRIPTIONS = {
+      member:      "everyone in lab-mgmt/members",
+      pi:          "the named PI of a lab or a service core",
+      registrar:   "centre-level administrator",
+    };
+
+    const inferredEl = document.getElementById("inferred-handle");
+    const handleInput = document.getElementById("handle-input");
+    const rolesEl = document.getElementById("roles");
+    const submitBtn = document.getElementById("submit");
+    const msgEl = document.getElementById("msg");
+    const rememberEl = document.getElementById("remember");
+    const form = document.getElementById("login-form");
+
+    let selectedRole = null;
+    let lastResolved = null;
+
+    function escapeHTML(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    function setMessage(text, kind) {
+      msgEl.textContent = text || "";
+      msgEl.className = "msg" + (kind ? " " + kind : "");
+    }
+
+    // A refusal the dashboard handed back on its way here (see hifi-data.jsx).
+    // It stays on screen until something more specific replaces it.
+    const noticeEl = document.getElementById("card-notice");
+    let pinnedNotice = null;
+    try {
+      const refused = sessionStorage.getItem("murmurent.refusal");
+      if (refused) {
+        sessionStorage.removeItem("murmurent.refusal");
+        pinnedNotice = { kind: "error", text: refused };
+      }
+    } catch (e) { /* storage blocked: nothing was handed over */ }
+
+    function showNotice(notice) {
+      const n = notice || pinnedNotice;
+      if (!n || !n.text) { noticeEl.hidden = true; noticeEl.innerHTML = ""; return; }
+      // Server messages end with the fix after ":  " (two spaces); set it apart
+      // so it can be copied in one click.
+      const parts = String(n.text).split(":  ");
+      let html = escapeHTML(parts[0]);
+      if (parts.length > 1) html += ":<br><code>" + escapeHTML(parts.slice(1).join(":  ")) + "</code>";
+      noticeEl.innerHTML = html;
+      noticeEl.className = "card-notice" + (n.kind === "error" ? " error" : "");
+      noticeEl.hidden = false;
+    }
+    showNotice(null);
+
+    function renderRoles(resolved) {
+      lastResolved = resolved;
+      const handle = resolved && resolved.handle ? resolved.handle : "";
+      const flags = {
+        member:      !!(resolved && resolved.is_member),
+        pi:          !!(resolved && resolved.is_pi),
+        registrar:   !!(resolved && resolved.is_registrar),
+      };
+      // A PI (or registrar) does NOT get a "member" lens — the server
+      // derives the dashboard persona from their actual role, so picking
+      // "member" would land on their group dashboard anyway. Unknown
+      // handles CAN pick "member" (they see an empty dashboard; we don't
+      // punish a typo with a 403).
+      const holdsHigherRole = flags.pi || flags.registrar;
+      const allowed = {
+        member:      !holdsHigherRole,
+        pi:          flags.pi,
+        registrar:   flags.registrar,
+      };
+      const defaultRole = (resolved && resolved.default_role) || "member";
+      selectedRole = allowed[defaultRole] ? defaultRole
+        : allowed.pi ? "pi"
+        : allowed.registrar ? "registrar"
+        : "member";
+
+      // Always render all three lenses — unavailable ones are greyed out
+      // with the reason, never hidden (a missing row reads as a bug).
+      const roleOrder = ["member", "pi", "registrar"];
+
+      const rows = roleOrder.map(role => {
+        const isAllowed = allowed[role];
+        const why = role === "member"
+          ? (!handle ? "claim a netname first"
+             : holdsHigherRole ? "you sign in with your group role"
+             : "available")
+          : (isAllowed ? "you hold this role" : "not authorised");
+        const cls = isAllowed
+          ? "ok"
+          : "deny";
+        return (
+          '<div class="role-row ' +
+            (isAllowed ? "" : "disabled ") +
+            (role === selectedRole ? "active" : "") +
+            '" data-role="' + role + '" data-allowed="' + (isAllowed ? "1" : "0") + '">' +
+          '<span class="label">' + escapeHTML(ROLE_LABELS[role]) + '</span>' +
+          '<span class="why ' + cls + '">' + escapeHTML(why) + '</span>' +
+          '</div>'
+        );
+      });
+      rolesEl.innerHTML = rows.join("");
+      rolesEl.querySelectorAll(".role-row").forEach(row => {
+        row.addEventListener("click", () => {
+          if (row.dataset.allowed !== "1") return;
+          rolesEl.querySelectorAll(".role-row").forEach(r => r.classList.remove("active"));
+          row.classList.add("active");
+          selectedRole = row.dataset.role;
+          updateSubmitState();
+        });
+      });
+      updateSubmitState();
+    }
+
+    function updateSubmitState() {
+      const handle = (handleInput.value || "").trim().replace(/^@/, "");
+      submitBtn.disabled = !(handle && selectedRole);
+    }
+
+    let resolveTimer = null;
+    function scheduleResolve() {
+      if (resolveTimer) clearTimeout(resolveTimer);
+      resolveTimer = setTimeout(doResolve, 200);
+    }
+
+    function doResolve() {
+      const handle = (handleInput.value || "").trim().replace(/^@/, "");
+      if (!handle) {
+        renderRoles({ handle: "", is_member: false, is_pi: false, is_registrar: false, default_role: "member" });
+        return;
+      }
+      setMessage("checking…");
+      fetch("/api/login/resolve?user=" + encodeURIComponent(handle), {
+        credentials: "same-origin",
+        headers: { Accept: "application/json" },
+      })
+        .then(r => r.json())
+        .then(data => {
+          setMessage("");
+          renderRoles(data);
+          showNotice(data && data.card_notice);
+        })
+        .catch(err => {
+          console.warn("resolve failed", err);
+          setMessage("Could not check this netname — proceeding will still try.", "error");
+        });
+    }
+
+    handleInput.addEventListener("input", scheduleResolve);
+
+    form.addEventListener("submit", (ev) => {
+      ev.preventDefault();
+      const handle = (handleInput.value || "").trim().replace(/^@/, "");
+      if (!handle || !selectedRole) return;
+      submitBtn.disabled = true;
+      setMessage("signing in…");
+      fetch("/api/login/select", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          handle: handle,
+          role: selectedRole,
+          remember_user: rememberEl.checked,
+        }),
+      })
+        .then(r => r.json().then(j => ({ ok: r.ok, status: r.status, body: j })))
+        .then(({ ok, status, body }) => {
+          if (!ok) {
+            const detail = (body && body.detail) || ("HTTP " + status);
+            if (status === 403 && String(detail).length > 80) {
+              showNotice({ kind: "error", text: detail });
+              setMessage("Sign-in refused: see the note above.", "error");
+            } else {
+              setMessage(detail, "error");
+            }
+            submitBtn.disabled = false;
+            return;
+          }
+          window.location.href = body.next;
+        })
+        .catch(err => {
+          setMessage("Network error: " + (err && err.message ? err.message : err), "error");
+          submitBtn.disabled = false;
+        });
+    });
+
+    // Banner: show THIS install's real lab (never a hardcoded one). Blank
+    // until it resolves, so a fresh install shows no stale lab name.
+    fetch("/api/lab/public", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(r => r.json())
+      .then(lab => {
+        const label = (lab && (lab.display_name || lab.name)) || "";
+        const el = document.getElementById("lab-meta");
+        if (el) el.textContent = label;
+      })
+      .catch(() => {});
+
+    // Initial state — fetch the inferred handle from the server's
+    // resolve endpoint (no ?user= → server returns whatever MURMURENT_USER
+    // or ~/.murmurent/user resolves to).
+    fetch("/api/login/resolve", { credentials: "same-origin", headers: { Accept: "application/json" } })
+      .then(r => r.json())
+      .then(data => {
+        const h = data && data.handle ? data.handle : "";
+        inferredEl.textContent = h ? "@" + h : "(no saved netname)";
+        handleInput.value = h;
+        renderRoles(data);
+        showNotice(data && data.card_notice);
+      })
+      .catch(err => {
+        inferredEl.textContent = "(could not resolve)";
+        renderRoles({ handle: "", is_member: false, is_pi: false, is_registrar: false, default_role: "member" });
+      });
+    </script>
+  </body>
+</html>

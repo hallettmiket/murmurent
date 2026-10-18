@@ -7,8 +7,13 @@ happens inside repositories.
 
 A **Murmurent-ready** repo is a git clone Murmurent has registered, by
 writing a `.murmurent.yaml` marker at its root. This page covers how to make
-a repo ready, check its status, and upgrade it after a release. A project is a
-separate, higher-level thing built on top of ready repos; see
+a repo ready, check its status, and upgrade it after a release.
+
+**Every repository is part of a project.** A project is the unit Murmurent
+works with: its record lists its repositories, its data folders, its members
+and its state. Making a repository ready also puts it in a project when it is
+in none; see [Every repository is in a project](#every-repository-is-in-a-project)
+below. How a project with several members is set up is in
 [`project_intra.md`](project_intra.md).
 
 A project often owns several repos, each with a role: `code`, `manuscript`,
@@ -38,10 +43,11 @@ What readiness does buy, all of it keyed on that marker file:
    ready, and the only one that can cost you something real.
 2. **The audit log attributes activity to a project.** `hooks/audit.py` names
    the project the same way; without a marker the entry is recorded without it.
-3. **The repo can be attached to a project.** `core.cert_projects` finds a
+3. **The repo is found as part of its project.** `core.cert_projects` finds a
    project's code repo through the marker, and stamps one if a legacy
-   `CHARTER.md` repo is being migrated, precisely so the repo stays
-   discoverable.
+   `CHARTER.md` repo is being migrated, so the repo stays discoverable.
+   Commands run inside the repo, such as `murmurent project status`, use it to
+   work out which project you are in.
 4. **The repo can declare itself clinical.** `sensitivity: clinical` in the
    marker makes `core.personal_audit` treat it as holding patient data
    regardless of what the project registry says.
@@ -112,7 +118,9 @@ project folder, which is where the inventory looks.
 
 Adopting writes the two things readiness consists of, the `.murmurent.yaml`
 marker and the `.claude/agents/` symlinks, and leaves every other file as it
-was. Commit both, so each clone of the repository is ready as well.
+was. Commit both, so each clone of the repository is ready as well. If no
+project lists the repository, adopting also writes a project record for it in
+the lab records repository; see the next section.
 
 ## Adopting a repo
 
@@ -134,6 +142,89 @@ Parameters:
 - `--host <name>`: which machine to act on. `local` (default) is this
   laptop; any other value is a registered remote machine (see `murmurent
   host list`), acted on over SSH.
+
+## Every repository is in a project
+
+Each repository belongs to exactly one project, its **owning** project. When
+you adopt a repository that no project lists, Murmurent writes a project record
+for it, with you as lead and only member, in the lab records repository (the
+lab's shared management repository). Adopting it again changes nothing. If the
+repository later joins a bigger project, for example through the dashboard's
+New Project, its one-repository project is archived (kept, not deleted), so it
+still has one owning project.
+
+The project's name comes from the repository's name and place:
+
+| Repository | Project | Role |
+|---|---|---|
+| `~/repos/brca` | `brca` | `code` |
+| `~/repos/brca_manuscript`, when a project or repository `brca` exists | `brca` | `manuscript` |
+| `~/repos/brca/brca_seminar` (inside a project folder) | `brca` | `seminar` |
+| `~/repos/cell_data`, when nothing called `cell` exists | `cell_data` | `code` |
+
+Adopting never changes a project that already exists. If the repository
+belongs by its name to an existing project that does not list it yet, adopt
+says so and writes nothing. Add it with `murmurent project migrate`, which
+shows the change and asks first.
+
+### Finding repositories and data that are in no project
+
+```bash
+murmurent project migrate            # list them and what would be written; writes nothing
+murmurent project migrate --apply    # write those records, after you confirm
+```
+
+`migrate` lists every repository in your repositories folder, and every folder
+directly under `immutable/` and `append_only/` in the data root, that no
+project claims. It proposes project records for the repositories, grouping
+`x`, `x_manuscript` and `x_seminar` into one project `x`. A data folder named
+after a project is claimed by that project. Any other folder stays listed as
+unclaimed, for you to decide about. `migrate` never moves, renames or deletes
+anything, and `--yes` skips the question for scripts. Murmurent's own
+repositories, the lab records repository, and repositories you have marked
+private (`murmurent repo private add`) are left out.
+
+### What a project record holds
+
+Besides its repositories and members, a project record has three settings,
+all optional:
+
+| Setting | What it holds |
+|---|---|
+| `data_folders` | The folders the project owns. Left empty, these are `immutable/<project>/` and `append_only/<project>/` under the data root, which is right for most projects. Write a folder in full, or relative to the data root (`append_only/brca`) so it is right on every machine. |
+| `reads_from` | What the project reads but does not own: a folder, written as a path (`append_only/shared_cohort`), or another project's repository, by its name. These are never offered to this project for clean-up. |
+| `retain_until` | A date, `YYYY-MM-DD`, before which nothing in the project may be suggested for deletion, for example the end of an ethics approval or a data-sharing agreement. |
+
+For now, set them by editing the project's file in `cert_projects/` in the lab
+records repository, then commit and push it.
+
+### Whether a project is in use
+
+```bash
+murmurent project status brca        # or, inside one of its repositories: murmurent project status
+```
+
+This shows the project's repositories, data folders, what it reads, its
+keep-until date, when it was last used, and its **activity**:
+
+- **active**: used in the last 12 months;
+- **quiet**: not used for 12 months;
+- **dormant**: not used for 24 months;
+- **unknown**: nothing on this computer shows it being used.
+
+A lab can set its own numbers of months in its policy file,
+`policy/millwright.yaml` in the lab records repository
+(`project_quiet_months:` and `project_dormant_months:`). The same file holds the
+lab's other numbers; a commented example is in `templates/millwright_policy.yaml`.
+
+"Used" means the newest of: a commit in any of the project's repositories on
+this computer, a job started with `murmurent run`, and a file changed in its
+data folders, as recorded by the lab's data scan where one runs. Reading data
+does not count unless it ran through `murmurent run`, because the shared data
+drive does not record when a file was read.
+
+Activity is separate from a project's status (`active` or `archived`), which
+decides who can reach it. A dormant project keeps its members.
 
 ## Checking readiness
 
@@ -194,8 +285,8 @@ part is automatic.
 ## See also
 
 - [`setup.md`](setup.md): per-machine + per-project install steps.
-- [`project_intra.md`](project_intra.md): what a project is and how one
-  gets created.
+- [`project_intra.md`](project_intra.md): how a project with several members
+  is set up.
 - [`cli_manual.md`](cli_manual.md): full `murmurent repo …` command
   reference.
 - [`reconcile.md`](reconcile.md): the readiness/adoption drift checks

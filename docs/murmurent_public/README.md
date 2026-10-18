@@ -92,7 +92,7 @@ murmurent choreography init pin1_inhibition   # asks for anything you leave out
 
 Or click **＋ new choreography** in the Choreographies panel of your dashboard.
 Step by step, including what happens after your PI approves:
-[Starting a choreography](https://hallettmiket.github.io/murmurent/starting_a_choreography/).
+[Starting a choreography](https://mikehallett.science/murmurent/starting_a_choreography/).
 
 **Publishing yours:** push the repository, then open a pull request adding one
 row to `choreographies.tsv`: the name, a tab, and the repository's git address.

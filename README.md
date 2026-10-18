@@ -14,6 +14,9 @@ helps.
 
 **▶ [Watch the 7-minute getting-started video](https://mikehallett.science/assets/videos/murmurent_getting_started.html)**
 
+**📖 [Read the documentation](https://mikehallett.science/murmurent/)**: getting
+started, joining a lab, projects, the agents, and every command.
+
 You need a Mac or Linux computer with
 [Claude Code](https://claude.com/claude-code) installed and signed in.
 
@@ -59,7 +62,7 @@ murmurent repo adopt ~/repos/<folder>
 
 The folder must be a git repository inside your repositories folder (`~/repos`
 unless you chose another).
-[If it does not work](https://hallettmiket.github.io/murmurent/install_special_cases/#setting-up-a-folder-did-not-work).
+[If it does not work](https://mikehallett.science/murmurent/install_special_cases/#setting-up-a-folder-did-not-work).
 
 ## 4. Start working
 
@@ -79,16 +82,16 @@ murmurent install
 
 ## Next
 
-- [See what Murmurent can do](https://hallettmiket.github.io/murmurent/getting_started/)
-- [Join your lab](https://hallettmiket.github.io/murmurent/identity/#members-join-a-group)
-- [Set up your lab or core](https://hallettmiket.github.io/murmurent/identity/#pis-set-up-your-lab-standalone-no-mayor-needed)
-- [Start a centre](https://hallettmiket.github.io/murmurent/centre_overview/)
-- [All documentation](https://hallettmiket.github.io/murmurent/)
+- [See what Murmurent can do](https://mikehallett.science/murmurent/getting_started/)
+- [Join your lab](https://mikehallett.science/murmurent/identity/#members-join-a-group)
+- [Set up your lab or core](https://mikehallett.science/murmurent/identity/#pis-set-up-your-lab-standalone-no-mayor-needed)
+- [Start a centre](https://mikehallett.science/murmurent/centre_overview/)
+- [All documentation](https://mikehallett.science/murmurent/)
 
 ## Help
 
 Ask Claude Code first. If that does not solve it, see
-[installation special cases](https://hallettmiket.github.io/murmurent/install_special_cases/)
+[installation special cases](https://mikehallett.science/murmurent/install_special_cases/)
 or [report a problem](https://github.com/hallettmiket/murmurent_dev/issues).
 
 ---

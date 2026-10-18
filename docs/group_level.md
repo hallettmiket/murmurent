@@ -26,27 +26,44 @@ across them.
   legacy-but-supported marker that predates the current certificate-based
   project model (see [Creating a project](project_intra.md)).
 
-## Agent classification: the freeze cascade
+## Agent classification: the freeze flag
 
 Agents ship as shared definitions in the commons, but a member may want to
-customize an agent for their own work. The **freeze cascade** is the rule
-that decides, for any given run, whether an agent uses the shared (frozen)
-definition or a member's own (personal) version. "Freeze" marks an agent
+customize an agent for their own work. Each agent's frontmatter carries a
+**freeze flag** that says whether that is allowed. "Freeze" marks an agent
 whose definition should not drift from the shared version, for consistency
-and reproducibility; "cascade" refers to the ordered levels below, where a
-more specific level overrides a more general one.
+and reproducibility.
 
-Each agent has a **default freeze flag** in the registry. The effective flag for any given invocation cascades through three levels:
+- `frozen`: the member cannot make their own version. Used for
+  safety-critical agents whose drift would erode group consistency or
+  compliance, for example `security_guard`, `conscience` and the millwrights.
+- `personal`: the member may make their own version (`murmurent agent fork`,
+  or Modify on the dashboard). Used where individual variation is acceptable,
+  for example `artist` and `bookworm`.
 
-1. **Registry default**: `frozen` or `personal`, set in the agent's frontmatter.
-   - `frozen` for safety-critical agents whose drift would erode group consistency or compliance: `conscience`, `security_guard`, `adversary` when used in code review, anything that gates outgoing artefacts.
-   - `personal` for stylistic agents where individual variation is acceptable: `artist`, often `bookworm`.
-2. **Role override**: when an agent is run as part of a role, the role can override the default. Example: `bookworm` is `personal` by default; the `bookworm_curator` role overrides to `frozen` because the curator's output is consumed by the rest of the group.
-3. **Bot pinning**: when the agent runs in a GitHub Actions context (or any other shared CI), it always runs `frozen`, regardless of the default or role flag. Bots write to shared artefacts; reproducibility forbids drift.
+Three agents are never editable whatever their flag, because they guard the
+rest: `security_guard`, `adversary` and `conscience`, plus any agent that
+withholds a tool able to send data out.
 
-Effective flag = bot pin (if applicable) ∨ role override (if applicable) ∨ registry default.
+The flag is checked when a member tries to edit an agent. It does not yet
+decide which version runs: once a member has their own version, Claude Code
+uses it in all of that member's projects.
 
-The cascade is enforced by the install tooling and by the bot's workflow file (which references the registry version explicitly).
+### Planned: levels and the cascade
+
+Two further rules were designed but are **not built**:
+
+1. **Role override**: a role could pin an agent to the shared version. For
+   example, `bookworm` is `personal`, but a `bookworm_curator` role, whose
+   output the whole group relies on, would always run the shared definition.
+2. **Automated runs**: an agent run by a bot (GitHub Actions or other shared
+   automation) would always use the shared version, because bots write to
+   shared results and those must be reproducible.
+
+[Issue #186](https://github.com/hallettmiket/murmurent_dev/issues/186) plans
+how an agent's version will be chosen across the centre, lab, project and
+person levels, including switching an agent off in one project. These two
+rules belong there.
 
 ### Tool preferences (defaults + overrides)
 
@@ -226,7 +243,7 @@ The CLI inspects the diff and, if any changed path requires PR, refuses direct p
 
 ### Bot reviews on PR
 
-Each PR triggers GitHub Actions per the paths involved. Bots always run frozen versions of the agents (per the freeze cascade).
+Each PR triggers GitHub Actions per the paths involved. Bots are meant to always run the shared versions of the agents (the planned automated-run rule above; not built yet).
 
 | Bot | Triggers on | Effect |
 |---|---|---|
@@ -354,7 +371,7 @@ murmurent onboard <group> --profile student
 
 This:
 - Clones the Murmurent repo (default `~/repos/murmurent`).
-- Installs agents per the profile, applying the freeze cascade (symlinks for `frozen`, copies for `personal`).
+- Installs agents per the profile (planned; see the freeze flag section above).
 - Configures MCP servers (inventory, oracle, request board) in `~/.claude/settings.json`.
 - Generates a personal `age` key pair; pushes the public key to `lab-mgmt-repo/keys/<github-handle>.age`.
 - Creates `lab-mgmt-repo/members/<github-handle>.md` with a profile stub (interests, contact, current projects).

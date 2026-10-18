@@ -8,7 +8,7 @@ routine use.
 
 Murmurent uses Slack as its communication fabric in this deployment: a
 private **mayor↔CC channel** (`#murmurent-ops`) where the code posts events,
-a private **channel per lab/core** (named after the group, members-only),
+a private **channel per lab/core** (`#lab-<group>`, members-only),
 and **`#general`** for broadcasts. This guide is the one-time setup a
 **mayor** does so those channels get created and populated automatically.
 
@@ -130,10 +130,15 @@ channel, `everyone` → `#general`). Re-running is safe (idempotent).
 
 ## What happens automatically after this
 
-- **New lab/core** (created via a join approval or the registrar): a private
-  channel **named after the group** is created, the PI/leader is invited, and the
-  channel id is stored on the group, as long as the token + `slack_workspace`
-  are set.
+- **New lab/core** (created via a join approval or the registrar's create
+  button): a private channel **`#lab-<group>`** is created, the group's members
+  are invited, and the channel id is stored on the group, as long as the token
+  is set (a join approval also needs `slack_workspace`). If the name is already
+  taken, the existing channel is used. If Slack is not set up, the group is
+  still created and the dashboard says that no channel was made.
+- **Members join and leave with the group**: adding a core member or issuing a
+  lab member's card adds them to the channel; removing a core member, or
+  deactivating a lab member, removes them; reactivating adds them back.
 - **Broadcasts**: `murmurent broadcast --audience everyone …` lands in `#general`;
   `--audience admin` reaches the mayor channel.
 - **Join requests**: the mayor is notified in the `admin` (mayor) channel; the
@@ -153,5 +158,11 @@ to a Slack account automatically; anyone missing that field is reported as
 - **Free/Pro Slack limits invites to the invite-link step above** (joining
   a *channel* is automatic once someone is already in the workspace). Full
   workspace-invite automation needs a paid admin token.
-- Channel names follow the group's own name normalized to Slack rules
-  (lowercase, `[a-z0-9_-]`, ≤80): `example_lab` → `#example_lab`.
+- Channel names are `lab-` plus the group's name, normalized to Slack rules
+  (lowercase, `[a-z0-9_-]`, ≤80): `mh` → `#lab-mh`. A name that already starts
+  with `lab_` is not repeated: `lab_mh` → `#lab-mh`. Groups created before this
+  naming keep the channel they already have.
+- Adding a member to the channel needs their **email** on their member file,
+  to find their Slack account. Adding a core member accepts an optional
+  `email` for this (`POST /api/registrar/core/<core>/members`; the dashboard
+  has no form for it yet).

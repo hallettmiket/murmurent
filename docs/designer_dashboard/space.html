@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Murmurent · Space</title>
+    <link rel="icon" type="image/x-icon" href="/assets/favicon.ico" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700&family=Courier+Prime:ital,wght@0,400;0,700&display=swap"
+      rel="stylesheet"
+    />
+    <!--
+      The lab's weekly space report (issue #151, step 3). PI only. The report
+      lives on the machine the scan runs on; this page asks the local dashboard
+      to fetch it over SSH each time, and keeps no copy.
+    -->
+    <style>
+      :root {
+        --purple: #4F2683; --purple-deep: #201436; --tiger: #F0A757;
+        --paper: #FAF8F5; --paper-2: #F1ECE3; --card: #FFFFFF;
+        --rule: #E0DAD0; --rule-strong: #C7BFB1;
+        --ink: #1A1A1A; --muted: #5B5B5B; --green: #4F6B3A; --red: #B23A2B;
+        --serif: "EB Garamond", Georgia, serif;
+        --mono: "Courier Prime", "IBM Plex Mono", Menlo, monospace;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--serif); }
+      .banner {
+        background: var(--purple); color: white; padding: 12px 28px;
+        display: flex; align-items: baseline; justify-content: space-between; gap: 24px;
+        border-bottom: 4px solid var(--tiger);
+      }
+      .banner h1 { margin: 0; font-size: 22px; font-weight: 600; }
+      .banner .meta { font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+                      text-transform: uppercase; opacity: 0.9; }
+      .container { max-width: 1100px; margin: 24px auto; padding: 0 28px; }
+      .card { background: var(--card); border: 1px solid var(--rule-strong);
+              border-radius: 2px; margin-bottom: 18px; }
+      .card > header { padding: 10px 16px; border-bottom: 1px solid var(--rule);
+                       background: var(--paper-2); font-weight: 600; font-size: 17px; }
+      .card > .body { padding: 12px 16px; }
+      .controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+      select, button { font-family: var(--serif); font-size: 15px; padding: 4px 10px; }
+      button { background: var(--purple); color: white; border: 1px solid var(--purple);
+               border-radius: 2px; cursor: pointer; }
+      button[disabled] { opacity: 0.5; cursor: wait; }
+      .status { font-size: 14px; color: var(--muted); }
+      .status.error { color: var(--red); }
+      .summary { font-size: 17px; line-height: 1.5; }
+      .emergency { border-left: 4px solid var(--red); background: #F8E7E4;
+                   padding: 8px 12px; margin: 6px 0; }
+      .top { border-left: 4px solid var(--tiger); padding: 6px 12px; margin: 8px 0; }
+      .top .size { font-family: var(--mono); font-weight: 700; }
+      .top .path { font-family: var(--mono); font-size: 12px; color: var(--muted);
+                   word-break: break-all; }
+      table { width: 100%; border-collapse: collapse; font-size: 15px; }
+      th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--rule); }
+      th { font-weight: 600; background: var(--paper-2); }
+      td.num, th.num { text-align: right; font-family: var(--mono); }
+      .pill { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius: 2px;
+              border: 1px solid var(--rule-strong); }
+      .pill.dormant { border-color: var(--red); color: var(--red); }
+      .pill.quiet { border-color: var(--tiger); color: #8a5a1c; }
+      .note { font-size: 13px; color: var(--muted); }
+      .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+      .filters label { font-size: 13px; color: var(--muted); }
+      .rows td.path { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+      .rows td.why { font-size: 13px; color: var(--muted); }
+      .rows td { vertical-align: top; }
+      .more { margin-top: 10px; }
+      code { font-family: var(--mono); font-size: 12px; background: var(--paper-2);
+             padding: 1px 4px; border-radius: 2px; }
+      @media (max-width: 640px) { .container { padding: 0 16px; } .banner { padding: 12px 16px; } }
+    </style>
+  </head>
+  <body>
+    <div class="banner">
+      <h1>Lab space report</h1>
+      <div class="meta" id="meta"></div>
+    </div>
+    <div class="container">
+      <div class="card">
+        <div class="body controls">
+          <label for="host">Report from</label>
+          <select id="host"></select>
+          <button id="load">Fetch report</button>
+          <span class="status" id="status"></span>
+        </div>
+      </div>
+      <div id="report"></div>
+      <div class="card" id="rows-card" hidden>
+        <header>Every suggestion</header>
+        <div class="body">
+          <div class="filters">
+            <label>Project <select id="f-project"><option value="">any</option></select></label>
+            <label>Category <select id="f-category"><option value="">any</option></select></label>
+            <label>Suggestion <select id="f-suggestion"><option value="">any</option></select></label>
+            <label>Owner <select id="f-owner"><option value="">any</option></select></label>
+            <label>At least <select id="f-size">
+              <option value="0">any size</option><option value="1073741824">1 GB</option>
+              <option value="10737418240" selected>10 GB</option><option value="107374182400">100 GB</option>
+              <option value="1099511627776">1 TB</option></select></label>
+            <button id="f-show">Show</button>
+            <span class="status" id="rows-status"></span>
+          </div>
+          <table class="rows"><thead><tr><th class="num">Size</th><th>Suggestion</th><th>Where</th><th>Owner</th><th>Why</th></tr></thead>
+            <tbody id="rows-body"></tbody></table>
+          <button class="more" id="rows-more" hidden>Show more</button>
+          <p class="note">Nothing here is changed by looking. Record a decision on the server with
+            <code>murmurent space decide &lt;row&gt; keep|delete|mothball|compress|move</code>.</p>
+        </div>
+      </div>
+      <p class="note">
+        The weekly scan only suggests: nothing is changed, moved or deleted. To see every row of one
+        project, or to record a decision, run <code>murmurent space show &lt;project&gt;</code> on the
+        machine the scan runs on.
+      </p>
+    </div>
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      const user = params.get("user") || "";
+      const hostEl = document.getElementById("host");
+      const loadEl = document.getElementById("load");
+      const statusEl = document.getElementById("status");
+      const reportEl = document.getElementById("report");
+      const STORE_KEY = "murmurent.space.host";
+
+      function esc(s) {
+        return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+      }
+      function size(n) {
+        let v = Number(n || 0); const units = ["bytes", "KB", "MB", "GB", "TB", "PB"]; let i = 0;
+        while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+        return i === 0 ? v + " bytes" : v.toFixed(1) + " " + units[i];
+      }
+      // Parse a response as JSON even when the server sent an error page, so a
+      // failure reads as a sentence, not "SyntaxError".
+      function readJson(r) {
+        return r.text().then(t => {
+          let body = null;
+          try { body = JSON.parse(t); } catch (e) { body = { detail: "the dashboard server hit an error (HTTP " + r.status + ")" }; }
+          return { ok: r.ok, body: body };
+        });
+      }
+
+      function setStatus(text, isError) {
+        statusEl.textContent = text || "";
+        statusEl.className = "status" + (isError ? " error" : "");
+      }
+
+      function render(report) {
+        if (!report) {
+          reportEl.innerHTML = '<div class="card"><div class="body">No report on that machine yet. ' +
+            'The space audit runs on the lab\'s data server: pick that machine above. If it has never ' +
+            'been set up, run <code>murmurent space schedule --install</code> there once (it runs under ' +
+            'your own account and only reads), or <code>murmurent space scan-lab</code> for a report now. ' +
+            'If your lab does not want the audit, turn it off in the dashboard under Lab settings.</div></div>';
+          return;
+        }
+        const projects = report.projects || [];
+        const unclaimed = report.unclaimed;
+        const total = projects.reduce((a, p) => a + p.bytes, 0) + (unclaimed ? unclaimed.bytes : 0);
+        const waiting = projects.reduce((a, p) => a + p.waiting_bytes, 0) + (unclaimed ? unclaimed.waiting_bytes : 0);
+        document.getElementById("meta").textContent =
+          "lab " + (report.lab || "?") + " · scanned " + String(report.finished_at || "").slice(0, 16).replace("T", " ");
+        let html = '<div class="card"><div class="body summary">' + projects.length + " projects, " +
+          esc(size(total)) + " in all; <strong>" + esc(size(waiting)) + "</strong> waiting for a decision.";
+        for (const d of report.disks || []) {
+          html += "<br>The disk holding <code>" + esc(d.label) + "</code> is " + Math.round(d.fill * 100) +
+            "% full, " + esc(size(d.free)) + " free.";
+        }
+        html += "</div></div>";
+        if ((report.emergencies || []).length) {
+          html += '<div class="card"><header>Emergencies</header><div class="body">';
+          for (const e of report.emergencies) html += '<div class="emergency">' + esc(e.text) + "</div>";
+          html += "</div></div>";
+        }
+        if ((report.top || []).length) {
+          html += '<div class="card"><header>Look at these first</header><div class="body">';
+          report.top.forEach((t, i) => {
+            html += '<div class="top"><span class="size">' + esc(size(t.size)) + "</span> &nbsp;" +
+              esc(t.project) + ": " + esc(t.category) + ", suggest <strong>" + esc(t.suggestion) +
+              "</strong> <span class=\"note\">[row " + esc(t.row) + "]</span>";
+            if (t.reason) html += "<br>" + esc(t.reason);
+            if (t.path) html += '<div class="path">' + esc(t.path) + "</div>";
+            html += "</div>";
+          });
+          html += "</div></div>";
+        }
+        const blind = report.unreadable || {};
+        if (blind.items) {
+          html += '<div class="card"><header>Not readable: ' + esc(blind.items.toLocaleString()) +
+            ' items, in no total</header><div class="body"><p>The scan could not read these, so every ' +
+            'figure on this page is low by an unknown amount. Each owner can fix theirs with ' +
+            '<code>chmod -R g+rX &lt;folder&gt;</code>.</p><p>By owner: ' +
+            Object.entries(blind.by_owner || {}).map(([o, n]) => esc(o) + " " + esc(n.toLocaleString())).join(", ") +
+            "</p>";
+          if ((blind.list || []).length) {
+            html += "<table><thead><tr><th>Where</th><th>Owner</th><th class=\"num\">Items</th></tr></thead><tbody>";
+            for (const p of blind.list) {
+              html += "<tr><td>" + (p.path ? "<code>" + esc(p.path) + "</code>" : "a folder of " + esc(p.project)) +
+                "</td><td>" + esc(p.owner) + '</td><td class="num">' + esc(p.items) + "</td></tr>";
+            }
+            html += "</tbody></table>";
+          }
+          html += "</div></div>";
+        }
+        html += '<div class="card"><header>Projects</header><div class="body"><table><thead><tr>' +
+          '<th>Project</th><th class="num">Size</th><th>Activity</th><th>Last used</th>' +
+          '<th class="num">Waiting rows</th><th class="num">Waiting size</th></tr></thead><tbody>';
+        const sorted = projects.slice().sort((a, b) => b.waiting_bytes - a.waiting_bytes);
+        for (const p of sorted) {
+          if (p.no_data) {
+            html += "<tr><td>" + esc(p.name) + '</td><td colspan="5" class="note">No data folder found; ' +
+              "the record points to " + esc((p.looked_in || []).join(", ")) +
+              ". Set <code>data_folders</code> in its record.</td></tr>";
+            continue;
+          }
+          html += "<tr><td>" + esc(p.name) + '</td><td class="num">' + esc(size(p.bytes)) +
+            '</td><td><span class="pill ' + esc(p.activity) + '">' + esc(p.activity) + "</span></td><td>" +
+            esc(p.last_used || "no sign of use") + '</td><td class="num">' + esc(p.waiting_rows) +
+            '</td><td class="num">' + esc(size(p.waiting_bytes)) + "</td></tr>";
+        }
+        if (unclaimed) {
+          html += "<tr><td><em>No project claims these</em></td><td class=\"num\">" + esc(size(unclaimed.bytes)) +
+            "</td><td></td><td></td><td class=\"num\">" + esc(unclaimed.waiting_rows) +
+            '</td><td class="num">' + esc(size(unclaimed.waiting_bytes)) + "</td></tr>";
+        }
+        html += "</tbody></table></div></div>";
+        const folders = report.unclaimed_folders || [];
+        if (folders.length) {
+          html += '<div class="card"><header>Folders no project claims</header><div class="body">' +
+            "<p>Add each to a project's data folders, or ask its owner. Largest first.</p>" +
+            '<table><thead><tr><th class="num">Size</th><th>Folder</th><th>Owners</th></tr></thead><tbody>';
+          for (const f of folders) {
+            html += '<tr><td class="num">' + esc(size(f.size)) + "</td><td><code>" + esc(f.path) +
+              "</code></td><td>" + esc(f.owners) + "</td></tr>";
+          }
+          html += "</tbody></table></div></div>";
+        }
+        const dormant = report.dormant || [];
+        if (dormant.length) {
+          html += '<div class="card"><header>Dormant projects: mothballing suggested</header><div class="body"><table><tbody>';
+          for (const d of dormant) html += '<tr><td class="num">' + esc(size(d.size)) + "</td><td>" + esc(d.project) + "</td></tr>";
+          html += "</tbody></table></div></div>";
+        }
+        reportEl.innerHTML = html;
+      }
+
+      function load() {
+        const host = hostEl.value;
+        try { localStorage.setItem(STORE_KEY, host); } catch (e) { /* not remembered */ }
+        loadEl.disabled = true;
+        setStatus(host ? "fetching from " + host + "…" : "reading…");
+        const qs = new URLSearchParams();
+        if (host) qs.set("host", host);
+        if (user) qs.set("user", user);
+        fetch("/api/space/lab?" + qs.toString(), { credentials: "same-origin", headers: { Accept: "application/json" } })
+          .then(readJson)
+          .then(({ ok, body }) => {
+            loadEl.disabled = false;
+            if (!ok) { setStatus((body && body.detail) || "could not fetch the report", true); return; }
+            setStatus("");
+            render(body.report);
+          })
+          .catch(err => { loadEl.disabled = false; setStatus("network error: " + err, true); });
+      }
+
+      fetch("/api/hosts", { credentials: "same-origin", headers: { Accept: "application/json" } })
+        .then(r => r.json())
+        .then(data => {
+          const hosts = (data && data.hosts) || [];
+          // null = never chosen; "" = "this computer" was chosen and must be kept.
+          let remembered = null;
+          try { remembered = localStorage.getItem(STORE_KEY); } catch (e) { /* none */ }
+          const firstRemote = (hosts.find(h => h.kind === "ssh") || {}).name || "";
+          const choice = remembered !== null ? remembered : firstRemote;
+          hostEl.innerHTML = '<option value="">this computer</option>' + hosts
+            .filter(h => h.kind === "ssh")
+            .map(h => '<option value="' + esc(h.name) + '"' + (h.name === choice ? " selected" : "") + ">" +
+              esc(h.name) + "</option>").join("");
+          load();
+        })
+        .catch(() => { hostEl.innerHTML = '<option value="">this computer</option>'; load(); })
+        .finally(() => loadRows(false));
+      loadEl.addEventListener("click", load);
+
+      // ── Every suggestion: one page at a time, largest first ──
+      const rowsCard = document.getElementById("rows-card");
+      const rowsBody = document.getElementById("rows-body");
+      const rowsStatus = document.getElementById("rows-status");
+      const moreEl = document.getElementById("rows-more");
+      const PAGE = 200;
+      let offset = 0, facetsFilled = false;
+      const pick = id => document.getElementById(id).value;
+
+      function fillFacet(id, pairs, label) {
+        const el = document.getElementById(id);
+        const keep = el.value;
+        el.innerHTML = '<option value="">any</option>' + (pairs || []).map(([v, n]) =>
+          '<option value="' + esc(v) + '">' + esc(label ? label(v) : v) + " (" + Number(n).toLocaleString() + ")</option>").join("");
+        el.value = keep;
+      }
+
+      function loadRows(append) {
+        if (!append) offset = 0;
+        const qs = new URLSearchParams();
+        if (hostEl.value) qs.set("host", hostEl.value);
+        if (user) qs.set("user", user);
+        for (const [k, id] of [["project", "f-project"], ["category", "f-category"],
+                               ["suggestion", "f-suggestion"], ["owner", "f-owner"]]) {
+          if (pick(id)) qs.set(k, pick(id));
+        }
+        if (Number(pick("f-size"))) qs.set("min_size", pick("f-size"));
+        qs.set("limit", PAGE); qs.set("offset", offset);
+        rowsStatus.className = "status"; rowsStatus.textContent = "fetching…";
+        fetch("/api/space/rows?" + qs.toString(), { credentials: "same-origin", headers: { Accept: "application/json" } })
+          .then(readJson)
+          .then(({ ok, body }) => {
+            // A failure here is almost always the one the report already shows
+            // at the top, so do not repeat it; just hide the list.
+            if (!ok || body.no_table) { rowsCard.hidden = true; rowsStatus.textContent = ""; return; }
+            rowsCard.hidden = false;
+            if (!facetsFilled) {
+              fillFacet("f-project", body.facets.projects, v => v === "(unclaimed)" ? "no project claims these" : v);
+              fillFacet("f-category", body.facets.categories);
+              fillFacet("f-suggestion", body.facets.suggestions);
+              fillFacet("f-owner", body.facets.owners);
+              facetsFilled = true;
+            }
+            const html = body.rows.map(r =>
+              '<tr><td class="num">' + esc(size(r.size)) + (r.files > 1 ? '<div class="note">' + esc(r.files.toLocaleString()) + " files</div>" : "") +
+              "</td><td><strong>" + esc(r.suggestion) + '</strong><div class="note">' + esc(r.category) + " · " +
+              esc(r.project === "(unclaimed)" ? "unclaimed" : r.project) + " · row " + esc(r.id) + "</div></td>" +
+              '<td class="path">' + esc(r.path) + "</td><td>" + esc(r.owner) + '</td><td class="why">' + esc(r.reason) + "</td></tr>").join("");
+            rowsBody.innerHTML = append ? rowsBody.innerHTML + html : html;
+            offset += body.rows.length;
+            rowsStatus.textContent = body.total.toLocaleString() + " rows, " + size(body.total_bytes) +
+              "; showing " + offset.toLocaleString() + ".";
+            moreEl.hidden = offset >= body.total;
+          })
+          .catch(err => { rowsStatus.className = "status error"; rowsStatus.textContent = "network error: " + err; });
+      }
+      document.getElementById("f-show").addEventListener("click", () => loadRows(false));
+      moreEl.addEventListener("click", () => loadRows(true));
+      loadEl.addEventListener("click", () => { facetsFilled = false; loadRows(false); });
+    </script>
+  </body>
+</html>

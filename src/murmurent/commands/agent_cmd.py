@@ -13,6 +13,8 @@ in :mod:`core.agent_forks`; this module is the CLI surface only.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import click
 from rich.console import Console
 from rich.table import Table
@@ -65,6 +67,30 @@ def cmd_list() -> None:
         else:  # user-file
             table.add_row(st.name, "[magenta]user-file[/magenta]", "[dim]—[/dim]", "[dim]—[/dim]")
     console.print(table)
+
+
+def cmd_which(repo: str | None) -> None:
+    """Print which definition of each agent Claude Code will use, and where it
+    comes from (#186 step 1). With ``repo``, for a session in that repo."""
+    from ..core import agent_in_use as _aiu
+
+    root = Path(repo).expanduser().resolve() if repo else None
+    rows = _aiu.which_all(repo=root)
+    if not rows:
+        click.echo("No agents found.")
+        return
+    tone = {"centre": "", "yours": "magenta", "project": "green",
+            "local-file": "yellow", "broken-link": "red", "missing": "red"}
+    where = f"a session in {root}" if root else "a session outside any repo"
+    table = Table(title=f"Agents Claude Code will use in {where}")
+    table.add_column("agent", style="bold")
+    table.add_column("in use")
+    table.add_column("why")
+    for r in rows:
+        style = tone.get(r.level, "")
+        label = f"[{style}]{r.label}[/{style}]" if style else r.label
+        table.add_row(r.name, label, r.detail)
+    Console().print(table)
 
 
 def cmd_fork(name: str, force: bool) -> None:

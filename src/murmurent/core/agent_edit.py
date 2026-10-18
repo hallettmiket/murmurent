@@ -207,7 +207,7 @@ def save_edit(name: str, *, handle: str = "", allow_warn: bool = True,
         model = None
     elif model not in _pa.VALID_MODELS:
         raise AgentEditError(
-            f"unknown model {model!r} (choose fable|opus|sonnet|haiku).")
+            f"unknown model {model!r} (choose {'|'.join(sorted(_pa.VALID_MODELS))}).")
 
     # (2) assemble against the LOCKED name/category/freeze of the existing agent.
     proposed = _pa.build_agent_md(
@@ -250,21 +250,81 @@ def save_edit(name: str, *, handle: str = "", allow_warn: bool = True,
             f"{detail}")
 
     # (4) fork-on-first-edit (commons) or write-in-place (personal).
-    forked = False
-    if loc.origin == "commons":
-        installed = _af.installed_agents_dir() / f"{name}.md"
-        if installed.is_symlink() or name not in _af.load_manifest()["forks"]:
-            _af.fork_agent(name, force=True)  # snapshot commons, land in vault forks
-            forked = True
-        canonical = _af.forks_dir() / f"{name}.md"
-        canonical.write_text(proposed, encoding="utf-8")
-        _af._install_working_copy(canonical, installed)
-        out_path = canonical
-    else:  # personal — edit the vault file in place
-        canonical = loc.path
-        canonical.write_text(proposed, encoding="utf-8")
-        _pa._install(canonical)
-        out_path = canonical
-
+    out_path, forked = _write_own_copy(loc, proposed)
     return {"ok": True, "name": rec.name, "path": str(out_path),
             "origin": loc.origin, "forked": forked, "warnings": warnings}
+
+
+def _write_own_copy(loc: AgentLocator, text: str) -> tuple[Path, bool]:
+    """Write ``text`` to the member's OWN copy of an agent and install it.
+
+    A commons agent is forked into the vault on first edit, so the shared file
+    (which other members' links point at) is never written. A personal agent is
+    edited in place. A hand-written ``~/.claude/agents/<name>.md`` that murmurent
+    did not create is refused rather than overwritten (#185).
+
+    Returns ``(path_written, forked)``.
+    """
+    if loc.origin != "commons":
+        loc.path.write_text(text, encoding="utf-8")
+        _pa._install(loc.path)
+        return loc.path, False
+
+    name = loc.name
+    installed = _af.installed_agents_dir() / f"{name}.md"
+    known_forks = _af.load_manifest()["forks"]
+    if installed.exists() and not installed.is_symlink() and name not in known_forks:
+        raise AgentEditError(
+            f"you already have your own hand-written copy of {name!r} at "
+            f"{installed}. murmurent will not overwrite it. Edit that file "
+            "directly, or move it aside and try again.")
+    forked = False
+    if installed.is_symlink() or name not in known_forks:
+        _af.fork_agent(name, force=True)  # snapshot commons, land in vault forks
+        forked = True
+    canonical = _af.forks_dir() / f"{name}.md"
+    canonical.write_text(text, encoding="utf-8")
+    _af._install_working_copy(canonical, installed)
+    return canonical, forked
+
+
+def set_agent_fields(name: str, *, disabled: bool | None = None,
+                     model: str | None = None) -> dict:
+    """Change an agent's ``disabled`` flag or ``model`` for THIS member only.
+
+    Used by the dashboard's agent-card switch and model menu. Goes through the
+    same own-copy path as :func:`save_edit`, so it never writes into the shared
+    commons file (#185). Frozen and guardian agents are refused.
+
+    Returns ``{ok, name, disabled, model, origin, forked, path}``.
+    """
+    gate = editability(name)
+    if not gate["exists"]:
+        raise AgentEditError(gate["reason"])
+    if not gate["editable"]:
+        raise AgentNotEditableError(gate["reason"])
+    if model is not None and model not in _pa.VALID_MODELS:
+        raise AgentEditError(
+            f"unknown model {model!r} (choose {'|'.join(sorted(_pa.VALID_MODELS))}).")
+
+    from .frontmatter import dump_document
+
+    loc = _locate(name)
+    assert loc is not None
+    # Start from the member's current copy if they already have one, so an
+    # earlier Modify is kept; otherwise from the file _locate found.
+    source = loc.path
+    if loc.origin == "commons":
+        own = _af.forks_dir() / f"{loc.name}.md"
+        if loc.name in _af.load_manifest()["forks"] and own.is_file():
+            source = own
+    parsed = parse_file(source)
+    meta = dict(parsed.meta or {})
+    if disabled is not None:
+        meta["disabled"] = disabled
+    if model is not None:
+        meta["model"] = model
+    out_path, forked = _write_own_copy(loc, dump_document(meta, parsed.body))
+    return {"ok": True, "name": loc.name, "disabled": bool(meta.get("disabled", False)),
+            "model": meta.get("model"), "origin": loc.origin, "forked": forked,
+            "path": str(out_path)}

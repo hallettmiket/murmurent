@@ -33,6 +33,7 @@ Decline only updates the request state.
 from __future__ import annotations
 
 import datetime as _dt
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,6 +42,8 @@ from typing import Any, Iterable, Literal
 from .frontmatter import dump_document, parse_file
 from .projects import find_project
 from .repo import MEMBERS_FILENAME, lab_mgmt_repo_root
+
+_logger = logging.getLogger(__name__)
 
 REQUESTS_SUBDIR = "requests"
 REQUEST_ID_RE = re.compile(r"^(?P<id>\d+)\.md$")
@@ -542,8 +545,30 @@ def _register_project_from_repos(req: JoinRequest) -> None:
         _cp.add_repo(req.project, repo_name=rname, role=role,
                      host=host, path=path,
                      overleaf=(role == "manuscript"))
+        # After add_repo, so adoption finds the repo already in this project
+        # and does not write a stray one-repo project for it (#151).
+        _make_ready_quietly(host, path, lab=lab)
     for m in req.proposed_members or []:
         _cp.upsert(req.project, lab=lab, member=m)
+
+
+def _make_ready_quietly(host: str, path: str, *, lab: str) -> None:
+    """Make a project's repo murmurent-ready if it is not already (#185 item 9).
+
+    Choosing repos for a project is enough: the member should not have to make
+    each one ready first. Only local clones are adopted here. A failure never
+    blocks the project; the repo can still be made ready from the Repos panel.
+    """
+    if host != "local":
+        return
+    clone = Path(path).expanduser()
+    if not (clone / ".git").exists() or (clone / ".murmurent.yaml").is_file():
+        return
+    try:
+        from . import adopt as _adopt
+        _adopt.adopt_clone(clone_path=str(clone), lab=lab, host="local")
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("could not make %s murmurent-ready: %s", clone, exc)
 
 
 def _stamp_slack_workspace(req: JoinRequest) -> None:

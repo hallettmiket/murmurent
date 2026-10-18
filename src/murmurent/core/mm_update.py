@@ -1,10 +1,11 @@
 """
-Purpose: Report whether this machine's murmurent install (``~/repos/murmurent``)
-         is behind its upstream — the data behind the dashboard's "update
-         available" banner (issue #41 pt 1).
+Purpose: Report whether this machine's murmurent install is behind its
+         upstream — the data behind the dashboard's "update available" banner
+         (issue #41 pt 1).
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-21
-Input: The murmurent repo on disk (``murmurent_repo_root()``) + its git remote.
+Input: The murmurent repo the running code comes from (:func:`install_root`)
+       + its git remote.
 Output: :class:`UpdateStatus` — is there a newer push, and is it a safe
         fast-forward.
 
@@ -16,10 +17,16 @@ status, never an exception that could wedge the dashboard.
 
 from __future__ import annotations
 
+import logging
+import os
 import subprocess
+import sys
 from dataclasses import asdict, dataclass
+from pathlib import Path
 
 from .repo import murmurent_repo_root
+
+_log = logging.getLogger(__name__)
 
 # A status poll hits the network (git fetch); keep it snappy so an unreachable
 # remote can't hang the dashboard load.
@@ -37,9 +44,39 @@ class UpdateStatus:
     current: str      # short local HEAD sha
     latest: str       # short upstream sha
     detail: str       # human-readable one-liner
+    root: str = ""    # the checkout that was checked (shown in the banner)
+    # In words for the banner (#185 follow-up): which copy, the version here and
+    # upstream (they differ only after a release), and the new changes' titles.
+    name: str = ""            # "murmurent_dev" or the checkout's folder name
+    current_version: str = ""
+    latest_version: str = ""
+    changes: list = None      # up to 10 commit titles, newest first
+
+    def __post_init__(self) -> None:
+        if self.changes is None:
+            self.changes = []
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+def install_root() -> Path:
+    """The murmurent checkout whose code this process is running.
+
+    ``$MURMURENT_REPO_ROOT`` wins when set. Otherwise, walk up from this file to
+    the enclosing git checkout: an editable install runs from wherever it was
+    installed (for a developer, ``murmurent_dev``), so checking the default
+    ``~/repos/murmurent`` instead pulled a repo the dashboard was not running
+    and the restart changed nothing (#185). Falls back to
+    :func:`murmurent_repo_root` for a non-editable install.
+    """
+    if os.environ.get("MURMURENT_REPO_ROOT"):
+        return murmurent_repo_root()
+    here = Path(__file__).resolve()
+    for parent in here.parents:
+        if (parent / ".git").exists() and (parent / "pyproject.toml").is_file():
+            return parent
+    return murmurent_repo_root()
 
 
 def _run_git(root, *args: str) -> subprocess.CompletedProcess:
@@ -49,6 +86,65 @@ def _run_git(root, *args: str) -> subprocess.CompletedProcess:
     )
 
 
+def describe_running_code() -> dict:
+    """What code this process runs: which checkout, development or release,
+    branch and commit. Shown in the dashboard's top bar so a member can tell
+    a murmurent_dev checkout from a release install (#185 follow-up).
+
+    ``{label, kind, folder, branch, commit, dirty}``; ``kind`` is ``dev``
+    (a checkout of murmurent_dev), ``checkout`` (another git checkout, such as
+    a clone of the public release repo) or ``release`` (installed without
+    git). Never raises; local git only, no network.
+    """
+    from .. import __version__
+    root = install_root()
+    out = {"label": f"release v{__version__}", "kind": "release",
+           "folder": str(root), "branch": "", "commit": "", "dirty": False}
+    if not (root / ".git").exists():
+        return out
+    try:
+        def git(*a: str) -> str:
+            r = subprocess.run(["git", "-C", str(root), *a], capture_output=True,
+                               text=True, timeout=5)
+            return r.stdout.strip() if r.returncode == 0 else ""
+        branch = git("rev-parse", "--abbrev-ref", "HEAD")
+        commit = git("rev-parse", "--short", "HEAD")
+        dirty = bool(git("status", "--porcelain", "--untracked-files=no"))
+    except (OSError, subprocess.SubprocessError):
+        return out
+    name = _copy_name(root)
+    is_dev = name == "murmurent_dev"
+    label = f"{name} · {branch} @ {commit}" + (" (edited)" if dirty else "")
+    out.update(label=label, kind="dev" if is_dev else "checkout",
+               branch=branch, commit=commit, dirty=dirty)
+    return out
+
+
+_VERSION_FILE = "src/murmurent/__init__.py"
+
+
+def _version_at(root, ref: str) -> str:
+    """murmurent's version number as committed at ``ref`` ("" if unreadable)."""
+    import re
+    try:
+        out = _run_git(root, "show", f"{ref}:{_VERSION_FILE}")
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    m = re.search(r'^__version__\s*=\s*["\']([^"\']+)["\']', out.stdout or "", re.M)
+    return m.group(1) if m else ""
+
+
+def _copy_name(root) -> str:
+    """"murmurent_dev" for a development checkout, else the folder's name."""
+    try:
+        remote = _run_git(root, "remote", "get-url", "origin").stdout
+    except (OSError, subprocess.SubprocessError):
+        remote = ""
+    if "murmurent_dev" in remote or Path(root).name == "murmurent_dev":
+        return "murmurent_dev"
+    return Path(root).name
+
+
 def check_update(*, fetch: bool = True) -> UpdateStatus:
     """Whether the local murmurent install is behind upstream.
 
@@ -56,11 +152,11 @@ def check_update(*, fetch: bool = True) -> UpdateStatus:
     push is seen; ``fetch=False`` compares against whatever was last fetched
     (instant, no network). Never raises.
     """
-    root = murmurent_repo_root()
+    root = install_root()
 
     def _na(detail: str, *, is_git: bool = True, ok: bool = False) -> UpdateStatus:
         return UpdateStatus(is_git=is_git, ok=ok, behind=0, can_ff=False,
-                            current="", latest="", detail=detail)
+                            current="", latest="", detail=detail, root=str(root))
 
     if not (root / ".git").exists():
         return _na("not a git checkout — nothing to update", is_git=False)
@@ -92,8 +188,17 @@ def check_update(*, fetch: bool = True) -> UpdateStatus:
         detail = "up to date" if behind == 0 else f"{behind} new commit(s) upstream"
         if behind and not can_ff:
             detail += " — local has diverged, resolve manually"
+        changes: list[str] = []
+        if behind:
+            log = _run_git(root, "log", "--no-merges", "--format=%s", "-n", "10",
+                           f"HEAD..{upstream}")
+            changes = [ln for ln in log.stdout.splitlines() if ln.strip()] if log.returncode == 0 else []
+        latest_version = _version_at(root, upstream)
         return UpdateStatus(is_git=True, ok=True, behind=behind, can_ff=can_ff,
-                            current=current, latest=latest, detail=detail)
+                            current=current, latest=latest, detail=detail,
+                            root=str(root), name=_copy_name(root),
+                            current_version=_version_at(root, "HEAD"),
+                            latest_version=latest_version, changes=changes)
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
         return _na(f"update check failed: {exc}")
 
@@ -103,8 +208,8 @@ def apply_update() -> dict:
     the caller schedules that after the HTTP response flushes.
 
     **Scope is deliberately narrow — this only updates code, never user data.**
-    It runs ``git pull --ff-only`` inside the murmurent repo (``~/repos/
-    murmurent``) and nothing else. User identity/profile/tokens/keys live in
+    It runs ``git pull --ff-only`` inside the murmurent repo the dashboard runs
+    from (:func:`install_root`) and nothing else. User identity/profile/tokens/keys live in
     ``~/.murmurent``, the roster in its own clone, and data under the data root —
     all *outside* this repo, so a pull cannot reach them. ``--ff-only`` refuses
     to overwrite: if local commits have diverged, or uncommitted changes would
@@ -130,7 +235,7 @@ def apply_update() -> dict:
                           "not pulling (your local commits are untouched)"}
 
     try:
-        pull = _run_git(murmurent_repo_root(), "pull", "--ff-only")
+        pull = _run_git(install_root(), "pull", "--ff-only")
     except (OSError, subprocess.SubprocessError) as exc:
         return {**base, "ok": False, "detail": f"git pull failed: {exc}"}
     if pull.returncode != 0:
@@ -145,9 +250,16 @@ def apply_update() -> dict:
 def reexec() -> None:
     """Replace the running process with a fresh copy of itself so the just-pulled
     code takes effect. Python's sockets are close-on-exec, so the old listening
-    socket is released and the new process re-binds the port. Preserves the exact
-    launch command (``sys.argv``) — port, ``--hifi``, etc."""
-    import os
-    import sys
+    socket is released and the new process re-binds the port.
 
-    os.execv(sys.argv[0], sys.argv)
+    Re-runs the interpreter with its exact original arguments
+    (``sys.orig_argv``), so ``murmurent dashboard``, ``python -m …`` and a
+    systemd unit all restart the same way. ``os.execv(sys.argv[0], …)`` failed
+    for ``python -m``, where ``argv[0]`` is a non-executable ``.py`` file, and
+    the error vanished in the timer thread (#185).
+    """
+    args = [sys.executable, *sys.orig_argv[1:]]
+    try:
+        os.execv(sys.executable, args)
+    except OSError as exc:
+        _log.error("dashboard restart failed (%s); still running the old code", exc)

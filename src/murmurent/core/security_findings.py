@@ -214,6 +214,10 @@ def iter_jsonl(path: Path) -> Iterator[Finding]:
 
 ROLLUP_THRESHOLD = 5
 
+#: Finding categories that roll up to the project folder rather than the
+#: immediate parent: repos plus the governed data folders, new and legacy names.
+ROLLUP_TO_PROJECT = ("repos", "immutable", "append_only", "modifiable", "raw", "refined")
+
 
 def _rollup_key(f: Finding) -> str:
     """Return the directory to group ``f`` under for rollup.
@@ -225,11 +229,13 @@ def _rollup_key(f: Finding) -> str:
       so a clone with 100 group-readable files becomes one row with a
       single ``chmod -R`` fix. Without this, findings spread across
       dozens of subdirs never cluster enough to trigger threshold.
-    - ``refined`` / ``raw`` — roll up to the **project root** under
-      ``<lab_vm>/{raw,refined}/<project>/`` for the same reason.
+    - the governed data folders (``immutable``, ``append_only``,
+      ``modifiable`` and the legacy ``raw`` / ``refined``) — roll up to the
+      **project root** under ``<data root>/<folder>/<project>/`` for the
+      same reason.
     """
     p = Path(f.path)
-    if f.category in ("repos", "raw", "refined") and f.project:
+    if f.category in ROLLUP_TO_PROJECT and f.project:
         # Find the **highest** ancestor whose basename matches the
         # project name. Walk top-down so that a path like
         # ``/home/u/repos/murmurent/src/murmurent/foo.py`` rolls up at

@@ -66,6 +66,14 @@ Every Tier 1 / Tier 2 finding carries a stable rule ID. Use the anchors
 below to deep-link from the dashboard rows. `<data_root>` stands for
 the lab's data root.
 
+**Which data folders are checked.** Both tiers check every governed data
+folder that exists. `immutable/` must be read-only on disk: a file is saved
+there once and not changed afterwards, so the `RAW-` rules apply to it.
+`append_only/` and `modifiable/` are for the lab group only, so the
+`REFINED-` rules apply to them. During the move to the new names the legacy
+`raw/` (read-only) and `refined/` (lab-shared) are checked too. Each
+finding's category is the folder it was found in.
+
 ### Tier 1: unprivileged scanners
 
 | Rule | Severity | Description |
@@ -116,8 +124,8 @@ templates (kept privately). Rules:
 The snapshot script's per-core ACL files are diffed against the same
 templates as the lab tree, with `CORE-`-prefixed rule IDs so the
 dashboard can group findings per core. Each finding carries the core's
-short id in its `project` field. Categories: `core_raw` and
-`core_refined`.
+short id in its `project` field. The category is `core_` plus the folder
+name, for example `core_immutable` or `core_append_only`.
 
 | Rule | Severity | Description |
 |---|---|---|
@@ -164,9 +172,24 @@ login.
 
 ## Tier 2 setup
 
-Murmurent ships a root-owned snapshot script and a narrowly-scoped
-NOPASSWD sudoers grant template under `scripts/`. The general one-time
-install on the target host is:
+**The short way.** On the lab server, in an up-to-date murmurent folder, run
+once:
+
+```bash
+sudo bash scripts/install_security_snapshot.sh --dry-run   # preview; changes nothing
+sudo bash scripts/install_security_snapshot.sh             # install
+```
+
+It checks the script's fingerprint, installs it at
+`/opt/murmurent/lab_sec_dump.sh`, writes this server's settings to
+`/etc/default/murmurent`, lets you run the script without a password, and
+validates the sudo configuration before using it. If the server has an older
+install under the project's previous name (`/opt/wigamig`), it copies the
+earlier results across and moves the old pieces into
+`/var/backups/wigamig_retired_<date>/`. Run it again after each update to
+the script.
+
+The steps it automates are:
 
 1. SSH to the lab server and update the commons clone (`git pull`).
 2. **Verify the shipped script's SHA256** against the recorded checksum

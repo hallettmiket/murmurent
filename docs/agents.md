@@ -32,6 +32,23 @@ personal agents and forks follow you to every machine: after a vault pull,
 run `murmurent agent relink` (`scripts/setup.sh` also runs it) to load them
 into that machine's `~/.claude/agents/`.
 
+**Which version am I using?** Each agent card on the dashboard says which
+definition Claude Code will actually use on this machine: the centre version,
+your own version, a hand-written file, a broken link, or nothing installed.
+Hover over the label for the reason. In a terminal,
+`murmurent agent which` shows the same for every agent, and
+`murmurent agent which --repo <folder>` shows it for a session started in
+that repo, where the repo's own agent files take priority. A **broken link**
+usually means the repo contains links into another member's home folder;
+`murmurent repo status <folder>` explains how to fix it.
+
+Your own version of an agent applies to all of your projects. There is not
+yet a way to keep a version for one project only, to share a version with a
+project team or a whole lab, or to switch an agent off in one project. The
+**disable** button on the dashboard's agent cards only labels the agent; Claude
+Code still uses it. These are planned in
+[issue #186](https://github.com/hallettmiket/murmurent_dev/issues/186).
+
 You invoke these by addressing an agent by name in plain English (for
 example, *"Bookworm, find all manuscripts related to MMP11 in breast
 cancer,"* or *"Adversary, review the findings of the Bookworm's
@@ -40,19 +57,26 @@ Claude Code session on a Murmurent-enabled machine, and CC routes to it.
 Every agent ships pre-configured with sensible defaults and is usable
 immediately; you can override those defaults without editing the agent
 itself, per member via `~/.claude/murmurent-preferences.yaml`
-(`murmurent preference set <field> <value>`), or per lab through the
-lab's own toolkit. The sections below call out which defaults are worth
+(`murmurent preference set <field> <value>`). The sections below call out
+which defaults are worth
 knowing about for each agent. Every agent's final reply leads with a
 single ≤200-character verdict line in a fixed vocabulary (see
 [`rules/headline_first.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/headline_first.md)),
 so the Murmurent VSCode dashboard's live activity pane always shows a
 scannable verdict.
 
-Group and core toolkits are built on top of the commons: a lab adds
+Group and core toolkits are meant to build on top of the commons: a lab adds
 discipline-specific agents (a medchem specialist, an image segmenter, a
 cohort curator, …) that compose against this same reference set, the
 same hard rules, and the same verdict protocol. This corresponds to the
 so-called "commons-plus-toolkit" pattern described in the manuscript.
+
+**What works today:** `murmurent group-init-toolkit <group>` creates a toolkit
+repository for a lab's agents, but nothing installs those agents for the
+lab's members yet. To use one now, copy its file into the `.claude/agents/`
+folder of each repo where it is needed. Installing a lab's agents for every
+member, from the lab-management repository, is planned in
+[issue #186](https://github.com/hallettmiket/murmurent_dev/issues/186).
 
 ## All of them at a glance
 
@@ -560,7 +584,7 @@ presents the alternatives side by side. It never silently discards a contributio
 output, hands the combined presentation to the [Artist](#artist) for
 expression, and its combination is reviewed by the [Adversary](#adversary).
 Its ranking and decision strategy evolves in its own definition over time and
-can be forked per lab like any reference agent.
+can be forked like any reference agent.
 
 **Verdict vocabulary:** `Presented / Split / Insufficient — <one-line on the combined result>`
 

@@ -19,7 +19,8 @@ empty (``A::OWNER@:...``). ``type`` is ``A`` (allow) or ``D`` (deny).
 ``perms`` is a string from the alphabet ``rwaDdxtTnNcCoy``.
 
 This module is pure-parsing: it never executes a command or writes
-under ``/data/lab_vm/raw|refined``. It only emits :class:`Finding`
+under the governed data folders (``immutable``/``raw``,
+``append_only``/``refined``, ``modifiable``). It only emits :class:`Finding`
 rows the dashboard surfaces.
 """
 
@@ -208,8 +209,13 @@ _EXCEPTION_GROUP_PERMS_MAX = set("tcy")  # GROUP@ ≤ metadata-only
 
 def diff_raw(acls: list[FileAcl], *, host: str,
              lab_vm_root: str = "/data/lab_vm",
-             now_iso: str | None = None) -> list[Finding]:
+             now_iso: str | None = None,
+             kind: str = "raw") -> list[Finding]:
     """Diff the observed ``raw/`` ACLs against the immutability template.
+
+    ``kind`` names the read-only folder being checked: ``immutable`` or its
+    legacy name ``raw`` (the default). It sets the finding category and the
+    path used to find each project. Rule ids keep their ``RAW-`` prefix.
 
     Emits:
 
@@ -224,8 +230,6 @@ def diff_raw(acls: list[FileAcl], *, host: str,
     """
     now_iso = now_iso or _dt.datetime.utcnow().isoformat() + "Z"
     findings: list[Finding] = []
-    raw_root_prefix = "lab_vm/raw"  # match suffix; the snapshot rewrites
-                                     # /srv/acl-view/lab_vm/raw -> .../lab_vm/raw
     for fa in acls:
         # Determine if this is a directory or a file. ``nfs4_getfacl``
         # doesn't tag the kind; we use the rule "dir = has ``d`` or
@@ -234,7 +238,7 @@ def diff_raw(acls: list[FileAcl], *, host: str,
         # flags on dir ACEs.
         is_dir = any(("d" in a.flags or "fd" in a.flags or "fdi" in a.flags)
                      for a in fa.aces)
-        project = _extract_project(fa.path, "raw")
+        project = _extract_project(fa.path, kind)
         if is_dir:
             # RAW-DENY-DELETE-MISSING-01 — both OWNER@ and GROUP@ inherited
             # Deny-delete required.
@@ -258,11 +262,11 @@ def diff_raw(acls: list[FileAcl], *, host: str,
                         current=f"no D:fdi:{principal}:Dd on {fa.path}",
                         expected="Deny inherited (Dd) for OWNER@ and GROUP@",
                         fix=(f"sudo nfs4_setfacl -a 'D:fdi:{principal}:Dd' "
-                             f"/srv/acl-view/lab_vm/raw/...    "
+                             f"/srv/acl-view/lab_vm/{kind}/...    "
                              "# review template in docs/security-dashboard.md first"),
                         project=project,
                         now_iso=now_iso,
-                        category="raw",
+                        category=kind,
                     ))
         else:
             # File. Any OWNER@/GROUP@ allow ACE granting w/a/D/C is a defect.
@@ -280,11 +284,11 @@ def diff_raw(acls: list[FileAcl], *, host: str,
                         host=host,
                         current=f"{a.to_text()} (forbidden bits: {''.join(sorted(offending))})",
                         expected=f"{a.principal} ACE perms subset of '{''.join(sorted(_RAW_FILE_ALLOWED_PERMS))}'",
-                        fix=("review file; raw/ files should have only "
+                        fix=(f"review file; {kind}/ files should have only "
                              "OWNER@/GROUP@ rxtTcy via inherited fi ACEs"),
                         project=project,
                         now_iso=now_iso,
-                        category="raw",
+                        category=kind,
                     ))
         # Unexpected principal — only on directories, only for ACEs
         # *declared* on this object (skip inherit-only ACEs that don't
@@ -311,15 +315,20 @@ def diff_raw(acls: list[FileAcl], *, host: str,
                     fix="vet whether the named principal is intentional",
                     project=project,
                     now_iso=now_iso,
-                    category="raw",
+                    category=kind,
                 ))
     return findings
 
 
 def diff_refined(acls: list[FileAcl], *, host: str,
                   lab_vm_root: str = "/data/lab_vm",
-                  now_iso: str | None = None) -> list[Finding]:
+                  now_iso: str | None = None,
+                  kind: str = "refined") -> list[Finding]:
     """Diff the observed ``refined/`` ACLs.
+
+    ``kind`` names the lab-shared folder being checked: ``append_only``,
+    ``modifiable``, or the legacy ``refined`` (the default). Rule ids keep
+    their ``REFINED-`` prefix.
 
     Emits:
 
@@ -335,10 +344,10 @@ def diff_refined(acls: list[FileAcl], *, host: str,
     """
     now_iso = now_iso or _dt.datetime.utcnow().isoformat() + "Z"
     findings: list[Finding] = []
-    refined_root_suffix = "lab_vm/refined"
+    refined_root_suffix = f"lab_vm/{kind}"
     for fa in acls:
         is_root = fa.path.rstrip("/").endswith(refined_root_suffix)
-        project = _extract_project(fa.path, "refined")
+        project = _extract_project(fa.path, kind)
         if is_root:
             missing = []
             for principal_match, flag_req, perm_req in _REFINED_REQUIRED_ALLOW:
@@ -363,7 +372,7 @@ def diff_refined(acls: list[FileAcl], *, host: str,
                     fix="see expected templates in docs/security-dashboard.md",
                     project=project,
                     now_iso=now_iso,
-                    category="refined",
+                    category=kind,
                 ))
         # Exception pattern: GROUP@ ACE on a subdir is metadata-only.
         # We only check non-root paths so the root's collaborative
@@ -383,7 +392,7 @@ def diff_refined(acls: list[FileAcl], *, host: str,
                         fix="confirm this restriction is intentional (PI vet)",
                         project=project,
                         now_iso=now_iso,
-                        category="refined",
+                        category=kind,
                     ))
                     break
         # Detect dir vs file the same way diff_raw does. Only emit the
@@ -414,7 +423,7 @@ def diff_refined(acls: list[FileAcl], *, host: str,
                     fix="vet whether the named principal is intentional",
                     project=project,
                     now_iso=now_iso,
-                    category="refined",
+                    category=kind,
                 ))
     return findings
 

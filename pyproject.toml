@@ -127,6 +127,10 @@ exclude = ["rules/local", "rules/local/**"]
 # The dashboard icon's image, read by core/launcher.py (#156). Without it a
 # PyPI install made the icon with a generic picture, or could not make it at all.
 "assets/murmurent_app_icon.png" = "murmurent/commons/assets/murmurent_app_icon.png"
+# The dashboard's pages and its logo animation. Without them an installed
+# release's dashboard showed only "static dir not found" (2026.10.1).
+"docs/designer_dashboard" = "murmurent/commons/dashboard"
+"assets/murmurent_uniform_wordmark.html" = "murmurent/commons/assets/murmurent_uniform_wordmark.html"
 # The adversary's only source for TRIPOD+AI, PROBAST+AI and REMARK items (#155).
 # It may not browse, so a PyPI install without this file could not run the check.
 "docs/reporting_guidelines.md" = "murmurent/commons/docs/reporting_guidelines.md"
@@ -142,6 +146,7 @@ include = [
     "templates",
     "output_styles",
     "assets/murmurent_app_icon.png",
+    "assets/murmurent_uniform_wordmark.html",
     "scripts",
     "docs",
     "README.md",

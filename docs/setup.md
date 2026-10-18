@@ -160,8 +160,9 @@ murmurent repo status ~/repos/<directory>
 
 Adopting writes a `.murmurent.yaml` marker and leaves every other file as it
 was. Commit it, so each clone of the repository is ready as well. It adds no
-agent links unless you ask for them with `--agents`, which you rarely need. A
-ready repository can then be attached to a **project**. Both topics have their
+agent links unless you ask for them with `--agents`, which you rarely need.
+Every repository belongs to a **project**, so if no project lists this one,
+adopting also records a one-repository project for it. Both topics have their
 own pages:
 
 - [`ready_vs_projects.md`](ready_vs_projects.md): readiness in full, the

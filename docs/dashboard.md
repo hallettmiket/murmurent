@@ -60,6 +60,20 @@ At a high level, it shows:
 - your lab's **members**, and
 - your **Oracle** and daily **lab-notebook** panels.
 
+**Which murmurent is running.** The top bar says which code the dashboard
+runs, for example `running murmurent_dev · main @ 787faca` for the
+development copy, or `running release v2026.10.0` for an installed release.
+Hover over it for the folder. If it names a different copy than the one you
+just updated, restart the dashboard from that copy.
+
+**Stopping the dashboard.** Closing the browser window does not stop the
+dashboard: it keeps running in the background, especially when the dashboard
+icon started it. To stop it, press **⏻ stop dashboard** in the top bar, or run
+`murmurent dashboard --stop`. Start it again with the icon or
+`murmurent dashboard --hifi`. On a lab server where the system runs the
+dashboard as a service, the button is hidden, because the service would start
+it again.
+
 Most dashboard actions have a `murmurent ...` CLI twin, and vice versa, so
 you can work from whichever you prefer. A few concrete pairs:
 

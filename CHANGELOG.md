@@ -17,6 +17,142 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.10.1] - 2026-10-18
+
+**To upgrade:** `uv tool upgrade murmurent`, then `murmurent install`, then
+restart Claude Code and the dashboard (the new **⏻ stop dashboard** button in
+its top bar, then start it again). Run `murmurent repo upgrade --all` once. If
+you installed from a copy of the repository, `git pull` there instead of the
+first command. On a lab server that uses the security snapshot, run
+`sudo bash scripts/install_security_snapshot.sh` once from that copy: it also
+replaces an install made under the old name, wigamig. PIs: choose **on** or
+**off** for the space audit under **⚙ Lab settings** (it is hidden until you
+choose).
+
+### Added
+- **The dashboard says which version of each agent is in use** (#186). Each
+  agent card shows "in use:" with the centre version, your own version, the
+  project's version, a file on this machine only, a broken link, or "not
+  installed", and hovering gives the reason. `murmurent agent which [--repo
+  <folder>]` shows the same in a terminal.
+- **Each lab and core gets a `#lab-<name>` Slack channel** (#188), whether it
+  joins through a join request or the registrar creates it, and members are
+  added and removed as they join, leave, are deactivated or reactivated.
+  Existing channels are kept.
+- **A stop button for the dashboard**, and `murmurent dashboard --stop`.
+  Closing the browser window does not stop the dashboard.
+- **The top bar says which murmurent is running**, for example
+  `running murmurent_dev · main @ 787faca` or `running release v2026.10.1`.
+- **`scripts/install_security_snapshot.sh`** installs the security snapshot on
+  a lab server in one step and retires an old wigamig install.
+- **Every repository is now part of a project** (#151). `murmurent repo adopt`
+  records a one-repository project for a repository that no project lists,
+  with you as lead; adopting again changes nothing, and an existing project is
+  never changed by adopting. When such a repository later joins a bigger
+  project, its one-repository project is archived, so each repository has one
+  owning project. `murmurent project migrate` lists every repository and data
+  folder that no project claims and proposes project records for them,
+  grouping `x`, `x_manuscript` and `x_seminar` into one project. It writes
+  nothing unless you add `--apply` and confirm, and it never moves, renames or
+  deletes anything. Run it once on each machine.
+- **`murmurent project status`** shows one project as a whole: its
+  repositories, its data folders, what it reads without owning, its keep-until
+  date, when it was last used, and whether it is active, quiet (no use for 12
+  months) or dormant (24 months). Activity is worked out from commits,
+  `murmurent run` job records and the data scan's record, never typed, and it
+  does not change who can reach a project.
+- **Three optional settings in a project record**: `data_folders` (the folders
+  it owns; by default `immutable/<project>/` and `append_only/<project>/`),
+  `reads_from` (folders and repositories it reads but does not own, which are
+  never offered to it for clean-up) and `retain_until` (a date before which
+  nothing in it may be suggested for deletion). Records without them read as
+  before.
+- **`murmurent run` starts a long job so that a dropped connection does not
+  stop it, and `murmurent jobs` says how it is going** (#151). The job runs
+  inside tmux (a program that keeps a command running after you disconnect),
+  at the lowest priority, with the thread settings numerical libraries read set
+  to the number of cores it was given. Cores and GPUs are chosen from the lab's
+  rules and how busy the server is; memory and disk space are checked before it
+  starts; it can start at a set time or once the server is quieter. When the job
+  finishes, fails or stops producing output, one line goes to the project's
+  Slack channel, giving the job's name, what happened, how long it ran and its
+  exit code, never the command or a file path. `murmurent jobs` lists what is
+  running and how earlier jobs ended, with time and disk estimates where there
+  is something to base them on. The lab's rules live in one file in its
+  management repository, `policy/millwright.yaml`; a commented example is in
+  `templates/millwright_policy.yaml`. Guide: [Running long
+  jobs](https://hallettmiket.github.io/murmurent/run_launcher/).
+- **`murmurent space scan` lists what in a project could be deleted, compressed,
+  moved or asked about** (#151). It looks through one project's repositories
+  and data folders, reading sizes, dates, owners and names, and suggests:
+  temporary files, job output that could be made again, uncompressed text data,
+  duplicates, files out of place, files owned by non-members, and files already
+  listed in `src/ready_to_delete.md`. Each row gives a reason and its evidence.
+  `murmurent space show` lists the three most pressing first, and
+  `murmurent space decide` records what you decide. Nothing is changed, moved or
+  deleted, nothing in `immutable/` is ever suggested for deletion, and a
+  project's keep-until date turns every "delete" into "keep". The table is kept
+  in your own `~/.murmurent/space/`, readable by you only. The thresholds are in
+  `policy/millwright.yaml`. Guide: [Tidying a project's
+  space](https://hallettmiket.github.io/murmurent/space_table/).
+- **A weekly lab-wide space scan, and the report on your laptop** (#151). On
+  the server, `murmurent space schedule --install` runs `murmurent space
+  scan-lab` every Sunday at 02:00: it scans every project's data folders and
+  every folder under the data root that no project claims, suggests mothballing
+  for projects unused for 24 months, and sends the PI a Slack summary with no
+  file names. Other labs' folders are never scanned. On a laptop, `murmurent
+  space lab --host <server>`, or the new Space page of the PI's dashboard,
+  fetches the report over SSH. A full scan takes about 10 minutes per million
+  files on the lab's network drive.
+- **`murmurent run --input`** records what a job reads, so the space scan can
+  tell later whether its output could be made again.
+
+### Changed
+- **The space audit is optional for each lab.** The PI chooses on or off in
+  Lab settings; until then the dashboard does not show it. Off also makes the
+  weekly scan do nothing. When it is not set up, it explains what is missing
+  instead of showing raw errors.
+- **The security scans check `immutable/`, `append_only/` and `modifiable/`**,
+  as well as the old `raw/` and `refined/`. Files in `immutable/` must be
+  read-only on disk.
+- **Dashboard tidied** (#185): the live agent feed, My contributions,
+  Inventory, the compliance panels and Installations are gone. "Create new
+  project" is simpler: a description instead of a justification, no machines
+  or git provider fields, the PI's own project is created at once, the chosen
+  repos are made murmurent-ready automatically, and the repo list is
+  rescanned. Repos are grouped by project. "space" and "security" are now
+  "space audit" and "security audit".
+- **The update banner speaks in words**: "Murmurent 2026.10.2 is available", or
+  "murmurent_dev has 3 new changes on GitHub", with the change titles, instead
+  of commit codes.
+- **Both READMEs link to the documentation** at
+  <https://mikehallett.science/murmurent/> near the top.
+
+### Fixed
+- **The released murmurent's dashboard showed only an error** ("static dir
+  not found"). Its pages were left out of the release and of the installed
+  package; both now include them.
+- **The update button updated the wrong copy** when the dashboard ran from
+  murmurent_dev, and could report success without restarting.
+- **The agent card's disable switch and model menu edited the shared agent
+  file**, changing the agent for everyone linked to it. They now make your own
+  copy, as the Modify window does, and never overwrite a hand-written one.
+- **Approving a project built from existing repos reported a failed
+  git-remote step.** Each repo now keeps its own remote.
+- **Profile and lab settings saves** go to the person whose page is open, and
+  say when an edit is saved on this computer only or did not reach the lab's
+  repository.
+- **Files anyone can write in a data folder are marked as blocking** by the
+  security scan; the check never matched before.
+- **The dashboard now says when your identity card has expired.** Before, the
+  sign-in page accepted you, the dashboard was then refused, and you landed back
+  on the sign-in page with no reason given. Now the sign-in page checks your
+  card first and, if it has expired, says on which date and gives the command
+  that renews it: `murmurent pi-init <lab>` for a PI, or a new card from the PI
+  for a member. A member whose own card is fine but whose PI's card (which their
+  card carries) has expired is told so. In the two weeks before a card expires,
+  the sign-in page shows a warning with the same command.
+
 ## [2026.10.0] - 2026-10-14
 
 **To upgrade:** `uv tool upgrade murmurent`, then `murmurent install`, then

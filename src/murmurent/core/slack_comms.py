@@ -6,7 +6,7 @@ Date: 2026-07-03
 Wires the existing engines into the murmurent lifecycle so Slack is the primary
 comms channel:
   - a private **mayor↔CC channel** where the code posts centre events;
-  - a private **per-lab/core channel** named after the group, members-only;
+  - a private **per-lab/core channel**, ``#lab-<group>``, members-only;
   - `#general` for broadcasts (handled by `core/broadcasts.py`).
 
 Reuses (does not re-implement):
@@ -42,13 +42,28 @@ def token_present() -> bool:
         return False
 
 
+#: Every lab and core channel is ``#lab-<group>`` (#188); cores use the same
+#: prefix so a member finds any group's channel the same way.
+GROUP_CHANNEL_PREFIX = "lab-"
+
+
 def channel_name_for(group: str) -> str | None:
-    """The Slack channel name for a lab/core = the group's own name,
-    normalized to Slack rules (lowercase, `[a-z0-9_-]`, <=80). None if the
-    name can't be made valid."""
+    """The Slack channel name for a lab/core: ``lab-<group>`` (a leading
+    ``lab_`` in the group name is not repeated), normalized to
+    Slack rules (lowercase, `[a-z0-9_-]`, <=80). None if the name can't be
+    made valid. Groups created before #188 keep the channel they already have
+    (its id is in the registry), so this name applies to new channels only."""
     try:
         from ..dashboard import slack_notify
-        return slack_notify.normalize_channel_name(group)
+        group = (group or "").strip().lower()
+        # A group already named lab_<x> gets #lab-<x>, not #lab-lab_<x>.
+        for already in ("lab_", "lab-"):
+            if group.startswith(already) and len(group) > len(already):
+                group = group[len(already):]
+        if not group:
+            return None
+        return slack_notify.normalize_channel_name(
+            (GROUP_CHANNEL_PREFIX + group)[:80])
     except Exception:  # noqa: BLE001
         return None
 

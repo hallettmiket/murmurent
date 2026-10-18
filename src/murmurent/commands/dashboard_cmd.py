@@ -9,6 +9,7 @@ Output: Side effects on ``lab-mgmt/dashboards/`` or stdout.
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import sys
@@ -31,8 +32,11 @@ def cmd_dashboard(
     port: int = 8770,
     tunnel: str = "",
     tunnel_port: int | None = None,
+    stop: bool = False,
 ) -> int:
     """``murmurent dashboard`` — open Streamlit, print the snapshot, or print outstanding."""
+    if stop:
+        return stop_dashboard(port)
     # Tunnel mode: no local server at all — forward a remote machine's
     # dashboard (bound to its own 127.0.0.1) to this laptop over SSH.
     if tunnel:
@@ -108,16 +112,112 @@ def _launch_hifi(*, host: str, port: int) -> int:
             f"login, then front it with TLS. See docs/setup.md.",
             fg="yellow", err=True,
         )
-    click.echo("  Ctrl+C to stop.")
+    click.echo("  Ctrl+C to stop, or the dashboard's stop button, or: murmurent dashboard --stop")
     import uvicorn
 
-    uvicorn.run(
-        "murmurent.dashboard.server:app",
-        host=host,
-        port=port,
-        log_level="info",
-        reload=False,
-    )
+    # Record this process so `murmurent dashboard --stop` finds exactly it,
+    # even when it was started in the background by the dashboard icon.
+    pid_file = _pid_file(port)
+    try:
+        pid_file.parent.mkdir(parents=True, exist_ok=True)
+        pid_file.write_text(f"{os.getpid()}\n", encoding="utf-8")
+    except OSError:
+        pid_file = None
+    try:
+        uvicorn.run(
+            "murmurent.dashboard.server:app",
+            host=host,
+            port=port,
+            log_level="info",
+            reload=False,
+        )
+    finally:
+        if pid_file is not None and _read_pid(pid_file) == os.getpid():
+            pid_file.unlink(missing_ok=True)
+    return 0
+
+
+# ---------------------------------------------------------------------------
+# Stopping a running dashboard
+# ---------------------------------------------------------------------------
+
+
+def _pid_file(port: int) -> Path:
+    """Where a running dashboard records its process id."""
+    from ..core.project_unit import murmurent_home
+    return murmurent_home() / f"dashboard_{port}.pid"
+
+
+def _read_pid(path: Path) -> int | None:
+    try:
+        return int(path.read_text(encoding="utf-8").strip())
+    except (OSError, ValueError):
+        return None
+
+
+def _pid_listening_on(port: int) -> int | None:
+    """The process listening on ``port``, for a dashboard started before pid
+    files existed. Uses lsof, which Macs and most Linux machines have."""
+    try:
+        res = subprocess.run(["lsof", "-t", f"-iTCP:{port}", "-sTCP:LISTEN"],
+                             capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    pids = [int(x) for x in res.stdout.split() if x.strip().isdigit()]
+    return pids[0] if pids else None
+
+
+def _alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True   # someone else's process: alive, but not ours to stop
+
+
+def stop_dashboard(port: int = 8770) -> int:
+    """Stop the dashboard running on ``port`` on this machine, if it is yours.
+
+    Finds it through its pid file, or through the port. Sends it the normal
+    "please stop" signal, so it shuts down cleanly, and waits a few seconds
+    for it to go.
+    """
+    import signal
+    import time
+
+    pid_file = _pid_file(port)
+    pid = _read_pid(pid_file)
+    if pid is not None and not _alive(pid):
+        pid_file.unlink(missing_ok=True)   # left behind by a crash
+        pid = None
+    if pid is None:
+        pid = _pid_listening_on(port)
+    if pid is None:
+        click.echo(f"No dashboard is running on port {port}.")
+        return 0
+    if pid == os.getpid():
+        raise click.ClickException("refusing to stop this very process")
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except PermissionError:
+        raise click.ClickException(
+            f"The program on port {port} (process {pid}) belongs to another user, "
+            "so it was not stopped.")
+    except ProcessLookupError:
+        click.echo(f"No dashboard is running on port {port}.")
+        return 0
+    for _ in range(50):
+        if not _alive(pid):
+            break
+        time.sleep(0.1)
+    pid_file.unlink(missing_ok=True)
+    if _alive(pid):
+        click.echo(f"Asked the dashboard (process {pid}) to stop; it has not finished yet.")
+        return 1
+    click.echo(f"Stopped the dashboard on port {port}. Start it again with: "
+               "murmurent dashboard --hifi")
     return 0
 
 

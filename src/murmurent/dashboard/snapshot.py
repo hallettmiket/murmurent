@@ -191,6 +191,7 @@ def build_response(
 
     return C.DashboardResponse(
         version=_mm_version,
+        build=_running_code(),
         today=_today_block(today_d),
         persona=effective_persona,  # type: ignore[arg-type]
         member=member_block,
@@ -293,8 +294,12 @@ _LAB_DEFAULT_LOCATION = C.MemberLocation()
 
 
 def _identity(handle: str, full_name: str | None, role: str) -> C.IdentityBlock:
-    """Build the current-member ``IdentityBlock`` with frontmatter overrides."""
-    profile = _load_member_profile(handle)
+    """Build the current-member ``IdentityBlock`` with frontmatter overrides.
+
+    The member's own staged profile edits are laid over the roster record, so
+    the footer shows the same values as the profile window after a save (#185).
+    """
+    profile = _overlay_staged_profile(_load_member_profile(handle), handle)
     is_active = str(profile.get("status", "active")) == "active" if profile else True
     return C.IdentityBlock(
         handle=handle,
@@ -643,6 +648,7 @@ def _lab_settings(lab_name: str) -> C.LabSettings:
                 pi_github=_pi_github(_pi),
                 slack_workspace=str(meta.get("slack_workspace") or ""),
                 slack_invite_url=str(meta.get("slack_invite_url") or ""),
+                space_audit=_space_audit_choice(meta.get("space_audit")),
                 kind=kind,
                 website=meta.get("website") or None,
                 admins=list(meta.get("admins") or []),
@@ -1465,6 +1471,37 @@ def _peer_role(handle: str) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _space_audit_choice(value) -> str:
+    """lab.md ``space_audit:`` as "on", "off" or "" (not chosen). YAML may read
+    an unquoted on/off as a boolean."""
+    if value is True:
+        return "on"
+    if value is False:
+        return "off"
+    value = str(value or "").strip().lower()
+    return value if value in ("on", "off") else ""
+
+
+_RUNNING_CODE: dict | None = None
+
+
+def _running_code() -> dict:
+    """Describe the running code once per process: it cannot change without a
+    restart, and the dashboard reloads its data often."""
+    global _RUNNING_CODE
+    if _RUNNING_CODE is None:
+        try:
+            from ..core import mm_update as _mm
+            _RUNNING_CODE = _mm.describe_running_code()
+        except Exception:
+            _RUNNING_CODE = {}
+        # The stop button is offered unless the system runs this dashboard as
+        # a service (systemd), which would only start it again.
+        import os as _os
+        _RUNNING_CODE["stoppable"] = not _os.environ.get("INVOCATION_ID")
+    return _RUNNING_CODE
+
+
 def _agents() -> list[C.AgentRow]:
     """Load the agent registry as dashboard rows: the commons agents (grouped by
     category) plus this member's own personal (member-created) agents."""
@@ -1475,9 +1512,13 @@ def _agents() -> list[C.AgentRow]:
     except Exception:
         registry = []
     for record in registry:
-        # The AgentRecord doesn't expose model + disabled directly, so
-        # re-parse the source file for the extra fields.
-        model, disabled = _agent_extras(record.path)
+        # Show the definition Claude Code actually loads (#186): after a member
+        # makes their own copy, its model and disabled flag are theirs, not
+        # the centre file's. Fall back to the centre file when nothing usable
+        # is installed.
+        use = _agent_in_use(record.name)
+        source = Path(use.path) if use and use.path else record.path
+        model, disabled = _agent_extras(source)
         rows.append(
             C.AgentRow(
                 name=record.name,
@@ -1488,10 +1529,27 @@ def _agents() -> list[C.AgentRow]:
                 disabled=disabled,
                 origin="commons",
                 category=getattr(record, "category", "member"),  # type: ignore[arg-type]
+                **_in_use_fields(use),
             )
         )
     rows.extend(_personal_agents())
     return rows
+
+
+def _agent_in_use(name: str):
+    """core.agent_in_use.which(name) for this machine; None if it fails."""
+    try:
+        from ..core import agent_in_use as _aiu
+        return _aiu.which(name)
+    except Exception:
+        return None
+
+
+def _in_use_fields(use) -> dict:
+    if use is None:
+        return {}
+    return {"in_use_level": use.level, "in_use_label": use.label,
+            "in_use_detail": use.detail, "upstream_changed": use.upstream_changed}
 
 
 def _personal_agents() -> list[C.AgentRow]:
@@ -1541,6 +1599,7 @@ def _personal_agents() -> list[C.AgentRow]:
                 disabled=bool(meta.get("disabled", False)),
                 origin="personal",
                 category="member",
+                **_in_use_fields(_agent_in_use(name)),
             )
         )
     return rows

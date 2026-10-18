@@ -2,7 +2,7 @@ site_name: Murmurent
 site_description: >-
   Shared agentic-AI infrastructure for research groups — agents, rules,
   cryptographic membership, and institutional memory on top of Claude Code.
-site_url: https://hallettmiket.github.io/murmurent/
+site_url: https://mikehallett.science/murmurent/
 repo_url: https://github.com/hallettmiket/murmurent
 repo_name: hallettmiket/murmurent
 edit_uri: edit/main/docs/
@@ -99,6 +99,8 @@ nav:
               - 6 · Share a fact with the lab: vault_vignettes/6_share_with_the_lab.md
               - 7 · Recall across all your notes: vault_vignettes/7_recall_across_tiers.md
       - Creating a project (in your lab): project_intra.md
+      - Running long jobs: run_launcher.md
+      - Tidying a project's space: space_table.md
   - Labs & cores:
       - "Overview: members, groups, projects": overview.md
       - Group-level architecture: group_level.md

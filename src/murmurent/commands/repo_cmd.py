@@ -7,8 +7,9 @@ Output: Stdout tables/ladders + (for adopt/upgrade) the same side
         effects as the dashboard's Repos-panel buttons.
 
 Terminology: adopting a repo makes it **murmurent-ready** (readiness
-marker + commons agent symlinks) — it does NOT create a project. A
-project is a set of repos + members, made via the New Project flow.
+marker + commons agent symlinks). A project is a set of repos + members.
+Every repository belongs to one (#151): adopting a repository no project
+lists writes a one-repository project for it.
 ``upgrade`` re-runs the bootstrap against the current murmurent release
 (new commons agents, marker schema) and stamps the marker on a legacy
 CHARTER.md bootstrap, preserving the CHARTER.md (issue #28).
@@ -219,8 +220,9 @@ def cmd_status(target: str, host_name: str | None) -> int:
 def cmd_adopt(*, path: str, lab: str | None, agents_csv: str | None,
               host_name: str, all_agents: bool = False) -> int:
     """Make an existing clone murmurent-ready (CLI twin of the Repos
-    panel's ↑ adopt button). Creates NO project — attach the ready repo
-    to a project via `murmurent project new` / the dashboard.
+    panel's ↑ adopt button). Every repository belongs to a project (#151),
+    so when no project lists this one, a one-repository project is written
+    for it; an existing project is never changed.
 
     ``all_agents`` links every agent in the commons. It exists because the
     alternative was to name them: with neither option, adopt makes the repo
@@ -254,8 +256,8 @@ def cmd_adopt(*, path: str, lab: str | None, agents_csv: str | None,
     icon = {"ok": "✓", "warn": "!", "fail": "✗"}
     for p in outcome.probes:
         click.echo(f"  {icon.get(p.status, '?')} {p.name}: {p.detail}")
-    click.echo("Next: attach it to a project when you need one — "
-               "`murmurent project new … ` or the dashboard's New Project.")
+    click.echo("See its project with `murmurent project status`, run inside the "
+               "repository.")
     return 0
 
 

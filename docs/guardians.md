@@ -100,6 +100,12 @@ the lab has the access they need, and no more:
   archived and generates (but does not itself execute) the
   access-revocation checklist for SSH keys, GitHub, and Slack.
 
+- **Space audit (optional).** A weekly, read-only scan of the lab's data
+  server that reports how much disk each project uses and what could be
+  tidied. The PI turns it on or off under **⚙ Lab settings → Space audit**;
+  it needs no administrator rights. See
+  [Tidying a project's space](space_table.md#turning-the-space-audit-on-or-off-for-the-pi).
+
 Several of these operations are backed by real, tested code rather
 than being purely agent-authored actions: GitHub-collaborator and
 Slack-channel synchronization for a project

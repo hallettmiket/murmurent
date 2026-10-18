@@ -14,15 +14,16 @@ The snapshot directory layout — see scripts/lab_sec_dump.sh:
 
     <snapshot_dir>/
       manifest.json       — script_version, attempts list
-      acls_raw.txt        — nfs4_getfacl -R output for raw/
-      acls_refined.txt    — same for refined/
+      acls_<folder>.txt   — nfs4_getfacl output for each governed data
+                            folder present: immutable, append_only,
+                            modifiable, and the legacy raw, refined
       sshd_runtime.txt    — ``sshd -T`` output
       ssh_keys.jsonl      — one row per (member, key) — NO key bodies
       auth_summary.json   — per-user counts of publickey/password/failed
 
 This module is pure-Python and side-effect-free with respect to the
 snapshot. It never writes back to the snapshot dir and never proposes
-mutations to /data/lab_vm/{raw,refined}.
+mutations to the governed data folders.
 """
 
 from __future__ import annotations
@@ -33,6 +34,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .security_acl import diff_raw, diff_refined, parse_nfs4_getfacl
+
+#: Governed data folders (rules/data-storage.md), new names first. Read-only
+#: folders are checked against the immutability template; lab-shared ones
+#: against the refined template.
+READONLY_KINDS = ("immutable", "raw")
+SHARED_KINDS = ("append_only", "refined", "modifiable")
 from .security_findings import (
     Finding,
     SEVERITY_BLOCK,
@@ -43,7 +50,7 @@ from .security_findings import (
 )
 
 
-SUPPORTED_SCRIPT_VERSIONS = ("1", "2", "3", "4", "5", "6", "7")
+SUPPORTED_SCRIPT_VERSIONS = ("1", "2", "3", "4", "5", "6", "7", "8")
 
 
 @dataclass
@@ -112,24 +119,31 @@ def consume_snapshot(snapshot_dir: Path, *, host: str,
             now_iso=now_iso,
         ))
 
-    # ----- ACL diffs (lab raw + refined) -----------------------------------
-    for kind, parser_fn in (
-        ("raw", diff_raw),
-        ("refined", diff_refined),
-    ):
-        acl_path = snapshot_dir / f"acls_{kind}.txt"
-        if not acl_path.is_file():
-            result.warnings.append(f"acls_{kind}.txt missing")
-            continue
-        try:
-            text = acl_path.read_text(encoding="utf-8", errors="replace")
-        except OSError as exc:
-            result.warnings.append(f"acls_{kind}.txt: read failed ({exc})")
-            continue
-        acls = parse_nfs4_getfacl(text)
-        result.findings.extend(parser_fn(
-            acls, host=host, lab_vm_root=lab_vm_root, now_iso=now_iso,
-        ))
+    # ----- ACL diffs (lab data folders) ------------------------------------
+    # Read-only folders use the immutability template, lab-shared folders the
+    # refined template (#185). Each folder is optional on its own: a lab mid-
+    # migration has the old name or the new one. Warn only when a whole group
+    # is missing, since that means the dump did not cover it.
+    for group, parser_fn in ((READONLY_KINDS, diff_raw), (SHARED_KINDS, diff_refined)):
+        found = False
+        for kind in group:
+            acl_path = snapshot_dir / f"acls_{kind}.txt"
+            if not acl_path.is_file():
+                continue
+            found = True
+            try:
+                text = acl_path.read_text(encoding="utf-8", errors="replace")
+            except OSError as exc:
+                result.warnings.append(f"acls_{kind}.txt: read failed ({exc})")
+                continue
+            acls = parse_nfs4_getfacl(text)
+            result.findings.extend(parser_fn(
+                acls, host=host, lab_vm_root=lab_vm_root, now_iso=now_iso,
+                kind=kind,
+            ))
+        if not found:
+            result.warnings.append(
+                "no ACL file for any of " + ", ".join(f"{k}/" for k in group))
 
     # ----- ACL diffs (per-core raw + refined) ------------------------------
     # Phase 1c of the cores rollout (the cores rollout design notes §11). The Phase
@@ -140,14 +154,14 @@ def consume_snapshot(snapshot_dir: Path, *, host: str,
     # core's leader can see only their core's findings later (Phase 3
     # of the security dashboard work).
     for acl_path in sorted(snapshot_dir.glob("acls_core_*_*.txt")):
-        # Filename format: acls_core_<core>_<kind>.txt  (kind = raw|refined)
+        # Filename format: acls_core_<core>_<kind>.txt  (kind = a data folder)
         stem = acl_path.stem  # e.g. "acls_core_biocore_raw"
         parts = stem.split("_", 3)
         if len(parts) < 4 or parts[0] != "acls" or parts[1] != "core":
             continue
         core_name = parts[2]
         kind = parts[3]
-        if kind not in ("raw", "refined"):
+        if kind not in READONLY_KINDS + SHARED_KINDS:
             continue
         try:
             text = acl_path.read_text(encoding="utf-8", errors="replace")
@@ -160,9 +174,10 @@ def consume_snapshot(snapshot_dir: Path, *, host: str,
         # "core_refined" works without duplicating ~300 lines of ACL
         # template logic. The lab_vm_root mapping for paths needs
         # adjusting because core trees live one level deeper.
-        parser_fn = diff_raw if kind == "raw" else diff_refined
+        parser_fn = diff_raw if kind in READONLY_KINDS else diff_refined
         core_findings = parser_fn(
             acls, host=host, lab_vm_root=lab_vm_root, now_iso=now_iso,
+            kind=kind,
         )
         for f in core_findings:
             # Rule re-tag: RAW-IMMUTABLE-01 -> CORE-RAW-IMMUTABLE-01,

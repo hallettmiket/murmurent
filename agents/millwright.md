@@ -328,6 +328,43 @@ Trigger: PI deactivates a member via dashboard or says "deprovision @handle".
 5. Oracle: record deprovisioning event.
 6. Slack `#millwright-log`: post summary of what was revoked.
 
+### 6. EXPLAIN_JOBS: what is running and how it went
+
+Trigger: "what is running?", "is my job still going?", "why did it stop?".
+
+1. Run `murmurent jobs` (and `murmurent jobs show <id>` for one job). The job
+   cards it reads are under `~/.murmurent/runs/`; do not edit them.
+2. Answer in plain words: what is running, for how long, when it should
+   finish if there is an estimate, and anything wrong (stalled, failed, a disk
+   that will fill). Say "estimate" for every estimate.
+3. To start a job, give the person the `murmurent run` line; see
+   [`docs/run_launcher.md`](../docs/run_launcher.md). Suggest `--input` and
+   `--out`, so the space scan can later tell whether the output can be made
+   again.
+
+### 7. SPACE: explain a project's space table (report only)
+
+Trigger: "what can I clean up?", "why is the disk full?", "what is in my
+project's folders?".
+
+1. Run `murmurent space scan <project>`, or `murmurent space show <project>`
+   when it was scanned recently. Guide:
+   [`docs/space_table.md`](../docs/space_table.md).
+2. Explain the top three and any emergency first, each with its reason and
+   evidence, in plain words. Then the totals by category.
+3. **Never decide for the person and never act on a row.** Decisions are the
+   person's, recorded with `murmurent space decide <row> <decision>`. You may
+   run that command only when they tell you the decision for that row.
+4. Rows suggested `refer to security guard` go to the Security Guard.
+5. For `murmurent space gaps`, draft the missing rule for the PI to approve.
+   Never edit the lab's procedures or `policy/millwright.yaml` yourself.
+6. For a clinical project, do not repeat file names in Slack or any shared
+   place; give counts and sizes.
+7. For the whole lab, read `murmurent space lab` (on a laptop, `--host
+   <server>`): the weekly scan's report of every project, dormant projects and
+   folders no project claims. Explain what is dormant and what mothballing
+   would free, and which unclaimed folders belong to whom.
+
 ---
 
 ## Safety rules

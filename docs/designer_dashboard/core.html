@@ -1,0 +1,1436 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Murmurent · Core dashboard</title>
+    <link rel="icon" type="image/x-icon" href="/assets/favicon.ico" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700&family=Courier+Prime:ital,wght@0,400;0,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --purple:        #4F2683;
+        --purple-deep:   #201436;
+        --purple-soft:   #6F4DA8;
+        --tiger:         #F0A757;
+        --paper:         #FAF8F5;
+        --paper-2:       #F1ECE3;
+        --card:          #FFFFFF;
+        --rule:          #E0DAD0;
+        --rule-strong:   #C7BFB1;
+        --ink:           #1A1A1A;
+        --ink-2:         #3A3A3A;
+        --muted:         #5B5B5B;
+        --green:         #4F6B3A;
+        --red:           #B23A2B;
+        --serif: "EB Garamond", Georgia, serif;
+        --mono:  "Courier Prime", "IBM Plex Mono", Menlo, monospace;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--paper); color: var(--ink);
+                   font-family: var(--serif); }
+      .banner {
+        background: var(--purple); color: white;
+        padding: 12px 28px; display: flex; align-items: baseline;
+        justify-content: space-between; gap: 24px;
+        border-bottom: 4px solid var(--tiger);
+      }
+      .banner h1 { margin: 0; font-size: 22px; font-weight: 600; }
+      .banner h1 small {
+        font-family: var(--mono); font-size: 11px; font-weight: 400;
+        letter-spacing: 1px; opacity: 0.75; margin-left: 6px;
+      }
+      .banner .meta {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+        text-transform: uppercase; opacity: 0.9;
+      }
+      .banner a { color: var(--tiger); text-decoration: none; }
+      .banner a:hover { text-decoration: underline; }
+      .container { max-width: 1240px; margin: 24px auto; padding: 0 28px; }
+      .card {
+        background: var(--card); border: 1px solid var(--rule-strong);
+        border-radius: 2px; margin-bottom: 18px;
+      }
+      .card > header {
+        padding: 12px 16px; border-bottom: 1px solid var(--rule);
+        background: var(--paper-2); display: flex; align-items: center;
+        justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      }
+      .card > header h2 {
+        margin: 0; font-size: 16px; color: var(--purple-deep);
+      }
+      .card > header .meta {
+        font-family: var(--mono); font-size: 11px; color: var(--muted);
+      }
+      .card .body { padding: 14px 18px; }
+      .identity-grid {
+        display: grid; grid-template-columns: 180px 1fr; gap: 8px 18px;
+        font-size: 13px;
+      }
+      .identity-grid dt {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 1.2px;
+        text-transform: uppercase; color: var(--muted); padding-top: 3px;
+      }
+      .identity-grid dd { margin: 0; font-size: 14px; }
+      .identity-grid dd a { color: var(--purple); text-decoration: none; }
+      .identity-grid dd a:hover { text-decoration: underline; }
+      .pill {
+        display: inline-block; padding: 1px 9px; border-radius: 2px;
+        font-family: var(--mono); font-size: 10.5px;
+        letter-spacing: 1px; text-transform: uppercase;
+        background: var(--paper-2); color: var(--purple-deep);
+        border: 1px solid var(--rule);
+        margin-right: 4px; margin-bottom: 2px;
+      }
+      .pill.active { background: var(--green); color: white; border-color: var(--green); }
+      .pill.archived, .pill.inactive { background: var(--red); color: white; border-color: var(--red); }
+      table.members {
+        width: 100%; border-collapse: collapse; font-size: 13px;
+      }
+      table.members th, table.members td {
+        text-align: left; padding: 8px 10px;
+        border-bottom: 1px solid var(--rule);
+      }
+      table.members th {
+        font-family: var(--mono); font-size: 10.5px; letter-spacing: 1px;
+        text-transform: uppercase; color: var(--muted);
+        background: var(--paper-2);
+      }
+      .placeholder {
+        background: var(--paper-2); border: 1px dashed var(--rule-strong);
+        padding: 14px 16px; font-family: var(--mono); font-size: 12px;
+        color: var(--muted); border-radius: 2px;
+      }
+      .placeholder code { color: var(--purple-deep); }
+      .err {
+        background: #FFF1F0; border: 1px solid var(--red);
+        color: var(--red); padding: 12px 16px; font-family: var(--mono);
+        font-size: 12px; border-radius: 2px;
+      }
+      .service-row {
+        border: 1px solid var(--rule); border-radius: 2px;
+        padding: 12px 14px; margin-bottom: 10px; background: white;
+      }
+      .service-row .head {
+        display: flex; justify-content: space-between; align-items: baseline;
+        gap: 12px; flex-wrap: wrap; margin-bottom: 6px;
+      }
+      .service-row .head h3 {
+        margin: 0; font-size: 16px; color: var(--purple-deep);
+      }
+      .service-row .head .slug {
+        font-family: var(--mono); font-size: 11px; color: var(--muted);
+      }
+      .service-row .body-text {
+        font-size: 13px; color: var(--ink-2); margin: 4px 0 8px;
+      }
+      .service-row .meta-grid {
+        display: grid; grid-template-columns: 140px 1fr;
+        gap: 4px 14px; font-size: 12px;
+      }
+      .service-row .meta-grid dt {
+        font-family: var(--mono); font-size: 10.5px; letter-spacing: 1px;
+        text-transform: uppercase; color: var(--muted); padding-top: 2px;
+      }
+      .service-row .meta-grid dd { margin: 0; }
+      .fee-table {
+        font-family: var(--mono); font-size: 11.5px;
+        display: inline-block; margin-right: 14px;
+      }
+      .fee-table .tier { display: inline-block; padding: 1px 8px;
+        background: var(--paper-2); border: 1px solid var(--rule);
+        border-radius: 2px; margin-right: 4px; margin-bottom: 2px; }
+      .fee-table .tier strong { color: var(--purple-deep); }
+      .muted { color: var(--muted); }
+      .footer { margin: 30px 0 20px; padding: 0 28px;
+                font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    </style>
+  </head>
+  <body>
+    <div class="banner">
+      <h1>Murmurent <small>CORE DASHBOARD</small></h1>
+      <div class="meta">
+        <span id="leader-handle">@—</span> ·
+        <span id="role-label">view</span> ·
+        <a href="/">↺ switch</a>
+      </div>
+    </div>
+
+    <div class="container">
+      <div id="loading" class="placeholder">Loading core data…</div>
+      <div id="error-box" class="err" style="display:none"></div>
+
+      <!-- Identity card -->
+      <div class="card" id="identity-card" style="display:none">
+        <header>
+          <h2 id="core-display-name">—</h2>
+          <span class="meta">
+            <span id="core-status-pill" class="pill">—</span>
+            <span id="core-kind-pill" class="pill">core</span>
+            <button id="core-settings-btn" type="button"
+                    style="display:none; margin-left:10px;
+                           font-family:var(--mono); font-size:11px;
+                           letter-spacing:1px; text-transform:uppercase;
+                           background:var(--purple); color:white; border:0;
+                           border-radius:2px; padding:3px 10px; cursor:pointer;
+                           font-weight:600;">⚙ Core settings</button>
+          </span>
+        </header>
+        <div class="body">
+          <dl class="identity-grid" id="identity-grid"></dl>
+        </div>
+      </div>
+
+      <!-- Members card -->
+      <div class="card" id="members-card" style="display:none">
+        <header>
+          <h2>Core members</h2>
+          <span class="meta"><span id="members-count">0</span> total</span>
+        </header>
+        <div class="body" id="members-body">
+          <div class="placeholder">No members yet.</div>
+        </div>
+      </div>
+
+      <!-- Service catalog (Phase 2b read + 2c editor) -->
+      <div class="card" id="services-card" style="display:none">
+        <header>
+          <h2>Service catalog</h2>
+          <span class="meta">
+            <span id="services-count">0</span> service<span id="services-plural">s</span>
+            <button id="add-service-btn" class="btn-primary"
+                    style="display:none; margin-left:10px;
+                           font-family:var(--mono); font-size:11px;
+                           background:var(--purple); color:white;
+                           border:1px solid var(--purple); border-radius:2px;
+                           padding:4px 10px; cursor:pointer;">
+              ＋ add service
+            </button>
+          </span>
+        </header>
+        <div class="body" id="services-body">
+          <div class="placeholder">Loading services…</div>
+        </div>
+      </div>
+
+      <!-- Requests inbox (Phase 3f) -->
+      <div class="card" id="requests-card" style="display:none">
+        <header>
+          <h2>Requests inbox</h2>
+          <span class="meta">
+            <span id="requests-count">0</span> request<span id="requests-plural">s</span>
+            <label style="margin-left:14px; font-size:11px;">
+              <input type="checkbox" id="requests-show-terminal" checked>
+              show completed / cancelled
+            </label>
+            <button id="requests-refresh" class="btn-primary"
+                    style="margin-left:10px; font-family:var(--mono); font-size:11px;
+                           background:white; color:var(--text);
+                           border:1px solid var(--rule-strong); border-radius:2px;
+                           padding:4px 10px; cursor:pointer;">
+              ↻ refresh
+            </button>
+          </span>
+        </header>
+        <div class="body" id="requests-body">
+          <div class="placeholder">Loading requests…</div>
+        </div>
+      </div>
+
+      <!-- Training roster (Phase 6++: bioCore tracks who it has trained) -->
+      <div class="card" id="roster-card" style="display:none">
+        <header>
+          <h2>Training roster</h2>
+          <span class="meta">
+            <span id="roster-count">…</span>
+            <button id="roster-add" class="btn-primary"
+                    style="margin-left:10px; font-family:var(--mono); font-size:11px;
+                           background:var(--purple); color:white;
+                           border:1px solid var(--purple); border-radius:2px;
+                           padding:4px 10px; cursor:pointer;">
+              ＋ sign off
+            </button>
+          </span>
+        </header>
+        <div class="body" id="roster-body">
+          <div class="placeholder">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Deliverables overview (Phase 8b) -->
+      <div class="card" id="deliverables-card" style="display:none">
+        <header>
+          <h2>Deliverables overview</h2>
+          <span class="meta">
+            <span id="deliverables-count">…</span>
+            <button id="deliverables-refresh" class="btn-primary"
+                    style="margin-left:10px; font-family:var(--mono); font-size:11px;
+                           background:white; border:1px solid var(--rule-strong);
+                           border-radius:2px; padding:4px 10px; cursor:pointer;">
+              ↻ refresh
+            </button>
+          </span>
+        </header>
+        <div class="body" id="deliverables-body">
+          <div class="placeholder">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Audit log slice (Phase 8a) -->
+      <div class="card" id="audit-card" style="display:none">
+        <header>
+          <h2>Recent activity</h2>
+          <span class="meta">
+            <span id="audit-count">…</span> entries
+          </span>
+        </header>
+        <div class="body" id="audit-body">
+          <div class="placeholder">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Billing card (Phase 4c): per-month invoice preview + generate -->
+      <div class="card" id="billing-card" style="display:none">
+        <header>
+          <h2>Billing</h2>
+          <span class="meta">
+            <label style="font-size:11px;">
+              month
+              <input type="text" id="billing-month" placeholder="YYYY-MM"
+                     style="font-family:var(--mono); font-size:11px; padding:2px 6px;
+                            border:1px solid var(--rule-strong); border-radius:2px;
+                            margin-left:4px; width:80px;">
+            </label>
+            <label style="font-size:11px; margin-left:10px;">
+              <input type="checkbox" id="billing-finalised">
+              finalised (skip unconfirmed)
+            </label>
+            <button id="billing-preview" class="btn-primary"
+                    style="margin-left:10px; font-family:var(--mono); font-size:11px;
+                           background:white; border:1px solid var(--rule-strong);
+                           border-radius:2px; padding:4px 10px; cursor:pointer;">
+              preview
+            </button>
+            <button id="billing-generate" class="btn-primary"
+                    style="margin-left:6px; font-family:var(--mono); font-size:11px;
+                           background:var(--purple); color:white;
+                           border:1px solid var(--purple); border-radius:2px;
+                           padding:4px 10px; cursor:pointer;">
+              generate
+            </button>
+          </span>
+        </header>
+        <div class="body" id="billing-body">
+          <div class="placeholder">Pick a month and click <strong>preview</strong>.</div>
+        </div>
+      </div>
+
+      <!-- Service editor modal (Phase 2c) -->
+      <div id="modal-backdrop" style="display:none;
+           position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100;
+           align-items:center; justify-content:center; padding:20px;">
+        <div style="background:white; border-radius:4px; max-width:680px;
+             width:100%; max-height:90vh; overflow-y:auto;
+             padding:24px; font-family:var(--serif);">
+          <div style="display:flex; justify-content:space-between; align-items:center;
+                      margin-bottom:14px;">
+            <h2 id="modal-title" style="margin:0; color:var(--purple-deep)">Add service</h2>
+            <button id="modal-close" style="background:none; border:0; font-size:22px;
+                                             cursor:pointer; color:var(--muted)">×</button>
+          </div>
+          <form id="service-form">
+            <input type="hidden" id="f-slug-existing" />
+            <div style="display:grid; grid-template-columns:130px 1fr; gap:10px 14px; font-size:13px;">
+              <label>Slug *</label>
+              <input id="f-slug" required pattern="[a-z0-9][a-z0-9_]{1,63}"
+                     placeholder="e.g. itc_microcal_peaq"
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;" />
+              <label>Display name *</label>
+              <input id="f-name" required placeholder="e.g. MicroCal PEAQ-ITC"
+                     style="padding:4px 6px;" />
+              <label>Capability</label>
+              <select id="f-capability" style="padding:4px 6px;">
+                <option value="">(none)</option>
+                <option value="protein_production_synthetic_biology">protein_production_synthetic_biology</option>
+                <option value="structure_function_interaction">structure_function_interaction</option>
+                <option value="high_throughput_molecular_analysis">high_throughput_molecular_analysis</option>
+              </select>
+              <label>Mode</label>
+              <select id="f-mode" style="padding:4px 6px;">
+                <option value="independent_data_collection">independent_data_collection</option>
+                <option value="fee_for_service_data_collection">fee_for_service_data_collection</option>
+                <option value="consultation">consultation</option>
+              </select>
+              <label>Description</label>
+              <textarea id="f-description" rows="3" placeholder="One-paragraph summary"
+                        style="padding:4px 6px; font-family:var(--serif);"></textarea>
+              <label>Location</label>
+              <input id="f-location" placeholder="e.g. Room 100, bench A"
+                     style="padding:4px 6px;" />
+              <label>Equipment</label>
+              <div style="display:flex; gap:6px;">
+                <input id="f-equip-manuf" placeholder="manufacturer"
+                       style="flex:1; padding:4px 6px;" />
+                <input id="f-equip-model" placeholder="model"
+                       style="flex:1; padding:4px 6px;" />
+              </div>
+              <label>Duration (default)</label>
+              <div><input id="f-duration-default" type="number" value="60" min="5"
+                          style="width:80px; padding:4px 6px;" />
+                   <span class="muted" style="font-size:11px; margin-left:4px;">minutes</span></div>
+              <label>Duration (max)</label>
+              <div><input id="f-duration-max" type="number" value="240" min="5"
+                          style="width:80px; padding:4px 6px;" />
+                   <span class="muted" style="font-size:11px; margin-left:4px;">minutes</span></div>
+              <label>Training required</label>
+              <input id="f-training" placeholder="e.g. itc_basic_training (or blank)"
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;" />
+              <label>Prerequisites</label>
+              <textarea id="f-prereqs" rows="3"
+                        placeholder="One per line — e.g.&#10;Sample concentration ≥ 10 µM&#10;Buffer matched between cell and syringe"
+                        style="padding:4px 6px; font-family:var(--serif);"></textarea>
+              <label>Fee unit</label>
+              <select id="f-fee-unit" style="padding:4px 6px;">
+                <option value="per_run">per_run</option>
+                <option value="per_hour">per_hour</option>
+                <option value="per_sample">per_sample</option>
+              </select>
+              <label>Fee tiers (CAD)</label>
+              <div style="display:grid; grid-template-columns:1fr 90px; gap:4px 8px; font-family:var(--mono); font-size:11.5px;">
+                <span>academic_internal</span><input id="f-fee-ai" type="number" step="0.01" min="0" style="padding:3px 6px;" />
+                <span>academic_external</span><input id="f-fee-ae" type="number" step="0.01" min="0" style="padding:3px 6px;" />
+                <span>industry</span><input id="f-fee-ind" type="number" step="0.01" min="0" style="padding:3px 6px;" />
+              </div>
+              <label>Modifiers</label>
+              <div style="display:grid; grid-template-columns:1fr 90px; gap:4px 8px; font-family:var(--mono); font-size:11.5px;">
+                <span>weekend</span><input id="f-mod-weekend" type="number" step="0.01" min="0" placeholder="1.25" style="padding:3px 6px;" />
+                <span>after_hours</span><input id="f-mod-after" type="number" step="0.01" min="0" placeholder="1.5" style="padding:3px 6px;" />
+                <span>overtime</span><input id="f-mod-overtime" type="number" step="0.01" min="0" placeholder="1.5" style="padding:3px 6px;" />
+              </div>
+            </div>
+            <div id="form-error" class="err" style="display:none; margin-top:12px;"></div>
+            <div style="margin-top:18px; display:flex; gap:10px; justify-content:flex-end;">
+              <button type="button" id="modal-cancel"
+                      style="font-family:var(--mono); font-size:11px; padding:6px 14px;
+                             background:white; border:1px solid var(--rule-strong);
+                             border-radius:2px; cursor:pointer;">cancel</button>
+              <button type="submit" id="modal-submit"
+                      style="font-family:var(--mono); font-size:11px; padding:6px 14px;
+                             background:var(--purple); color:white;
+                             border:1px solid var(--purple); border-radius:2px;
+                             cursor:pointer;">save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Core settings modal (leader-editable core metadata) -->
+      <div id="settings-backdrop" style="display:none;
+           position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:100;
+           align-items:center; justify-content:center; padding:20px;">
+        <div style="background:white; border-radius:4px; max-width:620px;
+             width:100%; max-height:90vh; overflow-y:auto;
+             padding:24px; font-family:var(--serif);">
+          <div style="display:flex; justify-content:space-between; align-items:center;
+                      margin-bottom:6px;">
+            <h2 id="settings-title" style="margin:0; color:var(--purple-deep)">Core settings</h2>
+            <button id="settings-close" type="button" style="background:none; border:0;
+                    font-size:22px; cursor:pointer; color:var(--muted)">×</button>
+          </div>
+          <p class="muted" style="font-size:12px; margin:0 0 12px; line-height:1.5;">
+            Core-wide parameters. Only the core leader and centre registrars can save.
+            Edits write to the core's <code>lab.md</code> and are committed for you.
+          </p>
+          <form id="settings-form">
+            <div style="display:grid; grid-template-columns:150px 1fr; gap:10px 14px; font-size:13px;">
+              <label>Core id</label>
+              <input id="s-core-id" disabled
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;
+                            background:var(--paper-2);" />
+              <label>Display name</label>
+              <input id="s-display-name" placeholder="e.g. Example Bioconvergence Core"
+                     style="padding:4px 6px;" />
+              <label>Institution</label>
+              <input id="s-institution" placeholder="e.g. Example University"
+                     style="padding:4px 6px;" />
+              <label>Department</label>
+              <input id="s-department" placeholder="e.g. Example School of Medicine"
+                     style="padding:4px 6px;" />
+              <label>GitHub org</label>
+              <input id="s-github-org" placeholder="e.g. western-core"
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;" />
+              <label>Slack workspace</label>
+              <input id="s-slack-workspace" placeholder="e.g. westernqa"
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;" />
+              <label>Oracle vault</label>
+              <input id="s-oracle-vault" placeholder="path or vault id (optional)"
+                     style="font-family:var(--mono); font-size:12px; padding:4px 6px;" />
+            </div>
+            <div id="settings-error" class="err" style="display:none; margin-top:12px;"></div>
+            <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:16px;">
+              <button type="button" id="settings-cancel"
+                      style="font-family:var(--mono); font-size:11px; padding:6px 14px;
+                             background:white; border:1px solid var(--rule-strong);
+                             border-radius:2px; cursor:pointer;">cancel</button>
+              <button type="submit" id="settings-submit"
+                      style="font-family:var(--mono); font-size:11px; padding:6px 14px;
+                             background:var(--purple); color:white;
+                             border:1px solid var(--purple); border-radius:2px;
+                             cursor:pointer;">save</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h2>Incoming service requests</h2>
+          <span class="meta">phase 3</span>
+        </header>
+        <div class="body">
+          <div class="placeholder">
+            Phase 3 wires the booking inbox + calendar widget. State machine
+            mirrors the existing SEA flow:
+            <code>requested → scheduled → in_progress → completed</code>.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h2>Data deliverables</h2>
+          <span class="meta">phase 4</span>
+        </header>
+        <div class="body">
+          <div class="placeholder">
+            Phase 4 ships the <code>wigamig-core-data</code> MCP that
+            delivers each completed job's artifacts to the requesting
+            lab without leaking across labs. Mirrors the existing
+            <code>wigamig-oracle</code> pattern.
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <header>
+          <h2>Pending invoices</h2>
+          <span class="meta">phase 5</span>
+        </header>
+        <div class="body">
+          <div class="placeholder">
+            Phase 5 wires monthly invoice generation per requesting lab.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      Plan reference:
+      <a href="https://github.com/hallettmiket/murmurent/blob/main/docs/cores_plan.md" target="_blank">docs/cores_plan.md</a>
+      · §10 (Core Dashboard) for the panel inventory.
+    </div>
+
+    <script>
+      "use strict";
+      const params = new URLSearchParams(window.location.search);
+      const CORE  = params.get("core") || "";
+      const ACTOR = params.get("user") || "";
+      let LOADED_CORE = null;   // last-fetched core metadata (for the settings modal)
+      document.getElementById("leader-handle").textContent = ACTOR ? "@" + ACTOR : "@—";
+
+      const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+      }[c]));
+
+      async function loadCore() {
+        const loading = document.getElementById("loading");
+        const errBox = document.getElementById("error-box");
+        if (!CORE) {
+          loading.style.display = "none";
+          errBox.style.display = "block";
+          errBox.textContent = "Missing ?core=<id> in URL.";
+          return;
+        }
+        try {
+          const url = `/api/core/dashboard?core=${encodeURIComponent(CORE)}`
+                    + (ACTOR ? `&user=${encodeURIComponent(ACTOR)}` : "");
+          const res = await fetch(url);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          loading.style.display = "none";
+          LOADED_CORE = data.core || null;
+          renderIdentity(data.core, data.viewer);
+          renderMembers(data.members);
+          renderRoleLabel(data.viewer);
+          loadServices(data.viewer);
+          loadRequests(data.viewer);
+          loadRoster(data.viewer);
+          loadDeliverables(data.viewer);
+          loadAudit(data.viewer);
+          // Reveal the billing card (admin-only); user explicitly
+          // clicks preview to populate.
+          if (data.viewer && data.viewer.can_admin) {
+            document.getElementById("billing-card").style.display = "block";
+            document.getElementById("core-settings-btn").style.display = "inline-block";
+          }
+        } catch (ex) {
+          loading.style.display = "none";
+          errBox.style.display = "block";
+          errBox.textContent = "Error: " + (ex.message || ex);
+        }
+      }
+
+      function renderRoleLabel(viewer) {
+        const el = document.getElementById("role-label");
+        if (!viewer) { el.textContent = "view"; return; }
+        if (viewer.is_leader)        el.textContent = "core leader view";
+        else if (viewer.is_registrar) el.textContent = "registrar view";
+        else                          el.textContent = "view";
+      }
+
+      function renderIdentity(core, viewer) {
+        const card = document.getElementById("identity-card");
+        const grid = document.getElementById("identity-grid");
+        document.getElementById("core-display-name").textContent = core.display_name || core.name;
+        const statusPill = document.getElementById("core-status-pill");
+        statusPill.textContent = core.status;
+        statusPill.className = "pill " + (core.status === "active" ? "active" : "archived");
+
+        const c = core.contact || {};
+        const caps = (core.capabilities || []).map(s =>
+          `<span class="pill">${esc(s)}</span>`).join("");
+        const modes = (core.service_modes || []).map(s =>
+          `<span class="pill">${esc(s)}</span>`).join("");
+
+        const rows = [
+          ["Leader",      esc(core.leader)],
+          ["Institution", esc(core.institution || "—")],
+          ["Department",  esc(core.department || "—")],
+          ["Website",     core.website
+              ? `<a href="${esc(core.website)}" target="_blank" rel="noopener">${esc(core.website)}</a>`
+              : "—"],
+          ["Email",       c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : "—"],
+          ["Phone",       esc(c.phone || "—")],
+          ["Location",    esc(c.location || "—")],
+          ["Capabilities", caps || "<span class='placeholder' style='padding:6px 10px;display:inline-block;'>none catalogued yet</span>"],
+          ["Service modes", modes || "—"],
+          ["Data root",   core.data_root
+              ? `<code>${esc(core.data_root)}</code>`
+              : "—"],
+          ["Created",     esc(core.created || "—")],
+        ];
+        grid.innerHTML = rows.map(([label, value]) =>
+          `<dt>${esc(label)}</dt><dd>${value}</dd>`
+        ).join("");
+        card.style.display = "block";
+      }
+
+      function renderMembers(members) {
+        const card = document.getElementById("members-card");
+        const body = document.getElementById("members-body");
+        const countEl = document.getElementById("members-count");
+        members = members || [];
+        countEl.textContent = members.length;
+        if (members.length === 0) {
+          body.innerHTML = '<div class="placeholder">No members yet. Use the registrar dashboard to add core staff.</div>';
+        } else {
+          const rows = members.map(m => `
+            <tr>
+              <td><strong>${esc(m.full_name || m.handle)}</strong></td>
+              <td><code>@${esc(m.handle)}</code></td>
+              <td>${esc(m.role || "member")}</td>
+              <td><span class="pill ${esc(m.status || "active")}">${esc(m.status || "active")}</span></td>
+            </tr>
+          `).join("");
+          body.innerHTML = `
+            <table class="members">
+              <thead><tr><th>name</th><th>handle</th><th>role</th><th>status</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          `;
+        }
+        card.style.display = "block";
+      }
+
+      async function loadRoster(viewer) {
+        if (!(viewer && viewer.can_admin)) return;
+        const card = document.getElementById("roster-card");
+        const body = document.getElementById("roster-body");
+        const count = document.getElementById("roster-count");
+        card.style.display = "block";
+        try {
+          const url = `/api/core/${encodeURIComponent(CORE)}/training_roster`
+                    + `?user=${encodeURIComponent(ACTOR || "")}`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          const rows = data.members || [];
+          count.textContent = `${rows.length} member${rows.length === 1 ? "" : "s"} on roster`;
+          if (rows.length === 0) {
+            body.innerHTML = '<div class="placeholder">No members signed off yet. Click <strong>＋ sign off</strong> to record the first training.</div>';
+            return;
+          }
+          const html = rows.map(m => {
+            const items = m.trainings.map(t => {
+              const tag = t.is_current
+                ? '<span class="pill active">current</span>'
+                : '<span class="pill retired">expired</span>';
+              return `<li><code>${esc(t.name)}</code> ${tag}`
+                   + ` <span class="muted">${esc(t.completed)}`
+                   + (t.valid_until ? ` → ${esc(t.valid_until)}` : "")
+                   + ` (by ${esc(t.by)})</span></li>`;
+            }).join("");
+            return `
+              <tr>
+                <td><code>${esc(m.handle)}</code></td>
+                <td><ul style="margin:0; padding-left:18px;">${items}</ul></td>
+              </tr>`;
+          }).join("");
+          body.innerHTML = `
+            <table class="members" style="font-size:12px;">
+              <thead><tr><th>member</th><th>trainings</th></tr></thead>
+              <tbody>${html}</tbody>
+            </table>`;
+        } catch (ex) {
+          body.innerHTML = `<div class="err">Failed: ${esc(ex.message || ex)}</div>`;
+        }
+      }
+
+      async function recordTrainingSignoff() {
+        const member = window.prompt("Member handle to sign off (@netname):");
+        if (!member) return;
+        // Pull the training catalog so we can offer a sensible default.
+        let trainings = [];
+        try {
+          const res = await fetch(
+            `/api/core/${encodeURIComponent(CORE)}/training?user=${encodeURIComponent(ACTOR || "")}`,
+          );
+          if (res.ok) trainings = (await res.json()).trainings || [];
+        } catch (_) { /* best-effort */ }
+        const slugs = trainings.map(t => t.slug).join(", ");
+        const slug = window.prompt(
+          `Training slug (one of: ${slugs || "[catalog empty]"}):`);
+        if (!slug) return;
+        const today = new Date().toISOString().slice(0, 10);
+        const completed = window.prompt("Completion date (YYYY-MM-DD):", today);
+        if (!completed) return;
+        const validUntil = window.prompt(
+          "Valid until (YYYY-MM-DD, leave blank to auto-compute from refresher_years):",
+          "");
+        const notes = window.prompt("Notes (optional):", "") || "";
+        const payload = { member, completed, notes };
+        if (validUntil) payload.valid_until = validUntil;
+        try {
+          const url = `/api/core/${encodeURIComponent(CORE)}/training/${encodeURIComponent(slug)}/record`
+                    + `?user=${encodeURIComponent(ACTOR || "")}`;
+          const res = await fetch(url, { method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload) });
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const j = await res.json();
+          alert(`Signed off: ${j.member} on ${j.training_slug}\nvalid until ${j.valid_until || "(no expiry)"}.`);
+          loadRoster(VIEWER);
+        } catch (ex) {
+          alert("Sign-off failed: " + (ex.message || ex));
+        }
+      }
+
+      async function loadDeliverables(viewer) {
+        if (!(viewer && viewer.can_admin)) return;
+        const card = document.getElementById("deliverables-card");
+        const body = document.getElementById("deliverables-body");
+        const count = document.getElementById("deliverables-count");
+        card.style.display = "block";
+        try {
+          const url = `/api/core/${encodeURIComponent(CORE)}/deliverables`
+                    + `?user=${encodeURIComponent(ACTOR || "")}`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          const rows = data.rows || [];
+          count.textContent = `${rows.length} job${rows.length === 1 ? "" : "s"}`;
+          if (rows.length === 0) {
+            body.innerHTML = '<div class="placeholder">No jobs yet.</div>';
+            return;
+          }
+          const fmtBytes = b => b < 1024 ? `${b} B`
+            : b < 1048576 ? `${(b/1024).toFixed(1)} KB`
+            : `${(b/1048576).toFixed(1)} MB`;
+          const html = rows.map(r => `
+            <tr>
+              <td class="mono" style="font-size:11px;">${esc(r.job_id)}</td>
+              <td class="mono" style="font-size:11px;">${esc(r.service)}</td>
+              <td><code>${esc(r.requester)}</code></td>
+              <td>${esc(r.state)}</td>
+              <td class="num">${r.file_count}</td>
+              <td class="num">${fmtBytes(r.bytes_total)}</td>
+              <td class="mono" style="font-size:11px;">${esc(r.last_upload_at || "—")}</td>
+              <td class="mono" style="font-size:11px;">${esc(r.last_access_at || "—")}</td>
+              <td>${r.accessed_by && r.accessed_by.length ? r.accessed_by.map(a => `<code>${esc(a)}</code>`).join(" ") : '<span class="muted">—</span>'}</td>
+            </tr>`).join("");
+          body.innerHTML = `
+            <table class="members" style="font-size:12px;">
+              <thead><tr>
+                <th>job</th><th>service</th><th>requester</th>
+                <th>state</th>
+                <th style="text-align:right;">files</th>
+                <th style="text-align:right;">size</th>
+                <th>last upload</th>
+                <th>last access</th>
+                <th>accessed by</th>
+              </tr></thead>
+              <tbody>${html}</tbody>
+            </table>`;
+        } catch (ex) {
+          body.innerHTML = `<div class="err">Failed: ${esc(ex.message || ex)}</div>`;
+        }
+      }
+
+      async function loadAudit(viewer) {
+        if (!(viewer && viewer.can_admin)) return;
+        const card = document.getElementById("audit-card");
+        const body = document.getElementById("audit-body");
+        const count = document.getElementById("audit-count");
+        card.style.display = "block";
+        try {
+          const url = `/api/core/${encodeURIComponent(CORE)}/audit`
+                    + `?user=${encodeURIComponent(ACTOR || "")}&limit=50`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          const entries = data.entries || [];
+          count.textContent = entries.length;
+          if (entries.length === 0) {
+            body.innerHTML = '<div class="placeholder">No audit entries yet.</div>';
+            return;
+          }
+          body.innerHTML = `
+            <table class="members" style="font-size:12px;">
+              <thead><tr>
+                <th>when</th><th>who</th><th>action</th><th>sha</th>
+              </tr></thead>
+              <tbody>${entries.map(e => `
+                <tr>
+                  <td class="mono" style="font-size:11px;">${esc(e.iso_ts)}</td>
+                  <td>${esc(e.author)}</td>
+                  <td>${esc(e.subject)}</td>
+                  <td class="mono" style="font-size:11px;">${esc(e.sha)}</td>
+                </tr>`).join("")}</tbody>
+            </table>`;
+        } catch (ex) {
+          body.innerHTML = `<div class="err">Failed: ${esc(ex.message || ex)}</div>`;
+        }
+      }
+
+      async function loadBilling(viewer, action) {
+        // Leader/registrar only — show the billing card.
+        if (!(viewer && viewer.can_admin)) return;
+        const card = document.getElementById("billing-card");
+        card.style.display = "block";
+        const month = document.getElementById("billing-month").value.trim();
+        if (!month) {
+          document.getElementById("billing-body").innerHTML =
+            '<div class="placeholder">Pick a month (YYYY-MM) and click <strong>preview</strong>.</div>';
+          return;
+        }
+        const finalised = document.getElementById("billing-finalised").checked;
+        const body = document.getElementById("billing-body");
+        body.innerHTML = `<div class="placeholder">${action === "generate" ? "Writing files…" : "Loading…"}</div>`;
+        try {
+          let url, method = "GET", payload = null;
+          if (action === "generate") {
+            url = `/api/core/${encodeURIComponent(CORE)}/invoices/${encodeURIComponent(month)}/generate`
+                + `?user=${encodeURIComponent(ACTOR || "")}`;
+            method = "POST";
+            payload = JSON.stringify({ finalised });
+          } else {
+            url = `/api/core/${encodeURIComponent(CORE)}/invoices/${encodeURIComponent(month)}/preview`
+                + `?user=${encodeURIComponent(ACTOR || "")}`
+                + `&finalised=${finalised ? "true" : "false"}`;
+          }
+          const opts = { method, headers: { "Content-Type": "application/json" } };
+          if (payload) opts.body = payload;
+          const res = await fetch(url, opts);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          if (action === "generate") {
+            const list = (data.written || []).map(p => `<li><code>${esc(p)}</code></li>`).join("");
+            body.innerHTML = `
+              <div style="padding:10px 14px;">
+                <strong>Wrote ${(data.written || []).length} file(s)</strong>
+                · labs: ${(data.labs || []).join(", ") || "—"}
+                · total: $${Number(data.total || 0).toFixed(2)}
+                <ul style="font-family:var(--mono); font-size:11px; margin-top:8px;">${list}</ul>
+              </div>`;
+          } else {
+            const rows = (data.labs || []).map(L => `
+              <tr>
+                <td>${esc(L.lab)}</td>
+                <td style="text-align:right;">${L.lines}</td>
+                <td style="text-align:right;">${L.unconfirmed}</td>
+                <td style="text-align:right;">$${Number(L.subtotal).toFixed(2)}</td>
+              </tr>`).join("");
+            body.innerHTML = (data.labs || []).length === 0
+              ? '<div class="placeholder">No billable requests for this month.</div>'
+              : `
+                <table class="members" style="font-size:12px;">
+                  <thead><tr>
+                    <th>lab</th><th style="text-align:right;">lines</th>
+                    <th style="text-align:right;">unconfirmed</th>
+                    <th style="text-align:right;">subtotal</th>
+                  </tr></thead>
+                  <tbody>${rows}</tbody>
+                  <tfoot><tr style="font-weight:600;">
+                    <td>TOTAL</td>
+                    <td style="text-align:right;">${(data.labs || []).reduce((a,b) => a + b.lines, 0)}</td>
+                    <td style="text-align:right;">${data.unconfirmed}</td>
+                    <td style="text-align:right;">$${Number(data.total).toFixed(2)}</td>
+                  </tr></tfoot>
+                </table>`;
+          }
+        } catch (ex) {
+          body.innerHTML = `<div class="err">Failed: ${esc(ex.message || ex)}</div>`;
+        }
+      }
+
+      async function loadRequests(viewer) {
+        // Leader/registrar only — show the requests-inbox card.
+        if (!(viewer && viewer.can_admin)) return;
+        const showTerm = document.getElementById("requests-show-terminal").checked;
+        try {
+          const url = `/api/core/${encodeURIComponent(CORE)}/requests`
+                    + `?user=${encodeURIComponent(ACTOR || "")}`
+                    + `&include_terminal=${showTerm ? "true" : "false"}`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          renderRequests(data.requests || []);
+        } catch (ex) {
+          const body = document.getElementById("requests-body");
+          body.innerHTML = `<div class="err">Failed to load requests: ${esc(ex.message || ex)}</div>`;
+          document.getElementById("requests-card").style.display = "block";
+        }
+      }
+
+      function renderRequests(requests) {
+        const card = document.getElementById("requests-card");
+        const body = document.getElementById("requests-body");
+        const countEl = document.getElementById("requests-count");
+        const pluralEl = document.getElementById("requests-plural");
+        countEl.textContent = requests.length;
+        pluralEl.textContent = requests.length === 1 ? "" : "s";
+        if (requests.length === 0) {
+          body.innerHTML = '<div class="placeholder">No requests yet.</div>';
+          card.style.display = "block";
+          return;
+        }
+        const rows = requests.map(r => {
+          const terminal = (r.state === "completed" || r.state === "cancelled");
+          const actions = `
+            <div style="display:flex; gap:4px; justify-content:flex-end;">
+              ${terminal ? "" : `
+                <button class="adv-req" data-rid="${esc(r.request_id)}"
+                        style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                               background:white; border:1px solid var(--green); color:var(--green);
+                               border-radius:2px; cursor:pointer;">advance</button>
+                <button class="cancel-req" data-rid="${esc(r.request_id)}"
+                        style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                               background:white; border:1px solid var(--red); color:var(--red);
+                               border-radius:2px; cursor:pointer;">cancel</button>`}
+              <button class="charge-req" data-rid="${esc(r.request_id)}"
+                      data-booked="${Number(r.fee_at_booking.total || 0).toFixed(2)}"
+                      style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                             background:white; border:1px solid var(--purple); color:var(--purple);
+                             border-radius:2px; cursor:pointer;">$ charge</button>
+              <button class="upload-req" data-rid="${esc(r.request_id)}"
+                      style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                             background:white; border:1px solid var(--rule-strong);
+                             border-radius:2px; cursor:pointer;">upload</button>
+            </div>`;
+          const fee = r.fee_at_booking.total
+            ? `$${Number(r.fee_at_booking.total).toFixed(2)}` : "—";
+          return `
+            <tr style="${terminal ? 'opacity:0.55;' : ''}">
+              <td><code>${esc(r.request_id)}</code></td>
+              <td><code>${esc(r.requester)}</code><br>
+                  <span class="muted" style="font-size:10px;">${esc(r.requester_lab)} lab</span></td>
+              <td><code>${esc(r.service)}</code></td>
+              <td><code style="font-size:11px;">${esc(r.slot.start || "—")}</code></td>
+              <td><span class="pill ${esc(r.state)}">${esc(r.state)}</span></td>
+              <td style="text-align:right;">${fee}</td>
+              <td>${actions}</td>
+            </tr>`;
+        }).join("");
+        body.innerHTML = `
+          <table class="members" style="font-size:12px;">
+            <thead><tr>
+              <th>request id</th><th>requester</th><th>service</th>
+              <th>start</th><th>state</th><th>fee</th><th></th>
+            </tr></thead>
+            <tbody>${rows}</tbody>
+          </table>`;
+        card.style.display = "block";
+
+        // Wire row actions.
+        body.querySelectorAll(".adv-req").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const rid = btn.dataset.rid;
+            btn.disabled = true;
+            try {
+              const url = `/api/core/${encodeURIComponent(CORE)}/requests/${encodeURIComponent(rid)}/advance`
+                        + `?user=${encodeURIComponent(ACTOR || "")}`;
+              const res = await fetch(url, { method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({}) });
+              if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                throw new Error(d.detail || `HTTP ${res.status}`);
+              }
+              loadRequests(VIEWER);
+            } catch (ex) { alert("Advance failed: " + (ex.message || ex)); btn.disabled = false; }
+          });
+        });
+        body.querySelectorAll(".upload-req").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const rid = btn.dataset.rid;
+            const input = document.createElement("input");
+            input.type = "file";
+            input.onchange = async (e) => {
+              const f = e.target.files && e.target.files[0];
+              if (!f) return;
+              const subdir = window.prompt(
+                `Subdir under job ${rid} (e.g. raw, refined):`, "refined");
+              if (!subdir) return;
+              const relpath = subdir.replace(/\/$/, "") + "/" + f.name;
+              btn.disabled = true;
+              try {
+                const buf = await f.arrayBuffer();
+                let bin = "";
+                const arr = new Uint8Array(buf);
+                for (let i = 0; i < arr.byteLength; i++) bin += String.fromCharCode(arr[i]);
+                const b64 = btoa(bin);
+                const url = `/api/core/${encodeURIComponent(CORE)}/jobs/${encodeURIComponent(rid)}/files`
+                          + `?user=${encodeURIComponent(ACTOR || "")}`;
+                const res = await fetch(url, { method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ relpath, content_base64: b64 }) });
+                if (!res.ok) {
+                  const d = await res.json().catch(() => ({}));
+                  throw new Error(d.detail || `HTTP ${res.status}`);
+                }
+                alert(`Uploaded ${relpath} (${f.size.toLocaleString()} B).`);
+              } catch (ex) { alert("Upload failed: " + (ex.message || ex)); }
+              finally { btn.disabled = false; }
+            };
+            input.click();
+          });
+        });
+        body.querySelectorAll(".charge-req").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const rid = btn.dataset.rid;
+            const booked = btn.dataset.booked;
+            const totalStr = window.prompt(
+              `Actual charge for ${rid} (booked: $${booked}):`, booked);
+            if (totalStr === null) return;
+            const total = parseFloat(totalStr);
+            if (!isFinite(total) || total < 0) { alert("Bad amount."); return; }
+            const note = window.prompt("Optional note (overtime, etc.):", "") || "";
+            btn.disabled = true;
+            try {
+              const url = `/api/core/${encodeURIComponent(CORE)}/requests/${encodeURIComponent(rid)}/actual_charge`
+                        + `?user=${encodeURIComponent(ACTOR || "")}`;
+              const res = await fetch(url, { method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ total, note }) });
+              if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                throw new Error(d.detail || `HTTP ${res.status}`);
+              }
+              loadRequests(VIEWER);
+            } catch (ex) { alert("Charge failed: " + (ex.message || ex)); btn.disabled = false; }
+          });
+        });
+        body.querySelectorAll(".cancel-req").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const rid = btn.dataset.rid;
+            const reason = window.prompt("Cancellation note (optional):", "") || "";
+            btn.disabled = true;
+            try {
+              const url = `/api/core/${encodeURIComponent(CORE)}/requests/${encodeURIComponent(rid)}/cancel`
+                        + `?user=${encodeURIComponent(ACTOR || "")}`;
+              const res = await fetch(url, { method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ note: reason }) });
+              if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                throw new Error(d.detail || `HTTP ${res.status}`);
+              }
+              loadRequests(VIEWER);
+            } catch (ex) { alert("Cancel failed: " + (ex.message || ex)); btn.disabled = false; }
+          });
+        });
+      }
+
+      // Wire refresh button + toggle (deferred-bound once DOM is ready).
+      document.addEventListener("DOMContentLoaded", () => {
+        const refresh = document.getElementById("requests-refresh");
+        const toggle  = document.getElementById("requests-show-terminal");
+        if (refresh) refresh.addEventListener("click", () => loadRequests(VIEWER));
+        if (toggle)  toggle.addEventListener("change", () => loadRequests(VIEWER));
+        // Billing card (Phase 4c).
+        const dlvRefresh = document.getElementById("deliverables-refresh");
+        if (dlvRefresh) dlvRefresh.addEventListener("click", () => loadDeliverables(VIEWER));
+        const rosterAdd = document.getElementById("roster-add");
+        if (rosterAdd) rosterAdd.addEventListener("click", recordTrainingSignoff);
+        const prev = document.getElementById("billing-preview");
+        const gen  = document.getElementById("billing-generate");
+        const mInp = document.getElementById("billing-month");
+        if (prev) prev.addEventListener("click", () => loadBilling(VIEWER, "preview"));
+        if (gen)  gen.addEventListener("click",  () => {
+          if (!window.confirm("Write CSV + MD invoices to lab_info?")) return;
+          loadBilling(VIEWER, "generate");
+        });
+        // Default the month input to current YYYY-MM.
+        if (mInp && !mInp.value) {
+          const d = new Date();
+          mInp.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        }
+      });
+
+      async function loadServices(viewer) {
+        try {
+          const url = `/api/core/${encodeURIComponent(CORE)}/services`
+                    + (ACTOR ? `?user=${encodeURIComponent(ACTOR)}` : "");
+          const res = await fetch(url);
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          const data = await res.json();
+          renderServices(data.services || [], viewer);
+        } catch (ex) {
+          const body = document.getElementById("services-body");
+          body.innerHTML = `<div class="err">Failed to load services: ${esc(ex.message || ex)}</div>`;
+          document.getElementById("services-card").style.display = "block";
+        }
+      }
+
+      let VIEWER = null;   // captured for the modal's permission gating
+
+      function renderServices(services, viewer) {
+        VIEWER = viewer;
+        const card = document.getElementById("services-card");
+        const body = document.getElementById("services-body");
+        const countEl = document.getElementById("services-count");
+        const pluralEl = document.getElementById("services-plural");
+        const addBtn = document.getElementById("add-service-btn");
+        countEl.textContent = services.length;
+        pluralEl.textContent = services.length === 1 ? "" : "s";
+        addBtn.style.display = (viewer && viewer.can_admin) ? "inline-block" : "none";
+        if (services.length === 0) {
+          body.innerHTML = '<div class="placeholder">No services catalogued yet. '
+                         + (viewer && viewer.can_admin
+                              ? 'Click <strong>＋ add service</strong> to add the first one.'
+                              : 'The core leader will add them via the editor.')
+                         + '</div>';
+          card.style.display = "block";
+          return;
+        }
+        const rows = services.map(s => {
+          const tiers = Object.entries(s.fee.tiers || {})
+            .map(([k, v]) => `<span class="tier"><strong>${esc(k)}</strong> $${Number(v).toFixed(2)}</span>`)
+            .join("");
+          const mods = Object.entries(s.fee.modifiers || {})
+            .map(([k, v]) => `<span class="tier">${esc(k)} ×${v}</span>`)
+            .join("");
+          const equipment = s.equipment && (s.equipment.manufacturer || s.equipment.model)
+            ? `${esc(s.equipment.manufacturer || "")} ${esc(s.equipment.model || "")}`.trim()
+            : "—";
+          const prereqs = (s.prerequisites || []).length
+            ? "<ul style='margin:2px 0 0; padding-left:18px;'>" +
+              (s.prerequisites || []).map(p => `<li>${esc(p)}</li>`).join("") +
+              "</ul>"
+            : "<span class='muted'>none</span>";
+          const adminActions = (viewer && viewer.can_admin) ? `
+            <div style="display:flex; gap:6px; margin-left:10px;">
+              <button class="edit-svc" data-slug="${esc(s.slug)}"
+                      style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                             background:white; border:1px solid var(--rule-strong);
+                             border-radius:2px; cursor:pointer;">edit</button>
+              <button class="archive-svc" data-slug="${esc(s.slug)}"
+                      style="font-family:var(--mono); font-size:10px; padding:2px 8px;
+                             background:white; border:1px solid var(--red); color:var(--red);
+                             border-radius:2px; cursor:pointer;">archive</button>
+            </div>` : "";
+          return `
+            <div class="service-row">
+              <div class="head">
+                <h3>${esc(s.name)}</h3>
+                <span class="slug" style="display:flex; align-items:center; gap:6px;">
+                  ${esc(s.slug)} · <span class="pill ${esc(s.status)}">${esc(s.status)}</span>
+                  ${adminActions}
+                </span>
+              </div>
+              ${s.description ? `<div class="body-text">${esc(s.description)}</div>` : ""}
+              <dl class="meta-grid">
+                <dt>Equipment</dt><dd>${equipment}${s.location ? ` · <span class="muted">${esc(s.location)}</span>` : ""}</dd>
+                <dt>Mode</dt><dd>${esc(s.mode || "—")} · capability: <span class="muted">${esc(s.capability || "—")}</span></dd>
+                <dt>Duration</dt><dd>${s.duration_default_min} min (default) / ${s.duration_max_min} min (max)</dd>
+                <dt>Training</dt><dd>${s.training_required ? "<code>" + esc(s.training_required) + "</code> (required)" : "<span class='muted'>none required</span>"}</dd>
+                <dt>Prerequisites</dt><dd>${prereqs}</dd>
+                <dt>Fees</dt><dd>
+                  <div class="fee-table">
+                    <div style="margin-bottom:4px"><strong style="font-family:var(--serif); font-size:13px">${esc(s.fee.unit)}:</strong> ${tiers || "<span class='muted'>none</span>"}</div>
+                    ${mods ? "<div><strong style='font-family:var(--serif); font-size:13px'>modifiers:</strong> " + mods + "</div>" : ""}
+                  </div>
+                </dd>
+                <dt>Delivery</dt><dd>${s.data_deliverable && s.data_deliverable.format ? esc(s.data_deliverable.format) + " · <span class='muted'>" + esc(s.data_deliverable.delivery || "—") + "</span>" : "<span class='muted'>—</span>"}</dd>
+              </dl>
+            </div>
+          `;
+        }).join("");
+        body.innerHTML = rows;
+        card.style.display = "block";
+      }
+
+      // ---- Editor modal (Phase 2c) ----------------------------------------
+      const modal = document.getElementById("modal-backdrop");
+
+      function openModalForNew() {
+        document.getElementById("modal-title").textContent = "Add service";
+        document.getElementById("service-form").reset();
+        document.getElementById("f-slug-existing").value = "";
+        document.getElementById("f-slug").disabled = false;
+        document.getElementById("form-error").style.display = "none";
+        modal.style.display = "flex";
+      }
+      function openModalForEdit(svc) {
+        document.getElementById("modal-title").textContent = "Edit " + svc.slug;
+        document.getElementById("f-slug-existing").value = svc.slug;
+        document.getElementById("f-slug").value = svc.slug;
+        document.getElementById("f-slug").disabled = true;  // slug is the id; can't rename
+        document.getElementById("f-name").value = svc.name || "";
+        document.getElementById("f-capability").value = svc.capability || "";
+        document.getElementById("f-mode").value = svc.mode || "independent_data_collection";
+        document.getElementById("f-description").value = svc.description || "";
+        document.getElementById("f-location").value = svc.location || "";
+        document.getElementById("f-equip-manuf").value = (svc.equipment || {}).manufacturer || "";
+        document.getElementById("f-equip-model").value = (svc.equipment || {}).model || "";
+        document.getElementById("f-duration-default").value = svc.duration_default_min || 60;
+        document.getElementById("f-duration-max").value = svc.duration_max_min || 240;
+        document.getElementById("f-training").value = svc.training_required || "";
+        document.getElementById("f-prereqs").value = (svc.prerequisites || []).join("\n");
+        document.getElementById("f-fee-unit").value = (svc.fee || {}).unit || "per_run";
+        const t = (svc.fee || {}).tiers || {};
+        document.getElementById("f-fee-ai").value  = t.academic_internal ?? "";
+        document.getElementById("f-fee-ae").value  = t.academic_external ?? "";
+        document.getElementById("f-fee-ind").value = t.industry ?? "";
+        const m = (svc.fee || {}).modifiers || {};
+        document.getElementById("f-mod-weekend").value   = m.weekend   ?? "";
+        document.getElementById("f-mod-after").value     = m.after_hours ?? "";
+        document.getElementById("f-mod-overtime").value  = m.overtime  ?? "";
+        document.getElementById("form-error").style.display = "none";
+        modal.style.display = "flex";
+      }
+      function closeModal() { modal.style.display = "none"; }
+
+      function readModalForm() {
+        const slug = document.getElementById("f-slug").value.trim();
+        const name = document.getElementById("f-name").value.trim();
+        const tiers = {};
+        const ai  = parseFloat(document.getElementById("f-fee-ai").value);
+        const ae  = parseFloat(document.getElementById("f-fee-ae").value);
+        const ind = parseFloat(document.getElementById("f-fee-ind").value);
+        if (!isNaN(ai))  tiers.academic_internal = ai;
+        if (!isNaN(ae))  tiers.academic_external = ae;
+        if (!isNaN(ind)) tiers.industry = ind;
+        const mods = {};
+        const mw  = parseFloat(document.getElementById("f-mod-weekend").value);
+        const ma  = parseFloat(document.getElementById("f-mod-after").value);
+        const mo  = parseFloat(document.getElementById("f-mod-overtime").value);
+        if (!isNaN(mw)) mods.weekend     = mw;
+        if (!isNaN(ma)) mods.after_hours = ma;
+        if (!isNaN(mo)) mods.overtime    = mo;
+        const prereqs = document.getElementById("f-prereqs").value
+          .split("\n").map(s => s.trim()).filter(Boolean);
+        const equipment = {};
+        const em = document.getElementById("f-equip-manuf").value.trim();
+        const ee = document.getElementById("f-equip-model").value.trim();
+        if (em) equipment.manufacturer = em;
+        if (ee) equipment.model = ee;
+        return {
+          slug, name,
+          capability: document.getElementById("f-capability").value,
+          mode: document.getElementById("f-mode").value,
+          description: document.getElementById("f-description").value.trim(),
+          equipment,
+          location: document.getElementById("f-location").value.trim(),
+          duration_default_min: parseInt(document.getElementById("f-duration-default").value, 10),
+          duration_max_min: parseInt(document.getElementById("f-duration-max").value, 10),
+          training_required: document.getElementById("f-training").value.trim() || null,
+          prerequisites: prereqs,
+          fee: { unit: document.getElementById("f-fee-unit").value,
+                 tiers, modifiers: mods },
+        };
+      }
+
+      document.getElementById("add-service-btn").addEventListener("click", openModalForNew);
+      document.getElementById("modal-close").addEventListener("click", closeModal);
+      document.getElementById("modal-cancel").addEventListener("click", closeModal);
+      modal.addEventListener("click", e => { if (e.target === modal) closeModal(); });
+
+      document.getElementById("service-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const errEl = document.getElementById("form-error");
+        errEl.style.display = "none";
+        const submitBtn = document.getElementById("modal-submit");
+        submitBtn.disabled = true;
+        try {
+          const data = readModalForm();
+          const existingSlug = document.getElementById("f-slug-existing").value;
+          let url, method;
+          if (existingSlug) {
+            url = `/api/core/${encodeURIComponent(CORE)}/services/${encodeURIComponent(existingSlug)}`
+                + (ACTOR ? `?user=${encodeURIComponent(ACTOR)}` : "");
+            method = "PATCH";
+            // PATCH body — drop slug (immutable on edit).
+            const patch = { ...data };
+            delete patch.slug;
+            var body = patch;
+          } else {
+            url = `/api/core/${encodeURIComponent(CORE)}/services`
+                + (ACTOR ? `?user=${encodeURIComponent(ACTOR)}` : "");
+            method = "POST";
+            var body = data;
+          }
+          const res = await fetch(url, {
+            method,
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || `HTTP ${res.status}`);
+          }
+          closeModal();
+          // Reload services list.
+          loadServices(VIEWER);
+        } catch (ex) {
+          errEl.textContent = "Error: " + (ex.message || ex);
+          errEl.style.display = "block";
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      // Click delegation for the per-row Edit / Archive buttons.
+      document.getElementById("services-body").addEventListener("click", async (ev) => {
+        const t = ev.target;
+        if (t.classList.contains("edit-svc")) {
+          const slug = t.dataset.slug;
+          const url = `/api/core/${encodeURIComponent(CORE)}/services?user=${encodeURIComponent(ACTOR || "")}`;
+          const res = await fetch(url);
+          const d = await res.json();
+          const svc = (d.services || []).find(s => s.slug === slug);
+          if (svc) openModalForEdit(svc);
+        } else if (t.classList.contains("archive-svc")) {
+          const slug = t.dataset.slug;
+          if (!confirm(`Archive service "${slug}"? The file is preserved; flag flips to status=retired.`)) return;
+          const url = `/api/core/${encodeURIComponent(CORE)}/services/${encodeURIComponent(slug)}/archive`
+                    + (ACTOR ? `?user=${encodeURIComponent(ACTOR)}` : "");
+          const res = await fetch(url, { method: "POST" });
+          if (res.ok) loadServices(VIEWER);
+          else alert("Archive failed: " + (await res.text()));
+        }
+      });
+
+      // ---- Core settings modal (leader-editable metadata) -----------------
+      const settingsModal = document.getElementById("settings-backdrop");
+
+      function openSettingsModal() {
+        const c = LOADED_CORE || {};
+        document.getElementById("s-core-id").value          = c.name || CORE;
+        document.getElementById("s-display-name").value     = c.display_name || "";
+        document.getElementById("s-institution").value      = c.institution || "";
+        document.getElementById("s-department").value       = c.department || "";
+        document.getElementById("s-github-org").value       = c.github_org || "";
+        document.getElementById("s-slack-workspace").value  = c.slack_workspace || "";
+        document.getElementById("s-oracle-vault").value     = c.oracle_vault || "";
+        document.getElementById("settings-error").style.display = "none";
+        settingsModal.style.display = "flex";
+      }
+      function closeSettingsModal() { settingsModal.style.display = "none"; }
+
+      document.getElementById("core-settings-btn").addEventListener("click", openSettingsModal);
+      document.getElementById("settings-close").addEventListener("click", closeSettingsModal);
+      document.getElementById("settings-cancel").addEventListener("click", closeSettingsModal);
+      settingsModal.addEventListener("click", e => { if (e.target === settingsModal) closeSettingsModal(); });
+
+      document.getElementById("settings-form").addEventListener("submit", async (ev) => {
+        ev.preventDefault();
+        const errEl = document.getElementById("settings-error");
+        errEl.style.display = "none";
+        const submitBtn = document.getElementById("settings-submit");
+        submitBtn.disabled = true;
+        try {
+          // Send only fields the leader can set; empty strings are allowed
+          // (they clear a value), so we always send the full editable set.
+          const payload = {
+            display_name:     document.getElementById("s-display-name").value.trim(),
+            institution:      document.getElementById("s-institution").value.trim(),
+            department:       document.getElementById("s-department").value.trim(),
+            github_org:       document.getElementById("s-github-org").value.trim(),
+            slack_workspace:  document.getElementById("s-slack-workspace").value.trim(),
+            oracle_vault:     document.getElementById("s-oracle-vault").value.trim(),
+          };
+          const url = `/api/core/${encodeURIComponent(CORE)}/settings`
+                    + `?user=${encodeURIComponent(ACTOR || "")}`;
+          const res = await fetch(url, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            const d = await res.json().catch(() => ({}));
+            throw new Error(d.detail || ("HTTP " + res.status));
+          }
+          closeSettingsModal();
+          loadCore();   // refresh the identity card with the saved values
+        } catch (ex) {
+          errEl.textContent = String(ex.message || ex);
+          errEl.style.display = "block";
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+
+      loadCore();
+    </script>
+  </body>
+</html>

@@ -1,0 +1,2009 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Murmurent · Registrar dashboard</title>
+    <link rel="icon" type="image/x-icon" href="/assets/favicon.ico" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700&family=Courier+Prime:ital,wght@0,400;0,700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --purple:        #4F2683;
+        --purple-deep:   #201436;
+        --purple-soft:   #6F4DA8;
+        --tiger:         #F0A757;
+        --paper:         #FAF8F5;
+        --paper-2:       #F1ECE3;
+        --card:          #FFFFFF;
+        --rule:          #E0DAD0;
+        --rule-strong:   #C7BFB1;
+        --ink:           #1A1A1A;
+        --muted:         #5B5B5B;
+        --green:         #4F6B3A;
+        --red:           #B23A2B;
+        --serif: "EB Garamond", Georgia, serif;
+        --mono:  "Courier Prime", "IBM Plex Mono", Menlo, monospace;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { margin: 0; background: var(--paper); color: var(--ink);
+                   font-family: var(--serif); }
+      /* Column layout so the brand footer sits at the bottom of a short
+         page instead of floating under the last panel (issue #109). */
+      body { min-height: 100vh; display: flex; flex-direction: column; }
+      body > .container#content { flex: 1 0 auto; }
+      .banner {
+        background: var(--purple); color: white;
+        padding: 12px 28px; display: flex; align-items: baseline;
+        justify-content: space-between; gap: 24px;
+        border-bottom: 4px solid var(--tiger);
+      }
+      .banner h1 { margin: 0; font-size: 22px; font-weight: 600; }
+      .banner h1 small {
+        font-family: var(--mono); font-size: 11px; font-weight: 400;
+        letter-spacing: 1px; opacity: 0.75; margin-left: 6px;
+      }
+      .banner .meta {
+        font-family: var(--mono); font-size: 11px; letter-spacing: 1px;
+        text-transform: uppercase; opacity: 0.9;
+      }
+      .container { max-width: 1200px; margin: 24px auto; padding: 0 28px; }
+      .stats { display: flex; gap: 20px; margin-bottom: 24px; }
+      .stat {
+        background: var(--card); border: 1px solid var(--rule-strong);
+        border-radius: 2px; padding: 14px 18px; flex: 1;
+      }
+      .stat .label {
+        font-family: var(--mono); font-size: 10px; letter-spacing: 1.2px;
+        text-transform: uppercase; color: var(--muted);
+      }
+      .stat .value {
+        font-family: var(--serif); font-size: 32px; font-weight: 600;
+        color: var(--purple-deep); line-height: 1.1;
+      }
+      .panel {
+        background: var(--card); border: 1px solid var(--rule-strong);
+        border-radius: 2px; margin-bottom: 22px;
+      }
+      .panel > header {
+        padding: 12px 18px; border-bottom: 1px solid var(--rule);
+        display: flex; align-items: baseline; justify-content: space-between;
+        background: var(--paper-2);
+      }
+      .panel > header h2 {
+        margin: 0; font-family: var(--serif); font-size: 17px; color: var(--purple-deep);
+      }
+      .panel > header .meta {
+        font-family: var(--mono); font-size: 11px; color: var(--muted);
+        letter-spacing: 1px; text-transform: uppercase;
+      }
+      table { width: 100%; border-collapse: collapse; font-size: 13px; }
+      th {
+        text-align: left; font-family: var(--mono); font-size: 10px;
+        letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted);
+        padding: 9px 14px; border-bottom: 1px solid var(--rule);
+        background: var(--paper);
+      }
+      td { padding: 9px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+      tr:last-child td { border-bottom: 0; }
+      .mono { font-family: var(--mono); font-size: 12px; }
+      /* Copyable command block: terminal-styled, its own line, click-selects all. */
+      .cmd {
+        display: block; font-family: var(--mono); font-size: 12.5px;
+        background: #0d1117; color: #e6edf3;
+        border-radius: 7px; padding: 10px 13px; margin: 7px 0 12px;
+        overflow-x: auto; white-space: pre; line-height: 1.5;
+        user-select: all; -webkit-user-select: all;
+      }
+      /* Prominent OAuth-scope chips so none get missed. */
+      .scopes { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+      .scope {
+        font-family: var(--mono); font-size: 12px;
+        background: #eef6ff; border: 1px solid #b6d4fe; color: #0b5cad;
+        border-radius: 5px; padding: 3px 9px;
+        user-select: all; -webkit-user-select: all;
+      }
+      .setup-steps { margin: 6px 0 4px 20px; line-height: 1.55; }
+      .setup-steps > li { margin-bottom: 9px; }
+      .setup-steps ol { margin: 5px 0 4px 14px; }
+      .pill {
+        display: inline-block; padding: 1px 8px; border-radius: 999px;
+        font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+      .pill-active { background: rgba(79,107,58,0.12); color: var(--green); }
+      .pill-archived { background: rgba(178,58,43,0.12); color: var(--red); }
+      .pill-warn { background: rgba(240,167,87,0.20); color: #8a560f; }
+      .lab-detail { padding: 6px 14px 14px; background: var(--paper); }
+      .lab-detail h4 {
+        margin: 4px 0 6px; font-family: var(--mono); font-size: 10px;
+        letter-spacing: 1px; text-transform: uppercase; color: var(--muted);
+      }
+      details > summary { cursor: pointer; padding: 6px 0; }
+      .muted { color: var(--muted); }
+      .empty {
+        padding: 16px 18px; color: var(--muted); font-style: italic;
+      }
+      .error {
+        padding: 12px 18px; background: rgba(178,58,43,0.08);
+        color: var(--red); border-left: 4px solid var(--red);
+        font-family: var(--mono); font-size: 12px;
+      }
+      /* Dark-purple branding footer — mirrors the user dashboard Footer
+         (lab logo, Schulich + Western marks, contact line, land ack) so
+         both dashboards land on the same closing brand. */
+      .footer {
+        margin-top: 36px;
+        padding: 14px 28px;
+        background: var(--purple-deep);
+        color: rgba(255,255,255,0.85);
+        border-top: 3px solid var(--tiger);
+        font-family: var(--serif); font-size: 13px;
+      }
+      .footer .bar {
+        max-width: 1200px; margin: 0 auto;
+        display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+      }
+      .footer img.lab-logo-mini { height: 28px; border-radius: 2px; }
+      .footer img.schulich-mini {
+        height: 22px; filter: brightness(0) invert(1); opacity: 0.85;
+      }
+      .footer img.western-mini {
+        height: 18px; filter: brightness(0) invert(1); opacity: 0.85;
+      }
+      .footer .dept {
+        font-size: 12px; color: rgba(255,255,255,0.7);
+        flex-grow: 1;
+      }
+      .footer .links { display: flex; gap: 18px; }
+      .footer a {
+        color: var(--tiger); border-bottom: 1px dotted var(--tiger);
+        text-decoration: none;
+      }
+      .footer .links a {
+        font-size: 12px; color: rgba(255,255,255,0.85);
+        border-bottom: 0;
+      }
+      .footer .links a:hover { color: var(--tiger); }
+      .footer .ack {
+        max-width: 1200px; margin: 10px auto 0;
+        font-style: italic; font-size: 12px;
+        color: rgba(255,255,255,0.75); line-height: 1.55;
+      }
+      /* New-lab form (Phase B) */
+      .modal-backdrop {
+        position: fixed; inset: 0; background: rgba(32,20,54,0.55);
+        display: flex; align-items: flex-start; justify-content: center;
+        z-index: 200; padding: 40px 20px; overflow-y: auto;
+      }
+      .modal {
+        background: var(--card); border: 1px solid var(--rule-strong);
+        border-radius: 2px; padding: 18px; width: min(560px, 96vw);
+      }
+      .modal h2 { margin: 0 0 4px; font-family: var(--serif); font-size: 18px;
+                  color: var(--purple-deep); }
+      .modal p.muted { font-size: 12px; margin: 4px 0 12px; color: var(--muted); }
+      .modal label {
+        display: block; margin-top: 8px;
+        font-family: var(--mono); font-size: 10px; letter-spacing: 1px;
+        text-transform: uppercase; color: var(--muted);
+      }
+      .modal input, .modal textarea {
+        width: 100%; padding: 6px 8px; border: 1px solid var(--rule-strong);
+        border-radius: 2px; font-family: var(--mono); font-size: 12px;
+        box-sizing: border-box; background: var(--paper);
+      }
+      .modal .actions {
+        display: flex; justify-content: flex-end; gap: 6px;
+        margin-top: 14px; align-items: center;
+      }
+      .btn {
+        padding: 5px 12px; font-family: var(--mono); font-size: 11px;
+        letter-spacing: 0.5px; cursor: pointer; border-radius: 2px;
+        border: 1px solid var(--rule-strong); background: var(--card);
+      }
+      .btn:hover { border-color: var(--purple); color: var(--purple); }
+      .btn.primary {
+        background: var(--purple); color: white; border-color: var(--purple);
+      }
+      .btn.primary:hover { background: var(--purple-deep); }
+      .btn.ghost { background: transparent; }
+      .form-msg { font-size: 11px; margin-right: auto; }
+      .form-msg.error { color: var(--red); }
+      .form-msg.ok { color: var(--green); }
+    </style>
+  </head>
+  <body>
+    <div class="banner">
+      <h1>Murmurent <small>v{{MM_VERSION}}</small> &middot; Registrar dashboard</h1>
+      <div class="meta" id="banner-meta">loading…</div>
+    </div>
+
+    <div class="container" id="content">
+      <p class="muted">Loading registry from <code>~/.murmurent/lab_info/_registry.yaml</code>…</p>
+    </div>
+
+    <footer class="container" id="footer-meta" style="margin-top:32px; padding:0 28px;">
+      <!-- populated by renderFooter() — registrar's own profile + edit button -->
+    </footer>
+
+    <footer class="footer">
+      <div class="bar">
+        <a href="https://mikehallett.science" target="_blank" rel="noopener">
+          <img class="lab-logo-mini" src="assets/lab-logo-hi-res.jpg" alt="Hallett Lab" />
+        </a>
+        <a href="https://www.schulich.uwo.ca/" target="_blank" rel="noopener">
+          <img class="schulich-mini" src="assets/Schulich_horizontal_CMYK.png" alt="Schulich School of Dentristy and Medicine" />
+        </a>
+        <a href="https://www.uwo.ca/" target="_blank" rel="noopener">
+          <img class="western-mini" src="assets/western_longWhite.png" alt="Western University" />
+        </a>
+        <span class="dept">Department of Biochemistry &middot; London, ON, Canada</span>
+      </div>
+      <div class="ack">
+        We acknowledge that Western University is located on the traditional lands of
+        the Anishinaabek, Haudenosaunee, Lūnaapéewak and Attawandaron peoples.
+      </div>
+    </footer>
+
+    <script>
+    "use strict";
+
+    // Read ?user=<override> the same way the main dashboard does so
+    // developers can switch identities without writing the sentinel.
+    const params = new URLSearchParams(window.location.search);
+    const userOverride = params.get("user");
+
+    const banner = document.getElementById("banner-meta");
+    const root = document.getElementById("content");
+
+    function escapeHTML(s) {
+      return String(s == null ? "" : s)
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+    }
+
+    // 2i: Mayor wizard — shown when no centre is initialised yet.
+    function secHdr(text) {
+      return '<div style="grid-column:1 / -1; margin-top:10px; font-weight:600; '
+        + 'color:var(--purple); border-bottom:1px solid #e2ddef; padding-bottom:4px;">'
+        + text + '</div>';
+    }
+
+    function renderMayorWizard() {
+      banner.textContent = "murmurent — first-time setup";
+      const osUser = (userOverride || "").trim();
+      root.innerHTML =
+        '<div class="panel"><header><h2>Welcome — let\'s set up your murmurent server.</h2></header>'
+        + '<div style="padding:18px 20px;">'
+        + '<p>Nothing is configured yet. As the <strong>mayor</strong>, '
+        + 'fill in these centre-level details and you\'ll become the first '
+        + 'registrar. Provisioning steps (Slack, GitHub, filesystem ACLs) '
+        + 'are wired up by the <strong>millwright</strong> once this is saved. '
+        + 'You can edit any of this later from the profile panel.</p>'
+        + '<form id="mayor-form" autocomplete="off" '
+        +     'style="display:grid; grid-template-columns: 220px 1fr; gap:8px 14px; align-items:baseline; max-width:760px;">'
+        + secHdr('Identity')
+        + '<label>Centre name <span style="color:#b23a2b">*</span></label>'
+        + '<input name="name" required placeholder="Western Bioconvergence Centre">'
+        + '<label>Institution <span style="color:#b23a2b">*</span></label>'
+        + '<input name="institution" required placeholder="Western University">'
+        + '<label>Unique install name</label>'
+        + '<input name="unique_name" placeholder="western — drives repo/Slack/group names; not institution-specific">'
+        + '<label>Public join-request email</label>'
+        + '<input name="join_email" placeholder="wigamig-western@example.edu — the only thing listed in the public directory">'
+        + '<label>Founding mayor (@handle)</label>'
+        + '<input name="mayor" value="' + escapeHTML(osUser) + '" '
+        +   'placeholder="@tbrowne — defaults to ?user= or $MURMURENT_USER">'
+        + secHdr('Communication &amp; code')
+        + '<label>Slack workspace id</label>'
+        + '<input name="slack_workspace" placeholder="T0WESTERN">'
+        + '<label>GitHub org / account</label>'
+        + '<input name="github_org" placeholder="centre-westernu (dedicated-purpose account)">'
+        + '<label>Public onboarding hub</label>'
+        + '<input name="public_hub" placeholder="github.com/hallettmiket/murmurent_public#western">'
+        + secHdr('Murmurent server (always-online, ssh-key gated)')
+        + '<label>Server host / IP</label>'
+        + '<input name="server_host" placeholder="lab-server.example.edu">'
+        + '<label>SSH access account</label>'
+        + '<input name="server_account" placeholder="murmurent">'
+        + '<label>Claude Code install path</label>'
+        + '<input name="cc_install_path" placeholder="/opt/claude">'
+        + secHdr('Storage &amp; vault')
+        + '<label>Mayor root dir</label>'
+        + '<input name="mayor_root" placeholder="/mayor/wigamig — mirrorable to GitHub">'
+        + '<label>Obsidian vault (centre pool)</label>'
+        + '<input name="obsidian_vault" placeholder="/mayor/obsidian">'
+        + '<label>Data server hostname</label>'
+        + '<input name="data_server" placeholder="lab-server.example.edu (legacy alias of server host)">'
+        + '<label>Raw root path</label>'
+        + '<input name="raw_root" value="/data/lab_vm/raw">'
+        + '<label>Refined root path</label>'
+        + '<input name="refined_root" value="/data/lab_vm/refined">'
+        + '</form>'
+        + '<div id="mayor-err" class="error" style="display:none; margin-top:12px;"></div>'
+        + '<div style="margin-top:18px;">'
+        + '<button class="btn" id="btn-mayor-submit" '
+        +   'style="background:var(--purple); color:white; border-color:var(--purple);">'
+        +   'Bootstrap centre →</button>'
+        + '</div>'
+        + '</div></div>';
+      document.getElementById("btn-mayor-submit")
+        .addEventListener("click", submitMayorWizard);
+    }
+
+    async function submitMayorWizard() {
+      const errEl = document.getElementById("mayor-err");
+      errEl.style.display = "none";
+      const btn = document.getElementById("btn-mayor-submit");
+      btn.disabled = true;
+      btn.textContent = "Bootstrapping…";
+      const form = document.getElementById("mayor-form");
+      const data = Object.fromEntries(new FormData(form).entries());
+      const userParam = data.mayor
+        ? "?user=" + encodeURIComponent(data.mayor.replace(/^@/, ""))
+        : "";
+      try {
+        const r = await fetch("/api/centre/init" + userParam, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        });
+        if (!r.ok) {
+          const detail = (await r.json().catch(() => ({}))).detail
+            || ("HTTP " + r.status);
+          throw new Error(detail);
+        }
+        // Reload — the page will now render the normal dashboard.
+        const out = await r.json();
+        const mayor = (out.profile && out.profile.founding_mayor)
+          ? out.profile.founding_mayor.replace(/^@/, "")
+          : (data.mayor || "").replace(/^@/, "");
+        const target = "/registrar"
+          + (mayor ? "?user=" + encodeURIComponent(mayor) : "");
+        window.location.href = target;
+      } catch (ex) {
+        errEl.textContent = String(ex.message || ex);
+        errEl.style.display = "block";
+        btn.disabled = false;
+        btn.textContent = "Bootstrap centre →";
+      }
+    }
+
+    function renderError(detail) {
+      banner.textContent = "registrar dashboard";
+      root.innerHTML =
+        '<div class="error">' +
+        '<strong>Cannot load registrar dashboard.</strong><br/>' +
+        escapeHTML(detail) +
+        '<br/><br/>Declare your handle in <code>~/.murmurent/registrar</code> ' +
+        '(one line, no @) and reload, or pass <code>?user=&lt;netname&gt;</code>.' +
+        '</div>';
+    }
+
+    function pill(status) {
+      const cls = status === "active" ? "pill pill-active" : "pill pill-archived";
+      return '<span class="' + cls + '">' + escapeHTML(status) + '</span>';
+    }
+
+    function renderCertCell(cell) {
+      const status = cell.status || "missing";
+      let cls = "pill ";
+      let label = status;
+      if (status === "ok") { cls += "pill-active"; }
+      else if (status === "one_time") { cls += "pill-active"; label = "ok"; }
+      else if (status === "expiring") { cls += "pill-warn"; }
+      else if (status === "expired") { cls += "pill-archived"; }
+      else if (status === "missing") { cls += "pill-archived"; }
+      else if (status === "n/a") { cls = "pill"; label = "n/a"; }
+      const expiry = cell.expires ? ' <span class="mono muted" style="font-size:10px;">' + escapeHTML(cell.expires) + '</span>' : '';
+      return '<span class="' + cls + '">' + escapeHTML(label) + '</span>' + expiry;
+    }
+
+    function renderMembers(members) {
+      if (!members || !members.length) {
+        return '<div class="muted" style="font-style:italic;">No members on file.</div>';
+      }
+      let html = '<table style="background:var(--card);">';
+      html += '<thead><tr><th>handle</th><th>name</th><th>role</th><th>certs</th><th>status</th></tr></thead>';
+      html += '<tbody>';
+      for (const m of members) {
+        html += '<tr>'
+          + '<td class="mono">' + escapeHTML(m.handle) + '</td>'
+          + '<td>' + escapeHTML(m.full_name) + '</td>'
+          + '<td class="mono">' + escapeHTML(m.role) + '</td>'
+          + '<td class="mono muted">' + escapeHTML(m.cert_summary) + '</td>'
+          + '<td>' + pill(m.member_status) + '</td>'
+          + '</tr>';
+      }
+      html += '</tbody></table>';
+      return html;
+    }
+
+    function renderLabRow(lab) {
+      const unresolvedBanner = lab.unresolved
+        ? '<div class="error" style="margin-bottom:6px;">⚠ ' + escapeHTML(lab.unresolved_reason || "pointer unresolved") + '</div>'
+        : '';
+      const labNameEsc = escapeHTML(lab.name);
+      const isActive = lab.status === "active";
+      const actionButtons = ''
+        + '<button class="btn lab-action" data-action="edit" data-lab="' + labNameEsc + '">edit</button> '
+        + (isActive
+            ? '<button class="btn lab-action" data-action="archive" data-lab="' + labNameEsc + '">archive</button>'
+            : '<button class="btn lab-action" data-action="unarchive" data-lab="' + labNameEsc + '">unarchive</button>');
+      return ''
+        + '<tr>'
+        + '<td><strong>' + escapeHTML(lab.display_name) + '</strong> <span class="mono muted">' + escapeHTML(lab.name) + '</span></td>'
+        + '<td class="mono">' + escapeHTML(lab.pi) + '</td>'
+        + '<td class="mono">' + (lab.member_count || 0) + '</td>'
+        + '<td class="mono muted">' + escapeHTML(lab.created || "—") + '</td>'
+        + '<td>' + pill(lab.status) + (lab.unresolved ? ' <span class="pill pill-warn">unresolved</span>' : '') + '</td>'
+        + '<td style="text-align:right; white-space:nowrap;">' + actionButtons + '</td>'
+        + '</tr>'
+        + '<tr><td colspan="6" style="padding:0;">'
+        + '<details><summary class="mono muted" style="padding:6px 14px;">▸ details</summary>'
+        + '<div class="lab-detail">'
+        + unresolvedBanner
+        + '<h4>lab-mgmt path</h4><div class="mono">' + escapeHTML(lab.lab_mgmt_path) + '</div>'
+        + (lab.github_org ? '<h4>github org</h4><div class="mono">' + escapeHTML(lab.github_org) + '</div>' : '')
+        // slack_workspace + oracle_vault intentionally not surfaced here:
+        // those are lab-internal operational settings; the registrar shouldn't
+        // need to see them in the read view. The edit form still carries them
+        // for cases where the registrar must set them on a new lab.
+        + '<h4>members</h4>'
+        + renderMembers(lab.members)
+        + '</div></details></td></tr>';
+    }
+
+    function renderCoreRow(c) {
+      const unresolvedBanner = c.unresolved
+        ? '<div class="error" style="margin-bottom:6px;">⚠ ' + escapeHTML(c.unresolved_reason || "pointer unresolved") + '</div>'
+        : '';
+      const coreNameEsc = escapeHTML(c.name);
+      const isActive = c.status === "active";
+      const actionButtons = ''
+        + '<button class="btn core-action" data-action="edit" data-core="' + coreNameEsc + '">edit</button> '
+        + (isActive
+            ? '<button class="btn core-action" data-action="archive" data-core="' + coreNameEsc + '">archive</button>'
+            : '<button class="btn core-action" data-action="unarchive" data-core="' + coreNameEsc + '">unarchive</button>');
+      return ''
+        + '<tr>'
+        + '<td><strong>' + escapeHTML(c.display_name) + '</strong> <span class="mono muted">' + escapeHTML(c.name) + '</span></td>'
+        + '<td class="mono">' + escapeHTML(c.leader || "") + '</td>'
+        + '<td class="mono">' + (c.member_count || 0) + '</td>'
+        + '<td class="mono muted">' + escapeHTML(c.created || "—") + '</td>'
+        + '<td>' + pill(c.status) + (c.unresolved ? ' <span class="pill pill-warn">unresolved</span>' : '') + '</td>'
+        + '<td style="text-align:right; white-space:nowrap;">' + actionButtons + '</td>'
+        + '</tr>'
+        + '<tr><td colspan="6" style="padding:0;">'
+        + '<details><summary class="mono muted" style="padding:6px 14px;">▸ details</summary>'
+        + '<div class="lab-detail">'
+        + unresolvedBanner
+        + '<h4>core lab-mgmt path</h4><div class="mono">' + escapeHTML(c.lab_mgmt_path) + '</div>'
+        + (c.slack_workspace ? '<h4>slack workspace</h4><div class="mono">' + escapeHTML(c.slack_workspace) + '</div>' : '')
+        + (c.github_org ? '<h4>github org</h4><div class="mono">' + escapeHTML(c.github_org) + '</div>' : '')
+        + (c.oracle_vault ? '<h4>oracle vault</h4><div class="mono">' + escapeHTML(c.oracle_vault) + '</div>' : '')
+        + '<h4>members</h4>'
+        + renderMembers(c.members)
+        + '</div></details></td></tr>';
+    }
+
+    function renderCollabRequest(r) {
+      // One row in the "Pending collaboration requests" panel.
+      // Approve invokes /api/registrar/collaboration_request/<id>/approve,
+      // which delegates to create_collaboration (so all invariants run).
+      // Decline pops a prompt for the reason text.
+      const idAttr = String(r.id);
+      const partners = (r.proposed_groups || []).join(" + ")
+        + " · " + (r.proposed_pis || []).join(", ");
+      const justification = r.justification
+        ? '<div class="mono muted" style="white-space:normal; max-width:400px;">'
+          + escapeHTML(r.justification) + '</div>'
+        : '';
+      const declineInfo = r.decline_reason
+        ? '<div class="mono muted" style="font-size:11px;">reason: ' + escapeHTML(r.decline_reason) + '</div>'
+        : '';
+      const actions = r.state === "pending"
+        ? '<button class="btn collabreq-action" data-action="approve" data-reqid="' + idAttr + '">approve</button> '
+        + '<button class="btn collabreq-action" data-action="decline" data-reqid="' + idAttr + '">decline</button>'
+        : '<span class="muted mono" style="font-size:11px;">'
+          + (r.resolved_by ? "by " + escapeHTML(r.resolved_by) + " " : "")
+          + (r.resolved_at ? "@ " + escapeHTML(r.resolved_at.slice(0,10)) : "")
+          + '</span>';
+      return ''
+        + '<tr>'
+        + '<td><strong>' + escapeHTML(r.proposed_name) + '</strong>'
+        + '<div class="mono muted" style="font-size:11px;">#' + idAttr + '</div>'
+        + justification + '</td>'
+        + '<td>' + pill(r.state) + declineInfo + '</td>'
+        + '<td class="mono">' + escapeHTML(r.requester) + '</td>'
+        + '<td class="mono">' + escapeHTML(partners) + '</td>'
+        + '<td class="mono muted">' + escapeHTML((r.created_at || "").slice(0,10)) + '</td>'
+        + '<td style="text-align:right; white-space:nowrap;">' + actions + '</td>'
+        + '</tr>';
+    }
+
+    function renderCollab(c) {
+      const groups = (c.groups || []).join(", ");
+      const pis = (c.pis || []).join(", ");
+      const isActive = c.status === "active";
+      const nameEsc = escapeHTML(c.name);
+      const actions = ''
+        + '<button class="btn collab-action" data-action="edit" data-collab="' + nameEsc + '">edit</button> '
+        + (isActive
+            ? '<button class="btn collab-action" data-action="archive" data-collab="' + nameEsc + '">archive</button>'
+            : '<button class="btn collab-action" data-action="unarchive" data-collab="' + nameEsc + '">unarchive</button>');
+      const subsetLines = Object.keys(c.member_subset || {}).map(g =>
+        '<div class="mono"><span class="muted">' + escapeHTML(g) + ':</span> ' +
+        (c.member_subset[g] || []).map(escapeHTML).join(", ") + '</div>'
+      ).join("");
+      return ''
+        + '<tr>'
+        + '<td><strong>' + escapeHTML(c.name) + '</strong></td>'
+        + '<td class="mono">' + escapeHTML(pis) + '</td>'
+        + '<td class="mono">' + escapeHTML(groups) + '</td>'
+        + '<td class="mono muted">' + escapeHTML(c.created || "—") + '</td>'
+        + '<td>' + pill(c.status) + '</td>'
+        + '<td style="text-align:right; white-space:nowrap;">' + actions + '</td>'
+        + '</tr>'
+        + (subsetLines
+          ? '<tr><td colspan="6" class="lab-detail"><h4>member subset</h4>' + subsetLines
+            + (c.oracle_vault ? '<h4>oracle vault</h4><div class="mono">' + escapeHTML(c.oracle_vault) + '</div>' : '')
+            + '</td></tr>'
+          : "");
+    }
+
+    async function load() {
+      // 2i: Mayor wizard. If no centre is initialised, show the
+      // bootstrap form INSTEAD of the normal dashboard. Otherwise keep the
+      // centre profile so we can render the installation's identity header.
+      let centre = null;
+      try {
+        const cp = await fetch("/api/centre/profile",
+                                { credentials: "same-origin" });
+        if (cp.status === 404) {
+          renderMayorWizard();
+          return;
+        }
+        if (cp.ok) { centre = await cp.json(); }
+      } catch (_) { /* fall through to normal load */ }
+
+      const url = "/api/registrar/dashboard" + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+      let res;
+      try {
+        res = await fetch(url, { credentials: "same-origin" });
+      } catch (ex) {
+        renderError(String(ex.message || ex));
+        return;
+      }
+      if (!res.ok) {
+        let detail = "HTTP " + res.status;
+        try { detail = (await res.json()).detail || detail; } catch (_) {}
+        renderError(detail);
+        return;
+      }
+      const data = await res.json();
+      banner.textContent = "signed in as " + data.registrar_handle + " · " + data.today.pretty;
+
+      const s = data.stats || {};
+      let html = ""
+        + '<div class="stats">'
+        + '<div class="stat"><div class="label">labs</div><div class="value">' + (s.total_labs || 0) + '</div></div>'
+        + '<div class="stat"><div class="label">cores</div><div class="value">' + (s.total_cores || 0) + '</div></div>'
+        + '<div class="stat"><div class="label">collaborations</div><div class="value">' + (s.total_collaborations || 0) + '</div></div>'
+        + '<div class="stat"><div class="label">members</div><div class="value">' + (s.total_members || 0) + '</div></div>'
+        + '</div>';
+
+      // Centre identity — show the murmurent installation's own details at the
+      // top. The data comes from /api/centre/profile (fetched above); without
+      // this the registrar page never displays what centre you're looking at.
+      if (centre) {
+        const row = (label, val) => val
+          ? '<div style="display:flex; gap:10px; padding:3px 0; border-top:1px solid var(--border,#eee);">'
+            + '<span class="meta" style="min-width:190px;">' + escapeHTML(label) + '</span>'
+            + '<span>' + escapeHTML(String(val)) + '</span></div>'
+          : '';
+        const centreHtml = '<div class="panel" id="centre-card">'
+          + '<header><h2>' + escapeHTML(centre.name || 'Centre') + '</h2>'
+          + '<span class="meta">murmurent installation'
+          + (centre.institution ? ' · ' + escapeHTML(centre.institution) : '')
+          + '</span></header>'
+          + '<div>'
+          + row('Institution', centre.institution)
+          + row('Install id (unique name)', centre.unique_name)
+          + row('Founding mayor', centre.founding_mayor)
+          + row('Slack workspace', centre.slack_workspace)
+          + row('GitHub org', centre.github_org)
+          + row('Join email (public contact)', centre.join_email)
+          + row('Created', centre.created)
+          + '</div></div>';
+
+        // Centre setup checklist — the post-bootstrap steps a new mayor still
+        // has to do. Surfaced here because nothing previously told the mayor
+        // about Slack setup or how to get listed on the public hub.
+        const uniq = centre.unique_name || 'centre';
+        const wsName = 'wigamig-' + uniq;
+        const dirRow = (centre.institution || 'Institution')
+          + ' (' + (centre.name || 'centre') + ')\t'
+          + (centre.join_email || 'YOUR_EMAIL') + '\t'
+          + (centre.age_recipient || 'age1…  (run: murmurent centre-age-keygen)');
+        const slackHtml = '<div class="panel" id="slack-setup-card">'
+          + '<header><h2>Slack</h2><span class="meta">centre communication fabric</span></header>'
+          + '<div>'
+          + (centre.slack_workspace
+              ? '<p>Declared workspace id: <span class="mono">' + escapeHTML(centre.slack_workspace) + '</span></p>'
+              : '<p><strong>No Slack workspace declared yet.</strong></p>')
+          + (centre.slack_invite_url
+              ? '<p><strong>Workspace join link set ✓</strong> — new members are sent this to join the workspace:</p>'
+                + '<code class="cmd">' + escapeHTML(centre.slack_invite_url) + '</code>'
+              : '<p><strong>No workspace join link set.</strong> New members can\'t join the workspace (so they can\'t be added to any channel) until you add one. In Slack open <span class="mono">' + escapeHTML(wsName) + ' → Invite people → Copy invite link</span>, then paste it in place of the placeholder and run:</p>'
+                + '<code class="cmd">murmurent centre-set slack_invite_url=PASTE-YOUR-INVITE-LINK</code>')
+          + '<p>As the mayor you set up Slack once. Follow these steps in order:</p>'
+          + '<ol class="setup-steps">'
+          + '<li>Create a Slack workspace named <span class="mono">' + escapeHTML(wsName) + '</span> (or reuse an existing one).</li>'
+          + '<li><strong>Create a channel named exactly <span class="mono">#general</span></strong> — new Slack workspaces don\'t include one (you may see <span class="mono">#social</span> instead). murmurent broadcasts to everyone through it.</li>'
+          + '<li><strong>Create a Slack app + bot token</strong> — this is what lets murmurent post and manage channels. Click by click:'
+          +   '<ol style="list-style:lower-alpha;">'
+          +     '<li>Go to <a href="https://api.slack.com/apps" target="_blank" rel="noopener"><span class="mono">api.slack.com/apps</span></a> and sign in as the account that owns your <span class="mono">' + escapeHTML(wsName) + '</span> workspace.</li>'
+          +     '<li>Click <strong>Create New App → From scratch</strong>. Name it <span class="mono">mayor</span>, pick your workspace, click <strong>Create App</strong>.</li>'
+          +     '<li>Open <strong>App Home</strong> (left sidebar) and set the bot\'s <strong>Display Name</strong> + <strong>Default username</strong> to <span class="mono">mayor</span> — this is who PIs + members see as the sender of every murmurent DM, so messages read as <em>from the mayor</em>. (Already have an app? Rename it here.)</li>'
+          +     '<li>In the app\'s left sidebar, open <strong>OAuth &amp; Permissions</strong>.</li>'
+          +     '<li>Scroll to <strong>Scopes → Bot Token Scopes</strong> (the <em>Bot</em> section, <strong>not</strong> "User Token Scopes"). Click <strong>Add an OAuth Scope</strong> and add <strong>every one</strong> of these seven:'
+          +       '<div class="scopes">'
+          +         '<span class="scope">channels:manage</span>'
+          +         '<span class="scope">groups:write</span>'
+          +         '<span class="scope">chat:write</span>'
+          +         '<span class="scope">im:write</span>'
+          +         '<span class="scope">users:read.email</span>'
+          +         '<span class="scope">channels:read</span>'
+          +         '<span class="scope">groups:read</span>'
+          +       '</div>'
+          +     '</li>'
+          +     '<li>Scroll back <strong>up</strong> to <strong>OAuth Tokens for Your Workspace → Install to Workspace → Allow</strong>.</li>'
+          +     '<li>Copy the <strong>Bot User OAuth Token</strong> — it starts with <span class="mono">xoxb-</span>.</li>'
+          +   '</ol>'
+          + '</li>'
+          + '<li><strong>Give murmurent the token</strong> — paste your <span class="mono">xoxb-…</span> token in place of the placeholder, then run (writes a mode-0600 file any terminal can read):'
+          +   '<code class="cmd">umask 077; printf \'%s\\n\' \'xoxb-PASTE-YOUR-TOKEN\' &gt; ~/.config/wigamig/slack-token</code>'
+          + '</li>'
+          + '<li>In Slack, <span class="mono">/invite</span> the bot into <span class="mono">#general</span> so it can post there. (It auto-joins private channels it creates, like <span class="mono">#murmurent-ops</span>.)</li>'
+          + '<li><strong>Verify, then provision</strong> — run these two, in order:'
+          +   '<code class="cmd">murmurent centre-slack-smoke</code>'
+          +   '<code class="cmd">murmurent centre-slack-setup</code>'
+          + '</li>'
+          + '</ol>'
+          + '<p class="meta">Same steps live in <span class="mono">docs/slack_setup.md</span>. If a scope is missing you\'ll get <span class="mono">missing_scope</span> — add it and <strong>Reinstall</strong> the app. Until a token is wired, channel + broadcast provisioning is skipped (no-op).</p>'
+          + '</div></div>';
+        const hubHtml = '<div class="panel" id="hub-publish-card">'
+          + '<header><h2>Public hub listing</h2><span class="meta">how members find &amp; join you</span></header>'
+          + '<div>'
+          + (centre.age_recipient
+              ? '<p>Encryption key ready ✓ — members can send you an encrypted join request.</p>'
+              : '<p><strong>No encryption key yet.</strong> Run <span class="mono">murmurent centre-age-keygen</span> so members can send encrypted join requests.</p>')
+          + '<p>Your centre is <strong>not auto-posted</strong> to GitHub — nothing about you is published without your say-so. To be listed so members can find you, this row goes in the hub directory:</p>'
+          + '<code class="cmd">' + escapeHTML(dirRow) + '</code>'
+          + '<p><strong>Easiest:</strong> run the command below — it clones the hub (if you don\'t have it) and writes this row into <span class="mono">directory.tsv</span> + the README for you, then prints the <span class="mono">git push</span> to run from the printed folder:</p>'
+          + '<code class="cmd">murmurent centre-hub-publish</code>'
+          + '<p class="meta">You still commit + push yourself — that push is the only step that publishes anything public, so it stays deliberate. (Manual alternative: edit both files by hand; see <span class="mono">docs/connect_to_hub.md</span>.)</p>'
+          + '</div></div>';
+        html = centreHtml + slackHtml + hubHtml + html;
+      }
+
+      html += '<div class="panel"><header><h2>Labs</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + (data.labs || []).length + ' total'
+        + '<button class="btn" id="btn-new-lab">＋ new lab</button>'
+        + '</span></header>';
+      if ((data.labs || []).length === 0) {
+        html += '<div class="empty">No labs registered yet. Seed via <code>murmurent.core.registrar.bootstrap_from_existing_lab_mgmt(...)</code> or hand-edit <code>~/.murmurent/lab_info/_registry.yaml</code>.</div>';
+      } else {
+        html += '<table><thead><tr><th>name</th><th>PI</th><th>members</th><th>created</th><th>status</th><th style="text-align:right;">actions</th></tr></thead><tbody>';
+        for (const lab of data.labs) html += renderLabRow(lab);
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+
+      html += '<div class="panel"><header><h2>Cores</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + (data.cores || []).length + ' total'
+        + '<button class="btn" id="btn-new-core">＋ new core</button>'
+        + '</span></header>';
+      if ((data.cores || []).length === 0) {
+        html += '<div class="empty">No cores registered yet.</div>';
+      } else {
+        html += '<table><thead><tr><th>name</th><th>core leader</th><th>members</th><th>created</th><th>status</th><th style="text-align:right;">actions</th></tr></thead><tbody>';
+        for (const c of data.cores) html += renderCoreRow(c);
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+
+      html += '<div class="panel"><header><h2>Collaborations</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + (data.collaborations || []).length + ' total'
+        + '<button class="btn" id="btn-new-collab">＋ new collaboration</button>'
+        + '</span></header>';
+      if ((data.collaborations || []).length === 0) {
+        html += '<div class="empty">No collaborations registered yet. Click <strong>＋ new collaboration</strong> above to register one (requires ≥2 active groups with ≥2 PIs).</div>';
+      } else {
+        html += '<table><thead><tr><th>name</th><th>PIs</th><th>groups</th><th>created</th><th>status</th><th style="text-align:right;">actions</th></tr></thead><tbody>';
+        for (const c of data.collaborations) html += renderCollab(c);
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+
+      // Pending collaboration requests (PIs propose; registrar approves).
+      // Rendered as a panel below Collaborations so the queue is right
+      // next to the live registry. Approve flips the request to
+      // "approved" AND creates the collab entry above. Decline records
+      // a free-text reason.
+      const collabReqs = data.collaboration_requests || [];
+      const pendingCollab = collabReqs.filter(r => r.state === "pending");
+      const historicalCollab = collabReqs.filter(r => r.state !== "pending");
+      html += '<div class="panel"><header><h2>Pending collaboration requests</h2>'
+        + '<span class="meta">'
+        + pendingCollab.length + ' pending'
+        + (historicalCollab.length > 0 ? ' · ' + historicalCollab.length + ' historical' : '')
+        + '</span></header>';
+      if (pendingCollab.length === 0 && historicalCollab.length === 0) {
+        html += '<div class="empty">No collaboration requests filed. PIs propose new collaborations from their own dashboards; they appear here for approval.</div>';
+      } else {
+        html += '<table><thead><tr><th>name</th><th>state</th><th>requester</th><th>partners</th><th>filed</th><th style="text-align:right;">actions</th></tr></thead><tbody>';
+        for (const r of pendingCollab.concat(historicalCollab)) {
+          html += renderCollabRequest(r);
+        }
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+
+      // -- Pending join requests panel (item 2j) --
+      // Public /join form posts here; registrar approves/declines.
+      html += '<div class="panel" id="join-card"><header>'
+        + '<h2>Pending join requests</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + '<span id="join-count">…</span>'
+        + '<a class="btn" href="/join" target="_blank" rel="noopener" '
+        +     'style="text-decoration:none;">'
+        +   'open /join form ↗</a>'
+        + '</span></header>'
+        + '<div id="join-body"><div class="empty">Loading…</div></div>'
+        + '</div>';
+
+      // -- External customers panel (Phase 6e) --
+      // Industry / non-Schulich clients that the registrar tracks so
+      // booking + invoicing know how to bill them. Hidden until the
+      // registrar adds the first one.
+      html += '<div class="panel" id="ext-cust-card"><header>'
+        + '<h2>External customers</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + '<span id="ext-cust-count">…</span>'
+        + '<button class="btn" id="btn-new-ext-cust">＋ new external customer</button>'
+        + '</span></header>'
+        + '<div id="ext-cust-body"><div class="empty">Loading…</div></div>'
+        + '</div>';
+
+      // -- Centre broadcasts (compose + audit view) --
+      // Registrar can send to any audience and audits the full log
+      // here. The same panel lives on every member's /dashboard
+      // (read-only for non-PIs).
+      html += '<div class="panel" id="broadcasts-card"><header>'
+        + '<h2>Centre broadcasts</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + '<span id="broadcasts-count">…</span>'
+        + '<button class="btn" id="btn-broadcast-compose">＋ compose</button>'
+        + '</span></header>'
+        + '<div id="broadcasts-compose" style="display:none; padding:10px 14px; background:var(--paper); border-bottom:1px solid var(--rule);">'
+        +   '<div style="display:flex; gap:8px; align-items:baseline; margin-bottom:6px;">'
+        +     '<label style="font-size:11px;">to</label>'
+        +     '<select id="broadcasts-audience">'
+        +       '<option value="everyone">everyone</option>'
+        +       '<option value="pis">pis</option>'
+        +       '<option value="leaders">leaders</option>'
+        +       '<option value="admin">admin</option>'
+        +     '</select>'
+        +   '</div>'
+        +   '<textarea id="broadcasts-message" rows="3" placeholder="Your message …" style="width:100%; font-family:inherit; font-size:13px; padding:6px; border:1px solid var(--rule); border-radius:2px;"></textarea>'
+        +   '<div id="broadcasts-err" class="err" style="display:none; font-size:11px; margin-top:4px;"></div>'
+        +   '<div style="display:flex; justify-content:flex-end; margin-top:6px;">'
+        +     '<button id="btn-broadcast-send" class="btn">Send</button>'
+        +   '</div>'
+        + '</div>'
+        + '<div id="broadcasts-body"><div class="empty">Loading…</div></div>'
+        + '</div>';
+
+      // -- Common SEAs (centre-wide catalog, read-only here) --
+      // Each PI submits from their own /dashboard "SEAs we offer"
+      // panel. The registrar sees the full picture here with an
+      // archive button (registrars + owner_lab PIs may archive).
+      html += '<div class="panel" id="common-seas-card"><header>'
+        + '<h2>Common SEAs (centre-wide catalog)</h2>'
+        + '<span class="meta" style="display:flex; align-items:center; gap:10px;">'
+        + '<span id="common-seas-count">…</span>'
+        + '<label style="font-size:11px;"><input type="checkbox" id="common-seas-show-deprecated"> include deprecated</label>'
+        + '</span></header>'
+        + '<div id="common-seas-body"><div class="empty">Loading…</div></div>'
+        + '</div>';
+
+      // -- Certifications panel (centre-wide compliance view) --
+      const certs = data.certs || { aggregate: {}, rows: [], cert_specs: [] };
+      const a = certs.aggregate || {};
+      html += '<div class="panel"><header>'
+        + '<h2>Compliance · Western training</h2>'
+        + '<span class="meta">'
+        + (certs.rows || []).length + ' member-group rows · '
+        + (a.members_with_issues || 0) + ' / ' + (a.members_total || 0) + ' with issues'
+        + '</span>'
+        + '</header>';
+      if ((certs.rows || []).length === 0) {
+        html += '<div class="empty">No certifications to report. Make sure each lab\'s <code>compliance.md</code> declares a <code>required:</code> list and members\' <code>certifications:</code> frontmatter is populated.</div>';
+      } else {
+        // Mini stat row inside the panel
+        html += '<div style="display:flex; gap:14px; padding:10px 16px; background:var(--paper); border-bottom:1px solid var(--rule); font-size:12px;">'
+          + '<span><strong style="color:var(--red);">' + (a.expired_count || 0) + '</strong> <span class="muted">expired</span></span>'
+          + '<span><strong style="color:#8a560f;">' + (a.expiring_count || 0) + '</strong> <span class="muted">expiring</span></span>'
+          + '<span><strong style="color:var(--purple-deep);">' + (a.missing_count || 0) + '</strong> <span class="muted">missing</span></span>'
+          + '</div>';
+        // Column headers come from cert_specs — short name (e.g. "tcps2")
+        // with the full name + cadence in the tooltip, matching the
+        // PI dashboard's TrainingCompliancePanel exactly.
+        const specs = certs.cert_specs || [];
+        html += '<table><thead><tr>'
+          + '<th>group</th><th>handle</th><th>name</th><th>role</th>';
+        for (const s of specs) {
+          const cadenceNote = s.cadence_years
+            ? " · renew every " + s.cadence_years + "y"
+            : " · one-time";
+          const tooltip = escapeHTML((s.name || s.code) + " (" + s.code + ")" + cadenceNote);
+          html += '<th class="mono" title="' + tooltip + '">' + escapeHTML(s.short || s.code) + '</th>';
+        }
+        html += '</tr></thead><tbody>';
+        for (const r of certs.rows) {
+          const cellByCode = {};
+          for (const c of r.certs || []) cellByCode[c.code] = c;
+          const rowAttn = r.has_expired ? ' style="background:rgba(178,58,43,0.04);"'
+                        : r.has_expiring ? ' style="background:rgba(240,167,87,0.06);"'
+                        : '';
+          html += '<tr' + rowAttn + '>'
+            + '<td class="mono">' + escapeHTML(r.group) + ' <span class="muted">(' + escapeHTML(r.group_kind) + ')</span></td>'
+            + '<td class="mono">' + escapeHTML(r.handle) + '</td>'
+            + '<td>' + escapeHTML(r.full_name || "") + '</td>'
+            + '<td class="mono muted">' + escapeHTML(r.role) + '</td>';
+          for (const s of specs) {
+            const cell = cellByCode[s.code];
+            html += '<td>' + (cell ? renderCertCell(cell) : '<span class="muted">—</span>') + '</td>';
+          }
+          html += '</tr>';
+        }
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+
+      root.innerHTML = html;
+      const newLabBtn = document.getElementById("btn-new-lab");
+      if (newLabBtn) newLabBtn.addEventListener("click", openNewLabModal);
+      // Phase C action buttons (archive / unarchive / edit) — delegate
+      // via a single listener so re-render replaces them cleanly.
+      root.querySelectorAll(".lab-action").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const action = btn.getAttribute("data-action");
+          const lab = btn.getAttribute("data-lab");
+          if (action === "edit") openEditLabModal(lab, data.labs.find(l => l.name === lab));
+          else if (action === "archive" || action === "unarchive") {
+            confirmLabAction(action, lab);
+          }
+        });
+      });
+
+      // Phase D: collaboration controls.
+      const newCollabBtn = document.getElementById("btn-new-collab");
+      if (newCollabBtn) newCollabBtn.addEventListener("click", () => openNewCollabModal(data));
+      root.querySelectorAll(".collab-action").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const action = btn.getAttribute("data-action");
+          const name = btn.getAttribute("data-collab");
+          if (action === "edit") openEditCollabModal(name, (data.collaborations || []).find(c => c.name === name), data);
+          else if (action === "archive" || action === "unarchive") {
+            confirmCollabAction(action, name);
+          }
+        });
+      });
+
+      // Pending-collab-request approve/decline (item #9).
+      // Approve: POST .../approve — server delegates to create_collaboration.
+      // Decline: prompt for a reason, then POST .../decline.
+      root.querySelectorAll(".collabreq-action").forEach(btn => {
+        btn.addEventListener("click", async () => {
+          const action = btn.getAttribute("data-action");
+          const reqId  = btn.getAttribute("data-reqid");
+          if (!action || !reqId) return;
+          if (action === "approve") {
+            if (!window.confirm("Approve collaboration request #" + reqId + "?\n\n" +
+                                "This creates the collaboration in _registry.yaml.")) return;
+            btn.disabled = true;
+            try {
+              const userParam = userOverride ? "?user=" + encodeURIComponent(userOverride) : "";
+              const r = await fetch("/api/registrar/collaboration_request/" + reqId + "/approve" + userParam,
+                                    { method: "POST", headers: { Accept: "application/json" } });
+              const j = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+              await load();
+            } catch (ex) {
+              alert("Approve failed: " + (ex.message || ex));
+              btn.disabled = false;
+            }
+          } else if (action === "decline") {
+            const reason = window.prompt("Decline collaboration request #" + reqId + "\n\n" +
+                                         "Reason (visible to the proposing PI):");
+            if (reason === null) return;  // user cancelled the prompt
+            btn.disabled = true;
+            try {
+              const userParam = userOverride ? "?user=" + encodeURIComponent(userOverride) : "";
+              const r = await fetch("/api/registrar/collaboration_request/" + reqId + "/decline" + userParam, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Accept: "application/json" },
+                body: JSON.stringify({ reason: reason }),
+              });
+              const j = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error(j.detail || ("HTTP " + r.status));
+              await load();
+            } catch (ex) {
+              alert("Decline failed: " + (ex.message || ex));
+              btn.disabled = false;
+            }
+          }
+        });
+      });
+
+      // Phase E: core controls.
+      const newCoreBtn = document.getElementById("btn-new-core");
+      if (newCoreBtn) newCoreBtn.addEventListener("click", openNewCoreModal);
+      root.querySelectorAll(".core-action").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const action = btn.getAttribute("data-action");
+          const name = btn.getAttribute("data-core");
+          if (action === "edit") openEditCoreModal(name, (data.cores || []).find(c => c.name === name));
+          else if (action === "archive" || action === "unarchive") {
+            confirmCoreAction(action, name);
+          }
+        });
+      });
+
+      // 2j: pending join requests panel.
+      loadJoinRequests();
+
+      // Phase 6e: external customers panel.
+      loadExternalCustomers();
+      const newCustBtn = document.getElementById("btn-new-ext-cust");
+      if (newCustBtn) newCustBtn.addEventListener("click", openNewExternalCustomerModal);
+
+      // Common SEAs catalog (read-only here; PIs submit from their dashboard).
+      loadCommonSeas();
+      const depToggle = document.getElementById("common-seas-show-deprecated");
+      if (depToggle) depToggle.addEventListener("change", loadCommonSeas);
+
+      // Centre broadcasts (compose + recent log).
+      loadBroadcasts();
+      const composeBtn = document.getElementById("btn-broadcast-compose");
+      const composeBox = document.getElementById("broadcasts-compose");
+      if (composeBtn) composeBtn.addEventListener("click", () => {
+        composeBox.style.display = composeBox.style.display === "none" ? "block" : "none";
+      });
+      const sendBtn = document.getElementById("btn-broadcast-send");
+      if (sendBtn) sendBtn.addEventListener("click", sendBroadcast);
+
+      renderFooter(data);
+    }
+
+    // -----------------------------------------------------------
+    // Centre broadcasts
+    // -----------------------------------------------------------
+
+    async function loadBroadcasts() {
+      const body = document.getElementById("broadcasts-body");
+      const count = document.getElementById("broadcasts-count");
+      try {
+        const r = await fetch("/api/broadcast/recent?limit=20",
+                                { credentials: "same-origin" });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || ("HTTP " + r.status));
+        }
+        const data = await r.json();
+        const rows = data.broadcasts || [];
+        count.textContent = rows.length + " recent";
+        if (rows.length === 0) {
+          body.innerHTML = '<div class="empty">No broadcasts yet. Click <strong>＋ compose</strong> to send the first one.</div>';
+          return;
+        }
+        const fmtTs = (iso) => {
+          if (!iso) return "";
+          const m = iso.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+          return m ? `${m[1]} ${m[2]}:${m[3]} UTC` : iso;
+        };
+        let html = '<table><thead><tr>'
+          + '<th style="width:150px;">when</th>'
+          + '<th style="width:90px;">to</th>'
+          + '<th style="width:110px;">from</th>'
+          + '<th>message</th>'
+          + '</tr></thead><tbody>';
+        for (const b of rows) {
+          html += '<tr>'
+            + '<td class="mono" style="font-size:11px;">' + escapeHTML(fmtTs(b.iso_ts)) + '</td>'
+            + '<td><span class="pill">' + escapeHTML(b.audience) + '</span></td>'
+            + '<td class="mono" style="font-size:11px;">@' + escapeHTML(b.sender) + '</td>'
+            + '<td><div style="white-space:pre-wrap; font-size:13px;">' + escapeHTML(b.message) + '</div>'
+            + (b.message_link
+              ? '<a href="' + escapeHTML(b.message_link) + '" target="_blank" rel="noopener" style="font-size:11px;">open in Slack ↗</a>'
+              : '')
+            + '</td>'
+            + '</tr>';
+        }
+        html += '</tbody></table>';
+        body.innerHTML = html;
+      } catch (ex) {
+        body.innerHTML = '<div class="empty">Failed to load: ' + escapeHTML(String(ex.message || ex)) + '</div>';
+      }
+    }
+
+    async function sendBroadcast() {
+      const audience = document.getElementById("broadcasts-audience").value;
+      const message = document.getElementById("broadcasts-message").value;
+      const errBox = document.getElementById("broadcasts-err");
+      errBox.style.display = "none";
+      if (!message.trim()) {
+        errBox.textContent = "Message is empty.";
+        errBox.style.display = "block";
+        return;
+      }
+      try {
+        const url = "/api/broadcast"
+                  + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ audience, message }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || ("HTTP " + r.status));
+        }
+        // Clear + close + reload.
+        document.getElementById("broadcasts-message").value = "";
+        document.getElementById("broadcasts-compose").style.display = "none";
+        loadBroadcasts();
+      } catch (ex) {
+        errBox.textContent = "Send failed: " + (ex.message || ex);
+        errBox.style.display = "block";
+      }
+    }
+
+    // -----------------------------------------------------------
+    // Common SEAs catalog (read-only view + archive action)
+    // -----------------------------------------------------------
+
+    async function loadCommonSeas() {
+      const body = document.getElementById("common-seas-body");
+      const count = document.getElementById("common-seas-count");
+      const dep = document.getElementById("common-seas-show-deprecated").checked;
+      try {
+        const url = "/api/common_seas?include_deprecated=" + (dep ? "true" : "false");
+        const r = await fetch(url, { credentials: "same-origin" });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || ("HTTP " + r.status));
+        }
+        const data = await r.json();
+        const rows = data.seas || [];
+        count.textContent = rows.length + (rows.length === 1 ? " SEA" : " SEAs");
+        if (rows.length === 0) {
+          body.innerHTML = '<div class="empty">No common SEAs published yet. PIs publish from their own dashboard\'s "SEAs we offer" panel (or via <code>murmurent common-sea submit</code>).</div>';
+          return;
+        }
+        let html = '<table><thead><tr>'
+          + '<th>slug</th><th>name</th><th>kind</th><th>owner</th>'
+          + '<th>status</th><th>install</th>'
+          + '<th style="text-align:right;">actions</th>'
+          + '</tr></thead><tbody>';
+        for (const s of rows) {
+          const tags = (s.tags || []).map(x => '<span class="pill" style="font-size:10px;">' + escapeHTML(x) + '</span>').join(" ");
+          html += '<tr style="' + (s.status === "deprecated" ? "opacity:0.55;" : "") + '">'
+            + '<td class="mono" style="font-size:11px;">' + escapeHTML(s.slug) + '</td>'
+            + '<td>' + escapeHTML(s.name)
+              + (s.url ? ' <a href="' + escapeHTML(s.url) + '" target="_blank" rel="noopener" style="font-size:11px;">↗</a>' : "")
+              + (s.description ? '<br><span class="muted" style="font-size:11px;">' + escapeHTML(s.description) + '</span>' : "")
+              + (tags ? '<br>' + tags : "")
+              + '</td>'
+            + '<td class="mono" style="font-size:11px;">' + escapeHTML(s.kind) + '</td>'
+            + '<td class="mono" style="font-size:11px;">' + escapeHTML(s.owner_lab) + '</td>'
+            + '<td><span class="pill ' + escapeHTML(s.status) + '">' + escapeHTML(s.status) + '</span></td>'
+            + '<td><code style="font-size:11px;">' + escapeHTML(s.install || "—") + '</code></td>'
+            + '<td style="text-align:right;">'
+            +   (s.status === "active"
+                ? '<button class="btn common-sea-action" data-action="archive" data-slug="' + escapeHTML(s.slug) + '">archive</button>'
+                : '<span class="muted" style="font-size:11px;">—</span>')
+            + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        body.innerHTML = html;
+        body.querySelectorAll(".common-sea-action").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const slug = btn.getAttribute("data-slug");
+            if (!confirm("Archive common SEA " + slug + "?")) return;
+            const url = "/api/registrar/common_seas/" + encodeURIComponent(slug)
+                      + "/archive"
+                      + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+            const r = await fetch(url, { method: "POST" });
+            if (!r.ok) {
+              const d = await r.json().catch(() => ({}));
+              alert("Archive failed: " + (d.detail || ("HTTP " + r.status)));
+              return;
+            }
+            loadCommonSeas();
+          });
+        });
+      } catch (ex) {
+        body.innerHTML = '<div class="empty">Failed to load: ' + escapeHTML(String(ex.message || ex)) + '</div>';
+      }
+    }
+
+    // -----------------------------------------------------------
+    // Phase 6e: external customers helpers
+    // -----------------------------------------------------------
+
+    // 2j: pending join requests
+    async function loadJoinRequests() {
+      const body = document.getElementById("join-body");
+      const count = document.getElementById("join-count");
+      try {
+        const url = "/api/centre/join_requests"
+                  + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const r = await fetch(url, { credentials: "same-origin" });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || ("HTTP " + r.status));
+        }
+        const data = await r.json();
+        const rows = data.join_requests || [];
+        const pending = rows.filter(x => x.state === "pending");
+        const failed = rows.filter(x => x.state === "failed");
+        const resolved = rows.filter(x =>
+          x.state !== "pending" && x.state !== "failed");
+        count.textContent = pending.length + " pending"
+          + (failed.length > 0 ? " · " + failed.length + " failed" : "")
+          + (resolved.length > 0 ? " · " + resolved.length + " resolved" : "");
+        if (rows.length === 0) {
+          body.innerHTML = '<div class="empty">No join requests yet. '
+            + 'Share the link <a href="/join" target="_blank">'
+            + '<code>/join</code></a> for anyone at the institution to apply.</div>';
+          return;
+        }
+        const showRows = pending.concat(failed).concat(resolved);
+        let html = '<table><thead><tr>'
+          + '<th>id</th><th>kind</th><th>name</th><th>PI</th>'
+          + '<th>email</th><th>state</th>'
+          + '<th style="text-align:right;">actions</th>'
+          + '</tr></thead><tbody>';
+        for (const r of showRows) {
+          const probes = (r.probes || []).map(p =>
+            '<div style="font-size:11px; color:'
+            + (p.severity === "block" ? "#b23a2b"
+              : p.severity === "warn" ? "#8a560f" : "#2d7a2d")
+            + ';">[' + escapeHTML(p.severity) + '] '
+            + escapeHTML(p.kind) + ': ' + escapeHTML(p.summary || '')
+            + '</div>'
+          ).join("");
+          const isPending = r.state === "pending" || r.state === "failed";
+          html += '<tr style="' + (r.state === "declined" ? "opacity:0.55;" : "") + '">'
+            + '<td class="mono">#' + escapeHTML(r.id_str) + '</td>'
+            + '<td class="mono">' + escapeHTML(r.kind) + '</td>'
+            + '<td>' + escapeHTML(r.proposed_name)
+              + (r.institution_affiliation
+                ? '<br><span class="muted" style="font-size:11px;">'
+                  + escapeHTML(r.institution_affiliation) + '</span>'
+                : '')
+              + (r.justification
+                ? '<br><span class="muted" style="font-size:11px;">'
+                  + escapeHTML(r.justification.slice(0, 80))
+                  + (r.justification.length > 80 ? '…' : '')
+                  + '</span>'
+                : '')
+              + '</td>'
+            + '<td class="mono">' + escapeHTML(r.proposed_pi || "—") + '</td>'
+            + '<td>' + escapeHTML(r.requester_email) + '</td>'
+            + '<td><span class="pill ' + escapeHTML(r.state) + '">'
+              + escapeHTML(r.state) + '</span>'
+              + probes
+              + '</td>'
+            + '<td style="text-align:right;">'
+            +   (isPending
+                ? '<button class="btn join-action" data-action="approve" data-id="' + r.id + '">approve</button> '
+                  + '<button class="btn join-action" data-action="decline" data-id="' + r.id + '">decline</button>'
+                : (r.state === "failed"
+                  ? '<button class="btn join-action" data-action="approve" data-id="' + r.id + '">retry</button>'
+                  : '<span class="muted" style="font-size:11px;">—</span>'))
+            + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        body.innerHTML = html;
+        body.querySelectorAll(".join-action").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-id");
+            const action = btn.getAttribute("data-action");
+            if (action === "decline") {
+              const reason = window.prompt(
+                "Decline reason (will be in the audit log + email reply):");
+              if (!reason || !reason.trim()) return;
+              const url = "/api/registrar/join_request/" + id + "/decline"
+                + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+              const r = await fetch(url, { method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reason }) });
+              if (!r.ok) {
+                alert("Decline failed: " + (await r.json().catch(() => ({}))).detail);
+                return;
+              }
+            } else {
+              if (!confirm("Approve request #" + id
+                + "?\nThis will auto-provision Slack channel + GitHub repo + filesystem ACLs.")) return;
+              btn.disabled = true; btn.textContent = "approving…";
+              const url = "/api/registrar/join_request/" + id + "/approve"
+                + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+              const r = await fetch(url, { method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ provision: true }) });
+              if (!r.ok) {
+                alert("Approve failed: " + (await r.json().catch(() => ({}))).detail);
+                btn.disabled = false; btn.textContent = action;
+                return;
+              }
+            }
+            loadJoinRequests();
+          });
+        });
+      } catch (ex) {
+        body.innerHTML = '<div class="empty">Failed to load: '
+          + escapeHTML(String(ex.message || ex)) + '</div>';
+      }
+    }
+
+    async function loadExternalCustomers() {
+      const body = document.getElementById("ext-cust-body");
+      const count = document.getElementById("ext-cust-count");
+      if (!body) return;
+      try {
+        const url = "/api/registrar/external_customers"
+                  + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const r = await fetch(url, { credentials: "same-origin" });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          throw new Error(d.detail || ("HTTP " + r.status));
+        }
+        const data = await r.json();
+        const rows = data.customers || [];
+        count.textContent = rows.length + (rows.length === 1 ? " customer" : " customers");
+        if (rows.length === 0) {
+          body.innerHTML = '<div class="empty">No external customers yet. Click <strong>＋ new external customer</strong> to add an industry / non-Schulich client.</div>';
+          return;
+        }
+        let html = '<table><thead><tr>'
+          + '<th>id</th><th>name</th><th>kind</th>'
+          + '<th>billing contact</th><th>PO</th><th>status</th>'
+          + '<th style="text-align:right;">actions</th>'
+          + '</tr></thead><tbody>';
+        for (const c of rows) {
+          html += '<tr>'
+            + '<td class="mono">' + escapeHTML(c.id) + '</td>'
+            + '<td>' + escapeHTML(c.name) + '</td>'
+            + '<td class="mono">' + escapeHTML(c.kind) + '</td>'
+            + '<td>' + escapeHTML(c.billing_contact || '—') + '</td>'
+            + '<td class="mono">' + escapeHTML(c.po_number || '—') + '</td>'
+            + '<td><span class="pill ' + escapeHTML(c.status) + '">' + escapeHTML(c.status) + '</span></td>'
+            + '<td style="text-align:right;">'
+            +   '<button class="btn ext-cust-action" data-action="archive" data-id="' + escapeHTML(c.id) + '">archive</button>'
+            + '</td></tr>';
+        }
+        html += '</tbody></table>';
+        body.innerHTML = html;
+        body.querySelectorAll(".ext-cust-action").forEach(btn => {
+          btn.addEventListener("click", async () => {
+            const id = btn.getAttribute("data-id");
+            if (!confirm("Archive external customer " + id + "?")) return;
+            const url = "/api/registrar/external_customers/" + encodeURIComponent(id)
+                      + "/archive"
+                      + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+            const r = await fetch(url, { method: "POST" });
+            if (!r.ok) { alert("Archive failed"); return; }
+            loadExternalCustomers();
+          });
+        });
+      } catch (ex) {
+        body.innerHTML = '<div class="empty">Failed to load: ' + escapeHTML(String(ex.message || ex)) + '</div>';
+      }
+    }
+
+    function openNewExternalCustomerModal() {
+      const id   = prompt("ID (kebab-case, e.g. 'acme-bio'):");
+      if (!id) return;
+      const name = prompt("Display name (e.g. 'ACME Biosciences'):");
+      if (!name) return;
+      const kind = prompt("Kind (industry | academic_external | hospital):", "industry") || "industry";
+      const contact_name = prompt("Contact name:", "") || "";
+      const billing_contact = prompt("Billing email:", "") || "";
+      const po_number = prompt("PO number (optional):", "") || "";
+      (async () => {
+        const url = "/api/registrar/external_customers"
+                  + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const r = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, name, kind, contact_name,
+                                  billing_contact, po_number }),
+        });
+        if (!r.ok) {
+          const d = await r.json().catch(() => ({}));
+          alert("Create failed: " + (d.detail || ("HTTP " + r.status)));
+          return;
+        }
+        loadExternalCustomers();
+      })();
+    }
+
+    // -----------------------------------------------------------
+    // Footer: registrar profile + cross-link to lab dashboard
+    // -----------------------------------------------------------
+
+    function renderFooter(data) {
+      const footer = document.getElementById("footer-meta");
+      if (!footer) return;
+      const p = data.profile || {};
+      const contactBits = [
+        p.email   ? '<span class="mono">' + escapeHTML(p.email)   + '</span>' : null,
+        p.orcid   ? 'ORCID: <span class="mono">' + escapeHTML(p.orcid) + '</span>' : null,
+        p.website ? '<a href="' + escapeHTML(p.website) + '" target="_blank" rel="noopener">website</a>' : null,
+        p.github  ? 'GitHub: <span class="mono">' + escapeHTML(p.github)  + '</span>' : null,
+      ].filter(Boolean).join(" · ");
+      const locationBits = [
+        p.office  ? "Office: " + escapeHTML(p.office) : null,
+        p.address ? escapeHTML(p.address) : null,
+        p.city    ? escapeHTML(p.city) : null,
+      ].filter(Boolean).join(" · ");
+      const titleLine = p.title
+        ? '<div class="mono muted" style="font-size:11px;">' + escapeHTML(p.title) + '</div>'
+        : '<div class="mono muted" style="font-size:11px;">role: registrar</div>';
+      const departmentLine = p.department
+        ? '<div class="muted" style="font-size:12px; margin-top:6px;">' + escapeHTML(p.department) + '</div>'
+        : '';
+      const institutionLine = p.institution
+        ? '<div class="muted" style="font-size:12px;">' + escapeHTML(p.institution) + '</div>'
+        : '';
+
+      footer.innerHTML =
+        '<div class="panel">'
+        + '<header><h2>' + escapeHTML(p.full_name || data.registrar_handle) + ' '
+          + '<span class="mono muted" style="font-size:12px; font-weight:normal;">' + escapeHTML(data.registrar_handle) + '</span>'
+          + '</h2>'
+          + '<div style="display:flex; gap:8px; align-items:center;">'
+            + '<a class="btn" target="_blank" rel="noopener" href="/dashboard?user=' + encodeURIComponent(data.registrar_handle.replace(/^@/, "")) + '&persona=member" title="Open the lab dashboard (PI / member view) for the same handle in a new tab">→ Lab dashboard</a>'
+            + '<a class="btn" href="/" title="Switch user or role — returns to the sign-in page">↺ switch</a>'
+            + '<button class="btn" id="btn-edit-profile">⚙ profile</button>'
+          + '</div>'
+        + '</header>'
+        + '<div style="padding:14px 18px;">'
+          + titleLine
+          + (contactBits ? '<div class="row" style="margin-top:8px;">' + contactBits + '</div>' : '')
+          + (locationBits ? '<div class="row" style="margin-top:4px;">' + locationBits + '</div>' : '')
+          + departmentLine
+          + institutionLine
+          + (!contactBits && !locationBits && !p.department && !p.institution
+              ? '<div class="muted" style="margin-top:8px; font-size:12px; font-style:italic;">Click <strong>⚙ profile</strong> to fill in your contact and location.</div>'
+              : '')
+        + '</div>'
+        + '</div>';
+      const editBtn = document.getElementById("btn-edit-profile");
+      if (editBtn) editBtn.addEventListener("click", () => openProfileModal(p));
+    }
+
+    function openProfileModal(profile) {
+      const p = profile || {};
+      const v = (k) => escapeHTML(p[k] || "");
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      wrap.innerHTML =
+        '<form class="modal" id="reg-profile-form" autocomplete="off">' +
+          '<h2>Registrar profile</h2>' +
+          '<p class="muted">Saved to <code>~/.murmurent/lab_info/registrar.md</code>. This is the centre-level admin contact for the registrar role — separate from any lab membership you also hold.</p>' +
+          '<label>full name</label>' +
+          '<input name="full_name" value="' + v("full_name") + '" placeholder="e.g. Mike Hallett" />' +
+          '<label>title (admin role)</label>' +
+          '<input name="title" value="' + v("title") + '" placeholder="e.g. Centre Director, VP Research" />' +
+          '<label>email</label>' +
+          '<input name="email" value="' + v("email") + '" />' +
+          '<label>ORCID</label>' +
+          '<input name="orcid" value="' + v("orcid") + '" />' +
+          '<label>website</label>' +
+          '<input name="website" value="' + v("website") + '" placeholder="https://" />' +
+          '<label>GitHub</label>' +
+          '<input name="github" value="' + v("github") + '" />' +
+          '<label>office</label>' +
+          '<input name="office" value="' + v("office") + '" placeholder="e.g. MSB-360" />' +
+          '<label>address</label>' +
+          '<input name="address" value="' + v("address") + '" />' +
+          '<label>city, province</label>' +
+          '<input name="city" value="' + v("city") + '" placeholder="London, ON N6A 3K7" />' +
+          '<label>department</label>' +
+          '<input name="department" value="' + v("department") + '" />' +
+          '<label>institution</label>' +
+          '<input name="institution" value="' + v("institution") + '" />' +
+          '<div class="actions">' +
+            '<span class="form-msg" id="reg-profile-msg"></span>' +
+            '<button type="button" class="btn ghost" id="reg-profile-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="reg-profile-submit">save</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("reg-profile-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("reg-profile-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById("reg-profile-msg");
+        const submitBtn = document.getElementById("reg-profile-submit");
+        const fd = new FormData(e.target);
+        // Send every field so the server can clear ones the user blanked.
+        const payload = {};
+        for (const [k, val] of fd.entries()) payload[k] = String(val);
+
+        msg.textContent = "saving…";
+        msg.className = "form-msg";
+        submitBtn.disabled = true;
+        try {
+          const url = "/api/registrar/profile" + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+          const res = await fetch(url, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            let detail = "HTTP " + res.status;
+            try { detail = (await res.json()).detail || detail; } catch (_) {}
+            throw new Error(detail);
+          }
+          msg.textContent = "saved";
+          msg.className = "form-msg ok";
+          setTimeout(() => { wrap.remove(); load(); }, 600);
+        } catch (ex) {
+          msg.textContent = String(ex.message || ex);
+          msg.className = "form-msg error";
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
+    // -----------------------------------------------------------
+    // Phase B: create-lab modal
+    // -----------------------------------------------------------
+
+    function openNewLabModal() {
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      wrap.innerHTML =
+        '<form class="modal" id="new-lab-form" autocomplete="off">' +
+          '<h2>Create a new lab</h2>' +
+          '<p class="muted">Scaffolds a fresh <code>lab-mgmt</code> repo and adds the lab to the registry. The registrar PI invariant (one lab/core per PI) is enforced server-side.</p>' +
+          '<label>short ID (snake_case)</label>' +
+          '<input name="name" required placeholder="e.g. ortega" />' +
+          '<label>display name</label>' +
+          '<input name="display_name" required placeholder="e.g. Ortega Lab" />' +
+          '<label>PI Western netname</label>' +
+          '<input name="pi_handle" required placeholder="e.g. jortega" />' +
+          '<label>PI full name (optional)</label>' +
+          '<input name="pi_full_name" placeholder="e.g. Jane Ortega" />' +
+          '<label>Slack workspace ID (optional)</label>' +
+          '<input name="slack_workspace" placeholder="e.g. T01ABC23DE" />' +
+          '<label>GitHub org (optional)</label>' +
+          '<input name="github_org" placeholder="e.g. ortegalab" />' +
+          '<label>Obsidian vault name (optional)</label>' +
+          '<input name="oracle_vault" placeholder="e.g. wigamig_vault_ortega" />' +
+          '<label>institution (optional)</label>' +
+          '<input name="institution" placeholder="e.g. Western University" />' +
+          '<label>department (optional)</label>' +
+          '<input name="department" placeholder="e.g. Schulich School of Dentistry & Medicine" />' +
+          '<div class="actions">' +
+            '<span class="form-msg" id="new-lab-msg"></span>' +
+            '<button type="button" class="btn ghost" id="new-lab-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="new-lab-submit">create</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("new-lab-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("new-lab-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById("new-lab-msg");
+        const submitBtn = document.getElementById("new-lab-submit");
+        const form = e.target;
+        const fd = new FormData(form);
+        const payload = {};
+        for (const [k, v] of fd.entries()) {
+          const trimmed = String(v).trim();
+          if (trimmed) payload[k] = trimmed;
+        }
+        // Short ID is lowercase snake_case; silently normalise.
+        if (payload.name) payload.name = payload.name.toLowerCase();
+        msg.textContent = "creating…";
+        msg.className = "form-msg";
+        submitBtn.disabled = true;
+        try {
+          const url = "/api/registrar/lab" + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+          const res = await fetch(url, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            let detail = "HTTP " + res.status;
+            try { detail = (await res.json()).detail || detail; } catch (_) {}
+            throw new Error(detail);
+          }
+          msg.textContent = "created — refreshing…";
+          msg.className = "form-msg ok";
+          setTimeout(() => { wrap.remove(); load(); }, 600);
+        } catch (ex) {
+          msg.textContent = String(ex.message || ex);
+          msg.className = "form-msg error";
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
+    async function confirmLabAction(action, name) {
+      const verb = action === "archive" ? "archive" : "unarchive";
+      if (!confirm(`${verb} lab "${name}"?\n\nFiles will be preserved; this is reversible.`)) return;
+      const url = "/api/registrar/lab/" + encodeURIComponent(name) + "/" + action
+        + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+      let res;
+      try {
+        res = await fetch(url, { method: "POST", credentials: "same-origin" });
+      } catch (ex) {
+        alert("network error: " + (ex.message || ex));
+        return;
+      }
+      if (!res.ok) {
+        let detail = "HTTP " + res.status;
+        try { detail = (await res.json()).detail || detail; } catch (_) {}
+        alert(verb + " failed: " + detail);
+        return;
+      }
+      load();
+    }
+
+    function openEditLabModal(name, lab) {
+      const labData = lab || {};
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      const v = (k) => escapeHTML(labData[k] || "");
+      wrap.innerHTML =
+        '<form class="modal" id="edit-lab-form" autocomplete="off">' +
+          '<h2>Edit lab — <code style="font-family:var(--mono); font-size:14px;">' + escapeHTML(name) + '</code></h2>' +
+          '<p class="muted">Empty a field to clear it. The short ID is not editable. PI handoff re-enforces the one-PI-per-active-lab invariant.</p>' +
+          '<label>display name</label>' +
+          '<input name="display_name" value="' + v("display_name") + '" />' +
+          '<label>PI Western netname</label>' +
+          '<input name="pi_handle" value="' + escapeHTML((labData.pi || "").replace(/^@/, "")) + '" />' +
+          '<label>PI full name (only used when introducing a new PI)</label>' +
+          '<input name="pi_full_name" placeholder="(used only when pi handoff lands a new member file)" />' +
+          '<label>Slack workspace ID</label>' +
+          '<input name="slack_workspace" value="' + v("slack_workspace") + '" />' +
+          '<label>GitHub org</label>' +
+          '<input name="github_org" value="' + v("github_org") + '" />' +
+          '<label>Obsidian vault name</label>' +
+          '<input name="oracle_vault" value="' + v("oracle_vault") + '" />' +
+          '<div class="actions">' +
+            '<span class="form-msg" id="edit-lab-msg"></span>' +
+            '<button type="button" class="btn ghost" id="edit-lab-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="edit-lab-submit">save</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("edit-lab-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("edit-lab-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const msg = document.getElementById("edit-lab-msg");
+        const submitBtn = document.getElementById("edit-lab-submit");
+        const fd = new FormData(e.target);
+        // Send every field present (even empty strings — empty means
+        // "clear this field"). model_fields_set on the server only
+        // picks up keys actually in the JSON body.
+        const payload = {};
+        for (const [k, val] of fd.entries()) {
+          payload[k] = String(val);
+        }
+        // Drop fields that didn't change; otherwise we'd commit no-op edits.
+        if (payload.display_name === (labData.display_name || "")) delete payload.display_name;
+        if (payload.pi_handle === ((labData.pi || "").replace(/^@/, ""))) delete payload.pi_handle;
+        if (!payload.pi_full_name) delete payload.pi_full_name;
+        if (payload.slack_workspace === (labData.slack_workspace || "")) delete payload.slack_workspace;
+        if (payload.github_org === (labData.github_org || "")) delete payload.github_org;
+        if (payload.oracle_vault === (labData.oracle_vault || "")) delete payload.oracle_vault;
+
+        if (Object.keys(payload).length === 0) {
+          msg.textContent = "nothing changed";
+          msg.className = "form-msg";
+          return;
+        }
+        msg.textContent = "saving…";
+        msg.className = "form-msg";
+        submitBtn.disabled = true;
+        try {
+          const url = "/api/registrar/lab/" + encodeURIComponent(name) + "/edit"
+            + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+          const res = await fetch(url, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json", Accept: "application/json" },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            let detail = "HTTP " + res.status;
+            try { detail = (await res.json()).detail || detail; } catch (_) {}
+            throw new Error(detail);
+          }
+          msg.textContent = "saved — refreshing…";
+          msg.className = "form-msg ok";
+          setTimeout(() => { wrap.remove(); load(); }, 600);
+        } catch (ex) {
+          msg.textContent = String(ex.message || ex);
+          msg.className = "form-msg error";
+        } finally {
+          submitBtn.disabled = false;
+        }
+      });
+    }
+
+    // -----------------------------------------------------------
+    // Phase D: collaboration modals
+    // -----------------------------------------------------------
+
+    function _parseHandlesField(value) {
+      // Accepts comma-separated, newline-separated, or whitespace-separated.
+      return (value || "")
+        .split(/[\s,]+/)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .map(s => s.startsWith("@") ? s : "@" + s);
+    }
+
+    function _parseGroupsField(value) {
+      return (value || "")
+        .split(/[\s,]+/)
+        .map(s => s.trim().toLowerCase())
+        .filter(Boolean);
+    }
+
+    function _parseSubsetField(value) {
+      // "hallett: @the_pi, @bob; ortega: @jortega" -> dict
+      const subset = {};
+      const segments = (value || "").split(/[;\n]+/);
+      for (const seg of segments) {
+        const trimmed = seg.trim();
+        if (!trimmed) continue;
+        const colon = trimmed.indexOf(":");
+        if (colon < 0) continue;
+        const g = trimmed.slice(0, colon).trim().toLowerCase();
+        const handles = _parseHandlesField(trimmed.slice(colon + 1));
+        if (g && handles.length) subset[g] = handles;
+      }
+      return subset;
+    }
+
+    function _serializeSubset(subset) {
+      return Object.keys(subset || {})
+        .map(g => g + ": " + (subset[g] || []).join(", "))
+        .join("\n");
+    }
+
+    async function confirmCollabAction(action, name) {
+      const verb = action === "archive" ? "archive" : "unarchive";
+      if (!confirm(`${verb} collaboration "${name}"?\n\nFiles will be preserved.`)) return;
+      const url = "/api/registrar/collaboration/" + encodeURIComponent(name) + "/" + action
+        + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+      let res;
+      try {
+        res = await fetch(url, { method: "POST", credentials: "same-origin" });
+      } catch (ex) {
+        alert("network error: " + (ex.message || ex));
+        return;
+      }
+      if (!res.ok) {
+        let detail = "HTTP " + res.status;
+        try { detail = (await res.json()).detail || detail; } catch (_) {}
+        alert(verb + " failed: " + detail);
+        return;
+      }
+      load();
+    }
+
+    function _collabModalBody({ title, name, initial, suggestion }) {
+      const v = (k) => escapeHTML(initial[k] || "");
+      return ''
+        + '<h2>' + title + '</h2>'
+        + '<p class="muted">Validations: at least 2 active groups, at least 2 PIs (each contributing group\'s PI must be in the list), and every member in the subset must already be a member of their group.</p>'
+        + (name ? '<label>short ID (not editable)</label><input value="' + escapeHTML(name) + '" disabled />' : '<label>short ID (snake_case)</label><input name="name" required placeholder="e.g. dcis_imaging" />')
+        + '<label>groups (comma-separated short IDs)</label>'
+        + '<input name="groups" value="' + escapeHTML((initial.groups || []).join(", ")) + '" placeholder="' + escapeHTML(suggestion || "e.g. hallett, ortega") + '" />'
+        + '<label>PIs (comma-separated @handles)</label>'
+        + '<input name="pis" value="' + escapeHTML((initial.pis || []).join(", ")) + '" placeholder="e.g. @the_pi, @jortega" />'
+        + '<label>member subset (one group per line: <code>group: @h1, @h2</code>)</label>'
+        + '<textarea name="member_subset" rows="4" style="width:100%; padding:6px 8px; border:1px solid var(--rule-strong); border-radius:2px; font-family:var(--mono); font-size:12px; box-sizing:border-box;" placeholder="hallett: @the_pi, @bob&#10;ortega: @jortega">' + escapeHTML(_serializeSubset(initial.member_subset || {})) + '</textarea>'
+        + '<label>oracle vault (optional; defaults to wigamig_collab_&lt;name&gt;)</label>'
+        + '<input name="oracle_vault" value="' + v("oracle_vault") + '" placeholder="wigamig_collab_…" />';
+    }
+
+    function openNewCollabModal(data) {
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      const activeLabs = (data.labs || []).filter(l => l.status === "active").map(l => l.name);
+      wrap.innerHTML =
+        '<form class="modal" id="new-collab-form" autocomplete="off">' +
+          _collabModalBody({
+            title: "Create a new collaboration",
+            name: null,
+            initial: {},
+            suggestion: activeLabs.slice(0, 2).join(", "),
+          }) +
+          '<div class="actions">' +
+            '<span class="form-msg" id="new-collab-msg"></span>' +
+            '<button type="button" class="btn ghost" id="new-collab-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="new-collab-submit">create</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("new-collab-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("new-collab-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const payload = {
+          // Short ID is lowercase snake_case; silently normalise.
+          name: String(fd.get("name") || "").trim().toLowerCase(),
+          groups: _parseGroupsField(fd.get("groups")),
+          pis: _parseHandlesField(fd.get("pis")),
+          member_subset: _parseSubsetField(fd.get("member_subset")),
+        };
+        const oracleVault = String(fd.get("oracle_vault") || "").trim();
+        if (oracleVault) payload.oracle_vault = oracleVault;
+        await _submitCollab(wrap, "new-collab", "POST",
+          "/api/registrar/collaboration", payload);
+      });
+    }
+
+    function openEditCollabModal(name, current, data) {
+      if (!current) return;
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      wrap.innerHTML =
+        '<form class="modal" id="edit-collab-form" autocomplete="off">' +
+          _collabModalBody({
+            title: "Edit collaboration",
+            name: name,
+            initial: current,
+            suggestion: null,
+          }) +
+          '<div class="actions">' +
+            '<span class="form-msg" id="edit-collab-msg"></span>' +
+            '<button type="button" class="btn ghost" id="edit-collab-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="edit-collab-submit">save</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("edit-collab-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("edit-collab-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const payload = {
+          groups: _parseGroupsField(fd.get("groups")),
+          pis: _parseHandlesField(fd.get("pis")),
+          member_subset: _parseSubsetField(fd.get("member_subset")),
+        };
+        const oracleVault = String(fd.get("oracle_vault") || "").trim();
+        // Always send oracle_vault (so empty string clears).
+        payload.oracle_vault = oracleVault;
+        await _submitCollab(wrap, "edit-collab", "POST",
+          "/api/registrar/collaboration/" + encodeURIComponent(name) + "/edit", payload);
+      });
+    }
+
+    async function _submitCollab(wrap, prefix, method, urlBase, payload) {
+      const msg = document.getElementById(prefix + "-msg");
+      const submitBtn = document.getElementById(prefix + "-submit");
+      msg.textContent = "saving…";
+      msg.className = "form-msg";
+      submitBtn.disabled = true;
+      try {
+        const url = urlBase + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const res = await fetch(url, {
+          method: method,
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          let detail = "HTTP " + res.status;
+          try { detail = (await res.json()).detail || detail; } catch (_) {}
+          throw new Error(detail);
+        }
+        msg.textContent = "saved";
+        msg.className = "form-msg ok";
+        setTimeout(() => { wrap.remove(); load(); }, 600);
+      } catch (ex) {
+        msg.textContent = String(ex.message || ex);
+        msg.className = "form-msg error";
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+
+    // -----------------------------------------------------------
+    // Phase E: core modals (parallel to lab modals; terminology swapped)
+    // -----------------------------------------------------------
+
+    async function confirmCoreAction(action, name) {
+      const verb = action === "archive" ? "archive" : "unarchive";
+      if (!confirm(`${verb} core "${name}"?\n\nFiles will be preserved; reversible.`)) return;
+      const url = "/api/registrar/core/" + encodeURIComponent(name) + "/" + action
+        + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+      let res;
+      try {
+        res = await fetch(url, { method: "POST", credentials: "same-origin" });
+      } catch (ex) {
+        alert("network error: " + (ex.message || ex));
+        return;
+      }
+      if (!res.ok) {
+        let detail = "HTTP " + res.status;
+        try { detail = (await res.json()).detail || detail; } catch (_) {}
+        alert(verb + " failed: " + detail);
+        return;
+      }
+      load();
+    }
+
+    function openNewCoreModal() {
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      wrap.innerHTML =
+        '<form class="modal" id="new-core-form" autocomplete="off">' +
+          '<h2>Create a new core</h2>' +
+          '<p class="muted">Cores share the lab data model (members, projects, full agent fleet) but their primary purpose is to OFFER SEAs. The lead is called the <strong>core leader</strong>. Invariant: one active group (lab OR core) per leader.</p>' +
+          '<label>short ID (snake_case)</label>' +
+          '<input name="name" required placeholder="e.g. imaging" />' +
+          '<label>display name</label>' +
+          '<input name="display_name" required placeholder="e.g. Imaging Core" />' +
+          '<label>Core leader Western netname</label>' +
+          '<input name="leader_handle" required placeholder="e.g. dlee" />' +
+          '<label>Core leader full name (optional)</label>' +
+          '<input name="leader_full_name" placeholder="e.g. Dr. Diane Lee" />' +
+          '<label>Slack workspace ID (optional)</label>' +
+          '<input name="slack_workspace" placeholder="e.g. T01ABC23DE" />' +
+          '<label>GitHub org (optional)</label>' +
+          '<input name="github_org" placeholder="e.g. imaging-core" />' +
+          '<label>Obsidian vault name (optional)</label>' +
+          '<input name="oracle_vault" placeholder="e.g. wigamig_vault_imaging" />' +
+          '<label>institution (optional)</label>' +
+          '<input name="institution" placeholder="e.g. Western University" />' +
+          '<label>department (optional)</label>' +
+          '<input name="department" />' +
+          '<div class="actions">' +
+            '<span class="form-msg" id="new-core-msg"></span>' +
+            '<button type="button" class="btn ghost" id="new-core-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="new-core-submit">create</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("new-core-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("new-core-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const payload = {};
+        for (const [k, v] of fd.entries()) {
+          const trimmed = String(v).trim();
+          if (trimmed) payload[k] = trimmed;
+        }
+        // Short ID must be lowercase + snake_case; silently normalise so the
+        // user can type "Imaging" and not be told to fix it themselves.
+        if (payload.name) payload.name = payload.name.toLowerCase();
+        await _submitCore(wrap, "new-core", "POST", "/api/registrar/core", payload);
+      });
+    }
+
+    function openEditCoreModal(name, core) {
+      if (!core) return;
+      const v = (k) => escapeHTML(core[k] || "");
+      const wrap = document.createElement("div");
+      wrap.className = "modal-backdrop";
+      wrap.innerHTML =
+        '<form class="modal" id="edit-core-form" autocomplete="off">' +
+          '<h2>Edit core — <code style="font-family:var(--mono); font-size:14px;">' + escapeHTML(name) + '</code></h2>' +
+          '<p class="muted">Empty a field to clear it. Short ID is not editable. Leader handoff re-enforces the one-leader-per-active-group invariant.</p>' +
+          '<label>display name</label>' +
+          '<input name="display_name" value="' + v("display_name") + '" />' +
+          '<label>Core leader Western netname</label>' +
+          '<input name="leader_handle" value="' + escapeHTML((core.leader || "").replace(/^@/, "")) + '" />' +
+          '<label>Core leader full name (only used when handoff lands a new member file)</label>' +
+          '<input name="leader_full_name" placeholder="(optional)" />' +
+          '<label>Slack workspace ID</label>' +
+          '<input name="slack_workspace" value="' + v("slack_workspace") + '" />' +
+          '<label>GitHub org</label>' +
+          '<input name="github_org" value="' + v("github_org") + '" />' +
+          '<label>Obsidian vault name</label>' +
+          '<input name="oracle_vault" value="' + v("oracle_vault") + '" />' +
+          '<div class="actions">' +
+            '<span class="form-msg" id="edit-core-msg"></span>' +
+            '<button type="button" class="btn ghost" id="edit-core-cancel">cancel</button>' +
+            '<button type="submit" class="btn primary" id="edit-core-submit">save</button>' +
+          '</div>' +
+        '</form>';
+      document.body.appendChild(wrap);
+      wrap.addEventListener("click", (e) => { if (e.target === wrap) wrap.remove(); });
+      document.getElementById("edit-core-cancel").addEventListener("click", () => wrap.remove());
+      document.getElementById("edit-core-form").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        const payload = {};
+        for (const [k, val] of fd.entries()) payload[k] = String(val);
+        // Drop fields that didn't change (so the request body uses the
+        // partial-POST semantics the endpoint expects).
+        if (payload.display_name === (core.display_name || "")) delete payload.display_name;
+        if (payload.leader_handle === ((core.leader || "").replace(/^@/, ""))) delete payload.leader_handle;
+        if (!payload.leader_full_name) delete payload.leader_full_name;
+        if (payload.slack_workspace === (core.slack_workspace || "")) delete payload.slack_workspace;
+        if (payload.github_org === (core.github_org || "")) delete payload.github_org;
+        if (payload.oracle_vault === (core.oracle_vault || "")) delete payload.oracle_vault;
+        await _submitCore(wrap, "edit-core", "POST",
+          "/api/registrar/core/" + encodeURIComponent(name) + "/edit", payload);
+      });
+    }
+
+    async function _submitCore(wrap, prefix, method, urlBase, payload) {
+      const msg = document.getElementById(prefix + "-msg");
+      const submitBtn = document.getElementById(prefix + "-submit");
+      msg.textContent = "saving…";
+      msg.className = "form-msg";
+      submitBtn.disabled = true;
+      try {
+        const url = urlBase + (userOverride ? "?user=" + encodeURIComponent(userOverride) : "");
+        const res = await fetch(url, {
+          method: method,
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          let detail = "HTTP " + res.status;
+          try { detail = (await res.json()).detail || detail; } catch (_) {}
+          throw new Error(detail);
+        }
+        msg.textContent = "saved";
+        msg.className = "form-msg ok";
+        setTimeout(() => { wrap.remove(); load(); }, 600);
+      } catch (ex) {
+        msg.textContent = String(ex.message || ex);
+        msg.className = "form-msg error";
+      } finally {
+        submitBtn.disabled = false;
+      }
+    }
+
+    load();
+    </script>
+  </body>
+</html>

@@ -10,7 +10,7 @@ contact_links:
     url: https://github.com/hallettmiket/murmurent/blob/main/TROUBLESHOOTING.md
     about: Check TROUBLESHOOTING.md first. The common install, hook and MCP failures are already written up there.
   - name: Documentation
-    url: https://hallettmiket.github.io/murmurent/
+    url: https://mikehallett.science/murmurent/
     about: The full docs, including the CLI manual, the data-governance rules, and the agent reference.
   - name: Code of conduct concern
     url: https://github.com/hallettmiket/murmurent/blob/main/CODE_OF_CONDUCT.md

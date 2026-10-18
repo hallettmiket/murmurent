@@ -30,8 +30,9 @@ What we detect (all enabled by default):
      (`murmurent repo upgrade`) or remove from murmurent.
   4. **unadopted_clone** — git clone present in a scan dir but not
      yet murmurent-ready (no readiness marker + agent links). It is
-     NOT about projects: readiness is a repo property, and a ready
-     repo may belong to no project at all (see docs/ready_vs_projects.md).
+     NOT about projects: readiness is a repo property. Adopting a repo
+     also puts it in a project (#151); `murmurent project migrate` lists
+     repos that are in none (see docs/ready_vs_projects.md).
      Already surfaced by the Repo Inventory panel; here we just include
      the count so the daily summary gives a full picture of "what's on
      disk vs what murmurent sees".

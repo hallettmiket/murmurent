@@ -319,13 +319,134 @@ def resolve_slack_token(*, allow_file: bool = False) -> str:
     if tok or not allow_file:
         return tok
     try:
-        from pathlib import Path
-        f = Path.home() / ".config" / "murmurent" / "slack-token"
+        # The same file the dashboard reads (slack_notify._TOKEN_FILE), so the
+        # test suite's guard on that setting covers this path too.
+        from ..dashboard import slack_notify as _sn
+        f = _sn._TOKEN_FILE
         if f.is_file():
             return f.read_text(encoding="utf-8").strip()
     except Exception:  # noqa: BLE001
         pass
     return ""
+
+
+# ---------------------------------------------------------------------------
+# Group (lab / core) Slack channel: create, and keep members in sync (#188)
+# ---------------------------------------------------------------------------
+
+def _group_entry(group_name: str, env: dict[str, str] | None = None):
+    from . import registrar as _reg
+    reg = _reg.read_registry(env)
+    return next((g for g in [*reg.labs, *reg.cores] if g.name == group_name), None)
+
+
+def sync_group_slack_channel(
+    group_name: str,
+    *,
+    token: str,
+    env: dict[str, str] | None = None,
+    creator=None,   # (channel_name) -> SlackChannelResult
+    inviter=None,   # (channel_id, handles, member_email_map=...) -> dict
+) -> Probe:
+    """Make sure a lab/core has its Slack channel and that its active members
+    are in it.
+
+    A group that already has a channel on record keeps it: only the members
+    are synced, so a group named under the old scheme (``#<group>``) is not
+    given a second channel. Otherwise a private ``#lab-<group>`` is created;
+    if that name is already taken, the existing channel is reused. The
+    channel id is recorded in the registry.
+
+    ``token`` is passed explicitly so each caller chooses its token policy; an
+    empty token means Slack is not set up and nothing is attempted. Never
+    raises: the result is a probe describing what happened.
+    """
+    from . import registrar as _reg
+    from . import slack_comms as _sc
+    from ..dashboard import slack_notify as _sn
+
+    if not token:
+        return Probe(name="slack-channel", status="warn",
+            detail="Slack is not set up on this machine; no group channel was "
+                   "made. Run this again once the Slack token is in place.")
+    try:
+        entry = _group_entry(group_name, env)
+        if entry is None:
+            return Probe(name="slack-channel", status="warn",
+                detail=f"no lab or core named {group_name!r} in the registry.")
+        channel_id = getattr(entry, "slack_channel_id", None) or ""
+        created = False
+        if not channel_id:
+            name = _sc.channel_name_for(group_name)
+            if not name:
+                return Probe(name="slack-channel", status="warn",
+                    detail=f"cannot make a valid Slack channel name from {group_name!r}.")
+            make = creator or (lambda n: slack_create_channel(n, private=True, token=token))
+            res = make(name)
+            if res.ok and res.channel_id:
+                channel_id, created = res.channel_id, True
+            elif res.error == "name_taken":
+                channel_id = _sn._lookup_channel_id_by_name(name, token=token) or ""
+                if not channel_id:
+                    return Probe(name="slack-channel", status="warn",
+                        detail=f"#{name} already exists but murmurent cannot see it; "
+                               "invite the bot to it, then run this again.")
+            else:
+                return Probe(name="slack-channel", status="warn",
+                    detail=f"#{name} could not be created: {res.detail or res.error}")
+            _reg.set_group_slack_channel(group_name, channel_id, env=env)
+
+        email_map = _reg.group_email_map(group_name, env=env)
+        invite = inviter or (lambda cid, handles, member_email_map:
+            _sn.invite_members_to_channel(cid, handles,
+                member_email_map=member_email_map, token=token))
+        inv = (invite(channel_id, list(email_map.keys()),
+                      member_email_map=email_map) or {}) if email_map else {}
+        n_in = len(inv.get("invited", [])) + len(inv.get("already_in", []))
+        missing = [u.get("handle", "?") if isinstance(u, dict) else str(u)
+                   for u in inv.get("unresolved", [])]
+        detail = (f"{'created' if created else 'using'} channel {channel_id}; "
+                  f"{n_in} member(s) in it")
+        if missing:
+            detail += (f"; not in the Slack workspace yet: {', '.join(missing)} "
+                       "(they are added on the next sync)")
+        return Probe(name="slack-channel", status="warn" if missing else "ok",
+                     detail=detail)
+    except Exception as exc:  # noqa: BLE001
+        return Probe(name="slack-channel", status="warn", detail=f"Slack error: {exc}")
+
+
+def remove_member_from_group_channel(
+    group_name: str,
+    *,
+    handle: str,
+    email: str,
+    token: str,
+    env: dict[str, str] | None = None,
+    kicker=None,   # (channel_id, email) -> (bool, detail)
+) -> Probe:
+    """Remove one member from their group's Slack channel. Never raises.
+
+    Only the channel: the member's roster entry and GitHub access are left to
+    the caller (see :func:`deprovision_member_from_group` for the full removal).
+    """
+    norm = handle.lstrip("@")
+    entry = _group_entry(group_name, env)
+    channel_id = getattr(entry, "slack_channel_id", None) if entry else None
+    if not channel_id:
+        return Probe(name="slack-channel", status="warn",
+            detail=f"{group_name} has no Slack channel on record; nothing to remove them from.")
+    if not (kicker or token):
+        return Probe(name="slack-channel", status="warn",
+            detail="no Slack token; member not removed from the channel.")
+    if not email:
+        return Probe(name="slack-channel", status="warn",
+            detail=f"@{norm} has no email on file, so their Slack account cannot be found to remove.")
+    kick = kicker or (lambda cid, em: _live_slack_kick(cid, em, token))
+    ok, detail = kick(channel_id, email)
+    return Probe(name="slack-channel", status="ok" if ok else "warn",
+        detail=(f"removed @{norm} from the {group_name} channel ({detail})" if ok
+                else f"could not remove @{norm} from the channel: {detail}"))
 
 
 def provision_lab_onboarding(
@@ -367,54 +488,30 @@ def provision_lab_onboarding(
 
     probes: list[Probe] = []
 
-    # 1. Slack channel — a private channel named after the group, with the
-    #    group's members invited. The channel name is the group's own name
-    #    (normalized to Slack rules), e.g. lab_mh -> #lab_mh.
-    if slack_creator is None:
-        # When an explicit (file-aware) token is passed — e.g. from
-        # `join-request approve`, a deliberate mayor action — use it for the
-        # live create so the channel is made even if the token is only in the
-        # ~/.config token file. Unattended paths pass token=None → env-only.
-        if token:
-            def slack_creator(name, ws, _tok=token):
-                res = slack_create_channel(name, workspace_id=ws, private=True, token=_tok)
-                return res.channel_id if res.ok else None
-        else:
-            slack_creator = _live_slack_create_channel
+    # 1. Slack channel: a private #lab-<group> with the group's members
+    #    invited (#188), via the same path as the registrar's create buttons.
+    #    Token policy: an explicit token (e.g. from `join-request approve`, a
+    #    deliberate mayor action, which may read the ~/.config token file), else
+    #    env only, so an unattended run never fires on a stale token file. An
+    #    injected creator (tests) needs no token.
     if centre.slack_workspace:
-        try:
-            from . import registrar as _reg
-            from ..dashboard import slack_notify as _sn
-            channel_name = _sn.normalize_channel_name(lab_name) or lab_name
-            channel_id = slack_creator(channel_name, centre.slack_workspace)
-            if channel_id:
-                _reg.set_group_slack_channel(lab_name, channel_id, env=env)
-                # Invite members. Gated so the token-less test suite never
-                # hits the wire: an injected inviter, an explicit token, or an
-                # env Slack token. (invite_members_to_channel itself reads the
-                # ~/.config token file, so an explicit token unblocks the gate.)
-                invited_n = 0
-                if member_inviter is not None or token or _has_env_slack_token():
-                    inviter = member_inviter or _sn.invite_members_to_channel
-                    email_map = _reg.group_email_map(lab_name, env=env)
-                    inv = inviter(channel_id, list(email_map.keys()),
-                                  member_email_map=email_map) or {}
-                    invited_n = len(inv.get("invited", [])) + len(inv.get("already_in", []))
-                probes.append(Probe(
-                    name="slack-channel", status="ok",
-                    detail=f"#{channel_name} in {centre.slack_workspace} → "
-                           f"{channel_id} (members: {invited_n})",
-                ))
-            else:
-                probes.append(Probe(
-                    name="slack-channel", status="warn",
-                    detail=f"#{channel_name} could not be created (workspace {centre.slack_workspace})",
-                ))
-        except Exception as exc:  # noqa: BLE001
-            probes.append(Probe(
-                name="slack-channel", status="warn",
-                detail=f"slack error: {exc}",
-            ))
+        tok = token or (os.environ.get("MURMURENT_SLACK_TOKEN", "").strip()
+                        or os.environ.get("SLACK_BOT_TOKEN", "").strip())
+        creator = None
+        if slack_creator is not None:
+            # Legacy seam: (channel_name, workspace_id) -> channel_id | None.
+            def creator(name, _make=slack_creator, _ws=centre.slack_workspace):
+                cid = _make(name, _ws)
+                return SlackChannelResult(ok=bool(cid), channel_name=name,
+                                          channel_id=cid or "",
+                                          error="" if cid else "create_failed",
+                                          detail="" if cid else "creator returned no id")
+            tok = tok or "injected"
+        inviter = member_inviter
+        if inviter is None and not (token or _has_env_slack_token()):
+            inviter = lambda cid, handles, member_email_map: {}  # noqa: E731
+        probes.append(sync_group_slack_channel(
+            lab_name, token=tok, env=env, creator=creator, inviter=inviter))
     else:
         probes.append(Probe(
             name="slack-channel", status="warn",
@@ -574,27 +671,11 @@ def deprovision_member_from_group(
         return probes
     norm, email, ghlogin = info["handle"], info["email"], info["github"]
 
-    # 1. Slack — kick from the group's channel (the centre-workspace channel the
-    #    member was invited to; uses the centre bot token, same as the invite).
-    reg = _reg.read_registry(env)
-    entry = next((g for g in [*reg.labs, *reg.cores] if g.name == group_name), None)
-    channel_id = getattr(entry, "slack_channel_id", None) if entry else None
+    # 1. Slack: remove from the group's channel (the centre-workspace channel
+    #    the member was invited to; uses the centre bot token, same as the invite).
     tok = token if token is not None else resolve_slack_token(allow_file=True)
-    if not channel_id:
-        probes.append(Probe(name="slack-channel", status="warn",
-            detail=f"{group_name} has no Slack channel on record — nothing to remove them from."))
-    elif not (kicker or tok):
-        probes.append(Probe(name="slack-channel", status="warn",
-            detail="no Slack token — member not removed from the channel."))
-    elif not email:
-        probes.append(Probe(name="slack-channel", status="warn",
-            detail=f"@{norm} has no email on file — can't resolve their Slack account to remove."))
-    else:
-        kick = kicker or (lambda cid, em: _live_slack_kick(cid, em, tok))
-        ok, detail = kick(channel_id, email)
-        probes.append(Probe(name="slack-channel", status="ok" if ok else "warn",
-            detail=(f"removed @{norm} from #{group_name} ({detail})" if ok
-                    else f"couldn't remove @{norm} from the channel — {detail}")))
+    probes.append(remove_member_from_group_channel(
+        group_name, handle=norm, email=email, token=tok, env=env, kicker=kicker))
 
     # 2. GitHub — remove as a collaborator on the group's repo (PI-owned).
     prof = _reg.read_group_profile(group_name, env=env)

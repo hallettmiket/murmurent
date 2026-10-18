@@ -33,7 +33,9 @@ VAULT_AGENTS_SUBDIR = "agents"
 
 _NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_]*$")
 
-VALID_MODELS = {"fable", "opus", "sonnet", "haiku"}
+#: Claude Code model aliases an agent may name. ``inherit`` uses whatever model
+#: the calling session runs on.
+VALID_MODELS = {"fable", "opus", "sonnet", "haiku", "inherit"}
 
 #: Default headline-first verdict vocabulary for a fresh agent (rules/headline_first.md).
 DEFAULT_VERDICT = "Done / Failed / Partial"

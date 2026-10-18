@@ -243,6 +243,21 @@ def agent_list() -> None:
 
 
 @agent_group.command(
+    "which",
+    help="Show which version of each agent Claude Code will use, and where it "
+         "comes from: the centre, your own copy, the project, or a problem such "
+         "as a broken link.",
+)
+@click.option("--repo", "repo", default=None, metavar="PATH",
+              help="Describe a session started in this repo (its own "
+                   ".claude/agents/ wins). Default: a session outside any repo.")
+def agent_which(repo: str | None) -> None:
+    """Which definition of each agent is in use, and why (#186)."""
+    from .commands import agent_cmd as _agent_cmd
+    _agent_cmd.cmd_which(repo)
+
+
+@agent_group.command(
     "new",
     help="Create your OWN (net-new) personal agent — kept in your vault (backed "
          "up to your GitHub on `murmurent vault sync`) and loaded by Claude Code. "
@@ -437,10 +452,11 @@ def repo_status_cmd(target: str, host_name: str | None) -> None:
 
 @repo_group.command(
     "adopt",
-    help="Make an existing clone murmurent-READY (readiness marker + commons "
-         "agent symlinks + CLAUDE.md stub) — the CLI twin of the Repos "
-         "panel's ↑ adopt button. Creates NO project; attach ready repos to "
-         "a project via `murmurent project new`.",
+    help="Make an existing clone murmurent-READY (readiness marker, commons "
+         "agent symlinks and a CLAUDE.md stub). The same as the dashboard Repos "
+         "panel's ↑ adopt button. Every repository belongs to a project: when "
+         "no project lists this one, a one-repository project is recorded for "
+         "it. An existing project is never changed.",
 )
 @click.argument("path")
 @click.option("--lab", default=None,
@@ -622,6 +638,28 @@ def project_list() -> None:
 @click.argument("name")
 def project_describe(name: str) -> None:
     project_cmd.cmd_describe(name)
+
+
+@project_group.command("status",
+                       help="Show one project: its repositories, its data folders, what it "
+                            "reads without owning, its keep-until date, when it was last "
+                            "used, and whether it is active, quiet or dormant. NAME defaults "
+                            "to the project of the repository you are in.")
+@click.argument("name", required=False)
+def project_status(name: str | None) -> None:
+    raise SystemExit(project_cmd.cmd_status(name))
+
+
+@project_group.command("migrate",
+                       help="List every repository and data folder that no project claims, "
+                            "and propose project records for them (x, x_manuscript and "
+                            "x_seminar become one project x). Writes nothing unless you add "
+                            "--apply and confirm. Never moves, renames or deletes anything.")
+@click.option("--apply", "apply_records", is_flag=True,
+              help="Write the proposed project records, after asking.")
+@click.option("--yes", is_flag=True, help="With --apply, write without asking (for scripts).")
+def project_migrate(apply_records: bool, yes: bool) -> None:
+    raise SystemExit(project_cmd.cmd_migrate(apply=apply_records, yes=yes))
 
 
 @project_group.command("new", help="Create a new project.")
@@ -1564,6 +1602,11 @@ def breach_cmd(project_name: str, description: str) -> None:
     metavar="PORT",
     help="Local port for --tunnel if the default (--port, 8770) is taken.",
 )
+@click.option(
+    "--stop", is_flag=True,
+    help="Stop the dashboard running on this machine (on --port), for example "
+    "one started in the background by the dashboard icon.",
+)
 def dashboard_cmd(
     pi_view: bool,
     snapshot: bool,
@@ -1573,6 +1616,7 @@ def dashboard_cmd(
     port: int,
     tunnel: str,
     tunnel_port: int | None,
+    stop: bool,
 ) -> None:
     dashboard_impl.cmd_dashboard(
         pi_view=pi_view,
@@ -1583,6 +1627,7 @@ def dashboard_cmd(
         port=port,
         tunnel=tunnel,
         tunnel_port=tunnel_port,
+        stop=stop,
     )
 
 
@@ -2657,6 +2702,16 @@ cli.add_command(_group_remove_member)
 cli.add_command(_group_init_toolkit)
 cli.add_command(_join_request_group)
 cli.add_command(_keyring_group)
+
+# Long jobs: `murmurent run` starts one in tmux; `murmurent jobs` reports (#151).
+from .commands.run_cmd import jobs_group as _jobs_group
+from .commands.run_cmd import run_command as _run_command
+cli.add_command(_run_command)
+cli.add_command(_jobs_group)
+
+# Space: suggest what a project could delete, compress or move; record decisions (#151).
+from .commands.space_cmd import space_group as _space_group
+cli.add_command(_space_group)
 
 
 if __name__ == "__main__":  # pragma: no cover

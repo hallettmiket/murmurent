@@ -65,6 +65,7 @@ Stored in `~/.murmurent/machine.yaml`. Each applies to this computer only.
 
 | Command | Effect | Notes |
 |---|---|---|
+| `murmurent agent which [--repo <path>]` | Show which version of each agent Claude Code will use, and where it comes from | One row per agent: **centre version**, **your version** or **your agent** (from your vault), **project version** (committed in the repo), **local file** (this machine only), **broken link**, or **not installed**. `--repo` describes a session started in that repo, whose own `.claude/agents/` wins |
 | `murmurent agent list` | List installed agents in `~/.claude/agents/` | Each shown as **linked** (commons symlink), **forked** (personal copy), or **user-file**; forks also show upstream/local drift status |
 | `murmurent agent fork <name> [--force]` | Replace a commons agent's symlink with an editable personal copy | Preserved across commons upgrades; canonical copy in the vault's `agent_forks/` (rides `murmurent vault sync` to your other machines; legacy `~/.murmurent/agent_forks/` when no vault), hardlinked into `~/.claude/agents/`. `--force` re-snapshots from the current commons |
 | `murmurent agent drift [<name>]` | Merge indicator for forks | Per fork: `UP-TO-DATE` / `LOCAL-ONLY` / `UPSTREAM` / `DIVERGED` / `ORPHANED`, plus a summary of forks needing review |
@@ -127,6 +128,8 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 |---|---|
 | `murmurent project list` | List projects you are a member of |
 | `murmurent project describe <name>` | Charter, MEMBERS, status |
+| `murmurent project status [<name>]` | One project as a whole: its repositories, data folders, what it reads without owning, its keep-until date, when it was last used, and whether it is active, quiet or dormant. With no name, the project of the repository you are in. See [Every repository is in a project](ready_vs_projects.md#every-repository-is-in-a-project) |
+| `murmurent project migrate [--apply] [--yes]` | List every repository and every folder directly under `immutable/` and `append_only/` that no project claims, and propose project records for them (`x`, `x_manuscript` and `x_seminar` become one project `x`). Writes nothing without `--apply`, and asks before writing (`--yes` skips the question). Never moves, renames or deletes anything |
 | `murmurent project new <name> --charter <file> --members <list>` *PI/proposer* | Create a new project |
 | `murmurent project members <name>` | Print MEMBERS |
 | `murmurent project admit <name> <member>` *PI* | Add a member |
@@ -174,7 +177,7 @@ use the same core modules as the panel (`core.repo_inventory`,
 |---|---|
 | `murmurent repo list [--host <name>]` | Every git clone on **this** machine, each with its readiness verdict (`✓ ready` when it has a `.murmurent.yaml` marker, otherwise `• not set up yet`). Issue #94: this machine only, so remote hosts are skipped; view another machine's repos on its own dashboard ([Remote dashboard access](remote_dashboard.md)) |
 | `murmurent repo status <path-or-name> [--host <name>]` | Is this repo murmurent-ready? A path is checked directly (local, or on `--host` over SSH); a bare name is searched on every registered machine. Ready means the `.murmurent.yaml` marker is present; `.claude/agents/` plays no part. `partial` means only a legacy `CHARTER.md` setup (run `repo upgrade`). Also lists agent links that git tracks, with the repair (#150). Exit 0 = ready, 1 = not ready, 2 = not found (scriptable) |
-| `murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]` | Make an existing clone **murmurent-ready**: writes the `.murmurent.yaml` readiness marker. `--agents` pins named agents to this repo as links (rarely needed: every agent works in every folder); those links are listed in the repo's `.gitignore` so they are never committed. Creates NO project, no lab_mgmt registry entry: a project is a set of repos + members, made via the dashboard's **New Project** flow (see [`project_intra.md`](project_intra.md)), which attaches already-ready repos |
+| `murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]` | Make an existing clone **murmurent-ready**: writes the `.murmurent.yaml` readiness marker. `--agents` pins named agents to this repo as links (rarely needed: every agent works in every folder); those links are listed in the repo's `.gitignore` so they are never committed. Every repository belongs to a project, so when no project lists this one, adopt also records a one-repository project for it, with you as lead; an existing project is never changed. Adopting again changes nothing. See [Every repository is in a project](ready_vs_projects.md#every-repository-is-in-a-project) |
 | `murmurent repo upgrade [<path> \| --all] [--add-agents a,b] [--all-agents]` | Bring ready repos up to the current Murmurent release: converts legacy `CHARTER.md` bootstraps to the marker, migrates the marker schema, re-links commons agents, re-stamps `bootstrap_version`. Agent *content* updates never need this: symlinks track the commons clone automatically |
 
 ### Experiments
@@ -291,11 +294,46 @@ The finalisation choreography runs at SEA / experiment / project scope. `<scope>
 
 The full workflow is in [Assembling a choreography](assembling_choreographies.md).
 
+### Long jobs
+
+| Command | Effect |
+|---|---|
+| `murmurent run [options] -- <command>` | Start a long job inside tmux (so a dropped connection does not stop it) at priority `nice 19`, with thread limits set and cores and GPUs chosen from the lab's rules and the server's load. Writes a job card under `~/.murmurent/runs/` and posts one line to the project's Slack channel when the job finishes, fails or stalls (never the command or a file path) |
+| `murmurent run --cores N --gpus N --memory 64G` | Ask for cores, GPUs and memory. Requests above the lab's allowance are capped or refused, and the reply says why |
+| `murmurent run --out <folder> --expect-disk 500G` | Check the output folder's free space, and refuse a job whose stated output would not fit |
+| `murmurent run --input <path> [--input <path> ...]` | Record what the job reads, so the space scan can tell later whether its output could be made again |
+| `murmurent run --at 22:00` / `--when-load-below 150` / `--wait` | Start later: at a time, once the server is quieter, or as soon as there is room |
+| `murmurent run --exception "<reason>" --until <time>` | Go above your allowance after asking in the server channel; recorded on the card |
+| `murmurent run --session <name>` | Put the job in a new window of an existing tmux session |
+| `murmurent run --no-notify` / `--dry-run` | No Slack line / show what would be chosen and start nothing |
+| `murmurent jobs [--all]` | What is running, waiting and recently ended, with estimates |
+| `murmurent jobs show <id or name>` | Everything recorded about one job |
+| `murmurent jobs stop <id or name>` | Stop a job: asked to end cleanly, then by force 30 seconds later |
+| `murmurent jobs restart <id or name> [--wait]` | Run a job again from its card |
+| `murmurent jobs policy` | The lab's rules in force (from `<lab-mgmt>/policy/millwright.yaml`) and where they came from |
+
+The full guide is [Running long jobs](run_launcher.md).
+
+### Space
+
+| Command | Effect |
+|---|---|
+| `murmurent space scan [project] [--no-checksums]` | Look through one project's repositories and data folders and list what could be deleted, compressed, moved or asked about, most pressing first. Reads sizes, dates, owners and names; changes nothing. The table is kept in `~/.murmurent/space/`, readable by you only |
+| `murmurent space show [project] [--category C] [--owner O] [--min-size 10G] [--all]` | The table from the last scan: emergencies, the top three, then every row waiting for a decision |
+| `murmurent space decide <row> keep\|delete\|mothball\|compress\|move\|undo [--note …]` | Record your decision on one row. Nothing is carried out |
+| `murmurent space gaps [project]` | Cases the lab's procedures do not cover, each with an example |
+| `murmurent space scan-lab [--notify]` | (PI, on the server) Scan every project's data folders and the folders no project claims; write the lab report; with `--notify`, send the PI a Slack summary without file names |
+| `murmurent space lab [--host <server>] [--json]` | The lab's last report: emergencies, what to look at first, every project. With `--host`, fetch it from the server over SSH |
+| `murmurent space schedule [--install\|--remove] [--day sun --at 02:00]` | Show, set up or remove the weekly lab scan (a systemd user timer); recorded in the lab records repository |
+
+The full guide is [Tidying a project's space](space_table.md).
+
 ### Dashboard
 
 | Command | Effect |
 |---|---|
 | `murmurent dashboard --hifi` | Open the local dashboard (the FastAPI web UI) in your browser |
+| `murmurent dashboard --stop [--port N]` | Stop the dashboard running on this machine | For one started in the background by the dashboard icon; closing the browser window does not stop it. The top bar's **⏻ stop dashboard** button does the same |
 | `murmurent dashboard --pi` | Open the PI view (rejected if you're not a PI); adds escalated-from-members nags |
 | `murmurent dashboard --snapshot` | Print the latest markdown snapshot from the lab-management repo |
 | `murmurent dashboard --outstanding` | Print only the Outstanding analysis panel (terminal-friendly summary) |

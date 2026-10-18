@@ -11,14 +11,17 @@ Output: :class:`AdoptOutcome` wrapping the readiness probes, or
 
 Terminology (2026-07-15 split): adopting a repo makes it
 **murmurent-ready** — the ``.murmurent.yaml`` marker + the CC bootstrap
-(:mod:`core.repo_ready`). It does NOT create a project. A *project* is
-a named set of repos + members recorded in the lab_mgmt registry
-(``cert_projects/``), created via the New Project flow which attaches
-already-ready repos. Before the split, adopt minted a one-repo project
-(CHARTER.md + registry record + manifest). Readiness now keys on the
+(:mod:`core.repo_ready`). A *project* is a named set of repos + members
+recorded in the lab_mgmt registry (``cert_projects/``). Readiness keys on the
 ``.murmurent.yaml`` marker ONLY (issue #28): a repo that only carries a
 legacy CHARTER.md is NOT ready — `murmurent repo upgrade` (or simply
 re-adopting) stamps the marker, preserving the CHARTER.md.
+
+Every repository belongs to a project (issue #151, step 0). So adopting a
+repository that no project lists also writes a one-repository project record
+for it (:func:`core.project_unit.ensure_repo_project`): no CHARTER.md and no
+installation manifest, only the record. A repository already in a project is
+left as it is, and an existing project is never changed by adopting.
 
 Remote (SSH) adopts write the ``.murmurent.yaml`` marker on the host too
 (the batched script emits a ``marker`` step alongside the CHARTER write),
@@ -36,6 +39,7 @@ from . import hosts as _hosts
 from . import remote as _remote
 from . import repo as _repo
 from . import repo_ready as _rr
+from .preflight import Probe
 from .repo_inventory import is_murmurent_infra_repo
 
 # code → the HTTP status the dashboard endpoint responds with. Kept here
@@ -90,8 +94,10 @@ def adopt_clone(
     ``host == "local"`` validates the path against ``~/repos/`` and
     bootstraps on this filesystem. Any other value must name a
     registered SSH host; the bootstrap runs on the remote over one
-    batched SSH session. No project is created — attach the ready repo
-    to a project separately.
+    batched SSH session. When no project lists the repository, a
+    one-repository project is written for it (issue #151); the outcome's
+    ``project`` probe says which happened. Failing to write that record
+    never fails the adoption.
 
     Raises :class:`AdoptError`; never touches HTTP.
     """
@@ -137,8 +143,25 @@ def adopt_clone(
     except Exception as exc:  # noqa: BLE001
         raise AdoptError(f"bootstrap failed: {exc}", code="internal") from exc
     _raise_if_required_failed(probes)
+    probes.append(_project_probe(clone, lab=lab, host="local"))
     return AdoptOutcome(repo=clone.name, host="local",
                         clone_path=str(clone), probes=probes)
+
+
+def _project_probe(clone: Path, *, lab: str, host: str,
+                   remote_path: str = "") -> Probe:
+    """Put the repository in a project if it is in none (issue #151).
+
+    Never raises: the repository is ready whatever happens here, so a problem
+    with the project records is reported as a warning.
+    """
+    from . import project_unit as _pu
+    try:
+        return _pu.ensure_repo_project(clone, lab=lab, lead=_pu.local_handle(),
+                                       host=host, remote_path=remote_path)
+    except Exception as exc:  # noqa: BLE001
+        return Probe(name="project", status="warn",
+                     detail=f"no project was made ({exc})", required=False)
 
 
 def _refuse_if_infra(clone_path: str) -> None:
@@ -218,6 +241,8 @@ def _adopt_remote(*, clone_path: str, lab: str,
     except Exception as exc:  # noqa: BLE001
         raise AdoptError(f"remote bootstrap failed: {exc}", code="internal") from exc
     _raise_if_required_failed(probes)
+    probes.append(_project_probe(Path(clone_path), lab=resolved_lab, host=host,
+                                 remote_path=clone_path))
     return AdoptOutcome(repo=name, host=host, clone_path=clone_path,
                         probes=probes)
 

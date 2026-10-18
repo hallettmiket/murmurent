@@ -165,11 +165,9 @@ def _pi_of(group: str, env) -> str:
 
 
 def _channel_name(group: str) -> str:
-    try:
-        from ..dashboard import slack_notify as _sn
-        return _sn.normalize_channel_name(group) or group
-    except Exception:  # noqa: BLE001
-        return group
+    """The channel name to tell a newly welcomed PI: ``#lab-<group>`` (#188)."""
+    from . import slack_comms as _sc
+    return _sc.channel_name_for(group) or group
 
 
 __all__ = [

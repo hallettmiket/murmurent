@@ -118,10 +118,10 @@ fi
 
 # ── 3. CLI ───────────────────────────────────────────────────────────────────
 step "3/6 installing the murmurent CLI"
-# Install EDITABLE (-e) from the working clone: a non-editable `uv tool install .`
-# relocates the package into site-packages, where the dashboard's static assets
-# (docs/designer_dashboard/, not shipped in the wheel) can't be found -> the
-# hi-fi dashboard 500s. Pin 3.12 (murmurent needs >=3.12). Dashboard/Slack/MCP
+# Install EDITABLE (-e) from the working clone, so a `git pull` there updates
+# the installed murmurent too. (Since 2026.10.1 the dashboard's pages are also
+# packaged, so a non-editable install has a working dashboard as well.)
+# Pin 3.12 (murmurent needs >=3.12). Dashboard/Slack/MCP
 # deps are hard deps in pyproject, so they come along automatically.
 ( cd "$REPO_DIR" && uv tool install --reinstall --python 3.12 -e . >/dev/null )
 export PATH="$HOME/.local/bin:$PATH"

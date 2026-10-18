@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Purpose: Root-owned snapshot script for the murmurent Tier-2 security
 #          audit. Reads the real NFSv4 ACLs on the lab data tree
-#          ({raw,refined}) via a sudo-only root ACL view, the
+#          (immutable, append_only, modifiable, and the legacy raw and
+#          refined) via a sudo-only root ACL view, the
 #          authoritative sshd policy (`sshd -T`), and a lab-wide
 #          authorized_keys summary. Writes one timestamped directory per
 #          run; never overwrites history.
@@ -11,13 +12,13 @@
 #          REFUSES ARGUMENTS — keeps the sudo grant a single fixed
 #          command with no parameter-injection surface.
 #
-# Configuration (all site-specific values come from the environment so
-# this script is institution-agnostic — set them in the sudoers grant's
-# env_keep list, a wrapper, or /etc/default/murmurent):
+# Configuration (all site-specific values come from /etc/default/murmurent,
+# which scripts/install_security_snapshot.sh writes, so this script is
+# institution-agnostic):
 #   MURMURENT_ACL_ROOT      REQUIRED. The sudo-only root ACL view that
 #                           exposes the real NFSv4 ACLs, e.g. a
 #                           root-restricted NFSv4 re-export of the data
-#                           tree. Must contain raw/ and refined/.
+#                           tree, containing the governed data folders.
 #   MURMURENT_LAB_GROUP     REQUIRED. Unix group that owns the snapshot
 #                           dir; the lab group that may read it.
 #   MURMURENT_SNAPSHOT_BASE Where snapshots are written (LOCAL disk).
@@ -30,15 +31,15 @@
 #
 # Output:  $MURMURENT_SNAPSHOT_BASE/<UTC-date>/
 #            manifest.json       (script version, run timestamp, attempts)
-#            acls_raw.txt        (nfs4_getfacl -R $MURMURENT_ACL_ROOT/raw)
-#            acls_refined.txt    (nfs4_getfacl -R $MURMURENT_ACL_ROOT/refined)
+#            acls_<folder>.txt   (nfs4_getfacl -R $MURMURENT_ACL_ROOT/<folder>,
+#                                 one per governed data folder present)
 #            sshd_runtime.txt    (sshd -T)
 #            ssh_keys.jsonl      (per-member parsed authorized_keys; NO key bodies)
 #            auth_summary.json   (last 30 days auth.log: pubkey/password counts)
 #
 # Output mode: dir 0750 owned by root:$MURMURENT_LAB_GROUP, files 0640 —
 # readable by the lab group, never world-readable. Hard rule: this script
-# is read-only with respect to the {raw,refined} data content. It only
+# is read-only with respect to the governed data content. It only
 # writes into its own snapshot base directory.
 #
 # Versioned: bump SCRIPT_VERSION on any output-schema change so the
@@ -46,10 +47,30 @@
 
 set -euo pipefail
 
-SCRIPT_VERSION="7"   # v7: cores Phase 1c — also walks $V4_ROOT/core/<core>/
-                     # {raw,refined}/ for each core present on the lab
-                     # server. Emits acls_core_<core>_{raw,refined}.txt
-                     # so the consumer can route per-core findings.
+# -- Site settings ------------------------------------------------------------
+# sudo clears the environment, so the settings below cannot come from the
+# caller. Read them from /etc/default/murmurent, written once by
+# scripts/install_security_snapshot.sh. Only a root-owned file that no one
+# else can change is trusted, because this script runs as root.
+SITE_SETTINGS=/etc/default/murmurent
+if [[ -f "$SITE_SETTINGS" ]]; then
+    settings_owner=$(stat -c '%u' "$SITE_SETTINGS")
+    settings_mode=$(stat -c '%a' "$SITE_SETTINGS")
+    if [[ "$settings_owner" != 0 || "${settings_mode: -2:1}" =~ [2367] || "${settings_mode: -1}" =~ [2367] ]]; then
+        echo "lab_sec_dump.sh: refusing $SITE_SETTINGS (must be owned by root and writable only by root)" >&2
+        exit 78
+    fi
+    set -a
+    # shellcheck disable=SC1090
+    . "$SITE_SETTINGS"
+    set +a
+fi
+
+SCRIPT_VERSION="8"   # v8 (#185): walks immutable/, append_only/ and
+                     # modifiable/ as well as the legacy raw/ and refined/,
+                     # for the lab and each core. Files are named
+                     # acls_<folder>.txt and acls_core_<core>_<folder>.txt.
+                     # v7: cores Phase 1c (per-core walks).
 # Owner group on snapshot dir; readers. REQUIRED — no safe generic
 # default (chgrp to the wrong group could leak the snapshot).
 LAB_GROUP="${MURMURENT_LAB_GROUP:?set MURMURENT_LAB_GROUP to the lab unix group that may read the snapshot}"
@@ -61,12 +82,12 @@ LAB_GROUP="${MURMURENT_LAB_GROUP:?set MURMURENT_LAB_GROUP to the lab unix group 
 #  - A local base dir is plain POSIX — root writes freely; chgrp + chmod
 #    0750 give the lab group real read access.
 # The root ACL view is still READ-only for our purposes: nfs4_getfacl
-# needs it to enumerate ACLs on raw/refined for the Tier-2 audit.
+# needs it to enumerate ACLs on the data folders for the Tier-2 audit.
 WRITE_BASE="${MURMURENT_SNAPSHOT_BASE:-/var/lib/murmurent/.snapshot}"
 READ_BASE="$WRITE_BASE"   # same path on local disk — no NFS view to map.
 # The sudo-only root ACL view that exposes the real NFSv4 ACLs (for ACL
 # reads). REQUIRED — site-specific, no safe generic default.
-V4_ROOT="${MURMURENT_ACL_ROOT:?set MURMURENT_ACL_ROOT to the sudo-only root ACL view (must contain raw/ and refined/)}"
+V4_ROOT="${MURMURENT_ACL_ROOT:?set MURMURENT_ACL_ROOT to the sudo-only root ACL view of the data tree}"
 LAB_MEMBERS_DIR="${MURMURENT_DATA_ROOT:-${MURMURENT_LAB_VM_ROOT:-/data/lab_vm}}"   # used for member-handle discovery
 SSHD_CONFIG="/etc/ssh/sshd_config"
 AUTH_LOG="/var/log/auth.log"
@@ -143,90 +164,107 @@ bounded() {
     timeout --kill-after=10s "${secs}s" "$@"
 }
 
-# -- 1. NFSv4 ACLs on raw + refined -----------------------------------------
-# nfs4_getfacl produces a multi-line block per file; -R recurses. On a
-# tree with thousands of files this is the slowest step (seconds-to-minutes).
-acls_raw_file="$OUT_DIR/acls_raw.txt"
-if [[ -d "$V4_ROOT/raw" ]]; then
-    log "nfs4_getfacl -R raw (budget ${TIMEOUT_ACL}s) — may take minutes on large trees"
-    start=$SECONDS
-    if bounded "$TIMEOUT_ACL" nfs4_getfacl -R "$V4_ROOT/raw" > "$acls_raw_file" 2>"$OUT_DIR/acls_raw.stderr"; then
-        chmod 0640 "$acls_raw_file"
-        chgrp "$LAB_GROUP" "$acls_raw_file" 2>/dev/null || true
-        record_attempt "acls_raw" "ok" "$(wc -l < "$acls_raw_file") lines in $((SECONDS-start))s"
+# -- 1. NFSv4 ACLs on the governed data folders ----------------------------
+# The governed folders (rules/data-storage.md). Read-only folders are walked
+# whole; lab-shared folders project by project. Old and new names are both
+# walked during the migration, each only if present (#185).
+READONLY_DIRS=(immutable raw)
+SHARED_DIRS=(append_only refined modifiable)
+
+# Per-project budget for lab-shared folders. User report (v5): a global ``-R``
+# over refined timed out at 600s — it has many large project subdirs and we
+# don't want one giant project to block the rest. Budget is per project.
+TIMEOUT_ACL_PER_PROJECT="${LAB_SEC_DUMP_TIMEOUT_ACL_PER_PROJECT:-300}"  # 5 min default
+
+# dump_acl_whole <src_dir> <attempt_name>: one recursive nfs4_getfacl over a
+# folder into $OUT_DIR/<attempt_name>.txt. Records skip/ok/timeout/fail.
+# nfs4_getfacl produces a multi-line block per file; on a tree with thousands
+# of files this is the slowest step (seconds-to-minutes).
+dump_acl_whole() {
+    local src="$1" name="$2"
+    local out="$OUT_DIR/$name.txt"
+    if [[ ! -d "$src" ]]; then
+        record_attempt "$name" "skip" "$src not present"
+        return 0
+    fi
+    log "nfs4_getfacl -R $src (budget ${TIMEOUT_ACL}s) — may take minutes on large trees"
+    local start=$SECONDS rc
+    if bounded "$TIMEOUT_ACL" nfs4_getfacl -R "$src" > "$out" 2>"$OUT_DIR/$name.stderr"; then
+        chmod 0640 "$out"
+        chgrp "$LAB_GROUP" "$out" 2>/dev/null || true
+        record_attempt "$name" "ok" "$(wc -l < "$out") lines in $((SECONDS-start))s"
     else
         rc=$?
         if [[ $rc -eq 124 || $rc -eq 137 ]]; then
-            record_attempt "acls_raw" "timeout" "exceeded ${TIMEOUT_ACL}s; bump LAB_SEC_DUMP_TIMEOUT_ACL"
-            log "  TIMEOUT — partial output may be in $acls_raw_file"
+            record_attempt "$name" "timeout" "exceeded ${TIMEOUT_ACL}s; bump LAB_SEC_DUMP_TIMEOUT_ACL"
+            log "  TIMEOUT — partial output may be in $out"
         else
-            record_attempt "acls_raw" "fail" "nfs4_getfacl rc=$rc"
+            record_attempt "$name" "fail" "nfs4_getfacl rc=$rc"
         fi
     fi
-else
-    record_attempt "acls_raw" "skip" "$V4_ROOT/raw not present (mount missing?)"
-fi
+}
 
-acls_refined_file="$OUT_DIR/acls_refined.txt"
-: > "$acls_refined_file"
-# Per-project budget for refined. User report (v5): a global ``-R``
-# over refined timed out at 600s — refined has many large project
-# subdirs and we don't want one giant project to block the rest. Walk
-# each top-level subdir separately so each gets its own budget and one
-# slow project only times itself out. Budget is per-project, not global.
-TIMEOUT_ACL_PER_PROJECT="${LAB_SEC_DUMP_TIMEOUT_ACL_PER_PROJECT:-300}"  # 5 min default
-if [[ -d "$V4_ROOT/refined" ]]; then
-    log "nfs4_getfacl -R refined — per-project walk (${TIMEOUT_ACL_PER_PROJECT}s each)"
-    refined_ok=0
-    refined_timeout=0
-    refined_fail=0
-    refined_total_start=$SECONDS
-    # First, dump the refined root ACL itself (cheap, no recursion).
-    nfs4_getfacl "$V4_ROOT/refined" >> "$acls_refined_file" 2>"$OUT_DIR/acls_refined.stderr" || true
-    # Then walk each project subdir under its own timeout.
-    for proj_dir in "$V4_ROOT/refined"/*/; do
+# dump_acl_per_project <src_dir> <attempt_name>: the folder's own ACL, then
+# one recursive walk per top-level project, each under its own budget, so one
+# slow project only times itself out.
+dump_acl_per_project() {
+    local src="$1" name="$2"
+    local out="$OUT_DIR/$name.txt"
+    if [[ ! -d "$src" ]]; then
+        record_attempt "$name" "skip" "$src not present"
+        return 0
+    fi
+    log "nfs4_getfacl -R $src — per-project walk (${TIMEOUT_ACL_PER_PROJECT}s each)"
+    : > "$out"
+    local n_ok=0 n_timeout=0 n_fail=0 total_start=$SECONDS proj_dir proj proj_start rc status
+    nfs4_getfacl "$src" >> "$out" 2>"$OUT_DIR/$name.stderr" || true
+    for proj_dir in "$src"/*/; do
         [[ -d "$proj_dir" ]] || continue
         proj=$(basename "$proj_dir")
-        log "  refined/$proj"
+        log "  $proj"
         proj_start=$SECONDS
         if bounded "$TIMEOUT_ACL_PER_PROJECT" nfs4_getfacl -R "$proj_dir" \
-           >> "$acls_refined_file" 2>>"$OUT_DIR/acls_refined.stderr"; then
-            refined_ok=$((refined_ok + 1))
+           >> "$out" 2>>"$OUT_DIR/$name.stderr"; then
+            n_ok=$((n_ok + 1))
             log "    ok ($((SECONDS-proj_start))s)"
         else
             rc=$?
             if [[ $rc -eq 124 || $rc -eq 137 ]]; then
-                refined_timeout=$((refined_timeout + 1))
+                n_timeout=$((n_timeout + 1))
                 log "    TIMEOUT — partial output kept"
             else
-                refined_fail=$((refined_fail + 1))
+                n_fail=$((n_fail + 1))
                 log "    FAIL rc=$rc"
             fi
         fi
     done
-    chmod 0640 "$acls_refined_file"
-    chgrp "$LAB_GROUP" "$acls_refined_file" 2>/dev/null || true
-    if [[ $refined_timeout -eq 0 && $refined_fail -eq 0 ]]; then
+    chmod 0640 "$out"
+    chgrp "$LAB_GROUP" "$out" 2>/dev/null || true
+    if [[ $n_timeout -eq 0 && $n_fail -eq 0 ]]; then
         status="ok"
-    elif [[ $refined_ok -gt 0 ]]; then
+    elif [[ $n_ok -gt 0 ]]; then
         status="partial"
     else
         status="fail"
     fi
-    record_attempt "acls_refined" "$status" \
-        "$refined_ok ok, $refined_timeout timeout, $refined_fail fail (total $((SECONDS-refined_total_start))s)"
-else
-    record_attempt "acls_refined" "skip" "$V4_ROOT/refined not present"
-fi
+    record_attempt "$name" "$status" \
+        "$n_ok ok, $n_timeout timeout, $n_fail fail (total $((SECONDS-total_start))s)"
+}
+
+for kind in "${READONLY_DIRS[@]}"; do
+    dump_acl_whole "$V4_ROOT/$kind" "acls_$kind"
+done
+for kind in "${SHARED_DIRS[@]}"; do
+    dump_acl_per_project "$V4_ROOT/$kind" "acls_$kind"
+done
 
 # -- 1c. Per-core ACL walks (cores Phase 1c) -------------------------------
-# Each registered core's data tree lives at $V4_ROOT/core/<core>/{raw,refined}/.
+# Each registered core's data tree lives at $V4_ROOT/core/<core>/<folder>/.
 # We walk every core present on the filesystem (no centre-registry
 # lookup required — the directory is authoritative for what's actually
-# on disk on the server). Each core gets its own pair of dump files
-# named acls_core_<core>_raw.txt + acls_core_<core>_refined.txt so the
-# Python consumer can route per-core findings without splitting one
-# giant blob. Same per-project budget applies to refined/ subdirs.
+# on disk on the server). Each folder gets its own dump file named
+# acls_core_<core>_<folder>.txt so the Python consumer can route per-core
+# findings without splitting one giant blob.
 CORE_ROOT="$V4_ROOT/core"
 if [[ -d "$CORE_ROOT" ]]; then
     log "scanning per-core trees under $CORE_ROOT"
@@ -236,64 +274,12 @@ if [[ -d "$CORE_ROOT" ]]; then
         core=$(basename "$core_dir")
         core_count=$((core_count + 1))
         log "  core: $core"
-        # core/<core>/raw — same shape as lab raw: walk recursively
-        cr_file="$OUT_DIR/acls_core_${core}_raw.txt"
-        if [[ -d "$core_dir/raw" ]]; then
-            start=$SECONDS
-            if bounded "$TIMEOUT_ACL" nfs4_getfacl -R "$core_dir/raw" \
-               > "$cr_file" 2>"$OUT_DIR/acls_core_${core}_raw.stderr"; then
-                chmod 0640 "$cr_file"
-                chgrp "$LAB_GROUP" "$cr_file" 2>/dev/null || true
-                record_attempt "acls_core_${core}_raw" "ok" \
-                    "$(wc -l < "$cr_file") lines in $((SECONDS-start))s"
-            else
-                rc=$?
-                if [[ $rc -eq 124 || $rc -eq 137 ]]; then
-                    record_attempt "acls_core_${core}_raw" "timeout" "exceeded ${TIMEOUT_ACL}s"
-                else
-                    record_attempt "acls_core_${core}_raw" "fail" "rc=$rc"
-                fi
-            fi
-        else
-            record_attempt "acls_core_${core}_raw" "skip" "$core_dir/raw not present"
-        fi
-        # core/<core>/refined — same per-project per-project walk.
-        cf_file="$OUT_DIR/acls_core_${core}_refined.txt"
-        : > "$cf_file"
-        if [[ -d "$core_dir/refined" ]]; then
-            cf_ok=0; cf_timeout=0; cf_fail=0
-            cf_start=$SECONDS
-            nfs4_getfacl "$core_dir/refined" >> "$cf_file" \
-                2>"$OUT_DIR/acls_core_${core}_refined.stderr" || true
-            for proj_dir in "$core_dir/refined"/*/; do
-                [[ -d "$proj_dir" ]] || continue
-                proj=$(basename "$proj_dir")
-                if bounded "$TIMEOUT_ACL_PER_PROJECT" nfs4_getfacl -R "$proj_dir" \
-                   >> "$cf_file" 2>>"$OUT_DIR/acls_core_${core}_refined.stderr"; then
-                    cf_ok=$((cf_ok + 1))
-                else
-                    rc=$?
-                    if [[ $rc -eq 124 || $rc -eq 137 ]]; then
-                        cf_timeout=$((cf_timeout + 1))
-                    else
-                        cf_fail=$((cf_fail + 1))
-                    fi
-                fi
-            done
-            chmod 0640 "$cf_file"
-            chgrp "$LAB_GROUP" "$cf_file" 2>/dev/null || true
-            if [[ $cf_timeout -eq 0 && $cf_fail -eq 0 ]]; then
-                cf_status="ok"
-            elif [[ $cf_ok -gt 0 ]]; then
-                cf_status="partial"
-            else
-                cf_status="fail"
-            fi
-            record_attempt "acls_core_${core}_refined" "$cf_status" \
-                "$cf_ok ok, $cf_timeout timeout, $cf_fail fail (total $((SECONDS-cf_start))s)"
-        else
-            record_attempt "acls_core_${core}_refined" "skip" "$core_dir/refined not present"
-        fi
+        for kind in "${READONLY_DIRS[@]}"; do
+            dump_acl_whole "$core_dir$kind" "acls_core_${core}_$kind"
+        done
+        for kind in "${SHARED_DIRS[@]}"; do
+            dump_acl_per_project "$core_dir$kind" "acls_core_${core}_$kind"
+        done
     done
     log "  walked $core_count cores"
 else

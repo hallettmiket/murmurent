@@ -23,6 +23,7 @@ from ..core import repo_paths as _repo_paths_srv
 
 import datetime as _dt
 import os
+import time
 from pathlib import Path
 
 from fastapi import Body, FastAPI, HTTPException, Query
@@ -343,6 +344,9 @@ class LabSettingsBody(BaseModel):
     # don't touch, empty string = clear.
     slack_workspace: str | None = None               # workspace id, e.g. TDUD7D20Y
     slack_invite_url: str | None = None              # shareable join link
+    # The millwright's weekly space audit: "on", "off", or "" to clear the
+    # choice. ``None`` = don't touch.
+    space_audit: str | None = None
     # Storage locations (2026-07-06): notebooks + Obsidian each get a machine +
     # path; ``lab_base`` remains the files umbrella. ``None`` = don't touch,
     # empty string = clear.
@@ -473,8 +477,9 @@ class AdoptCloneBody(BaseModel):
 
     Makes an existing git clone (a ``• clone`` row in the Repo
     Inventory) **murmurent-ready**: readiness marker + commons agent
-    symlinks + CLAUDE.md stub. No project fields — adoption doesn't
-    create a project; the New Project flow attaches ready repos.
+    symlinks + CLAUDE.md stub. No project fields: when no project lists
+    the repository, adoption records a one-repository project named after
+    it (#151), and the New Project flow can still group repositories.
 
     ``host`` defaults to ``"local"``; a registered SSH host name runs
     the bootstrap on the remote over one batched SSH session.
@@ -627,7 +632,38 @@ class SeaActionBody(BaseModel):
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent
-STATIC_DIR = REPO_ROOT / "docs" / "designer_dashboard"
+#: Identifies this server process; reported by /healthz.
+_BOOT_ID = f"{os.getpid()}-{time.time_ns()}"
+def _dashboard_file_dir(dev_path: Path, packaged_name: str) -> Path:
+    """A dashboard file or folder: the copy in a development or release
+    checkout when there is one, else the copy packaged with an installed
+    murmurent (``murmurent/commons/``, from pyproject's force-include). Before
+    2026.10.1 an installed release had neither, and its dashboard showed only
+    "static dir not found"."""
+    if dev_path.exists():
+        return dev_path
+    try:
+        from ..core.commons import packaged_commons_root
+        packaged = packaged_commons_root() / packaged_name
+        if packaged.exists():
+            return packaged
+    except Exception:  # noqa: BLE001
+        pass
+    return dev_path
+
+
+STATIC_DIR = _dashboard_file_dir(REPO_ROOT / "docs" / "designer_dashboard", "dashboard")
+
+
+def _card_health():
+    """This machine's identity card status (core.issuance.CardHealth), or None
+    when it cannot be worked out. Never raises: a broken check must not lock
+    anyone out by itself; the registry checks still apply."""
+    try:
+        from ..core import issuance as _iss
+        return _iss.local_card_health()
+    except Exception:  # noqa: BLE001
+        return None
 
 
 def create_app() -> FastAPI:
@@ -747,18 +783,11 @@ def create_app() -> FastAPI:
         # (when a CRL is available), not tampered. A bad card is refused even when
         # ~/.murmurent/user matches (identity attestation; live authz stays on the
         # registry below). No card / no anchor → falls through untouched.
-        try:
-            from ..core import issuance as _iss
-            _cstatus, _creason = _iss.verify_local_identity()
-        except Exception:
-            _cstatus, _creason = ("no_card", "")
-        if _cstatus == "reject":
-            raise HTTPException(
-                status_code=403,
-                detail=(f"Your murmurent identity card failed verification "
-                        f"({_creason}). It may be expired or revoked — ask your "
-                        "PI/mayor to re-issue it (`murmurent import-card`)."),
-            )
+        _card = _card_health()
+        if _card is not None and _card.status == "reject":
+            # The page shows this text on the sign-in screen, so it must say
+            # what is wrong and how to fix it.
+            raise HTTPException(status_code=403, detail=_card.message)
         # Cross-lab scoping: look up which lab this handle belongs to via the
         # registrar registry and point lab_mgmt_repo_root() at that lab's
         # lab-mgmt repo for the duration of the request. Falls through to
@@ -1216,41 +1245,51 @@ def create_app() -> FastAPI:
                     detail=str(cert_exc), required=False,
                 ).to_dict())
 
-            # Provision the git origin. Phase 4: resolve the project's
-            # ``repo_kind`` (which is now a provider id) against the
-            # lab's git_providers list. Falls back to the legacy
-            # github/local synthesized provider when the id matches
-            # those literals — keeps pre-refactor charters working.
-            from ..core import git_providers as _gpr2
-            local_repo = _repo_paths_srv.find_or_default(req.project)
-            kind_or_id = req.repo_kind or "github"
-            lab_settings = snap_mod._current_lab_settings()
-            provider = _gpr2.find_provider(
-                [_pp._GP.GitProvider(**p.model_dump()) for p in lab_settings.git_providers],
-                kind_or_id,
-            )
-            ctx = _pp.ProvisionContext(
-                project=req.project,
-                local_repo=local_repo,
-                kind=kind_or_id,
-                org=lab_settings.github_org,
-                bare_repo_path=(
-                    Path(req.local_repo_root).expanduser() / f"{req.project}.git"
-                    if kind_or_id == "local" and req.local_repo_root else None
-                ),
-                members=list(req.proposed_members or []),
-                lab_mgmt_root=_lmgmt(),
-                provider=provider,
-                provider_id=kind_or_id,
-            )
-            try:
-                probes.extend(p.to_dict() for p in _pp.provision_project_remote(ctx))
-            except Exception as exc:  # noqa: BLE001
-                _log.warning("remote provisioning failed for %s: %s", req.project, exc)
+            # A project built from EXISTING repos (the dashboard flow) keeps
+            # each repo's own remote. There is no project-named working tree
+            # to push, so provisioning would only report a failure (#185).
+            if req.attach_repos:
                 probes.append(_Probe(
-                    name="remote provisioning", status="fail",
-                    detail=str(exc), required=True,
+                    name="git remote", status="ok",
+                    detail="each repo keeps its existing remote",
+                    required=False,
                 ).to_dict())
+            else:
+                # Provision the git origin. Phase 4: resolve the project's
+                # ``repo_kind`` (which is now a provider id) against the
+                # lab's git_providers list. Falls back to the legacy
+                # github/local synthesized provider when the id matches
+                # those literals — keeps pre-refactor charters working.
+                from ..core import git_providers as _gpr2
+                local_repo = _repo_paths_srv.find_or_default(req.project)
+                kind_or_id = req.repo_kind or "github"
+                lab_settings = snap_mod._current_lab_settings()
+                provider = _gpr2.find_provider(
+                    [_pp._GP.GitProvider(**p.model_dump()) for p in lab_settings.git_providers],
+                    kind_or_id,
+                )
+                ctx = _pp.ProvisionContext(
+                    project=req.project,
+                    local_repo=local_repo,
+                    kind=kind_or_id,
+                    org=lab_settings.github_org,
+                    bare_repo_path=(
+                        Path(req.local_repo_root).expanduser() / f"{req.project}.git"
+                        if kind_or_id == "local" and req.local_repo_root else None
+                    ),
+                    members=list(req.proposed_members or []),
+                    lab_mgmt_root=_lmgmt(),
+                    provider=provider,
+                    provider_id=kind_or_id,
+                )
+                try:
+                    probes.extend(p.to_dict() for p in _pp.provision_project_remote(ctx))
+                except Exception as exc:  # noqa: BLE001
+                    _log.warning("remote provisioning failed for %s: %s", req.project, exc)
+                    probes.append(_Probe(
+                        name="remote provisioning", status="fail",
+                        detail=str(exc), required=True,
+                    ).to_dict())
         response = _request_response(result.request)
         if probes:
             from ..core import preflight as _pf2
@@ -1982,9 +2021,9 @@ def create_app() -> FastAPI:
                 return {
                     "ok": True, "staged": True, "path": str(path),
                     "message": (
-                        "Saved to your profile. Members hold the lab roster "
-                        "read-only, so this doesn't touch it — your PI applies "
-                        "it to the roster on the next sync."
+                        "Saved on this computer. The shared lab roster is "
+                        "changed only by your PI, so other members will not "
+                        "see this yet. Ask your PI to update your roster entry."
                     ),
                     "probes": [],
                 }
@@ -2142,6 +2181,10 @@ def create_app() -> FastAPI:
     ) -> dict:
         """Write lab-wide settings to ``<lab-mgmt>/lab.md`` frontmatter (PI only).
 
+        PI only because only the PI can push to the lab management repo;
+        members hold read-only clones, so anyone else's save would commit
+        locally and then fail to push (the #34 problem).
+
         Preserves the body, ``lab:`` (the short ID), ``created:``,
         ``institution``, ``department``, and any other unknown keys.
         Only the fields explicitly present in the body are updated.
@@ -2196,6 +2239,12 @@ def create_app() -> FastAPI:
             updates["slack_workspace"] = body.slack_workspace or None
         if body.slack_invite_url is not None:
             updates["slack_invite_url"] = body.slack_invite_url or None
+        if body.space_audit is not None:
+            choice = body.space_audit.strip().lower()
+            if choice not in ("on", "off", ""):
+                raise HTTPException(status_code=422, detail="space_audit must be on, off or empty")
+            # Stored quoted as text: an unquoted on/off reads back as a boolean.
+            updates["space_audit"] = choice or None
         if body.git_providers is not None:
             # Validate kinds + ids before persisting. An empty list
             # explicitly clears the providers block (so the resolver
@@ -2413,9 +2462,9 @@ def create_app() -> FastAPI:
 
         Thin HTTP wrapper over :func:`core.adopt.adopt_clone` — the same
         chokepoint ``murmurent repo adopt`` uses. Adoption bootstraps the
-        REPO only (readiness marker + commons agents); it does NOT create
-        a project — attach ready repos to a project via the New Project
-        flow (a project = a set of repos + a set of members). Refusals
+        repo (readiness marker + commons agents) and, since every repository
+        belongs to a project (#151), records a one-repository project when no
+        project lists it; an existing project is never changed. Refusals
         arrive as :class:`core.adopt.AdoptError` and map onto HTTP
         statuses via ``core.adopt.ERROR_HTTP_STATUS``.
         """
@@ -2543,7 +2592,7 @@ def create_app() -> FastAPI:
         """One-click update: ``git pull --ff-only`` the murmurent install, then
         restart the dashboard so the new code takes effect.
 
-        Only touches the murmurent CODE repo (``~/repos/murmurent``) — never
+        Only touches the murmurent CODE repo the dashboard runs from — never
         ~/.murmurent, the roster clone, or the data root (all outside the repo),
         and ``--ff-only`` refuses to overwrite a diverged/dirty tree. The one
         thing at risk is uncommitted local changes to murmurent's own code
@@ -2751,6 +2800,9 @@ def create_app() -> FastAPI:
             "bundle": bundle,
             "import_hint": import_hint,
             "dm": {"sent": dm_ok, "detail": dm_detail},
+            # #188: a new member joins the group's Slack channel.
+            "slack": _invite_to_group_channel(
+                group, handle, str(payload.get("email") or "")),
         }
 
     @app.get("/api/members/audit")
@@ -2959,6 +3011,58 @@ def create_app() -> FastAPI:
                     continue
             tf.extract(member, dest_dir)
 
+    @app.get("/api/space/lab")
+    def space_lab_endpoint(
+        host: str = Query("", description="Registered host the scan runs on; blank = here."),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """The lab's last space report (#151, step 3), for the PI only.
+
+        Fetched from ``host`` over SSH when named, so a PI can read on a laptop
+        the report the weekly scan wrote on the server. The report holds file
+        names, so it is never cached here.
+        """
+        from ..core import membership as _m
+        from ..core import space_lab as _sl
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        if actor.lower() != _m.pi_handle().lower():
+            raise HTTPException(status_code=403, detail="Only the PI can see the lab's space report.")
+        if _sl.audit_setting() == "off":
+            raise HTTPException(status_code=409, detail=_sl.TURNED_OFF)
+        try:
+            report = _sl.fetch_report(host)
+        except _sl.FetchError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+        return {"host": host, "report": report,
+                "lines": _sl.describe(report) if report else []}
+
+    @app.get("/api/space/rows")
+    def space_rows_endpoint(
+        host: str = Query("", description="Registered host the scan runs on; blank = here."),
+        project: str = Query(""), category: str = Query(""), suggestion: str = Query(""),
+        owner: str = Query(""), min_size: int = Query(0), limit: int = Query(200),
+        offset: int = Query(0),
+        user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
+    ) -> dict:
+        """One page of the space table (#151), for the PI only: every file and folder
+        with a suggestion, largest first, fetched from ``host`` over SSH when named.
+        Never cached here."""
+        from ..core import membership as _m
+        from ..core import space_lab as _sl
+        actor = _resolve_actor(user)
+        _require_active(actor)
+        if actor.lower() != _m.pi_handle().lower():
+            raise HTTPException(status_code=403, detail="Only the PI can see the lab's space table.")
+        if _sl.audit_setting() == "off":
+            raise HTTPException(status_code=409, detail=_sl.TURNED_OFF)
+        try:
+            return _sl.fetch_rows(host, project=project or None, category=category or None,
+                                  suggestion=suggestion or None, owner=owner or None,
+                                  min_size=min_size, limit=limit, offset=offset)
+        except _sl.FetchError as exc:
+            raise HTTPException(status_code=502, detail=str(exc))
+
     @app.get("/api/security/findings")
     @_scoped_to_viewer
     def security_findings_endpoint(
@@ -2988,7 +3092,7 @@ def create_app() -> FastAPI:
         # Gate: PI or lab_sudo
         try:
             rec = _m.get(actor)
-            meta = _m.parse_member(rec.path).path  # ensure record exists
+            _m.parse_member(rec.path)  # ensure record exists
         except Exception:
             raise HTTPException(status_code=403, detail="member not found")
         is_pi = actor.lower() == _m.pi_handle().lower()
@@ -2997,7 +3101,7 @@ def create_app() -> FastAPI:
         if not (is_pi or bool(meta_dict.get("lab_sudo"))):
             raise HTTPException(
                 status_code=403,
-                detail="lab_sudo required (ask your PI to grant via the LabSudoPanel)",
+                detail="lab_sudo required (ask your PI to grant it under Security access on the dashboard)",
             )
 
         try:
@@ -3111,7 +3215,7 @@ def create_app() -> FastAPI:
         actionable error instead of a hang.
 
         On success, the snapshot lives at
-        ``<host>:/data/lab_vm/wigamig/.snapshot/<UTC-date>/`` and is
+        ``<host>:/var/lib/murmurent/.snapshot/<UTC-date>/`` and is
         group-readable for the lab. The next call to
         ``GET /api/security/findings`` picks it up automatically (the
         scan path also reads the snapshot when present and merges Tier 2
@@ -3158,10 +3262,10 @@ def create_app() -> FastAPI:
                 "ok": False,
                 "error": "sudoers entry not installed on " + host_name,
                 "remediation": (
-                    "Ask your sysadmin to install "
-                    "/etc/sudoers.d/murmurent_sec_dump from the template at "
-                    "scripts/sudoers.d/murmurent_sec_dump in this repo. "
-                    "See docs/security-dashboard.md#tier-2-setup."
+                    "The security snapshot is not installed on this server "
+                    "(or was installed under the old name, wigamig). On the "
+                    "server, from a murmurent folder, run: "
+                    "sudo bash scripts/install_security_snapshot.sh"
                 ),
                 "stderr": res.stderr.strip()[:500],
             }
@@ -3404,11 +3508,21 @@ def create_app() -> FastAPI:
         except OSError:
             pass
         report = getattr(_m, "last_report_path", None)
+        # #188: a deactivated member leaves the lab's Slack channel; a
+        # reactivated one is added back.
+        try:
+            from ..core.lab import load_lab_config
+            lab = load_lab_config().lab or ""
+        except Exception:  # noqa: BLE001
+            lab = ""
+        slack = (_invite_to_group_channel(lab, rec.handle) if action == "activate"
+                 else _remove_from_group_channel(lab, rec.handle))
         return {
             "ok": True,
             "handle": rec.handle,
             "status": rec.status,
             "report": str(report) if report else None,
+            "slack": slack,
         }
 
     # -----------------------------------------------------------------
@@ -5961,6 +6075,17 @@ def create_app() -> FastAPI:
         _notify.core_service_archived(core=core, slug=slug, actor=actor)
         return {"ok": True, "core": core, "slug": slug, "status": "retired"}
 
+    def _card_notice() -> dict | None:
+        """What the sign-in page should say about this machine's card, if anything."""
+        card = _card_health()
+        if card is None:
+            return None
+        if card.status == "reject":
+            return {"kind": "error", "text": card.message}
+        if card.warning:
+            return {"kind": "warning", "text": card.warning}
+        return None
+
     @app.get("/api/login/resolve")
     def get_login_resolve(
         user: str = Query("", description="Western netname to resolve roles for"),
@@ -5971,7 +6096,9 @@ def create_app() -> FastAPI:
         if not handle:
             identity = resolve_identity(allow_unknown=True)
             handle = identity.handle if identity.source != "unknown" else ""
-        return _resolve_roles(handle)
+        out = dict(_resolve_roles(handle))
+        out["card_notice"] = _card_notice()
+        return out
 
     @app.get("/api/lab/public")
     def get_lab_public() -> dict:
@@ -6013,6 +6140,15 @@ def create_app() -> FastAPI:
         # Members are not gated server-side (unknown handles still get
         # the member lens — they just won't see any projects). PI and
         # registrar both require an authoritative match.
+        card = _card_health()
+        if card is not None and card.status == "reject":
+            # Refuse here, with the reason, rather than let the dashboard's own
+            # data request refuse a moment later and bounce back to this page.
+            role_audit.record(
+                handle=handle, role=role, source=client_host,
+                allowed=False, reason=f"card_{card.reason or 'invalid'}",
+            )
+            raise HTTPException(status_code=403, detail=card.message)
         if not allowed:
             role_audit.record(
                 handle=handle, role=role, source=client_host,
@@ -6385,25 +6521,23 @@ def create_app() -> FastAPI:
         action: str,
         model: str | None = Query(
             None,
-            description="When action='set_model', the new model shorthand (fable|opus|sonnet|haiku).",
+            description="When action='set_model', the new model alias (fable|opus|sonnet|haiku|inherit).",
         ),
     ) -> dict:
-        """Manage a personal agent's frontmatter.
+        """Change an agent's ``disabled`` flag or model for THIS member.
 
         Actions:
           - ``enable`` / ``disable`` — flip the ``disabled:`` flag
-          - ``set_model`` — pick a model shorthand (``fable|opus|sonnet|haiku``)
+          - ``set_model`` — pick a model alias
 
-        Frozen agents (centre-controlled) cannot be modified here; they
-        require a PR against the agents/ registry.
+        A commons agent is forked into the member's vault first, exactly as the
+        Modify wizard does, so the shared file other members link to is never
+        written (#185: two members were overwriting each other's agents).
+        Frozen and guardian agents are refused.
         """
-        from ..core import agents as agents_core
-        from ..core.repo import murmurent_repo_root
+        from ..core import agent_edit as _ae
+        from ..core.personal_agents import VALID_MODELS
 
-        # ``fable`` (claude-fable-5) is the most-capable tier; offered so a
-        # member can put a personal agent (or the Oracle) on it. Kept in sync
-        # with the model dropdown in docs/designer_dashboard/hifi-app.jsx.
-        VALID_MODELS = {"fable", "opus", "sonnet", "haiku"}
         if action not in {"enable", "disable", "set_model"}:
             raise HTTPException(status_code=422, detail=f"unknown action: {action}")
         if action == "set_model" and (not model or model not in VALID_MODELS):
@@ -6411,42 +6545,16 @@ def create_app() -> FastAPI:
                 status_code=422,
                 detail=f"set_model needs ?model={'|'.join(sorted(VALID_MODELS))}",
             )
-
-        from ..core.commons import commons_root as _commons_root
-        registry_dir = _commons_root() / "agents"
-        try:
-            registry = agents_core.load_registry(registry_dir)
-        except Exception as exc:
-            raise HTTPException(status_code=500, detail=str(exc))
-
-        match = next((a for a in registry if a.name == name), None)
-        if match is None:
+        if not _ae.editability(name)["exists"]:
             raise HTTPException(status_code=404, detail=f"agent not found: {name}")
-        if match.freeze == "frozen":
-            raise HTTPException(
-                status_code=403,
-                detail=(
-                    f"agent {name!r} is frozen (centre-controlled). "
-                    f"Modify via PR against agents/{name}.md."
-                ),
-            )
-
-        path = match.path
-        if path is None:
-            raise HTTPException(status_code=500, detail="agent path missing")
-        from ..core.frontmatter import dump_document, parse_file
-        parsed = parse_file(path)
-        if action in {"enable", "disable"}:
-            parsed.meta["disabled"] = action == "disable"
-        elif action == "set_model":
-            parsed.meta["model"] = model
-        path.write_text(dump_document(parsed.meta, parsed.body), encoding="utf-8")
-        return {
-            "ok": True,
-            "name": name,
-            "disabled": bool(parsed.meta.get("disabled", False)),
-            "model": parsed.meta.get("model"),
-        }
+        try:
+            if action == "set_model":
+                return _ae.set_agent_fields(name, model=model)
+            return _ae.set_agent_fields(name, disabled=(action == "disable"))
+        except _ae.AgentNotEditableError as exc:
+            raise HTTPException(status_code=403, detail=str(exc))
+        except _ae.AgentEditError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
 
     @app.post("/api/agents/new")
     def new_personal_agent_endpoint(body: NewPersonalAgentBody) -> dict:
@@ -6687,6 +6795,56 @@ def create_app() -> FastAPI:
             )
         return _reg_snap.build_registrar_response(actor)
 
+    def _group_slack_token() -> str:
+        """The centre bot token for group channels: env, then the dashboard's
+        token file. Registrar and PI actions are deliberate, so the file is
+        allowed (as in `join-request approve`)."""
+        from ..core import centre_provision as _cp
+        return _cp.resolve_slack_token(allow_file=True)
+
+    def _group_slack_sync(group: str) -> dict:
+        """Create the group's #lab-<group> channel if needed and sync its
+        members (#188). Never fails the request: the result is reported."""
+        from ..core import centre_provision as _cp
+        return _cp.sync_group_slack_channel(group, token=_group_slack_token()).to_dict()
+
+    def _group_has_channel(group: str) -> bool:
+        from ..core import centre_provision as _cp
+        try:
+            entry = _cp._group_entry(group)
+        except Exception:  # noqa: BLE001
+            return False
+        return bool(entry is not None and getattr(entry, "slack_channel_id", None))
+
+    def _invite_to_group_channel(group: str, handle: str, email: str = "") -> dict | None:
+        """Add one member to their group's channel. ``None`` when this machine
+        does not know the group's channel (e.g. a PI's laptop without the
+        centre registry), so nothing is reported."""
+        from ..core import centre_provision as _cp
+        if not group or not _group_has_channel(group):
+            return None
+        try:
+            probes = _cp.provision_member_to_group(
+                group, handle=handle, email=email, token=_group_slack_token())
+            return probes[0].to_dict() if probes else None
+        except Exception as exc:  # noqa: BLE001
+            return {"name": "member-channel", "status": "warn", "detail": str(exc)}
+
+    def _remove_from_group_channel(group: str, handle: str) -> dict | None:
+        """Remove one member from their group's channel; ``None`` when this
+        machine does not know the group's channel."""
+        from ..core import centre_provision as _cp
+        from ..core import registrar as _reg
+        if not group or not _group_has_channel(group):
+            return None
+        try:
+            info = _reg.read_group_member(group, handle) or {}
+            return _cp.remove_member_from_group_channel(
+                group, handle=handle, email=info.get("email", ""),
+                token=_group_slack_token()).to_dict()
+        except Exception as exc:  # noqa: BLE001
+            return {"name": "slack-channel", "status": "warn", "detail": str(exc)}
+
     @app.post("/api/registrar/lab")
     def registrar_create_lab(
         body: RegistrarLabCreateBody,
@@ -6732,6 +6890,7 @@ def create_app() -> FastAPI:
                 "lab_mgmt_path": entry.lab_mgmt_path,
                 "created": entry.created,
             },
+            "slack": _group_slack_sync(entry.name),
         }
 
     def _require_registrar(user: str) -> str:
@@ -6823,7 +6982,8 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc))
         except _reg.RegistrarError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-        return {"ok": True, "core": _core_entry_to_dict(entry)}
+        return {"ok": True, "core": _core_entry_to_dict(entry),
+                "slack": _group_slack_sync(entry.name)}
 
     @app.post("/api/registrar/core/{name}/archive")
     def registrar_archive_core(
@@ -6907,8 +7067,9 @@ def create_app() -> FastAPI:
         body: dict,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
-        """Add a staff member to a core. Body: {handle, full_name, role}.
-        ``role`` defaults to 'staff'. Registrar-only."""
+        """Add a staff member to a core. Body: {handle, full_name, role, email}.
+        ``role`` defaults to 'staff'. ``email`` (optional) finds their Slack
+        account so they can be added to the core's channel. Registrar-only."""
         from ..core import registrar as _reg
         from ..core.membership import MembershipError
         from . import slack_notify as _notify
@@ -6918,10 +7079,11 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=422, detail="handle required")
         full_name = body.get("full_name") or None
         role = str(body.get("role") or "staff").strip() or "staff"
+        email = str(body.get("email") or "").strip()
         try:
             path = _reg.add_core_member(
                 core_name=name, handle=handle,
-                full_name=full_name, role=role,
+                full_name=full_name, role=role, email=email,
             )
         except _reg.LabNotFound as exc:
             raise HTTPException(status_code=404, detail=str(exc))
@@ -6933,7 +7095,8 @@ def create_app() -> FastAPI:
             role=role,
         )
         return {"ok": True, "core": name, "handle": handle.lstrip("@"),
-                "path": str(path)}
+                "path": str(path),
+                "slack": _invite_to_group_channel(name, handle, email)}
 
     @app.post("/api/registrar/core/{name}/members/{handle}/remove")
     def registrar_remove_core_member(
@@ -6951,10 +7114,12 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail=str(exc))
         except _reg.PIAlreadyLeadsAnother as exc:
             raise HTTPException(status_code=409, detail=str(exc))
+        slack = None
         if changed:
             _notify.core_member_removed(core=name, handle=handle.lstrip("@"))
+            slack = _remove_from_group_channel(name, handle)
         return {"ok": True, "core": name, "handle": handle.lstrip("@"),
-                "changed": changed}
+                "changed": changed, "slack": slack}
 
     @app.post("/api/registrar/core/{name}/leader")
     def registrar_rotate_core_leader(
@@ -7963,9 +8128,46 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail=str(exc))
         return {"ok": True, "profile": _centre_profile_to_dict(profile)}
 
+    @app.post("/api/dashboard/stop")
+    def dashboard_stop(request: Request) -> dict:
+        """Stop this dashboard (the top bar's stop button). Closing the browser
+        window does not stop it, and when the dashboard icon starts it there
+        is no terminal to press Ctrl+C in.
+
+        Refused when the system runs the dashboard as a service (systemd sets
+        ``INVOCATION_ID``): the service would start it again at once. Only a
+        browser on this machine may stop it (a tunnel counts as this machine).
+        """
+        if os.environ.get("INVOCATION_ID"):
+            raise HTTPException(status_code=409, detail=(
+                "This dashboard is run by the server's system service, which "
+                "starts it again. Ask whoever manages the server to stop it."))
+        client = (request.client.host if request.client else "") or ""
+        if client not in ("127.0.0.1", "::1", "localhost", "testclient"):
+            raise HTTPException(status_code=403, detail=(
+                "Only a browser on the machine running the dashboard can stop it."))
+        import signal
+        import threading
+        # Remove this process's pid file now: uvicorn ends the process by
+        # re-raising the signal after shutdown, so the launcher's own clean-up
+        # does not run on this path.
+        try:
+            from ..core.project_unit import murmurent_home
+            for f in murmurent_home().glob("dashboard_*.pid"):
+                if f.read_text(encoding="utf-8").strip() == str(os.getpid()):
+                    f.unlink(missing_ok=True)
+        except OSError:
+            pass
+        # After the response is sent: the normal "please stop" signal, so the
+        # server shuts down cleanly.
+        threading.Timer(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM)).start()
+        return {"ok": True, "detail": "The dashboard is stopping."}
+
     @app.get("/healthz")
     def healthz() -> dict[str, str]:
-        return {"status": "ok"}
+        # ``boot`` changes on every process start, so the update banner can
+        # tell the restarted server from the old one still answering (#185).
+        return {"status": "ok", "boot": _BOOT_ID}
 
     @app.get("/api/environment/local_user")
     def environment_local_user() -> dict[str, str]:
@@ -8146,6 +8348,15 @@ def create_app() -> FastAPI:
             """
             return _html_page("core.html")
 
+        @app.get("/space", response_class=HTMLResponse)
+        def space_index() -> HTMLResponse:
+            """The lab's space report (#151, step 3): PI only, fetched from the
+            machine the weekly scan runs on."""
+            return HTMLResponse(
+                (STATIC_DIR / "space.html").read_text(encoding="utf-8"),
+                headers=_NO_CACHE,
+            )
+
         @app.get("/security", response_class=HTMLResponse)
         def security_index() -> HTMLResponse:
             """Per-lab security dashboard. Gated by ``lab_sudo`` (set by
@@ -8168,7 +8379,9 @@ def create_app() -> FastAPI:
         # dashboard header widget (``<iframe src="/murmuration?logo">``) and for
         # any VSCode / browser window that wants it. ``?logo`` renders it chrome-
         # free (no intro veil / HUD / audio).
-        _MURMURATION = REPO_ROOT / "assets" / "murmurent_uniform_wordmark.html"
+        _MURMURATION = _dashboard_file_dir(
+            REPO_ROOT / "assets" / "murmurent_uniform_wordmark.html",
+            "assets/murmurent_uniform_wordmark.html")
 
         @app.get("/murmuration")
         def murmuration():

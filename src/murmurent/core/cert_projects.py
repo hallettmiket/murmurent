@@ -240,6 +240,18 @@ class CertProject:
     # Full repo set (code + manuscript + …). Authoritative; code_repo mirrors the
     # code repo within it.
     repos: tuple[RepoRef, ...] = ()
+    # The project as the unit (issue #151, step 0). See core.project_unit.
+    # ``data_folders``: the folders this project owns, in full or relative to the
+    # data root. Empty means the default, immutable/<project>/ and
+    # append_only/<project>/; ``project_unit.effective_data_folders`` resolves it.
+    data_folders: tuple[str, ...] = ()
+    # ``reads_from``: folders (written as paths) and repositories (bare names)
+    # this project reads but does not own. Never offered to it for clean-up.
+    reads_from: tuple[str, ...] = ()
+    # ``retain_until``: an ISO date (YYYY-MM-DD). Before it, nothing in the
+    # project may be suggested for deletion (an ethics approval, a data-sharing
+    # agreement or a funder may require this).
+    retain_until: str = ""
 
     def to_dict(self) -> dict:
         return {"name": self.name, "lab": self.lab, "status": self.status,
@@ -260,7 +272,10 @@ class CertProject:
                 "decommissioned_by": self.decommissioned_by,
                 "members": list(self.members),
                 "certs": [dict(c) for c in self.certs],
-                "repos": [r.to_dict() for r in self.repos]}
+                "repos": [r.to_dict() for r in self.repos],
+                "data_folders": list(self.data_folders),
+                "reads_from": list(self.reads_from),
+                "retain_until": self.retain_until}
 
 
 class CertProjectError(RuntimeError):
@@ -281,7 +296,8 @@ def validate_project(cp: "CertProject", *, context: str = "") -> None:
     - ``sensitivity`` must be one of :data:`VALID_SENSITIVITY_TIERS`;
     - a ``clinical`` project must carry ``reb_number`` + ``reb_expires`` +
       ``data_residency`` (:data:`CLINICAL_EXTRA_FIELDS`);
-    - an explicit ``choreography`` must be in :data:`VALID_CHOREOGRAPHIES`.
+    - an explicit ``choreography`` must be in :data:`VALID_CHOREOGRAPHIES`;
+    - a ``retain_until`` must be a date written ``YYYY-MM-DD``.
 
     Called explicitly by governance-raising callers (``cmd_sensitivity``,
     ``cmd_new``, the migration round-trip). Not called on every ``upsert`` so a
@@ -302,6 +318,37 @@ def validate_project(cp: "CertProject", *, context: str = "") -> None:
         raise CertProjectValidationError(
             f"cert-project choreography{suffix} {cp.choreography!r} is not in "
             f"the known catalog {VALID_CHOREOGRAPHIES!r}")
+    if str(cp.retain_until or "").strip() and not _is_iso_date(cp.retain_until):
+        raise CertProjectValidationError(
+            f"cert-project retain_until{suffix} must be a date written YYYY-MM-DD; "
+            f"got {cp.retain_until!r}")
+
+
+def _is_iso_date(value: str) -> bool:
+    try:
+        _dt.date.fromisoformat(str(value).strip())
+    except ValueError:
+        return False
+    return True
+
+
+def _str_list(value: object) -> tuple[str, ...]:
+    """A list of strings from a record field. One string alone counts as a list
+    of one, so a hand-edited ``data_folders: append_only/x`` still reads."""
+    if value is None:
+        return ()
+    if isinstance(value, str):
+        items: list = [value]
+    elif isinstance(value, (list, tuple)):
+        items = list(value)
+    else:
+        items = []
+    out: list[str] = []
+    for item in items:
+        text = str(item).strip()
+        if text and text not in out:
+            out.append(text)
+    return tuple(out)
 
 
 def registry_dir(env: dict | None = None) -> Path:
@@ -372,6 +419,10 @@ def _parse(path: Path) -> CertProject:
         members=members,
         certs=certs,
         repos=repos,
+        data_folders=_str_list(meta.get("data_folders")),
+        reads_from=_str_list(meta.get("reads_from")),
+        # A hand-written unquoted date reads as a YAML date; str() gives it back.
+        retain_until=str(meta.get("retain_until") or "").strip(),
     )
 
 
@@ -440,6 +491,14 @@ def _render(p: CertProject) -> str:
     # synthesizes a code RepoRef from them, and cp.code_repo is derived on read.
     if p.repos:
         meta["repos"] = [_shared_repo_dict(r) for r in p.repos]
+    # Issue #151 fields, written only when set, so a record that never used
+    # them is rewritten exactly as before.
+    if p.data_folders:
+        meta["data_folders"] = list(p.data_folders)
+    if p.reads_from:
+        meta["reads_from"] = list(p.reads_from)
+    if p.retain_until:
+        meta["retain_until"] = p.retain_until
     meta["members"] = list(p.members)
     meta["certs"] = [dict(c) for c in p.certs]
     front = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).strip()
@@ -492,6 +551,9 @@ def upsert(name: str, *, lab: str, member: str | None = None,
            data_residency: str | None = None,
            decommissioned_at: str | None = None,
            decommissioned_by: str | None = None,
+           data_folders: list[str] | tuple[str, ...] | None = None,
+           reads_from: list[str] | tuple[str, ...] | None = None,
+           retain_until: str | None = None,
            today: str | None = None, env: dict | None = None) -> CertProject:
     """Create or update a cert project. Optionally add a certified ``member``
     (with their ``cert`` = {handle, fingerprint, card_id}) and/or set project
@@ -499,6 +561,10 @@ def upsert(name: str, *, lab: str, member: str | None = None,
     metadata-free membership upsert (from ``issue_project_card``) never clobbers a
     project's sensitivity/lead/etc. Idempotent: a member already present is
     de-duplicated and their cert entry replaced.
+
+    ``data_folders`` and ``reads_from`` (lists of strings) replace the whole
+    list when given; an empty list clears it. ``retain_until=""`` clears the
+    keep-until date.
 
     ``repos`` (a list of ``RepoRef`` or dicts) replaces the whole repo set; the
     primary (code) repo is mirrored back into code_repo/host/remote_path. When
@@ -556,7 +622,13 @@ def upsert(name: str, *, lab: str, member: str | None = None,
         data_residency=_keep(data_residency, cur.data_residency),
         decommissioned_at=_keep(decommissioned_at, cur.decommissioned_at),
         decommissioned_by=_keep(decommissioned_by, cur.decommissioned_by),
-        members=tuple(members), certs=tuple(certs), repos=new_repos)
+        members=tuple(members), certs=tuple(certs), repos=new_repos,
+        data_folders=(cur.data_folders if data_folders is None
+                      else _str_list(data_folders)),
+        reads_from=(cur.reads_from if reads_from is None
+                    else _str_list(reads_from)),
+        retain_until=(cur.retain_until if retain_until is None
+                      else str(retain_until).strip()))
     _write(updated, env)
     return updated
 
@@ -597,7 +669,59 @@ def add_repo(name: str, *, role: str = "code", repo_name: str = "",
                   path=path, remote_path=remote_path, remote_url=remote_url,
                   overleaf=bool(overleaf))
     kept = [r for r in cur.repos if r.name != rname]
-    return upsert(name, lab=cur.lab, repos=[*kept, ref], env=env)
+    updated = upsert(name, lab=cur.lab, repos=[*kept, ref], env=env)
+    _retire_placeholders(rname, name, env)
+    return updated
+
+
+def owning_project(repo_name: str, *, projects: list[CertProject] | None = None,
+                   env: dict | None = None) -> CertProject | None:
+    """The project that owns repository ``repo_name``: the one whose record lists it.
+
+    Each repository has one owning project (issue #151). Should two records
+    list it, an active project wins over an archived one. Names are compared
+    without regard to case, as GitHub compares them.
+    """
+    want = str(repo_name or "").strip().casefold()
+    if not want:
+        return None
+    pool = projects if projects is not None else iter_projects(env)
+    matches = [p for p in pool
+               if any((r.name or "").strip().casefold() == want for r in p.repos)]
+    return next((p for p in matches if p.status == "active"), matches[0] if matches else None)
+
+
+def is_placeholder_for(cp: CertProject, repo_name: str) -> bool:
+    """True for the one-repository project ``repo adopt`` makes for a repository.
+
+    That is an active project named after its only repository, never given a
+    Slack channel, a GitHub repository or a project card.
+    """
+    want = str(repo_name or "").strip().casefold()
+    return (cp.status == "active" and len(cp.repos) == 1
+            and cp.name.casefold() == want
+            and (cp.repos[0].name or "").casefold() == want
+            and not cp.certs and not cp.slack_channel_id and not cp.github_repo)
+
+
+def _retire_placeholders(repo_name: str, new_owner: str, env: dict | None) -> None:
+    """After ``repo_name`` joins project ``new_owner``, archive the one-repository
+    project adopt made for it, so the repository has one owning project.
+
+    Archiving keeps the record and its history; nothing is deleted. A project
+    that is more than a placeholder (see :func:`is_placeholder_for`) is never
+    touched. Best-effort: a failure here leaves both records as they were.
+    """
+    try:
+        for other in iter_projects(env):
+            if other.name.casefold() == str(new_owner).casefold():
+                continue
+            if is_placeholder_for(other, repo_name):
+                set_status(other.name, "archived", env=env)
+    except Exception as exc:  # noqa: BLE001
+        import logging
+        logging.getLogger(__name__).warning(
+            "could not archive the placeholder project for %s: %s", repo_name, exc)
 
 
 def remove_repo(name: str, repo_name: str, *, env: dict | None = None) -> CertProject:
@@ -858,13 +982,22 @@ def migrate_charters(*, delete: bool = True, env: dict | None = None,
 
 
 def project_name_for_cwd(start=None, env: dict | None = None) -> str | None:
-    """Resolve the project name for the repo containing ``start`` (default cwd) —
-    from its CHARTER.md ``project`` field, else the repo dir name. None if not
-    inside a project repo."""
+    """Resolve the project name for the repo containing ``start`` (default cwd).
+
+    In order: the project whose record lists this repository (so a
+    ``x_manuscript`` repository answers ``x``, issue #151), then its CHARTER.md
+    ``project`` field, then the repository's folder name. None if not inside a
+    project repo."""
     from . import repo as _repo
     pr = _repo.find_project_repo(start)
     if pr is None:
         return None
+    try:
+        owner = owning_project(pr.path.name, env=env)
+        if owner is not None:
+            return owner.name
+    except Exception:  # noqa: BLE001 - the registry is a better answer, not a required one
+        pass
     try:
         from .frontmatter import parse_file as _pf
         name = (_pf(pr.charter_path).meta or {}).get("project")
@@ -900,6 +1033,6 @@ __all__ = ["CertProject", "RepoRef", "VALID_REPO_ROLES", "CertProjectError",
            "REGISTRY_DIR", "registry_dir", "project_path", "get", "iter_projects",
            "projects_for_member", "upsert", "remove_member", "add_repo", "remove_repo",
            "add_mirror", "remove_mirror", "list_mirrors",
-           "set_status",
+           "set_status", "owning_project", "is_placeholder_for",
            "register_from_summary", "backfill_from_charter", "migrate_charters",
            "slack_channel_for", "project_name_for_cwd"]

@@ -1,0 +1,108 @@
+# The lab's rules for long jobs, read by `murmurent run` and the millwright.
+#
+# Copy this file into your lab's management repository as
+#     policy/millwright.yaml
+# and change the numbers to suit your server. Every line is optional: a setting
+# you leave out keeps murmurent's built-in default, which is deliberately
+# modest. `murmurent jobs policy` prints the rules in force and the files they
+# came from, and names any value it could not use.
+#
+# The numbers below are one lab's choices for a large shared server, agreed by
+# its PI on 2026-10-16 (issue #151). They are an example, not a recommendation.
+
+# Every job runs at this priority. 19 is the lowest, so other people's
+# interactive work always goes first.
+priority: 19
+
+# The most cores one person's jobs may use at once, across all of them.
+max_cores_per_person: 100
+
+# Cores a job gets when it does not ask with --cores.
+default_cores: 1
+
+# New work is held once the server's load passes this share of its cores.
+# The load is the number of processes running or waiting for a core, averaged
+# over one minute. 0.8 leaves room for people working interactively.
+hold_new_work_at_load_fraction: 0.8
+
+# A job does not start if it would leave less than this share of memory free.
+# Below about a fifth, the system starts moving memory to disk and every
+# user's jobs slow sharply.
+min_free_memory_fraction: 0.20
+
+# The share of total memory one person may claim with --memory without asking.
+memory_per_person_fraction: 0.25
+
+# When the daytime GPU allowance applies.
+working_hours:
+  days: [mon, tue, wed, thu, fri]
+  start: "08:00"
+  end: "18:00"
+
+# GPUs one person may hold. "all" means every GPU that is idle when the job
+# starts, and never fewer than the daytime number.
+gpus_per_person_working_hours: 4
+gpus_per_person_outside_hours: all
+
+# A GPU counts as idle when its use and its memory in use are both below this
+# percentage.
+gpu_idle_below_percent: 10
+
+# A job that states its output with --expect-disk is refused if writing it would
+# fill the disk past this share.
+disk_fill_limit_fraction: 0.95
+
+# A running job whose log has not grown for this many minutes is reported as
+# stalled. Nothing is stopped.
+stall_minutes: 60
+
+# Home-folder sizes for a friendly note and a firm reminder (used by a later
+# step of the millwright).
+home_folder_heads_up_gb: 100
+home_folder_firm_gb: 150
+
+# Months without use after which a project is quiet (a note to its lead), then
+# dormant (mothballing suggested).
+project_quiet_months: 12
+project_dormant_months: 24
+
+# --- Space (murmurent space scan). The scan only suggests; a person decides.
+
+# A temporary file (nohup.out, a notebook checkpoint, a partial download) is
+# suggested for deletion once it is this many days old, so files a running job
+# is still using are left alone.
+temporary_min_age_days: 7
+
+# A file this big or bigger inside a repository folder is out of place. Data
+# belongs in the project's data folders, not in a repository.
+large_file_in_repo_mb: 100
+
+# Uncompressed text data (FASTQ, SAM, VCF, CSV) this big or bigger is suggested
+# for compression. Only lossless methods are ever suggested.
+compress_min_mb: 100
+
+# Files this big or bigger are compared to find duplicates. Comparing means
+# reading the whole file to fingerprint it, so small files are skipped.
+duplicate_min_mb: 10
+
+# The most one scan reads in full to confirm duplicates. On a network drive,
+# reading 100 GB takes roughly ten to twenty minutes. Past this, files with the
+# same size and the same first and last megabyte are listed as probable
+# duplicates, for a person to confirm.
+duplicate_max_read_gb: 100
+
+# Folders the scan lists at once. On the lab's network drive this made little
+# difference (about 10 minutes per million files either way); a drive that
+# answers slowly but in parallel may gain more.
+scan_threads: 8
+
+# An intermediate file made by a job you ran with `murmurent run`, from code
+# that is committed and inputs that still exist, is suggested for deletion when
+# making it again would take fewer CPU hours than this. Costlier ones are marked
+# "ask the owner".
+remake_cheap_below_cpu_hours: 10
+
+# Emergencies: a disk fuller than this share, or one item larger than this
+# share of the disk's free space.
+disk_emergency_fill_fraction: 0.90
+emergency_item_share_of_free: 0.25
