@@ -695,6 +695,13 @@ def resolve_notify_token(project: str, slack_group: str) -> str:
         return ""
 
 
+def disk_warning_text(card: _cards.JobCard, hours: float, free_bytes: float) -> str:
+    """The one line sent when a job would fill its disk soon (#151). No paths."""
+    return (f"Job {card.name} ({card.user}) is filling its disk: at the rate of its first "
+            f"minutes, the disk is full in about {hours:.0f} h ({_cards.format_size(free_bytes)} "
+            "free). Check that its output is going where it should, or make room.")
+
+
 def notice_text(card: _cards.JobCard) -> str:
     """The one line posted to Slack: name, owner, state, duration, exit code.
 
@@ -726,6 +733,7 @@ def post_notice(
     *,
     poster: Poster | None = None,
     token_resolver: Callable[[str, str], str] | None = None,
+    text: str | None = None,
 ) -> bool:
     """Post the card's one-line notice, and record on the card what happened.
 
@@ -752,7 +760,7 @@ def post_notice(
 
         poster = _sn._post
     try:
-        posted = bool(poster(channel, notice_text(card), token=token))
+        posted = bool(poster(channel, text or notice_text(card), token=token))
     except Exception:  # noqa: BLE001 - a Slack problem never fails a job
         posted = False
     notify.setdefault("posted", []).append(

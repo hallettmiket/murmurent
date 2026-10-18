@@ -134,6 +134,11 @@ If murmurent cannot find a channel or the lab's Slack bot on your account, it
 posts nothing and says so on the job card. Add `--no-notify` to turn the
 message off for one job.
 
+**Filling its disk.** In its first ten minutes the job's output folder is
+measured to estimate how fast it grows. If, at that rate, the disk would be
+full within a day, one extra line goes to the channel, again without any path.
+`murmurent jobs` shows the estimate at any time.
+
 **Stalled** means the job's log has not grown for an hour (your lab may set a
 different time). The job is not stopped; look at its log and decide. If your
 program writes its progress to its own file instead of the screen, point
@@ -180,13 +185,14 @@ Estimates are labelled as estimates, and often there is none yet.
 
 The rules live in one file in your lab's management repository,
 `policy/millwright.yaml`, so the written procedure and what the tool does stay
-the same. A commented example ships with murmurent as
-`templates/millwright_policy.yaml`: copy it into the management repository and
-change the numbers. Any setting left out keeps murmurent's modest built-in
-default. To see the rules in force and the files they came from:
+the same. `murmurent pi-init` creates it from the commented example that ships
+with murmurent; for a lab set up before that, create it once and change the
+numbers. Any setting left out keeps murmurent's modest built-in default. To see
+the rules in force and the files they came from:
 
 ```bash
-murmurent jobs policy
+murmurent jobs policy --init   # creates the file if the lab has none
+murmurent jobs policy          # the rules in force
 ```
 
 | Setting | Built-in default | What it controls |
@@ -207,6 +213,39 @@ The **load** is the number of processes running or waiting for a core, averaged
 over the last minute; `uptime` prints it. A value in the file that murmurent
 cannot use (a typing mistake, say) is ignored and named by `murmurent jobs
 policy`, and the earlier value is kept, so a mistake cannot remove a limit.
+
+## Server etiquette: a daily check (for the PI)
+
+`murmurent etiquette check` looks at the server and reports lab members whose
+jobs run above nice 19, use more cores than `max_cores_per_person`, or hold
+more GPUs than the allowance for the time of day. It reads each process's
+account, priority, CPU share and age, and which GPUs it holds; never command
+lines, which can contain file names. It needs no administrator rights and
+never changes anyone's jobs.
+
+- Only members of your lab are named. Other accounts appear as a count, so you
+  can raise a persistent problem with the server's administrator.
+- Each person is compared with their own allowance, not with other people.
+- A process counts only after it has run for 10 minutes, and a priority note
+  needs at least a core's worth of work, so an editor or a short burst is not
+  reported.
+
+By default it only prints its report. With `--notify`, the person gets a
+direct message the first day, saying what was seen, why it matters and the
+exact command that fixes it (for example `renice -n 19 -u <login>`). If it is
+still there at the next check, a line goes to the lab's Slack channel; after
+that, to you. A day without the issue starts again from the beginning.
+
+To run it every weekday at 11:00 under your account:
+
+```bash
+murmurent etiquette schedule --install            # report only, to begin
+murmurent etiquette schedule --install --notify   # once the report looks right
+murmurent etiquette schedule --remove
+```
+
+The schedule is written into `policy/scheduled_jobs.md` in the lab records
+repository, beside the space scan, so the lab can see what runs in your name.
 
 ## What it cannot do
 

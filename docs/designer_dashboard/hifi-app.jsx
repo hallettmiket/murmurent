@@ -2338,7 +2338,17 @@ function ProjectsPanel({ projects, span="c-5" }) {
                   <td><Pill tone={p.sens==="clinical"?"red":""}>{p.sens}</Pill></td>
                   <td className="mono" style={{fontSize:12, paddingLeft:14}}>{p.lead}</td>
                   <td className="num">{p.members}</td>
-                  <td className="muted" style={{fontSize:12}}>{p.last_activity}</td>
+                  <td className="muted" style={{fontSize:12}}>
+                    {p.last_activity}
+                    {(p.activity === "quiet" || p.activity === "dormant") && (
+                      <span style={{marginLeft:6}}
+                            title={p.activity === "dormant"
+                              ? "Not used for the lab's dormant period: worth mothballing what is large"
+                              : "Not used for the lab's quiet period"}>
+                        <Pill tone={p.activity === "dormant" ? "amber" : ""}>{p.activity}</Pill>
+                      </span>
+                    )}
+                  </td>
                   {isPI && (
                     <td style={{textAlign:"right", whiteSpace:"nowrap"}} onClick={(e) => e.stopPropagation()}>
                       {p.is_cert && (
@@ -3330,10 +3340,70 @@ function slugify(text) {
     .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "contribution";
 }
 
+// Choreographies published in the public murmurent_public index (#185 item
+// 15): list them and install one into the repositories folder.
+function PublishedChoreographiesModal({ onClose }) {
+  const [data, setData] = useState(null);
+  const [busy, setBusy] = useState("");
+  const [msg, setMsg] = useState("");
+  const load = () => fetch("/api/choreographies/published").then(r => r.json())
+    .then(setData).catch(e => setData({ rows: [], error: String(e) }));
+  useEffect(() => { load(); }, []);
+  const install = async (name) => {
+    setBusy(name); setMsg("");
+    try {
+      const r = await fetch("/api/choreographies/install", { method: "POST",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+      const d = await r.json().catch(() => ({}));
+      setMsg(d.detail || (r.ok ? "installed" : "HTTP " + r.status));
+      load();
+    } finally { setBusy(""); }
+  };
+  const rows = (data && data.rows) || [];
+  return (
+    <div onClick={onClose} style={{position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+         display:"flex", alignItems:"center", justifyContent:"center", zIndex:100}}>
+      <div onClick={e => e.stopPropagation()} style={{background:"var(--card)", padding:18,
+           border:"1px solid var(--rule-strong)", borderRadius:2, width:"min(560px, 92vw)",
+           display:"flex", flexDirection:"column", gap:8, fontSize:13}}>
+        <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)"}}>
+          Published choreographies
+        </h2>
+        <div className="muted" style={{fontSize:12, lineHeight:1.5}}>
+          From the public murmurent directory. Installing copies the repository
+          into your repositories folder and makes it murmurent-ready; data is
+          never included. Each choreography's README says what it does.
+        </div>
+        {!data && <div className="muted">Loading…</div>}
+        {data && data.error && <div style={{color:"var(--red)"}}>{data.error}</div>}
+        {data && !data.error && rows.length === 0 && <div className="muted">None published yet.</div>}
+        {rows.map(r => (
+          <div key={r.name} className="row" style={{justifyContent:"space-between", gap:8,
+               borderBottom:"1px solid var(--rule)", padding:"4px 0"}}>
+            <span><strong>{r.name}</strong>{" "}
+              <a href={r.url.replace(/\.git$/, "")} target="_blank" rel="noopener"
+                 className="mono muted" style={{fontSize:11}}>source ↗</a></span>
+            {r.installed
+              ? <span className="mono muted" style={{fontSize:11}} title={r.path}>installed</span>
+              : <button className="btn sm" disabled={!!busy} onClick={() => install(r.name)}>
+                  {busy === r.name ? "installing…" : "install"}
+                </button>}
+          </div>
+        ))}
+        {msg && <div style={{fontSize:12, lineHeight:1.5}}>{msg}</div>}
+        <div className="row" style={{justifyContent:"flex-end"}}>
+          <button className="btn sm ghost" onClick={onClose}>close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ChoreographiesPanel({ choreographies, span="c-12" }) {
   const list = choreographies || [];
   const [modal, setModal] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
   return (
     <div className={"panel "+span}>
       <header>
@@ -3347,6 +3417,10 @@ function ChoreographiesPanel({ choreographies, span="c-12" }) {
           <button className="btn sm" onClick={() => setModal(true)}
                   title="Pose a question on its own, with no repository behind it">
             + pose a question
+          </button>
+          <button className="btn sm" onClick={() => setBrowsing(true)}
+                  title="Choreographies other labs published in the public murmurent directory">
+            browse published
           </button>
         </span>
       </header>
@@ -3362,6 +3436,7 @@ function ChoreographiesPanel({ choreographies, span="c-12" }) {
       </div>
       {modal && <NewChoreographyModal onClose={() => setModal(false)} />}
       {starting && <StartChoreographyModal onClose={() => setStarting(false)} />}
+      {browsing && <PublishedChoreographiesModal onClose={() => setBrowsing(false)} />}
     </div>
   );
 }
@@ -3453,12 +3528,106 @@ const GUARDIAN_AGENTS = ["security_guard", "adversary", "conscience"];
 // Badge colours for "which version is in use" (#186 step 1). Problems
 // (a broken link, nothing installed) stand out; the normal cases stay quiet.
 const IN_USE_TONE = {
-  "centre": "", "yours": "purple", "project": "green",
-  "local-file": "amber", "broken-link": "red", "missing": "red",
+  "centre": "", "lab": "green", "yours": "purple", "person-project": "purple",
+  "project": "green", "local-file": "amber", "broken-link": "red", "missing": "red",
 };
+
+// Versions of one agent per project (#186): which version you use there, and
+// buttons to make your own for that project, switch it off there, or (PI)
+// make yours the lab's. The levels are explained in docs/agent_versions.md.
+function AgentVersionsModal({ name, onClose }) {
+  const projects = (window.DATA.projects || []).filter(p => p.status !== "archived").map(p => p.name);
+  const [project, setProject] = useState(projects[0] || "");
+  const [view, setView] = useState(null);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = async (proj) => {
+    setView(null);
+    try {
+      const r = await fetch("/api/agents/" + encodeURIComponent(name) + "/levels?project=" + encodeURIComponent(proj || ""));
+      setView(await r.json());
+    } catch (e) { setMsg("could not load: " + e); }
+  };
+  useEffect(() => { load(project); }, [project]);
+  const act = async (path, body) => {
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/agents/" + encodeURIComponent(name) + "/" + path, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}) });
+      const d = await r.json().catch(() => ({}));
+      setMsg(r.ok ? (d.detail || "done. Open a new Claude Code session for it to apply.")
+                  : (d.detail || "HTTP " + r.status));
+      await load(project);
+      if (r.ok && typeof window.__murmurentFetchData === "function") {
+        try { await window.__murmurentFetchData(window.DATA.persona); } catch (_) {}
+      }
+    } finally { setBusy(false); }
+  };
+  const v = view || {};
+  return (
+    <div onClick={onClose} style={{position:"fixed", inset:0, background:"rgba(32,20,54,0.55)",
+         display:"flex", alignItems:"center", justifyContent:"center", zIndex:100}}>
+      <div onClick={e => e.stopPropagation()} style={{background:"var(--card)", padding:18,
+           border:"1px solid var(--rule-strong)", borderRadius:2, width:"min(520px, 92vw)",
+           display:"flex", flexDirection:"column", gap:8, fontSize:13}}>
+        <h2 style={{margin:0, fontFamily:"var(--serif)", fontSize:18, color:"var(--purple-deep)",
+                    textTransform:"capitalize"}}>{name}: versions</h2>
+        <div className="muted" style={{fontSize:12, lineHeight:1.5}}>
+          Most specific wins: your version for one project, the project's, yours
+          for all projects, the lab's, the centre's.
+        </div>
+        {v.everywhere && <div>Everywhere: <strong>{v.everywhere.label}</strong></div>}
+        <label className="mono muted" style={{fontSize:11}}>project</label>
+        <select value={project} onChange={e => setProject(e.target.value)}
+                style={{padding:"5px 8px", border:"1px solid var(--rule-strong)"}}>
+          {projects.length === 0 && <option value="">(no projects)</option>}
+          {projects.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        {project && v.in_use && (
+          <div>In {project}: <strong>{v.switched_off ? "switched off" : v.in_use.label}</strong>
+            {!v.project_has_repo_here && (
+              <span className="muted"> (none of its repos is on this machine, so this
+                applies once one is)</span>
+            )}
+          </div>
+        )}
+        {v.locked ? (
+          <div className="muted">This agent is centre-controlled: every lab, project
+            and person uses the centre version{v.guardian ? ", and it cannot be switched off" : ""}.</div>
+        ) : (
+          <div className="row" style={{gap:6, flexWrap:"wrap"}}>
+            <button className="btn sm" disabled={busy || !project}
+                    onClick={() => act("fork_project", { project })}>
+              my own for {project || "this project"}
+            </button>
+            {!v.guardian && (
+              <button className="btn sm" disabled={busy || !project}
+                      onClick={() => act("switch", { project, off: !v.switched_off })}>
+                {v.switched_off ? "switch on in " : "switch off in "}{project || "this project"}
+              </button>
+            )}
+            {v.is_pi && (
+              <button className="btn sm" disabled={busy}
+                      onClick={() => window.confirm("Make the version you use the lab's " + name +
+                        "? Members use it unless they have their own.") && act("share_lab")}>
+                make mine the lab's
+              </button>
+            )}
+          </div>
+        )}
+        {msg && <div style={{fontSize:12, lineHeight:1.5}}>{msg}</div>}
+        <div className="row" style={{justifyContent:"flex-end"}}>
+          <button className="btn sm ghost" onClick={onClose}>close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function AgentCard({ a }) {
   const [modify, setModify] = useState(false);
+  const [versions, setVersions] = useState(false);
   // Show the Modify affordance only where an edit could land: not frozen, not a
   // guardian. The server re-checks (403) — this is just to avoid dead clicks.
   const canModify = a.freeze !== "frozen" && !GUARDIAN_AGENTS.includes(a.name);
@@ -3503,6 +3672,10 @@ function AgentCard({ a }) {
           </span>
         )}
         <span style={{marginLeft:"auto"}}>
+          <button className="btn sm ghost" onClick={() => setVersions(true)}
+                  title="Which version you use in each project; your own for one project; switch off per project">
+            versions
+          </button>
           {canModify ? (
             <button className="btn sm" onClick={() => setModify(true)}
                     title="Edit this agent — commons agents fork into your vault on first save">
@@ -3514,6 +3687,7 @@ function AgentCard({ a }) {
         </span>
       </div>
       {modify && <ModifyAgentModal name={a.name} onClose={() => setModify(false)} />}
+      {versions && <AgentVersionsModal name={a.name} onClose={() => setVersions(false)} />}
     </div>
   );
 }
@@ -3939,11 +4113,13 @@ function NewProjectModal({ onClose }) {
         for (const row of (j.rows || [])) {
           const nm = (row && row.name) || "";
           const clones = (row && row.clones) || [];
-          // Only repos that actually EXIST somewhere are selectable —
-          // GitHub-only rows can't form a project (clone them first).
-          if (!nm || clones.length === 0) continue;
-          if (!opts.some(o => o.name === nm)) {
+          if (!nm || rowIsMurmurentInfra(row) || opts.some(o => o.name === nm)) continue;
+          if (clones.length > 0) {
             opts.push({ name: nm, hosts: [...new Set(clones.map(c => c.host))] });
+          } else if (row.github && row.github.full_name) {
+            // On GitHub only (#185 item 8): copied to this machine when the
+            // project is created.
+            opts.push({ name: nm, hosts: [], github: row.github.full_name });
           }
         }
         setRepoOptions(opts);
@@ -4145,9 +4321,10 @@ function NewProjectModal({ onClose }) {
 
         <label className="mono muted" style={{fontSize:11, letterSpacing:1, textTransform:"uppercase", marginTop:6}}>repos (select at least one)</label>
         <div className="muted" style={{fontSize:11, marginTop:-2, marginBottom:2, lineHeight:1.5}}>
-          Pick the repos on this machine that belong to the project. Each one is
-          made murmurent-ready for you. Creating a project never creates a new
-          repo, so clone it first if it is not listed.
+          Pick the repos that belong to the project: on this machine, or in the
+          lab's GitHub organisation (those are copied here when the project is
+          created). Each one is made murmurent-ready for you. Creating a project
+          never creates a new repo.
         </div>
         {repoScan.loading ? (
           <div className="muted" style={{fontSize:11}}>Looking for repos on this machine…</div>
@@ -4177,7 +4354,9 @@ function NewProjectModal({ onClose }) {
                   <input type="checkbox" checked={on} onChange={() => toggleRepo(opt.name)} />
                   <span className="mono">{opt.name}</span>
                   <span className="muted" style={{fontSize:10}}>
-                    ({(opt.hosts || []).join(", ") || "?"})
+                    {opt.github
+                      ? "(on GitHub; copied here when the project is created)"
+                      : "(" + ((opt.hosts || []).join(", ") || "?") + ")"}
                   </span>
                 </label>
               );
@@ -6214,11 +6393,16 @@ function MemberProfileModal({ onClose }) {
           </h2>
           <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
         </div>
-        <p className="muted" style={{fontSize:12, margin:"4px 0 0"}}>
-          Edits save to <code>&lt;lab-mgmt&gt;/members/&lt;handle&gt;.md</code> —
-          follows you to any machine. Per-machine paths (Obsidian vault,
-          notebook subfolder) live in the <strong>Machine settings</strong>
-          dialog instead.
+        <p className="muted" style={{fontSize:12, margin:"4px 0 0", lineHeight:1.5}}>
+          <strong>You, on all your machines.</strong>{" "}
+          {(window.DATA.persona || "member") === "pi"
+            ? <>Saved to your entry in the lab roster
+                (<code>&lt;lab-mgmt&gt;/members/&lt;handle&gt;.md</code>) and pushed,
+                so your other machines and the lab see it.</>
+            : <>Saved in your personal vault, so your other machines get it, and
+                sent to your PI, who adds it to the lab roster with
+                <code> murmurent reconcile</code>.</>}
+          {" "}Folders on this computer are in <strong>Machine settings</strong>.
         </p>
 
         {/* Identity (read-only) */}
@@ -7349,16 +7533,9 @@ function LabSettingsModal({ onClose }) {
     obsidian_host:     ls.obsidian_host     || "",
     obsidian_path:     ls.obsidian_path     || "",
   });
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg]   = useState(null);
-
-  const update = (k) => (e) => setForm((prev) => ({ ...prev, [k]: e.target.value }));
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true); setMsg(null);
-    try {
-      const payload = {
+  // The save payload for a form state; the first one is kept so a save can
+  // send only the fields that changed.
+  const buildLabPayload = (form) => ({
         display_name:      form.display_name,
         website:           form.website,
         admins:            form.admins.split(",").map(s => s.trim()).filter(Boolean),
@@ -7374,7 +7551,24 @@ function LabSettingsModal({ onClose }) {
         notebook_path:     form.notebook_path,
         obsidian_host:     form.obsidian_host,
         obsidian_path:     form.obsidian_path,
-      };
+  });
+  const [initialPayload] = useState(() => buildLabPayload(form));
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg]   = useState(null);
+
+  const update = (k) => (e) => setForm((prev) => ({ ...prev, [k]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true); setMsg(null);
+    try {
+      // Send only what the PI changed (#187): re-sending untouched fields
+      // rewrote lab.md (for example github_org from the PI's own login, or
+      // reshaped storage paths) without anyone asking.
+      const all = buildLabPayload(form);
+      const payload = Object.fromEntries(Object.entries(all).filter(
+        ([k, v]) => JSON.stringify(v) !== JSON.stringify(initialPayload[k])));
+      if (Object.keys(payload).length === 0) { setMsg("nothing changed"); setBusy(false); return; }
       const userParam = new URLSearchParams(window.location.search).get("user");
       const res = await fetch("/api/lab/settings" + (userParam ? "?user=" + encodeURIComponent(userParam) : ""), {
         method: "POST",
@@ -7446,9 +7640,9 @@ function LabSettingsModal({ onClose }) {
           <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
         </div>
         <p className="muted" style={{fontSize:12, margin:"4px 0 8px", lineHeight:1.5}}>
-          Lab-wide parameters. Only the PI and designated admins can save. Edits
-          write to <code className="mono">{labMgmtPath}/lab.md</code> and are
-          committed + pushed for you.
+          <strong>The whole lab.</strong> Only the PI can save. Edits write to
+          <code className="mono"> {labMgmtPath}/lab.md</code> and are committed
+          and pushed, so every member's dashboard picks them up.
         </p>
 
         {/* 1 · Identity */}

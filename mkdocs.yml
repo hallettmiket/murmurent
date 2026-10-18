@@ -83,6 +83,7 @@ nav:
   - Working day to day:
       - Making a repo Murmurent-ready: ready_vs_projects.md
       - The reference agents: agents.md
+      - Choosing an agent's version: agent_versions.md
       - How Murmurent remembers (the three tiers): memory.md
       - Your Obsidian vault:
           - Layout & what Murmurent touches: obsidian-usage.md

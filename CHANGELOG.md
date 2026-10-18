@@ -17,6 +17,58 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.10.2] - 2026-10-18
+
+**To upgrade:** `uv tool upgrade murmurent`, then `murmurent install`, then
+restart Claude Code and the dashboard (**⏻ stop dashboard**, then start it
+again). If you installed from a copy of the repository, `git pull` there
+instead of the first command. PIs: if your lab has no `policy/millwright.yaml`
+yet, run `murmurent jobs policy --init` and commit it.
+
+### Added
+- **Your profile follows you, and reaches the lab roster** (#187). A member's
+  profile edits are saved in their personal vault, so their other machines see
+  them, and sent to the PI as an issue on the lab management repo. The PI's
+  `murmurent reconcile --apply` adds them to the roster, only when the issue
+  was opened from that member's own GitHub account. The dashboard updates the
+  roster and the vault when it starts and every 15 minutes. Each settings
+  window says whether its settings apply to this machine, to you everywhere,
+  or to the whole lab.
+- **Agent versions at five levels** (#186): your version for one project, the
+  project's, yours for all projects, the lab's, the centre's. A person's own
+  version beats the lab's; the guardians always use the centre's. Switch an
+  agent off in one project. On the dashboard, each agent card's **versions**
+  button does all of this; in a terminal, `murmurent agent fork --project`,
+  `agent off` / `on`, `agent share --lab` and `agent sync`. Guide: [Choosing
+  an agent's version](https://mikehallett.science/murmurent/agent_versions/).
+- **Server etiquette check** (#151): `murmurent etiquette check` reports lab
+  members running above nice 19, over their cores, or over the GPU allowance
+  for the time of day, and with `--notify` messages them politely (the person,
+  then the lab channel, then the PI). It never reads command lines or changes
+  anyone's jobs. `murmurent etiquette schedule --install` runs it every
+  weekday.
+- **Browse and install published choreographies** from the dashboard's
+  Choreographies panel.
+- **Create a project from repos on GitHub** as well as on this machine; they
+  are copied here when the project is created.
+- **`murmurent project set`** sets a project's data folders, what it reads
+  without owning, and its keep-until date.
+- **`murmurent jobs policy --init`**, and `murmurent pi-init`, create the lab's
+  policy file from the template.
+
+### Changed
+- The Projects panel marks a project **quiet** or **dormant**.
+- A running job sends one Slack line, without any path, when it would fill its
+  disk within a day.
+- The project access check uses a project's own data folders when its record
+  names any.
+
+### Fixed
+- **Lab settings sends only the fields you changed.** Before, a save could
+  rewrite untouched values in `lab.md`, such as filling the lab's GitHub
+  organisation from the PI's own login.
+- A cleared field in a member's profile stays cleared.
+
 ## [2026.10.1] - 2026-10-18
 
 **To upgrade:** `uv tool upgrade murmurent`, then `murmurent install`, then

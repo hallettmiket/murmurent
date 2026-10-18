@@ -503,8 +503,19 @@ def jobs_stop(job: str) -> None:
 @jobs_group.command(
     "policy", help="The lab's rules the launcher follows, and the " "files they come from."
 )
-def jobs_policy() -> None:
-    """Print the policy in force."""
+@click.option("--init", "init", is_flag=True,
+              help="Create the lab's policy file from the commented template, if the lab "
+                   "has none (never overwrites one).")
+def jobs_policy(init: bool) -> None:
+    """Print the policy in force; with --init, create the lab's file first."""
+    if init:
+        from ..core.millwright_policy import write_default_policy
+        path, created = write_default_policy()
+        if path is None:
+            raise click.ClickException("the lab records repository was not found on this machine.")
+        click.echo(f"Created {path} from the template. Edit the numbers to suit your lab, "
+                   "then commit and push the lab records repository." if created
+                   else f"The lab already has a policy file: {path}")
     for line in describe_policy(load_policy()):
         click.echo(line)
 

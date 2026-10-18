@@ -723,6 +723,35 @@ def create_app() -> FastAPI:
     # ``~/.murmurent/inventory/`` and the dashboard reads from there.
     # Issue #94: this-machine-only — no foreign-host SSH sweep.
     @app.on_event("startup")
+    def _schedule_auto_pull() -> None:  # pragma: no cover (timing)
+        """Keep the lab roster and the personal vault current (#187): pull both
+        (fast-forward only, so local changes are never overwritten) at startup
+        and every 15 minutes, in a background thread. Before this, a change
+        made on another machine appeared only after pressing "update".
+        ``MURMURENT_NO_AUTO_PULL`` turns it off (the test suite sets it)."""
+        if os.environ.get("MURMURENT_NO_AUTO_PULL"):
+            return
+        import logging as _logging
+        import threading as _threading
+        _log = _logging.getLogger(__name__)
+
+        def _pull_both() -> None:
+            from ..core import roster_sync as _rs
+            from ..core import vault_sync as _vs
+            for name, fn in (("lab roster", _rs.pull_lab_mgmt), ("vault", _vs.pull_personal_vault)):
+                try:
+                    res = fn()
+                    if not res.ok:
+                        _log.info("auto-pull of the %s did not run: %s", name, res.detail)
+                except Exception as exc:  # noqa: BLE001
+                    _log.info("auto-pull of the %s failed: %s", name, exc)
+            timer = _threading.Timer(15 * 60, _pull_both)
+            timer.daemon = True
+            timer.start()
+
+        _threading.Thread(target=_pull_both, daemon=True).start()
+
+    @app.on_event("startup")
     def _schedule_inventory_refresh() -> None:  # pragma: no cover (timing)
         import logging as _logging
         import threading
@@ -1245,6 +1274,25 @@ def create_app() -> FastAPI:
                     detail=str(cert_exc), required=False,
                 ).to_dict())
 
+            # Say which of the project's repos are on this machine, so a repo
+            # that could not be copied from GitHub is not missed (#185 item 8).
+            if req.attach_repos:
+                try:
+                    from ..core import cert_projects as _cps
+                    cp_rec = _cps.get(req.project)
+                    for r in (cp_rec.repos if cp_rec else []):
+                        if (r.host or "local") != "local":
+                            continue
+                        here = bool(r.path) and Path(r.path).expanduser().exists()
+                        probes.append(_Probe(
+                            name=f"repo {r.name}", status="ok" if here else "warn",
+                            detail=(f"on this machine at {r.path}" if here else
+                                    "not on this machine and could not be copied from "
+                                    f"GitHub; copy it with: gh repo clone <org>/{r.name}"),
+                            required=False,
+                        ).to_dict())
+                except Exception:  # noqa: BLE001
+                    pass
             # A project built from EXISTING repos (the dashboard flow) keeps
             # each repo's own remote. There is no project-named working tree
             # to push, so provisioning would only report a failure (#185).
@@ -1565,6 +1613,16 @@ def create_app() -> FastAPI:
                 raise HTTPException(status_code=404, detail=f"project not found: {body.project}")
             cwd = str(project_path(body.project))
 
+        if cwd and (Path(cwd) / ".git").exists():
+            # Install the agent versions that should win in this repo (lab,
+            # project, your own for this project) before the session reads
+            # them (#186). Best-effort: never blocks the launch.
+            try:
+                from ..core import agent_levels as _lv
+                _lv.sync_user_level()
+                _lv.sync_repo(Path(cwd))
+            except Exception:  # noqa: BLE001
+                pass
         res = _launchers.launch_claude_session(cwd=cwd)
         # ``already_open`` is a success: an existing session was raised instead
         # of spawning a duplicate. Only a genuine failure (no terminal, spawn
@@ -2018,20 +2076,46 @@ def create_app() -> FastAPI:
                 if "git_logins" in sent and body.git_logins is not None:
                     edits["git_logins"] = body.git_logins
                 path = _mp.stage_roster_profile(actor, edits)
-                return {
-                    "ok": True, "staged": True, "path": str(path),
-                    "message": (
-                        "Saved on this computer. The shared lab roster is "
-                        "changed only by your PI, so other members will not "
-                        "see this yet. Ask your PI to update your roster entry."
-                    ),
-                    "probes": [],
-                }
+                return _share_staged_profile(actor, path)
 
             return _save_member_settings_to_roster(
                 body, actor, sent, contact_keys, location_keys,
                 parse_file, dump_document,
             )
+
+    def _share_staged_profile(actor: str, path) -> dict:
+        """After a member's edit is staged (#187): save it to their vault so
+        their other machines get it, and send it to the PI as an issue on the
+        lab management repo. Both best-effort; each reports a probe."""
+        from ..core import member_profile as _mp
+        from ..core import profile_relay as _relay
+        from ..core import vault_sync as _vs
+        probes: list[dict] = []
+        in_vault = _mp.vault_profile_path() is not None and str(path) == str(_mp.vault_profile_path())
+        if in_vault:
+            res = _vs.commit_and_push(path, message=f"profile: @{actor}", add_all=False)
+            probes.append({"name": "your other machines",
+                           "status": "ok" if res.ok and res.pushed else "warn",
+                           "detail": ("saved in your vault; your other machines get it "
+                                      "when they next update it" if res.ok and res.pushed
+                                      else f"saved in your vault but not pushed ({res.detail})"),
+                           "required": False})
+        else:
+            probes.append({"name": "your other machines", "status": "warn",
+                           "detail": "this machine has no personal vault, so the change "
+                                     "stays here (set one up with murmurent vault init)",
+                           "required": False})
+        block = _mp.staged_roster_profile(actor)
+        probes.append(_relay.send_profile_update(actor, block).to_probe())
+        sent_ok = probes[-1]["status"] == "ok"
+        return {
+            "ok": True, "staged": True, "path": str(path), "probes": probes,
+            "message": ("Saved. Your PI was sent the change and it reaches the lab "
+                        "roster when they next run murmurent reconcile."
+                        if sent_ok else
+                        "Saved for you, but your PI was not sent the change: "
+                        + probes[-1]["detail"]),
+        }
 
     def _save_member_settings_to_roster(
         body, actor, sent, contact_keys, location_keys, parse_file, dump_document,
@@ -2048,70 +2132,19 @@ def create_app() -> FastAPI:
             )
 
         parsed = parse_file(member_path)
-        meta = dict(parsed.meta or {})
-
-        def _merge(block_name: str, fields: dict) -> None:
-            existing = meta.get(block_name)
-            block = dict(existing) if isinstance(existing, dict) else {}
-            for k, v in fields.items():
-                if v is None or (isinstance(v, str) and not v.strip()):
-                    block.pop(k, None)
-                else:
-                    block[k] = v
-            if block:
-                meta[block_name] = block
-            else:
-                meta.pop(block_name, None)
-
-        _merge("contact", {k: getattr(body, k) for k in contact_keys if k in sent})
-        _merge("location", {k: getattr(body, k) for k in location_keys if k in sent})
-
-        # Handles that live at the top level of the frontmatter (the roster
-        # model owns them, so writing them here keeps the roster + dashboard in
-        # sync). ``slack_handle`` maps onto the roster's ``slack`` key; the
-        # murmurent handle is the file's ``handle`` (never edited here).
-        def _set_top(key: str, value) -> None:
-            if value is None or (isinstance(value, str) and not value.strip()):
-                meta.pop(key, None)
-            else:
-                meta[key] = value.strip().lstrip("@") if isinstance(value, str) else value
-
+        from ..core import member_profile as _mp
+        edits: dict = {
+            "contact": {k: getattr(body, k) for k in contact_keys if k in sent},
+            "location": {k: getattr(body, k) for k in location_keys if k in sent},
+        }
         if "official_handle" in sent:
-            _set_top("official_handle", body.official_handle)
+            edits["official_handle"] = body.official_handle
         if "slack_handle" in sent:
-            _set_top("slack", body.slack_handle)
-
-        # Phase 3: per-provider git_logins map. Replaces the flat
-        # ``contact.github`` for new code, but we keep contact.github
-        # in sync with git_logins["github"] so legacy readers keep
-        # working through the migration.
+            edits["slack"] = body.slack_handle
         if "git_logins" in sent and body.git_logins is not None:
-            from ..core import git_providers as _gpr
-            existing = meta.get("git_logins") if isinstance(meta.get("git_logins"), dict) else {}
-            merged = dict(existing or {})
-            for k, v in body.git_logins.items():
-                if v is None or (isinstance(v, str) and not v.strip()):
-                    merged.pop(k, None)
-                else:
-                    merged[str(k)] = str(v).strip().lstrip("@")
-            cleaned = _gpr.dump_logins(merged)
-            if cleaned:
-                meta["git_logins"] = cleaned
-            else:
-                meta.pop("git_logins", None)
-            # Mirror github login back into contact.github for legacy
-            # readers (the JSX still surfaces it as a contact link).
-            gh = cleaned.get("github")
-            contact_block = meta.get("contact") if isinstance(meta.get("contact"), dict) else {}
-            contact_block = dict(contact_block or {})
-            if gh:
-                contact_block["github"] = gh
-            elif "github" in (existing or {}):
-                contact_block.pop("github", None)
-            if contact_block:
-                meta["contact"] = contact_block
-            else:
-                meta.pop("contact", None)
+            edits["git_logins"] = body.git_logins
+        # The same writer applies a member's update from an issue (#187).
+        meta = _mp.apply_edits_to_meta(parsed.meta or {}, edits)
 
         try:
             member_path.write_text(dump_document(meta, parsed.body or ""), encoding="utf-8")
@@ -6515,6 +6548,72 @@ def create_app() -> FastAPI:
             ),
         }
 
+    # -- Agent versions per project (#186) -----------------------------------
+
+    @app.get("/api/agents/{name}/levels")
+    def agent_levels_view(name: str, project: str = Query("")) -> dict:
+        """Which version of ``name`` you use in ``project`` (or everywhere),
+        whether you switched it off there, and what you may do about it."""
+        from ..core import agent_levels as _lv
+        from ..core.identity import resolve as _who
+        from ..core.lab import pi_handle
+        repos = _lv.project_repos(project) if project else []
+        repo = repos[0] if repos else None
+        win = _lv.resolve(name, project=project or None, repo=repo)
+        everywhere = _lv.resolve(name, user_level_only=True)
+        me = (_who(allow_unknown=True).handle or "").lstrip("@").lower()
+        return {
+            "name": name,
+            "project": project,
+            "project_has_repo_here": bool(repo),
+            "in_use": {"level": win.level, "label": win.label} if win else None,
+            "everywhere": {"level": everywhere.level, "label": everywhere.label} if everywhere else None,
+            "switched_off": bool(project) and name in _lv.switched_off_for(project),
+            "locked": _lv.is_locked(name),
+            "guardian": _lv.is_guardian(name),
+            "is_pi": me == pi_handle().lstrip("@").lower(),
+        }
+
+    @app.post("/api/agents/{name}/fork_project")
+    def agent_fork_project(name: str, body: dict = Body(default_factory=dict)) -> dict:
+        """Make your own version of ``name`` for one project (in your vault)."""
+        from ..core import agent_levels as _lv
+        project = str(body.get("project") or "").strip()
+        if not project:
+            raise HTTPException(status_code=422, detail="choose a project")
+        try:
+            path, created = _lv.fork_for_project(name, project)
+        except _lv.LevelError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"ok": True, "path": str(path), "created": created,
+                "detail": (f"Your own {name} for {project} is {path}. Edit it there; "
+                           "run `murmurent vault sync` to keep it on your other machines.")}
+
+    @app.post("/api/agents/{name}/switch")
+    def agent_switch(name: str, body: dict = Body(default_factory=dict)) -> dict:
+        """Switch ``name`` off (or back on) for you in one project."""
+        from ..core import agent_levels as _lv
+        project = str(body.get("project") or "").strip()
+        if not project:
+            raise HTTPException(status_code=422, detail="choose a project")
+        off = bool(body.get("off", True))
+        try:
+            _lv.switch(name, project, off)
+        except _lv.LevelError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"ok": True, "off": off}
+
+    @app.post("/api/agents/{name}/share_lab")
+    def agent_share_lab(name: str) -> dict:
+        """PI only: make the version you use the lab's."""
+        from ..core import agent_levels as _lv
+        try:
+            path, probes = _lv.share_with_lab(name)
+        except _lv.LevelError as exc:
+            raise HTTPException(status_code=403 if "only the PI" in str(exc) else 409,
+                                detail=str(exc))
+        return {"ok": True, "path": str(path), "probes": [p.to_dict() for p in probes]}
+
     @app.post("/api/agents/{name}/{action}")
     def agent_toggle(
         name: str,
@@ -6679,6 +6778,58 @@ def create_app() -> FastAPI:
                 status_code=409, detail=f"a choreography already exists at {dest.name}")
         dest.write_text(obj.to_markdown(), encoding="utf-8")
         return {"ok": True, "id": dest.stem, "path": str(dest)}
+
+    # -- Published choreographies (#185 item 15) -----------------------------
+
+    @app.get("/api/choreographies/published")
+    def published_choreographies() -> dict:
+        """The choreographies listed in the public murmurent_public index, and
+        whether each is already on this machine. Names and locations only: a
+        choreography describes itself in its own repo, read at install."""
+        from ..commands import choreography_install_cmd as _ci
+        from ..core.repo import repos_root
+        try:
+            rows = _ci._fetch_index(_ci.INDEX_URL, timeout=10.0)
+        except _ci.IndexUnavailable as exc:
+            return {"rows": [], "error": str(exc).split("\n")[0]}
+        root = repos_root()
+        return {"rows": [{"name": n, "url": u, "installed": (root / n).exists(),
+                          "path": str(root / n)} for n, u in rows], "error": ""}
+
+    @app.post("/api/choreographies/install")
+    def install_choreography(body: dict = Body(default_factory=dict)) -> dict:
+        """Install a published choreography by name: copy its repository into
+        the repositories folder and make it murmurent-ready."""
+        from ..commands import choreography_install_cmd as _ci
+        from ..core import adopt as _adopt
+        from ..core import choreography_registry as _cr
+        name = str(body.get("name") or "").strip()
+        if not name:
+            raise HTTPException(status_code=422, detail="name required")
+        try:
+            url = _ci._resolve_name(name, index_url=_ci.INDEX_URL, timeout=10.0)
+            clone = _cr.clone_choreography(url)
+        except (_ci.IndexUnavailable, _cr.ChoreographyError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc).split("\n")[0])
+        try:
+            info = _cr.read_marker(clone)
+        except _cr.ChoreographyError as exc:
+            return {"ok": False, "path": str(clone),
+                    "detail": f"Copied to {clone}, but it does not declare itself a "
+                              f"choreography ({exc}); it was left alone."}
+        missing = _cr.missing_agents(info)
+        try:
+            _adopt.adopt_clone(clone_path=str(clone), agents=info.agents or None)
+            adopted = True
+            note = ""
+        except _adopt.AdoptError as exc:
+            adopted = False
+            note = f" It was not made murmurent-ready ({exc}); run: murmurent repo adopt {clone}"
+        return {"ok": True, "path": str(clone), "title": info.title or info.name,
+                "summary": info.summary, "missing_agents": missing, "adopted": adopted,
+                "detail": f"Installed {info.title or info.name} at {clone}." + note
+                          + (f" It asks for agents this machine does not have: "
+                             f"{', '.join(missing)}." if missing else "")}
 
     @app.post("/api/choreography/init")
     def init_choreography_endpoint(

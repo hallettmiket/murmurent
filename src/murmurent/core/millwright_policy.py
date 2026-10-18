@@ -416,6 +416,26 @@ def load_policy(env: dict[str, str] | None = None) -> Policy:
     return policy
 
 
+def write_default_policy(lab_mgmt: Path | None = None,
+                         env: dict[str, str] | None = None) -> tuple[Path | None, bool]:
+    """Copy the commented template to ``<lab-mgmt>/policy/millwright.yaml``
+    when the lab has no policy file yet. Returns ``(path, created)``; never
+    overwrites an existing file. Before this, every lab ran on the built-in
+    defaults until the PI copied the template by hand (#151)."""
+    from .commons import commons_root
+    path = (Path(lab_mgmt) / "policy" / "millwright.yaml") if lab_mgmt else lab_policy_path(env)
+    if path is None:
+        return None, False
+    if path.exists():
+        return path, False
+    template = commons_root() / "templates" / "millwright_policy.yaml"
+    if not template.is_file():
+        return path, False
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(template.read_text(encoding="utf-8"), encoding="utf-8")
+    return path, True
+
+
 def describe_policy(policy: Policy) -> list[str]:
     """Plain-English lines saying what the rules are and where they came from.
 

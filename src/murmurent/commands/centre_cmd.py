@@ -1274,6 +1274,13 @@ def pi_init(group: str, core: bool) -> None:
                f"    murmurent group-reconcile {group} --apply   # grants the roster read access")
     click.echo("  (A mayor can ALSO issue you a centre PI ID later — that's separate, "
                "for joining a centre; your members' cards keep working.)")
+    # The lab's numbers for jobs, disk and the space audit (#151): start from
+    # the commented template rather than the built-in defaults.
+    from ..core.millwright_policy import write_default_policy
+    policy, created = write_default_policy(_P(lab_repo))
+    if created:
+        click.echo(f"  The lab's rules for jobs and disk space are in {policy};\n"
+                   "  edit the numbers to suit your lab, then commit.")
 
 
 @click.command("centre-pin",

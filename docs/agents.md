@@ -42,12 +42,11 @@ that repo, where the repo's own agent files take priority. A **broken link**
 usually means the repo contains links into another member's home folder;
 `murmurent repo status <folder>` explains how to fix it.
 
-Your own version of an agent applies to all of your projects. There is not
-yet a way to keep a version for one project only, to share a version with a
-project team or a whole lab, or to switch an agent off in one project. The
-**disable** button on the dashboard's agent cards only labels the agent; Claude
-Code still uses it. These are planned in
-[issue #186](https://github.com/hallettmiket/murmurent_dev/issues/186).
+A version can also be kept for one project only, shared with a project team
+or the whole lab, or an agent switched off in one project: see
+[Choosing an agent's version](agent_versions.md). The **disable** button on
+the dashboard's agent cards only labels the agent; to stop Claude Code using
+it in a project, use `murmurent agent off <name> --project <project>`.
 
 You invoke these by addressing an agent by name in plain English (for
 example, *"Bookworm, find all manuscripts related to MMP11 in breast
@@ -71,12 +70,11 @@ cohort curator, …) that compose against this same reference set, the
 same hard rules, and the same verdict protocol. This corresponds to the
 so-called "commons-plus-toolkit" pattern described in the manuscript.
 
-**What works today:** `murmurent group-init-toolkit <group>` creates a toolkit
-repository for a lab's agents, but nothing installs those agents for the
-lab's members yet. To use one now, copy its file into the `.claude/agents/`
-folder of each repo where it is needed. Installing a lab's agents for every
-member, from the lab-management repository, is planned in
-[issue #186](https://github.com/hallettmiket/murmurent_dev/issues/186).
+**A lab's own versions** live in the `agents/` folder of the lab-management
+repository. The PI puts one there with
+`murmurent agent share <name> --lab`, and every member's machine uses it
+unless they have their own. See
+[Choosing an agent's version](agent_versions.md).
 
 ## All of them at a glance
 

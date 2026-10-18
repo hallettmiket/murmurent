@@ -179,6 +179,100 @@ def cmd_relink() -> None:
             click.echo("No vault agents or forks to re-link.")
     else:
         click.echo(f"Re-linked {n} agent(s) into {_af.installed_agents_dir()}.")
+    # The lab's versions, where you have none of your own (#186).
+    from ..core import agent_levels as _lv
+    _print_sync("lab versions", _lv.sync_user_level())
+
+
+# ---------------------------------------------------------------------------
+# Levels: lab, project, and your own version for one project (#186)
+# ---------------------------------------------------------------------------
+
+
+def _print_sync(where: str, rep) -> None:
+    if rep.linked:
+        click.echo(f"{where}: " + ", ".join(rep.linked))
+    if rep.off:
+        click.echo(f"{where}: switched off: " + ", ".join(rep.off))
+    for note in rep.notes:
+        click.echo(f"{where}: {note}")
+
+
+def cmd_sync(repo: str | None, all_repos: bool) -> None:
+    """Install the winning version of each agent: the lab's into your agents
+    folder, and the project's or your per-project versions into each repo."""
+    from ..core import agent_levels as _lv
+    _print_sync("your agents folder", _lv.sync_user_level())
+    targets: list[tuple[str | None, Path]] = []
+    if repo:
+        targets.append((None, Path(repo).expanduser().resolve()))
+    elif all_repos:
+        targets = list(_lv.local_project_repos())
+    else:
+        here = Path.cwd()
+        if (here / ".git").exists():
+            targets.append((None, here))
+    for project, path in targets:
+        _print_sync(str(path), _lv.sync_repo(path, project))
+    click.echo("Done. Open a new Claude Code session for the changes to apply.")
+
+
+def cmd_fork_for_project(name: str, project: str) -> None:
+    """Copy the version you use now into your vault as your version for one
+    project, then install it in that project's repos."""
+    from ..core import agent_levels as _lv
+    try:
+        dest, created = _lv.fork_for_project(name, project)
+    except _lv.LevelError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo((f"Copied {name} to {dest}." if created
+                else f"You already have your own {name} for {project}: {dest}"))
+    click.echo(f"Edit it, then run `murmurent vault sync` to keep it on your other "
+               "machines. Open a new Claude Code session for it to apply.")
+
+
+def cmd_switch(name: str, project: str, off: bool) -> None:
+    """Switch an agent off (or back on) for you in one project."""
+    from ..core import agent_levels as _lv
+    try:
+        _lv.switch(name, project, off)
+    except _lv.LevelError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"{name} is {'switched off' if off else 'back on'} for you in {project}. "
+               "Open a new Claude Code session for it to apply.")
+
+
+def cmd_share(name: str, to_lab: bool, repo: str | None) -> None:
+    """Share the version you use now: with the whole lab (PI only), or with a
+    project team by putting it in the repo for you to commit."""
+    import shutil
+    from ..core import agent_levels as _lv
+    if _lv.is_locked(name):
+        raise click.ClickException(f"{name} is centre-controlled and cannot be replaced.")
+    win = _lv.resolve(name, user_level_only=True)
+    if win is None:
+        raise click.ClickException(f"no agent named {name!r}.")
+    if to_lab:
+        try:
+            dest, probes = _lv.share_with_lab(name)
+        except _lv.LevelError as exc:
+            raise click.ClickException(str(exc)) from exc
+        click.echo(f"The lab's {name} is now {dest}.")
+        for pr in probes:
+            click.echo(f"  {pr.name}: {pr.detail}")
+        click.echo("Members get it when their dashboard next updates the lab repo, or with "
+                   "`murmurent agent sync`. A member's own version still wins.")
+    elif repo:
+        root = Path(repo).expanduser().resolve()
+        dest = _lv.project_agents_dir(root) / f"{name}.md"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(win.path, dest)
+        _print_sync(str(root), _lv.sync_repo(root))
+        click.echo(f"Copied to {dest}. Commit and push it so the whole project uses it:\n"
+                   f"  git -C {root} add .murmurent/agents/{name}.md && git -C {root} commit "
+                   f"-m 'project version of {name}' && git -C {root} push")
+    else:
+        raise click.ClickException("say who to share with: --lab, or --repo <folder>.")
 
 
 def cmd_unfork(name: str, force: bool) -> None:

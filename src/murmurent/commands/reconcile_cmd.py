@@ -52,10 +52,35 @@ def cmd_reconcile(*, apply: bool, slack_body: bool) -> int:
         click.echo("\n--- slack body (copy into #claude-test) ---")
         click.echo(_build_slack_body(report, applied=apply))
     _keyring_autosync(apply=apply)
+    _profile_updates(apply=apply)
     actionable = [f for f in report.findings if f.severity == "actionable"]
     if actionable and not apply:
         return 1
     return 0
+
+
+def _profile_updates(*, apply: bool) -> None:
+    """Apply members' profile changes waiting as issues on the lab management
+    repo (#187). Only on the PI's machine: only the PI can push the roster.
+    Never fatal."""
+    try:
+        from ..core import profile_relay as _relay
+        from ..core.identity import resolve as _who
+        from ..core.lab import pi_handle
+        me = (_who(allow_unknown=True).handle or "").lstrip("@").lower()
+        if not me or me != pi_handle().lstrip("@").lower():
+            return
+        rep = _relay.ingest_profile_updates(apply=apply)
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"\n[profiles] skipped: {exc}")
+        return
+    if not rep.items and not rep.detail:
+        return
+    click.echo("\n[profiles] " + ("applied" if apply else "waiting (run with --apply to apply)") + ":")
+    for it in rep.items:
+        click.echo(f"  issue #{it.issue} @{it.handle} (opened by @{it.author}): {it.detail}")
+    if rep.detail:
+        click.echo(f"  {rep.detail}")
 
 
 def _keyring_autosync(*, apply: bool) -> None:

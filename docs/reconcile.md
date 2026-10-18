@@ -40,6 +40,13 @@ Exit codes:
 - `1`: actionable drift exists and `--apply` wasn't passed (so
   cron / CI can branch on it).
 
+## Members' profile updates (PI only)
+
+On the PI's machine, reconcile also lists members' profile changes waiting as
+issues on the lab management repo, and `murmurent reconcile --apply` applies
+them to the roster. See
+[How a member's profile edit reaches the roster](lab_mgmt.md#how-a-members-profile-edit-reaches-the-roster-34-187).
+
 ## Daily schedule via CC `/routine`
 
 Set up once:

@@ -2,15 +2,13 @@
 
 > Diagram: [project lifecycle](diagrams.md#4-project-lifecycle) shows a project's states from creation to archive.
 
-A Murmurent **project** is three coordinated sets:
+A Murmurent **project** is two coordinated sets:
 
-- a set of **repos**: *existing* clones picked from your machines'
-  repositories folders (`~/repos` unless you chose another;
-  `murmurent config repos-root` shows it, and the dashboard's settings for
-  this machine have a *Repositories folder* field). Creating a project attaches
-  existing clones: clone or `git init` the repo first, then group it into
-  a project;
-- a set of **machines** (your laptop, the lab VM, …),
+- a set of **repos**: existing repos, picked from your repositories folder
+  (`~/repos` unless you chose another; `murmurent config repos-root` shows
+  it) or from the lab's GitHub organisation. A repo picked from GitHub is
+  copied to this machine when the project is created, and every repo is made
+  murmurent-ready for you. Creating a project never creates a new repo;
 - a set of **members**, and membership is *cryptographic*: each member holds
   a signed **project certificate**, a credential that cryptographically
   proves their membership and can be verified (offline) against the
@@ -45,17 +43,17 @@ Allie (a member of the Rao lab) wants to start `brca_17` with Bob. She
 already has the two repos that make up the work (`brca_code` and
 `brca_manuscript`) cloned in her repositories folder on her laptop.
 
-**1. Propose.** On her dashboard, Allie clicks **＋ new project** and picks:
+**1. Create.** On her dashboard, Allie clicks **＋ new project**
+(**Create new project**) and fills in:
 
-- *name*: `brca_17`
+- *name*: `brca_17`, and a short *description* of what it is about
 - *members*: `@allie`, `@bob` (from the lab roster dropdown)
-- *machines*: her laptop + `lab-server`
-- *repos*: `brca_code` + `brca_manuscript`, selected from the clones Murmurent
-  already found in her repo folders: code and paper grouped into one project.
-  (Only existing clones are offered in the picker: clone or `git init` a
-  repo first and it appears there.)
+- *repos*: `brca_code` + `brca_manuscript`, picked from the repos on her
+  laptop and in the lab's GitHub organisation: code and paper grouped into
+  one project.
 
-She submits; the request lands in the PI's approval queue.
+She clicks **create**. Because she is a member, not the PI, the request goes
+to the PI to confirm. (When the PI creates a project, it is created at once.)
 
 **2. PI approves.** The PI approves the request from the dashboard.
 Murmurent registers the project over the

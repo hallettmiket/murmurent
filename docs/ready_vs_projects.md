@@ -195,8 +195,16 @@ all optional:
 | `reads_from` | What the project reads but does not own: a folder, written as a path (`append_only/shared_cohort`), or another project's repository, by its name. These are never offered to this project for clean-up. |
 | `retain_until` | A date, `YYYY-MM-DD`, before which nothing in the project may be suggested for deletion, for example the end of an ethics approval or a data-sharing agreement. |
 
-For now, set them by editing the project's file in `cert_projects/` in the lab
-records repository, then commit and push it.
+Set them with one command, which commits and pushes the record:
+
+```bash
+murmurent project set brca --data-folder append_only/brca --data-folder immutable/brca_raw
+murmurent project set brca --reads-from append_only/shared_cohort --retain-until 2031-06-30
+murmurent project set brca --clear data-folders     # back to the default pair
+```
+
+The Projects panel on the dashboard marks a project **quiet** or **dormant**
+when it has not been used for the lab's quiet or dormant period.
 
 ### Whether a project is in use
 

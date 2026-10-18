@@ -350,13 +350,26 @@ def project_data_dirs(cp: _cp.CertProject, env: dict | None) -> list[DataDir]:
     """The governed directories to check for a project: its ``immutable/`` tree
     (read), its ``append_only/`` tree (read + write), and each LOCAL repo clone
     (read + write). Remote-host repos are skipped — their ACLs live on that host
-    and are audited there."""
-    dirs: list[DataDir] = [
-        DataDir(_lab_vm.project_immutable_dir(cp.name, env),
-                "immutable data", needs_write=False),
-        DataDir(_lab_vm.project_append_only_dir(cp.name, env),
-                "append_only data", needs_write=True),
-    ]
+    and are audited there.
+
+    When the project record names its own ``data_folders`` (#151), those are
+    checked instead of the default pair: a folder under ``immutable/`` (or the
+    legacy ``raw/``) is read-only, any other needs write."""
+    if cp.data_folders:
+        from . import project_unit as _pu
+        dirs = []
+        for folder in _pu.effective_data_folders(cp, env):
+            parts = set(Path(folder).parts)
+            readonly = bool(parts & {"immutable", "raw"})
+            dirs.append(DataDir(Path(folder), f"data folder {Path(folder).name}",
+                                needs_write=not readonly))
+    else:
+        dirs = [
+            DataDir(_lab_vm.project_immutable_dir(cp.name, env),
+                    "immutable data", needs_write=False),
+            DataDir(_lab_vm.project_append_only_dir(cp.name, env),
+                    "append_only data", needs_write=True),
+        ]
     for r in cp.repos:
         if (r.host or "local") != "local" or not r.path:
             continue

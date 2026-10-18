@@ -100,6 +100,10 @@ the lab has the access they need, and no more:
   archived and generates (but does not itself execute) the
   access-revocation checklist for SSH keys, GitHub, and Slack.
 
+- **Server etiquette.** A daily check, run by the PI, of lab members' jobs
+  against the lab's priority, core and GPU limits, with polite messages that
+  escalate only if a problem persists. See
+  [Running long jobs](run_launcher.md#server-etiquette-a-daily-check-for-the-pi).
 - **Space audit (optional).** A weekly, read-only scan of the lab's data
   server that reports how much disk each project uses and what could be
   tidied. The PI turns it on or off under **⚙ Lab settings → Space audit**;

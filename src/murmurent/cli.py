@@ -281,9 +281,59 @@ def agent_new(name: str, description: str, model: str | None, tools: tuple[str, 
 @click.argument("name")
 @click.option("--force", is_flag=True,
               help="Overwrite an existing real file / re-snapshot from the current commons.")
-def agent_fork(name: str, force: bool) -> None:
+@click.option("--project", default="", metavar="PROJECT",
+              help="Make your own version for this project only, kept in your vault "
+                   "(#186). Without it, your version applies to all your projects.")
+def agent_fork(name: str, force: bool, project: str) -> None:
     from .commands import agent_cmd as _agent_cmd
-    _agent_cmd.cmd_fork(name, force=force)
+    if project:
+        _agent_cmd.cmd_fork_for_project(name, project)
+    else:
+        _agent_cmd.cmd_fork(name, force=force)
+
+
+@agent_group.command(
+    "sync",
+    help="Install the version of each agent that should win: the lab's into your "
+         "agents folder (unless you have your own), and the project's or your "
+         "per-project versions into a repo. Also applies agents switched off "
+         "there. Default: the repo in the current folder.",
+)
+@click.option("--repo", default=None, metavar="PATH", help="This repo.")
+@click.option("--all", "all_repos", is_flag=True, help="Every project repo on this machine.")
+def agent_sync(repo: str | None, all_repos: bool) -> None:
+    from .commands import agent_cmd as _agent_cmd
+    _agent_cmd.cmd_sync(repo, all_repos)
+
+
+@agent_group.command("off", help="Switch an agent off for you in one project.")
+@click.argument("name")
+@click.option("--project", required=True, metavar="PROJECT")
+def agent_off(name: str, project: str) -> None:
+    from .commands import agent_cmd as _agent_cmd
+    _agent_cmd.cmd_switch(name, project, off=True)
+
+
+@agent_group.command("on", help="Switch an agent back on for you in one project.")
+@click.argument("name")
+@click.option("--project", required=True, metavar="PROJECT")
+def agent_on(name: str, project: str) -> None:
+    from .commands import agent_cmd as _agent_cmd
+    _agent_cmd.cmd_switch(name, project, off=False)
+
+
+@agent_group.command(
+    "share",
+    help="Share the version of an agent you use now: with the whole lab (--lab, "
+         "PI only; members' own versions still win), or with a project team "
+         "(--repo, copied into the repo for you to commit).",
+)
+@click.argument("name")
+@click.option("--lab", "to_lab", is_flag=True, help="Make it the lab's version.")
+@click.option("--repo", default=None, metavar="PATH", help="Make it this repo's project version.")
+def agent_share(name: str, to_lab: bool, repo: str | None) -> None:
+    from .commands import agent_cmd as _agent_cmd
+    _agent_cmd.cmd_share(name, to_lab, repo)
 
 
 @agent_group.command(
@@ -648,6 +698,29 @@ def project_describe(name: str) -> None:
 @click.argument("name", required=False)
 def project_status(name: str | None) -> None:
     raise SystemExit(project_cmd.cmd_status(name))
+
+
+@project_group.command("set",
+                       help="Set a project's data folders, the folders or repositories it "
+                            "reads without owning, and its keep-until date (YYYY-MM-DD). "
+                            "Each option replaces that list; --clear empties it. The PI or "
+                            "project lead runs this; it commits and pushes the record.")
+@click.argument("name")
+@click.option("--data-folder", "data_folders", multiple=True, metavar="FOLDER",
+              help="A folder the project owns, in full or relative to the data root "
+                   "(append_only/x). Repeat for several.")
+@click.option("--reads-from", "reads_from", multiple=True, metavar="FOLDER_OR_REPO",
+              help="A folder or repository the project reads but does not own. Repeat for several.")
+@click.option("--retain-until", "retain_until", default=None, metavar="YYYY-MM-DD",
+              help="Nothing may be suggested for deletion before this date; empty clears it.")
+@click.option("--clear", "clear", multiple=True,
+              type=click.Choice(["data-folders", "reads-from"]),
+              help="Empty a list (back to the default data folders, or nothing read).")
+def project_set(name: str, data_folders: tuple, reads_from: tuple,
+                retain_until: str | None, clear: tuple) -> None:
+    raise SystemExit(project_cmd.cmd_set(name, data_folders=data_folders,
+                                         reads_from=reads_from, retain_until=retain_until,
+                                         clear=clear))
 
 
 @project_group.command("migrate",
@@ -2712,6 +2785,8 @@ cli.add_command(_jobs_group)
 # Space: suggest what a project could delete, compress or move; record decisions (#151).
 from .commands.space_cmd import space_group as _space_group
 cli.add_command(_space_group)
+from .commands.etiquette_cmd import etiquette_group as _etiquette_group
+cli.add_command(_etiquette_group)
 
 
 if __name__ == "__main__":  # pragma: no cover

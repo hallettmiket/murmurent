@@ -1258,9 +1258,21 @@ def _projects(
                 slack_workspace=(cert_ws.get(p.name) or None),
                 repos=cert_repos.get(p.name, []),
                 machines=_project_machines(host, cert_repos.get(p.name, [])),
+                activity=_project_activity(p.name) if p.name in cert_names else "",
             )
         )
     return rows
+
+
+def _project_activity(name: str) -> str:
+    """The project's activity (#151); "" if it cannot be worked out."""
+    try:
+        from ..core import cert_projects as _cps
+        from ..core import project_unit as _pu
+        cp = _cps.get(name)
+        return _pu.activity(cp) if cp is not None else ""
+    except Exception:
+        return ""
 
 
 def _viewer_project_cert(project: str, viewer: str, members: list[str]) -> str:

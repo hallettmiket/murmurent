@@ -550,6 +550,31 @@ def _rows(rows: list[tuple[str, ...]], indent: str = "  ") -> list[str]:
     return [indent + "  ".join(c.ljust(w) for c, w in zip(r, widths)).rstrip() for r in rows]
 
 
+def cmd_set(name: str, *, data_folders: tuple = (), reads_from: tuple = (),
+            retain_until: str | None = None, clear: tuple = ()) -> int:
+    """`murmurent project set`: data folders, reads-from and keep-until (#151)."""
+    from ..core import cert_projects as _cps
+    cp = _cps.get(name)
+    if cp is None:
+        raise click.ClickException(f"no project named {name!r}.")
+    kwargs: dict = {}
+    if data_folders or "data-folders" in clear:
+        kwargs["data_folders"] = list(data_folders)
+    if reads_from or "reads-from" in clear:
+        kwargs["reads_from"] = list(reads_from)
+    if retain_until is not None:
+        kwargs["retain_until"] = retain_until.strip()
+    if not kwargs:
+        raise click.ClickException("nothing to set: give --data-folder, --reads-from, "
+                                   "--retain-until or --clear.")
+    try:
+        _cps.upsert(name, lab=cp.lab, **kwargs)
+    except _cps.CertProjectError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Updated {name}. Its record is committed and pushed so the lab sees it.")
+    return cmd_status(name)
+
+
 def cmd_status(name: str | None) -> int:
     """``murmurent project status [name]``: one project, as the unit of work.
 

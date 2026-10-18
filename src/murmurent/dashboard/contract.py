@@ -339,6 +339,10 @@ class ProjectRow(BaseModel):
     # distinct host set the project spans (derived from ``host`` + each repo's
     # host). Single-element for legacy single-host projects.
     machines: list[str] = []
+    # #151: "active", "quiet" or "dormant", from the newest commit, data change
+    # or job across the project and the lab's policy ("unknown" when nothing
+    # shows use). Never affects who can reach the project.
+    activity: str = ""
 
 
 class PeerRow(BaseModel):

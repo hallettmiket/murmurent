@@ -224,22 +224,38 @@ but the inventory MCP refuses to commit-publish their changes unless
 they hold the `lab_manager` role. The PI's review on incoming PRs is
 the final gate.
 
-### Member profile edits are staged, not committed (#34)
+### How a member's profile edit reaches the roster (#34, #187)
 
-Members hold the roster clone **read-only** by design: the PI/leader is
-the only writer, so a member's `git pull --ff-only` on the roster can
-never conflict. That is why a member editing their own profile in the
-dashboard does **not** write to `members/<handle>.md` — committing to a
-read-only clone leaves an unpushable local commit that diverges it and
-breaks the next pull.
+Members hold the roster clone **read-only** by design: the PI is the only
+writer, so a member's `git pull --ff-only` on the roster can never conflict.
+So a member editing their own profile in the dashboard does **not** write to
+`members/<handle>.md`. Instead:
 
-Instead, a non-writer's profile edit is **staged** to their own
-`~/.murmurent/profile.yaml` under a `roster_profile:` block (shaped like
-the roster frontmatter), and their own dashboard overlays it so the edit
-shows immediately. The PI applies staged edits to the roster on the next
-sync. Only the writer (PI/leader) edits `members/<handle>.md` directly,
-with a real commit + push. (The reconcile step that ingests staged member
-profiles into the roster is the durable follow-up to this staging store.)
+1. **The edit is saved in the member's personal vault**
+   (`profile/roster_profile.yaml`) and pushed, so their other machines get it.
+   Their dashboard shows it straight away on every machine with that vault.
+2. **The PI is sent the change** as an issue on the lab management repo,
+   titled `Profile update: @<handle>`. Members can open issues with read
+   access. A later edit updates the same issue.
+3. **The PI applies it** with `murmurent reconcile --apply` on their own
+   machine. The change is applied only if the GitHub account that opened the
+   issue is the GitHub login already on that member's roster entry, so nobody
+   can change someone else's details. A member's GitHub login is never changed
+   from an issue. Each applied change is committed and pushed, and its issue
+   closed. Without `--apply`, reconcile lists what is waiting.
+
+If the member's machine has no personal vault, the change stays on that
+machine (step 1) but is still sent to the PI (step 2). If the lab management
+repo has no GitHub copy, the dashboard says the PI was not sent the change.
+
+The PI's own profile edits go straight to `members/<pi>.md`, committed and
+pushed. Every dashboard updates the roster and the vault when it starts and
+every 15 minutes, so a change made elsewhere appears without pressing
+"update".
+
+Which settings follow you between machines and which stay on one machine is
+recorded in `src/murmurent/core/settings_scope.py`; each settings window says
+which at the top.
 
 ## `lab_mgmt` vs `~/.murmurent/lab_info/`: the comparison
 

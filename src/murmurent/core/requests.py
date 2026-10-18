@@ -539,6 +539,10 @@ def _register_project_from_repos(req: JoinRequest) -> None:
     preferred = (req.host or "local").strip() or "local"
     for rname in req.attach_repos or []:
         host, path = _repo_clone_location(rname, preferred)
+        if host == "local" and not Path(path).expanduser().exists():
+            # A repo picked from GitHub that is not on this machine yet
+            # (#185 item 8): copy it here first.
+            path = _clone_from_github(rname) or path
         # Role heuristic: manuscript repos are usually named so; everything
         # else defaults to code. Editable later from the project's repo list.
         role = "manuscript" if "manuscript" in rname.lower() else "code"
@@ -550,6 +554,46 @@ def _register_project_from_repos(req: JoinRequest) -> None:
         _make_ready_quietly(host, path, lab=lab)
     for m in req.proposed_members or []:
         _cp.upsert(req.project, lab=lab, member=m)
+
+
+def _github_full_name(name: str) -> str:
+    """``owner/name`` of repo ``name`` in the lab's GitHub organisation, from
+    the cached repo inventory; "" when unknown."""
+    try:
+        from . import repo_inventory as _inv
+        cached = _inv.latest_report_path()
+        report = (_inv.load_report(cached) or {}) if cached else {}
+    except Exception:  # noqa: BLE001
+        return ""
+    for row in report.get("rows") or []:
+        gh = row.get("github") or {}
+        if str(row.get("name") or "") == name and gh.get("full_name"):
+            return str(gh["full_name"])
+    return ""
+
+
+def _clone_from_github(name: str) -> str:
+    """Copy repo ``name`` from the lab's GitHub organisation into the
+    repositories folder with ``gh repo clone`` (which handles private repos).
+    Returns the new path, or "" when it could not be copied."""
+    import subprocess
+    from .repo import repos_root
+    full = _github_full_name(name)
+    if not full:
+        _logger.warning("repo %s is not on this machine and not in the lab's GitHub list", name)
+        return ""
+    dest = repos_root() / name
+    try:
+        res = subprocess.run(["gh", "repo", "clone", full, str(dest)],
+                             capture_output=True, text=True, timeout=600)
+    except (OSError, subprocess.SubprocessError) as exc:
+        _logger.warning("could not copy %s from GitHub: %s", full, exc)
+        return ""
+    if res.returncode != 0:
+        _logger.warning("could not copy %s from GitHub: %s", full,
+                        (res.stderr or res.stdout).strip()[-300:])
+        return ""
+    return str(dest)
 
 
 def _make_ready_quietly(host: str, path: str, *, lab: str) -> None:

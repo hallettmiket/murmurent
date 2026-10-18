@@ -67,7 +67,10 @@ Stored in `~/.murmurent/machine.yaml`. Each applies to this computer only.
 |---|---|---|
 | `murmurent agent which [--repo <path>]` | Show which version of each agent Claude Code will use, and where it comes from | One row per agent: **centre version**, **your version** or **your agent** (from your vault), **project version** (committed in the repo), **local file** (this machine only), **broken link**, or **not installed**. `--repo` describes a session started in that repo, whose own `.claude/agents/` wins |
 | `murmurent agent list` | List installed agents in `~/.claude/agents/` | Each shown as **linked** (commons symlink), **forked** (personal copy), or **user-file**; forks also show upstream/local drift status |
-| `murmurent agent fork <name> [--force]` | Replace a commons agent's symlink with an editable personal copy | Preserved across commons upgrades; canonical copy in the vault's `agent_forks/` (rides `murmurent vault sync` to your other machines; legacy `~/.murmurent/agent_forks/` when no vault), hardlinked into `~/.claude/agents/`. `--force` re-snapshots from the current commons |
+| `murmurent agent fork <name> [--force] [--project P]` | Replace a commons agent's symlink with an editable personal copy | Preserved across commons upgrades; canonical copy in the vault's `agent_forks/` (rides `murmurent vault sync` to your other machines; legacy `~/.murmurent/agent_forks/` when no vault), hardlinked into `~/.claude/agents/`. `--force` re-snapshots from the current commons. `--project P` keeps the copy in your vault's `projects/P/agents/`, for that project only |
+| `murmurent agent sync [--repo PATH] [--all]` | Install the version of each agent that should win | The lab's into `~/.claude/agents` unless you have your own; project and per-project versions into a repo; agents switched off there. See [Choosing an agent's version](agent_versions.md) |
+| `murmurent agent off <name> --project P` / `on` | Switch an agent off (or back on) for you in one project | Becomes Claude Code's `Agent(<name>)` deny rule in the repo's `.claude/settings.local.json`. Guardians cannot be switched off |
+| `murmurent agent share <name> --lab` / `--repo PATH` | Make the version you use the lab's (PI only) or a project's | `--lab` commits it to the lab-management repo's `agents/`; `--repo` copies it into `.murmurent/agents/` for you to commit |
 | `murmurent agent drift [<name>]` | Merge indicator for forks | Per fork: `UP-TO-DATE` / `LOCAL-ONLY` / `UPSTREAM` / `DIVERGED` / `ORPHANED`, plus a summary of forks needing review |
 | `murmurent agent unfork <name> [--force]` | Restore the commons symlink, dropping the personal copy | Prompts if local edits would be lost, unless `--force` |
 | `murmurent agent relink` | Re-link the vault's personal agents (symlinks) + forks (hardlinks) into `~/.claude/agents/` | Run after a vault pull on another machine (`scripts/setup.sh` also runs it). Migrates a legacy `~/.murmurent/agent_forks/` into the vault once; idempotent and non-destructive |
@@ -129,6 +132,7 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 | `murmurent project list` | List projects you are a member of |
 | `murmurent project describe <name>` | Charter, MEMBERS, status |
 | `murmurent project status [<name>]` | One project as a whole: its repositories, data folders, what it reads without owning, its keep-until date, when it was last used, and whether it is active, quiet or dormant. With no name, the project of the repository you are in. See [Every repository is in a project](ready_vs_projects.md#every-repository-is-in-a-project) |
+| `murmurent project set <name> [--data-folder F]... [--reads-from F]... [--retain-until DATE] [--clear data-folders\|reads-from]` | Set a project's data folders, what it reads without owning, and its keep-until date | Commits and pushes the project record |
 | `murmurent project migrate [--apply] [--yes]` | List every repository and every folder directly under `immutable/` and `append_only/` that no project claims, and propose project records for them (`x`, `x_manuscript` and `x_seminar` become one project `x`). Writes nothing without `--apply`, and asks before writing (`--yes` skips the question). Never moves, renames or deletes anything |
 | `murmurent project new <name> --charter <file> --members <list>` *PI/proposer* | Create a new project |
 | `murmurent project members <name>` | Print MEMBERS |
@@ -309,6 +313,9 @@ The full workflow is in [Assembling a choreography](assembling_choreographies.md
 | `murmurent jobs [--all]` | What is running, waiting and recently ended, with estimates |
 | `murmurent jobs show <id or name>` | Everything recorded about one job |
 | `murmurent jobs stop <id or name>` | Stop a job: asked to end cleanly, then by force 30 seconds later |
+| `murmurent jobs policy [--init]` | The lab's rules in force; `--init` creates `policy/millwright.yaml` from the template if the lab has none |
+| `murmurent etiquette check [--notify]` | Lab members running above nice 19, over their cores or GPUs | Reports only unless `--notify`: a direct message, then the lab channel, then the PI. Never reads command lines or changes jobs |
+| `murmurent etiquette schedule --install [--notify] [--at 11:00]` / `--remove` | Run the check every weekday under your account | Recorded in `policy/scheduled_jobs.md` |
 | `murmurent jobs restart <id or name> [--wait]` | Run a job again from its card |
 | `murmurent jobs policy` | The lab's rules in force (from `<lab-mgmt>/policy/millwright.yaml`) and where they came from |
 

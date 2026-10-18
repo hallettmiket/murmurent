@@ -46,6 +46,8 @@ CHECK_SECONDS = 60
 WAIT_CHECK_SECONDS = 60
 STOP_GRACE_SECONDS = 30
 DISK_SAMPLE_MINUTES = (1, 2, 5, 10)
+#: Send one Slack warning when a job would fill its disk within this many hours.
+DISK_WARN_HOURS = 24
 FOLDER_WALK_MAX_ENTRIES = 200_000
 FOLDER_WALK_MAX_SECONDS = 20.0
 ECHO_MAX_BYTES = 64 * 1024
@@ -428,7 +430,17 @@ class Supervisor:
         card.estimates["disk_free_bytes"] = free
         card.estimates["disk_measured_minutes"] = round(minutes, 1)
         if rate > 0 and free is not None:
-            card.estimates["hours_until_disk_full"] = free / rate
+            hours_left = free / rate
+            card.estimates["hours_until_disk_full"] = hours_left
+            # Warn once in Slack when the disk would fill within a day (#151);
+            # `murmurent jobs` already shows the estimate.
+            if hours_left < DISK_WARN_HOURS and not card.notify.get("disk_warned"):
+                card.notify["disk_warned"] = _cards.to_iso(now)
+                try:
+                    _rl.post_notice(card, poster=self.poster, token_resolver=self.token_resolver,
+                                    text=_rl.disk_warning_text(card, hours_left, free))
+                except Exception:  # noqa: BLE001 - a Slack problem never fails a job
+                    pass
         else:
             card.estimates.pop("hours_until_disk_full", None)
 

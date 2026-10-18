@@ -45,9 +45,10 @@ Three agents are never editable whatever their flag, because they guard the
 rest: `security_guard`, `adversary` and `conscience`, plus any agent that
 withholds a tool able to send data out.
 
-The flag is checked when a member tries to edit an agent. It does not yet
-decide which version runs: once a member has their own version, Claude Code
-uses it in all of that member's projects.
+The flag is checked when a member tries to edit an agent, and frozen agents
+always run the centre version. Which version runs otherwise is set by five
+levels (person in one project, project, person, lab, centre): see
+[Choosing an agent's version](agent_versions.md).
 
 ### Planned: levels and the cascade
 
@@ -60,10 +61,8 @@ Two further rules were designed but are **not built**:
    automation) would always use the shared version, because bots write to
    shared results and those must be reproducible.
 
-[Issue #186](https://github.com/hallettmiket/murmurent_dev/issues/186) plans
-how an agent's version will be chosen across the centre, lab, project and
-person levels, including switching an agent off in one project. These two
-rules belong there.
+Both would sit on top of the levels described in
+[Choosing an agent's version](agent_versions.md).
 
 ### Tool preferences (defaults + overrides)
 

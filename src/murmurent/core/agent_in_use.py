@@ -41,6 +41,8 @@ YOURS = "yours"
 PROJECT = "project"
 LOCAL_FILE = "local-file"
 BROKEN_LINK = "broken-link"
+LAB = "lab"
+PERSON_PROJECT = "person-project"
 MISSING = "missing"
 
 
@@ -123,6 +125,20 @@ def _classify_link(name: str, path: Path, *, where: str) -> AgentInUse:
             f"{where} links to {shown}, which is missing or cannot be read on "
             "this machine, so Claude Code cannot use this agent.",
             path=str(path))
+    from . import agent_levels as _lv
+    lab = _lv.lab_agents_dir()
+    if lab is not None and _is_under(target, _safe_resolve(lab)):
+        return AgentInUse(name, LAB, "lab version",
+            f"{where} links to the lab's own definition, set by the PI.", path=str(target))
+    vault = _lv._vault()
+    if vault is not None and _is_under(target, _safe_resolve(vault / "projects")):
+        return AgentInUse(name, PERSON_PROJECT, "your version for this project",
+            f"{where} links to your own version for this project, kept in your vault.",
+            path=str(target))
+    if "/.murmurent/agents/" in str(target):
+        return AgentInUse(name, PROJECT, "project version",
+            f"{where} links to the project's definition, committed in the repo.",
+            path=str(target))
     commons = _safe_resolve(_af.commons_agents_dir())
     if _is_under(target, commons):
         return AgentInUse(name, CENTRE, "centre version",

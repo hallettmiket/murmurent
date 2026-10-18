@@ -21,7 +21,8 @@ it a project. See [Starting a choreography](starting_a_choreography.md).
 ## Getting a choreography
 
 A choreography lives in its own repository. Published ones are in a public
-index, so you can find one by name:
+index. On the dashboard, the Choreographies panel's **browse published** button
+lists them and installs one with a click. In a terminal, find one by name:
 
 ```bash
 murmurent choreography list                  # what is published
