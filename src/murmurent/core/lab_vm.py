@@ -41,6 +41,8 @@ LEGACY_APPEND_ONLY_SUBDIR = "refined"
 # Backwards-compatible aliases (some callers still import these names).
 RAW_SUBDIR = IMMUTABLE_SUBDIR
 REFINED_SUBDIR = APPEND_ONLY_SUBDIR
+# A folder name on disk, not the sensitivity tier: the tier is now called
+# ``protected`` (core/sensitivity.py) but existing folders keep their name.
 CLINICAL_SUBDIR = "clinical"
 INSTRUMENT_OUTPUTS_SUBDIR = "instrument_outputs"
 
@@ -135,7 +137,7 @@ def refined_root(env: dict[str, str] | None = None) -> Path:
 
 
 def clinical_root(env: dict[str, str] | None = None) -> Path:
-    """Return ``<data-root>/clinical``."""
+    """Return ``<data-root>/clinical`` (a legacy folder name, kept as is)."""
     return data_root(env) / CLINICAL_SUBDIR
 
 

@@ -24,7 +24,7 @@ It has two separate ways of running:
    API tokens, SSH keys, age keys, `.env`-style assignments, and known
    cloud key formats; scans touched paths for restricted prefixes
    (`immutable/`, `keys/`, `.env*`, `secrets/`); and, for
-   `sensitivity: clinical` projects, scans added text for PHI-shaped
+   `sensitivity: protected` projects, scans added text for PHI-shaped
    patterns (OHIP-like, MRN-like, SIN-like, DOB-near-name proximity).
    It refuses any PR that touches `immutable/`, and it treats
    `~/.murmurent/keys/**` and `~/.murmurent/age/**` as never-commit

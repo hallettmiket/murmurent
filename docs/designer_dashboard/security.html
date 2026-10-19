@@ -233,7 +233,7 @@
             Purpose: runs locally on your own machine (your repos, vault, and
             certificates) — no SSH, read-only, nothing is changed. It checks
             your GitHub &amp; Slack project access, local repo &amp; vault
-            permissions, certificate validity, and clinical-data containment.
+            permissions, certificate validity, and protected-data containment.
           </div>
           <div class="controls" style="margin-bottom:12px">
             <button id="pa-run-btn">Run personal audit</button>
@@ -252,7 +252,7 @@
                 Square colour = is that a concern?
                 <b style="color:var(--green)">green</b> = no access (good) ·
                 <b style="color:var(--tiger)">amber</b> = group can get in ·
-                <b style="color:var(--red)">red</b> = world can get in (or group, on clinical data).
+                <b style="color:var(--red)">red</b> = world can get in (or group, on protected data).
                 A private repo is ideally owner-only (<code>chmod 700 &lt;folder&gt;</code>);
                 <code>755</code> lets group and world read it.
               </div>
@@ -282,7 +282,7 @@
               <div class="pa-legend" style="font-family:var(--mono); font-size:11px; color:var(--muted); line-height:1.65; margin:2px 0 9px">
                 Literal file targets in your code that land <b>outside</b> the governed data root:
                 <b style="color:var(--tiger)">warn</b> = an analysis/data write to <code>$HOME</code>, <code>/tmp</code>, Desktop, or another un-governed spot ·
-                <b style="color:var(--red)">block</b> = the same on a <b>clinical</b> repo.
+                <b style="color:var(--red)">block</b> = the same on a <b>protected</b> repo.
                 Heuristic + conservative: only <i>literal, absolute</i> paths are flagged; dynamic paths are left alone.
                 Fix: write under <code>$MURMURENT_DATA_ROOT/append_only/&lt;project&gt;/</code>.
               </div>
@@ -304,8 +304,8 @@
                 Outbound / API destinations reached from each repo — informational, not an error:
                 <b style="color:var(--purple)">AI</b> = expected Anthropic/OpenAI calls ·
                 <b style="color:var(--muted)">other</b> = generic HTTP clients, cloud SDKs, uploads, email.
-                On a <b>clinical</b> repo, data-shipping/upload/cloud/email egress escalates
-                (<b style="color:var(--tiger)">warn</b>/<b style="color:var(--red)">block</b>) — clinical data must not leave.
+                On a <b>protected</b> repo, data-shipping/upload/cloud/email egress escalates
+                (<b style="color:var(--tiger)">warn</b>/<b style="color:var(--red)">block</b>): protected data must not leave.
               </div>
               <div id="pa-egress"></div>
             </div>
@@ -757,7 +757,8 @@
         const host = document.getElementById("pa-heatmap");
         if (!acl.length) { host.innerHTML = '<div class="pa-empty">No local repos or vault scanned.</div>'; return; }
         const rows = acl.map(f => {
-          const clinical = (f.notes || "").includes("clinical") || f.category === "vault"
+          const notes = f.notes || "";
+          const clinical = notes.includes("protected") || notes.includes("clinical") || f.category === "vault"
                         || f.rule === "PERSONAL-ACL-CLINICAL-01";
           const cur = f.current_state || "";
           // owner is always ok; group/world derive from severity + text.
@@ -766,7 +767,7 @@
           const ownerChip = paChip("green");
           const groupChip = group ? paChip(clinical ? "red" : "amber") : paChip("green");
           const worldChip = world ? paChip("red") : paChip("green");
-          const flag = clinical ? '<span class="clin-flag">CLINICAL</span>' : "";
+          const flag = clinical ? '<span class="clin-flag">PROTECTED</span>' : "";
           return `<tr>
             <td>${escP(f.path)}${flag}</td>
             <td>${worldChip}</td><td>${groupChip}</td><td>${ownerChip}</td>

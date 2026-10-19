@@ -18,9 +18,9 @@ exceptions the PI agreed to on 2026-10-16:
 1. To find duplicates, files of the same size (above a set size) are
    fingerprinted, which reads them. The fingerprint is a number; nothing in the
    file is kept or shown. ``--no-checksums`` turns this off.
-2. For a file no project member owns, in a project not marked clinical, the
+2. For a file no project member owns, in a project not marked protected, the
    first three lines are kept in the table, so the PI can tell what it is. For
-   a clinical project, nothing inside a file is ever read for this.
+   a protected project, nothing inside a file is ever read for this.
 
 What the scan never does. It changes no file, follows no link out of the
 project, and never walks a folder the project only reads (``reads_from``).
@@ -49,6 +49,7 @@ from typing import Callable
 from . import cert_projects as _cp
 from . import lab_vm as _lab_vm
 from . import project_unit as _pu
+from . import sensitivity as _sens
 from . import space_table as _st
 from .millwright_policy import Policy, load_policy
 
@@ -140,9 +141,15 @@ ROOT_REPO = "repository"
 ROOT_IMMUTABLE = "immutable"
 ROOT_APPEND_ONLY = "append_only"
 ROOT_DATA = "data folder"
+#: A project's folder in mothballed/ (#206): waiting for long-term storage.
+#: People move files there; the scan never suggests deleting or changing them.
+ROOT_MOTHBALLED = "mothballed"
+#: Folders whose contents only a person decides about.
+HANDS_OFF = frozenset({ROOT_IMMUTABLE, ROOT_MOTHBALLED})
 
 # Where a copy is kept when there are duplicates: the most protected place.
-_KEEP_ORDER = {ROOT_IMMUTABLE: 0, ROOT_APPEND_ONLY: 1, ROOT_DATA: 2, ROOT_REPO: 3}
+_KEEP_ORDER = {ROOT_IMMUTABLE: 0, ROOT_MOTHBALLED: 1, ROOT_APPEND_ONLY: 2, ROOT_DATA: 3,
+               ROOT_REPO: 4}
 
 
 @dataclass(frozen=True)
@@ -244,7 +251,8 @@ def _within(child: Path, parent: Path) -> bool:
 
 def _root_kind(folder: Path, env: dict | None) -> str:
     for kind, base in ((ROOT_IMMUTABLE, _lab_vm.immutable_root(env)),
-                       (ROOT_APPEND_ONLY, _lab_vm.append_only_root(env))):
+                       (ROOT_APPEND_ONLY, _lab_vm.append_only_root(env)),
+                       (ROOT_MOTHBALLED, _lab_vm.data_root(env) / "mothballed")):
         base = Path(os.path.normpath(base))
         if _within(folder, base) or _within(_pu._resolved(folder), _pu._resolved(base)):
             return kind
@@ -425,7 +433,7 @@ def job_outputs(project: str, roots: list[Root],
             continue
         folder = Path(os.path.normpath(card.out))
         root = next((r for r in roots if _within(folder, r.path)), None)
-        if root is None or root.kind == ROOT_IMMUTABLE:
+        if root is None or root.kind in HANDS_OFF:
             continue
         current = by_folder.get(folder)
         if current is None or end.timestamp() > current.end:
@@ -658,10 +666,12 @@ def find_duplicates(candidates: list[_Candidate], *, retention_blocked: bool,
             kept = unique[0]
             for extra in unique[1:]:
                 in_immutable = extra.root_kind == ROOT_IMMUTABLE
-                suggestion = _st.ASK_OWNER if in_immutable else _st.DELETE
+                suggestion = _st.ASK_OWNER if extra.root_kind in HANDS_OFF else _st.DELETE
                 reason = f"An identical copy is kept at {kept.path}."
                 if in_immutable:
                     reason += " This copy is in immutable/, which is never deleted without the PI."
+                elif extra.root_kind == ROOT_MOTHBALLED:
+                    reason += " This copy is in mothballed/, which only people change."
                 if retention_blocked and suggestion == _st.DELETE:
                     suggestion = _st.KEEP
                     reason += " The project keeps everything until its keep-until date."
@@ -707,7 +717,7 @@ class _Walker:
         self.options = options
         self.env = env
         self.now = (options.now or _dt.datetime.now().astimezone()).timestamp()
-        self.clinical = cp.sensitivity == "clinical"
+        self.protected = _sens.is_protected(cp.sensitivity)
         self.skip = [Path(os.path.normpath(p)) for p in _pu.resolve_reads_from(cp, env).folders]
         self.logins, self.unknown_members = member_logins(cp)
         self.experiments = experiment_names(cp)
@@ -832,7 +842,7 @@ class _Walker:
         """One row per temporary folder, or one per root and name when there are several."""
         items: list[_st.Item] = []
         for (root, name), found in self.temporary_folders.items():
-            suggestion = _st.ASK_OWNER if root.kind == ROOT_IMMUTABLE else _st.DELETE
+            suggestion = _st.ASK_OWNER if root.kind in HANDS_OFF else _st.DELETE
             what = TEMPORARY_FOLDERS[name]
             if len(found) == 1:
                 path, group = found[0]
@@ -896,7 +906,7 @@ class _Walker:
         if what and not is_tracked and self._old_enough(mtime):
             self.items.append(_st.Item(
                 path=spath, category=_st.TEMPORARY, reason=f"{what[0].upper()}{what[1:]}.",
-                suggestion=_st.ASK_OWNER if root.kind == ROOT_IMMUTABLE else _st.DELETE,
+                suggestion=_st.ASK_OWNER if root.kind in HANDS_OFF else _st.DELETE,
                 size=size, owner=owner, changed_at=_iso(mtime), disk=root.disk,
                 evidence=f"file name {name}; last changed {_iso(mtime)[:10]}"))
 
@@ -924,7 +934,7 @@ class _Walker:
 
         # Compressible text data.
         if (ext in COMPRESS_METHODS and size >= self.policy.compress_min_mb * MB
-                and root.kind != ROOT_IMMUTABLE):
+                and root.kind not in HANDS_OFF):
             self.items.append(_st.Item(
                 path=spath, category=_st.COMPRESSIBLE, suggestion=_st.COMPRESS,
                 reason=f"Uncompressed {ext[1:].upper()} data. Lossless: {COMPRESS_METHODS[ext]}.",
@@ -956,7 +966,7 @@ class _Walker:
         if st.st_mode & stat.S_IWOTH:
             self.access.setdefault((str(root.path), "anyone on the server can change"),
                                    _Group()).add(spath, size, mtime)
-        elif self.clinical and st.st_mode & stat.S_IROTH:
+        elif self.protected and st.st_mode & stat.S_IROTH:
             self.access.setdefault((str(root.path), "anyone on the server can read"),
                                    _Group()).add(spath, size, mtime)
 
@@ -1180,7 +1190,7 @@ def _listed_items(cp: _cp.CertProject, roots: list[Root]) -> list[_st.Item]:
             continue
         is_file = stat.S_ISREG(st.st_mode)
         size = st.st_size if is_file else _folder_size(path)
-        in_immutable = root.kind == ROOT_IMMUTABLE
+        in_immutable = root.kind in HANDS_OFF
         items.append(_st.Item(
             path=str(path), category=_st.LISTED,
             suggestion=_st.ASK_OWNER if in_immutable else _st.DELETE,
@@ -1197,7 +1207,7 @@ def _unattributed_items(walker: _Walker, roots: list[Root]) -> list[_st.Item]:
     items: list[_st.Item] = []
     for (owner, group_path, disk), group in sorted(walker.unattributed.items()):
         single = group.n_files == 1 and group.example == group_path
-        text = "" if walker.clinical else peek(group.example)
+        text = "" if walker.protected else peek(group.example)
         reason = (f"Owned by {owner}, who is not a member of this project we can match."
                   if not walker.unknown_members else
                   f"Owned by {owner}, who is not a member of this project we can match "
@@ -1273,7 +1283,7 @@ def write_data_dates(newest: dict[str, float], scanned_at: str,
 
 __all__ = [
     "COMPRESS_METHODS", "KNOWN_TYPES", "TEMPORARY_FOLDERS", "TEMPORARY_NAMES",
-    "ROOT_REPO", "ROOT_IMMUTABLE", "ROOT_APPEND_ONLY", "ROOT_DATA",
+    "ROOT_REPO", "ROOT_IMMUTABLE", "ROOT_APPEND_ONLY", "ROOT_DATA", "ROOT_MOTHBALLED", "HANDS_OFF",
     "Root", "ScanOptions", "project_roots", "member_logins", "git_tracked",
     "experiment_names", "ENVIRONMENT_FOLDERS", "script_state", "job_outputs", "ready_to_delete_entries",
     "peek", "duplicate_items", "scan_project", "write_data_dates", "owner_name",

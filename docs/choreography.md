@@ -8,6 +8,24 @@ A **choreography** is a documented multi-actor pattern: a recipe for how
 several people, and the agents they run, work together, in what order,
 producing what artefacts. A choreography runs in one of two modes.
 
+## A choreography and a project
+
+They answer different questions.
+
+- A **project** says *who and what*: its members, who hold certificates; its
+  repos; its data folders; its private Slack channel. It is how murmurent
+  decides access, and every repo belongs to one.
+- A **choreography** says *how*: the steps, the roles, the question being
+  asked and how contributions are combined. It is written down in its own
+  repo (whose `.murmurent.yaml` says `kind: choreography`), so another lab can
+  install it and run the same recipe.
+
+A choreography runs inside a project. Starting one creates its repo and asks
+your PI to make it a project, so the people taking part, the data and the
+channel are governed like any other project. One project can carry several
+choreographies, and the same published choreography can run in many projects
+in different labs.
+
 ## Starting one
 
 ```bash
@@ -21,8 +39,9 @@ it a project. See [Starting a choreography](starting_a_choreography.md).
 ## Getting a choreography
 
 A choreography lives in its own repository. Published ones are in a public
-index. On the dashboard, the Choreographies panel's **browse published** button
-lists them and installs one with a click. In a terminal, find one by name:
+index. On the dashboard, the Choreographies panel lists them under
+**Published by other labs** and installs one with a click. In a terminal, find
+one by name:
 
 ```bash
 murmurent choreography list                  # what is published

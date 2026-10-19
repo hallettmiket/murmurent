@@ -140,8 +140,8 @@ along with the prose (see [vignette 5](vault_vignettes/5_bring_in_a_table.md));
 a full spreadsheet or PDF belongs in `murmurent_data/` (see
 [vignette 4](vault_vignettes/4_add_a_manuscript.md)).
 
-For **clinical or otherwise sensitive** documents, mark any referencing entry
-`sensitivity: clinical` so it stays in your personal vault and is never
+For **patient-derived or otherwise sensitive** documents, mark any referencing
+entry `sensitivity: protected` so it stays in your personal vault and is never
 published to the lab. Large bulk-data files (cohort tables, imaging stacks)
 belong in Tier 3, not `murmurent_data/`.
 
@@ -154,12 +154,12 @@ that findings from one collaboration do not accidentally cross-contaminate
 another.
 
 A governance boundary sits on this promotion. `murmurent oracle publish`
-refuses any entry with `sensitivity: clinical` or `sensitivity: restricted`;
+refuses any entry with `sensitivity: protected` or `sensitivity: restricted`;
 those stay in the personal vault permanently. The personal Oracle agent
 enforces the same refusal before it will even stage a draft. This matches
 the schema rule in
 [`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md),
-which states that a clinical entry must stay in the personal vault and is
+which states that a protected entry must stay in the personal vault and is
 never published to the Lab Oracle, and it is enforced identically in the
 agent definitions of both `oracle` and `lab_oracle`.
 
@@ -241,16 +241,19 @@ coloured badge). There are three levels:
 |---|---|---|
 | `standard` | Shareable with the lab. | Promotes it to the Lab Oracle. |
 | `restricted` | Stays in the personal vault. | Refuses to publish it. |
-| `clinical` | Stays in the personal vault. The underlying clinical records stay in Tier-3 storage with access logging (see below). | Refuses to publish it. |
+| `protected` | Stays in the personal vault. Material a data-use agreement or research ethics board keeps inside your own account, such as patient records, stays in Tier-3 storage with access logging (see below). | Refuses to publish it. |
 
-For `clinical` data, the records themselves live in Tier-3 storage
+`clinical` is the former name of `protected`. An entry that still says
+`clinical` is treated exactly as `protected`.
+
+For `protected` data, the records themselves live in Tier-3 storage
 (for example under `immutable/<project>/clinical/`) with access logging.
 Agents reach them only through a de-identifying MCP boundary that
 returns structured summary slices, never the raw pathology reports or
 radiology notes. The records are never copied into an oracle entry, a
 prompt, or a vector index. Only a de-identified provenance or summary
 entry (cohort size, inclusion criteria, REB/IRB approval) may live in
-the oracle, and even that entry is tagged `sensitivity: clinical` so
+the oracle, and even that entry is tagged `sensitivity: protected` so
 it never gets promoted to the Lab Oracle.
 
 ---
@@ -259,7 +262,7 @@ it never gets promoted to the Lab Oracle.
 
 | Rule | Enforced by |
 |---|---|
-| `sensitivity: clinical` / `restricted` entries never leave the personal vault | `oracle` agent (refuses to stage a draft) and `murmurent oracle publish` CLI (refuses to commit) |
+| `sensitivity: protected` / `restricted` entries never leave the personal vault | `oracle` agent (refuses to stage a draft) and `murmurent oracle publish` CLI (refuses to commit) |
 | New Lab Oracle entries arrive only via reviewed `murmurent oracle publish` | `lab_oracle` agent has no `Write` tool; the CLI is the only write path |
 | `immutable/` is read-only | `raw_guard` hook, blocks Write/Edit/NotebookEdit/Bash on `immutable/` |
 | `append_only/` is append-only | `protected_paths` hook, blocks delete/overwrite of existing files |
@@ -322,7 +325,7 @@ murmurent oracle publish 2026-05-16_chrm_p14 --push # validate + commit + push
 ```
 
 `murmurent oracle publish` checks `sensitivity` (here `standard`, so
-it proceeds; had it been `clinical` or `restricted` it would refuse),
+it proceeds; had it been `protected` or `restricted` it would refuse),
 checks the lab doesn't already have an entry at that path, and commits
 the file into
 `~/repos/murmurent_lab_mgmt_mh/oracle/2026-05-16_chrm_p14.md` under

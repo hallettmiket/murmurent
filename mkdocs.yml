@@ -64,7 +64,7 @@ exclude_docs: |
   backlog.md
   cores_plan.md
   cores_smoke_runbook.md
-  scientific_writing.md
+  scientific_writing_examples.md
   designer_dashboard/
   murmurent_public/
   diagrams/README.md
@@ -102,6 +102,7 @@ nav:
       - Creating a project (in your lab): project_intra.md
       - Running long jobs: run_launcher.md
       - Tidying a project's space: space_table.md
+      - The lab folder protocol: lab_folders.md
   - Labs & cores:
       - "Overview: members, groups, projects": overview.md
       - Group-level architecture: group_level.md
@@ -134,6 +135,7 @@ nav:
   - Reference:
       - CLI manual: cli_manual.md
       - "Reporting checklists (TRIPOD+AI, PROBAST+AI, REMARK)": reporting_guidelines.md
+      - "Writing guide for manuscripts (the Scribe)": scientific_writing.md
       - Architecture diagrams: diagrams.md
       - Versioning: versioning.md
       - Code style: style/code-style.md

@@ -51,6 +51,7 @@ from . import cert_projects as _cp
 from . import identity as _identity
 from . import lab_vm as _lab_vm
 from . import membership as _members
+from . import sensitivity as _sens
 from .frontmatter import parse_file as _parse_file
 from .security_acl import FileAcl, parse_nfs4_getfacl
 from .security_findings import (
@@ -403,7 +404,7 @@ def check_project_access(handle: str, env: dict | None = None, *,
     directories. Emits one :class:`Finding` per (member, directory):
 
     - ``PROJECT-ACCESS-NO-READ-01`` / ``-NO-WRITE-01`` (warn; **block** on a
-      clinical project) when a member is locked out;
+      protected project) when a member is locked out;
     - ``PROJECT-ACCESS-OK-01`` (info) when access is correct;
     - ``PROJECT-ACCESS-UNVERIFIABLE-01`` (info, unverifiable) when the member's
       OS-user mapping or its OS identity cannot be resolved;
@@ -418,8 +419,8 @@ def check_project_access(handle: str, env: dict | None = None, *,
 
     out: list[Finding] = []
     for cp in projects:
-        clinical = cp.sensitivity == "clinical"
-        block_sev = SEVERITY_BLOCK if clinical else SEVERITY_WARN
+        protected = _sens.is_protected(cp.sensitivity)
+        block_sev = SEVERITY_BLOCK if protected else SEVERITY_WARN
         dirs = project_data_dirs(cp, env)
 
         # Resolve each member's OS identity ONCE (an unresolved mapping is one
@@ -484,7 +485,7 @@ def check_project_access(handle: str, env: dict | None = None, *,
                                    handle=handle, project=cp.name,
                                    verify_state=VERIFY_UNVERIFIABLE, when=when))
                     continue
-                kind = "clinical " if clinical else ""
+                kind = "protected " if protected else ""
                 if not acc.can_read:
                     out.append(_mk("PROJECT-ACCESS-NO-READ-01",
                                    severity=block_sev, path=str(d.path),
@@ -496,7 +497,7 @@ def check_project_access(handle: str, env: dict | None = None, *,
                                        "(fix group/ACL membership)",
                                    handle=handle, project=cp.name,
                                    notes=(f"{kind}project — a locked-out member "
-                                          "blocks their work; PI must fix." if clinical
+                                          "blocks their work; PI must fix." if protected
                                           else "PI must fix the member's access."),
                                    when=when))
                     continue
@@ -509,7 +510,7 @@ def check_project_access(handle: str, env: dict | None = None, *,
                                             "and their repos",
                                    fix=f"PI: grant @{mh} write on {d.path}",
                                    handle=handle, project=cp.name,
-                                   notes=(f"{kind}project." if clinical else
+                                   notes=(f"{kind}project." if protected else
                                           "PI must fix the member's access."),
                                    when=when))
                     continue

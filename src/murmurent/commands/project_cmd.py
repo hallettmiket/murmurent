@@ -20,6 +20,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ..core import lab_vm
+from ..core import sensitivity as _sens
 from ..core.charter import (
     VALID_SENSITIVITY_TIERS,
     CharterError,
@@ -105,7 +106,7 @@ def cmd_describe(name: str) -> int:
     click.echo(f"lead:        {summary.lead}")
     if summary.choreography:
         click.echo(f"choreography: {summary.choreography}")
-    if summary.sensitivity == "clinical":
+    if _sens.is_protected(summary.sensitivity):
         click.echo(f"reb_number:   {parsed.meta.get('reb_number')}")
         click.echo(f"reb_expires:  {parsed.meta.get('reb_expires')}")
         click.echo(f"data_residency: {parsed.meta.get('data_residency')}")
@@ -483,20 +484,23 @@ def cmd_sensitivity(name: str, set_value: str | None) -> int:
     if repo is None:
         raise click.ClickException(f"Project not found locally: {name}")
     parsed = parse_file(repo.charter_path)
-    current = parsed.meta.get("sensitivity")
+    # Show and compare the current tier name, even if the charter still says
+    # the former ``clinical``.
+    current = _sens.normalize(parsed.meta.get("sensitivity"))
     if set_value is None:
         click.echo(current)
         return 0
+    set_value = _sens.normalize(set_value)
     if set_value not in VALID_SENSITIVITY_TIERS:
         raise click.ClickException(
             f"--set must be one of {VALID_SENSITIVITY_TIERS!r}; got {set_value!r}"
         )
     parsed.meta["sensitivity"] = set_value
-    if set_value == "clinical":
+    if set_value == _sens.PROTECTED:
         for required in ("reb_number", "reb_expires", "data_residency"):
             if required not in parsed.meta:
                 raise click.ClickException(
-                    f"raising to clinical requires {required} in CHARTER.md; "
+                    f"raising to protected requires {required} in CHARTER.md; "
                     "edit the charter and re-run."
                 )
     try:

@@ -40,6 +40,7 @@ from pathlib import Path
 
 from . import cert_projects as _cp
 from . import lab_vm as _lab_vm
+from . import sensitivity as _sens
 from .preflight import Probe
 
 _log = logging.getLogger(__name__)
@@ -118,10 +119,23 @@ def _resolve_folder(entry: str, env: dict | None) -> Path:
     return Path(os.path.normpath(p))
 
 
+#: The lab folder protocol's other per-project folders (#206), counted as the
+#: project's own when they exist on this machine.
+OPTIONAL_PROJECT_FOLDERS = ("modifiable", "release", "mothballed")
+
+
 def default_data_folders(name: str, env: dict | None = None) -> list[Path]:
-    """``immutable/<project>/`` and ``append_only/<project>/`` under the data root."""
-    return [Path(os.path.normpath(_lab_vm.project_immutable_dir(name, env))),
-            Path(os.path.normpath(_lab_vm.project_append_only_dir(name, env)))]
+    """``immutable/<project>/`` and ``append_only/<project>/`` under the data
+    root, then ``modifiable/``, ``release/`` and ``mothballed/<project>/`` for
+    each that exists."""
+    out = [Path(os.path.normpath(_lab_vm.project_immutable_dir(name, env))),
+           Path(os.path.normpath(_lab_vm.project_append_only_dir(name, env)))]
+    root = _lab_vm.data_root(env)
+    for tier in OPTIONAL_PROJECT_FOLDERS:
+        folder = Path(os.path.normpath(root / tier / name))
+        if folder.is_dir():
+            out.append(folder)
+    return out
 
 
 def effective_data_folders(cp: _cp.CertProject, env: dict | None = None) -> list[Path]:
@@ -584,19 +598,22 @@ def local_handle() -> str:
 
 
 def marker_sensitivity(repo: Path) -> str:
-    """The sensitivity a repository declares in its ``.murmurent.yaml``, or ""."""
+    """The sensitivity a repository declares in its ``.murmurent.yaml``, or "".
+
+    A marker that still says the former name ``clinical`` reads as ``protected``.
+    """
     try:
         from .repo_ready import read_marker
-        value = str((read_marker(Path(repo)) or {}).get("sensitivity") or "").strip().lower()
+        value = _sens.normalize((read_marker(Path(repo)) or {}).get("sensitivity"))
     except Exception:  # noqa: BLE001
         return ""
     return value if value in _cp.VALID_SENSITIVITY_TIERS else ""
 
 
 def most_sensitive(tiers: list[str]) -> str:
-    """The most sensitive of ``tiers`` (clinical, then restricted, then standard)."""
+    """The most sensitive of ``tiers`` (protected, then restricted, then standard)."""
     order = list(_cp.VALID_SENSITIVITY_TIERS)
-    known = [t for t in tiers if t in order]
+    known = [_sens.normalize(t) for t in tiers if _sens.normalize(t) in order]
     return max(known, key=order.index) if known else "standard"
 
 

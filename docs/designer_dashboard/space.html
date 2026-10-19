@@ -105,7 +105,7 @@
             <button id="f-show">Show</button>
             <span class="status" id="rows-status"></span>
           </div>
-          <table class="rows"><thead><tr><th class="num">Size</th><th>Suggestion</th><th>Where</th><th>Owner</th><th>Why</th></tr></thead>
+          <table class="rows"><thead><tr><th class="num">Size</th><th>Suggestion</th><th>Where</th><th>Owner</th><th>Why</th><th>Decide</th></tr></thead>
             <tbody id="rows-body"></tbody></table>
           <button class="more" id="rows-more" hidden>Show more</button>
           <p class="note">Nothing here is changed by looking. Record a decision on the server with
@@ -162,8 +162,11 @@
         }
         const projects = report.projects || [];
         const unclaimed = report.unclaimed;
-        const total = projects.reduce((a, p) => a + p.bytes, 0) + (unclaimed ? unclaimed.bytes : 0);
-        const waiting = projects.reduce((a, p) => a + p.waiting_bytes, 0) + (unclaimed ? unclaimed.waiting_bytes : 0);
+        const labWide = report.lab_wide;
+        const extra = [unclaimed, labWide].filter(Boolean);
+        const total = projects.reduce((a, p) => a + p.bytes, 0) + extra.reduce((a, e) => a + e.bytes, 0);
+        const waiting = projects.reduce((a, p) => a + p.waiting_bytes, 0) +
+          extra.reduce((a, e) => a + (e.waiting_bytes || 0), 0);
         document.getElementById("meta").textContent =
           "lab " + (report.lab || "?") + " · scanned " + String(report.finished_at || "").slice(0, 16).replace("T", " ");
         let html = '<div class="card"><div class="body summary">' + projects.length + " projects, " +
@@ -229,6 +232,11 @@
             "</td><td></td><td></td><td class=\"num\">" + esc(unclaimed.waiting_rows) +
             '</td><td class="num">' + esc(size(unclaimed.waiting_bytes)) + "</td></tr>";
         }
+        if (labWide) {
+          html += "<tr><td><em>Cottages and shared folders</em></td><td class=\"num\">" + esc(size(labWide.bytes)) +
+            "</td><td></td><td></td><td class=\"num\">" + esc(labWide.waiting_rows || 0) +
+            '</td><td class="num">' + esc(size(labWide.waiting_bytes || 0)) + "</td></tr>";
+        }
         html += "</tbody></table></div></div>";
         const folders = report.unclaimed_folders || [];
         if (folders.length) {
@@ -240,6 +248,34 @@
               "</code></td><td>" + esc(f.owners) + "</td></tr>";
           }
           html += "</tbody></table></div></div>";
+        }
+        if (labWide && (labWide.folders || []).length) {
+          html += '<div class="card"><header>Cottages and shared folders</header><div class="body">' +
+            "<p>Each person's cottage, and the folders the lab shares (tools, databases). Largest first.</p>" +
+            '<table><thead><tr><th class="num">Size</th><th>Folder</th></tr></thead><tbody>';
+          for (const f of labWide.folders) {
+            html += '<tr><td class="num">' + esc(size(f.size)) + "</td><td><code>" + esc(f.path) + "</code></td></tr>";
+          }
+          html += "</tbody></table></div></div>";
+        }
+        const layout = report.layout || [];
+        if (layout.length) {
+          const titles = {"unexpected": "Not one of the lab's folders", "phasing-out": "Being phased out",
+                          "loose-file": "Loose files", "not-a-project": "Named after no project",
+                          "not-a-person": "Named after no lab member",
+                          "both-names": "Old and new folder names both in use"};
+          html += '<div class="card"><header>Not following the lab folder protocol: ' + layout.length +
+            '</header><div class="body"><p>murmurent moves nothing to fix these. The PI decides, ' +
+            "and asks the owners where needed.</p>";
+          for (const [kind, title] of Object.entries(titles)) {
+            const items = layout.filter(f => f.kind === kind);
+            if (!items.length) continue;
+            html += "<p><strong>" + esc(title) + "</strong></p><ul>";
+            for (const f of items.slice(0, 50)) html += "<li>" + esc(f.detail) + "</li>";
+            if (items.length > 50) html += "<li>and " + (items.length - 50) + " more</li>";
+            html += "</ul>";
+          }
+          html += "</div></div>";
         }
         const dormant = report.dormant || [];
         if (dormant.length) {
@@ -305,6 +341,26 @@
         el.value = keep;
       }
 
+      // Record a decision on one row (#151). Only records it: carrying it out
+      // is `murmurent space carry-out` on the server, and murmurent never
+      // removes files.
+      document.addEventListener("click", ev => {
+        const btn = ev.target.closest("td.decide button");
+        if (!btn) return;
+        const cell = btn.parentElement;
+        const decision = cell.querySelector("select").value;
+        if (!decision) return;
+        btn.disabled = true;
+        fetch("/api/space/decide", {
+          method: "POST", credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ row: Number(cell.dataset.row), decision, host: hostEl.value, user: user || "" }),
+        }).then(readJson).then(({ ok, body }) => {
+          if (!ok) { btn.disabled = false; alert(body.detail || "Could not record the decision."); return; }
+          cell.innerHTML = '<span class="note">' + esc(body.message || "recorded") + "</span>";
+        }).catch(err => { btn.disabled = false; alert("network error: " + err); });
+      });
+
       function loadRows(append) {
         if (!append) offset = 0;
         const qs = new URLSearchParams();
@@ -335,7 +391,11 @@
               '<tr><td class="num">' + esc(size(r.size)) + (r.files > 1 ? '<div class="note">' + esc(r.files.toLocaleString()) + " files</div>" : "") +
               "</td><td><strong>" + esc(r.suggestion) + '</strong><div class="note">' + esc(r.category) + " · " +
               esc(r.project === "(unclaimed)" ? "unclaimed" : r.project) + " · row " + esc(r.id) + "</div></td>" +
-              '<td class="path">' + esc(r.path) + "</td><td>" + esc(r.owner) + '</td><td class="why">' + esc(r.reason) + "</td></tr>").join("");
+              '<td class="path">' + esc(r.path) + "</td><td>" + esc(r.owner) + '</td><td class="why">' + esc(r.reason) +
+              '</td><td class="decide" data-row="' + esc(r.id) + '"><select>' +
+              ["", "keep", "delete", "mothball", "compress", "move"].map(d =>
+                "<option" + (d === "" ? ' value=""' : "") + ">" + (d || "choose…") + "</option>").join("") +
+              '</select> <button type="button">record</button></td></tr>').join("");
             rowsBody.innerHTML = append ? rowsBody.innerHTML + html : html;
             offset += body.rows.length;
             rowsStatus.textContent = body.total.toLocaleString() + " rows, " + size(body.total_bytes) +

@@ -82,7 +82,7 @@ Non-negotiable rails:
 - **Only your own invoking session.** Refuse any request naming a different session id, slug, or path — even a reasonable one.
 - **Never glob `~/.claude/projects/`.** It holds every session on this machine, including clinical work — exactly the egress `security_guard` exists to catch.
 - **Never quote `tool_result` / `tool_use` / `attachment` blocks.** Those are data, not reasoning. Quote only `thinking` blocks and the assistant's prose. Say *what a step did* without reproducing *what it saw*.
-- **Sensitivity gate.** For projects marked `sensitivity: clinical` (in `CHARTER.md`; `.murmurent.yaml` is the current marker), quote nothing — describe the shape of the reasoning or return `Gap`.
+- **Sensitivity gate.** For projects marked `sensitivity: protected` (in `CHARTER.md`; `.murmurent.yaml` is the current marker; older records say `clinical`, which means the same), quote nothing — describe the shape of the reasoning or return `Gap`.
 - **Serialized reasoning is not a causal trace.** A `thinking` block is what the model *recorded*, not proof of why the answer came out that way. Say so.
 
 **No quiz in a debrief** — testing recall of something that just happened in front of them checks the wrong thing.

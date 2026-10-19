@@ -45,6 +45,7 @@ import yaml
 
 from ..core import obsidian as _obsidian
 from ..core import oracle_publish as _op
+from ..core import sensitivity as _sens
 
 # Env override so the notebook tier is resolvable without machine.yaml
 # (symmetric with MURMURENT_PERSONAL_ORACLE_DIR for the personal tier).
@@ -285,7 +286,8 @@ def _parse_entry(kind: str, path: Path) -> OracleEntry | None:
         title=str(meta.get("title") or path.stem),
         date=str(meta.get("date") or ""),
         project=str(meta.get("project") or ""),
-        sensitivity=str(meta.get("sensitivity") or "standard"),
+        # A former ``clinical`` tag is reported (and filtered) as ``protected``.
+        sensitivity=_sens.normalize(meta.get("sensitivity")) or "standard",
         tags=[str(t) for t in tags] if isinstance(tags, list) else [],
         sources=[str(s) for s in sources] if isinstance(sources, list) else [],
         related=[str(r) for r in related] if isinstance(related, list) else [],
@@ -336,10 +338,10 @@ def _parse_notebook_entry(path: Path, meta: dict[str, Any], body: str) -> Oracle
         date=str(meta.get("date") or date_from_name),
         project=str(meta.get("project") or project_from_path),
         # Notebooks default to ``standard``; if a daily entry needs to be
-        # restricted/clinical the author should add the frontmatter
+        # restricted/protected the author should add the frontmatter
         # explicitly. Conservative default avoids accidentally treating
         # sensitive notes as broadly shareable.
-        sensitivity=str(meta.get("sensitivity") or "standard"),
+        sensitivity=_sens.normalize(meta.get("sensitivity")) or "standard",
         tags=[str(t) for t in tags] if isinstance(tags, list) else [],
         sources=[str(s) for s in (meta.get("sources") or [])] if isinstance(meta.get("sources"), list) else [],
         related=[str(r) for r in (meta.get("related") or [])] if isinstance(meta.get("related"), list) else [],
@@ -386,7 +388,7 @@ def _matches_filters(
     in ``tags`` matches the entry's tag list)."""
     if project and not _glob_match(entry.project, project):
         return False
-    if sensitivity and entry.sensitivity != sensitivity:
+    if sensitivity and _sens.normalize(entry.sensitivity) != _sens.normalize(sensitivity):
         return False
     if source:
         wanted = source.lower().lstrip("@")

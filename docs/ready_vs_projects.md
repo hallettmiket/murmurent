@@ -48,8 +48,9 @@ What readiness does buy, all of it keyed on that marker file:
    `CHARTER.md` repo is being migrated, so the repo stays discoverable.
    Commands run inside the repo, such as `murmurent project status`, use it to
    work out which project you are in.
-4. **The repo can declare itself clinical.** `sensitivity: clinical` in the
-   marker makes `core.personal_audit` treat it as holding patient data
+4. **The repo can declare itself protected.** `sensitivity: protected` in the
+   marker (or `clinical`, the former name) makes `core.personal_audit` treat it
+   as holding patient data
    regardless of what the project registry says.
 5. **It appears as ready** in `murmurent repo list` and the dashboard's Repos
    panel.

@@ -373,13 +373,15 @@ It has two jobs, inferred from what you give it:
   wherever a citation, a number or an interpretation is missing, rather than
   inventing one.
 
-Its rules come from the PI's own writing, not from general advice. The house
-writing guide (`docs/scientific_writing.md` in the development repository) was
-built from 728 rewrites and 74 deletions Mike Hallett made by hand to text
-Claude Code had written for two manuscripts, plus a profile of the finished
-papers. About 70 to 85% of those edits change voice rather than facts, and the
-main move is cutting. If the guide is not on the machine, the Scribe returns
-`Gap` rather than fall back on generic advice.
+Its rules come from a PI's own writing, not from general advice. The writing
+guide ([`scientific_writing.md`](scientific_writing.md)) was built from several
+hundred rewrites and deletions a PI made by hand to text Claude Code had
+written for two manuscripts, plus a profile of the finished papers. Most of
+those edits change voice rather than facts, and the main move is cutting. Its
+examples are invented. A lab can add real pairs from its own PI's edits in
+`docs/scientific_writing_examples.md`, kept private while the papers are
+unpublished, and the Scribe reads them too. If the guide is not on the
+machine, the Scribe returns `Gap` rather than fall back on generic advice.
 
 Two blind tests on 18 passages the PI later rewrote showed where it can be
 trusted. Word-level fixes (intensifiers, metaphors, dashes, emphasis, sentence
@@ -398,9 +400,6 @@ main session with the same guide.
 
 A member can fork it (`murmurent agent fork scribe`) to build a version in their
 own voice from their own edits.
-
-**Status:** the Scribe and its guide are in the development repository and not
-yet in a release, because the guide quotes unpublished manuscripts.
 
 **Verdict vocabulary:** `Revised / Drafted / Gap — <one-line on what was written or what is missing>`
 
@@ -548,7 +547,7 @@ personnel changes rather than leaving with whoever originally set it up.
 
 Scans diffs and outgoing artefacts for secrets, restricted paths, and
 PHI patterns before they leave the lab. It checks for credentials, API
-tokens, and key material; for clinical-sensitivity projects, scans for
+tokens, and key material; for protected-sensitivity projects, scans for
 PHI-shaped patterns (OHIP/MRN/SIN-like strings, DOB-near-name
 proximity); and treats `~/.murmurent/keys/**` as never-commit
 territory. Under Murmurent's default data layout (see

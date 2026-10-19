@@ -11,9 +11,12 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
+from . import sensitivity as _sens
 from .frontmatter import FrontmatterError
 
-VALID_SENSITIVITY_TIERS: tuple[str, ...] = ("standard", "restricted", "clinical")
+# Tier names come from core/sensitivity.py; a legacy ``clinical`` charter is
+# read as ``protected``.
+VALID_SENSITIVITY_TIERS: tuple[str, ...] = _sens.TIERS
 VALID_CHOREOGRAPHIES: tuple[str, ...] = (
     "drug_discovery_litl",
     "clinical_cohort",
@@ -26,7 +29,10 @@ COMMON_REQUIRED_FIELDS: tuple[str, ...] = (
     "members",
     "sensitivity",
 )
-CLINICAL_EXTRA_FIELDS: tuple[str, ...] = ("reb_number", "reb_expires", "data_residency")
+#: Fields a protected-tier charter must carry (``CLINICAL_EXTRA_FIELDS`` is the
+#: former name, kept for existing imports).
+PROTECTED_EXTRA_FIELDS: tuple[str, ...] = ("reb_number", "reb_expires", "data_residency")
+CLINICAL_EXTRA_FIELDS = PROTECTED_EXTRA_FIELDS
 
 
 class CharterError(FrontmatterError):
@@ -37,8 +43,8 @@ def validate_charter(meta: dict[str, Any], *, context: str = "") -> None:
     """Validate a parsed charter ``meta`` dict.
 
     Checks that the common required fields are present and well-formed and, for
-    ``sensitivity: clinical`` charters, that the clinical-specific fields are also
-    present.
+    ``sensitivity: protected`` charters (or the legacy ``clinical``), that the
+    protected-tier fields are also present.
 
     Parameters
     ----------
@@ -58,18 +64,18 @@ def validate_charter(meta: dict[str, Any], *, context: str = "") -> None:
     if missing:
         raise CharterError(f"CHARTER missing required field(s){suffix}: {', '.join(missing)}")
 
-    sensitivity = meta.get("sensitivity")
+    sensitivity = _sens.normalize(meta.get("sensitivity"))
     if sensitivity not in VALID_SENSITIVITY_TIERS:
         raise CharterError(
             f"CHARTER sensitivity{suffix} must be one of "
-            f"{VALID_SENSITIVITY_TIERS!r}; got {sensitivity!r}"
+            f"{VALID_SENSITIVITY_TIERS!r}; got {meta.get('sensitivity')!r}"
         )
 
-    if sensitivity == "clinical":
-        missing_clin = [f for f in CLINICAL_EXTRA_FIELDS if f not in meta]
+    if sensitivity == _sens.PROTECTED:
+        missing_clin = [f for f in PROTECTED_EXTRA_FIELDS if f not in meta]
         if missing_clin:
             raise CharterError(
-                f"CHARTER with sensitivity: clinical{suffix} missing field(s): "
+                f"CHARTER with sensitivity: protected{suffix} missing field(s): "
                 f"{', '.join(missing_clin)}"
             )
 
@@ -108,7 +114,7 @@ def render_charter(
 ) -> str:
     """Render a CHARTER.md markdown document with validated frontmatter.
 
-    Parameters mirror the design's CHARTER frontmatter. Clinical projects must
+    Parameters mirror the design's CHARTER frontmatter. Protected projects must
     pass ``reb_number``, ``reb_expires``, and ``data_residency``.
 
     ``repo_kind`` records where the project's git origin lives —
@@ -117,6 +123,8 @@ def render_charter(
     knows where to ``git clone`` from without inspecting ``.git/config``.
     """
     members_list = list(members)
+    # Always write the current tier name, even if a caller passed ``clinical``.
+    sensitivity = _sens.normalize(sensitivity)
     meta: dict[str, Any] = {
         "project": project,
         "lead": lead,
@@ -125,10 +133,10 @@ def render_charter(
     }
     if choreography is not None:
         meta["choreography"] = choreography
-    if sensitivity == "clinical":
+    if sensitivity == _sens.PROTECTED:
         if not (reb_number and reb_expires and data_residency):
             raise CharterError(
-                "Clinical charter requires reb_number, reb_expires, and data_residency"
+                "Protected charter requires reb_number, reb_expires, and data_residency"
             )
         meta["reb_number"] = reb_number
         meta["reb_expires"] = reb_expires
@@ -142,7 +150,7 @@ def render_charter(
     extra_lines: list[str] = []
     if choreography is not None:
         extra_lines.append(f"choreography: {choreography}")
-    if sensitivity == "clinical":
+    if sensitivity == _sens.PROTECTED:
         extra_lines.extend(
             [
                 f"reb_number: {reb_number}",

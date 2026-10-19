@@ -19,7 +19,7 @@ filtered quickly.
 The millwright never decides. ``decision``, ``decided_by`` and ``decided_at``
 are written only by :func:`decide`, from a person's command. A rescan keeps
 every decision. Nothing here moves or deletes a file; carrying out decisions is
-step 6.
+step 6 (:mod:`core.space_actions`), which logs each action in ``actions``.
 """
 
 from __future__ import annotations
@@ -95,6 +95,13 @@ CREATE TABLE IF NOT EXISTS sop_gaps (
     example TEXT, count INTEGER, size INTEGER,
     first_seen TEXT, last_seen TEXT,
     UNIQUE (project, kind, detail)
+);
+CREATE TABLE IF NOT EXISTS actions (
+    id INTEGER PRIMARY KEY,
+    item_id INTEGER NOT NULL, project TEXT NOT NULL, action TEXT NOT NULL,
+    source TEXT NOT NULL, destination TEXT, status TEXT NOT NULL,
+    files INTEGER, bytes INTEGER, detail TEXT, done_by TEXT,
+    started_at TEXT, finished_at TEXT
 );
 CREATE TABLE IF NOT EXISTS disks (
     project TEXT NOT NULL, disk TEXT NOT NULL, label TEXT,

@@ -62,7 +62,7 @@ You do **not** write to `lab_mgmt/oracle/`. New lab knowledge arrives via:
 1. A member curates an entry in their personal Oracle vault.
 2. The personal Oracle agent stages it as a draft at `<vault>/oracle/drafts/<slug>.md`.
 3. The member runs `murmurent oracle publish <slug>` — which validates the
-   schema, refuses `sensitivity: clinical` or `restricted`, and commits
+   schema, refuses `sensitivity: protected` (or the former `clinical`) or `restricted`, and commits
    the file to `lab_mgmt/oracle/` with the member's handle as the
    committer.
 4. (Future) A PI review step gates the push.

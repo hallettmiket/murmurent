@@ -19,6 +19,7 @@ import datetime as _dt
 from pathlib import Path
 
 from ..core import repo_paths as _repo_paths
+from ..core import sensitivity as _sens
 from ..core import dashboard as core_dashboard
 from ..core import inventory as inventory_core
 from ..core.dashboard import DashboardSnapshot, _load_member_meta, _parse_certifications
@@ -149,7 +150,7 @@ def build_response(
         ProjectSummary(
             name=cp.name,
             path=_repo_paths.find_or_default(cp.name, hint=cp.code_repo or ""),
-            sensitivity=cp.sensitivity or "standard",
+            sensitivity=_sens.normalize(cp.sensitivity) or "standard",
             lead=cp.lead or _pi_handle(),
             members=tuple(cp.members),
             choreography=cp.choreography,
@@ -743,19 +744,19 @@ def _attention_member(snap: DashboardSnapshot) -> list[C.AttentionItem]:
                         sev="red",
                         kind="CERT",
                         id="TCPS_2",
-                        text="TCPS_2 expired — clinical access blocked",
+                        text="TCPS_2 expired: protected-data access blocked",
                         project=row.project,
                         age=f"expired {cert.expires}" if cert.expires else "—",
                         actions=[["renew now", "primary"], ["guide", ""]],
                     )
                 )
-            elif cert.status == "missing" and row.sensitivity == "clinical":
+            elif cert.status == "missing" and _sens.is_protected(row.sensitivity):
                 items.append(
                     C.AttentionItem(
                         sev="red",
                         kind="CERT",
                         id="TCPS_2",
-                        text="TCPS_2 missing — clinical access blocked",
+                        text="TCPS_2 missing: protected-data access blocked",
                         project=row.project,
                         age="—",
                         actions=[["enrol", "primary"]],
@@ -809,10 +810,10 @@ def _attention_pi(
     """PI lens: lab-wide cert lapses + project backlogs + inventory."""
     items: list[C.AttentionItem] = []
 
-    # Per-project cert lapses across every member, on every clinical project.
+    # Per-project cert lapses across every member, on every protected project.
     seen: set[tuple[str, str, str]] = set()  # de-dup (project, peer, cert_status)
     for project in projects:
-        if project.sensitivity != "clinical":
+        if not _sens.is_protected(project.sensitivity):
             continue
         for raw in project.members:
             peer = raw.lstrip("@").lower()
@@ -832,7 +833,7 @@ def _attention_pi(
                         kind="CERT",
                         id=f"@{peer}",
                         text=(
-                            f"@{peer} TCPS_2 expired — clinical access blocked "
+                            f"@{peer} TCPS_2 expired: protected-data access blocked "
                             f"on {project.name}"
                         ),
                         project=project.name,
@@ -847,7 +848,7 @@ def _attention_pi(
                         kind="CERT",
                         id=f"@{peer}",
                         text=(
-                            f"@{peer} missing TCPS_2 — clinical access blocked "
+                            f"@{peer} missing TCPS_2: protected-data access blocked "
                             f"on {project.name}"
                         ),
                         project=project.name,
@@ -1222,7 +1223,7 @@ def _projects(
         rows.append(
             C.ProjectRow(
                 name=p.name,
-                sens=p.sensitivity,  # type: ignore[arg-type]
+                sens=_sens.normalize(p.sensitivity) or "standard",  # type: ignore[arg-type]
                 lead=p.lead,
                 choreo=p.choreography,
                 members=len(p.members),
@@ -1858,7 +1859,7 @@ def _to_request_row(r) -> C.JoinRequestRow:
         resolved_by=r.resolved_by,
         decline_reason=r.decline_reason,
         proposed_members=r.proposed_members,
-        proposed_sensitivity=r.proposed_sensitivity,
+        proposed_sensitivity=(_sens.normalize(r.proposed_sensitivity) or None),
         proposed_lead=r.proposed_lead,
         machines=getattr(r, "machines", None),
         attach_repos=getattr(r, "attach_repos", None),
@@ -2202,7 +2203,7 @@ def _heatmap(
                 cells.append("amb")
             else:
                 cells.append("ok")
-        rows.append(C.HeatmapRow(project=p.name, sens=p.sensitivity, cells=cells))  # type: ignore[arg-type]
+        rows.append(C.HeatmapRow(project=p.name, sens=_sens.normalize(p.sensitivity) or "standard", cells=cells))  # type: ignore[arg-type]
     return C.Heatmap(members=member_set, rows=rows)
 
 

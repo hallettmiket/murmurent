@@ -26,6 +26,7 @@ from pathlib import Path
 
 import yaml
 
+from . import sensitivity as _sens
 from .frontmatter import parse_file
 from .repo import lab_mgmt_repo_root
 
@@ -47,16 +48,21 @@ VALID_REPO_ROLES = ("code", "manuscript", "seminar", "data", "infra")
 # ---------------------------------------------------------------------------
 # Governance validation — moved here from ``core/charter.py`` (which is being
 # retired). A cert-project record is now the single source of truth, so the
-# clinical-governance + choreography-catalog checks live where the record does.
+# protected-tier governance + choreography-catalog checks live where the record does.
 # ---------------------------------------------------------------------------
-VALID_SENSITIVITY_TIERS: tuple[str, ...] = ("standard", "restricted", "clinical")
+# The tier names come from core/sensitivity.py; a legacy ``clinical`` record is
+# read as ``protected`` when it is parsed.
+VALID_SENSITIVITY_TIERS: tuple[str, ...] = _sens.TIERS
 VALID_CHOREOGRAPHIES: tuple[str, ...] = (
     "drug_discovery_litl",
     "clinical_cohort",
     "method_benchmarking",
     "imaging_phenotyping",
 )
-CLINICAL_EXTRA_FIELDS: tuple[str, ...] = ("reb_number", "reb_expires", "data_residency")
+#: Fields a protected-tier project must carry. ``CLINICAL_EXTRA_FIELDS`` is the
+#: former name, kept so existing imports keep working.
+PROTECTED_EXTRA_FIELDS: tuple[str, ...] = ("reb_number", "reb_expires", "data_residency")
+CLINICAL_EXTRA_FIELDS = PROTECTED_EXTRA_FIELDS
 
 
 @dataclass
@@ -205,7 +211,7 @@ class CertProject:
     status: str = "active"                 # "active" | "archived"
     created: str = ""
     lead: str = ""                         # project lead handle (defaults to lab PI)
-    sensitivity: str = "standard"          # standard | restricted | clinical
+    sensitivity: str = "standard"          # standard | restricted | protected
     choreography: str | None = None
     code_repo: str = ""                    # primary (code) repo path — mirrors repos[code]
     host: str = "local"                    # primary repo's host
@@ -226,7 +232,7 @@ class CertProject:
     repo_kind: str = "github"
     local_repo_root: str = ""
     remote_url: str = ""
-    # Clinical-governance fields — REQUIRED when sensitivity == "clinical"
+    # Protected-tier governance fields: REQUIRED when sensitivity == "protected"
     # (validated by :func:`validate_project`). Empty otherwise.
     reb_number: str = ""
     reb_expires: str = ""
@@ -252,6 +258,12 @@ class CertProject:
     # project may be suggested for deletion (an ethics approval, a data-sharing
     # agreement or a funder may require this).
     retain_until: str = ""
+
+    def __post_init__(self) -> None:
+        # A record built by hand with the former tier name (``clinical``) is
+        # stored as ``protected``, so every comparison downstream sees one name.
+        if _sens.is_protected(self.sensitivity):
+            self.sensitivity = _sens.PROTECTED
 
     def to_dict(self) -> dict:
         return {"name": self.name, "lab": self.lab, "status": self.status,
@@ -285,7 +297,7 @@ class CertProjectError(RuntimeError):
 
 class CertProjectValidationError(CertProjectError):
     """A cert-project record fails governance validation (bad sensitivity tier,
-    a clinical project missing REB fields, or an unknown choreography)."""
+    a protected project missing REB fields, or an unknown choreography)."""
 
 
 def validate_project(cp: "CertProject", *, context: str = "") -> None:
@@ -294,8 +306,8 @@ def validate_project(cp: "CertProject", *, context: str = "") -> None:
     single source of truth, so the rules move with it:
 
     - ``sensitivity`` must be one of :data:`VALID_SENSITIVITY_TIERS`;
-    - a ``clinical`` project must carry ``reb_number`` + ``reb_expires`` +
-      ``data_residency`` (:data:`CLINICAL_EXTRA_FIELDS`);
+    - a ``protected`` project (legacy ``clinical``) must carry ``reb_number`` +
+      ``reb_expires`` + ``data_residency`` (:data:`PROTECTED_EXTRA_FIELDS`);
     - an explicit ``choreography`` must be in :data:`VALID_CHOREOGRAPHIES`;
     - a ``retain_until`` must be a date written ``YYYY-MM-DD``.
 
@@ -304,15 +316,15 @@ def validate_project(cp: "CertProject", *, context: str = "") -> None:
     metadata-free membership upsert can never fail on an unrelated field.
     """
     suffix = f" in {context}" if context else ""
-    if cp.sensitivity not in VALID_SENSITIVITY_TIERS:
+    if not _sens.is_valid(cp.sensitivity):
         raise CertProjectValidationError(
             f"cert-project sensitivity{suffix} must be one of "
             f"{VALID_SENSITIVITY_TIERS!r}; got {cp.sensitivity!r}")
-    if cp.sensitivity == "clinical":
-        missing = [f for f in CLINICAL_EXTRA_FIELDS if not getattr(cp, f, "")]
+    if _sens.is_protected(cp.sensitivity):
+        missing = [f for f in PROTECTED_EXTRA_FIELDS if not getattr(cp, f, "")]
         if missing:
             raise CertProjectValidationError(
-                f"clinical cert-project{suffix} missing field(s): "
+                f"protected cert-project{suffix} missing field(s): "
                 f"{', '.join(missing)}")
     if cp.choreography is not None and cp.choreography not in VALID_CHOREOGRAPHIES:
         raise CertProjectValidationError(
@@ -401,7 +413,7 @@ def _parse(path: Path) -> CertProject:
         status=str(meta.get("status") or "active").strip().lower() or "active",
         created=str(meta.get("created") or ""),
         lead=str(meta.get("lead") or ""),
-        sensitivity=str(meta.get("sensitivity") or "standard").strip().lower() or "standard",
+        sensitivity=_sens.normalize(meta.get("sensitivity")) or "standard",
         choreography=str(chor) if chor else None,
         code_repo=code_repo, host=host, remote_path=remote_path,
         slack_channel_id=str(meta.get("slack_channel_id") or ""),
@@ -457,7 +469,7 @@ def _render(p: CertProject) -> str:
             "created": p.created, "lead": p.lead, "sensitivity": p.sensitivity}
     if p.choreography:
         meta["choreography"] = p.choreography
-    # Clinical-governance fields (only emitted when set — a standard project
+    # Protected-tier governance fields (only emitted when set — a standard project
     # carries none of them).
     if p.reb_number:
         meta["reb_number"] = p.reb_number
@@ -607,7 +619,7 @@ def upsert(name: str, *, lab: str, member: str | None = None,
         name=cur.name, lab=cur.lab or str(lab),
         status=(status or cur.status), created=cur.created or today,
         lead=_keep(lead, cur.lead),
-        sensitivity=(str(sensitivity).strip().lower() if sensitivity else cur.sensitivity),
+        sensitivity=(_sens.normalize(sensitivity) if sensitivity else cur.sensitivity),
         choreography=_keep(choreography, cur.choreography),
         code_repo=n_code, host=n_host, remote_path=n_remote,
         slack_channel_id=_keep(slack_channel_id, cur.slack_channel_id),
@@ -849,7 +861,7 @@ def backfill_from_charter(*, env: dict | None = None,
     the authoritative store reflects projects that predate the cert model. For
     each ``~/repos/<name>`` with a CHARTER.md, upsert a cert-project carrying
     **every** field the CHARTER recorded — name/lab/sensitivity/lead/choreography,
-    the clinical-governance block (reb_number/reb_expires/data_residency), the git
+    the protected-tier governance block (reb_number/reb_expires/data_residency), the git
     origin (repo_kind/remote_url/local_repo_root), the Slack + github pointers,
     lifecycle flags, and a ``code_repo`` link — copied straight from the parsed
     charter meta. Idempotent — a project already in the registry keeps its
@@ -951,7 +963,7 @@ def migrate_charters(*, delete: bool = True, env: dict | None = None,
             skipped.append((name, "charter unreadable for verification"))
             continue
         # Verify the load-bearing fields survived before we drop the source.
-        if str(meta.get("sensitivity") or "standard").strip().lower() != rec.sensitivity:
+        if (_sens.normalize(meta.get("sensitivity")) or "standard") != rec.sensitivity:
             skipped.append((name, "sensitivity mismatch after backfill"))
             continue
         charter_members = {_norm(str(m)) for m in (meta.get("members") or [])}
@@ -1030,6 +1042,7 @@ def set_status(name: str, status: str, *, env: dict | None = None) -> CertProjec
 __all__ = ["CertProject", "RepoRef", "VALID_REPO_ROLES", "CertProjectError",
            "CertProjectValidationError", "validate_project",
            "VALID_SENSITIVITY_TIERS", "VALID_CHOREOGRAPHIES", "CLINICAL_EXTRA_FIELDS",
+           "PROTECTED_EXTRA_FIELDS",
            "REGISTRY_DIR", "registry_dir", "project_path", "get", "iter_projects",
            "projects_for_member", "upsert", "remove_member", "add_repo", "remove_repo",
            "add_mirror", "remove_mirror", "list_mirrors",

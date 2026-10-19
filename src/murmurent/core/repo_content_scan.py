@@ -7,7 +7,8 @@ Purpose: the deterministic **local-repo content scanners** — issue #63 Phase 2
 Author: Mike Hallett (with Claude Code)
 Date: 2026-07-23
 Input: a member handle, the local repo inventory (``repo_inventory.RepoOnHost``),
-       an ``is_clinical(repo) -> bool`` predicate, and the data-root resolver
+       an ``is_clinical(repo) -> bool`` predicate (true for a protected repo,
+       the tier formerly called clinical), and the data-root resolver
        (``lab_vm``). All read-only.
 Output: a flat list of :class:`Finding` (categories ``output`` / ``network`` /
         ``egress``), rolled up per directory so a repo with many hits collapses
@@ -18,7 +19,7 @@ trust in the report):
 
 - **2(ii) output-location** — only a *literal, absolute/home-anchored* write
   target that resolves OUTSIDE the data root is flagged (warn; block on a
-  clinical repo). Dynamic / variable / relative paths are NOT flagged: we cannot
+  protected repo). Dynamic / variable / relative paths are NOT flagged: we cannot
   resolve them, and guessing produces noise. If the data root itself is
   unresolvable we emit ONE ``unverifiable`` finding rather than silently
   passing.
@@ -29,8 +30,8 @@ trust in the report):
 - **2(iv) egress** — outbound/API usage is surfaced as **info** (not an error):
   "this repo reaches out to <destination>". Anthropic/OpenAI AI calls are tagged
   distinctly (expected AI usage) from arbitrary hosts / cloud uploads. On a
-  **clinical** repo, data-shipping / upload / cloud / email egress escalates
-  (clinical data must not leave the governed store).
+  **protected** repo, data-shipping / upload / cloud / email egress escalates
+  (protected data must not leave the governed store).
 
 Read-only by construction: this module only reads files. It never writes,
 renames, deletes, or makes a network call of its own.
@@ -73,7 +74,7 @@ SCAN_EXTS = frozenset({
 })
 
 # Directories never descended into: VCS, dependency trees, caches, and the
-# governed data store (immutable/append_only/raw/refined/clinical) which is
+# governed data store (immutable/append_only/raw/refined, plus a legacy clinical/ folder) which is
 # data, not code.
 SKIP_DIRS = frozenset({
     ".git", "node_modules", "__pycache__", ".venv", "venv", "env",
@@ -228,12 +229,12 @@ def _network_hits(line: str) -> list[tuple[str, str, str]]:
 # 2(iv) — egress matchers
 # ===========================================================================
 #
-# ``kind`` drives dashboard tinting + clinical escalation:
+# ``kind`` drives dashboard tinting + protected escalation:
 #   ai            → expected AI usage (Anthropic/OpenAI), never escalates
-#   http-client   → generic outbound HTTP; clinical → warn (reaching out)
-#   cloud         → cloud SDK; clinical → BLOCK (data must not leave)
-#   transfer      → scp/rsync/upload/paramiko/curl; clinical → BLOCK
-#   email         → smtplib/sendmail; clinical → BLOCK
+#   http-client   → generic outbound HTTP; protected → warn (reaching out)
+#   cloud         → cloud SDK; protected → BLOCK (data must not leave)
+#   transfer      → scp/rsync/upload/paramiko/curl; protected → BLOCK
+#   email         → smtplib/sendmail; protected → BLOCK
 
 _EGRESS_PATTERNS: tuple[tuple[_re.Pattern, str, str], ...] = (
     (_re.compile(r"""\b(?:import\s+anthropic|from\s+anthropic\b|anthropic\.|api\.anthropic\.com)"""),
@@ -256,7 +257,7 @@ _EGRESS_PATTERNS: tuple[tuple[_re.Pattern, str, str], ...] = (
     (_re.compile(r"""\b(?:import\s+smtplib|smtplib\.|sendmail\()"""), "email", "email (smtplib)"),
 )
 
-# On a clinical repo these egress kinds mean data may leave the governed store.
+# On a protected repo these egress kinds mean data may leave the governed store.
 _EGRESS_CLINICAL_BLOCK = frozenset({"cloud", "transfer", "email"})
 _EGRESS_KIND_RULE = {
     "ai": "PERSONAL-EGRESS-AI-01",
@@ -370,7 +371,7 @@ def _scan_one_repo(repo_root: Path, *, clinical: bool, handle: str,
                         fix="redirect output under $MURMURENT_DATA_ROOT/"
                             "append_only/<project>/…",
                         handle=handle,
-                        notes=("clinical repo: out-of-root write escalated to BLOCK. "
+                        notes=("protected repo: out-of-root write escalated to BLOCK. "
                                if clinical else "")
                         + "heuristic: only literal out-of-root paths are flagged; "
                           "dynamic paths are not."))
@@ -386,7 +387,7 @@ def _scan_one_repo(repo_root: Path, *, clinical: bool, handle: str,
                     expected="use TLS/SSH transports (https, sftp, ssh, scp); "
                              "no credentials in URLs",
                     handle=handle,
-                    notes="clinical repo" if clinical else ""))
+                    notes="protected repo" if clinical else ""))
 
             # -- 2(iv) egress ------------------------------------------------
             for kind, dest in _egress_hits(line):
@@ -404,14 +405,14 @@ def _scan_one_repo(repo_root: Path, *, clinical: bool, handle: str,
                 tag = "expected-ai" if kind == "ai" else kind
                 note = f"egress-kind={tag}"
                 if clinical and kind in _EGRESS_CLINICAL_BLOCK:
-                    note += "; clinical data must not leave — escalated to BLOCK"
+                    note += "; protected data must not leave: escalated to BLOCK"
                 elif clinical:
-                    note += "; clinical repo reaches out — review"
+                    note += "; protected repo reaches out: review"
                 out.append(_mk(
                     AREA_EGRESS, rule, severity=sev, path=rel,
                     current=f"reaches out to {dest}",
                     expected="informational — surfaced so you can confirm it is "
-                             "intended" if not clinical else "clinical data stays "
+                             "intended" if not clinical else "protected data stays "
                              "in the governed store",
                     handle=handle, notes=note))
 

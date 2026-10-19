@@ -26,6 +26,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import lab_vm as _lab_vm
+from . import sensitivity as _sens
 from . import repo as _repo
 
 # Standard Tier-II layout scaffolded into a fresh personal vault. ``oracle`` and
@@ -245,14 +246,16 @@ _VAULT_GITIGNORE_CRUFT: tuple[str, ...] = (
 
 # Sensitivities that, by default, are kept OUT of the GitHub-backed vault. The
 # personal vault is a private repo, but "private on GitHub" is still egress to a
-# third party — clinical/PHI-tagged notes stay local unless the owner overrides.
-DEFAULT_EXCLUDED_SENSITIVITIES: tuple[str, ...] = ("clinical",)
+# third party — protected/PHI-tagged notes stay local unless the owner overrides.
+# A note still tagged with the former name ``clinical`` is excluded too: the
+# comparison goes through core/sensitivity.py, which reads it as ``protected``.
+DEFAULT_EXCLUDED_SENSITIVITIES: tuple[str, ...] = ("protected",)
 
 # The ONLY top-level folders a murmurent-scoped vault tracks. An existing
 # Obsidian vault usually holds far more (health/, journal/, recipes/, …); the
 # default adopt scope is "murmurent" — an ALLOWLIST that tracks just these +
 # CLAUDE.md and leaves everything else local (off GitHub). This is safer than a
-# clinical denylist, which would push untagged personal notes.
+# protected denylist, which would push untagged personal notes.
 MURMURENT_TRACKED_FOLDERS: tuple[str, ...] = (
     "oracle", "lab-notebook", "maps-legends", "murmurent_data",
     # Personal agents + commons-agent forks sync across the member's machines
@@ -285,12 +288,13 @@ def scan_sensitive(vault_root: Path,
                    *, sensitivities: tuple[str, ...] = DEFAULT_EXCLUDED_SENSITIVITIES,
                    ) -> list[str]:
     """Relative paths of ``.md`` files whose frontmatter ``sensitivity`` is in
-    ``sensitivities`` (default: clinical). Read-only; tolerant of unparseable
+    ``sensitivities`` (default: protected, which also matches the former name
+    ``clinical``). Read-only; tolerant of unparseable
     files (skipped). Content is NOT returned — only paths — so a caller can
     show the exclusion list without surfacing PHI."""
     from .frontmatter import parse_file as _pf
     root = Path(vault_root)
-    want = {s.strip().lower() for s in sensitivities}
+    want = {_sens.normalize(s) for s in sensitivities}
     hits: list[str] = []
     for p in root.rglob("*.md"):
         if ".git" in p.parts:
@@ -299,7 +303,7 @@ def scan_sensitive(vault_root: Path,
             meta = _pf(p).meta or {}
         except Exception:  # noqa: BLE001 — an unreadable note just isn't scanned
             continue
-        if str(meta.get("sensitivity") or "").strip().lower() in want:
+        if _sens.normalize(meta.get("sensitivity")) in want:
             hits.append(str(p.relative_to(root)))
     return sorted(hits)
 
@@ -314,7 +318,7 @@ def _vault_gitignore_lines(excluded_rel: list[str]) -> list[str]:
         *(_VAULT_GITIGNORE_CRUFT),
     ]
     if excluded_rel:
-        lines += ["", "# Sensitivity-tagged (e.g. clinical) — never pushed:"]
+        lines += ["", "# Sensitivity-tagged (e.g. protected) — never pushed:"]
         # Anchor with a leading slash so only the exact file is ignored (not a
         # same-named file elsewhere). git-ignore treats '#' and trailing space
         # specially — escape them.
@@ -373,7 +377,8 @@ def plan_adopt(vault_root: Path,
 
 def _install_precommit_guard(dest: Path) -> bool:
     """Install a git pre-commit hook that REFUSES to commit any staged file
-    tagged ``sensitivity: clinical`` — an ongoing safety net so a clinical note
+    tagged ``sensitivity: protected`` (or the former ``clinical``) — an ongoing
+    safety net so a protected note
     added later can't slip into the GitHub-backed vault even if .gitignore
     misses it. Returns True if written."""
     hooks = Path(dest) / ".git" / "hooks"
@@ -382,16 +387,17 @@ def _install_precommit_guard(dest: Path) -> bool:
     hook = hooks / "pre-commit"
     hook.write_text(
         "#!/bin/sh\n"
-        "# murmurent vault guard: block committing clinical-tagged notes.\n"
+        "# murmurent vault guard: block committing protected-tagged notes\n"
+        "# (the former tag name, clinical, is blocked too).\n"
         "staged=$(git diff --cached --name-only --diff-filter=ACM | grep '\\.md$' || true)\n"
         "bad=''\n"
         "for f in $staged; do\n"
-        "  if [ -f \"$f\" ] && grep -qiE '^sensitivity:[[:space:]]*clinical' \"$f\"; then\n"
+        "  if [ -f \"$f\" ] && grep -qiE '^sensitivity:[[:space:]]*(protected|clinical)' \"$f\"; then\n"
         "    bad=\"$bad\\n  $f\"\n"
         "  fi\n"
         "done\n"
         "if [ -n \"$bad\" ]; then\n"
-        "  printf 'murmurent vault: refusing to commit clinical-tagged file(s):%b\\n' \"$bad\"\n"
+        "  printf 'murmurent vault: refusing to commit protected-tagged file(s):%b\\n' \"$bad\"\n"
         "  printf 'These stay local. Add them to .gitignore or drop the sensitivity tag.\\n'\n"
         "  exit 1\n"
         "fi\n",
@@ -571,7 +577,8 @@ def init_personal_vault(
                 pinned = _pin_machine_vault_path(dest)
                 return {"ok": True, "repo": expected, "owner": owner, "path": str(dest),
                         "created_repo": True, "adopted": True, "cloned": False,
-                        "scope": adopt_scope, "clinical_excluded": excluded,
+                        "scope": adopt_scope, "protected_excluded": excluded,
+                        "clinical_excluded": excluded,  # former key name
                         "scaffolded": scaffolded, "committed": True, "pushed": pushed,
                         "pinned": pinned, "sync_detail": detail}
             # empty dir → safe to create+clone into it below

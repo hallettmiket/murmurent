@@ -26,8 +26,10 @@ except ModuleNotFoundError:  # pragma: no cover
 
 try:
     from ..core import dashboard
+    from ..core import sensitivity as _sens
 except ImportError:
     from murmurent.core import dashboard  # type: ignore[no-redef]
+    from murmurent.core import sensitivity as _sens  # type: ignore[no-redef]
 
 
 USER_PREF_PATH = Path.home() / ".murmurent" / "user"
@@ -403,7 +405,7 @@ def _nav_grid(snap: dashboard.DashboardSnapshot) -> None:
         ),
     ]
     if snap.is_pi:
-        rows.append(("pi", "PI view", "clinical-project compliance grid"))
+        rows.append(("pi", "PI view", "protected-project compliance grid"))
 
     st.html("<p style='color:#5b5b5b; margin: 0 0 1.2rem 0;'>Pick a topic.</p>")
     # 3 columns × ceil(rows/3) rows of buttons. With 6 (or 7) tiles, this gives
@@ -445,8 +447,8 @@ def _section_projects(snap: dashboard.DashboardSnapshot) -> None:
         st.info("You are not on any project.")
         return
     for p in snap.projects:
-        badge = {"clinical": "🔴", "restricted": "🟡", "standard": "🟢"}.get(
-            p.sensitivity, "⚪"
+        badge = {"protected": "🔴", "restricted": "🟡", "standard": "🟢"}.get(
+            _sens.normalize(p.sensitivity), "⚪"
         )
         with st.container(border=True):
             st.markdown(
@@ -639,10 +641,10 @@ def _section_inventory(snap: dashboard.DashboardSnapshot) -> None:
 
 def _section_pi(snap: dashboard.DashboardSnapshot) -> None:
     _back_button()
-    st.subheader("PI view: clinical-project compliance grid")
-    grid = snap.pi_view.get("clinical_compliance", [])
+    st.subheader("PI view: protected-project compliance grid")
+    grid = snap.pi_view.get("protected_compliance", [])
     if not grid:
-        st.info("No clinical projects.")
+        st.info("No protected projects.")
         return
     for row in grid:
         badge = {

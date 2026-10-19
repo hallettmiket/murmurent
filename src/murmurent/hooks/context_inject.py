@@ -47,6 +47,7 @@ import sys
 from pathlib import Path
 from typing import IO, Any
 
+from ..core import sensitivity as _sens
 from ..core.frontmatter import parse_file
 from ..core.identity import resolve as resolve_identity
 from ..core.repo import find_project_repo, read_members
@@ -61,7 +62,7 @@ def _project_summary(start: str | None = None) -> str | None:
         parsed = parse_file(repo.charter_path)
     except Exception:
         return None
-    sensitivity = parsed.meta.get("sensitivity", "?")
+    sensitivity = _sens.normalize(parsed.meta.get("sensitivity")) or "?"
     name = parsed.meta.get("project", repo.path.name)
     body = parsed.body.strip()
     first_para = body.split("\n\n", 1)[0] if body else ""

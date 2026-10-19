@@ -20,15 +20,17 @@ Design (from the maintainer's locked decisions on issue #63):
      false "everyone is missing". The report never silently lies.
   3. Phase-1 scope = aggregate EXISTING checks behind one button: item 1
      (GitHub perms), 2i (local repo + vault ACLs), 4 (Slack membership), 6
-     (non-MM repos), 7-member (own cert validity), and item V clinical
+     (non-MM repos), 7-member (own cert validity), and item V protected
      containment. New content scanners (2ii-iv), machine posture (5), and
      project-CARD expiry across other members are Phase 2/3 — NOT here.
 
-Clinical-repo rule: a repo is clinical if its linked cert-project has
-``sensitivity == "clinical"`` (matched by ``github_repo`` and/or a repo path in
-``repos``), OR its ``.murmurent.yaml`` declares ``sensitivity: clinical``. For a
-clinical repo and for the personal vault, an over-share ACL finding escalates
-from ``warn`` to ``block``.
+Protected-repo rule: a repo is protected if its linked cert-project has
+``sensitivity == "protected"`` (matched by ``github_repo`` and/or a repo path in
+``repos``), OR its ``.murmurent.yaml`` declares ``sensitivity: protected``. The
+former tier name ``clinical`` counts as protected everywhere here. For a
+protected repo and for the personal vault, an over-share ACL finding escalates
+from ``warn`` to ``block``. (Internal names and rule IDs such as
+``PERSONAL-CLINICAL-LEAK-01`` keep the old word so existing reports still match.)
 
 Read-only by construction. This module never mutates GitHub, Slack, or the
 filesystem; it only reports.
@@ -53,6 +55,7 @@ from . import project_provision as _pp
 from . import repo as _repo
 from . import repo_content_scan as _rcs
 from . import repo_inventory as _inv
+from . import sensitivity as _sens
 from .frontmatter import parse_text as _parse_fm
 from .security_findings import (
     Finding,
@@ -526,15 +529,15 @@ def check_cert(handle: str, projects: list[_cp.CertProject],
                        current=f"could not verify your card: {reason}",
                        handle=handle, verify_state=VERIFY_UNVERIFIABLE))
 
-    # -- REB expiry on clinical projects the viewer LEADS ---------------------
+    # -- REB expiry on protected projects the viewer LEADS --------------------
     for cp in projects:
-        if cp.sensitivity != "clinical" or not _is_lead(cp, handle):
+        if not _sens.is_protected(cp.sensitivity) or not _is_lead(cp, handle):
             continue
         reb = (cp.reb_expires or "").strip()
         if not reb:
             out.append(_mk(AREA_CERT, "PERSONAL-REB-MISSING-01",
                            severity=SEVERITY_BLOCK, path=cp.name,
-                           current="clinical project has no reb_expires recorded",
+                           current="protected project has no reb_expires recorded",
                            expected="a valid REB approval date",
                            handle=handle, project=cp.name))
             continue
@@ -554,7 +557,7 @@ def check_cert(handle: str, projects: list[_cp.CertProject],
                            severity=SEVERITY_BLOCK, path=cp.name,
                            current=f"REB approval expired {exp.date().isoformat()}",
                            expected="a current REB approval",
-                           fix="renew the REB before continuing clinical work",
+                           fix="renew the REB before continuing protected work",
                            handle=handle, project=cp.name))
         elif days <= REB_WARN_DAYS:
             out.append(_mk(AREA_CERT, "PERSONAL-REB-EXPIRING-01",
@@ -608,7 +611,7 @@ def _acl_finding(area: str, path: Path, acc: dict, *, clinical: bool,
                    path=str(path),
                    current=f"{label}: owner-only ({mode_str})",
                    expected="owner-only (0700)", handle=handle, project=project,
-                   notes="clinical" if clinical else "")
+                   notes="protected" if clinical else "")
     who = []
     if acc["world_read"] or acc["world_write"]:
         who.append("world")
@@ -617,24 +620,24 @@ def _acl_finding(area: str, path: Path, acc: dict, *, clinical: bool,
     sev = SEVERITY_BLOCK if clinical else SEVERITY_WARN
     rule = ("PERSONAL-ACL-CLINICAL-01" if clinical
             else "PERSONAL-ACL-OVERSHARE-01")
-    kind = "clinical repo/vault" if clinical else "repo"
+    kind = "protected repo/vault" if clinical else "repo"
     return _mk(area, rule, severity=sev, path=str(path),
                current=f"{label}: {'/'.join(who)}-accessible ({mode_str})",
                expected="owner-only (0700)",
                fix=f"chmod 700 {path}",
                handle=handle, project=project,
                notes=(f"{kind}: over-shared directory permissions escalate to "
-                      "BLOCK for clinical data." if clinical else ""))
+                      "BLOCK for protected data." if clinical else ""))
 
 
 def _clinical_repo_index(env: dict | None) -> tuple[set[str], set[str]]:
     """Return ``(clinical_repo_paths, clinical_github_slugs)`` derived from
-    cert-projects with ``sensitivity == "clinical"``. Paths are resolved
+    cert-projects with ``sensitivity == "protected"`` (or legacy ``clinical``). Paths are resolved
     absolute strings; slugs are lower-cased ``org/name``."""
     paths: set[str] = set()
     slugs: set[str] = set()
     for cp in _cp.iter_projects(env):
-        if cp.sensitivity != "clinical":
+        if not _sens.is_protected(cp.sensitivity):
             continue
         if cp.github_repo and "/" in cp.github_repo:
             slugs.add(cp.github_repo.strip().lower())
@@ -653,7 +656,8 @@ def _clinical_repo_index(env: dict | None) -> tuple[set[str], set[str]]:
 
 
 def _marker_declares_clinical(repo_dir: Path) -> bool:
-    """True when ``repo_dir/.murmurent.yaml`` declares ``sensitivity: clinical``."""
+    """True when ``repo_dir/.murmurent.yaml`` declares ``sensitivity: protected``
+    (or the former name ``clinical``)."""
     marker = repo_dir / MARKER_FILENAME
     if not marker.is_file():
         return False
@@ -662,7 +666,7 @@ def _marker_declares_clinical(repo_dir: Path) -> bool:
         data = yaml.safe_load(marker.read_text(encoding="utf-8")) or {}
     except Exception:  # noqa: BLE001
         return False
-    return str((data or {}).get("sensitivity") or "").strip().lower() == "clinical"
+    return _sens.is_protected((data or {}).get("sensitivity"))
 
 
 def _repo_is_clinical(repo, clinical_paths: set[str], clinical_slugs: set[str]) -> bool:
@@ -703,7 +707,7 @@ def check_repo_acls(handle: str, repos: list, env: dict | None) -> list[Finding]
         clinical = _repo_is_clinical(repo, clinical_paths, clinical_slugs)
         out.append(_acl_finding(AREA_REPOS, p, acc, clinical=clinical,
                                 handle=handle, project=None,
-                                label=p.name + (" [clinical]" if clinical else "")))
+                                label=p.name + (" [protected]" if clinical else "")))
     return out
 
 
@@ -745,8 +749,9 @@ def check_clinical_containment(handle: str, repos: list,
                                env: dict | None) -> list[Finding]:
     """Item V. Scan lab-shared locations (the group governance repo ``oracle/``
     and every local repo) for oracle markdown carrying frontmatter
-    ``sensitivity: clinical``. Any hit OUTSIDE the personal vault is a BLOCK —
-    a clinical entry must never leave the personal vault (rules/oracle_schema)."""
+    ``sensitivity: protected`` (or the former ``clinical``). Any hit OUTSIDE the
+    personal vault is a BLOCK — a protected entry must never leave the personal
+    vault (rules/oracle_schema)."""
     from . import vault_sync as _vs
     from .frontmatter import parse_file as _pf
 
@@ -789,23 +794,23 @@ def check_clinical_containment(handle: str, repos: list,
                 meta = _pf(md).meta or {}
             except Exception:  # noqa: BLE001
                 continue
-            if str(meta.get("sensitivity") or "").strip().lower() != "clinical":
+            if not _sens.is_protected(meta.get("sensitivity")):
                 continue
             seen.add(key)
             out.append(_mk(AREA_VAULT, "PERSONAL-CLINICAL-LEAK-01",
                            severity=SEVERITY_BLOCK, path=str(md),
-                           current="clinical-tagged oracle entry outside the "
+                           current="protected-tagged oracle entry outside the "
                                    "personal vault",
-                           expected="clinical entries live ONLY in the personal vault",
+                           expected="protected entries live ONLY in the personal vault",
                            fix="move this entry into your personal vault and remove "
                                "the shared copy",
                            handle=handle,
-                           notes="rules/oracle_schema.md: a clinical entry must "
+                           notes="rules/oracle_schema.md: a protected entry must "
                                  "never leave the personal vault."))
     if not out:
         out.append(_mk(AREA_VAULT, "PERSONAL-CLINICAL-CONTAINED-01",
                        severity=SEVERITY_INFO, path="(lab-shared locations)",
-                       current="no clinical entries found outside the personal vault",
+                       current="no protected entries found outside the personal vault",
                        handle=handle))
     return out
 

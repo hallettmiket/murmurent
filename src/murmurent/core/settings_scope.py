@@ -59,7 +59,8 @@ _add("profile", PERSON_PER_MACHINE, "~/.murmurent/machine.yaml",
 _MACHINE_FILE = "~/.murmurent/machine.yaml"
 _add("machine", MACHINE, _MACHINE_FILE,
      "machine_name", "wigamig_base", "obsidian_vault_path", "obsidian_vault_name",
-     "lab_base", "repos_root", "data_immutable_name", "data_append_only_name")
+     "lab_base", "repos_root", "data_immutable_name", "data_append_only_name",
+     "data_folders")
 _add("machine", PERSON_PER_MACHINE, _MACHINE_FILE,
      "notebook_subfolder", "oracle_subfolder", "murmurent_data_subfolder")
 

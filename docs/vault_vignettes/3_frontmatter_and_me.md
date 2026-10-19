@@ -13,7 +13,7 @@ First, Sam looks at the top of a saved note (the frontmatter) and
 notices `project`, `tags`, and `sensitivity` are already filled in.
 These let the oracle find the right notes later, and decide what may
 ever be shared. A note marked `sensitivity: standard` can eventually
-be shared with the lab; a note marked `sensitivity: clinical` stays
+be shared with the lab; a note marked `sensitivity: protected` stays
 private and can never be published (more on that in vignette 5 and 6).
 
 Second, Sam writes a short "me" file describing how they like to

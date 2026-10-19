@@ -27,7 +27,7 @@ vignette 4), where an agent reads it on demand.
    questions about it.
 3. This illustrative table is fabricated, so `sensitivity: standard`
    is appropriate. Real clinicopathological or patient data must be
-   marked `sensitivity: clinical`: that keeps it in Sam's personal
+   marked `sensitivity: protected`: that keeps it in Sam's personal
    vault only, and it can never be published to the lab (see vignette 6).
    Only small tables belong inside a note; a full spreadsheet file goes
    in `murmurent_data/` (see vignette 4), and large data files live in the
@@ -39,7 +39,7 @@ flowchart LR
     B --> C[Ask questions about your samples]
 ```
 
-Clinical data stays personal: it never leaves Sam's vault.
+Protected data stays personal: it never leaves Sam's vault.
 
 ## What you get
 

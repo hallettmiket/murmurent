@@ -134,6 +134,8 @@ exclude = ["rules/local", "rules/local/**"]
 # The adversary's only source for TRIPOD+AI, PROBAST+AI and REMARK items (#155).
 # It may not browse, so a PyPI install without this file could not run the check.
 "docs/reporting_guidelines.md" = "murmurent/commons/docs/reporting_guidelines.md"
+# The Scribe's writing guide (#173). The Scribe returns Gap without it.
+"docs/scientific_writing.md" = "murmurent/commons/docs/scientific_writing.md"
 
 [tool.hatch.build.targets.sdist]
 # The sdist is what PyPI keeps as the buildable source, so it needs the same

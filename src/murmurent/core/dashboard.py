@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Iterable
 
 from . import inventory, sea
+from . import sensitivity as _sens
 from .frontmatter import parse_file
 from .projects import ProjectSummary, iter_local_projects, load_summary
 from .repo import lab_mgmt_repo_root, read_members
@@ -339,10 +340,10 @@ def _compliance_rows(
         if norm not in members:
             continue
         notes: list[str] = []
-        if project.sensitivity == "clinical":
+        if _sens.is_protected(project.sensitivity):
             tcps = next((c for c in member_certs if c.name == "TCPS_2"), None)
             if tcps is None or tcps.status == "missing":
-                notes.append("TCPS_2 missing — would block clinical access in production.")
+                notes.append("TCPS_2 missing: would block protected-data access in production.")
             elif tcps.status == "expired":
                 notes.append(f"TCPS_2 expired on {tcps.expires}.")
             elif tcps.status == "expiring":
@@ -350,7 +351,7 @@ def _compliance_rows(
         rows.append(
             ProjectComplianceRow(
                 project=project.name,
-                sensitivity=project.sensitivity,
+                sensitivity=_sens.normalize(project.sensitivity) or "standard",
                 member_certs=list(member_certs),
                 notes=notes,
             )
@@ -541,10 +542,10 @@ def _inv_row(item: inventory.InventoryItem) -> dict:
 
 
 def _build_pi_view(projects: Iterable[ProjectSummary], today: _dt.date) -> dict[str, list]:
-    """Build the PI-only across-all-clinical-projects compliance grid."""
+    """Build the PI-only across-all-protected-projects compliance grid."""
     grid: list[dict] = []
     for project in projects:
-        if project.sensitivity != "clinical":
+        if not _sens.is_protected(project.sensitivity):
             continue
         for handle in project.members:
             norm = handle.lstrip("@").lower()
@@ -560,7 +561,7 @@ def _build_pi_view(projects: Iterable[ProjectSummary], today: _dt.date) -> dict[
                     "tcps_expires": tcps.expires if tcps else None,
                 }
             )
-    return {"clinical_compliance": grid}
+    return {"protected_compliance": grid}
 
 
 # ---------------------------------------------------------------------------
@@ -662,10 +663,10 @@ def render_markdown(snapshot: DashboardSnapshot) -> str:
     lines.append("")
 
     if snapshot.is_pi:
-        lines.append("## PI view: clinical compliance grid")
-        grid = snapshot.pi_view.get("clinical_compliance", [])
+        lines.append("## PI view: protected compliance grid")
+        grid = snapshot.pi_view.get("protected_compliance", [])
         if not grid:
-            lines.append("- _no clinical projects_")
+            lines.append("- _no protected projects_")
         else:
             lines.append("| project | member | TCPS_2 | expiry |")
             lines.append("|---|---|---|---|")

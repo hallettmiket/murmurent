@@ -1,6 +1,7 @@
 """
 Purpose: PHI pattern detection hook for Claude Code. Active *only* when the
-         current project's CHARTER is ``sensitivity: clinical``. Pre-call: refuses
+         current project is ``sensitivity: protected`` (or the former name
+         ``clinical``). Pre-call: refuses
          outbound prompts containing PHI-shaped patterns. Post-call: redacts
          matches in the returned content.
 Author: Mike Hallett (with Claude Code)
@@ -23,6 +24,7 @@ import sys
 from pathlib import Path
 from typing import IO, Any
 
+from ..core import sensitivity as _sens
 from ..core.frontmatter import parse_file
 from ..core.repo import find_project_repo
 
@@ -63,7 +65,7 @@ def _lab_mgmt_records_readable() -> bool:
 
     A dangling or absent lab-mgmt root means we CANNOT confirm a project's
     sensitivity — and PHI enforcement must never silently weaken, so callers
-    treat "records unreadable" as clinical (fail closed)."""
+    treat "records unreadable" as protected (fail closed)."""
     try:
         from ..core import cert_projects as _cp
         root = _cp.registry_dir().parent
@@ -77,15 +79,17 @@ def _lab_mgmt_records_readable() -> bool:
         return False
 
 
-def _is_clinical_project(start: str | None = None) -> bool:
-    """Whether the project rooted at ``start`` is clinical-tier.
+def _is_protected_project(start: str | None = None) -> bool:
+    """Whether the project rooted at ``start`` is protected-tier.
+
+    A record that still says ``clinical`` (the former name) counts as protected.
 
     Sensitivity now comes from the authoritative cert-project registry
     (repo-name → ``cert_projects/<name>`` → ``sensitivity``), NOT a CHARTER.
-    The lookup FAILS CLOSED — treats the project as clinical / most-restrictive —
+    The lookup FAILS CLOSED — treats the project as protected / most-restrictive —
     whenever the lab-mgmt records can't be read (registry access raises, or the
     lab-mgmt root is dangling/absent). That way a broken records path can never
-    downgrade a clinical project to "not clinical" and leak PHI.
+    downgrade a protected project to "not protected" and leak PHI.
     """
     repo = find_project_repo(start or os.getcwd())
     if repo is None:
@@ -99,7 +103,7 @@ def _is_clinical_project(start: str | None = None) -> bool:
     except Exception:  # noqa: BLE001 — records unreadable → fail closed
         return True
     if rec is not None:
-        return rec.sensitivity == "clinical"
+        return _sens.is_protected(rec.sensitivity)
 
     # 2. No cert record. Legacy fallback: a CHARTER still on disk (pre-migration).
     charter = repo.charter_path
@@ -108,12 +112,16 @@ def _is_clinical_project(start: str | None = None) -> bool:
             meta = parse_file(charter).meta or {}
         except Exception:  # noqa: BLE001 — charter present but unreadable → fail closed
             return True
-        return str(meta.get("sensitivity") or "").strip().lower() == "clinical"
+        return _sens.is_protected(meta.get("sensitivity"))
 
     # 3. No record and no charter. If the registry itself isn't readable we
-    #    cannot rule out clinical → fail closed; otherwise there is genuinely
-    #    no clinical signal for this repo.
+    #    cannot rule out protected → fail closed; otherwise there is genuinely
+    #    no protected signal for this repo.
     return not _lab_mgmt_records_readable()
+
+
+#: Former name, kept so existing callers keep working.
+_is_clinical_project = _is_protected_project
 
 
 def _bash_is_outbound(command: str) -> bool:
@@ -169,8 +177,8 @@ def _redact(text: str) -> str:
 
 
 def evaluate_pre(call: dict[str, Any]) -> dict[str, Any]:
-    """Decide on a PreToolUse call: deny if outbound + PHI-shaped + clinical."""
-    if not _is_clinical_project():
+    """Decide on a PreToolUse call: deny if outbound + PHI-shaped + protected."""
+    if not _is_protected_project():
         return {"decision": "allow"}
     tool = call.get("tool_name") or call.get("tool") or ""
     args = call.get("tool_input") or call.get("args") or {}
@@ -195,14 +203,14 @@ def evaluate_pre(call: dict[str, Any]) -> dict[str, Any]:
         "decision": "deny",
         "reason": (
             f"PHI hook: refusing outbound {tool} with {', '.join(labels)} pattern(s). "
-            f"Active project is clinical-tier; de-identify before retrying."
+            f"Active project is protected-tier; de-identify before retrying."
         ),
     }
 
 
 def evaluate_post(payload: dict[str, Any]) -> dict[str, Any]:
     """Decide on a PostToolUse result: redact PHI in the response."""
-    if not _is_clinical_project():
+    if not _is_protected_project():
         return {"decision": "allow"}
     response = payload.get("tool_response") or payload.get("response") or payload.get("result")
     text = _flatten(response)

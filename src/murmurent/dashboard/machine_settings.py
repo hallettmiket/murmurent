@@ -81,6 +81,21 @@ def load(*, legacy_obsidian: dict | None = None) -> C.MachineSettings:
     except Exception:  # noqa: BLE001
         pass
 
+    # Every folder of the lab folder protocol (#206), and whether it is here.
+    # A former name (raw/, refined/) is listed only where it still exists.
+    data_folders: list[dict] = []
+    try:
+        from pathlib import Path as _Path
+
+        from ..core import lab_layout as _layout
+        from ..core import lab_vm as _lv
+
+        root = _Path(wigamig_base).expanduser() if wigamig_base else _lv.data_root()
+        data_folders = [f for f in _layout.present_folders(root)
+                        if not f["legacy_of"] or f["present"]]
+    except Exception:  # noqa: BLE001
+        pass
+
     return C.MachineSettings(
         machine_name=data.get("machine_name") or None,
         wigamig_base=wigamig_base,
@@ -96,6 +111,7 @@ def load(*, legacy_obsidian: dict | None = None) -> C.MachineSettings:
         murmurent_data_subfolder=murmurent_data_subfolder,
         data_immutable_name=data_immutable_name,
         data_append_only_name=data_append_only_name,
+        data_folders=data_folders,
     )
 
 

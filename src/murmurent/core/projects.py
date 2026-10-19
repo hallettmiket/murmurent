@@ -14,6 +14,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from . import sensitivity as _sens
 from .charter import validate_charter
 from .frontmatter import parse_file
 from .repo import CHARTER_FILENAME, MEMBERS_FILENAME, ProjectRepo, lab_mgmt_repo_root, read_members
@@ -46,6 +47,11 @@ class ProjectSummary:
     status: str = "active"
     decommissioned_at: str | None = None
     decommissioned_by: str | None = None
+
+    def __post_init__(self) -> None:
+        # The former tier name ``clinical`` is held as ``protected``.
+        if _sens.is_protected(self.sensitivity):
+            object.__setattr__(self, "sensitivity", _sens.PROTECTED)
 
 
 def projects_root(env: dict[str, str] | None = None) -> Path:
@@ -96,7 +102,7 @@ def load_summary(repo: ProjectRepo) -> ProjectSummary:
     return ProjectSummary(
         name=str(parsed.meta.get("project", repo.path.name)),
         path=repo.path,
-        sensitivity=str(parsed.meta["sensitivity"]),
+        sensitivity=_sens.normalize(parsed.meta["sensitivity"]),
         lead=str(parsed.meta["lead"]),
         members=tuple(seen),
         choreography=parsed.meta.get("choreography"),
@@ -362,7 +368,7 @@ def archive_project(
             note="Slack channel. The bot can't archive channels itself; archive via the Slack UI when ready.",
         ),
     ]
-    if summary.sensitivity == "clinical":
+    if _sens.is_protected(summary.sensitivity):
         items.append(CleanupItem(
             path=f"lab_base/repos/{name}.git",
             note="Private bare git remote (sensitive project). May still be cloned on other machines.",

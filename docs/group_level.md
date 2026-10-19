@@ -619,7 +619,7 @@ Each member has a dashboard. The PI gets an enhanced version of it. Two implemen
   - Outgoing: requests you've made of others, with status.
   - Incoming: assigned to you, with status and deadlines.
 - **Outstanding analysis**: SEAs / experiments / projects where you are a squad member or lead and `analysis_status != concluded`. Sorted by age since `complete`. Visual escalation: subtle yellow at >2 weeks unexamined; red and escalated to squad lead + PI dashboards at >2 months. The panel header reads "what does each result mean?" (pedagogical purpose stated explicitly).
-- **Security and compliance**: per-project sensitivity badge (`standard` / `restricted` / `clinical`), the controls required for that tier, and your compliance status (TCPS 2 certified ✓, TOTP enrolled ✓, signing key registered ✓, etc.). Missing required controls render in red with a one-click action to resolve. Includes an **Elected upgrades** subsection where you toggle stricter-than-required controls (always-on 2FA, always age-encrypted off-VM transfers, etc.). Required and elected stay distinct: you can layer stricter controls but cannot opt out of required ones. See [Sensitivity tiers](#sensitivity-tiers-and-project-level-controls).
+- **Security and compliance**: per-project sensitivity badge (`standard` / `restricted` / `protected`), the controls required for that tier, and your compliance status (TCPS 2 certified ✓, TOTP enrolled ✓, signing key registered ✓, etc.). Missing required controls render in red with a one-click action to resolve. Includes an **Elected upgrades** subsection where you toggle stricter-than-required controls (always-on 2FA, always age-encrypted off-VM transfers, etc.). Required and elected stay distinct: you can layer stricter controls but cannot opt out of required ones. See [Sensitivity tiers](#sensitivity-tiers-and-project-level-controls).
 - **Quick MCP queries**: inventory search bar (low / expiring shortcuts), oracle latest, request board.
 - **Recent activity**: your commits, your PRs, oracle publishes touching projects you're in.
 - **Storage / compute**: your workspace size, your share of `$MURMURENT_DATA_ROOT/append_only/`, GitHub Action minutes consumed.
@@ -635,7 +635,7 @@ Each member has a dashboard. The PI gets an enhanced version of it. Two implemen
 - **Onboarding queue**: open onboarding issues, pending key/profile PRs.
 - **Oracle**: pending publishes, recent findings, oracle health (size, last curation).
 - **Risk**: stale roles, frozen agents needing update, encrypted bundles needing re-encryption, unmerged personal branches > 30 days old.
-- **Compliance grid**: across all `clinical` projects in the group, a member-by-control matrix. Members with expiring or expired certifications, missing 2FA enrollments, or pending REB renewals surface here. Drives onboarding-style "fix this" actions on individual member dashboards.
+- **Compliance grid**: across all `protected` projects in the group, a member-by-control matrix. Members with expiring or expired certifications, missing 2FA enrollments, or pending REB renewals surface here. Drives onboarding-style "fix this" actions on individual member dashboards.
 
 ### Implementation notes
 
@@ -653,7 +653,7 @@ Each project declares a sensitivity tier in its `CHARTER.md` frontmatter. The ti
 |---|---|---|
 | `standard` | Most basic-research projects | (baseline: signed commits, branch protection, MEMBERS-scoped repos, age for off-VM transfer) |
 | `restricted` | Unpublished collaborator data, IP-sensitive work | + per-project secret keys; off-VM artefacts must be age-encrypted; 4-hour MCP token TTL |
-| `clinical` | PHI / human-subject regulated data | + REB number in CHARTER, TCPS 2 (CORE-2022) certification per member with annual renewal, **no data in the repo** (only methods/code), per-project encrypted FS volume, 2FA SSH, 15-minute MCP token TTL with TOTP refresh, PHI pattern detection in hooks, BAA-tier API or de-identification mandatory for any LLM-mediated step |
+| `protected` | Material a data-use agreement or research ethics board keeps inside the member's own account; patient-derived records are the usual case | + REB number in CHARTER, TCPS 2 (CORE-2022) certification per member with annual renewal, **no data in the repo** (only methods/code), per-project encrypted FS volume, 2FA SSH, 15-minute MCP token TTL with TOTP refresh, PHI pattern detection in hooks, BAA-tier API or de-identification mandatory for any LLM-mediated step |
 
 ### Policy file
 
@@ -670,7 +670,7 @@ tiers:
     mcp_token_ttl: 4h
     off_vm_must_be_age_encrypted: true
     ssh_2fa: false
-  clinical:
+  protected:
     mcp_token_ttl: 15m
     mcp_token_2fa: true
     data_in_repo: forbidden
@@ -682,13 +682,13 @@ tiers:
 
 ### CHARTER frontmatter
 
-A `clinical` charter must declare additional fields:
+A `protected` charter must declare additional fields. (`clinical` is the former name of this tier; a charter that still says it is read as `protected`.)
 
 ```yaml
 ---
 project: brca_clinical_imaging
 lead: '@member_a'
-sensitivity: clinical
+sensitivity: protected
 reb_number: WREM-2026-0142
 reb_expires: 2027-08-01
 data_residency: ca
@@ -699,12 +699,12 @@ data_residency: ca
 
 ### Sensitive-project-mode controls in detail
 
-For `sensitivity: clinical`:
+For `sensitivity: protected`:
 
-- **No data in repo**: notebook frontmatter's `immutable_data:` and `append_only_data:` paths point only to lab VM locations. Checksums also stay on the VM, not in the repo. A pre-commit hook refuses commits that introduce data files into a clinical repo.
+- **No data in repo**: notebook frontmatter's `immutable_data:` and `append_only_data:` paths point only to lab VM locations. Checksums also stay on the VM, not in the repo. A pre-commit hook refuses commits that introduce data files into a protected repo.
 - **Per-project encrypted volume** on lab VM. Mounted only while the project is active; unmounted on session end.
 - **PHI pattern detection** extends the secret-leak hook with patterns: OHIP (10-digit + 2-letter version code), MRN-style identifiers, SIN, DOB-near-name proximity. Outbound calls (WebFetch, mcp__slack, Anthropic API) refuse to send any prompt or argument matching these patterns.
-- **Member certifications**: each clinical-project member holds current TCPS 2 (CORE-2022) certification, recorded in `lab-mgmt-repo/members/<handle>.md` with expiry date. Auto-revocation on expiry.
+- **Member certifications**: each protected-project member holds current TCPS 2 (CORE-2022) certification, recorded in `lab-mgmt-repo/members/<handle>.md` with expiry date. Auto-revocation on expiry.
 - **REB-bounded access**: when the REB approval expires or amends, member access auto-pauses pending re-approval.
 - **`murmurent breach <project> --description <text>`**: opens an incident in the lab-management repo, notifies PI immediately, starts the PHIPA 24-hour clock, drafts the IPC notification.
 
@@ -725,7 +725,7 @@ Each member's dashboard adds a **Security and compliance** panel:
 - **Per-project block**: sensitivity badge, the controls required for that tier, the member's compliance status (TCPS 2 certified ✓, TOTP enrolled ✓, signing key registered ✓, etc.). Missing required controls show in red.
 - **Outstanding required**: aggregated list of any required control the member doesn't currently satisfy. Clicking takes them to the action that resolves it.
 - **Elected upgrades**: members can opt into stricter controls than required (e.g. always-on 2FA, always age-encrypt off-VM artefacts even for standard projects). Toggles on the dashboard; persisted in the personal preferences profile.
-- **PI view**: across-all-clinical-projects compliance grid; flags members whose certifications are expiring or expired.
+- **PI view**: across-all-protected-projects compliance grid; flags members whose certifications are expiring or expired.
 
 The required-vs-elected distinction is enforced: a member cannot opt out of a control their project requires, but can layer stricter controls on top.
 
@@ -774,6 +774,6 @@ The required-vs-elected distinction is enforced: a member cannot opt out of a co
 - **Standardised vocabulary**: controlled list of cross-cutting `defaults` field names documented at `murmurent/preferences.md`; groups extend via `murmurent/<group>/preferences.md`. Used for fields multiple agents share (plotting, citation_style, prose_style, etc.).
 - **Personal preferences profile**: `~/.claude/murmurent-preferences.yaml`, local to each member's machine, sets standardised fields once for all `personal` agents. Never committed to group repos.
 - **Onboarding profile**: YAML+markdown spec at `murmurent/onboarding/<profile>.md` (centre default) or `lab-mgmt-repo/onboarding/<profile>.md` (lab override) bundling agents-to-install, default permissions, lead eligibility, and expiry for a class of new member. Four centre defaults: `student`, `postdoc`, `pi-collab`, `visitor`. Cores are themselves groups, not profiles within a group.
-- **Sensitivity tier**: project-level property declared in `CHARTER.md` frontmatter: `standard` / `restricted` / `clinical`. Controls per tier defined in `murmurent/sensitivity-policy.yaml`. Projects in the same group can be at different tiers.
-- **PHIPA / TCPS 2 / REB**: Personal Health Information Protection Act (Ontario), Tri-Council Policy Statement on research ethics, Research Ethics Board. Together they govern `clinical` projects.
+- **Sensitivity tier**: project-level property declared in `CHARTER.md` frontmatter: `standard` / `restricted` / `protected`. Controls per tier defined in `murmurent/sensitivity-policy.yaml`. Projects in the same group can be at different tiers.
+- **PHIPA / TCPS 2 / REB**: Personal Health Information Protection Act (Ontario), Tri-Council Policy Statement on research ethics, Research Ethics Board. Together they govern `protected` projects.
 - **Required vs elected controls**: required controls come from a project's sensitivity tier; elected controls are stricter-than-required preferences a member opts into. Members cannot opt out of required.

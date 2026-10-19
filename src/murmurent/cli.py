@@ -26,7 +26,26 @@ from .commands import push_cmd as push_impl
 from .commands import reconcile_cmd as reconcile_impl
 from .commands import sea_cmd
 from .commands import security_cmd as security_impl
+from .core import sensitivity as _sens
+
 NOT_IMPLEMENTED_MSG = "not yet implemented in v1"
+
+
+class SensitivityChoice(click.Choice):
+    """The three sensitivity tiers as a click choice.
+
+    Help text lists only the current names (standard, restricted, protected).
+    The former name ``clinical`` is still accepted on the command line and is
+    turned into ``protected`` before the command sees it.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(list(_sens.TIERS), case_sensitive=False)
+
+    def convert(self, value, param, ctx):  # type: ignore[override]
+        if isinstance(value, str):
+            value = _sens.normalize(value) or value
+        return super().convert(value, param, ctx)
 
 
 def _stub(*_args, **_kwargs) -> None:
@@ -741,7 +760,7 @@ def project_migrate(apply_records: bool, yes: bool) -> None:
 @click.option("--members", "members_list", required=True, help="Comma-separated handles.")
 @click.option(
     "--sensitivity",
-    type=click.Choice(["standard", "restricted", "clinical"]),
+    type=SensitivityChoice(),
     default=None,
 )
 @click.option("--lead", default=None, help="Project lead handle (defaults to first member).")
@@ -896,7 +915,7 @@ def project_archive(name: str) -> None:
 @click.option(
     "--set",
     "set_value",
-    type=click.Choice(["standard", "restricted", "clinical"]),
+    type=SensitivityChoice(),
     default=None,
 )
 def project_sensitivity(name: str, set_value: str | None) -> None:
@@ -2109,7 +2128,7 @@ def oracle_vault_drafts_cmd() -> None:
             path.stem,
             str(meta.get("title", path.stem)),
             str(meta.get("project", "—")),
-            str(meta.get("sensitivity", "—")),
+            str(_sens.normalize(meta.get("sensitivity")) or "—"),
         )
     console.print(table)
 
@@ -2122,7 +2141,8 @@ def oracle_vault_drafts_cmd() -> None:
               help="Validate + copy, but skip git commit. Use to preview the result.")
 def oracle_publish_cmd(slug: str, push: bool, dry_run: bool) -> None:
     """Promote a draft from <vault>/oracle/drafts/<slug>.md to the Lab
-    Oracle. Refuses sensitivity=clinical|restricted entries.
+    Oracle. Refuses sensitivity=protected|restricted entries (and the former
+    name, clinical).
     """
     from .core import oracle_publish as _op
     from .core.identity import resolve as resolve_identity
@@ -2178,7 +2198,7 @@ def vault_group() -> None:
                    "keeps everything else local. Use for already-onboarded members.")
 @click.option("--include-all", is_flag=True,
               help="With --adopt: back the WHOLE vault (minus files tagged "
-                   "sensitivity: clinical) instead of only the murmurent folders. "
+                   "sensitivity: protected) instead of only the murmurent folders. "
                    "Pushes personal folders (health/, journal/, …) to GitHub.")
 @click.option("--dry-run", is_flag=True,
               help="With --adopt: preview exactly what would be tracked vs kept "
@@ -2568,7 +2588,7 @@ def choreography_list(index_url: str | None) -> None:
               help="How the judge ranks results (text, or @file to read).")
 @click.option("--members", default=None,
               help="Project members besides you, comma-separated handles.")
-@click.option("--sensitivity", type=click.Choice(["standard", "restricted", "clinical"]),
+@click.option("--sensitivity", type=SensitivityChoice(),
               default="standard", show_default=True)
 @click.option("--lab", default="", help="Owning lab (default: this machine's lab).")
 @click.option("--no-project", "no_project", is_flag=True,

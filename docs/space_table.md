@@ -52,7 +52,7 @@ a large project it can take a while; it prints a line every 50,000 files.
 | out of place | A large file inside a repository; a file loose at the top of the project's append-only folder; a data folder with no matching experiment folder in `exp/`. | move, or ask the owner |
 | unattributed | Files owned by someone who is not a member of the project. Grouped by owner and folder. | ask the owner |
 | listed | Files a member already listed in `src/ready_to_delete.md`. | delete |
-| access | Files anyone on the server can change (or, for a clinical project, read). These go to the security guard, not to you. | refer to security guard |
+| access | Files anyone on the server can change (or, for a protected project, read). These go to the security guard, not to you. | refer to security guard |
 | unreadable | A folder the scan could not look into, so its size is unknown. | ask the owner |
 
 A **fingerprint** (a checksum) is a short number worked out from a file's
@@ -124,10 +124,49 @@ murmurent space decide 15 keep --note "needed for the revision"
 murmurent space decide 15 undo
 ```
 
-The choices are keep, delete, mothball, compress and move. Recording a
-decision changes nothing on disk. Carrying decisions out is a separate step,
-still to be built, which will delete from the server only after a backup has
-been checked. Scanning again keeps every decision.
+The PI can also record a decision on the dashboard's Space page: each row has
+a "Decide" column. The choices are keep, delete, mothball, compress and move.
+Recording a decision changes nothing on disk. Scanning again keeps every decision.
+
+## Carry out decisions
+
+`murmurent space carry-out` makes a copy for each mothball, compress or move
+decision, checks the copy against fingerprints of the original, and logs who
+did it and when. A fingerprint is a short code computed from a file's
+contents: if two files have the same fingerprint, they are identical.
+
+murmurent never removes the original. Once the copy is checked, you remove
+the original yourself. This keeps a person in charge of every deletion.
+
+```bash
+murmurent space carry-out             # show what would be done; changes nothing
+murmurent space carry-out --apply     # do it
+murmurent space carry-out --row 12 --to /path/to/new/place --apply   # a move needs --to
+murmurent space removable             # originals you may now remove
+```
+
+What each decision does:
+
+- **mothball**: copies to the lab's backup drive, under a folder named after
+  the project. The PI sets the drive in the lab's policy file
+  (`mothball_target`); until then, mothballing is refused. A copy that would
+  fill the drive past `mothball_target_fill_limit` (90% unless set) is
+  refused.
+- **compress**: writes a `.gz` copy beside a text file (FASTQ, FASTA, CSV,
+  TSV, plain text; VCF, BED, GFF and GTF use bgzip when it is installed, so
+  they stay indexable). Lossless only. Never inside `immutable/` or
+  `mothballed/`. SAM files are not converted; do that by hand.
+- **move**: copies to the place you give with `--to`.
+
+Nothing is overwritten: if the copy's name is already taken, the row is
+skipped. If any file in a copy does not match, the action is marked failed,
+the copy is left for you to look at, and the original is not listed as
+removable.
+
+`murmurent space removable` lists originals whose copy was checked, and rows
+you decided to delete. A project with a keep-until date in the future is
+listed separately, as held. The log of every action is
+`~/.murmurent/space/actions.log`, readable by you only.
 
 ## Gaps in the lab's procedures
 
@@ -146,9 +185,9 @@ These are for the PI, to decide whether a rule needs writing.
 - The scan reads sizes, dates, owners and names. To find duplicates it reads
   large files of the same size to fingerprint them, up to a limit the lab sets
   (100 GB unless it says otherwise); add `--no-checksums` to skip that.
-- For files owned by a non-member in a project **not** marked clinical, the
+- For files owned by a non-member in a project **not** marked protected, the
   table keeps the first three lines, so you can tell what the file is. In a
-  clinical project nothing inside a file is read for this.
+  protected project nothing inside a file is read for this.
 - The table is kept in your own murmurent folder (`~/.murmurent/space/`),
   readable only by you. It is never posted to Slack or GitHub, and nothing is
   written to the project's repositories.
@@ -257,10 +296,10 @@ across the lab, and every project with how much is waiting for a decision. To
 see every row of one project or record a decision, use `murmurent space show`
 and `murmurent space decide` on the server.
 
-For clinical projects, and for folders no project claims, the lab-wide list of
+For protected projects, and for folders no project claims, the lab-wide list of
 pressing items gives sizes but no file names.
 
 ## What it cannot do yet
 
-- It does not carry out decisions.
-- Rows cannot yet be decided from the dashboard; use `murmurent space decide`.
+- It does not remove files: `carry-out` copies and checks, and a person
+  removes the originals.

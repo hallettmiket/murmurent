@@ -17,6 +17,53 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.10.3] - 2026-10-19
+
+**To upgrade:** `uv tool upgrade murmurent`, then `murmurent install`, then
+restart Claude Code and the dashboard (**⏻ Stop dashboard**, then start it
+again). If you installed from a copy of the repository, `git pull` there
+instead of the first command.
+
+### Added
+- **The lab folder protocol** (#206). murmurent knows what each folder at the
+  top of a lab's data root is for: `immutable/`, `append_only/`,
+  `modifiable/`, `mothballed/` and `release/` (one subfolder per project),
+  `cottage/` (one per person), and the shared `tools/` and `db/`.
+  `murmurent space layout` lists anything that does not follow it, and moves
+  nothing. Every agent's rules and the millwright describe it; agents tell
+  the PI rather than tidy. Guide: [The lab folder
+  protocol](https://mikehallett.science/murmurent/lab_folders/).
+- **Carrying out space decisions** (#151, step 6). `murmurent space
+  carry-out` copies each mothball, compress or move decision, checks the copy
+  against fingerprints of the original, and logs it. `murmurent space
+  removable` lists the originals a person may then remove. murmurent never
+  removes files. Mothballing needs `mothball_target` in the lab's policy file.
+- **Decide from the dashboard.** The Space page has a Decide column for the
+  PI.
+- **The Scribe** (#153, #173), an agent that revises and drafts manuscript
+  text in the house style, and its writing guide, [Writing a scientific
+  manuscript](https://mikehallett.science/murmurent/scientific_writing/).
+
+### Changed
+- **The sensitivity tiers are standard, restricted and protected** (#205),
+  matching the manuscript. `clinical`, the former name of `protected`, is
+  still read everywhere, so existing records need no edit.
+- The weekly space scan counts a project's `modifiable/`, `release/` and
+  `mothballed/` folders as its own, never suggests changes in `mothballed/`,
+  and reports cottages and shared folders on their own line.
+- Dashboard:
+  - the This machine window lists each lab folder and what it is for;
+  - the Repos panel shows every project's repos, including murmurent's own,
+    under shaded project headings, and a listed repo it cannot find as "not
+    found";
+  - project actions (provision, reconcile, delete) sit on a "Manage this
+    project" line in the project's details; the Projects panel is above
+    Repos; published choreographies are listed without a button;
+  - a project's member list takes an @handle from another group;
+  - the lab notebook window shows about the last 25 lines of the day;
+  - the Stop dashboard button is red and easy to see;
+  - the agent versions window no longer says "most specific wins".
+
 ## [2026.10.2] - 2026-10-18
 
 **To upgrade:** `uv tool upgrade murmurent`, then `murmurent install`, then

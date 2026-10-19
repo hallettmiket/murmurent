@@ -10,7 +10,7 @@ Output: A committed file at ``<lab-mgmt>/oracle/<YYYY-MM-DD>_<slug>.md``,
 
 Boundary: this module does NOT decide whether the lab should accept an
 entry — that's a PI review concern handled separately. It only enforces
-mechanical invariants (schema present, sensitivity not clinical/restricted,
+mechanical invariants (schema present, sensitivity not protected/restricted,
 slug doesn't clobber an existing entry) and copies + commits.
 
 Path resolution:
@@ -34,12 +34,15 @@ from typing import Iterable
 import yaml
 
 from . import obsidian as _obsidian
+from . import sensitivity as _sens
 from .repo import lab_mgmt_repo_root
 
 REQUIRED_FIELDS: tuple[str, ...] = (
     "title", "date", "project", "sensitivity", "tags", "sources",
 )
-BLOCKED_SENSITIVITIES: frozenset[str] = frozenset({"clinical", "restricted"})
+# Compared after core/sensitivity.normalize, so the former name ``clinical`` is
+# refused exactly like ``protected``.
+BLOCKED_SENSITIVITIES: frozenset[str] = frozenset({"protected", "restricted"})
 SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 DATE_PREFIX_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_")
 ENV_PERSONAL = "MURMURENT_PERSONAL_ORACLE_DIR"
@@ -58,7 +61,7 @@ class SchemaViolation(OracleError):
 
 
 class SensitivityBlocked(OracleError):
-    """Refused: clinical/restricted entries must stay personal."""
+    """Refused: protected/restricted entries must stay personal."""
 
 
 class TargetExists(OracleError):
@@ -295,7 +298,7 @@ def validate_for_publish(path: Path) -> dict:
             f"(see rules/oracle_schema.md)"
         )
     sensitivity = str(meta.get("sensitivity", "")).strip().lower()
-    if sensitivity in BLOCKED_SENSITIVITIES:
+    if _sens.normalize(sensitivity) in BLOCKED_SENSITIVITIES:
         raise SensitivityBlocked(
             f"{path.name}: sensitivity={sensitivity!r} is blocked from "
             f"Lab Oracle publish — the entry must stay in your personal vault"

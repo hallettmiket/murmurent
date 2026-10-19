@@ -40,3 +40,6 @@ docs/*.html
 ## this rule and remain in the public history; ignoring a path does not
 ## untrack what is already in it.
 outputs/
+
+# Working copies Claude Code makes for helper agents (never commit)
+.claude/worktrees/

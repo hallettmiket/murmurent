@@ -262,7 +262,7 @@ returns.
 
 **Only teacher may do this.** Reading session transcripts is fenced by rails that live in
 that agent — never globbing `~/.claude/projects/`, never quoting `tool_result` blocks, the
-clinical sensitivity gate. Do not go read a `.jsonl` yourself because it would be quicker.
+protected sensitivity gate. Do not go read a `.jsonl` yourself because it would be quicker.
 
 ## Closing every session
 

@@ -15,7 +15,9 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
+
+from ..core import sensitivity as _sens
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +189,10 @@ class MachineSettings(BaseModel):
     #     shows ``immutable``/``append_only`` (see ``core.lab_vm``).
     data_immutable_name: str = "immutable"
     data_append_only_name: str = "append_only"
+    #   • ``data_folders`` — every folder of the lab folder protocol (#206):
+    #     ``{name, kind, purpose, legacy_of, present}``, from
+    #     ``core.lab_layout.present_folders``. Read-only.
+    data_folders: list[dict] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -273,7 +279,11 @@ class StatStrip(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-Sensitivity = Literal["clinical", "restricted", "standard"]
+# The three tiers (core/sensitivity.py). A record that still says the former
+# name ``clinical`` is turned into ``protected`` before validation, so an old
+# record never fails to load.
+Sensitivity = Annotated[Literal["protected", "restricted", "standard"],
+                        BeforeValidator(_sens.normalize)]
 RepoDestination = Literal["github", "local"]
 
 

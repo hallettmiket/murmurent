@@ -264,9 +264,10 @@ def _ensure_dir(path: Path, *, label: str, required: bool) -> Probe:
 
 
 #: Sensitivity tiers treated as tier-3 for residency purposes. Today only
-#: ``clinical`` (the top of ``cert_projects.VALID_SENSITIVITY_TIERS``); kept as
+#: ``protected`` (the top of ``cert_projects.VALID_SENSITIVITY_TIERS``); kept as
 #: a set so a future "restricted-large" class can join without touching callers.
-TIER3_SENSITIVITIES: frozenset[str] = frozenset({"clinical"})
+#: Labels are normalized first, so the former name ``clinical`` counts too.
+TIER3_SENSITIVITIES: frozenset[str] = frozenset({"protected"})
 
 
 def probe_tier3_residency(
@@ -276,14 +277,14 @@ def probe_tier3_residency(
     project: str = "",
     data_root: str | None = None,
 ) -> Probe:
-    """Residency policy: tier-3 (clinical) data must never live on a laptop.
+    """Residency policy: tier-3 (protected) data must never live on a laptop.
 
     Large / tier-3 data is server-resident and *reached* over the network
     (SSH / sshfs / Remote-SSH), never *replicated* onto a portable device
     (``rules/data-storage.md`` → "Data tiering & residency"). This probe is the
     machine-role gate on binding a project's data root:
 
-    - ``role == "laptop"`` **and** the project is tier-3 (``clinical``) →
+    - ``role == "laptop"`` **and** the project is tier-3 (``protected``) →
       ``fail`` (``required=True``) — the manifest write is refused. The message
       names the fix (reach it over SSH, don't replicate it here).
     - a ``host`` / server → ``ok`` (the data root's proper home).
@@ -295,7 +296,8 @@ def probe_tier3_residency(
     sensitivity from :class:`cert_projects.CertProject`), so it is trivially
     unit-testable and never itself touches git, the network, or the disk.
     """
-    tier = str(sensitivity or "standard").strip().lower() or "standard"
+    from . import sensitivity as _sens
+    tier = _sens.normalize(sensitivity) or "standard"
     who = f" for project {project!r}" if project else ""
     if tier not in TIER3_SENSITIVITIES:
         return Probe(
@@ -308,14 +310,14 @@ def probe_tier3_residency(
         return Probe(
             name="data residency", status="fail",
             detail=(
-                f"clinical/tier-3 data must stay on a server; this machine is a "
+                f"protected/tier-3 data must stay on a server; this machine is a "
                 f"laptop{where} — reach it over SSH, don't replicate it to a laptop."
             ),
             required=True,
         )
     return Probe(
         name="data residency", status="ok",
-        detail=f"clinical/tier-3 data{who} on a host/server{where} — allowed (server-resident).",
+        detail=f"protected/tier-3 data{who} on a host/server{where} — allowed (server-resident).",
         required=False,
     )
 

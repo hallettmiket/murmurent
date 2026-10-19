@@ -62,12 +62,41 @@ function NbHintPopup({ text }) {
 function NbToday() {
   const NB = window.DATA.notebook;
   const t = NB.today;
-  // Cap the rendered day to its most recent ~50 blocks so a long entry doesn't
-  // grow the panel without bound — the file itself always has the full text.
-  const CAP = 50;
+  // Show only the most recent ~25 lines of the day (#207), counted as they
+  // appear on screen: a long paragraph counts as several lines, about
+  // CHARS_PER_LINE characters each. The oldest block shown is trimmed to its
+  // end if it alone would go over. The file itself always has the full text.
+  const MAX_LINES = 25;
+  const CHARS_PER_LINE = 90;
   const all = t.content || [];
-  const shown = all.length > CAP ? all.slice(-CAP) : all;
-  const hidden = all.length - shown.length;
+  const screenLines = (text) => String(text || "").split("\n")
+    .reduce((n, ln) => n + Math.max(1, Math.ceil(ln.length / CHARS_PER_LINE)), 0);
+  const linesOf = (b) => {
+    if (b.kind === "list") return (b.items || []).reduce((n, x) => n + screenLines(x), 0) || 1;
+    return screenLines(b.text);
+  };
+  const trimTo = (b, lines) => {
+    // Keep the last `lines` screen lines of one block.
+    const budget = Math.max(1, lines) * CHARS_PER_LINE;
+    if (b.kind === "list") {
+      const items = []; let n = 0;
+      for (let j = (b.items || []).length - 1; j >= 0 && n < lines; j--) {
+        items.unshift(b.items[j]); n += screenLines(b.items[j]);
+      }
+      return { ...b, items };
+    }
+    const text = String(b.text || "");
+    return text.length > budget ? { ...b, text: "…" + text.slice(text.length - budget) } : b;
+  };
+  let used = 0, first = all.length;
+  const shown = [];
+  for (let i = all.length - 1; i >= 0 && used < MAX_LINES; i--) {
+    const n = linesOf(all[i]);
+    shown.unshift(used + n > MAX_LINES ? trimTo(all[i], MAX_LINES - used) : all[i]);
+    used += n;
+    first = i;
+  }
+  const hidden = first > 0 || used > MAX_LINES;
   return (
     <div className="nb-entry">
       <h3>{t.title}</h3>
@@ -77,9 +106,9 @@ function NbToday() {
         <span><span className="muted">links ›</span> {t.links_seas.map(n => <span key={n} className="wikilink" style={{marginRight:6}}>SEA #{n}</span>)} {t.links_exp.map(e => <span key={e} className="wikilink" style={{marginRight:6}}>{e}</span>)}</span>
       </div>
 
-      {hidden > 0 && (
+      {hidden && (
         <p className="muted" style={{fontSize:12, fontStyle:"italic", margin:"0 0 8px"}}>
-          … showing the last {CAP} of {all.length} blocks — open the file for the full day.
+          Showing the last {MAX_LINES} lines or so. Open the file for the whole day.
         </p>
       )}
       {shown.map((b, i) => {

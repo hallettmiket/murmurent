@@ -141,7 +141,7 @@ project intends to act on**:
 - **governed data about to move** — an export to a collaborator, a transfer off
   the data host, a new storage location, a new person given access, or a release
   or preprint carrying participant-level content. For a `restricted` or
-  `clinical` project this is a referral even when nothing is named: the question
+  `protected` project this is a referral even when nothing is named: the question
   is whether PHIPA, the data-sharing agreement, or the REB approval permits it,
   and the answer lives in a document, not in your judgement.
 

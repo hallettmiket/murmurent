@@ -60,7 +60,7 @@ murmurent oracle publish 2026-05-16_chrm_p14        # validate + copy + commit
 murmurent oracle publish 2026-05-16_chrm_p14 --push # commit + push in one shot
 ```
 
-`murmurent oracle publish` **refuses `sensitivity: clinical` /
+`murmurent oracle publish` **refuses `sensitivity: protected` /
 `restricted` entries** (those stay personal) and never overwrites an
 existing lab entry. See [obsidian-usage.md §2.4](obsidian-usage.md)
 for the full mechanics (identity checks, and what happens to the draft

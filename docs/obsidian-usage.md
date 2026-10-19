@@ -190,10 +190,9 @@ Publish enforces, mechanically, in `core/oracle_publish.py`:
 
 - The draft must have complete frontmatter: `title`, `date`, `project`,
   `sensitivity`, non-empty `tags`, non-empty `sources`.
-- Entries with `sensitivity: clinical` or `sensitivity: restricted` are
-  refused and stay in your personal vault. (`rules/oracle_schema.md`
-  calls out `clinical` explicitly; the code also blocks `restricted`,
-  so treat both as personal-vault-only.)
+- Entries with `sensitivity: protected` or `sensitivity: restricted` are
+  refused and stay in your personal vault. An entry that still says
+  `clinical`, the former name for `protected`, is refused too.
 - The target filename (`<lab-mgmt>/oracle/<YYYY-MM-DD>_<slug>.md`) must
   be new: publish refuses to overwrite an existing lab entry.
 - On success, the draft commits to the lab-mgmt repo (and pushes, if
@@ -214,7 +213,7 @@ to parse them:
 title:        <one-line human-readable headline>
 date:         <YYYY-MM-DD>
 project:      <project_name | "general">
-sensitivity:  standard | restricted | clinical
+sensitivity:  standard | restricted | protected
 tags:         [comma-sep, list, of, tags]
 sources:      ['@handle']
 ---

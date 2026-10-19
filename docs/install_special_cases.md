@@ -65,8 +65,11 @@ your computer are not moved.
 Add this line to the folder's `.murmurent.yaml` file:
 
 ```yaml
-sensitivity: clinical
+sensitivity: protected
 ```
+
+(Older folders may say `sensitivity: clinical`. That is the former name and
+still works the same way.)
 
 ## Setting up a folder did not work
 

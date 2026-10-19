@@ -87,7 +87,7 @@ ENV_MACHINE_ROLE = "MURMURENT_MACHINE_ROLE"
 
 #: The two roles the tier-3 residency policy distinguishes. A "host" is a
 #: server (the data-root's proper home); a "laptop" is a portable box that must
-#: never become the residency for clinical / tier-3 data.
+#: never become the residency for protected / tier-3 data.
 MACHINE_ROLES: tuple[str, ...] = ("laptop", "host")
 
 
@@ -105,7 +105,7 @@ def machine_kind(settings: Any | None = None) -> str:
        (``mike-mbp``, ``alice-laptop``) is a ``laptop``.
 
     A laptop is the *conservative* default: if we cannot tell, we assume the
-    box is portable, so the tier-3 guard errs toward refusing to plant clinical
+    box is portable, so the tier-3 guard errs toward refusing to plant protected
     data on it rather than silently allowing it. ``settings`` is accepted for
     symmetry with :func:`machine_id` (a future machine.yaml role field could be
     honoured here) but is unused today.

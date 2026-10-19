@@ -26,7 +26,7 @@ Without frontmatter, none of these queries are reliable.
 title:        <one-line human-readable headline>
 date:         <YYYY-MM-DD>            # when the finding was recorded
 project:      <project_name | "general">
-sensitivity:  standard | restricted | clinical
+sensitivity:  standard | restricted | protected
 tags:         [comma-sep, list, of, tags]
 sources:      ['@handle']             # who observed / contributed
 ---
@@ -41,9 +41,21 @@ sources:      ['@handle']             # who observed / contributed
   when the entry is not project-specific (tooling assessments,
   cross-cutting methods, etc.). Multiple projects: pick the primary,
   list the others under `related:`.
-- **sensitivity**: matches the CHARTER.md vocabulary. **A clinical
-  entry MUST stay in the personal vault — never publish to Lab
-  Oracle.** The publish CLI refuses `sensitivity: clinical`.
+- **sensitivity**: the same three tiers a project uses.
+  - `standard`: ordinary material that may be shared with the group.
+  - `restricted`: material that is not yet the group's to hold, such as
+    an unpublished result or a candidate molecule with a patent position.
+  - `protected`: material that a data-use agreement or a research ethics
+    board keeps inside your own account. Patient-derived records are the
+    usual case.
+
+  **A protected entry MUST stay in the personal vault and is never
+  published to the Lab Oracle.** The publish command refuses
+  `sensitivity: protected`, and refuses `restricted` too.
+
+  `clinical` is the former name of `protected`. Older entries that still
+  say `clinical` are read as `protected` everywhere, so you do not need to
+  edit them. Write `protected` in new entries.
 - **tags**: open vocabulary, but prefer reuse. Common axes: subject
   area (`dcis`, `imaging`, `genomics`), artefact type (`gene`,
   `method`, `tool`, `decision`), and lifecycle stage (`hypothesis`,

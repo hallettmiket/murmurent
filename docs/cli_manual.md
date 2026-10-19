@@ -275,7 +275,7 @@ The finalisation choreography runs at SEA / experiment / project scope. `<scope>
 
 | Command | Effect | Authority |
 |---|---|---|
-| `murmurent project sensitivity <project> [--set <standard\|restricted\|clinical>]` | Read or change a project's sensitivity tier | PI; raising allowed; lowering requires PR + audit |
+| `murmurent project sensitivity <project> [--set <standard\|restricted\|protected>]` | Read or change a project's sensitivity tier | PI; raising allowed; lowering requires PR + audit |
 | `murmurent compliance status [--project <p>]` | Show your compliance state per project (required + elected controls; missing items in red) | Member |
 | `murmurent compliance certify <cert-name> --expires <date>` | Record a certification (e.g. TCPS 2) on your member profile | Member; PI verifies |
 | `murmurent audit verify <repo>` | Walk the audit chain, verify signatures and tamper-evident hash chain | Anyone with repo access |
@@ -327,10 +327,13 @@ The full guide is [Running long jobs](run_launcher.md).
 |---|---|
 | `murmurent space scan [project] [--no-checksums]` | Look through one project's repositories and data folders and list what could be deleted, compressed, moved or asked about, most pressing first. Reads sizes, dates, owners and names; changes nothing. The table is kept in `~/.murmurent/space/`, readable by you only |
 | `murmurent space show [project] [--category C] [--owner O] [--min-size 10G] [--all]` | The table from the last scan: emergencies, the top three, then every row waiting for a decision |
-| `murmurent space decide <row> keep\|delete\|mothball\|compress\|move\|undo [--note …]` | Record your decision on one row. Nothing is carried out |
+| `murmurent space decide <row> keep\|delete\|mothball\|compress\|move\|undo [--note …]` | Record your decision on one row. Nothing is carried out; see `carry-out` |
+| `murmurent space carry-out [project] [--row N] [--to <place>] [--apply]` | Carry out mothball, compress and move decisions: copy, check the copy against fingerprints of the original, and log it. Shows the plan unless `--apply` is given. Never removes an original |
+| `murmurent space removable [project]` | Originals a person may now remove: those whose copy was checked, and rows decided `delete`. Projects with a keep-until date in the future are listed as held. Removes nothing |
 | `murmurent space gaps [project]` | Cases the lab's procedures do not cover, each with an example |
 | `murmurent space scan-lab [--notify]` | (PI, on the server) Scan every project's data folders and the folders no project claims; write the lab report; with `--notify`, send the PI a Slack summary without file names |
 | `murmurent space lab [--host <server>] [--json]` | The lab's last report: emergencies, what to look at first, every project. With `--host`, fetch it from the server over SSH |
+| `murmurent space layout [--json]` | Compare the lab's data root with the lab folder protocol and list what does not follow it: folders not in the protocol, folders being phased out, loose files, and subfolders named after no project or person. Reads folder names only and moves nothing; see [The lab folder protocol](lab_folders.md) |
 | `murmurent space schedule [--install\|--remove] [--day sun --at 02:00]` | Show, set up or remove the weekly lab scan (a systemd user timer); recorded in the lab records repository |
 
 The full guide is [Tidying a project's space](space_table.md).

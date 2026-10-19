@@ -28,7 +28,7 @@ murmurent oracle publish esr1-high-in-tumour-samples --push
    pushes it in one go.
 3. Now every lab member can recall Sam's finding through their own
    oracle.
-4. If the note were marked `sensitivity: clinical` or `restricted`,
+4. If the note were marked `sensitivity: protected` or `restricted`,
    `murmurent oracle publish` would refuse it outright: those notes
    stay personal, tying back to vignettes 3 and 5.
 
@@ -49,7 +49,7 @@ murmurent oracle publish esr1-high-in-tumour-samples --push
 published: esr1-high-in-tumour-samples -> lab vault · pushed: yes
 ```
 
-If Sam had tried to publish a `sensitivity: clinical` note instead,
+If Sam had tried to publish a `sensitivity: protected` note instead,
 the command would refuse it and nothing would leave Sam's vault.
 
 ??? note "Under the hood"

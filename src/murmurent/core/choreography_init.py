@@ -36,6 +36,7 @@ from . import choreography as _ch
 from . import contribution_contract as _pc
 from . import repo as _repo
 from . import repo_ready as _rr
+from . import sensitivity as _sens
 from .preflight import Probe
 
 #: The two modes a choreography runs in. See docs/choreography.md.
@@ -124,8 +125,8 @@ class ChoreographyPlan:
         elif self.criteria.strip():
             out.append("criteria were given without a candidate key; give both, "
                        "or neither to pose the question later")
-        if self.sensitivity not in ("standard", "restricted", "clinical"):
-            out.append("sensitivity must be standard, restricted or clinical")
+        if not _sens.is_valid(self.sensitivity):
+            out.append("sensitivity must be standard, restricted or protected")
         return out
 
     def declaration(self) -> dict:
@@ -386,7 +387,7 @@ def _step_request(plan: ChoreographyPlan, actor: str) -> tuple[Probe, int | None
     try:
         filed = _ra.file_create_request(
             actor=actor, project=plan.name, proposed_members=list(plan.members),
-            sensitivity=plan.sensitivity,
+            sensitivity=_sens.normalize(plan.sensitivity) or "standard",
             justification=f"Choreography: {plan.title.strip()}",
             attach_repos=[plan.name],
         )

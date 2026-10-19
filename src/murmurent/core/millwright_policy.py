@@ -151,6 +151,12 @@ class Policy:
     emergency_item_share_of_free : float
         One suggestion bigger than this share of a disk's free space is an
         emergency (step 2).
+    mothball_target : str
+        The folder on the backup drive that mothballed files are copied to
+        (step 6). Empty means mothballing is not set up, and nothing is copied.
+    mothball_target_fill_limit : float
+        A copy that would fill the backup drive past this share is refused
+        (step 6).
     sources : tuple of str
         The files read, in order, after the built-in defaults.
     problems : tuple of str
@@ -182,6 +188,8 @@ class Policy:
     remake_cheap_below_cpu_hours: int = 10
     disk_emergency_fill_fraction: float = 0.90
     emergency_item_share_of_free: float = 0.25
+    mothball_target: str = ""
+    mothball_target_fill_limit: float = 0.90
     sources: tuple[str, ...] = ()
     problems: tuple[str, ...] = ()
 
@@ -291,6 +299,8 @@ _CHECKERS = {
     "temporary_min_age_days": _check_int(0),
     "large_file_in_repo_mb": _check_int(1),
     "compress_min_mb": _check_int(1),
+    "mothball_target": lambda value: str(value or "").strip(),
+    "mothball_target_fill_limit": _check_fraction,
     "duplicate_min_mb": _check_int(1),
     "duplicate_max_read_gb": _check_int(0),
     "scan_threads": _check_int(1, 32),

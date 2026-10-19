@@ -106,3 +106,11 @@ remake_cheap_below_cpu_hours: 10
 # share of the disk's free space.
 disk_emergency_fill_fraction: 0.90
 emergency_item_share_of_free: 0.25
+
+# Carrying out decisions (step 6). Mothballed files are copied here, then
+# checked against fingerprints taken before the copy. A person removes the
+# originals afterwards; murmurent never does. Leave empty until the lab has a
+# backup drive mounted on the server.
+mothball_target: ""
+# Refuse a copy that would fill the backup drive past this share.
+mothball_target_fill_limit: 0.90

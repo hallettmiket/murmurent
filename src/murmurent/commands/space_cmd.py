@@ -224,8 +224,81 @@ def space_decide(row: int, decision: str, note: str) -> None:
         click.echo(f"Row {row}: decision cleared.")
     else:
         click.echo(f"Row {row}: recorded '{updated['decision']}' for {_short(updated['path'])}.")
-        click.echo("Nothing was changed. Carrying out decisions is a separate step, still "
-                   "to be built.")
+        click.echo("Nothing was changed. To carry out mothball, compress or move: "
+                   "murmurent space carry-out")
+
+
+@space_group.command(
+    "carry-out",
+    help="Carry out the mothball, compress and move decisions in the space table. Each "
+         "makes a copy, checks it against fingerprints of the original, and logs it. "
+         "Originals are never removed; `murmurent space removable` lists those a person "
+         "may now remove. Shows the plan only, unless --apply is given.")
+@click.argument("project", required=False)
+@click.option("--row", "rows", type=int, multiple=True,
+              help="Only this row (repeat for several).")
+@click.option("--to", "move_to", default="",
+              help="Where a 'move' goes: a folder, or a new name.")
+@click.option("--apply", "apply_it", is_flag=True, help="Do it. Without this, only the plan.")
+def space_carry_out(project: str | None, rows: tuple[int, ...], move_to: str,
+                    apply_it: bool) -> None:
+    from ..core import space_actions as _sa
+    _lower_priority()
+    conn = _st.connect()
+    try:
+        planned = _sa.plan(conn, project=project, rows=list(rows) or None, move_to=move_to)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not planned:
+        click.echo("No mothball, compress or move decisions to carry out. Record one with "
+                   "murmurent space decide <row> <decision>.")
+        return
+    todo = [p for p in planned if not p.blocked]
+    for p in planned:
+        click.echo("  " + p.describe())
+    if not apply_it:
+        click.echo(f"\n{len(todo)} of {len(planned)} can be carried out. Nothing was changed; "
+                   "add --apply to do it. Originals are never removed.")
+        return
+    by = _pu.local_handle() or os.environ.get("USER", "") or "unknown"
+    ok = 0
+    for p in todo:
+        result = _sa.carry_out(conn, p, by=by)
+        ok += result.status == _sa.VERIFIED
+        click.echo(f"row {p.row}: {result.status}. {result.detail}")
+        for m in result.mismatches[:10]:
+            click.echo(f"    {m}")
+    click.echo(f"\n{ok} of {len(todo)} copied and checked; each is logged. The originals are "
+               "still in place. See which may now be removed: murmurent space removable")
+
+
+@space_group.command(
+    "removable",
+    help="List originals a person may now remove: those whose copy was checked by "
+         "`carry-out`, and rows decided 'delete'. Projects with a keep-until date in the "
+         "future are listed separately. murmurent removes nothing.")
+@click.argument("project", required=False)
+def space_removable(project: str | None) -> None:
+    from ..core import space_actions as _sa
+    may, held = _sa.removable(_st.connect(), project=project)
+    if not may and not held:
+        click.echo("Nothing is waiting to be removed.")
+        return
+    if may:
+        total = sum(r.size for r in may)
+        click.echo(f"May be removed by a person ({len(may)}, {_short_size(total)} in all):")
+        for r in may:
+            click.echo(f"  row {r.row}  {r.path}\n      {r.reason}")
+    if held:
+        click.echo(f"\nHeld by a keep-until date ({len(held)}):")
+        for r in held:
+            click.echo(f"  row {r.row}  {r.path}\n      {r.reason}")
+    click.echo("\nmurmurent does not remove files. Check each, then remove it yourself.")
+
+
+def _short_size(n: int) -> str:
+    from ..core.run_cards import format_size
+    return format_size(int(n))
 
 
 @space_group.command(
@@ -364,6 +437,27 @@ def space_rows(project: str, category: str | None, suggestion: str | None, owner
         click.echo(f"  {format_size(r['size']):>9}  {r['project']}: {r['category']}, suggest "
                    f"{r['suggestion']}  [row {r['id']}]")
         click.echo(f"      {r['path']}")
+
+
+@space_group.command(
+    "layout",
+    help="Check the lab folder against the lab's folder protocol: each top-level "
+         "folder's purpose, subfolders named after projects (or logins in cottage/), "
+         "no loose files, and folders being phased out. Reads names only; changes "
+         "nothing. Report to the PI; never fix by hand-moving files.")
+@click.option("--json", "as_json", is_flag=True, help="Print the findings as JSON.")
+def space_layout(as_json: bool) -> None:
+    import json as _json
+
+    from ..core import lab_layout as _ll
+    projects, logins = _ll.lab_projects_and_logins()
+    findings = _ll.check(_lv.data_root(), projects=projects, logins=logins)
+    if as_json:
+        click.echo(_json.dumps([f.to_dict() for f in findings], indent=2))
+        return
+    click.echo(f"Lab folder: {_lv.data_root()}")
+    for line in _ll.describe(findings):
+        click.echo(line)
 
 
 @space_group.command(

@@ -39,6 +39,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Literal
 
+from . import sensitivity as _sens
 from .frontmatter import dump_document, parse_file
 from .projects import find_project
 from .repo import MEMBERS_FILENAME, lab_mgmt_repo_root
@@ -188,7 +189,7 @@ def parse_request(path: Path) -> JoinRequest:
         resolved_by=_opt_str(meta.get("resolved_by")),
         decline_reason=_opt_str(meta.get("decline_reason")),
         proposed_members=proposed_members,
-        proposed_sensitivity=_opt_str(meta.get("proposed_sensitivity")),
+        proposed_sensitivity=(_sens.normalize(meta.get("proposed_sensitivity")) or None),
         proposed_lead=_opt_str(meta.get("proposed_lead")),
         repo_kind=_opt_str(meta.get("repo_kind")),
         local_repo_root=_opt_str(meta.get("local_repo_root")),
@@ -395,7 +396,7 @@ def file_create_request(
         state="pending",
         created_at=today.isoformat(),
         proposed_members=norm_members,
-        proposed_sensitivity=sensitivity,
+        proposed_sensitivity=(_sens.normalize(sensitivity) or None),
         proposed_lead=_at(proposed_lead) if proposed_lead else _at(requester),
         repo_kind=repo_kind or "github",
         local_repo_root=local_repo_root,
@@ -453,7 +454,7 @@ def _create_project_from_request(req: JoinRequest) -> None:
         _stamp_slack_workspace(req)
         return
     members_csv = ",".join(req.proposed_members or [])
-    sensitivity = req.proposed_sensitivity or "standard"
+    sensitivity = _sens.normalize(req.proposed_sensitivity) or "standard"
     lead = req.proposed_lead or req.requester
     description = req.justification or f"Proposed by {req.requester}."
     # Legacy/CLI path (no repo set named): reuse the CLI command's logic —

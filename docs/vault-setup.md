@@ -126,9 +126,10 @@ git -C "<VAULT>" add oracle/ && git -C "<VAULT>" commit -m "vault: add oracle" &
 ## Sensitive notes stay off GitHub
 
 The Murmurent scope already keeps your personal folders local. On top of that, a
-git pre-commit hook refuses to commit any note tagged `sensitivity: clinical`:
-clinical/PHI-tagged notes never reach GitHub, even a private repo. If you
-genuinely want your *whole* vault backed (minus clinical-tagged files), use
+git pre-commit hook refuses to commit any note tagged `sensitivity: protected`
+(or `clinical`, the former name for the same tier): protected notes, such as
+anything derived from patient records, never reach GitHub, even a private repo.
+If you genuinely want your *whole* vault backed (minus protected-tagged files), use
 `--adopt --include-all` instead, but that pushes your personal folders too, so
 only do it deliberately.
 
