@@ -494,10 +494,12 @@ function StopDashboardButton() {
             title={isService
               ? "This dashboard is run by the server's system service, which would start it again. Ask whoever manages the server to stop it."
               : "Stop the dashboard program on this machine (closing the window does not)"}
-            style={{marginLeft:10, fontSize:11.5, fontWeight:600,
-                    color: isService ? "var(--muted)" : "var(--red)",
-                    border: "1px solid " + (isService ? "var(--rule-strong)" : "var(--red)"),
-                    background: "transparent", cursor: isService ? "not-allowed" : "pointer"}}>
+            style={{marginLeft:10, fontSize:12, fontWeight:700, padding:"3px 10px",
+                    borderRadius:3, opacity:1,
+                    color: isService ? "var(--muted)" : "#fff",
+                    border: "1px solid " + (isService ? "var(--rule-strong)" : "#b3261e"),
+                    background: isService ? "transparent" : "#b3261e",
+                    cursor: isService ? "not-allowed" : "pointer"}}>
       ⏻ Stop dashboard
     </button>
   );
@@ -2404,16 +2406,22 @@ function ProjectsPanel({ projects, span="c-5" }) {
         </div>
       )}
       <div className="body" style={{padding:0}}>
-        <table className="dt">
+        {/* Columns sized to their contents (tableLayout auto, each 1% wide and
+            unwrapped), so the project names do not leave a wide gap before
+            sens.; the activity column takes the spare width at the right. */}
+        <table className="dt" style={{tableLayout:"auto"}}>
           <thead><tr>
-            <th>project</th><th style={{width:70}}>sens.</th><th style={{width:90}}>lead</th>
-            <th style={{width:60}} className="num">team</th><th style={{width:80}}>activity</th>
+            <th style={{width:"1%", whiteSpace:"nowrap", paddingRight:28}}>project</th>
+            <th style={{width:"1%", whiteSpace:"nowrap", paddingRight:20}}>sens.</th>
+            <th style={{width:"1%", whiteSpace:"nowrap", paddingRight:20}}>lead</th>
+            <th style={{width:"1%", whiteSpace:"nowrap", paddingRight:20}} className="num">team</th>
+            <th>activity</th>
           </tr></thead>
           <tbody>
             {projects.map(p => (
               <React.Fragment key={p.name}>
                 <tr style={{cursor:"pointer"}} onClick={() => setOpenProj(openProj === p.name ? null : p.name)}>
-                  <td>
+                  <td style={{whiteSpace:"nowrap", paddingRight:28}}>
                     <div style={{fontWeight:500, display:"inline-flex", alignItems:"center", gap:6}}>
                       {p.name}
                       {p.is_cert && (

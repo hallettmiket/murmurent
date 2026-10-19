@@ -17,6 +17,18 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.10.4] - 2026-10-19
+
+**To upgrade:** `uv tool upgrade murmurent`, then restart the dashboard
+(**⏻ Stop dashboard**, then start it again).
+
+### Changed
+- Dashboard: the Stop dashboard button is solid red with white text; the
+  Projects table's columns fit their contents, with no wide gap before the
+  sensitivity column.
+- The README has badges: PyPI version, downloads, Python, licence,
+  documentation.
+
 ## [2026.10.3] - 2026-10-19
 
 **To upgrade:** `uv tool upgrade murmurent`, then `murmurent install`, then

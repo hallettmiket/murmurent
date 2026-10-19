@@ -8,6 +8,15 @@
 
 # Murmurent
 
+<!-- Badges: images drawn by shields.io from live data (PyPI, GitHub). -->
+[![PyPI](https://img.shields.io/pypi/v/murmurent?label=PyPI)](https://pypi.org/project/murmurent/)
+[![Downloads](https://img.shields.io/pypi/dm/murmurent?label=downloads)](https://pypistats.org/packages/murmurent)
+[![Python](https://img.shields.io/badge/python-3.12%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-mikehallett.science-6f4da8)](https://mikehallett.science/murmurent/)
+[![Built on Claude Code](https://img.shields.io/badge/built%20on-Claude%20Code-d97757)](https://claude.com/claude-code)
+[![Stars](https://img.shields.io/github/stars/hallettmiket/murmurent?style=flat)](https://github.com/hallettmiket/murmurent/stargazers)
+
 AI assistants for research groups, built on Claude Code. Each lab keeps
 control of its own people and data, and can share with other labs when that
 helps.
