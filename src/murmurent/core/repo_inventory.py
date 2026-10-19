@@ -229,12 +229,25 @@ class RepoOnHost:
     origin_url: str                 # "" when the repo has no ``origin`` remote
     has_marker: bool                # readiness marker (.murmurent.yaml)
     has_claude_dir: bool            # ``.claude/agents/`` exists
-    is_murmurent_ready: bool        # marker + .claude/agents — the repo is murmurent-ready
+    is_murmurent_ready: bool        # has the marker — the repo is murmurent-ready (#169)
     is_murmurent_infra: bool = False  # murmurent's own repo — never "made ready" (#41 pt 5)
     is_git: bool = True             # a git repo (False = a plain project folder, #49)
+    is_choreography: bool = False   # its .murmurent.yaml says ``kind: choreography``
 
     def to_dict(self) -> dict:
         return asdict(self)
+
+
+def _is_choreography(path: str) -> bool:
+    """True when the repo's readiness marker says ``kind: choreography``.
+    Reads one small file on this machine; never raises."""
+    try:
+        import yaml
+        marker = Path(path).expanduser() / ".murmurent.yaml"
+        data = yaml.safe_load(marker.read_text(encoding="utf-8")) or {}
+        return str(data.get("kind", "")).strip().lower() == "choreography"
+    except Exception:  # noqa: BLE001 - no marker, unreadable or not YAML
+        return False
 
 
 @dataclass
@@ -486,11 +499,12 @@ def list_machine_repos(host_name: str = _hosts.LOCAL_NAME) -> tuple[list[RepoOnH
             origin_url=origin,
             has_marker=marked == "1",
             has_claude_dir=claude == "1",
-            # "murmurent-ready" = readiness marker + .claude/agents —
-            # the repo-side state, independent of any project.
-            is_murmurent_ready=(marked == "1" and claude == "1"),
+            # "murmurent-ready" = the .murmurent.yaml marker alone (#169), as
+            # in core.adopt.AdoptionStatus.ready; .claude/agents plays no part.
+            is_murmurent_ready=marked == "1",
             is_murmurent_infra=is_murmurent_infra_repo(path),
             is_git=is_git == "1",
+            is_choreography=marked == "1" and _is_choreography(path),
         ))
     return out, None
 

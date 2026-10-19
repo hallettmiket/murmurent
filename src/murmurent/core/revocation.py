@@ -248,10 +248,14 @@ def revoke_with_local_key(centre: str, *, card_id: str | None = None,
 
 def revoke_project(centre: str, group: str) -> dict:
     """Revoke EVERY card issued for project ``group`` (``<lab>/<project>``): union
-    all their ids + fingerprints into the CRL in a single serial bump, then
-    republish. Works for a centre mayor (root key) OR a standalone PI (their
-    machine key signs their own lab's CRL). This is the PI-only "delete a project"
-    teardown at the identity layer."""
+    all their card ids into the CRL in a single serial bump, then republish.
+    Works for a centre mayor (root key) OR a standalone PI (their machine key
+    signs their own lab's CRL). This is the PI-only "delete a project" teardown
+    at the identity layer.
+
+    Card ids only, never fingerprints: a fingerprint is the holder's key, shared
+    with their lab card and their other project cards (the lead's is the PI's
+    own), so revoking it would cancel every card that person holds."""
     priv = _crl_signing_priv()
     if priv is None:
         raise RevocationError(
@@ -259,9 +263,7 @@ def revoke_project(centre: str, group: str) -> dict:
     led = project_ledger(centre, group)
     if not led:
         raise RevocationError(f"no issued cards on record for project '{group}'")
-    ids = []
-    for rec in led.values():
-        ids.extend(i for i in (rec.get("card_id"), rec.get("fingerprint")) if i)
+    ids = [rec.get("card_id") for rec in led.values() if rec.get("card_id")]
     if not ids:
         raise RevocationError(f"project '{group}' ledger has no revocable ids")
     _add(centre, ids)

@@ -131,7 +131,7 @@ You make a repo ready with:
 murmurent repo adopt <path> [--lab <slug>] [--agents a,b] [--host <name>]
 ```
 
-This is the same action as the dashboard Repos panel's **↑ adopt** button.
+This is the same action as the dashboard Projects and repos panel's **Make ready** button.
 Parameters:
 
 - `<path>`: the local path to the git clone (e.g. `~/repos/brca_wgs`).
@@ -204,7 +204,7 @@ murmurent project set brca --reads-from append_only/shared_cohort --retain-until
 murmurent project set brca --clear data-folders     # back to the default pair
 ```
 
-The Projects panel on the dashboard marks a project **quiet** or **dormant**
+The Projects and repos panel on the dashboard marks a project **quiet** or **dormant**
 when it has not been used for the lab's quiet or dormant period.
 
 ### Whether a project is in use

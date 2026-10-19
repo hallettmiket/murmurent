@@ -17,6 +17,38 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.10.5] - 2026-10-19
+
+**To upgrade:** `uv tool upgrade murmurent`, then restart the dashboard
+(**⏻ Stop dashboard**, then start it again). From a copy of the repository:
+`git checkout main && git pull`, then restart.
+
+### Fixed
+- **Removing someone from a project no longer cancels all their cards.**
+  Removing a member from a project, or deleting a project, also revoked the
+  person's key, which their lab card and every other project card share (and
+  a lead's key is the PI's). Now only that project's card is revoked.
+- **The update notice appears on any branch.** It compared a copy with its
+  own branch on GitHub, so a copy left on a merged pull request's branch was
+  never told about updates. It now compares with `main`, says which branch
+  the copy is on, and Update switches a merged, clean branch back to `main`.
+
+### Changed
+- Dashboard:
+  - **one Projects and repos panel**: each project is a shaded heading with
+    its sensitivity, lead, team size and activity, and its repos below,
+    including a one-repo project; a project that runs a choreography gets a
+    "choreography" label;
+  - **Upgrade all repos**: one button replaces the Upgrade button on every
+    row;
+  - **Claude Code windows are named after their folder** ("Claude Code ·
+    survival"), and the button brings an already-open session's window to
+    the front;
+  - the docs link in the top bar has "docs" under the book, and it and the
+    version label are readable on the purple bar;
+  - the This machine panel is at the bottom of the page.
+- A repo counts as murmurent-ready when it has its `.murmurent.yaml` (#169).
+
 ## [2026.10.4] - 2026-10-19
 
 **To upgrade:** `uv tool upgrade murmurent`, then restart the dashboard

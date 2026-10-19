@@ -105,7 +105,7 @@ def _session_running(cd_prefix: str) -> bool:
     return False
 
 
-def _raise_claude_window() -> bool:
+def _raise_claude_window(title: str = "") -> bool:
     """Best-effort: bring an existing Claude Code terminal to the front.
 
     gnome-terminal runs a single server process for all its windows, so a
@@ -124,17 +124,22 @@ def _raise_claude_window() -> bool:
         return False
     term_ids: list[str] = []
     claude_titled: list[str] = []
+    exact: list[str] = []
+    want = title
     for line in out.splitlines():
         p = line.split(None, 4)
         if len(p) < 3:
             continue
         cls = p[2].lower()
-        title = p[4] if len(p) >= 5 else ""
+        title = p[4] if len(p) >= 5 else ""  # noqa: PLW2901 - this window's title
         if any(tok in cls for tok in _TERM_CLASS_TOKENS):
             term_ids.append(p[0])
             if "claude" in title.lower() or "✳" in title:
                 claude_titled.append(p[0])
-    target = claude_titled[-1] if claude_titled else (term_ids[-1] if term_ids else None)
+            if want and want in title:
+                exact.append(p[0])
+    target = (exact[-1] if exact else claude_titled[-1] if claude_titled
+              else (term_ids[-1] if term_ids else None))
     if not target:
         return False
     try:
@@ -144,15 +149,30 @@ def _raise_claude_window() -> bool:
         return False
 
 
-def _activate_macos_terminal() -> None:
-    """Bring Terminal.app to the front (macOS analogue of _raise_claude_window)."""
+def _activate_macos_terminal(title: str = "") -> None:
+    """Bring Terminal.app to the front, with the window titled ``title`` on top
+    when there is one (macOS analogue of _raise_claude_window)."""
+    lines = ['tell application "Terminal"', "activate"]
+    if title:
+        safe = title.replace("\\", "").replace('"', "")
+        lines += ["try", f'set index of (first window whose name contains "{safe}") to 1',
+                  "end try"]
+    lines.append("end tell")
     try:
         subprocess.Popen(  # noqa: S603
-            ["osascript", "-e", 'tell application "Terminal" to activate'],
+            ["osascript", "-e", "\n".join(lines)],
             **_POPEN_KW,
         )
     except OSError:
         pass
+
+
+def session_title(workdir: str) -> str:
+    """The terminal window's title for a session in ``workdir``: names the folder,
+    so the button raises exactly this window and you can tell windows apart."""
+    path = Path(workdir).expanduser()
+    name = "home" if path == Path.home() else path.name
+    return f"Claude Code · {name}"
 
 
 def _raise_new_window(class_token: str, before_ids: list[str]) -> None:
@@ -254,7 +274,12 @@ def launch_claude_session(*, cwd: str | None = None) -> dict:
     # ``-lc`` (login shell) so ~/.local/bin and the rest of the user's PATH are
     # present even if the dashboard was started from a minimal environment.
     cd_prefix = f"cd {shlex.quote(workdir)} 2>/dev/null"
-    script = f"{cd_prefix}; {shlex.quote(claude_bin)}; exec bash"
+    # Name the window after the folder, and stop Claude Code renaming it after
+    # the conversation's topic: a topic title ("SSH to a Concordia machine")
+    # hid which folder a window was in, and the button could not find it.
+    title = session_title(workdir)
+    script = (f"{cd_prefix}; printf '\\033]0;%s\\007' {shlex.quote(title)}; "
+              f"CLAUDE_CODE_DISABLE_TERMINAL_TITLE=1 {shlex.quote(claude_bin)}; exec bash")
 
     system = platform.system()
 
@@ -263,9 +288,9 @@ def launch_claude_session(*, cwd: str | None = None) -> dict:
     # terminal — bring the existing one to the front instead.
     if _session_running(cd_prefix):
         if system == "Darwin":
-            _activate_macos_terminal()
+            _activate_macos_terminal(title)
         else:
-            _raise_claude_window()
+            _raise_claude_window(title)
         return {
             "launched": False,
             "already_open": True,
@@ -279,8 +304,9 @@ def launch_claude_session(*, cwd: str | None = None) -> dict:
         # ``do script`` needs a double-quoted AppleScript string. shlex.quote
         # only ever emits single quotes, so the script text contains no ``"`` —
         # safe to wrap verbatim.
+        # AppleScript strings treat a backslash as an escape, so double it.
         osa = (
-            f'tell application "Terminal" to do script "{script}"\n'
+            f'tell application "Terminal" to do script "{script.replace(chr(92), chr(92) * 2)}"\n'
             'tell application "Terminal" to activate'
         )
         try:

@@ -417,10 +417,10 @@ each dashboard shows a read-only view of your other machines.
 
 **The repo inventory is this-machine-only (issue #94).** The retired
 "add an SSH host from the dashboard and scan it for repos" flow is gone:
-the Repos panel lists **this** machine's clones cross-referenced against
+the Projects and repos panel lists **this** machine's clones cross-referenced against
 GitHub, and adoption acts on this machine. To see or adopt repos on the
 lab server, open **its own** dashboard over the tunnel below and use the
-Repos panel there. See [`ready_vs_projects.md`](ready_vs_projects.md) for
+Projects and repos panel there. See [`ready_vs_projects.md`](ready_vs_projects.md) for
 what adoption does.
 
 ### Viewing a remote machine's dashboard

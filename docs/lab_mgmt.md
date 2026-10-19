@@ -97,8 +97,9 @@ murmurent_lab_mgmt_<lab>/
 │                             .md per project (name, lab, lead,
 │                             sensitivity, certified members, repos,
 │                             Slack channel). This is what the
-│                             dashboard's Projects panel reads; it no
-│                             longer scans ~/repos for CHARTER.md files.
+│                             dashboard's Projects and repos panel
+│                             reads; it no longer scans ~/repos for
+│                             CHARTER.md files.
 ├── projects/                 Legacy CHARTER-mirror registry that
 │                             cert_projects/ replaced (2026-07-15
 │                             split). Old entries may still be present

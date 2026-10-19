@@ -54,8 +54,7 @@ running.
 
 At a high level, it shows:
 
-- your **repos** and their readiness (Repos panel),
-- your **projects** (Projects panel),
+- your **projects and repos**, with each repo's readiness (Projects and repos panel),
 - your **machines/hosts** (Machines panel),
 - your lab's **members**, and
 - your **Oracle** and daily **lab-notebook** panels.
@@ -79,7 +78,7 @@ you can work from whichever you prefer. A few concrete pairs:
 
 | Dashboard action | CLI equivalent |
 |---|---|
-| Repos panel, **↑ adopt** button | `murmurent repo adopt` |
+| Projects and repos panel, **Make ready** button | `murmurent repo adopt` |
 | Machines panel, **edit this machine** | edit `~/.murmurent/machine.yaml` |
 | **New Project** flow | how projects get created (created here; see [`ready_vs_projects.md`](ready_vs_projects.md) and [`project_intra.md`](project_intra.md)) |
 

@@ -344,6 +344,13 @@ function UpdateBanner() {
     ? "You have " + st.current_version + " in " + copy + "."
     : copy + " has " + n + " new change" + (n === 1 ? "" : "s") + " on GitHub"
       + (st.current_version ? " (still version " + st.current_version + ")" : "") + ".";
+  // A copy left on another branch (often a merged pull request's) is compared
+  // with main; say so, since update will switch it back to main.
+  const offMain = st.branch && st.on_main === false;
+  const branchLine = offMain
+    ? " This copy is on the branch " + st.branch + ", not main" +
+      (diverged ? "." : "; update switches it back to main (the branch is kept).")
+    : "";
   // Version skew: the JSX is served fresh from disk, so it can be newer than the
   // running server. `can_self_update` is returned only by servers that also have
   // POST /api/murmurent/update — gate the button on it so we never offer a click
@@ -408,7 +415,7 @@ function UpdateBanner() {
       </span>
       <span className="muted"
             title={(st.root ? "checked " + st.root + " · " : "") + "commit " + st.current + " → " + st.latest}>
-        {updateLine}
+        {updateLine}{branchLine}
       </span>
       {(st.changes || []).length > 0 && (
         <details style={{fontSize:12}}>
@@ -421,7 +428,9 @@ function UpdateBanner() {
       {failed
         ? <span className="muted" style={{color:"var(--tiger-deep)"}}>{msg}</span>
         : diverged
-          ? <span className="muted">Your install has local changes. Bring <code>{st.root || "your murmurent folder"}</code> up to date by hand first.</span>
+          ? <span className="muted">{offMain
+              ? <>That branch has changes of its own, or uncommitted edits. Commit or set them aside, then run <code className="mono">git -C {st.root || "your murmurent folder"} checkout main</code> and reload.</>
+              : <>Your install has local changes. Bring <code>{st.root || "your murmurent folder"}</code> up to date by hand first.</>}</span>
           : !canSelfUpdate
             ? <span className="muted">Your dashboard is running older code than what's on disk — restart it to enable one-click update: <code className="mono">murmurent dashboard --hifi</code>, then reload.</span>
             : <>
@@ -450,8 +459,10 @@ function RunningCodeBadge() {
     <span title={tip} style={{
       marginLeft:14, fontFamily:"var(--mono)", fontSize:11, padding:"1px 8px",
       borderRadius:10, whiteSpace:"nowrap",
-      color: isDev ? "#7a3fb0" : "var(--muted)",
-      border: "1px solid " + (isDev ? "#7a3fb0" : "var(--rule-strong)"),
+      // Light text on the purple top bar: purple or grey text there could
+      // hardly be read. A development copy gets a stronger outline.
+      color: "#fff", background: "rgba(255,255,255,0.12)",
+      border: "1px solid " + (isDev ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.45)"),
     }}>
       running {b.label}
     </span>
@@ -514,12 +525,16 @@ function TopBar() {
   return (
     <div className="topbar">
       <span className="uwo" style={{fontWeight:600}}>{labLabel}</span>
+      {/* The online documentation: the book with "docs" written underneath,
+          so it reads as a link to the manual rather than a decoration. */}
       <a href="https://mikehallett.science/murmurent/" target="_blank" rel="noopener"
-         title="Murmurent documentation — getting started, projects, identity, CLI reference"
-         style={{marginLeft:14, fontFamily:"var(--mono)", fontSize:12,
-                 color:"var(--purple)", textDecoration:"none",
-                 borderBottom:"1px dotted var(--purple)"}}>
-        📖 docs
+         title="Murmurent documentation (opens in a new tab): getting started, projects, identity, command reference"
+         style={{marginLeft:14, display:"inline-flex", flexDirection:"column",
+                 alignItems:"center", lineHeight:1.05, textDecoration:"none",
+                 color:"inherit"}}>
+        <span style={{fontSize:20}} aria-hidden="true">📖</span>
+        <span style={{fontFamily:"var(--mono)", fontSize:11, fontWeight:600,
+                      letterSpacing:0.5, textDecoration:"underline"}}>docs</span>
       </a>
       <RunningCodeBadge />
       <StopDashboardButton />
@@ -798,11 +813,15 @@ function RepoInventoryPanel({ span = "c-12" }) {
   const [adoptCtx,   setAdoptCtx]   = useState(null);  // {name, path, origin}
   const [upgrading,  setUpgrading]  = useState(null);  // clone_path being upgraded
   const [upgraded,   setUpgraded]   = useState(null);  // {name, verdict, version}
-  // Hosts the user has registered. Sourced once on mount so the table
-  // columns are stable across refreshes. The inventory report also
-  // returns hosts_scanned; we use the registered list (which includes
-  // hosts that errored on this scan) so columns don't disappear.
-  const [knownHosts, setKnownHosts] = useState([]);
+  const [openProj,   setOpenProj]   = useState(null);  // project whose details are open
+  const [showNewProj, setShowNewProj] = useState(false);
+  const projectActions = useProjectActions();
+  const isPI = (window.DATA.persona || "member") === "pi";
+  const nProjects = (window.DATA.projects || []).filter(pr => pr.status !== "archived").length;
+  // One column: this machine. The scan has covered this machine only since
+  // #94, so a column per registered machine always read "Not cloned" for the
+  // others, which was wrong. To see another machine, open its own dashboard.
+  const knownHosts = ["local"];
 
   const load = async (refresh) => {
     setBusy(true); setErr(null);
@@ -839,12 +858,44 @@ function RepoInventoryPanel({ span = "c-12" }) {
     } finally { setUpgrading(null); }
   };
 
+  // Re-wire every murmurent-ready repo on this machine to the installed
+  // release, one after another. Replaces a button on every row: the upgrade is
+  // the same for each repo, so one button for all of them.
+  const [upgradingAll, setUpgradingAll] = useState(false);
+  const doUpgradeAll = async () => {
+    const paths = [];
+    for (const r of (report && report.rows) || []) {
+      for (const c of (r.clones || [])) {
+        if (c.host === "local" && c.is_murmurent_ready && !paths.some(p => p.path === c.path))
+          paths.push({ name: r.name, path: c.path });
+      }
+    }
+    if (paths.length === 0) { setErr("No murmurent-ready repos on this machine to upgrade."); return; }
+    if (!window.confirm(`Upgrade all ${paths.length} murmurent-ready repos on this machine to the ` +
+        "installed version of murmurent? This rewrites each repo's murmurent settings and agent " +
+        "links; it does not touch your files or commits.")) return;
+    setUpgradingAll(true); setErr(null); setUpgraded(null);
+    const failed = [];
+    for (const p of paths) {
+      try {
+        const r = await fetch("/api/inventory/upgrade", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clone_path: p.path }),
+        });
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          failed.push(p.name + " (" + (j.detail || ("HTTP " + r.status)) + ")");
+        }
+      } catch (ex) { failed.push(p.name + " (" + (ex.message || ex) + ")"); }
+    }
+    setUpgraded({ name: `${paths.length - failed.length} of ${paths.length} repos`,
+                  verdict: failed.length ? "upgraded; not upgraded: " + failed.join(", ") : "upgraded" });
+    setUpgradingAll(false);
+    await load(true);
+  };
+
   useEffect(() => {
     load(false);
-    fetch("/api/hosts", { headers: { Accept: "application/json" } })
-      .then(r => r.ok ? r.json() : { hosts: [] })
-      .then(j => setKnownHosts((j.hosts || []).map(h => h.name)))
-      .catch(() => setKnownHosts(["local"]));
   }, []);
 
   // Stats line for the panel header.
@@ -879,10 +930,12 @@ function RepoInventoryPanel({ span = "c-12" }) {
   // project come last. A repo a project lists is shown under it even when it is
   // GitHub-only or one of murmurent's own repos, and a listed repo found
   // nowhere gets a "not found" row, so nothing a project lists goes missing.
+  // Every active project gets a heading, even before the scan loads or when
+  // none of its repos is found, since the heading also carries the project's
+  // details and manage buttons.
   const groups = (() => {
-    if (!report) return [];
     const projects = (window.DATA.projects || []).filter(pr => pr.status !== "archived");
-    const allRows = report.rows || [];
+    const allRows = report ? (report.rows || []) : [];
     const out = [];
     const placed = new Set();
     const low = (x) => String(x || "").toLowerCase();
@@ -902,10 +955,13 @@ function RepoInventoryPanel({ span = "c-12" }) {
       for (const listed of (pr.repos || [])) {
         const found = allRows.filter(r => matches(r, listed));
         if (found.length) found.forEach(r => { if (!rows.includes(r)) rows.push(r); });
-        else rows.push({ key: "missing:" + pr.name + ":" + listed.name, name: listed.name,
+        else if (report) rows.push({ key: "missing:" + pr.name + ":" + listed.name, name: listed.name,
                          clones: [], missing: true });
       }
-      if (rows.length) out.push({ title: pr.name, isProject: true, rows });
+      // A project is a choreography when its record names one, or when one of
+      // its repos is a choreography repo (.murmurent.yaml kind: choreography).
+      const choreo = pr.choreo || (rows.some(rowIsChoreography) ? pr.name : "");
+      out.push({ title: pr.name, isProject: true, choreo, rows, project: pr });
       rows.forEach(r => placed.add(r));
     }
     const left = visibleRows.filter(r => !placed.has(r));
@@ -919,8 +975,12 @@ function RepoInventoryPanel({ span = "c-12" }) {
   return (
     <div className={"card " + span}>
       <header className="card-header" style={{display:"flex", alignItems:"center", justifyContent:"space-between", flexWrap:"wrap", gap:8}}>
-        <h3>Repos</h3>
+        <h3>Projects and repos</h3>
         <div style={{display:"flex", alignItems:"center", gap:10, flexWrap:"wrap"}}>
+          <span className="mono muted" style={{fontSize:11, letterSpacing:0.5}}>
+            {nProjects} project{nProjects === 1 ? "" : "s"}
+          </span>
+          <button className="btn sm" onClick={() => setShowNewProj(true)}>＋ new project</button>
           {stats && (
             <span className="mono muted" style={{fontSize:11, letterSpacing:0.5}}>
               {stats.cloned} cloned · {stats.ghOnly} GitHub-only · {stats.local} local-only · {stats.total} total
@@ -936,47 +996,73 @@ function RepoInventoryPanel({ span = "c-12" }) {
           <button className="btn sm" disabled={busy} onClick={() => load(true)}>
             {busy ? "…" : "Refresh"}
           </button>
+          <button className="btn sm" disabled={busy || upgradingAll} onClick={doUpgradeAll}
+                  title={"Rewrite every murmurent-ready repo's murmurent settings and agent links "
+                       + "to match the installed version of murmurent. Needed only after a release "
+                       + "that changes how repos are set up; agent edits reach repos on their own."}>
+            {upgradingAll ? "upgrading…" : "Upgrade all repos"}
+          </button>
           <label style={{fontSize:11, display:"inline-flex", alignItems:"center", gap:4}}>
             <input type="checkbox" checked={showAllGithub}
                    onChange={e => setShowAllGithub(e.target.checked)} />
             include {stats ? stats.ghOnly : "?"} GitHub-only rows
           </label>
           <label style={{fontSize:11, display:"inline-flex", alignItems:"center", gap:4}}
-                 title="murmurent's own repos (murmurent, murmurent_*) — infrastructure, pinned to the top when shown">
+                 title="Show murmurent's own repos (murmurent, murmurent_*) that belong to no project. Those in a project are always listed under it.">
             <input type="checkbox" checked={showInfra}
                    onChange={e => setShowInfra(e.target.checked)} />
             show Murmurent repos
           </label>
         </div>
       </header>
+      {showNewProj && <NewProjectModal onClose={() => setShowNewProj(false)} />}
+      <PendingProjectRequests />
       <div className="body" style={{padding:0}}>
         <div style={{
           padding:"10px 14px", fontSize:11.5, lineHeight:1.55,
           background:"var(--paper-2)", borderBottom:"1px solid var(--rule)",
           color:"var(--ink-2)",
         }}>
-          Repo states — each host cell shows whether the repo is on that machine,
-          and whether murmurent is wired into it:
+          The <strong>this machine</strong> column says whether the repo is on
+          this computer, and whether it is murmurent-ready. Ready means the repo
+          has a <code>.murmurent.yaml</code> file. Your security audit checks
+          ready repos for data written to the wrong place and data sent off the
+          machine, and only a ready repo can join a project. The agents work in
+          every folder either way.
           <ul style={{margin:"4px 0 0 18px", padding:0}}>
             <li>
-              Not cloned — the repo isn't on this machine.
+              <strong>● Cloned · ready</strong>: the repo is here and has the file.
+              <strong>Upgrade all repos</strong> (at the top) brings every ready
+              repo's setup up to the installed murmurent. You need it only after a
+              structural change, such as a new file format. Upgrading murmurent
+              itself is the Update button at the top of the dashboard.
             </li>
             <li>
-              Cloned · not ready — the repo is here, but murmurent isn't wired
-              into it. The Make ready button writes the readiness marker and links
-              the commons agents.
+              <strong>○ Cloned · not ready</strong>: the repo is here but has no
+              file. Make ready writes it. If no project lists the repo yet, it
+              becomes a project of its own. A repo set up by an older murmurent
+              (a <code>CHARTER.md</code> only) shows here too, and Make ready
+              finishes its setup.
             </li>
             <li>
-              Cloned · ready — Claude Code sessions opened here have the murmurent
-              agents and rules. The Upgrade button re-wires the repo to the current
-              murmurent release (a new agent, or a changed marker format); agent
-              edits arrive on their own, so you only need Upgrade for structural changes.
+              <strong>○ folder · not a git repo</strong>: a plain folder. It must
+              become a git repo before it can be made ready.
+            </li>
+            <li>
+              <strong>◆ murmurent</strong>: one of murmurent's own repos. These are
+              never made ready.
+            </li>
+            <li>
+              <strong>Not cloned</strong>: on GitHub, but not on this computer.
+              Shown only with "include GitHub-only rows".
             </li>
           </ul>
           <div style={{marginTop:6}}>
             Repos are grouped by the project they belong to. Each project has a
-            shaded heading marked <strong>project</strong>, with its repos below;
-            a project whose only repo has its own name is one shaded line.
+            shaded heading marked <strong>project</strong>, showing its
+            sensitivity, lead, team size and last activity, with its repos
+            below. Click a heading for the project's details
+            {isPI ? " and the provision, reconcile and delete buttons" : ""}.
             A repo belongs to a project only when that project's record lists
             it. Making a repo murmurent-ready puts it in a one-repo project of its
             own, and ＋ new project groups repos together. So a repo that is not
@@ -986,7 +1072,9 @@ function RepoInventoryPanel({ span = "c-12" }) {
           <div style={{marginTop:6}}>
             <strong>▶ Claude Code</strong> opens a new terminal window running
             Claude Code inside that repo, so the session starts with the repo's
-            files, agents and rules.
+            files, agents and rules. The window is named "Claude Code · &lt;repo&gt;".
+            If a session is already open in that repo, its window is brought to
+            the front instead of opening a second one.
           </div>
         </div>
         {err && (
@@ -1009,7 +1097,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
           <div style={{padding:"14px 16px", color:"var(--muted)", fontSize:12, fontFamily:"var(--mono)"}}>
             No cloned repos found. Click Refresh to scan, or toggle
             "include GitHub-only rows" to see the {stats ? stats.ghOnly : "—"} repos on
-            GitHub that aren't cloned anywhere.
+            GitHub that aren't on this computer.
           </div>
         )}
         {groups.length > 0 && (
@@ -1025,7 +1113,9 @@ function RepoInventoryPanel({ span = "c-12" }) {
               <th style={{minWidth:260, whiteSpace:"nowrap", paddingRight:32}}>repo</th>
               <th style={{whiteSpace:"nowrap", paddingRight:32}}>github</th>
               {knownHosts.map(h => (
-                <th key={h} style={{textAlign:"left", whiteSpace:"nowrap"}}>{h}</th>
+                <th key={h} style={{textAlign:"left", whiteSpace:"nowrap"}}>
+                  {h === "local" ? "this machine" : h}
+                </th>
               ))}
               <th style={{width:28}}></th>
             </tr></thead>
@@ -1033,31 +1123,60 @@ function RepoInventoryPanel({ span = "c-12" }) {
               {groups.map(g => {
                 // A project whose only repo has its own name is shown as one
                 // line, marked "project", not a heading plus a repo (#207).
-                const single = g.isProject && g.rows.length === 1 && !g.rows[0].missing
-                  && String(g.rows[0].name).toLowerCase() === String(g.title).toLowerCase();
-                if (single) {
-                  const r = g.rows[0];
-                  return (
-                    <RepoInventoryRow key={"g:" + g.title} row={r} knownHosts={knownHosts}
-                      projectBadge onAdopt={(ctx) => setAdoptCtx(ctx)} onUpgrade={doUpgrade}
-                      upgrading={upgrading} onRemove={(ctx) => setRemoveCtx(ctx)} />
-                  );
-                }
                 return (
                 <React.Fragment key={"g:" + g.title}>
-                  <tr style={{background: g.isProject ? PROJECT_TINT : "var(--paper-2, #f4f2ee)"}}>
+                  <tr style={{background: g.isProject ? PROJECT_TINT : "var(--paper-2, #f4f2ee)",
+                              cursor: g.isProject ? "pointer" : undefined}}
+                      title={g.isProject ? "Click for this project's details" : undefined}
+                      onClick={g.isProject
+                        ? () => setOpenProj(openProj === g.title ? null : g.title)
+                        : undefined}>
                     <td colSpan={3 + knownHosts.length}
                         style={{paddingTop:8, paddingBottom:6, fontWeight:600, fontSize:12.5,
                                 color: g.isProject ? "var(--purple-deep)" : "var(--muted)",
                                 borderTop:"1px solid var(--rule-strong)",
                                 borderBottom:"1px solid var(--rule-strong)"}}>
+                      {g.isProject && (
+                        <span className="mono" style={{display:"inline-block", width:12, fontWeight:400}}>
+                          {openProj === g.title ? "▾" : "▸"}
+                        </span>
+                      )}
                       {g.isProject && <span style={{marginRight:6}}><Pill tone="purple">project</Pill></span>}
+                      {g.choreo && (
+                        <span style={{marginRight:6}}
+                              title={"This project runs a choreography: a written, repeatable workflow" +
+                                     (g.choreo !== g.title ? " (" + g.choreo + ")" : "") + "."}>
+                          <span style={CHOREO_PILL}>choreography</span>
+                        </span>
+                      )}
                       {g.title}
                       <span className="mono muted" style={{fontWeight:400, fontSize:10.5, marginLeft:8}}>
                         {g.rows.length} repo{g.rows.length === 1 ? "" : "s"}
                       </span>
+                      {g.project && <ProjectHeadingMeta p={g.project} />}
                     </td>
                   </tr>
+                  {g.project && openProj === g.title && (
+                    <tr>
+                      <td colSpan={3 + knownHosts.length} style={{
+                        background:"var(--paper-2)", padding:"10px 12px 10px 22px",
+                        fontSize:12, fontFamily:"var(--mono)",
+                        borderBottom:"1px solid var(--rule)",
+                        wordBreak:"break-all", overflowWrap:"anywhere",
+                      }}>
+                        {isPI && <ProjectManageBar p={g.project} actions={projectActions} />}
+                        <ProjectDetailRows proj={g.project} />
+                      </td>
+                    </tr>
+                  )}
+                  {g.isProject && g.rows.length === 0 && report && (
+                    <tr>
+                      <td colSpan={3 + knownHosts.length} className="muted"
+                          style={{fontSize:11, paddingLeft:22}}>
+                        No repos listed for this project.
+                      </td>
+                    </tr>
+                  )}
                   {g.rows.map((r, i) => r.missing ? (
                     <tr key={g.title + ":" + r.key}>
                       <td colSpan={3 + knownHosts.length} style={{fontSize:12, paddingLeft:22}}>
@@ -1132,6 +1251,20 @@ function isMurmurentInfraName(name) {
   return n === "murmurent" || n.startsWith("murmurent_");
 }
 
+/* Is this inventory row a choreography repo (its .murmurent.yaml says
+   kind: choreography on some machine)? */
+function rowIsChoreography(row) {
+  return (row.clones || []).some(c => c.is_choreography);
+}
+
+// The label for a choreography: teal, so it reads apart from the purple
+// "project" label beside it.
+const CHOREO_PILL = {
+  fontFamily:"var(--mono)", fontSize:10, letterSpacing:0.5, padding:"1px 6px",
+  borderRadius:2, color:"#1f6f6b", background:"rgba(31,111,107,0.10)",
+  border:"1px solid rgba(31,111,107,0.35)", fontWeight:500,
+};
+
 /* Is this whole inventory row a murmurent-infra repo? True if the server flagged
    any clone, OR the repo/clone name matches the classifier (covers stale caches
    and GitHub-only rows that have no clone to carry the flag). */
@@ -1187,7 +1320,12 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading, onRe
       {gh.visibility === "private" ? "🔒 private" : "public"} ↗
     </a>
   ) : (
-    <span className="muted" style={{fontSize:11}}>—</span>
+    // No GitHub copy. A plain folder already says so in its own cell, so
+    // only a git repo without an origin gets the words here.
+    <span className="muted" style={{fontSize:11}}>
+      {row.local_only && (row.clones || []).some(c => c.is_git !== false)
+        ? "none (no origin)" : "—"}
+    </span>
   );
 
   // Per-host cell. Three states, named the way the legend names them:
@@ -1245,20 +1383,6 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading, onRe
           }}>
             ● Cloned · ready
           </span>
-          {/* Upgrade is local-only: repo_ready works on the filesystem, and the
-              remote bootstrap still writes the legacy CHARTER shape. */}
-          {onUpgrade && host === "local" && (
-            <button className="btn sm" style={{fontSize:11, padding:"3px 9px", whiteSpace:"nowrap"}}
-                    disabled={upgrading === c.path}
-                    title={"Re-wire this repo against the current murmurent release "
-                         + "(new agents, marker format). Agent edits arrive on their "
-                         + "own — this is for structural changes."}
-                    onClick={() => onUpgrade({
-                      name: row.name, path: c.path, host: host,
-                    })}>
-              {upgrading === c.path ? "…" : "Upgrade"}
-            </button>
-          )}
         </span>
       );
     }
@@ -1273,9 +1397,9 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading, onRe
         </span>
         {onAdopt && (
           <button className="btn sm" style={{fontSize:11, padding:"3px 9px", whiteSpace:"nowrap"}}
-                  title={host === "local"
-                    ? "Wire murmurent into this repo (marker + commons agents). Creates no project."
-                    : `Wire murmurent into this repo on ${host}, over SSH. Creates no project.`}
+                  title={"Write .murmurent.yaml into this repo"
+                    + (host === "local" ? "" : ` on ${host}, over SSH`)
+                    + ". If no project lists it yet, it becomes a project of its own."}
                   onClick={() => onAdopt({
                     name: row.name,
                     path: c.path,
@@ -1304,11 +1428,6 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading, onRe
                         color:"var(--purple)", border:"1px solid var(--purple)",
                         fontFamily:"var(--mono)", whiteSpace:"nowrap"}}>
             ◆ murmurent infra
-          </span>
-        )}
-        {row.local_only && (
-          <span className="muted" style={{fontSize:10, marginLeft:6}}>
-            (local-only — no GitHub origin)
           </span>
         )}
         {gh && gh.archived && (
@@ -1353,8 +1472,8 @@ function RepoInventoryRow({ row, knownHosts, onAdopt, onUpgrade, upgrading, onRe
    Pops from the Repo Inventory's "↑ adopt" button on • clone rows.
    POSTs /api/inventory/adopt, which writes the .murmurent.yaml
    readiness marker + the CC bootstrap (commons agent symlinks,
-   CLAUDE.md stub). Creates NO project — a project is a set of repos +
-   members, made via New Project, which attaches ready repos. */
+   CLAUDE.md stub). If no project lists the repo, it records a one-repo
+   project (#151); an existing project is never changed. */
 function AdoptCloneModal({ clone, onClose }) {
   // Default agent pick mirrors InstallModal: all non-disabled agents,
   // minus `receptionist` for non-PI users (PI-only role).
@@ -2270,17 +2389,12 @@ function SlackSyncButton({ project, userParam }) {
 }
 
 /* ───────── projects panel ───────── */
-function ProjectsPanel({ projects, span="c-5" }) {
-  const [openProj, setOpenProj] = useState(null);
-  const [showNewProj, setShowNewProj] = useState(false);
-  const [busyDecom, setBusyDecom] = useState(null);  // project name currently being deleted
-  const persona = window.DATA.persona || "member";
-  const isPI = persona === "pi";
-  // Pending project-create requests — shown as an approval queue for the PI.
-  const pendingCreate = (window.DATA.requests_pending || []).filter(
-    r => r.kind === "project-create"
-  );
-
+/* ───────── projects: shared pieces ─────────
+   The Projects table was folded into the Repos panel (now "Projects and
+   repos"): each project's heading row carries what the table showed, and
+   clicking it opens the manage buttons and details. */
+function useProjectActions() {
+  const [busyDecom, setBusyDecom] = useState(null);  // project name currently being acted on
   // (9) Unified delete: revoke every project certificate (CRL), archive the
   // private Slack channel, flip registry + CHARTER to archived, write the
   // decommission report. The project disappears from the dashboard entirely;
@@ -2320,7 +2434,6 @@ function ProjectsPanel({ projects, span="c-5" }) {
     }
   };
 
-  // Provision a cert-project's Slack channel + GitHub repo, membership = certs.
   const provisionProj = async (name) => {
     setBusyDecom(name);
     try {
@@ -2350,7 +2463,6 @@ function ProjectsPanel({ projects, span="c-5" }) {
     }
   };
 
-  // Reconcile channel/repo membership back to the certified members.
   const reconcileProj = async (name) => {
     setBusyDecom(name);
     try {
@@ -2378,170 +2490,113 @@ function ProjectsPanel({ projects, span="c-5" }) {
     }
   };
 
+  return { busyDecom, deleteProj, provisionProj, reconcileProj };
+}
+
+/* PI-only buttons for one project: provision / reconcile (cert projects) and
+   delete. Moved here from a 60px column where "delete" was pushed out of
+   sight (#207). */
+function ProjectManageBar({ p, actions }) {
+  const { busyDecom, deleteProj, provisionProj, reconcileProj } = actions;
+  const btn = (color) => ({
+    background:"transparent", border:"1px solid var(--rule-strong)",
+    borderRadius:2, padding:"1px 6px", cursor:"pointer",
+    fontSize:11, color, fontFamily:"var(--mono)", marginRight:4,
+  });
+  const busy = busyDecom === p.name;
   return (
-    <div className={"panel "+span}>
-      <header>
-        <h2>Projects</h2>
-        <div className="row" style={{gap:6}}>
-          <span className="meta">
-            {projects.length} active
-            {pendingCreate.length > 0 && (
-              <span> · <strong style={{color:"var(--tiger-deep)"}}>
-                {pendingCreate.length} pending
-              </strong></span>
-            )}
-          </span>
-          <button className="btn sm" onClick={() => setShowNewProj(true)}>＋ new project</button>
-        </div>
-      </header>
-      {showNewProj && <NewProjectModal onClose={() => setShowNewProj(false)} />}
-      {isPI && pendingCreate.length > 0 && (
-        <div style={{borderBottom:"2px solid var(--rule)"}}>
-          <div className="mono muted" style={{fontSize:11, padding:"6px 14px 2px", textTransform:"uppercase", letterSpacing:"0.05em"}}>
-            Pending approval
-          </div>
-          {pendingCreate.map(r => (
-            <RequestActionRow key={r.id} req={r} isPI={true} />
-          ))}
-        </div>
+    <div style={{display:"flex", gap:6, alignItems:"center", flexWrap:"wrap",
+                 marginBottom:8, paddingBottom:8,
+                 borderBottom:"1px solid var(--rule)"}}
+         onClick={(e) => e.stopPropagation()}>
+      <span className="muted" style={{fontSize:11}}>Manage this project:</span>
+      {p.is_cert && (
+        <>
+          <button type="button" disabled={busy} style={btn("var(--ink)")}
+                  title="Provision this cert-project's Slack channel + GitHub repo; sync membership to the certified members."
+                  onClick={() => provisionProj(p.name)}>
+            provision
+          </button>
+          <button type="button" disabled={busy} style={btn("var(--ink)")}
+                  title="Reconcile the channel + repo membership back to the certified members."
+                  onClick={() => reconcileProj(p.name)}>
+            reconcile
+          </button>
+        </>
       )}
-      <div className="body" style={{padding:0}}>
-        {/* Columns sized to their contents (tableLayout auto, each 1% wide and
-            unwrapped), so the project names do not leave a wide gap before
-            sens.; the activity column takes the spare width at the right. */}
-        <table className="dt" style={{tableLayout:"auto"}}>
-          <thead><tr>
-            <th style={{width:"1%", whiteSpace:"nowrap", paddingRight:28}}>project</th>
-            <th style={{width:"1%", whiteSpace:"nowrap", paddingRight:20}}>sens.</th>
-            <th style={{width:"1%", whiteSpace:"nowrap", paddingRight:20}}>lead</th>
-            <th style={{width:"1%", whiteSpace:"nowrap", paddingRight:20}} className="num">team</th>
-            <th>activity</th>
-          </tr></thead>
-          <tbody>
-            {projects.map(p => (
-              <React.Fragment key={p.name}>
-                <tr style={{cursor:"pointer"}} onClick={() => setOpenProj(openProj === p.name ? null : p.name)}>
-                  <td style={{whiteSpace:"nowrap", paddingRight:28}}>
-                    <div style={{fontWeight:500, display:"inline-flex", alignItems:"center", gap:6}}>
-                      {p.name}
-                      {p.is_cert && (
-                        <span
-                          title={"Cert-scoped project — membership is certified via "
-                                 + "project cards"
-                                 + ((p.cert_members && p.cert_members.length)
-                                    ? ": " + p.cert_members.join(", ") : ".")}
-                          style={{
-                            fontFamily:"var(--mono)", fontSize:10, letterSpacing:0.5,
-                            padding:"1px 5px", borderRadius:2,
-                            color:"var(--blue, #3a5f8a)", background:"rgba(58,95,138,0.10)",
-                            border:"1px solid rgba(58,95,138,0.30)",
-                          }}>
-                          🔑 cert
-                        </span>
-                      )}
-                      {p.host && p.host !== "local" && (
-                        <span
-                          title={"This project's working tree lives on " + p.host +
-                                 (p.remote_path ? " at " + p.remote_path : "") +
-                                 ". Local ~/repos/" + p.name + "/ is a pointer placeholder."}
-                          style={{
-                            fontFamily:"var(--mono)", fontSize:10, letterSpacing:0.5,
-                            padding:"1px 5px", borderRadius:2,
-                            color:"var(--green)", background:"rgba(79,107,58,0.10)",
-                            border:"1px solid rgba(79,107,58,0.30)",
-                          }}>
-                          🌐 {p.host}
-                        </span>
-                      )}
-                    </div>
-                    <div className="mono muted" style={{fontSize:11}}>{p.choreo}</div>
-                  </td>
-                  <td><Pill tone={(p.sens==="protected"||p.sens==="clinical")?"red":""}>{p.sens}</Pill></td>
-                  <td className="mono" style={{fontSize:12, paddingLeft:14}}>{p.lead}</td>
-                  <td className="num">{p.members}</td>
-                  <td className="muted" style={{fontSize:12}}>
-                    {p.last_activity}
-                    {(p.activity === "quiet" || p.activity === "dormant") && (
-                      <span style={{marginLeft:6}}
-                            title={p.activity === "dormant"
-                              ? "Not used for the lab's dormant period: worth mothballing what is large"
-                              : "Not used for the lab's quiet period"}>
-                        <Pill tone={p.activity === "dormant" ? "amber" : ""}>{p.activity}</Pill>
-                      </span>
-                    )}
-                  </td>
-                </tr>
-                {openProj === p.name && (
-                  <tr>
-                    <td colSpan={5} style={{
-                      background:"var(--paper-2)",
-                      padding:"10px 12px",
-                      fontSize:12, fontFamily:"var(--mono)",
-                      borderBottom:"1px solid var(--rule)",
-                      wordBreak:"break-all",
-                      overflowWrap:"anywhere",
-                    }}>
-                      {isPI && (
-                        // Moved here from a 60px column where "delete" was
-                        // pushed out of sight (#207).
-                        <div style={{display:"flex", gap:6, alignItems:"center", flexWrap:"wrap",
-                                     marginBottom:8, paddingBottom:8,
-                                     borderBottom:"1px solid var(--rule)"}}
-                             onClick={(e) => e.stopPropagation()}>
-                          <span className="muted" style={{fontSize:11}}>Manage this project:</span>
-                      {p.is_cert && (
-                        <>
-                          <button
-                            type="button"
-                            title="Provision this cert-project's Slack channel + GitHub repo; sync membership to the certified members."
-                            disabled={busyDecom === p.name}
-                            onClick={() => provisionProj(p.name)}
-                            style={{
-                              background:"transparent", border:"1px solid var(--rule-strong)",
-                              borderRadius:2, padding:"1px 6px", cursor:"pointer",
-                              fontSize:11, color:"var(--ink)", fontFamily:"var(--mono)", marginRight:4,
-                            }}>
-                            provision
-                          </button>
-                          <button
-                            type="button"
-                            title="Reconcile the channel + repo membership back to the certified members."
-                            disabled={busyDecom === p.name}
-                            onClick={() => reconcileProj(p.name)}
-                            style={{
-                              background:"transparent", border:"1px solid var(--rule-strong)",
-                              borderRadius:2, padding:"1px 6px", cursor:"pointer",
-                              fontSize:11, color:"var(--ink)", fontFamily:"var(--mono)", marginRight:4,
-                            }}>
-                            reconcile
-                          </button>
-                        </>
-                      )}
-                      <button
-                        type="button"
-                        title="Delete this project: revoke all certificates, archive the Slack channel + record, hide from the dashboard. No data files deleted; recovery is CLI-only."
-                        disabled={busyDecom === p.name}
-                        onClick={() => deleteProj(p.name)}
-                        style={{
-                          background:"transparent", border:"1px solid var(--rule-strong)",
-                          borderRadius:2, padding:"1px 6px", cursor:"pointer",
-                          fontSize:11, color:"var(--red)", fontFamily:"var(--mono)",
-                        }}>
-                        {busyDecom === p.name ? "…" : "delete"}
-                      </button>
-                        </div>
-                      )}
-                      <ProjectDetailRows proj={p} />
-                    </td>
-                  </tr>
-                )}
-              </React.Fragment>
-            ))}
-          </tbody>
-        </table>
-        {/* (9) Deleted projects are hidden entirely — no Decommissioned
-            section. Recovery is CLI-only: murmurent project-unarchive. */}
+      <button type="button" disabled={busy} style={btn("var(--red)")}
+              title="Delete this project: revoke all certificates, archive the Slack channel + record, hide from the dashboard. No data files deleted; recovery is CLI-only."
+              onClick={() => deleteProj(p.name)}>
+        {busy ? "…" : "delete"}
+      </button>
+    </div>
+  );
+}
+
+// Small labels on a project heading: certificate-scoped, and remote host.
+const PROJ_TAG = {
+  fontFamily:"var(--mono)", fontSize:10, letterSpacing:0.5,
+  padding:"1px 5px", borderRadius:2,
+};
+
+/* What the Projects table showed for a project, on one wrapping line:
+   certificate and host labels, sensitivity, lead, team size, activity. */
+function ProjectHeadingMeta({ p }) {
+  return (
+    <span style={{display:"inline-flex", alignItems:"center", gap:10, flexWrap:"wrap",
+                  fontWeight:400, fontSize:11.5, color:"var(--ink-2)", marginLeft:12}}>
+      {p.is_cert && (
+        <span title={"Cert-scoped project — membership is certified via project cards"
+                     + ((p.cert_members && p.cert_members.length)
+                        ? ": " + p.cert_members.join(", ") : ".")}
+              style={{...PROJ_TAG, color:"var(--blue, #3a5f8a)",
+                      background:"rgba(58,95,138,0.10)", border:"1px solid rgba(58,95,138,0.30)"}}>
+          🔑 cert
+        </span>
+      )}
+      {p.host && p.host !== "local" && (
+        <span title={"This project's working tree lives on " + p.host +
+                     (p.remote_path ? " at " + p.remote_path : "") +
+                     ". Local ~/repos/" + p.name + "/ is a pointer placeholder."}
+              style={{...PROJ_TAG, color:"var(--green)",
+                      background:"rgba(79,107,58,0.10)", border:"1px solid rgba(79,107,58,0.30)"}}>
+          🌐 {p.host}
+        </span>
+      )}
+      <Pill tone={(p.sens==="protected"||p.sens==="clinical")?"red":""}>{p.sens}</Pill>
+      {p.lead && <span className="mono" title="project lead">{p.lead}</span>}
+      <span className="mono muted" title="certified members">team {p.members}</span>
+      <span className="muted">
+        {p.last_activity}
+        {(p.activity === "quiet" || p.activity === "dormant") && (
+          <span style={{marginLeft:6}}
+                title={p.activity === "dormant"
+                  ? "Not used for the lab's dormant period: worth mothballing what is large"
+                  : "Not used for the lab's quiet period"}>
+            <Pill tone={p.activity === "dormant" ? "amber" : ""}>{p.activity}</Pill>
+          </span>
+        )}
+      </span>
+    </span>
+  );
+}
+
+/* Project-create requests waiting for the PI's approval. */
+function PendingProjectRequests() {
+  const isPI = (window.DATA.persona || "member") === "pi";
+  const pendingCreate = (window.DATA.requests_pending || []).filter(
+    r => r.kind === "project-create"
+  );
+  if (!isPI || pendingCreate.length === 0) return null;
+  return (
+    <div style={{borderBottom:"2px solid var(--rule)"}}>
+      <div className="mono muted" style={{fontSize:11, padding:"6px 14px 2px",
+                                         textTransform:"uppercase", letterSpacing:"0.05em"}}>
+        Pending approval
       </div>
+      {pendingCreate.map(r => (
+        <RequestActionRow key={r.id} req={r} isPI={true} />
+      ))}
     </div>
   );
 }
@@ -8089,19 +8144,13 @@ function App() {
                           labFolder={D.lab_oracle_folder} span="c-4" />
         </div>
 
-        {/* Machines, and the Claude Code launcher. */}
+        {/* The Claude Code launcher. (Machines moved to the bottom.) */}
         <div className="grid" style={{marginBottom:14}}>
-          <MachinesPanel span="c-5" />
-          <CCLaunchBar span="c-7" />
+          <CCLaunchBar span="c-12" />
         </div>
 
-        {/* Projects directly above the repos they group (#207). */}
-        <div className="grid" style={{marginBottom:14}}>
-          <ProjectsPanel projects={D.projects} span="c-12" />
-        </div>
-
-        {/* Repo inventory: cross-machine + GitHub audit — one column per
-            registered machine (local included). Cached weekly, on-demand
+        {/* Repo inventory: this machine's repos + the GitHub org, one
+            column for this machine (#94). Cached weekly, on-demand
             refresh. Per-row "↑ adopt" / "Install on <machine>" pre-fill
             the adopt/install wizards. Each cloned-locally row also has a
             "▶ CC" button to open a Claude Code session in that repo. Terminal
@@ -8151,8 +8200,13 @@ function App() {
         )}
 
         {/* Agents (large, low-frequency) lives toward the bottom. */}
-        <div className="grid">
+        <div className="grid" style={{marginBottom:14}}>
           <AgentsPanel agents={D.agents} span="c-12" />
+        </div>
+
+        {/* This machine (and the others, read-only): rarely needed, so last. */}
+        <div className="grid">
+          <MachinesPanel span="c-12" />
         </div>
       </div>
       <FooterMeta />

@@ -132,12 +132,14 @@ def remove_member(project: str, handle: str, *, lab: str | None = None,
 
     # 1. Revoke the card. The per-project ledger knows this handle's card;
     #    a member with no issued card (uncertified) has nothing to revoke.
+    #    Revoke by card_id ONLY: the fingerprint is the member's key, shared by
+    #    their lab card and every other project card, so revoking it would
+    #    cancel all of them.
     centre, group = _iss.project_context(project, lab=lab or cp.lab or None, env=env)
     entry = _rev.project_ledger(centre, group).get(norm) or {}   # ledger keys are bare handles
     revoked = False
-    if entry.get("card_id") or entry.get("fingerprint"):
-        _rev.revoke_with_local_key(centre, card_id=entry.get("card_id") or None,
-                                   fingerprint=entry.get("fingerprint") or None)
+    if entry.get("card_id"):
+        _rev.revoke_with_local_key(centre, card_id=entry["card_id"])
         revoked = True
 
     # 2. Registry: drop from members + certs.

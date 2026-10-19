@@ -51,6 +51,13 @@ class UpdateStatus:
     current_version: str = ""
     latest_version: str = ""
     changes: list = None      # up to 10 commit titles, newest first
+    # Which branch the copy is on. The check always compares with the main
+    # branch on GitHub: a copy left on a merged pull request's branch never
+    # saw main move, and once that branch was deleted on GitHub the check had
+    # nothing to compare with and the banner silently never appeared.
+    branch: str = ""
+    on_main: bool = True
+    clean: bool = True        # no uncommitted changes to tracked files
 
     def __post_init__(self) -> None:
         if self.changes is None:
@@ -145,12 +152,27 @@ def _copy_name(root) -> str:
     return Path(root).name
 
 
+def _main_ref(root) -> tuple[str, str]:
+    """``(remote ref, local branch name)`` of the main branch, e.g.
+    ``("origin/main", "main")``; ``("", "")`` when there is none."""
+    head = _run_git(root, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD")
+    ref = head.stdout.strip() if head.returncode == 0 else ""
+    if not ref:
+        for name in ("main", "master"):
+            if _run_git(root, "rev-parse", "--verify", "--quiet",
+                        f"refs/remotes/origin/{name}").returncode == 0:
+                ref = f"origin/{name}"
+                break
+    return (ref, ref.split("/", 1)[1]) if "/" in ref else ("", "")
+
+
 def check_update(*, fetch: bool = True) -> UpdateStatus:
-    """Whether the local murmurent install is behind upstream.
+    """Whether the local murmurent install is behind the main branch on GitHub.
 
     ``fetch=True`` (default) refreshes remote-tracking refs first so a brand-new
     push is seen; ``fetch=False`` compares against whatever was last fetched
-    (instant, no network). Never raises.
+    (instant, no network). Always compares with the main branch, whichever
+    branch the copy is on. Never raises.
     """
     root = install_root()
 
@@ -162,17 +184,18 @@ def check_update(*, fetch: bool = True) -> UpdateStatus:
         return _na("not a git checkout — nothing to update", is_git=False)
 
     try:
-        up = _run_git(root, "rev-parse", "--abbrev-ref",
-                      "--symbolic-full-name", "@{u}")
-        if up.returncode != 0:
-            return _na("current branch has no upstream to compare against")
-        upstream = up.stdout.strip()
-
         if fetch:
             fetched = _run_git(root, "fetch", "--quiet")
             if fetched.returncode != 0:
                 # Offline / auth failure — report gracefully rather than erroring.
                 return _na("couldn't reach the remote (offline?)")
+        upstream, main_name = _main_ref(root)
+        if not upstream:
+            return _na("no main branch on GitHub to compare against")
+        branch = _run_git(root, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+        on_main = branch == main_name
+        dirty = _run_git(root, "status", "--porcelain", "--untracked-files=no")
+        clean = dirty.returncode == 0 and not dirty.stdout.strip()
 
         current = _run_git(root, "rev-parse", "--short", "HEAD").stdout.strip()
         latest = _run_git(root, "rev-parse", "--short", upstream).stdout.strip()
@@ -180,13 +203,22 @@ def check_update(*, fetch: bool = True) -> UpdateStatus:
         counted = _run_git(root, "rev-list", "--count", f"HEAD..{upstream}")
         behind = int(counted.stdout.strip() or "0") if counted.returncode == 0 else 0
 
-        # Safe to `git pull --ff-only` only when local is a strict ancestor of
-        # upstream (no local commits / divergence — cf. the force-push case).
+        # Safe to bring up to date only when everything here is already in main
+        # (no local commits of its own), so nothing can be lost.
         can_ff = _run_git(root, "merge-base", "--is-ancestor",
                           "HEAD", upstream).returncode == 0
+        if not on_main:
+            # Leaving a branch also needs a clean copy, so nothing uncommitted
+            # is carried across or refused half way.
+            can_ff = can_ff and clean
 
         detail = "up to date" if behind == 0 else f"{behind} new commit(s) upstream"
-        if behind and not can_ff:
+        if not on_main:
+            detail += f" — this copy is on the branch {branch}, not {main_name}"
+            if behind and not can_ff:
+                detail += ("; it has changes of its own or uncommitted edits, so switch "
+                           f"to {main_name} yourself")
+        elif behind and not can_ff:
             detail += " — local has diverged, resolve manually"
         changes: list[str] = []
         if behind:
@@ -198,7 +230,8 @@ def check_update(*, fetch: bool = True) -> UpdateStatus:
                             current=current, latest=latest, detail=detail,
                             root=str(root), name=_copy_name(root),
                             current_version=_version_at(root, "HEAD"),
-                            latest_version=latest_version, changes=changes)
+                            latest_version=latest_version, changes=changes,
+                            branch=branch, on_main=on_main, clean=clean)
     except (OSError, subprocess.SubprocessError, ValueError) as exc:
         return _na(f"update check failed: {exc}")
 
@@ -230,12 +263,25 @@ def apply_update() -> dict:
         return {**base, "ok": True, "detail": "already up to date"}
     if not st.can_ff:
         # Never force over a diverged / dirty install — surface it instead.
+        if not st.on_main:
+            return {**base, "ok": False, "detail": st.detail}
         return {**base, "ok": False,
                 "detail": "local has diverged from upstream — resolve manually; "
                           "not pulling (your local commits are untouched)"}
 
+    root = install_root()
     try:
-        pull = _run_git(install_root(), "pull", "--ff-only")
+        if not st.on_main:
+            # Everything on this branch is already in main (checked above), so
+            # switching back loses nothing. The branch itself is kept.
+            upstream, main_name = _main_ref(root)
+            switched = _run_git(root, "checkout", main_name)
+            if switched.returncode != 0:
+                err = (switched.stderr or switched.stdout or "git checkout failed").strip()
+                return {**base, "ok": False, "detail": err.splitlines()[-1][:200]}
+            pull = _run_git(root, "merge", "--ff-only", upstream)
+        else:
+            pull = _run_git(root, "pull", "--ff-only")
     except (OSError, subprocess.SubprocessError) as exc:
         return {**base, "ok": False, "detail": f"git pull failed: {exc}"}
     if pull.returncode != 0:
