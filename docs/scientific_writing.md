@@ -3,7 +3,7 @@
 This is the house style for manuscripts, grant text and other scientific
 writing. The Scribe agent follows it, and so should any Claude Code session
 writing a paper. It is stricter than, and different from,
-[`output_styles/plain_english.md`](../output_styles/plain_english.md), which is
+[`output_styles/plain_english.md`](https://github.com/hallettmiket/murmurent/blob/main/output_styles/plain_english.md), which is
 for documentation. A paper is formal, cited, understated and built on
 convention. Where a manuscript's own `CLAUDE.md` says more, follow that too.
 

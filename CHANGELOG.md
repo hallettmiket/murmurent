@@ -17,6 +17,16 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.10.7] - 2026-10-29
+
+**To upgrade:** as for 2026.10.6 below; this release only repairs the
+documentation site.
+
+### Fixed
+- **The documentation site builds again.** A link in the writing guide
+  pointed outside the docs folder, and the strict build had refused every
+  release since 2026.10.3, so the site had not followed the releases.
+
 ## [2026.10.6] - 2026-10-29
 
 **To upgrade:** `uv tool upgrade murmurent`, then `murmurent install --hooks`,
