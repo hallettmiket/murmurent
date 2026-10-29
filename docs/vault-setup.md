@@ -133,9 +133,32 @@ If you genuinely want your *whole* vault backed (minus protected-tagged files), 
 `--adopt --include-all` instead, but that pushes your personal folders too, so
 only do it deliberately.
 
+## Keeping your machines in step
+
+Your vault syncs with GitHub by itself, so each machine sees the notes written
+on the others:
+
+- **When a Claude Code session starts**, it brings in your other machines'
+  notes first (waiting at most 10 seconds on a slow network).
+- **When a session writes a note in the vault** (the Oracle saving an entry,
+  a notebook note), it is sent to GitHub straight away, in the background.
+  The end of each reply also sends anything written another way.
+- **Notes you type in Obsidian** are sent when the dashboard starts and every
+  15 minutes, or at once with **⇅ Sync vault** at the top of the dashboard's
+  personal Oracle panel.
+
+Notes marked `sensitivity: protected` or `sensitivity: restricted` are never
+sent; they stay on the machine where they were written. If two machines
+changed the same note, nothing is overwritten: the sync stops, says so, and
+you sort it out on one of them.
+
+The Claude Code part needs murmurent's hooks, set up with
+`murmurent install --hooks`. To turn the automatic sync off, set
+`MURMURENT_NO_VAULT_SYNC=1`.
+
 ## Day to day
 
-- `murmurent vault sync`: commit + push new oracle/notebook entries (best-effort).
+- `murmurent vault sync`: sync now, in both directions (the same as the button).
 - `murmurent vault info`: where the clone is + how fresh it is.
 - `murmurent vault paths`: the resolved oracle / lab-notebook / maps-legends
   paths (what the agents consult).

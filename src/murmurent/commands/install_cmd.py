@@ -98,6 +98,31 @@ HOOK_REGISTRATIONS: list[dict[str, Any]] = [
         "env": {},
         "label": "murmurent-conscience-gaps",
     },
+    # The personal vault follows you between machines without a button:
+    # brought in when a session starts, sent as soon as a session writes a
+    # note in it, and checked at the end of each reply. Notes marked protected
+    # or restricted are never sent. See murmurent.hooks.vault_sync.
+    {
+        "event": "SessionStart",
+        "matcher": None,
+        "module": "murmurent.hooks.vault_sync",
+        "env": {},
+        "label": "murmurent-vault-sync-start",
+    },
+    {
+        "event": "PostToolUse",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit|mcp__murmurent-oracle__.*",
+        "module": "murmurent.hooks.vault_sync",
+        "env": {},
+        "label": "murmurent-vault-sync-write",
+    },
+    {
+        "event": "Stop",
+        "matcher": None,
+        "module": "murmurent.hooks.vault_sync",
+        "env": {},
+        "label": "murmurent-vault-sync-stop",
+    },
 ]
 
 MCP_REGISTRATIONS: dict[str, dict[str, Any]] = {

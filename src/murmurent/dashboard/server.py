@@ -748,11 +748,15 @@ def create_app() -> FastAPI:
         def _pull_both() -> None:
             from ..core import roster_sync as _rs
             from ..core import vault_sync as _vs
-            for name, fn in (("lab roster", _rs.pull_lab_mgmt), ("vault", _vs.pull_personal_vault)):
+            # The vault is synced both ways: this machine's notes, including
+            # ones typed in Obsidian, are sent, then the other machines' come in.
+            for name, fn in (("lab roster", _rs.pull_lab_mgmt),
+                             ("vault", lambda: _vs.sync("vault sync (dashboard, automatic)"))):
                 try:
                     res = fn()
                     if not res.ok:
-                        _log.info("auto-pull of the %s did not run: %s", name, res.detail)
+                        _log.info("auto-sync of the %s did not run: %s", name,
+                                  getattr(res, "detail", None) or getattr(res, "message", ""))
                 except Exception as exc:  # noqa: BLE001
                     _log.info("auto-pull of the %s failed: %s", name, exc)
             timer = _threading.Timer(15 * 60, _pull_both)
@@ -835,10 +839,9 @@ def create_app() -> FastAPI:
         from ..core import registrar as _registrar
         from ..core import centre_init as _ci_gate
         from ..core.repo import use_lab_mgmt_root
-        # resolve_viewer_lab_mgmt (not the bare lookup): it additionally
-        # upgrades a card-import stub to the member's real lab_mgmt clone once
-        # one exists, so a member whose card predates that fix stops seeing a
-        # roster of just themselves — without hand-editing lab_mgmt_path.
+        # The viewer's group and its records repo. The machine owner's own
+        # identity card settles their membership, so a member whose clone of
+        # the records is not on disk yet still gets in (and is told to clone).
         match = _registrar.resolve_viewer_lab_mgmt(handle)
         # SCOPING GATE: in ANY initialised centre, the ONLY valid identities are
         # those the centre registry claims (a member/PI/leader of a registered
@@ -2700,24 +2703,14 @@ def create_app() -> FastAPI:
                 "as_of": "",
             }
 
-        commit = _vs.commit_and_push(root, message="vault sync (dashboard)")
-        pull = _vs.pull_personal_vault()
-        diverged = (not pull.ok) and _vs.is_divergence(pull.detail)
-
-        if diverged:
-            message = ("Vault diverged — you have unsynced edits on another "
-                       "machine. Reconcile there (push), then sync here.")
-        else:
-            push_part = "pushed" if commit.pushed else f"push: {commit.detail}"
-            pull_part = "pulled" if pull.ok else f"pull: {pull.detail}"
-            message = f"{push_part}; {pull_part}"
-
+        res = _vs.sync("vault sync (dashboard)")
         return {
-            "pushed": bool(commit.pushed),
-            "pulled": bool(pull.ok) and not diverged,
-            "diverged": diverged,
-            "message": message,
-            "as_of": pull.as_of or _vs.vault_info().as_of,
+            "pushed": res.pushed,
+            "pulled": res.pulled,
+            "diverged": res.diverged,
+            "kept_local": res.kept_local,
+            "message": res.message,
+            "as_of": res.as_of or _vs.vault_info().as_of,
         }
 
     @app.post("/api/members")
@@ -2824,6 +2817,12 @@ def create_app() -> FastAPI:
         except OSError:
             pass
 
+        # #232: the member's machine learns about the lab from the lab records
+        # repo, so invite them to it on GitHub now, next to the Slack invite,
+        # rather than leaving it to a reconcile nobody is prompted to run.
+        records = _gr.records_access_for_new_member(
+            str(payload.get("github") or ""), group)
+
         dm_ok, dm_detail = False, "not attempted"
         if body.dm:
             member_email = str(payload.get("email") or "")
@@ -2832,6 +2831,11 @@ def create_app() -> FastAPI:
                 f"Your murmurent member ID for '{group}' is ready — your signed "
                 f"bundle.json is attached to this message. Download it, then run:"
                 f"\n\n    {import_hint}")
+            if records.get("clone_command"):
+                dm_text += (
+                    "\n\nThen accept the GitHub invitation to the lab records "
+                    "repository (check your GitHub notifications or email) and "
+                    f"clone it:\n\n    {records['clone_command']}")
             dm_ok, dm_detail = _gr.send_group_dm(
                 group, text=dm_text, slack=member_slack, email=member_email,
                 file_content=_json.dumps(bundle, indent=2), file_name="bundle.json")
@@ -2844,6 +2848,8 @@ def create_app() -> FastAPI:
             "bundle": bundle,
             "import_hint": import_hint,
             "dm": {"sent": dm_ok, "detail": dm_detail},
+            # #232: read access to the lab records repo, and the clone command.
+            "records": records,
             # #188: a new member joins the group's Slack channel.
             "slack": _invite_to_group_channel(
                 group, handle, str(payload.get("email") or "")),

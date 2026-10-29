@@ -91,10 +91,14 @@ for its name and clone it into your repositories folder (`~/repos` unless
 you chose another; `murmurent config repos-root` shows it):
 
 ```bash
-git clone git@github.com:<org>/murmurent_lab_mgmt_<lab>.git \
-    ~/repos/murmurent_lab_mgmt_<lab>
+gh repo clone <org>/murmurent_lab_mgmt_<lab> ~/repos/murmurent_lab_mgmt_<lab>
 murmurent member list   # the whole lab, not just you
 ```
+
+`gh repo clone` uses whatever you signed in to `gh` with, HTTPS or SSH. If
+GitHub refuses, run `murmurent doctor`: it says whether an invitation is
+waiting for you, whether it expired, or whether you are signed in as a
+different GitHub account from the one your PI invited.
 
 Until you do, `murmurent member list` and the dashboard's members panel
 have no roster to read; both will say so rather than showing an empty

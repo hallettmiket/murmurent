@@ -312,7 +312,133 @@ def pull_personal_vault() -> VaultSyncResult:
     )
 
 
+# ---------------------------------------------------------------------------
+# Two-way sync, automatic (hooks, dashboard) or on request
+# ---------------------------------------------------------------------------
+
+#: Sensitivity tiers whose notes never leave this machine. A protected note
+#: is held under a data-use agreement or an ethics board inside the person's
+#: own account; a restricted one is not yet theirs to share (a patent position,
+#: an unpublished result). ``clinical`` is the former name of ``protected``.
+KEEP_LOCAL = frozenset({"protected", "clinical", "restricted"})
+
+
+def _sensitivity(path: Path) -> str:
+    """The ``sensitivity:`` in a markdown note's frontmatter, lower case, or ""."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            if fh.readline().strip() != "---":
+                return ""
+            for _ in range(60):
+                line = fh.readline()
+                if not line or line.strip() == "---":
+                    return ""
+                if line.lower().startswith("sensitivity:"):
+                    return line.split(":", 1)[1].strip().strip("'\"").lower()
+    except OSError:
+        return ""
+    return ""
+
+
+def kept_local(root: Path) -> list[str]:
+    """Changed or new notes (paths relative to ``root``) that must stay on this
+    machine because their frontmatter marks them protected or restricted."""
+    try:
+        res = _run_git(root, "status", "--porcelain", "--untracked-files=all")
+    except (OSError, subprocess.SubprocessError):
+        return []
+    out = []
+    for line in (res.stdout or "").splitlines():
+        rel = line[3:].strip().strip('"')
+        if " -> " in rel:
+            rel = rel.split(" -> ", 1)[1]
+        if rel.endswith(".md") and _sensitivity(root / rel) in KEEP_LOCAL:
+            out.append(rel)
+    return out
+
+
+@dataclass
+class SyncResult:
+    """Outcome of :func:`sync`: what was sent, what was received, what stayed."""
+
+    ok: bool
+    pushed: bool
+    pulled: bool
+    diverged: bool
+    kept_local: list
+    message: str
+    as_of: str = ""
+
+    def to_dict(self) -> dict:
+        return {"ok": self.ok, "pushed": self.pushed, "pulled": self.pulled,
+                "diverged": self.diverged, "kept_local": list(self.kept_local),
+                "message": self.message, "as_of": self.as_of}
+
+
+def sync(reason: str = "vault sync") -> SyncResult:
+    """Send this machine's vault changes to GitHub and bring in the other
+    machines', in that order. Never raises, never forces.
+
+    1. Commit every change in murmurent's folders, except notes marked
+       protected or restricted (:data:`KEEP_LOCAL`), which stay unstaged here.
+    2. Bring in the other machines' commits, replaying this machine's on top
+       (``pull --rebase``). Notes are separate files, so this almost always
+       succeeds; if two machines changed the same lines, the rebase is undone,
+       nothing is lost, and the result says so (``diverged``).
+    3. Push.
+    """
+    root = personal_vault_root()
+    if root is None or not (root / ".git").exists():
+        return SyncResult(ok=False, pushed=False, pulled=False, diverged=False,
+                          kept_local=[], message="no personal vault on this machine")
+    local_only = kept_local(root)
+    try:
+        _run_git(root, "add", "-A")
+        if local_only:
+            _run_git(root, "reset", "-q", "--", *local_only)
+        staged = _run_git(root, "diff", "--cached", "--quiet")
+        if staged.returncode != 0:
+            commit = _run_git(root, "commit", "-q", "-m", reason)
+            if commit.returncode != 0:
+                tail = (commit.stderr or commit.stdout or "").strip().splitlines()
+                return SyncResult(ok=False, pushed=False, pulled=False, diverged=False,
+                                  kept_local=local_only,
+                                  message=tail[-1] if tail else "git commit failed")
+        remotes = [r for r in (_run_git(root, "remote").stdout or "").split() if r]
+        if not remotes:
+            return SyncResult(ok=True, pushed=False, pulled=False, diverged=False,
+                              kept_local=local_only,
+                              message="no remote configured; local-only vault",
+                              as_of=_last_commit_iso(root))
+        # --autostash keeps the unstaged, kept-local notes out of the way.
+        pull = _run_git(root, "pull", "--rebase", "--autostash", "--quiet")
+        if pull.returncode != 0:
+            _run_git(root, "rebase", "--abort")
+            detail = (pull.stderr or pull.stdout or "").strip().splitlines()
+            return SyncResult(ok=False, pushed=False, pulled=False, diverged=True,
+                              kept_local=local_only,
+                              message=("this machine and another changed the same note; "
+                                       "nothing was lost. Sync the other machine, then "
+                                       "this one. (" + (detail[-1] if detail else "") + ")"),
+                              as_of=_last_commit_iso(root))
+        pushed, detail = _push(root)
+    except subprocess.TimeoutExpired:
+        return SyncResult(ok=False, pushed=False, pulled=False, diverged=False,
+                          kept_local=local_only,
+                          message=f"git timed out after {_GIT_TIMEOUT}s")
+    except (OSError, subprocess.SubprocessError) as exc:
+        return SyncResult(ok=False, pushed=False, pulled=False, diverged=False,
+                          kept_local=local_only, message=str(exc))
+    note = (f"; {len(local_only)} protected or restricted note(s) kept on this machine"
+            if local_only else "")
+    return SyncResult(ok=pushed, pushed=pushed, pulled=True, diverged=False,
+                      kept_local=local_only,
+                      message=("synced" if pushed else f"pulled; push: {detail}") + note,
+                      as_of=_last_commit_iso(root))
+
+
 __all__ = [
-    "CommitResult", "VaultSyncResult", "personal_vault_root",
+    "CommitResult", "VaultSyncResult", "SyncResult", "personal_vault_root",
     "commit_and_push", "vault_info", "pull_personal_vault", "is_divergence",
+    "sync", "kept_local", "KEEP_LOCAL",
 ]

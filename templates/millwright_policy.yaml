@@ -114,3 +114,10 @@ emergency_item_share_of_free: 0.25
 mothball_target: ""
 # Refuse a copy that would fill the backup drive past this share.
 mothball_target_fill_limit: 0.90
+
+# The server etiquette check (`murmurent etiquette check --notify`) sends a
+# daily summary: lab members over the rules by name, other accounts as counts.
+# Name a Slack channel here to post it there with the lab's bot, for example
+# "#computers". The bot must be a member of that channel. Leave empty to send
+# it to the PI as a direct message.
+etiquette_summary_channel: ""

@@ -40,6 +40,7 @@ from pathlib import Path
 
 from . import cert_projects as _cp
 from . import lab_vm as _lab_vm
+from . import repo as _repo
 from . import sensitivity as _sens
 from .preflight import Probe
 
@@ -639,6 +640,14 @@ def ensure_repo_project(repo_path: Path, *, lab: str = "", lead: str = "",
     """
     repo_path = Path(repo_path)
     name = repo_path.name
+    # Writing a record into a lab records folder that is not there would create
+    # it, and other commands would then treat that invented folder as the lab's
+    # records (#227). Only pi-init, or cloning the real one, makes it.
+    records = _repo.lab_mgmt_repo_root(env)
+    if not records.is_dir():
+        return Probe(name="project", status="warn",
+                     detail=(f"no lab records folder on this machine ({records}), "
+                             "so no project was made"))
     try:
         projects = _cp.iter_projects(env)
     except Exception as exc:  # noqa: BLE001 - the repository is ready either way

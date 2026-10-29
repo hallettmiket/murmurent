@@ -309,6 +309,32 @@ def check_launcher() -> Check:
     return Check("dashboard icon", WARN, "no Murmurent Dashboard icon", "murmurent launcher")
 
 
+def check_lab_records() -> Check:
+    """Is the group's records repo on this machine, and if not, can this
+    GitHub account get it? A failed clone has four different causes that all
+    look alike to the member; this names the one that applies."""
+    from ..core import lab_records as _lr
+
+    try:
+        st = _lr.records_status()
+    except Exception as exc:  # noqa: BLE001 - never let the doctor die on this
+        return Check("lab records", WARN, f"could not resolve the records repo: {exc}")
+    if st is None:
+        return Check("lab records", OK, "no group on this machine's card; nothing to check")
+    if st.present:
+        return Check("lab records", OK, f"{st.group}: clone at {st.path}")
+    try:
+        acc = _lr.records_access_probe(st.group)
+    except Exception as exc:  # noqa: BLE001
+        return Check("lab records", WARN, f"{st.group}: not cloned, and the access check "
+                     f"failed: {exc}", st.hint)
+    if acc.kind == "access":
+        return Check("lab records", WARN, f"{st.group}: not cloned yet, and {acc.detail}",
+                     st.hint)
+    status = FAIL if acc.kind in ("no_access", "wrong_account") else WARN
+    return Check("lab records", status, f"{st.group}: not cloned; {acc.detail}", acc.fix)
+
+
 def run_checks() -> list[Check]:
     checks: list[Check] = [check_python(), check_path_tools(), check_version(), check_clone_remote()]
     checks.extend(check_links())
@@ -316,6 +342,7 @@ def run_checks() -> list[Check]:
     checks.append(check_packaged_commons())
     checks.append(check_repos_root())
     checks.append(check_launcher())
+    checks.append(check_lab_records())
     return checks
 
 

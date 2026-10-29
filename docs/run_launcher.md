@@ -236,6 +236,18 @@ exact command that fixes it (for example `renice -n 19 -u <login>`). If it is
 still there at the next check, a line goes to the lab's Slack channel; after
 that, to you. A day without the issue starts again from the beginning.
 
+Each day it also sends a summary: lab members over the rules by name, and
+other accounts as counts. It goes to you as a direct message, unless your
+lab's policy file names a Slack channel for it:
+
+```yaml
+# in policy/millwright.yaml of your lab's management repository
+etiquette_summary_channel: "#computers"
+```
+
+Invite the lab's bot into that channel once (`/invite @<bot name>` in Slack).
+If a post fails, the summary comes to you instead.
+
 To run it every weekday at 11:00 under your account:
 
 ```bash

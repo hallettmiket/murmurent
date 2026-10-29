@@ -274,14 +274,43 @@ def revoke_project(centre: str, group: str) -> dict:
 # The CRL to hand a verifier
 # ---------------------------------------------------------------------------
 
+def _is_own_trust_anchor(centre: str) -> bool:
+    """True when the key pinned as ``centre``'s trust anchor is this machine's own
+    identity key: a standalone PI, whose machine is their lab's CA. Their
+    CRLs are signed with that key, so they verify against the pin. A member's
+    machine key is NOT the anchor, and a CRL it signed would be rejected."""
+    try:
+        from . import idkeys as _k
+        pinned = _cert.load_pinned_root(centre)
+        return bool(pinned) and _k.have_keys() and \
+            _k.fingerprint(pinned) == _k.local_fingerprint()
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def current_crl(centre: str) -> dict | None:
-    """The CRL a verifier should use: freshly root-signed if we hold the root
-    key; otherwise the last imported/distributed signed CRL (may be None)."""
+    """The CRL a verifier should use: freshly signed if this machine holds a key
+    the verifier trusts (the centre root key on the mayor's machine, or the
+    machine's own key when it is the pinned trust anchor, as for a standalone
+    PI); otherwise the last imported/distributed signed CRL (may be None).
+
+    Signing fresh matters because a CRL goes stale after ``CRL_MAX_AGE_DAYS``
+    and the verifier then fails closed. Before the standalone-PI branch, a PI
+    with no root key was locked out of their own dashboard a week after their
+    last revocation, and renewing their card did not help, since the card and
+    the list are separate things."""
     if _cr.have_root_key():
         try:
-            return build_fresh_crl(centre)
+            return publish(centre)
         except RevocationError:
             return None
+    if _is_own_trust_anchor(centre):
+        priv = _crl_signing_priv()
+        if priv is not None:
+            try:
+                return publish(centre, signing_priv=priv)
+            except RevocationError:
+                pass
     return _load(_signed_path(centre), None)
 
 

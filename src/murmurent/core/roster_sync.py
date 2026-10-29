@@ -126,6 +126,22 @@ def pull_lab_mgmt() -> RosterSyncResult:
             branch = _run_git(root, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
             remote = "origin" if "origin" in remote_names else remote_names[0]
             res = _run_git(root, "pull", "--ff-only", remote, branch)
+        if res.returncode != 0 and "fast-forward" in ((res.stderr or "") + (res.stdout or "")).lower():
+            # This copy has commits GitHub never received, usually saves whose
+            # push was refused. Replay them on top of GitHub's and send them,
+            # rather than refusing every update from now on (#151 follow-up:
+            # one Mac held 120 such commits and stopped seeing new members).
+            from .git_persist import rebase_onto_upstream
+            problem = rebase_onto_upstream(root)
+            if problem is not None:
+                return _fail(problem)
+            push = _run_git(root, "push")
+            note = "brought in GitHub's changes and replayed this machine's on top"
+            if push.returncode != 0:
+                tail = (push.stderr or push.stdout or "").strip().splitlines()
+                note += "; sending them failed: " + (tail[-1] if tail else "git push failed")
+            return RosterSyncResult(path=info.path, is_git=True, ok=True,
+                                    detail=note, as_of=_last_commit_iso(root))
     except subprocess.TimeoutExpired:
         return _fail(f"git pull timed out after {_GIT_TIMEOUT}s")
     except (OSError, subprocess.SubprocessError) as exc:

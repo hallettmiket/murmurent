@@ -99,7 +99,16 @@ def _linux_paths() -> dict[str, Path]:
 
 def _launcher_script(shebang: str, open_cmd: str, notify: str, user: str) -> str:
     """The shell script the icon runs: open the dashboard if it is already up,
-    otherwise start it in the background and open it when it answers."""
+    otherwise start it in the background and open it when it answers.
+
+    The script then stays running until the server stops. On a Mac the system
+    ends an app's leftover background processes as soon as the app's own
+    process exits, so a launcher that started the server and exited took the
+    server down with it a few seconds after the login page appeared, and the
+    sign-in click failed with "Network error: Failed to fetch" (#235). While
+    the script waits, the app counts as running, so a second click on the icon
+    does not open the browser again; the dashboard is at the usual address.
+    """
     program = murmurent_program()
     who = (f'MURMURENT_USER="{user}"' if user else
            'MURMURENT_USER="$(head -1 "$HOME/.murmurent/user" 2>/dev/null | tr -d \'[:space:]\')"')
@@ -129,10 +138,19 @@ fi
 export MURMURENT_USER
 mkdir -p "$HOME/.murmurent"
 nohup "$PROGRAM" dashboard --hifi --port "$PORT" > "$LOG" 2>&1 &
+SERVER=$!
 
 for i in $(seq 1 30); do
   sleep 0.3
-  if healthy; then {open_cmd} "$URL" >/dev/null 2>&1; exit 0; fi
+  if healthy; then
+    {open_cmd} "$URL" >/dev/null 2>&1
+    # Stay alive until the server stops (Ctrl+C has no terminal here; the
+    # dashboard's stop button or `murmurent dashboard --stop` ends it). If
+    # this script exited now, the system would end the server with it.
+    wait "$SERVER"
+    exit 0
+  fi
+  kill -0 "$SERVER" 2>/dev/null || break
 done
 notify "The dashboard did not start. Details are in ~/.murmurent/dashboard.log"
 exit 1
@@ -152,6 +170,7 @@ _PLIST = """<?xml version="1.0" encoding="UTF-8"?>
     <key>CFBundleVersion</key><string>1.0</string>
     <key>CFBundleShortVersionString</key><string>1.0</string>
     <key>LSMinimumSystemVersion</key><string>12.0</string>
+    <key>LSBackgroundOnly</key><true/>
     <key>NSHighResolutionCapable</key><true/>
 </dict>
 </plist>

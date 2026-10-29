@@ -24,6 +24,9 @@ Who hears about it (Mike's decisions on #151):
   still there on the next check, a line in the lab's Slack channel; after
   that, a message to the PI. A day without the issue starts again from the
   beginning;
+- the daily summary goes to the Slack channel named by
+  ``etiquette_summary_channel`` in the lab's policy (for example
+  ``#computers``), or to the PI as a direct message when none is set;
 - every message says what was seen, why it matters to other people on the
   server, and the exact command that fixes it. A "how to" link is sent once,
   not with every message.
@@ -323,8 +326,11 @@ def plan_messages(report: dict, state: dict, today: str) -> tuple[list[dict], di
 
 
 def notify(report: dict, *, send_dm=None, post=None, today: str | None = None,
-           lab: str = "") -> list[str]:
-    """Send today's messages and the PI's summary; returns what was done, in words.
+           lab: str = "", policy=None) -> list[str]:
+    """Send today's messages and the summary; returns what was done, in words.
+
+    The summary goes to the policy's ``etiquette_summary_channel`` when one is
+    set, and to the PI as a direct message otherwise, or if that post fails.
 
     Uses the lab's own Slack bot. Never raises: a Slack problem is reported in
     the returned lines, and the escalation state is saved either way.
@@ -364,7 +370,20 @@ def notify(report: dict, *, send_dm=None, post=None, today: str | None = None,
             dm(pi_handle().lstrip("@"), m["text"])
     summary = summary_text(report)
     if summary:
-        dm(pi_handle().lstrip("@"), summary)
+        if policy is None:
+            from .millwright_policy import load_policy
+            policy = load_policy()
+        where = policy.etiquette_summary_channel
+        if where:
+            from ..dashboard.slack_notify import _post
+            token = resolve_group_slack_token(lab)
+            if (post or _post)(_channel_id(where, token), summary, token=token):
+                done.append(f"summary posted to {where}")
+            else:
+                done.append(f"summary: could not post to {where}; sent to the PI instead")
+                where = ""
+        if not where:
+            dm(pi_handle().lstrip("@"), summary)
     _write_json(state_path, new_state)
     return done
 
@@ -376,6 +395,18 @@ def _lab_channel(lab: str) -> str:
         return getattr(entry, "slack_channel_id", "") or ""
     except Exception:  # noqa: BLE001
         return ""
+
+
+def _channel_id(channel: str, token: str | None) -> str:
+    """A channel ID for ``#name``, looked up with the lab's bot; anything else,
+    or a name the bot cannot look up, is passed to Slack as written."""
+    if not channel.startswith("#"):
+        return channel
+    try:
+        from ..dashboard.slack_notify import _lookup_channel_id_by_name
+        return _lookup_channel_id_by_name(channel[1:], token=token) or channel
+    except Exception:  # noqa: BLE001
+        return channel
 
 
 def summary_text(report: dict) -> str:

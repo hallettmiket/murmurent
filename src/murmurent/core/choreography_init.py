@@ -27,6 +27,7 @@ decides), write a contributor's contract or pipeline, or run the judge.
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -277,7 +278,8 @@ def _step_ready(plan: ChoreographyPlan, repo_path: Path,
     from . import adopt as _adopt
     try:
         outcome = _adopt.adopt_clone(clone_path=str(repo_path), lab=plan.lab,
-                                     agents=list(plan.agents))
+                                     agents=list(plan.agents),
+                                     record_project=plan.request_project)
     except _adopt.AdoptError as exc:
         return Probe(name="murmurent-ready", status="fail", required=True,
                      detail=str(exc))
@@ -333,9 +335,26 @@ def _step_question(plan: ChoreographyPlan, repo_path: Path, actor: str,
         return Probe(name="question", status="warn", detail=f"not posed: {exc}"), None
     if not group_dir:
         written.append(dest)
-    where = "the group's choreographies folder" if group_dir else "this repository"
+    where = _question_place(group_dir)
     return Probe(name="question", status="ok",
                  detail=f"posed in {where}: {dest}"), dest
+
+
+def _question_place(group_dir: Path | None) -> str:
+    """Name the folder the question went to, for the probe message.
+
+    Only a folder inside the lab records repository is the group's; anywhere
+    else is the poser's own (#227).
+    """
+    if not group_dir:
+        return "this repository"
+    if os.environ.get(_ch.ENV_CHOREOGRAPHY_DIR, "").strip():
+        return f"the folder set by ${_ch.ENV_CHOREOGRAPHY_DIR}"
+    try:
+        Path(group_dir).relative_to(_repo.lab_mgmt_repo_root())
+    except ValueError:
+        return "your vault's choreographies folder (not shared with the group)"
+    return "the group's choreographies folder"
 
 
 def _step_data_folders(plan: ChoreographyPlan) -> Probe:
@@ -383,6 +402,14 @@ def _step_request(plan: ChoreographyPlan, actor: str) -> tuple[Probe, int | None
         return Probe(name="project request", status="warn",
                      detail="no member identity on this machine, so no request was "
                             "filed; use ＋ new project on the dashboard"), None
+    # Filing into a lab records folder that is not there would create it, and
+    # the PI would never see the request (#227).
+    records = _repo.lab_mgmt_repo_root()
+    if not records.is_dir():
+        return Probe(name="project request", status="warn",
+                     detail=f"no lab records folder on this machine ({records}), so "
+                            "no request was filed; clone your group's lab records, "
+                            "then use ＋ new project on the dashboard"), None
     from ..dashboard import request_actions as _ra
     try:
         filed = _ra.file_create_request(

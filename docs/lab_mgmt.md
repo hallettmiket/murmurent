@@ -53,10 +53,9 @@ suffix says whose. Machines that host several labs' clones (a
 registrar's laptop, a shared server) get collision-free directories
 for free.
 
-Deviant names still work (member-side resolution auto-discovers any
-clone in your repositories folder that has the lab_mgmt shape (`lab.md` +
-`members/`) and pins it), but stick to the canonical name; discovery
-refuses to guess when two candidate clones both match.
+This path is the only one murmurent looks at. A clone under any other
+name or folder is not used: the dashboard and `murmurent import-card`
+tell you the exact `mv` command that puts it in the right place.
 
 The clean conceptual boundary is:
 
@@ -80,6 +79,11 @@ murmurent_lab_mgmt_<lab>/
 │                             Slack workspace, GitHub org, lab-VM
 │                             base path. Single source of truth
 │                             for the lab's configuration.
+├── pi_card.json              The PI's current signed identity card,
+│                             written by `murmurent pi-init` (and when
+│                             a centre-issued PI card is imported).
+│                             Members' sign-in reads it, so renewing
+│                             the PI card does not lock members out.
 ├── compliance.md             Group-level required training
 │                             (TCPS_2, WHMIS, etc.) — applied to
 │                             every member.
@@ -127,7 +131,7 @@ murmurent_lab_mgmt_<lab>/
 | Person | Action | Where they get it |
 |---|---|---|
 | Lab PI | scaffolded by `murmurent pi-init <lab>` at `~/repos/murmurent_lab_mgmt_<lab>`; push it to GitHub under the same name | see "Naming" above |
-| Lab member (postdoc, student) | clone, read-only | `git clone git@github.com:<owner>/murmurent_lab_mgmt_<lab>.git ~/repos/murmurent_lab_mgmt_<lab>` (auto-discovered + pinned on first dashboard load) |
+| Lab member (postdoc, student) | accept the GitHub invitation, then clone, read-only | `gh repo clone <owner>/murmurent_lab_mgmt_<lab> ~/repos/murmurent_lab_mgmt_<lab>` (the exact command is in the message that brought your card, and on the dashboard until you have cloned; `murmurent doctor` says why a clone is refused) |
 | Core leader | clone OF THEIR CORE'S `lab_mgmt` (cores have their own) | same |
 | Registrar | reads multiple `lab_mgmt` repos via the centre registry | each lab's path is recorded in `~/.murmurent/lab_info/_registry.yaml` |
 | Mayor (bootstrap) | no | uses `~/.murmurent/lab_info/` instead |
@@ -141,45 +145,44 @@ join-request approval flow.
 
 ## How `lab_mgmt` is resolved at runtime
 
-`core.repo.lab_mgmt_repo_root()` returns the active lab's repo path
-using this order:
+Your identity card (`~/.murmurent/identity.yaml`, written by
+`murmurent import-card` or `murmurent pi-init`) lists the groups you
+belong to. For each one, the records repo is at
+`<your repositories folder>/murmurent_lab_mgmt_<group>`. That is the
+whole lookup, and it is the same lookup for the dashboard and for every
+terminal command, so they can never follow different labs.
 
-1. **Thread-local override**: the dashboard sets this per-request so a
-   shared, multi-lab dashboard scopes each request to the acting viewer's
-   own lab (via `use_lab_mgmt_root(resolve_viewer_lab_mgmt(actor))`).
-2. **`$MURMURENT_LAB_MGMT_REPO` env var**: an explicit operator pin to
-   one lab (single-lab installs, tests, scripted use). When set, it wins
-   over the registry net below — and the dashboard's per-viewer scoping
-   stands down, since a machine pinned to one lab is not multi-lab.
-3. **This machine's pinned pointer** (`~/.murmurent/lab_mgmt_path`):
-   written by `murmurent pi-init <lab>`, and by discovery (step 5).
-4. **Registry-authoritative** (`_registry_lab_mgmt_for_owner`): the
-   machine owner's own group per the centre registry (`_registry.yaml`).
-   A bare call acts for the owner, so their registered group is the
-   canonical default — returned **even if the clone isn't on disk yet**
-   (the honest answer; panels render empty until it's cloned). This is
-   what replaced the old hardcoded `~/repos/lab_mgmt` fallback.
-5. **Discovery**: scans your repositories folder for a directory with the lab_mgmt
-   shape (`lab.md` + `members/`), preferring one whose roster contains
-   your handle, and **pins** an unambiguous hit so this runs once. It
-   matches on shape, not name, so a pre-convention `~/repos/lab_mgmt`
-   clone is still found here — the name was dropped as a *fallback*, the
-   folder still resolves. If two clones match, it refuses to guess and
-   the panels stay empty; set `MURMURENT_LAB_MGMT_REPO` to break the tie.
-6. **Canonical-convention default** (`~/repos/murmurent_lab_mgmt`, no
-   group suffix): the honest last resort when nothing above resolves. It
-   never exists on disk, so every lookup misses cleanly and any resulting
-   404 names the canonical convention. Murmurent no longer falls back to
-   `~/repos/lab_mgmt` by name (that pre-convention path used to outrank
-   discovery and was returned even when absent — the root of the
-   wrong-roster 404s in issues #31 / #33).
+`core.repo.lab_mgmt_repo_root()` returns the repo of your primary group
+(the one you lead if you lead one, else the first on your card) in this
+order:
 
-So the canonical clone path needs no configuration: `pi-init` pins it
-for the PI; for members the registry net (step 4) resolves it the moment
-the PI has pushed their roster record, and discovery (step 5) self-heals
-the pre-registry case. The `MURMURENT_LAB_MGMT_REPO` env var remains the
-knob for tests and unusual deployments (e.g. a multi-lab dev workstation
-where discovery is ambiguous by design).
+1. **Per-request override**: the dashboard points each request at the
+   viewer's own group, so a shared dashboard scopes each person correctly.
+2. **`$MURMURENT_LAB_MGMT_REPO`**: an explicit pin to one repo, for tests
+   and unusual deployments. When set, it wins everywhere.
+3. **Your identity card**: the canonical path of your primary group,
+   whether or not the clone is on disk yet. If it is not, the dashboard
+   shows the clone command and panels stay empty until you run it.
+4. **The centre registry**, for a machine with no card (a lab the
+   registrar created on the mayor's machine lives under `lab_info/`).
+5. A group-less default that never exists, so a machine with nothing
+   configured misses cleanly.
+
+Things that no longer exist, in case you meet them in old notes: the pin
+file `~/.murmurent/lab_mgmt_path`, the scan of your repositories folder
+for anything shaped like a records repo, and the one-person placeholder
+roster that `import-card` used to invent when no clone was found. Each
+of them could point a machine at the wrong lab, or at a roster of one,
+with nothing on screen to say so.
+
+### Projects you can see
+
+The dashboard's Projects panel and `murmurent project list` show the
+same list: the projects of every group on your card (read from each
+group's `cert_projects/`), any project that lists you, and any project
+you hold a project card for. A cross-lab project is recorded in the host
+lab's records; if you are not in that lab, your card is what names it,
+and the row says "hosted by" that lab without a team or repo list.
 
 ## Backfilling access for pre-existing members
 
@@ -198,13 +201,61 @@ profile lacks a GitHub login are listed so the PI can collect them.
 Prerequisite: the lab_mgmt repo must be on GitHub (`git remote -v`
 shows an origin). The reconcile output says so if it isn't.
 
-Each member then completes their side once: accept the GitHub
-invitation e-mail, and clone the repo under its own name
-(`git clone git@github.com:<owner>/murmurent_lab_mgmt_<lab>.git
-~/repos/murmurent_lab_mgmt_<lab>`). Resolution auto-discovers the
-clone and pins it on the next dashboard load; `MURMURENT_LAB_MGMT_REPO`
-remains the explicit override. From then on their Lab Members panel
-and daily reconcile track what the PI pushes.
+**A repo owned by a personal account cannot grant read-only through the
+API.** GitHub answers `Cannot assign <login> permission of read` to every
+such request, even for a member who already has read-only access (set from
+the web page, which does allow it). This is why every grant to a repo under
+a personal account such as `hallettmiket/...` failed until 2026-10-29, while
+grants to an organisation-owned repo worked. The reconcile now falls back:
+it invites the member with GitHub's default (write) permission and then
+sets the pending invitation to read-only through the invitations endpoint,
+which does accept it. If that second step is refused too, the member is
+invited with write access and the line says so, with the settings page
+where you can set them to Read after they accept. Members who already hold
+write access are listed with the same link. Moving the records repo into a
+GitHub organisation removes the limitation.
+
+**A grant is only an invitation.** GitHub sends the member an email, and
+if nobody accepts it within seven days it expires, silently. So the
+reconcile reads the repo's collaborators *and* its pending invitations and
+reports each member as one of:
+
+| Line | Meaning | What `--apply` does |
+|---|---|---|
+| `read access ✓` | accepted; their machine can clone and pull | nothing |
+| `invitation sent N days ago, expires in M days, not yet accepted: <link>` | waiting on the member | DMs them the link and the clone command |
+| `invitation ... has expired` | never accepted | deletes the dead invitation, sends a new one, DMs them |
+| `would grant read-only access` | never invited | invites them, DMs them |
+| `no GitHub login on file` | nothing to invite | nothing; collect the login |
+
+The DM goes through the group's own Slack bot, so it needs the group
+Slack token on the PI's machine; without it the line says `reminder DM not
+sent`. Reading invitations needs `gh` signed in as the repo owner; if it is
+not, the reconcile says so and falls back to sending grants blind.
+
+Each member then completes their side once: accept the invitation, and
+clone the repo under its own name
+(`gh repo clone <owner>/murmurent_lab_mgmt_<lab>
+~/repos/murmurent_lab_mgmt_<lab>`). `gh repo clone` uses whichever
+protocol they signed in to `gh` with; a bare `git clone git@github.com:...`
+also needs an SSH key, and its "Permission denied (publickey)" is easily
+mistaken for a missing invitation. From then on their Lab Members panel
+and daily reconcile track what the PI pushes. Issuing a member card
+sends this invitation and the clone command automatically; the reconcile
+above is for members carded before that, or whose invitation failed or
+lapsed.
+
+**On the member's side, `murmurent doctor` names the cause** when the
+clone is refused. Its "lab records" check asks GitHub, signed in as the
+member, and reports one of: has access but not cloned yet (with the
+command), no access (invitation waiting, expired, or never sent, with the
+link to check and the reconcile to ask the PI for), signed in as a
+different GitHub account from the one on the roster (the common case
+when someone has two accounts), `gh` not signed in, or `gh` not installed.
+`murmurent init` now checks the GitHub username it is given against
+GitHub, defaults it to the account `gh` is signed in as, and warns before
+accepting a blank one, since a blank or misspelled login is how a member
+ends up never invited.
 
 ## Reading + writing: who's allowed?
 

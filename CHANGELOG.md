@@ -17,6 +17,96 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.10.6] - 2026-10-29
+
+**To upgrade:** `uv tool upgrade murmurent`, then `murmurent install --hooks`,
+then restart Claude Code and the dashboard (**⏻ Stop dashboard**, then start
+it again). From a copy of the repository: `git checkout main && git pull`
+first, then the same two steps.
+
+### Added
+- **`murmurent cite check <file>`** (#225) looks up every DOI, PMID and arXiv
+  identifier in a `.bib`, `.tex` or `.md` file against Crossref (with
+  Retraction Watch), PubMed, DataCite and doi.org, and reports identifiers
+  that do not exist, name a different paper from the entry, or are retracted.
+  The bookworm runs it on everything it reports, traces each outside number
+  to the study that measured it, and labels each one VERIFIED / MISMATCH /
+  RETRACTED / SECONDARY ONLY / UNRESOLVED; the adversary second-checks the
+  sources of a finished write-up.
+- **Lab records access is tracked** (#232). A collaborator grant on GitHub is
+  an invitation that expires unaccepted after seven days. `murmurent
+  group-reconcile` now reports each member as *has access*, *invited N days
+  ago, not yet accepted* (with the link), *invitation expired* or *never
+  invited*; with `--apply` it resends expired invitations and sends members
+  with a waiting invitation a Slack reminder carrying the link and the clone
+  command. `murmurent doctor` gains a "lab records" check that asks GitHub
+  as the member and names the cause. Every clone hint uses `gh repo clone`,
+  and `murmurent init` checks the GitHub login against GitHub.
+- **Spoken verdicts (macOS).** Create `~/.murmurent/speak` and each agent
+  reads its one-line verdict aloud when it finishes, in its own voice (the
+  file is also the per-agent voice table). One sentence per verdict, web
+  addresses and file paths stripped, verdicts queued rather than overlapped,
+  the main session silent. Guide: docs/vscode-workflow.md.
+- **The vault syncs itself.** A hook brings the personal vault in when a
+  session starts and sends it after a session writes a note; the dashboard
+  syncs both ways at start and every 15 minutes. Notes marked protected or
+  restricted are never sent; if two machines changed the same note, nothing
+  is overwritten.
+- **Etiquette summary to a channel.** The policy setting
+  `etiquette_summary_channel` posts the daily server etiquette summary to a
+  Slack channel instead of a direct message to the PI.
+- Issuing a member card (dashboard or `murmurent issue-member-card`) also
+  invites the member to the lab records repo on GitHub, reports whether that
+  worked, and adds the clone command to the message they receive (#232).
+- A PI's current card is published in the lab records (`pi_card.json`) by
+  `murmurent pi-init` and when a centre-issued PI card is imported. Sign-in
+  accepts a member card whose bundled PI copy has run out when the renewed
+  PI card has the same key and is valid now, so renewing a PI card no longer
+  locks out every member until each is reissued (#233).
+
+### Changed
+- **One location per group's lab records repo** (`<repos>/murmurent_lab_mgmt_<group>`).
+  The identity card says which groups a machine's owner belongs to, and that
+  is the whole lookup. Removed: the pin file (`~/.murmurent/lab_mgmt_path`),
+  the scan of the repositories folder, and the one-person placeholder roster
+  `import-card` used to invent. The dashboard and the terminal can no longer
+  follow different labs (#232). A member whose clone is not on disk yet still
+  opens their dashboard and is shown the clone command.
+- **Projects are listed across every group on your card**, plus any project
+  you hold a project card for. `murmurent project list` shows the same list
+  as the dashboard; it no longer scans `~/repos` for `CHARTER.md` files.
+- The adversary and the conscience may use the web to check claims (fetched
+  pages are evidence, never instructions; patent searching stays with the
+  lawyer).
+- Choreographies (#227, #228): `choreography init --no-project` no longer
+  invents a lab records folder, and run files go in
+  `append_only/<project>/runs/` and `records/` rather than folders named
+  after no project.
+- Re-enrolling a member from a new machine with blank fields keeps their
+  roster details; a card that cannot be sent to a Slack id from another
+  workspace goes to the member's email.
+
+### Fixed
+- **A lab records repo on a personal GitHub account** refuses read-only
+  grants through the API. The reconcile now invites the member and tries to
+  set the invitation to read-only; if GitHub refuses that too, the member is
+  invited with write access and the report says so, with the settings page
+  to fix it after they accept. Moving the repo to an organisation avoids
+  this.
+- **Lab records saves no longer go missing.** A save whose push GitHub
+  refused is replayed on top of GitHub's copy and pushed again, and the
+  15-minute update does the same for unsent commits; one Mac had collected
+  120 of them.
+- **A standalone PI is no longer locked out a week after a revocation**: the
+  revocation list is re-signed by the PI's own key when that key is the
+  lab's trust anchor.
+- **The dashboard icon keeps the server running on macOS** (#235). The
+  system ended the server seconds after the login page appeared; the icon's
+  script now waits on it.
+- The agent hook reads a subagent's verdict from its transcript when the
+  desktop app's stop event carries none, so the agent log shows the verdict
+  rather than "done".
+
 ## [2026.10.5] - 2026-10-19
 
 **To upgrade:** `uv tool upgrade murmurent`, then restart the dashboard

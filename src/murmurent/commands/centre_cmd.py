@@ -851,8 +851,17 @@ def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
     else:
         click.echo(text)
 
+    # #232: the member needs the lab records repo too. Invite them now.
+    records = _gr.records_access_for_new_member(
+        str((enrollment.get("payload") or {}).get("github") or ""), group)
+    click.echo(("✓ " if records["ok"] else "! ") + records["detail"])
+    clone_note = ""
+    if records.get("clone_command"):
+        clone_note = ("\n\nThen accept the GitHub invitation to the lab records "
+                      "repository and clone it:\n\n    " + records["clone_command"])
+
     if no_dm:
-        click.echo(f"\nSend them this bundle; they run:\n    {import_hint}")
+        click.echo(f"\nSend them this bundle; they run:\n    {import_hint}{clone_note}")
         return
 
     member_email = str((enrollment.get("payload") or {}).get("email") or "")
@@ -860,7 +869,7 @@ def issue_member_card_cmd(enrollment_file: str, group: str, handle: str,
     dm_text = (
         f"Your murmurent member ID for '{group}' is ready — your signed "
         f"bundle.json is attached to this message. Download it, then run:\n\n"
-        f"    {import_hint}"
+        f"    {import_hint}{clone_note}"
     )
     ok, detail = _gr.send_group_dm(group, text=dm_text, slack_user_id=dm_user_id,
                                     slack=member_slack, email=member_email,
@@ -1258,6 +1267,9 @@ def pi_init(group: str, core: bool) -> None:
     lab_repo = out["lab_repo"]
     repo_name = _P(lab_repo).name
     click.echo(f"✓ your PI ID for '{group}' is ready — you are this {what}'s root.")
+    click.echo(f"  {out.get('published', '')}")
+    click.echo("  Members already holding a card from you keep working across this "
+               "renewal:\n  they pick the card up with their next pull of the lab records.")
     click.echo(f"  Give members this trust root so they can import their cards:\n"
                f"    {out['trust_root']}")
     click.echo(f"  Issue a member ID:  murmurent issue-member-card <their-enroll.json> "

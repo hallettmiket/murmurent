@@ -10,10 +10,12 @@ module:
     handle's role(s), and produces a small, SCOPED identity card — the member's
     netname + only their own group's entry. A member never receives the whole
     centre's data.
-  - ``import_card(card)`` (MEMBER side): writes the card to ``~/.murmurent`` and
-    materializes a scoped ``lab_info/_registry.yaml`` (+ a minimal lab-mgmt) so
-    the existing role resolver / scoping gate work locally, and stamps the
-    machine's netname in ``~/.murmurent/user``.
+  - ``import_card(card)`` (MEMBER side): writes the card to ``~/.murmurent``,
+    materializes a scoped ``lab_info/_registry.yaml`` pointing each group at
+    its one records repo location (``<repos>/murmurent_lab_mgmt_<group>``),
+    and stamps the machine's netname in ``~/.murmurent/user``. Nothing is
+    invented when the clone is missing: the card itself proves membership,
+    and the import says where to clone.
   - ``local_card()``: read this machine's card (for netname enforcement).
 
 Decentralized by design: no shared server or GitHub repo is required — the
@@ -118,13 +120,16 @@ def _group_kind(role: dict) -> str:
     return "lab"
 
 
-def import_card(card: dict, *, env: dict[str, str] | None = None) -> list[str]:
+def import_card(card: dict, *, env: dict[str, str] | None = None,
+                remotes: dict[str, str] | None = None) -> list[str]:
     """Materialize a card onto this machine.
 
     Writes ``~/.murmurent/identity.yaml`` + ``~/.murmurent/user`` and a SCOPED
-    ``lab_info/_registry.yaml`` (+ a minimal lab-mgmt dir per group) so the
-    existing role resolver + scoping gate resolve this member locally. Returns
-    a list of human-readable actions.
+    ``lab_info/_registry.yaml`` whose every group points at the canonical
+    records repo path, so the role resolver + scoping gate resolve this
+    member locally. ``remotes`` maps a group to the git URL of its records
+    repo, when the caller knows it (a member-card bundle carries it), so the
+    "clone it" action can be copied as is. Returns human-readable actions.
     """
     card = parse_card(card) if isinstance(card, str) else card
     netname = _R._normalize(card["netname"])
@@ -151,58 +156,20 @@ def import_card(card: dict, *, env: dict[str, str] | None = None) -> list[str]:
         group = role["group"]
         kind = _group_kind(role)
         gpi = _R._normalize(role.get("pi") or netname)
-        if gpi == netname:
-            # This machine's owner IS this group's PI/leader. The authoritative
-            # lab-mgmt is their single ~/repos clone (created + version-controlled
-            # by pi-init / self_issue, and pushable to GitHub) — NOT a second copy
-            # under lab_info/. Point the registry at that one canonical location so
-            # the dashboard (registry) and the CLI (pinned pointer) never diverge.
-            # The clone + the PI's member record are written by self_issue.
-            canonical = _repo._pinned_lab_mgmt_path() or _repo.lab_repo_path(group)
-            entry = {"pi": f"@{gpi}", "lab_mgmt_path": str(canonical), "status": "active"}
-            (cores if kind == "core" else labs)[group] = entry
-            actions.append(f"registered {kind} '{group}' → {canonical}")
-            continue
-        # This machine's owner is a plain MEMBER of this group. They get a
-        # read-only clone of the group's lab_mgmt over GitHub (granted by
-        # `murmurent group-reconcile <group> --apply`), which is the real
-        # roster. Prefer it over a stub whenever it's already on disk: the
-        # registry path written here becomes a thread-local override in the
-        # dashboard (resolution step 1), so a stub recorded here would shadow
-        # the clone permanently — including from the self-healing discovery
-        # pass — and the member would see a roster containing only themselves.
-        clone = _repo.discover_lab_mgmt_clone_for_group(group, handle=netname)
-        if clone is not None:
-            entry = {"pi": f"@{gpi}", "lab_mgmt_path": str(clone), "status": "active"}
-            (cores if kind == "core" else labs)[group] = entry
-            actions.append(f"registered {kind} '{group}' → {clone} (existing clone)")
-            continue
-        # No clone found — they haven't accepted the GitHub invite yet, or are
-        # offline, or cloned somewhere we don't scan. Synthesize a minimal
-        # lab-mgmt so `is_member` resolves and they aren't locked out of their
-        # own dashboard. Marked as a stub so that resolution upgrades it to the
-        # real clone the moment one appears (registrar._heal_card_stub_entry).
-        gdir = lab_info / ("cores" if kind == "core" else "labs") / group / "lab-mgmt"
-        (gdir / "members").mkdir(parents=True, exist_ok=True)
-        (gdir / "lab.md").write_text(
-            f"---\nlab: {group}\nname: {group}\npi: '@{gpi}'\nkind: {kind}\n---\n\n# {group}\n",
-            encoding="utf-8")
-        # This member's own record (so is_member resolves).
-        (gdir / "members" / f"{netname}.md").write_text(
-            f"---\nhandle: '@{netname}'\nstatus: active\nlab: {group}\n---\n\n# @{netname}\n",
-            encoding="utf-8")
-        (gdir / _repo.CARD_STUB_MARKER).write_text(
-            f"Synthesized by `murmurent import-card` on {_dt.date.today().isoformat()} "
-            f"because no lab_mgmt clone for '{group}' was found under "
-            f"{_repo.repos_root()}.\nThis is a placeholder roster holding only "
-            f"@{netname}. Clone the group's lab_mgmt repo and this entry "
-            f"self-upgrades on the next dashboard load.\n",
-            encoding="utf-8")
-        entry = {"pi": f"@{gpi}", "lab_mgmt_path": str(gdir), "status": "active"}
+        # One place per group: <repos>/murmurent_lab_mgmt_<group>. The PI's
+        # copy is created there by pi-init and pushed to GitHub; a member
+        # clones it there, read-only. The dashboard and the terminal both
+        # resolve through this entry, so they can never follow different labs.
+        path = _repo.lab_repo_path(group)
+        entry = {"pi": f"@{gpi}", "lab_mgmt_path": str(path), "status": "active"}
         (cores if kind == "core" else labs)[group] = entry
-        actions.append(
-            f"materialized {kind} '{group}' (role: {role['kind']}) — placeholder "
-            f"roster; clone the group's lab_mgmt repo to see the full roster")
+        if gpi == netname:
+            actions.append(f"registered {kind} '{group}' → {path}")
+        elif path.is_dir():
+            actions.append(f"registered {kind} '{group}' → {path} (your copy of the lab records)")
+        else:
+            hint = _repo.records_clone_hint(group, remote=(remotes or {}).get(group, ""))
+            actions.append(f"registered {kind} '{group}' → {path} (not on this machine yet). {hint}")
 
     reg_doc = {
         "version": 1,

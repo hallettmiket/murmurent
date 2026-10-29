@@ -159,6 +159,47 @@ member's Zotero library. Which databases it favours and which starter
 reading list it emphasizes are tunable per lab, so a PI can bring a new
 trainee up to speed on the relevant literature quickly.
 
+### Checking sources before they enter a project
+
+Every outside number and paper reaches a project through the Bookworm, so it
+is the main guard against two documented problems. The first is invented
+statistics: a web page with a precise number and a year in its title gets
+picked up by AI research tools whether or not the number is true, and each
+new citation makes it look more trustworthy. The second is wrong references
+written by an AI agent, which can look exactly like real ones.
+
+Before it reports a source, the Bookworm runs `murmurent cite check` (below),
+traces each outside number to the study that measured it, and labels what it
+found:
+
+| Label | Meaning |
+|---|---|
+| `VERIFIED` | The reference is real and the Bookworm saw the claim in the original study |
+| `MISMATCH` | The reference is a different paper, or the number is not in it |
+| `RETRACTED` | Retracted, or under an expression of concern |
+| `SECONDARY ONLY` | Found only in a summary or round-up page; the original study was not found |
+| `UNRESOLVED` | Could not be checked, with the reason (for example a paywall) |
+
+A paper it could not open is `UNRESOLVED`, never `MISMATCH`. Nothing
+unverified goes into the Oracle as a fact.
+
+**`murmurent cite check <file>`** works on its own too. Give it a `.bib`,
+`.tex` or `.md` file and it looks up every DOI, PubMed ID (PMID) and arXiv ID.
+For each it says whether the identifier exists, whether it is the paper the
+bibliography entry claims, and whether it has been retracted, using Crossref
+(which includes the Retraction Watch database), PubMed and DataCite. It uses
+no AI, so it gives the same answer every time. For a `.tex` file it follows
+the bibliography files the manuscript names and checks only the entries it
+cites.
+
+```bash
+murmurent cite check main-article.tex   # exits with an error if any reference fails
+```
+
+It cannot tell whether a real paper supports the sentence that cites it. For a
+`.md` file it prints each paper's real title beside the line that cites it, so
+you can compare them.
+
 **Verdict vocabulary:** `Found N sources — <one-line summary>`
 
 > **You:** Bookworm, find the three most-cited papers on MMP11 in breast
@@ -210,6 +251,19 @@ to synthesis, a result heading for publication or disclosure) or moves
 governed data, the Adversary refers it to the [Lawyer](#lawyer) itself and
 folds the Lawyer's verdict into its own. Every audit ends with a `COUNSEL:`
 line saying what the Lawyer found, or why no referral was needed.
+
+### Checking the sources in a write-up
+
+When it audits a manuscript, grant section, abstract, slides or report, the
+Adversary checks the sources again, because an agent should not be the only
+check on its own work. It runs `murmurent cite check` on the write-up, reads
+each cited paper's real title against the sentence citing it, and fetches the
+sources of the numbers that the main argument rests on. A reference that does
+not exist, names a different paper, or has been retracted fails the audit. So
+does a central number that traces only to a summary page. A source it could
+not open is reported as not checked, with the reason, and never counts against
+the work. It does not check sources in code or analyses with nothing written
+up.
 
 ### Reporting checklists for prediction models
 

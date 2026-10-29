@@ -230,7 +230,8 @@ def onboard_cmd(group: str, profile: str) -> None:
 
 @cli.command(
     "doctor",
-    help="Check the local install (Python, PATH, commons links, hooks, clone remote) "
+    help="Check the local install (Python, PATH, commons links, hooks, clone remote, "
+         "access to the lab's records repository) "
          "and print the one command that fixes each problem found. Exit 1 if anything failed.",
 )
 def doctor_cmd() -> None:
@@ -1758,10 +1759,22 @@ def pull_cmd(project_name: str) -> None:
     push_impl.cmd_pull(project_name)
 
 
-@cli.command("cite", help="Resolve and insert a citation.")
-@click.argument("reference")
-def cite_cmd(reference: str) -> None:
-    _stub()
+@cli.group("cite", help="Check the citations in a file.")
+def cite_group() -> None:
+    pass
+
+
+@cite_group.command(
+    "check",
+    help="Look up every DOI, PMID and arXiv ID in a .bib, .tex or .md file. Reports "
+         "any that do not exist, name a different paper from the one the bibliography "
+         "claims, or have been retracted, and exits 1 if there are any.")
+@click.argument("path", type=click.Path(exists=True, dir_okay=False))
+@click.option("--json", "as_json", is_flag=True, help="Machine-readable output, for agents.")
+def cite_check_cmd(path: str, as_json: bool) -> None:
+    from .commands import cite_cmd as _cite
+
+    _cite.cmd_check(path, as_json=as_json)
 
 
 @cli.command("publish", help="Promote a finding to the group oracle.")
@@ -2274,7 +2287,9 @@ def vault_paths_cmd() -> None:
     click.echo(_json.dumps(_vp.resolve_vault_paths(), indent=2))
 
 
-@vault_group.command("sync", help="Commit + push pending personal-vault changes (best-effort).")
+@vault_group.command("sync", help="Send this machine's vault changes to GitHub, then bring in "
+                                  "your other machines'. Notes marked protected or restricted stay "
+                                  "here. Also happens by itself; this is for 'now'.")
 def vault_sync_cmd() -> None:
     from .core import vault_sync as _vs
 
@@ -2283,11 +2298,13 @@ def vault_sync_cmd() -> None:
         raise click.ClickException(
             "no personal vault registered — run `murmurent vault init` or set the "
             "vault path in Machine settings.")
-    res = _vs.commit_and_push(root, message="vault: sync personal Oracle + lab-notebook")
+    res = _vs.sync("vault sync (murmurent vault sync)")
     click.echo(f"Personal vault: {root}")
-    click.echo(f"  committed: {'yes' if res.committed else 'no'} · "
-               f"pushed: {'yes' if res.pushed else 'no'}")
-    click.echo(f"  {res.detail}")
+    click.echo(f"  {res.message}")
+    for rel in res.kept_local:
+        click.echo(f"  kept on this machine: {rel}")
+    if res.diverged:
+        raise SystemExit(1)
 
 
 @vault_group.command("info", help="Show the personal vault's clone path + freshness (no network).")
@@ -2331,8 +2348,10 @@ def member_list_cmd() -> None:
                 f"expected at:\n  {info.path}\n\n"
                 "Clone it there (ask your PI for the repository name if you "
                 "don't have it):\n"
-                "  git clone git@github.com:<org>/murmurent_lab_mgmt_<lab>.git "
+                "  gh repo clone <org>/murmurent_lab_mgmt_<lab> "
                 f"{info.path}\n\n"
+                "If GitHub refuses, `murmurent doctor` says whether you were "
+                "invited and which account it expects.\n\n"
                 "See docs/lab_mgmt.md."
             )
             return

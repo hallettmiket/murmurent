@@ -37,7 +37,6 @@ from ..core.projects import (
     iter_local_projects,
     load_summary,
     project_path,
-    projects_for_member,
 )
 from ..core.repo import MEMBERS_FILENAME, lab_mgmt_repo_root, read_members, require_project_repo
 
@@ -67,10 +66,14 @@ def _gh_available() -> bool:
 
 
 def cmd_list() -> int:
-    """``murmurent project list`` — projects the current user is a member of."""
+    """``murmurent project list`` — every project the current user can see:
+    their groups' projects (from each group's lab records), the ones that
+    list them, and the ones they hold a project card for. The same list the
+    dashboard shows."""
+    from ..core import project_lens as _lens
     identity = resolve_identity(allow_unknown=True)
-    summaries = projects_for_member(identity.handle)
-    if not summaries:
+    rows = [v for v in _lens.visible_projects(identity.handle) if v.status != "archived"]
+    if not rows:
         click.echo(
             f"No projects found for @{identity.handle}. "
             "Create one with `murmurent project new` or check your handle."
@@ -79,11 +82,13 @@ def cmd_list() -> int:
     console = Console()
     table = Table(title=f"Projects for @{identity.handle}")
     table.add_column("name", style="bold")
+    table.add_column("lab")
     table.add_column("sensitivity")
     table.add_column("lead")
     table.add_column("members")
-    for s in summaries:
-        table.add_row(s.name, s.sensitivity, s.lead, ", ".join(s.members))
+    for v in rows:
+        members = ", ".join(v.members) if v.source == "records" else "(from your project card)"
+        table.add_row(v.name, v.lab, v.sensitivity, v.lead, members)
     console.print(table)
     return 0
 

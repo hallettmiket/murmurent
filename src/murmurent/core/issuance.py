@@ -60,6 +60,47 @@ def _safe(name: str) -> str:
     return "".join(c if (c.isalnum() or c in "-_") else "_" for c in str(name or ""))
 
 
+#: Where a PI's current card is published inside the lab records repo, so a
+#: member's machine picks up a renewal with its next pull (#233).
+PI_CARD_FILENAME = "pi_card.json"
+
+
+def publish_pi_card(card: dict, lab_repo: Path) -> str:
+    """Write the PI's current signed card into the lab records repo and push it.
+
+    Members already pull that repo (the dashboard does it every 15 minutes),
+    so a renewed PI card reaches every member's machine without a new member
+    card each. Best-effort on the git side: the file is always written, and
+    the returned note says whether it was also sent to GitHub."""
+    lab_repo = Path(lab_repo)
+    lab_repo.mkdir(parents=True, exist_ok=True)
+    target = lab_repo / PI_CARD_FILENAME
+    target.write_text(_cert.dumps(card), encoding="utf-8")
+    try:
+        from .git_persist import commit_and_push
+        probes = commit_and_push(target, "Publish the PI's current identity card")
+        bad = [p for p in probes if getattr(p, "status", "ok") not in ("ok", "skipped")]
+        if bad:
+            return f"wrote {target.name}; sending it to GitHub failed: {bad[-1].detail}"
+    except Exception as exc:  # noqa: BLE001 - never block issuing on git
+        return f"wrote {target.name}; could not commit it: {exc}"
+    return f"published {target.name} to the lab records"
+
+
+def renewed_pi_card(group: str) -> dict | None:
+    """The PI's current card as published in ``group``'s records repo on this
+    machine, or ``None`` when the clone or the file is missing or unreadable."""
+    from . import repo as _repo
+    p = _repo.lab_repo_path(group) / PI_CARD_FILENAME
+    if not p.is_file():
+        return None
+    try:
+        card = _cert.loads(p.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return card if isinstance(card, dict) and "payload" in card else None
+
+
 def _git_init_lab_repo(lab_repo: Path) -> None:
     """Make the lab's management repo a real git repo so the roster is
     version-controlled (and pushable to the lab's git provider later). Best-effort
@@ -187,13 +228,13 @@ def self_issue_pi_card(handle: str, group: str, *, group_kind: str = "lab",
         lab_md.write_text(f"---\nlab: {group}\npi: '{at}'\nkind: {group_kind}\n{gh_line}---\n\n"
                           f"# {group}\n", encoding="utf-8")
     _git_init_lab_repo(lab_repo)          # version-control the roster (best-effort)
-    _repo.set_lab_mgmt_path(lab_repo)
     _mem.upsert_member(at, role="pi", email=str(prof.get("email") or ""),
                        github=str(prof.get("github") or ""),
                        card_fingerprint=card["payload"]["subject"]["fingerprint"],
                        card_id=card["payload"]["card_id"])
+    published = publish_pi_card(card, lab_repo)
     return {"pi_card": card, "trust_root": pub_str, "realm": realm,
-            "lab_repo": str(lab_repo)}
+            "lab_repo": str(lab_repo), "published": published}
 
 
 # ---------------------------------------------------------------------------
@@ -284,6 +325,13 @@ def verify_and_import_pi_card(card, *, trust_root: str | None = None,
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{_safe(centre_name)}_pi.json").write_text(_cert.dumps(card), encoding="utf-8")
     actions.append(f"stored signed PI card ({cards_dir()})")
+    # Members verify their cards against this one: publish it where they pull.
+    from . import repo as _repo
+    for role in payload.get("roles") or []:
+        if role.get("kind") in ("lab_pi", "core_leader") and role.get("group"):
+            lab_repo = _repo.lab_repo_path(str(role["group"]))
+            if lab_repo.is_dir():
+                actions.append(publish_pi_card(card, lab_repo))
     return v, actions
 
 
@@ -366,16 +414,30 @@ def issue_member_card(handle: str, *, enrollment: dict, group: str | None = None
     # was PoP-verified above, so no fresh ceremony is needed per project).
     from . import membership as _mem
     ep = enrollment.get("payload") or {}
-    _mem.upsert_member(handle, role="staff",
+    # A blank field leaves what the roster already holds (None), and the role
+    # is set only for a new member (upsert defaults it to staff): a member
+    # re-enrolling a new machine with empty boxes lost their netname and
+    # Slack id, and their role was reset to staff.
+    _mem.upsert_member(handle, role=None,
                        full_name=(str(ep.get("name") or "") or None),
-                       email=str(ep.get("email") or ""),
-                       github=str(ep.get("github") or ""),
-                       slack=str(ep.get("slack") or ""),
-                       official_handle=str(ep.get("official_handle") or ""),
+                       email=(str(ep.get("email") or "") or None),
+                       github=(str(ep.get("github") or "") or None),
+                       slack=(str(ep.get("slack") or "") or None),
+                       official_handle=(str(ep.get("official_handle") or "") or None),
                        card_fingerprint=member_card["payload"]["subject"]["fingerprint"],
                        card_id=member_card["payload"]["card_id"],
                        pubkey=str(pubkey))
-    return {"member_card": member_card, "pi_card": pi_card}
+    # The GitHub address of the lab records repo rides along, so the member's
+    # machine can print the exact clone command (and the dashboard can show
+    # it) without asking anyone. Best-effort: '' when the repo is not on
+    # GitHub yet.
+    try:
+        from . import group_reconcile as _gr
+        records_repo = _gr.lab_mgmt_repo_slug()
+    except Exception:  # noqa: BLE001
+        records_repo = ""
+    return {"member_card": member_card, "pi_card": pi_card,
+            "records_repo": records_repo}
 
 
 # ---------------------------------------------------------------------------
@@ -1030,7 +1092,11 @@ def verify_and_import_member_card(bundle, *, trust_root: str | None = None,
     if not v.ok:
         raise IssuanceError(f"card rejected: {v.reason}")
 
-    actions = _ic.import_card(_scoped_from_signed(member_card["payload"]), env=env)
+    slug = str(bundle.get("records_repo") or "")
+    group = str((member_card.get("payload") or {}).get("group") or "")
+    remotes = {group: f"git@github.com:{slug}.git"} if slug and group else None
+    actions = _ic.import_card(_scoped_from_signed(member_card["payload"]), env=env,
+                              remotes=remotes)
     d = cards_dir()
     d.mkdir(parents=True, exist_ok=True)
     (d / f"{_safe(centre_name)}_member.json").write_text(
@@ -1083,9 +1149,11 @@ def verify_local_identity(*, env: dict | None = None, now=None) -> tuple[str, st
     pi_p = cards_dir() / f"{_safe(centre)}_pi.json"
     if member_p.is_file():
         b = json.loads(member_p.read_text(encoding="utf-8"))
+        group = str(((b.get("member_card") or {}).get("payload") or {}).get("group") or "")
         v = _cert.verify_member_card(b.get("member_card"), b.get("pi_card"),
                                      root_pub=pinned, now=now, crl=crl,
-                                     centre=centre, require_crl=require)
+                                     centre=centre, require_crl=require,
+                                     renewed_pi_card=renewed_pi_card(group) if group else None)
     elif pi_p.is_file():
         v = _cert.verify_pi_card(_cert.loads(pi_p.read_text(encoding="utf-8")),
                                  root_pub=pinned, now=now, crl=crl, centre=centre,
@@ -1143,8 +1211,10 @@ def local_card_health(*, env: dict | None = None, now=None) -> CardHealth:
     sending the person back to the sign-in page with no reason.
 
     A member's card is checked together with the copy of their PI's card it
-    carries, and both must be in date. So a member is also refused when the
-    PI's copy has run out, even after the PI renewed their own card.
+    carries. When that copy has run out but the PI has renewed, the renewed
+    card published in the lab records (``pi_card.json``) stands in for it, so
+    a member is only refused when the PI has not renewed yet, or the lab
+    records on this machine are behind.
     """
     now = now or datetime.now(timezone.utc)
     status, reason = verify_local_identity(env=env, now=now)
@@ -1159,8 +1229,14 @@ def local_card_health(*, env: dict | None = None, now=None) -> CardHealth:
         if member_p.is_file():
             kind = "member"
             bundle = json.loads(member_p.read_text(encoding="utf-8"))
+            group = str(((bundle.get("member_card") or {}).get("payload") or {}).get("group") or "")
+            pi_until = _valid_until(bundle.get("pi_card"))
+            renewed = renewed_pi_card(group) if group else None
+            renewed_until = _valid_until(renewed) if renewed else None
+            if renewed_until and (pi_until is None or renewed_until > pi_until):
+                pi_until = renewed_until
             dates = [(_valid_until(bundle.get("member_card")), "yours"),
-                     (_valid_until(bundle.get("pi_card")), "your PI's")]
+                     (pi_until, "your PI's")]
         elif pi_p.is_file():
             kind = "pi"
             dates = [(_valid_until(json.loads(pi_p.read_text(encoding="utf-8"))), "yours")]
@@ -1175,9 +1251,10 @@ def local_card_health(*, env: dict | None = None, now=None) -> CardHealth:
     if kind == "pi":
         renew = f"Renew it on this computer with:  murmurent pi-init {lab}"
     elif who == "your PI's":
-        renew = ("Ask your PI to renew their card and issue you a new one: run "
-                 "murmurent enroll, send them the file, then import what they send "
-                 "back with:  murmurent import-card <file>")
+        renew = (f"Ask your PI to renew their card (murmurent pi-init {lab}). Their "
+                 "renewed card reaches you with the lab records: press update on "
+                 "the dashboard's members panel, or run murmurent reconcile, then "
+                 "sign in again. Your own card stays valid.")
     else:
         renew = ("Ask your PI for a new card: run murmurent enroll, send them the "
                  "file, then import what they send back with:  "

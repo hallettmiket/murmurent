@@ -157,6 +157,10 @@ class Policy:
     mothball_target_fill_limit : float
         A copy that would fill the backup drive past this share is refused
         (step 6).
+    etiquette_summary_channel : str
+        The Slack channel, such as ``#computers``, that the daily etiquette
+        summary is posted to with the lab's bot (step 4). Empty means the
+        summary goes to the PI as a direct message.
     sources : tuple of str
         The files read, in order, after the built-in defaults.
     problems : tuple of str
@@ -190,6 +194,7 @@ class Policy:
     emergency_item_share_of_free: float = 0.25
     mothball_target: str = ""
     mothball_target_fill_limit: float = 0.90
+    etiquette_summary_channel: str = ""
     sources: tuple[str, ...] = ()
     problems: tuple[str, ...] = ()
 
@@ -301,6 +306,7 @@ _CHECKERS = {
     "compress_min_mb": _check_int(1),
     "mothball_target": lambda value: str(value or "").strip(),
     "mothball_target_fill_limit": _check_fraction,
+    "etiquette_summary_channel": lambda value: str(value or "").strip(),
     "duplicate_min_mb": _check_int(1),
     "duplicate_max_read_gb": _check_int(0),
     "scan_threads": _check_int(1, 32),

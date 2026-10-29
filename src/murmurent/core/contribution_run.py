@@ -49,9 +49,13 @@ MANIFEST_NAME = "run.yaml"
 RECORD_MANIFEST_NAME = "record.yaml"
 CHOREOGRAPHY_COPY = "choreography.md"
 
-#: Subdir names under the resolved run/record root.
-PACKAGE_SUBDIR = "choreography_runs"
-RECORD_SUBDIR = "choreography_run_records"
+#: Folder names inside the project's ``append_only/<project>/`` folder. Every
+#: folder directly under ``append_only/`` is named after a project (#228).
+PACKAGE_SUBDIR = "runs"
+RECORD_SUBDIR = "records"
+
+#: Name stem of the temporary fallback when this machine has no data root.
+TEMP_PREFIX = "murmurent_choreography_"
 
 #: The commons agent whose definition version is frozen into every run.
 JUDGE_AGENT = "judge"
@@ -100,21 +104,51 @@ class _ContributionInputs:
 
 
 def _resolve_run_root(
-    out_dir: str | Path | None, subdir: str, env: dict[str, str] | None
+    out_dir: str | Path | None, subdir: str, env: dict[str, str] | None,
+    project: str = "",
 ) -> Path:
     """Where a run package / record is written.
 
-    Priority: an explicit ``out_dir`` wins; otherwise the Tier-3
-    ``append_only/`` tree when it exists on disk; otherwise a temp-style
-    default. (append_only writes are new-files-only, so the protected-paths
-    append-only hook is respected.)
+    Priority: an explicit ``out_dir`` wins; otherwise
+    ``append_only/<project>/<subdir>`` when the ``append_only/`` tree exists on
+    disk; otherwise a temp-style default. (append_only writes are
+    new-files-only, so the protected-paths append-only hook is respected.)
+
+    With an ``append_only/`` tree but no project, :class:`RunError` is raised
+    rather than writing a folder named after no project (#228).
     """
     if out_dir is not None:
         return Path(out_dir).expanduser()
     ao = append_only_root(env)
     if ao.exists():
-        return ao / subdir
-    return Path(tempfile.gettempdir()) / f"murmurent_{subdir}"
+        if not project:
+            raise RunError(
+                "cannot tell which project this choreography belongs to: its "
+                "question file has no repo: line, and it is not inside a "
+                "choreography repository. Add repo: <project> to the question "
+                f"file, or pass --out {ao}/<project>/{subdir}/<name>"
+            )
+        return ao / project / subdir
+    return Path(tempfile.gettempdir()) / f"{TEMP_PREFIX}{subdir}"
+
+
+def _project_of(choreo: Choreography, ch_path: Path) -> str:
+    """The project a choreography's runs belong to.
+
+    The question file's ``repo:`` names the choreography repository, which is
+    the project. A question file without one that sits inside a choreography
+    repository takes that repository's declared name.
+    """
+    if choreo.repo:
+        return choreo.repo
+    from . import choreography_registry as _cr
+    for parent in ch_path.resolve().parents:
+        if (parent / _cr.MARKER).is_file():
+            try:
+                return _cr.read_marker(parent).name
+            except _cr.ChoreographyError:
+                return ""
+    return ""
 
 
 def _unique_dir(root: Path, stem: str) -> Path:
@@ -215,7 +249,8 @@ def prepare_run(
 
     contributions = _gather_contribution_inputs(choreo, base)
 
-    root = _resolve_run_root(out_dir, PACKAGE_SUBDIR, env)
+    root = _resolve_run_root(out_dir, PACKAGE_SUBDIR, env,
+                             project=_project_of(choreo, ch_path))
     root.mkdir(parents=True, exist_ok=True)
     stem = f"{_pc.slugify(choreo.question) or 'choreography'}_run"
     if timestamp:
@@ -329,7 +364,10 @@ def freeze_run(
     manifest = yaml.safe_load((pkg / MANIFEST_NAME).read_text(encoding="utf-8")) or {}
     question = str(manifest.get("question") or "")
 
-    root = _resolve_run_root(out_dir, RECORD_SUBDIR, env)
+    ch_path = Path(choreography_path).expanduser()
+    project = (_project_of(Choreography.from_file(ch_path), ch_path)
+               if ch_path.is_file() else "")
+    root = _resolve_run_root(out_dir, RECORD_SUBDIR, env, project=project)
     root.mkdir(parents=True, exist_ok=True)
     stem = f"{_pc.slugify(question) or 'choreography'}_record"
     if timestamp:

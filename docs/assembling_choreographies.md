@@ -173,9 +173,13 @@ plus a copied `contract.md` and a copied `output.<ext>`, each recorded
 with its own sha256), a `choreography.md` copy, and a `contributions/<slug>/`
 copy per contribution. The command refuses to run if the choreography fails
 `validate()` (the joinability check) or if any attached contribution lacks a
-conforming output table. By default the package is written to Tier-3
-`append_only/` when the project's data tree exists, falling back to
-`--out` or a temporary default otherwise. The run package is what the
+conforming output table. By default the package is written to
+`append_only/<project>/runs/`, and `freeze-run` writes its record to
+`append_only/<project>/records/`. The project is the `repo:` named in the
+question file or, failing that, the choreography repository the question
+file sits in. If neither names a project, the command stops and asks for
+`--out`, so nothing is written to a folder named after no project. On a
+machine with no data root, both fall back to a temporary folder. The run package is what the
 judge agent reads; gathering these into one bundle up front means the
 judge's session starts from a fixed, inspectable set of inputs rather
 than re-resolving references live.

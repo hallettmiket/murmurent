@@ -122,17 +122,17 @@ def build_response(
     # (legacy charters from before this scoping) only appear when the
     # viewer is explicitly a member — that way a stale @the_pi-led project
     # without a ``lab:`` doesn't surface in @core_lead's dashboard.
-    member_profile_for_lab = _load_member_profile(norm)
-    viewer_lab = str(member_profile_for_lab.get("lab") or "")
-    # Projects come from the lab_mgmt registry (cert_projects/) and ONLY
-    # from there. A project is a named set of repos + members — a repo
-    # that merely carries the murmurent bootstrap is "murmurent-ready",
-    # not a project, and belongs in the Repos panel until it's attached
-    # to one (terminology split, 2026-07-15). The old behaviour — scanning
-    # ~/repos for CHARTER.md and minting a pseudo-project per repo — is
-    # what let five trial adoptions masquerade as projects.
-    from ..core import cert_projects as _cp
-    cert_projects_all = _cp.iter_projects()
+    # Projects come from the records repo of EVERY group on the viewer's
+    # identity card (cert_projects/ in each), plus any project the viewer holds
+    # a project card for. A project is shown when it belongs to one of the
+    # viewer's groups or lists the viewer. Nothing is read from ~/repos: a repo
+    # that merely carries the murmurent bootstrap is "murmurent-ready", not a
+    # project (terminology split, 2026-07-15). See core.project_lens.
+    from ..core import project_lens as _lens
+    visible = _lens.visible_projects(norm)
+    viewer_groups = _lens.viewer_group_paths(norm)
+    home_group = viewer_groups[0][0] if viewer_groups else ""
+    cert_projects_all = [v.record for v in visible if v.record is not None]
     cert_names = {cp.name for cp in cert_projects_all}
     cert_members_by_name = {cp.name: list(cp.members) for cp in cert_projects_all}
     cert_repos_by_name = {
@@ -146,26 +146,24 @@ def build_response(
                   for c in cp.certs}
         for cp in cert_projects_all}
     cert_ws_by_name = {cp.name: cp.slack_workspace for cp in cert_projects_all}
-    all_project_summaries = [
+    cert_hosted_by_name = {
+        v.name: v.lab for v in visible
+        if v.lab and home_group and v.lab.lower() != home_group.lower()}
+    cert_source_by_name = {v.name: v.source for v in visible}
+    project_summaries_all_visible = [
         ProjectSummary(
-            name=cp.name,
-            path=_repo_paths.find_or_default(cp.name, hint=cp.code_repo or ""),
-            sensitivity=_sens.normalize(cp.sensitivity) or "standard",
-            lead=cp.lead or _pi_handle(),
-            members=tuple(cp.members),
-            choreography=cp.choreography,
-            lab=cp.lab or None,
-            status=cp.status,
+            name=v.name,
+            path=_repo_paths.find_or_default(
+                v.name, hint=(v.record.code_repo if v.record else "") or ""),
+            sensitivity=_sens.normalize(v.sensitivity) or "standard",
+            lead=v.lead or _pi_handle(),
+            members=tuple(v.members),
+            choreography=v.record.choreography if v.record else None,
+            lab=v.lab or None,
+            status=v.status,
         )
-        for cp in cert_projects_all
+        for v in visible
     ]
-    def _is_member(p) -> bool:
-        return any(m.lstrip("@").lower() == norm for m in p.members)
-    def _visible_to_viewer(p) -> bool:
-        if p.lab and viewer_lab and p.lab.lower() == viewer_lab.lower():
-            return True
-        return _is_member(p)
-    project_summaries_all_visible = [p for p in all_project_summaries if _visible_to_viewer(p)]
     project_summaries = [p for p in project_summaries_all_visible if p.status != "archived"]
     all_seas = list(_iter_all_seas())
 
@@ -214,6 +212,7 @@ def build_response(
         requests_pending=_requests_pending(effective_persona, norm),
         requests_mine=_requests_mine(norm),
         group_members=_group_members(),
+        lab_records=_lab_records(),
         sea_catalog=_sea_catalog_rows(),
         inbound_requests=_inbound_rows(effective_persona),
         training_compliance=_training_compliance(today_d),
@@ -228,7 +227,9 @@ def build_response(
                            cert_names=cert_names, cert_members=cert_members_by_name,
                            cert_repos=cert_repos_by_name,
                            cert_certified=cert_certified_by_name,
-                           cert_ws=cert_ws_by_name, viewer=norm),
+                           cert_ws=cert_ws_by_name, viewer=norm,
+                           cert_hosted=cert_hosted_by_name,
+                           cert_source=cert_source_by_name),
         # (9) Deleted/archived projects are HIDDEN from the dashboard entirely
         # (recovery is CLI-only: `murmurent project-unarchive`). The contract
         # field stays for API compat but is always empty now.
@@ -1133,8 +1134,12 @@ def _projects(
     cert_certified: dict[str, set[str]] | None = None,
     cert_ws: dict[str, str] | None = None,
     viewer: str = "",
+    cert_hosted: dict[str, str] | None = None,
+    cert_source: dict[str, str] | None = None,
 ) -> list[C.ProjectRow]:
     cert_names = cert_names or set()
+    cert_hosted = cert_hosted or {}
+    cert_source = cert_source or {}
     cert_members = cert_members or {}
     cert_repos = cert_repos or {}
     cert_certified = cert_certified or {}
@@ -1225,6 +1230,8 @@ def _projects(
                 name=p.name,
                 sens=_sens.normalize(p.sensitivity) or "standard",  # type: ignore[arg-type]
                 lead=p.lead,
+                hosted_by=cert_hosted.get(p.name),
+                source=cert_source.get(p.name, "records"),
                 choreo=p.choreography,
                 members=len(p.members),
                 open_seas=open_seas,
@@ -1894,6 +1901,17 @@ def _requests_mine(viewer: str) -> list[C.JoinRequestRow]:
     ]
     mine.sort(key=lambda r: r.id, reverse=True)
     return [_to_request_row(r) for r in mine[:10]]
+
+
+def _lab_records() -> C.LabRecords | None:
+    """Is the group's records repo on this machine? ``None`` when the viewer
+    has no identity card (a pre-card install), so the page shows nothing."""
+    from ..core import lab_records as _lr
+    try:
+        st = _lr.records_status()
+    except Exception:  # noqa: BLE001 - a notice must never break the page
+        return None
+    return C.LabRecords(**st.to_dict()) if st else None
 
 
 def _group_members() -> list[str]:

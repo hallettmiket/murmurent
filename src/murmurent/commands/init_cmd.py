@@ -35,6 +35,74 @@ _VAULT_LATER_HINT = ("  • Create your personal vault any time:  "
                      "murmurent vault init   (needs `gh auth login` first)")
 
 
+def _gh_login_lookup(login: str) -> bool | None:
+    """Does a GitHub account named ``login`` exist? ``None`` when GitHub
+    cannot be asked (no ``gh``, not signed in, offline)."""
+    import shutil
+    import subprocess
+    if shutil.which("gh") is None:
+        return None
+    try:
+        proc = subprocess.run(["gh", "api", f"users/{login}", "--jq", ".login"],
+                              capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode == 0:
+        return True
+    err = (proc.stderr or "").lower()
+    if "404" in err or "not found" in err:
+        return False
+    return None
+
+
+def _gh_signed_in_login() -> str:
+    """The login ``gh`` is signed in as, or ''."""
+    import shutil
+    import subprocess
+    if shutil.which("gh") is None:
+        return ""
+    try:
+        proc = subprocess.run(["gh", "api", "user", "--jq", ".login"],
+                              capture_output=True, text=True, timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _ask_github_login(*, prompt=click.prompt, confirm=click.confirm, echo=click.echo,
+                      lookup=None, signed_in=None, tries: int = 3) -> str:
+    """Ask for the member's GitHub login and check that the account exists.
+
+    The login is what the PI invites to the lab records repository, so a blank
+    or misspelled one means the member never gets access and nobody can tell
+    why. The default is the account ``gh`` is signed in as. A login GitHub
+    does not know is refused; a blank one is accepted only after a warning.
+    Seams are injectable for tests.
+    """
+    lookup = lookup or _gh_login_lookup
+    signed_in = signed_in or _gh_signed_in_login
+    default = signed_in() or ""
+    login = ""
+    for _ in range(max(1, tries)):
+        login = str(prompt("Your GitHub username (your PI invites this account to the "
+                           "lab's records)", default=default)).strip().lstrip("@")
+        if not login:
+            echo("  Without a GitHub username your PI cannot give you access to the "
+                 "lab's records repository, and the dashboard stays empty.")
+            if confirm("  Leave it blank anyway?", default=False):
+                return ""
+            continue
+        exists = lookup(login)
+        if exists is False:
+            echo(f"  GitHub has no account named {login!r}; check the spelling.")
+            continue
+        if exists is None:
+            echo("  (could not check that account with GitHub; sign in with "
+                 "`gh auth login` so murmurent can verify it next time)")
+        return login
+    return login
+
+
 def _offer_vault_init(
     handle: str,
     *,
@@ -148,7 +216,7 @@ def run_init() -> None:
         "Your official / institutional handle (e.g. your Western netname; "
         "may differ from the murmurent handle above)",
         default=handle).strip().lstrip("@")
-    github = click.prompt("Your GitHub username (optional)", default="").strip().lstrip("@")
+    github = _ask_github_login()
     slack = click.prompt("Your Slack username or member ID (optional — lets your PI "
                          "DM your ID card straight back to you)",
                          default="").strip().lstrip("@")

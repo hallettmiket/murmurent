@@ -313,7 +313,7 @@ def verify_pi_card(card, *, root_pub, now=None, skew_seconds=DEFAULT_SKEW_SECOND
 
 def verify_member_card(member_card, pi_card, *, root_pub, now=None,
                        skew_seconds=DEFAULT_SKEW_SECONDS, crl=None, centre=None,
-                       require_crl=True) -> Verdict:
+                       require_crl=True, renewed_pi_card=None) -> Verdict:
     """Verify a member card by walking the full chain to the pinned root.
 
     1. the PI card verifies against ``root_pub`` (and CRL);
@@ -322,6 +322,17 @@ def verify_member_card(member_card, pi_card, *, root_pub, now=None,
        ``kind == "member"`` (leaf), it is temporally valid, and the PI card was
        valid at the member card's issue time;
     3. the member card is not on the (fail-closed) CRL.
+
+    ``renewed_pi_card`` covers the one case where the chain is sound but the
+    bundled PI card has run out: PI cards and member cards both last 90 days,
+    so a PI renewal used to lock out every member until each was issued a new
+    card (#233). When the bundled copy has merely **expired**, and the caller
+    supplies the PI's current card, the member card is accepted provided the
+    renewed card (a) verifies now against the same root and CRL, (b) carries
+    the same key and handle as the bundled copy, and (c) the bundled copy
+    verified at the moment the member card was issued. A PI whose key changed
+    still needs to reissue, and a revoked PI key is refused through the CRL
+    either way.
     """
     now = now or _now()
     skew = timedelta(seconds=skew_seconds)
@@ -336,6 +347,11 @@ def verify_member_card(member_card, pi_card, *, root_pub, now=None,
     pv = verify_pi_card(pi_card, root_pub=root_pub, now=now,
                         skew_seconds=skew_seconds, crl=crl, centre=centre,
                         require_crl=require_crl)
+    if not pv.ok and pv.reason == "expired" and renewed_pi_card is not None:
+        if _renewed_pi_card_covers(member_card, pi_card, renewed_pi_card,
+                                   root_pub=root_pub, now=now, skew_seconds=skew_seconds,
+                                   crl=crl, centre=centre, require_crl=require_crl):
+            pv = Verdict(True, "ok (PI card renewed)")
     if not pv.ok:
         return Verdict(False, f"PI card invalid: {pv.reason}")
     pi_payload = pi_card["payload"]
@@ -379,6 +395,31 @@ def verify_member_card(member_card, pi_card, *, root_pub, now=None,
     return Verdict(True, "ok", handle=subj["handle"], group=p.get("group"),
                    fingerprint=subj["fingerprint"], pubkey=subj["pubkey"],
                    kind="member", roles=tuple(p.get("roles") or ()))
+
+
+def _renewed_pi_card_covers(member_card, pi_card, renewed, *, root_pub, now,
+                            skew_seconds, crl, centre, require_crl) -> bool:
+    """The three conditions under which a renewed PI card stands in for the
+    expired copy bundled with a member card (see :func:`verify_member_card`)."""
+    rv = verify_pi_card(renewed, root_pub=root_pub, now=now, skew_seconds=skew_seconds,
+                        crl=crl, centre=centre, require_crl=require_crl)
+    if not rv.ok:
+        return False
+    old = (pi_card.get("payload") or {}) if isinstance(pi_card, dict) else {}
+    old_subj = old.get("subject") or {}
+    if (rv.pubkey != old_subj.get("pubkey") or rv.fingerprint != old_subj.get("fingerprint")
+            or rv.handle != old_subj.get("handle")
+            or (renewed.get("payload") or {}).get("centre") != old.get("centre")):
+        return False
+    try:
+        issued = _parse(member_card["payload"]["issued_at"])
+    except Exception:  # noqa: BLE001
+        return False
+    # The bundled copy must have been good when it signed the member card.
+    # Revocation is judged against ``now`` through the renewed card above.
+    then = verify_pi_card(pi_card, root_pub=root_pub, now=issued, skew_seconds=0,
+                          centre=centre, require_crl=False)
+    return bool(then.ok)
 
 
 def verify_project_lead_card(lead_card, pi_card, *, root_pub, now=None,

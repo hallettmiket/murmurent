@@ -214,6 +214,35 @@ def commit_and_push(
     return probes
 
 
+def _is_behind(git_output: str) -> bool:
+    """True when a push was refused because the remote has newer commits."""
+    low = git_output.lower()
+    return any(k in low for k in ("fetch first", "non-fast-forward", "[rejected]",
+                                  "tip of your current branch is behind"))
+
+
+def rebase_onto_upstream(repo: Path) -> str | None:
+    """Replay this copy's unsent commits on top of the remote's.
+
+    Returns ``None`` on success, else one plain sentence saying why not. On a
+    clash (the same lines changed on both sides) the replay is undone, so
+    nothing is lost or overwritten; the local commits stay, unsent.
+    """
+    pull = subprocess.run(
+        ["git", "-C", str(repo), "pull", "--rebase", "--autostash", "--quiet"],
+        check=False, capture_output=True, text=True, timeout=60,
+    )
+    if pull.returncode == 0:
+        return None
+    subprocess.run(["git", "-C", str(repo), "rebase", "--abort"],
+                   check=False, capture_output=True, text=True, timeout=30)
+    tail = (pull.stderr or pull.stdout or "").strip().splitlines()
+    return ("this machine and GitHub both changed the same lines; nothing was "
+            "overwritten, and this machine's change is committed but not sent. "
+            "Resolve it in the lab records folder (git pull --rebase), or ask "
+            "for help. (" + (tail[-1] if tail else "rebase failed") + ")")
+
+
 def _push(repo: Path) -> GitProbe:
     """Best-effort ``git push``. Yellow probe (not red) on failure so
     the save still looks successful in the UI."""
@@ -235,6 +264,18 @@ def _push(repo: Path) -> GitProbe:
         ["git", "-C", str(repo), "push"],
         check=False, capture_output=True, text=True, timeout=30,
     )
+    if push.returncode != 0 and _is_behind(push.stderr or push.stdout or ""):
+        # GitHub has commits this copy lacks (another machine saved first).
+        # Bring them in, replaying this copy's commits on top, and push
+        # again. Before this, the push failed quietly and every later save
+        # on this machine piled up unsent (120 commits on one Mac).
+        rebased = rebase_onto_upstream(repo)
+        if rebased is not None:
+            return GitProbe(name="git push", status="warn", detail=rebased, required=False)
+        push = subprocess.run(
+            ["git", "-C", str(repo), "push"],
+            check=False, capture_output=True, text=True, timeout=30,
+        )
     if push.returncode == 0:
         return GitProbe(
             name="git push",

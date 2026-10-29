@@ -88,6 +88,7 @@ def adopt_clone(
     lab: str = "",
     agents: list[str] | None = None,
     host: str = "local",
+    record_project: bool = True,
 ) -> AdoptOutcome:
     """Make an existing git clone murmurent-ready.
 
@@ -97,7 +98,9 @@ def adopt_clone(
     batched SSH session. When no project lists the repository, a
     one-repository project is written for it (issue #151); the outcome's
     ``project`` probe says which happened. Failing to write that record
-    never fails the adoption.
+    never fails the adoption. ``record_project=False`` skips that step, for
+    a caller that was told not to make a project (``choreography init
+    --no-project``, #227).
 
     Raises :class:`AdoptError`; never touches HTTP.
     """
@@ -143,7 +146,8 @@ def adopt_clone(
     except Exception as exc:  # noqa: BLE001
         raise AdoptError(f"bootstrap failed: {exc}", code="internal") from exc
     _raise_if_required_failed(probes)
-    probes.append(_project_probe(clone, lab=lab, host="local"))
+    if record_project:
+        probes.append(_project_probe(clone, lab=lab, host="local"))
     return AdoptOutcome(repo=clone.name, host="local",
                         clone_path=str(clone), probes=probes)
 

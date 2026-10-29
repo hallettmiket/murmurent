@@ -1,9 +1,9 @@
 # EDID PDF store
 
 Full texts for pool entries the [conscience](https://github.com/hallettmiket/murmurent/blob/main/agents/conscience.md)
-cannot reach. The agent does not browse — `WebFetch` and `WebSearch` are
-denied in its frontmatter — so a source behind a bot block, a captcha, or a
-paywall is unciteable until its text is here.
+cannot reach. The agent can search and fetch the web, but a source behind a
+bot block, a captcha, or a paywall refuses an automated reader, so it stays
+unciteable until its text is here.
 
 Each file is linked from its entry in
 [`docs/edid_resources.md`](../edid_resources.md) alongside the public URL.

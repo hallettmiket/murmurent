@@ -291,6 +291,13 @@ class ProjectRow(BaseModel):
     name: str
     sens: Sensitivity
     lead: str
+    # The group whose records hold this project, when it is not the viewer's
+    # own primary group (a cross-lab project), else None. ``source`` is
+    # "records" when read from a records repo, "card" when the viewer only
+    # holds a project card for it (the host lab's records are not on this
+    # machine, so the row has no repos or team list).
+    hosted_by: str | None = None
+    source: str = "records"
     choreo: str | None
     members: int
     open_seas: int
@@ -446,6 +453,20 @@ class VaultHealth(BaseModel):
     status: str = "unregistered"
     detail: str = ""
     path: str | None = None
+
+
+class LabRecords(BaseModel):
+    """Whether this machine holds its group's lab records repo
+    (``murmurent_lab_mgmt_<group>``) at its one canonical path. When it does
+    not, ``hint`` is the command that puts it there and the page says so
+    instead of showing a roster of one."""
+
+    group: str = ""
+    path: str = ""
+    present: bool = False
+    is_git: bool = False
+    remote: str = ""
+    hint: str = ""
 
 
 class AgentActivity(BaseModel):
@@ -1148,6 +1169,7 @@ class DashboardResponse(BaseModel):
     requests_pending: list[JoinRequestRow] = []  # PI: all pending; member: theirs only
     requests_mine: list[JoinRequestRow] = []     # the viewer's outgoing requests
     group_members: list[str] = []                # all known @handles (for forms)
+    lab_records: LabRecords | None = None        # is the records repo on this machine?
     sea_catalog: list[CatalogEntryRow] = []      # SEAs we offer (entire group sees)
     inbound_requests: list[InboundRequestRow] = []  # receptionist queue (PI only)
     training_compliance: TrainingComplianceBlock = TrainingComplianceBlock()

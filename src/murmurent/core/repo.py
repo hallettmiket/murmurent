@@ -21,29 +21,17 @@ MEMBERS_FILENAME = "MEMBERS"
 # The lab_mgmt roster lives in a ``members/`` subdir (one <handle>.md per member);
 # distinct from the project-level ``MEMBERS`` file above.
 MEMBERS_SUBDIR = "members"
-# Marks a lab-mgmt dir as a synthesized card-import fallback rather than a real
-# clone (see ``identity_card.import_card`` + ``is_card_import_stub``).
-CARD_STUB_MARKER = ".murmurent_card_stub"
 # Kept for older callers; murmurent_repo_root() reads repos_root() at call time,
 # so a machine's own repositories folder is honoured (#166).
 DEFAULT_MURMURENT_REPO = Path.home() / "repos" / "murmurent"
-# The canonical lab-mgmt clone is ``~/repos/murmurent_lab_mgmt_<group>`` (see
-# ``lab_repo_path``). ``DEFAULT_LAB_MGMT_REPO`` is ONLY the honest last-resort
-# return for a machine where nothing resolves — it is group-less and never
-# exists on disk, so every lookup against it misses cleanly and the resulting
-# 404s name the canonical convention rather than a stale legacy path.
-#
-# Deliberately NOT ``~/repos/lab_mgmt``: that pre-convention name used to be a
-# hardcoded fallback that outranked canonical-clone discovery and was returned
-# even when absent, producing ``…/repos/lab_mgmt/members/<h>.md not found`` on
-# member machines whose real clone lived elsewhere (#31/#33). A pre-convention
-# ``~/repos/lab_mgmt`` folder still resolves — ``_discover_lab_mgmt_clone``
-# finds it by SHAPE (lab.md + members/) — but murmurent no longer falls back to
-# it by NAME.
+# A group's records repo lives at exactly one place on a machine:
+# ``<repos>/murmurent_lab_mgmt_<group>`` (see ``lab_repo_path``). The identity
+# card says which groups the owner belongs to, and that is the whole lookup.
+# ``DEFAULT_LAB_MGMT_REPO`` is the honest last-resort return for a machine
+# with no card and no registry entry: it is group-less and never exists on
+# disk, so every lookup against it misses cleanly and the resulting message
+# names the convention rather than a stale path.
 DEFAULT_LAB_MGMT_REPO = Path.home() / "repos" / "murmurent_lab_mgmt"  # never exists; see above
-# Retained for the (now shape-discovered, not name-matched) older clones and for
-# tests that force the defaults to miss. No longer consulted by name.
-LEGACY_LAB_MGMT_REPO  = Path.home() / "repos" / "hallett-lab-mgmt"
 
 # Per-request lab-mgmt override. FastAPI dispatches sync handlers into a
 # threadpool, so thread-local state is request-scoped without env-var
@@ -76,34 +64,24 @@ def murmurent_repo_root(env: dict[str, str] | None = None) -> Path:
 
 
 def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
-    """Resolve the lab-management repo root.
+    """Resolve the lab records repo this machine acts on.
 
-    The canonical repo is ``~/repos/murmurent_lab_mgmt_<lab>`` (see
-    ``lab_repo_path``); everything below is the machinery that finds it — plus
-    fallbacks for pre-convention clones.
+    The canonical repo is ``<repos>/murmurent_lab_mgmt_<group>`` (see
+    ``lab_repo_path``), and the machine owner's identity card says which
+    groups they belong to. There is no pin file, no folder scan and no
+    placeholder roster: a missing clone resolves to the canonical path and
+    the caller says "clone it there".
 
     Resolution order:
-      1. Thread-local override set by ``use_lab_mgmt_root()`` — used by the
-         FastAPI dashboard to point each request at the viewer's own lab
-         (so @core_lead sees her lab_mgmt, @the_pi sees his).
-      2. ``$MURMURENT_LAB_MGMT_REPO`` env var
-      3. This machine's pinned pointer (``~/.murmurent/lab_mgmt_path``), written
-         by ``pi-init`` and by discovery below.
-      4. Registry-authoritative, IF it exists on disk: the machine owner's own
-         group per the centre registry (``_registry_lab_mgmt_for_owner``). Only
-         wins here when the recorded path is actually present — a registry path
-         that points nowhere must not out-rank a real clone (#52).
-      5. Discovery: an unambiguous lab_mgmt-shaped clone under ``repos_root()``
-         — the member-machine case — pinned on the way out. Finds a
-         pre-convention ``~/repos/lab_mgmt`` by SHAPE, so un-migrated clones
-         keep resolving. This beats a non-existent registry path.
-      6. The registry path even if absent (so a "clone it at <path>" hint points
-         at the canonical location), else ``DEFAULT_LAB_MGMT_REPO`` — a
-         group-less canonical-convention path that never exists on disk (NOT
-         ``~/repos/lab_mgmt``; see the constant).
-
-    The old name-based ``~/repos/lab_mgmt`` fallback (which outranked discovery
-    and was returned even when absent) is gone — that was the root of #31/#33.
+      1. Thread-local override set by ``use_lab_mgmt_root()``: the dashboard
+         points each request at the viewer's own group.
+      2. ``$MURMURENT_LAB_MGMT_REPO``: an explicit operator pin to one repo
+         (tests, scripted use, unusual deployments).
+      3. The identity card: the first group the owner leads, else the first
+         group they are a member of, at its canonical path.
+      4. The centre registry, for a machine with no card (a registrar-created
+         lab on the mayor's machine lives under ``lab_info/``).
+      5. ``DEFAULT_LAB_MGMT_REPO``, which never exists on disk.
     """
     override = getattr(_thread_local, "lab_mgmt_root", None)
     if override is not None:
@@ -112,51 +90,81 @@ def lab_mgmt_repo_root(env: dict[str, str] | None = None) -> Path:
     explicit = env.get("MURMURENT_LAB_MGMT_REPO")
     if explicit:
         return Path(explicit).expanduser()
-    pinned = _pinned_lab_mgmt_path()          # persistent pointer (set by pi-init)
-    if pinned is not None:
-        return pinned
-    # Canonical, registry-authoritative default for THIS machine's owner. This
-    # replaces the hardcoded ``~/repos/lab_mgmt`` fallback: the registry records
-    # each group's real ``lab_mgmt_path``, so the owner's own group is the right
-    # default and it can never be out-ranked by (or resolve past) a canonical
-    # clone.
+    own = records_repo_for_owner(env)
+    if own is not None:
+        return own
     registered = _registry_lab_mgmt_for_owner(env)
-    # A registry path that actually EXISTS on disk wins (fast + correct).
-    if registered is not None and registered.exists():
-        return registered
-    # Otherwise, a real clone on disk beats a registry path that points nowhere.
-    # A stale/misrecorded ``lab_mgmt_path`` (or a member whose clone dir is named
-    # differently than the registry expects) must not short-circuit discovery of
-    # the actual clone — that regression blanked the roster + lab name for a
-    # member whose registry entry named a non-existent path (#52). Discovery
-    # matches on SHAPE (lab.md + members/) and pins an unambiguous hit so it runs
-    # once; it finds a pre-convention ``~/repos/lab_mgmt`` just like a canonical
-    # ``~/repos/murmurent_lab_mgmt_<lab>``.
-    discovered = _discover_lab_mgmt_clone()
-    if discovered is not None:
-        return discovered
-    # No clone on disk anywhere. Prefer the registry's canonical location (so a
-    # "clone it at <path>" hint points at the right place) over the group-less
-    # default.
     if registered is not None:
         return registered
     return DEFAULT_LAB_MGMT_REPO
 
 
+@dataclass(frozen=True)
+class OwnerGroup:
+    """One group the machine owner belongs to, read from their identity card."""
+
+    group: str
+    kind: str      # "lab" | "core"
+    role: str      # "leader" | "member"
+    pi: str = ""   # the group's PI/leader handle, without the "@"
+
+    @property
+    def path(self) -> Path:
+        return lab_repo_path(self.group)
+
+    @property
+    def leads(self) -> bool:
+        return self.role == "leader"
+
+
+def owner_groups(env: dict[str, str] | None = None) -> list[OwnerGroup]:
+    """Every group on the machine owner's identity card, led groups first.
+
+    The card is the one source of truth for membership on a member's own
+    machine. Returns ``[]`` when there is no card. Never raises.
+    """
+    try:
+        from . import identity_card as _ic
+
+        card = _ic.local_card(env)
+    except Exception:  # noqa: BLE001 - an unreadable card means no groups
+        return []
+    if not card:
+        return []
+    out: list[OwnerGroup] = []
+    for role in card.get("roles") or []:
+        kind = str(role.get("kind") or "")
+        group = str(role.get("group") or "").strip()
+        if not group:
+            continue
+        pi = str(role.get("pi") or "").lstrip("@").lower()
+        if kind == "lab_pi":
+            out.append(OwnerGroup(group, "lab", "leader", pi))
+        elif kind == "core_leader":
+            out.append(OwnerGroup(group, "core", "leader", pi))
+        elif kind == "member":
+            gk = "core" if str(role.get("group_kind") or "lab") == "core" else "lab"
+            out.append(OwnerGroup(group, gk, "member", pi))
+    out.sort(key=lambda g: 0 if g.leads else 1)
+    return out
+
+
+def records_repo_for_owner(env: dict[str, str] | None = None) -> Path | None:
+    """The canonical records repo of the owner's primary group, or None
+    when the machine has no identity card. Led groups win over memberships."""
+    groups = owner_groups(env)
+    return groups[0].path if groups else None
+
+
 def _registry_lab_mgmt_for_owner(env: dict[str, str] | None = None) -> Path | None:
-    """The machine owner's own lab-mgmt clone per the centre registry, or None.
+    """The machine owner's group per the centre registry, or None.
 
-    A bare :func:`lab_mgmt_repo_root` acts on behalf of the machine's owner, so
-    their handle's registered group is the authoritative default. Returns the
-    registry-recorded path **even if the clone is not on disk yet** — that IS
-    the correct answer (the dashboard renders empty until it's cloned), and it
-    is always the canonical location, never a stale name.
-
-    Best-effort and fully isolated: a missing handle, an empty/absent registry,
-    or any import hiccup yields ``None`` so discovery and the last-resort default
-    still run. The registrar import is function-local to break the
-    ``repo`` ⇄ ``registrar`` cycle; the registry read never calls back into
-    ``lab_mgmt_repo_root``, so there is no recursion.
+    Only consulted when the owner has no identity card. Returns the recorded
+    path even if it is not on disk: that is the right answer (panels render
+    empty until it is cloned). Best-effort and fully isolated: a missing
+    handle, an empty registry, or any import hiccup yields ``None``. The
+    registrar import is function-local to break the ``repo`` <-> ``registrar``
+    cycle.
     """
     handle = _current_handle()
     if not handle:
@@ -164,8 +172,8 @@ def _registry_lab_mgmt_for_owner(env: dict[str, str] | None = None) -> Path | No
     try:
         from . import registrar as _reg
 
-        match = _reg.resolve_viewer_lab_mgmt(handle, env)
-    except Exception:  # noqa: BLE001 — registry trouble must never break resolution
+        match = _reg.lab_mgmt_path_for_handle(handle, env)
+    except Exception:  # noqa: BLE001 - registry trouble must never break resolution
         return None
     if match is None:
         return None
@@ -173,105 +181,54 @@ def _registry_lab_mgmt_for_owner(env: dict[str, str] | None = None) -> Path | No
 
 
 def _looks_like_lab_mgmt_clone(path: Path) -> bool:
-    """A directory is a plausible lab_mgmt clone when it carries both a
-    ``lab.md`` (the group config) and a ``members/`` roster directory."""
+    """A directory is a plausible records repo when it carries both ``lab.md``
+    (the group config) and a ``members/`` roster directory."""
     return (path / "lab.md").is_file() and (path / MEMBERS_SUBDIR).is_dir()
 
 
-def _discover_lab_mgmt_clone() -> Path | None:
-    """Best-effort discovery of a member's lab_mgmt clone under ``repos_root()``.
+def find_misplaced_records_clone(group: str) -> Path | None:
+    """A clone of ``group``'s records repo sitting at the wrong path, or None.
 
-    Only called when the env var, the pinned pointer, and both default paths
-    have all missed — i.e. the member-machine case. Scans the top level of
-    ``repos_root()`` for directories that look like a lab_mgmt clone (``lab.md``
-    + ``members/``). When the current user's handle can be resolved, candidates
-    whose roster contains that handle are preferred.
-
-    Returns the discovered clone on a **unique** hit — and PINS it (via
-    :func:`set_lab_mgmt_path`) so subsequent resolutions take the pinned branch
-    above and never re-scan. On zero or ambiguous hits it returns ``None`` and
-    the caller falls through to the unchanged default (no pin written).
-
-    Loop-safe: pinning is what stops the recursion (the next call short-circuits
-    on ``_pinned_lab_mgmt_path``); this function itself never calls
-    ``lab_mgmt_repo_root``.
+    Only the top level of the repositories folder is checked, and only
+    folders whose ``lab.md`` names ``group``. This is a hint for the "move it
+    here" message; nothing is pinned or rewritten.
     """
     root = repos_root()
+    want = lab_repo_path(group)
     try:
         entries = sorted(p for p in root.iterdir() if p.is_dir())
     except OSError:
         return None
-    # The lab records repository belongs to a lab, not a project, so it
-    # normally sits at the top. One level down is searched too (#166): a clone
-    # moved into a project folder by mistake is found rather than missed.
-    nested = []
     for p in entries:
-        if not (p / ".git").exists():
-            try:
-                nested += sorted(c for c in p.iterdir() if c.is_dir())
-            except OSError:
-                pass
-
-    candidates = [p for p in entries + nested if _looks_like_lab_mgmt_clone(p)]
-    if not candidates:
-        return None
-
-    # Prefer a clone whose roster actually contains the current user. If the
-    # handle can't be resolved (or matches nothing), fall back to the full set.
-    handle = _current_handle()
-    if handle:
-        member_file = f"{handle}.md"
-        with_me = [p for p in candidates if (p / MEMBERS_SUBDIR / member_file).is_file()]
-        if with_me:
-            candidates = with_me
-
-    if len(candidates) != 1:
-        # Zero (shouldn't happen here) or ambiguous — don't guess, don't pin.
-        return None
-
-    found = candidates[0]
-    try:
-        set_lab_mgmt_path(found)
-    except OSError:
-        # Couldn't persist the pointer; still return the live hit for this call.
-        pass
-    return found
+        if p == want or not _looks_like_lab_mgmt_clone(p):
+            continue
+        if _lab_md_group(p) == str(group):
+            return p
+    return None
 
 
-def discover_lab_mgmt_clone_for_group(
-    group: str, *, handle: str | None = None,
-) -> Path | None:
-    """A real lab_mgmt clone of ``group`` that lists ``handle``, or None.
+def records_clone_hint(group: str, *, remote: str = "") -> str:
+    """One sentence telling the owner how to get ``group``'s records repo
+    onto this machine: move a misplaced clone, or clone it from GitHub."""
+    want = lab_repo_path(group)
+    misplaced = find_misplaced_records_clone(group)
+    if misplaced is not None:
+        return (f"Your copy of the lab records is at {misplaced}; move it to the "
+                f"standard place:  mv {misplaced} {want}")
+    slug = github_slug(remote) if remote else f"<owner>/{want.name}"
+    return (f"Clone the lab records to {want}:  gh repo clone {slug} {want}"
+            f"   (if that is refused, `murmurent doctor` says why)")
 
-    Group- and member-aware wrapper over :func:`_discover_lab_mgmt_clone` —
-    which already does the hard parts (match on SHAPE not name, so a
-    pre-convention ``~/repos/lab_mgmt`` is found as readily as a canonical
-    ``~/repos/murmurent_lab_mgmt_<lab>``; prefer a roster containing the current
-    user; refuse to guess when ambiguous). Two checks are layered on:
 
-    - **group**: the clone must not *contradict* the group asked about, so a
-      member of two groups can't have both registry entries collapse onto one
-      clone. A clone whose ``lab.md`` declares no ``lab:`` is accepted —
-      pre-convention clones predate the field.
-    - **roster**: the clone must actually carry ``members/<handle>.md``. This
-      one is load-bearing. ``_discover_lab_mgmt_clone`` only *prefers* rosters
-      containing the current user and falls back to the full candidate set when
-      none match, so without this check a member could be pointed at a clone
-      that doesn't know them yet (the PI hasn't pushed their record, or they
-      cloned early). ``is_member`` would then resolve False and the scoping gate
-      would refuse them their own dashboard — strictly worse than the stub,
-      whose entire job is to make ``is_member`` resolve. When the clone doesn't
-      list them, the stub is the better answer and we say so by returning None.
-    """
-    found = _discover_lab_mgmt_clone()
-    if found is None:
-        return None
-    declared = _lab_md_group(found)
-    if declared and str(group) and declared != str(group):
-        return None
-    if handle and not (found / MEMBERS_SUBDIR / f"{handle}.md").is_file():
-        return None
-    return found
+def github_slug(remote: str) -> str:
+    """``owner/name`` from any GitHub remote URL (SSH or HTTPS), else ''."""
+    url = (remote or "").strip()
+    for prefix in ("git@github.com:", "https://github.com/",
+                   "http://github.com/", "ssh://git@github.com/"):
+        if url.startswith(prefix):
+            slug = url[len(prefix):].strip("/")
+            return slug[:-4] if slug.endswith(".git") else slug
+    return ""
 
 
 def _lab_md_group(path: Path) -> str:
@@ -283,44 +240,6 @@ def _lab_md_group(path: Path) -> str:
     except Exception:  # noqa: BLE001 — an unreadable lab.md just means "unknown"
         return ""
     return str(meta.get("lab") or "").strip()
-
-
-def is_card_import_stub(path: str | Path) -> bool:
-    """True when ``path`` is a synthesized card-import stub, not a real clone.
-
-    ``import_card`` materializes a one-person lab-mgmt under ``lab_info/`` when a
-    member has no clone, so ``is_member`` still resolves. That fallback is fine
-    until a real clone shows up — then the stub must yield, because the registry
-    path it wrote is entered as a thread-local override and would otherwise
-    shadow the clone permanently (the member sees a roster of one: themselves).
-
-    Detection is marker-first: stubs written from now on carry
-    ``.murmurent_card_stub``. The heuristic below is only for stubs already in
-    the field (issued before the marker existed) — it requires ALL of: living
-    under ``lab_info_root()``, having no ``.git`` of its own, and a roster of at
-    most one member. Callers must additionally confirm the machine owner is a
-    plain *member* of the group (see ``registrar._heal_card_stub_entry``); a
-    registrar-scaffolded lab on the mayor's own machine has the same shape and
-    must never be mistaken for a stub.
-    """
-    p = Path(path).expanduser()
-    if (p / CARD_STUB_MARKER).is_file():
-        return True
-    if (p / ".git").exists():
-        return False  # a real clone, whatever else is true
-    from . import registrar as _registrar
-
-    try:
-        root = _registrar.lab_info_root().resolve()
-        if not p.resolve().is_relative_to(root):
-            return False
-    except (OSError, ValueError):
-        return False
-    try:
-        roster = list((p / MEMBERS_SUBDIR).glob("*.md"))
-    except OSError:
-        return False
-    return len(roster) <= 1
 
 
 def _current_handle() -> str | None:
@@ -339,27 +258,6 @@ def _current_handle() -> str | None:
     if not handle or handle == "unknown":
         return None
     return handle
-
-
-def _wig_home() -> Path:
-    return Path(os.environ.get("MURMURENT_HOME", str(Path.home() / ".murmurent")))
-
-
-def _lab_mgmt_pointer_path() -> Path:
-    return _wig_home() / "lab_mgmt_path"
-
-
-def _pinned_lab_mgmt_path() -> Path | None:
-    """This machine's pinned lab-mgmt repo (written by ``set_lab_mgmt_path``), or
-    None. Lets a standalone PI's roster resolve without an exported env var."""
-    p = _lab_mgmt_pointer_path()
-    if not p.is_file():
-        return None
-    try:
-        txt = p.read_text(encoding="utf-8").strip()
-    except OSError:
-        return None
-    return Path(txt).expanduser() if txt else None
 
 
 #: Where this machine's own settings live (also written by the dashboard).
@@ -510,20 +408,8 @@ def lab_vault_repo_name(group: str) -> str:
 def lab_vault_path(group: str) -> Path:
     """Clone path for the lab (group) vault on this machine.
 
-    Identical to :func:`lab_repo_path` — the lab vault IS the lab-mgmt clone.
-    Prefer :func:`lab_mgmt_repo_root` when you want the *pinned* location a
-    given machine actually resolved to; this helper only gives the canonical
-    ``<repos>/murmurent_lab_mgmt_<group>`` default."""
+    Identical to :func:`lab_repo_path` — the lab vault IS the lab-mgmt clone."""
     return lab_repo_path(group)
-
-
-def set_lab_mgmt_path(path: str | Path) -> None:
-    """Persistently point ``lab_mgmt_repo_root()`` at a lab's own management repo
-    (canonically ``~/repos/murmurent_lab_mgmt_<lab>``). Honours ``MURMURENT_HOME``.
-    An explicit ``$MURMURENT_LAB_MGMT_REPO`` still overrides it."""
-    p = _lab_mgmt_pointer_path()
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(str(Path(path).expanduser()) + "\n", encoding="utf-8")
 
 
 @contextmanager

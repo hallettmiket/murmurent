@@ -65,22 +65,32 @@ Once `gh auth status` shows you logged in, two things get you fully set up:
    how to adopt an existing Obsidian vault instead of starting fresh):
    [`vault-setup.md`](vault-setup.md).
 2. **Your lab's governance repo.** Your PI (say, `@the_pi`) grants you
-   read access to `murmurent_lab_mgmt_<lab>` on GitHub. Accept the
-   invitation email, then clone it into your repositories folder (`~/repos`
-   unless you chose another; `murmurent config repos-root` shows it):
+   read access to `murmurent_lab_mgmt_<lab>` on GitHub. **Accept the
+   invitation** (GitHub emails it, and it is also listed at
+   `https://github.com/<org>/murmurent_lab_mgmt_<lab>/invitations`); an
+   invitation nobody accepts expires after seven days. Then clone the repo
+   into your repositories folder (`~/repos` unless you chose another;
+   `murmurent config repos-root` shows it):
 
    ```bash
-   git clone git@github.com:example_org/murmurent_lab_mgmt_example_lab.git \
+   gh repo clone example_org/murmurent_lab_mgmt_example_lab \
      ~/repos/murmurent_lab_mgmt_example_lab
    ```
 
-   Murmurent auto-discovers this clone and pins it the next time you load
-   the dashboard, so no further configuration is needed. Details on what
-   this repo contains: [`lab_mgmt.md`](lab_mgmt.md).
+   `gh repo clone` works whichever protocol you chose at `gh auth login`;
+   a plain `git clone git@github.com:...` needs an SSH key as well. That
+   path is the one place murmurent looks, so no further configuration is
+   needed; the dashboard shows this same command until the clone is there.
+   Details on what this repo contains: [`lab_mgmt.md`](lab_mgmt.md).
+
+   **If the clone is refused**, run `murmurent doctor`. Its "lab records"
+   line asks GitHub as you and names the cause: no invitation yet (ask your
+   PI to run the reconcile below), an invitation waiting or expired, or `gh`
+   signed in as a different account from the one on the roster.
 
 In summary, `gh auth login` together with being added by your PI covers
-everything a member needs from GitHub; Murmurent handles cloning, pinning, and
-syncing thereafter.
+everything a member needs from GitHub; once the clone is at that path,
+murmurent keeps it in sync.
 
 ## For a PI
 
@@ -106,6 +116,14 @@ own `gh auth login`:
    ```bash
    murmurent group-reconcile example_lab --apply
    ```
+
+   A grant is an invitation the member still has to accept. The reconcile
+   reports each member as *has access*, *invited N days ago, not yet
+   accepted* (with the accept link), *invitation expired* (`--apply`
+   deletes and resends it) or *never invited*, and with `--apply` sends
+   members whose invitation is waiting a Slack reminder carrying the link
+   and the clone command. Run it without `--apply` any time to see where
+   everyone stands.
 
 For the full sequence, including Slack setup and issuing member IDs, see
 [`setup.md`](setup.md)'s "Setting up a lab (for PIs)" section and
