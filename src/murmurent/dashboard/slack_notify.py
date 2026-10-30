@@ -29,6 +29,7 @@ _SLACK_API_LIST   = "https://slack.com/api/conversations.list"
 _SLACK_API_INVITE = "https://slack.com/api/conversations.invite"
 _SLACK_API_MEMBERS = "https://slack.com/api/conversations.members"
 _SLACK_API_LOOKUP_BY_EMAIL = "https://slack.com/api/users.lookupByEmail"
+_SLACK_API_USER_INFO = "https://slack.com/api/users.info"
 _TOKEN_FILE = Path("~/.config/murmurent/slack-token").expanduser()
 
 # Fallback channel IDs, resolved per deployment. ``_CHAN_DEFAULT`` is the
@@ -117,7 +118,18 @@ def _token() -> str | None:
 
 
 def _project_channel_id(project_slug: str) -> str:
-    """Return the Slack channel ID stored in the project's CHARTER.md, or the default lab channel."""
+    """The project's Slack channel id: from its cert-project record, else from
+    a legacy ``CHARTER.md``. Empty when the project has none. It used to fall
+    back to the deployment's development channel, which is how one project's
+    notes ended up in another's channel (issue #243): a missing channel now
+    means no post, never a guess."""
+    try:
+        from ..core import cert_projects as _cp
+        rec = _cp.get(project_slug)
+        if rec is not None and rec.slack_channel_id:
+            return rec.slack_channel_id
+    except Exception:  # noqa: BLE001 — no registry on this machine
+        pass
     charter_path = _repo_paths.find_or_default(project_slug) / "CHARTER.md"
     if charter_path.is_file():
         try:
@@ -127,7 +139,7 @@ def _project_channel_id(project_slug: str) -> str:
                 return m.group(1)
         except OSError:
             pass
-    return _CHAN_CLAUDE_CODE
+    return ""
 
 
 def _write_charter_channel_id(
@@ -360,7 +372,7 @@ def create_project_channel(
         # (id, name) tuple back to CHARTER so the next recovery is O(1).
         log.info("Slack channel %s already exists; recovering ID", channel_name)
         existing = _project_channel_id(project_slug)
-        if existing and existing != _CHAN_CLAUDE_CODE:
+        if existing:
             _write_charter_channel_id(project_slug, existing, channel_name=channel_name)
             return existing
         looked_up = _lookup_channel_id_by_name(channel_name)
@@ -680,8 +692,12 @@ def sea_state_change(
     new_state: str,
     channel: str | None = None,
 ) -> None:
-    """Post a SEA lifecycle event to the project's Slack channel (or #claude-test as fallback)."""
+    """Post a SEA lifecycle event to the project's Slack channel. A project with
+    no channel gets no post (issue #243: never another project's channel)."""
     resolved_channel = channel if channel is not None else _project_channel_id(project)
+    if not resolved_channel:
+        log.info("SEA #%s in %s: no project channel, note not posted", sea_id, project)
+        return
     emoji = {
         "claim": ":hand:",
         "complete": ":white_check_mark:",
@@ -1030,6 +1046,68 @@ def _lookup_user_id_by_email(email: str, *, token: str | None = None) -> str | N
         return None
 
 
+def _user_guest_kind(user_id: str, *, token: str | None = None) -> str | None:
+    """``"single-channel guest"``, ``"multi-channel guest"`` or ``""`` for a full
+    member; ``None`` when Slack could not say (no token, no scope, network).
+    A single-channel guest is the case that matters: ``conversations.invite``
+    answers ``ok`` for one and adds nobody, so an invite can only be trusted
+    after checking who the member is."""
+    tok = token or _token()
+    if not tok or not user_id:
+        return None
+    try:
+        import httpx
+
+        r = httpx.get(
+            _SLACK_API_USER_INFO,
+            headers={"Authorization": f"Bearer {tok}"},
+            params={"user": user_id},
+            timeout=8,
+        )
+        data = r.json()
+        if not data.get("ok"):
+            return None
+        u = data.get("user") or {}
+        if u.get("is_ultra_restricted"):
+            return "single-channel guest"
+        if u.get("is_restricted"):
+            return "multi-channel guest"
+        return ""
+    except Exception as exc:  # noqa: BLE001
+        log.warning("Slack users.info error: %s", exc)
+        return None
+
+
+SINGLE_CHANNEL_GUEST_REASON = (
+    "single-channel guest: Slack accepts the invite and adds nobody; a workspace "
+    "admin must make them a multi-channel guest (or a member) first")
+
+
+def _confirm_arrivals(channel_id: str, user_ids: list[str], handle_for_uid: dict[str, str],
+                      *, token: str) -> tuple[list[str], list[dict]]:
+    """After an invite Slack called ``ok``, read the channel again and say who
+    is really in it. Returns ``(arrived_handles, missing)`` where each missing
+    entry is ``{"handle", "reason"}``. If the channel cannot be read, every
+    handle counts as arrived: an unverifiable success stays a success."""
+    now = _channel_member_ids(channel_id, token=token)
+    if not now:
+        return [handle_for_uid[u] for u in user_ids], []
+    arrived, missing = [], []
+    for uid in user_ids:
+        if uid in now:
+            arrived.append(handle_for_uid[uid])
+            continue
+        kind = _user_guest_kind(uid, token=token)
+        if kind == "single-channel guest":
+            reason = SINGLE_CHANNEL_GUEST_REASON
+        else:
+            reason = "Slack accepted the invite but they are not in the channel"
+            if kind:
+                reason += f" ({kind})"
+        missing.append({"handle": handle_for_uid[uid], "reason": reason})
+    return arrived, missing
+
+
 def sync_project_channel_members(
     project_slug: str,
     member_handles: list[str],
@@ -1058,8 +1136,8 @@ def sync_project_channel_members(
                 "error": "no slack token configured"}
 
     channel_id = _project_channel_id(project_slug)
-    if channel_id == _CHAN_CLAUDE_CODE:
-        # No channel ID in CHARTER → try to look it up by name (same recovery
+    if not channel_id:
+        # No channel ID on record → try to look it up by name (same recovery
         # path as create_project_channel's name_taken branch).
         channel_name = f"proj-{project_slug.lower().replace('_', '-')}"[:80]
         looked_up = _lookup_channel_id_by_name(channel_name)
@@ -1152,7 +1230,10 @@ def invite_members_to_channel(
             )
             data = r.json()
             if data.get("ok"):
-                invited.extend(handle_for_uid[u] for u in user_ids_to_invite)
+                arrived, missing = _confirm_arrivals(
+                    channel_id, user_ids_to_invite, handle_for_uid, token=tok)
+                invited.extend(arrived)
+                unresolved.extend(missing)
             else:
                 err = data.get("error", "")
                 # ``already_in_channel`` means some of the batch were

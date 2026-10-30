@@ -143,8 +143,12 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 | `murmurent project end <name> --reason <r>` *PI* | Terminal event |
 | `murmurent project archive <name>` *PI* | Archive repo + data |
 | `murmurent project gather <name> [--yes]` | Move a project's repositories on this computer into one project folder. Shows the plan and moves nothing without `--yes`; never overwrites; lists anything to fix by hand |
+| `murmurent project note "<text>" [--project <name>] [--dry-run]` | Post a short note (a release note after a push) to the channel this repository's notes belong in: its project's channel, else the lab's; never a shared channel. Prints where it went or why it was not posted. `--dry-run` shows the destination only |
+| `murmurent project channels` | Audit every project's Slack channel: id, name, archived or not, whether the bot is in it; lists repositories two projects both claim and projects with no channel. Read-only |
+| `murmurent project channel [--project <name>]` | Print the project's Slack channel id, or fail with the reason (no channel yet; repository claimed by two projects) |
 | `murmurent project provision-slack <name>` *PI* | Create the project's private Slack channel, named `proj-<name>`, and invite its certified members. Idempotent |
 | `murmurent project rename-slack <name> [--to <channel>]` *PI* | Rename the project's Slack channel to `proj-<name>`, or to the name given. For channels made before 2026.10.0 without the `proj-` prefix (#157) |
+| `murmurent project reconcile <name> [--apply]` *PI* | Compare the project's Slack channel and GitHub collaborators with its certified members. Reports drift; `--apply` invites the missing and removes the extras. Nobody is removed while any member's Slack account is unresolved |
 
 ### Project-wide push + managed mirrors
 

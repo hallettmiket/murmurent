@@ -121,10 +121,11 @@ def configure(channel: str = "") -> None:
     TOKEN_FILE = Path.home() / ".config" / "murmurent" / "groups" / (SLACK_GROUP or "<lab>") / "slack-token"
     CHANNEL_ID = channel or str(block.get("channel") or "")
     if not CHANNEL_ID:
+        # The same resolver every murmurent note uses (issue #243): the
+        # project's channel, else the lab's, never a shared channel.
         try:
-            from murmurent.core import cert_projects
-            record = cert_projects.get(PROJECT)
-            CHANNEL_ID = str(getattr(record, "slack_channel_id", "") or "") if record else ""
+            from murmurent.core.slack_routing import resolve_route
+            CHANNEL_ID = resolve_route(repo, project=PROJECT or None, honour_marker=True).channel_id
         except Exception:  # noqa: BLE001 - a missing record is reported below, at post time
             CHANNEL_ID = ""
     CHANNEL_NAME = str(block.get("channel_name") or (f"the {PROJECT} channel" if CHANNEL_ID else ""))

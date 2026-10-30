@@ -653,18 +653,21 @@ def resolve_notify_target(folder: Path) -> NotifyTarget:
         target.reason = "this folder is not part of a murmurent project"
         return target
     block = marker.get("update_me") if isinstance(marker.get("update_me"), dict) else {}
-    target.channel = str(block.get("channel") or "")
     target.slack_group = str(block.get("lab") or marker.get("lab") or "").removeprefix("lab_")
+    # One resolver for every note about a repository (issue #243): the marker's
+    # own channel, else the project's, else the lab's, else nowhere.
     try:
-        from . import cert_projects as _cp
+        from .slack_routing import resolve_route
 
-        record = _cp.get(project)
+        route = resolve_route(folder, project=project or None, honour_marker=True)
     except Exception:  # noqa: BLE001
-        record = None
-    if record is not None:
-        target.channel = target.channel or str(record.slack_channel_id or "")
-        target.slack_group = target.slack_group or str(record.lab or "")
-    if not target.channel:
+        route = None
+    if route is not None:
+        target.channel = route.channel_id
+        target.slack_group = target.slack_group or route.lab
+        if not target.channel:
+            target.reason = route.reason
+    if not target.channel and not target.reason:
         target.reason = f"no Slack channel is recorded for the project '{project}'"
     return target
 

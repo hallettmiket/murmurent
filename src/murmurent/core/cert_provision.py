@@ -515,13 +515,39 @@ def _default_channel_ids_fetcher(channel_id: str, *, token: str | None = None) -
     return _sn._channel_member_ids(channel_id, token=token)
 
 
-def _default_uid_resolver(handles, email_map, *, token: str | None = None):
+def _default_uid_resolver(handles, email_map, *, token: str | None = None,
+                          slack_map: dict | None = None):
+    """handle -> Slack user id. The roster's ``slack`` field wins when it holds a
+    member id, because a member's Slack account is often registered under a
+    different email from the one on the roster (issue #243); only then the
+    email lookup."""
+    import re as _re
     from ..dashboard import slack_notify as _sn
+    smap = member_slack_map(handles) if slack_map is None else slack_map
     out = {}
     for h in handles:
+        explicit = str(smap.get(h) or "").strip().lstrip("@")
+        if _re.fullmatch(r"[UW][A-Z0-9]{6,}", explicit):
+            out[h] = explicit
+            continue
         email = email_map.get(h)
         out[h] = _sn._lookup_user_id_by_email(email, token=token) if email else None
     return out
+
+
+def _bot_user_id(token: str | None) -> str:
+    """The bot's own Slack user id (``auth.test``), so a reconcile never removes
+    the bot from the channel it posts to. Empty when unknown."""
+    if not token:
+        return ""
+    try:
+        import httpx
+        r = httpx.post("https://slack.com/api/auth.test",
+                       headers={"Authorization": f"Bearer {token}"}, timeout=8)
+        j = r.json()
+        return str(j.get("user_id") or "") if j.get("ok") else ""
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 def _default_kicker(channel_id: str, uid: str, *, token: str | None = None):
@@ -579,16 +605,40 @@ def reconcile_slack(project: str, *, env: dict | None = None, apply: bool = True
     desired_uids = {u for u in resolved.values() if u}
     unresolved = [h for h, u in resolved.items() if not u]
     actual = set(ids_fetcher(cp.slack_channel_id))
+    if bot_uid is None and _tok:
+        bot_uid = _bot_user_id(_tok) or None
 
     to_invite = [h for h, u in resolved.items() if u and u not in actual]
     keep = desired_uids | ({bot_uid} if bot_uid else set())
-    to_kick = sorted(actual - keep) if remove_extras else []
+    extras = sorted(actual - keep) if remove_extras else []
+    # Fail safe (issue #243): a certified member whose Slack account could not
+    # be found would be among the "extras", so nobody is removed while any
+    # member is unresolved. The drift is still reported.
+    kick_blocked = ""
+    if extras and unresolved:
+        kick_blocked = ("not removing anyone: " + ", ".join(unresolved)
+                        + " could not be matched to a Slack account (add their "
+                        "Slack member id to the roster's `slack:` field)")
+    to_kick = [] if kick_blocked else extras
 
     invited, kicked = [], []
+    invite_failed: list[dict] = []
+    invite_error = None
     if apply:
         if to_invite:
-            inviter(cp.slack_channel_id, to_invite, member_email_map=member_email_map(to_invite))
-            invited = to_invite
+            inv = inviter(cp.slack_channel_id, to_invite,
+                          member_email_map=member_email_map(to_invite))
+            if isinstance(inv, dict) and "invited" in inv:
+                # The inviter says who really arrived (issue #246): a
+                # single-channel guest is accepted by Slack and never added.
+                invited = list(inv.get("invited") or [])
+                invite_failed = list(inv.get("unresolved") or [])
+                invite_error = inv.get("error")
+                if invite_error and not invited and not invite_failed:
+                    invite_failed = [{"handle": h, "reason": invite_error}
+                                     for h in to_invite]
+            else:
+                invited = to_invite
         for uid in to_kick:
             ok, _d = kicker(cp.slack_channel_id, uid)
             if ok:
@@ -596,8 +646,10 @@ def reconcile_slack(project: str, *, env: dict | None = None, apply: bool = True
     return {"ok": True, "channel_id": cp.slack_channel_id,
             "invited": invited if apply else [], "to_invite": to_invite,
             "kicked": kicked if apply else [], "to_kick": to_kick,
+            "extras": extras, "kick_blocked": kick_blocked,
             "unresolved": unresolved,
-            "in_sync": not to_invite and not to_kick}
+            "invite_failed": invite_failed, "invite_error": invite_error,
+            "in_sync": not to_invite and not extras}
 
 
 def reconcile_github(project: str, *, env: dict | None = None, apply: bool = True,

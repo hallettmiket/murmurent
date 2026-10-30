@@ -56,11 +56,12 @@ Set up once:
   prompt: |
     Run `murmurent reconcile --slack-body` in the shell and capture the
     output. If exit code is 1 (actionable drift was found in dry-run
-    mode), post the slack-body block to #claude-test via
-    mcp__claude_ai_Slack__slack_send_message and STOP — do not
-    --apply automatically. If exit code is 0 and the report shows
-    info-only findings (unadopted clones), post a short summary and
-    stop. Never run --apply without my confirmation.
+    mode), post the slack-body block with
+    `murmurent project note "<the block>"` run from the murmurent
+    repository, and STOP — do not --apply automatically. If exit code
+    is 0 and the report shows info-only findings (unadopted clones),
+    post a short summary the same way and stop. Never run --apply
+    without my confirmation.
   schedule: daily at 09:00 America/Toronto
 ```
 

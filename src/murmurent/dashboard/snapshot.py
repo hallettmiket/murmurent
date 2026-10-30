@@ -1161,7 +1161,8 @@ def _projects(
         from ..core.lab import load_lab_config as _load_lab
         import re as _re
         import subprocess as _sp
-        slack_channel = f"proj_{p.name}"
+        from ..core.cert_provision import slack_channel_name as _chan_name
+        slack_channel = _chan_name(p.name)   # the name provision-slack uses (proj-<name>)
         _lab_cfg = _load_lab()
         ws = _lab_cfg.slack_workspace
         slack_url = (

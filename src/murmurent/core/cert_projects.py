@@ -694,13 +694,21 @@ def owning_project(repo_name: str, *, projects: list[CertProject] | None = None,
     list it, an active project wins over an archived one. Names are compared
     without regard to case, as GitHub compares them.
     """
+    matches = owning_projects(repo_name, projects=projects, env=env)
+    return next((p for p in matches if p.status == "active"), matches[0] if matches else None)
+
+
+def owning_projects(repo_name: str, *, projects: list[CertProject] | None = None,
+                    env: dict | None = None) -> list[CertProject]:
+    """EVERY project whose record lists repository ``repo_name``, in registry
+    order. One is the rule; two or more active ones is a records problem that
+    :mod:`slack_routing` refuses to guess across (issue #243)."""
     want = str(repo_name or "").strip().casefold()
     if not want:
-        return None
+        return []
     pool = projects if projects is not None else iter_projects(env)
-    matches = [p for p in pool
-               if any((r.name or "").strip().casefold() == want for r in p.repos)]
-    return next((p for p in matches if p.status == "active"), matches[0] if matches else None)
+    return [p for p in pool
+            if any((r.name or "").strip().casefold() == want for r in p.repos)]
 
 
 def is_placeholder_for(cp: CertProject, repo_name: str) -> bool:
@@ -1046,6 +1054,6 @@ __all__ = ["CertProject", "RepoRef", "VALID_REPO_ROLES", "CertProjectError",
            "REGISTRY_DIR", "registry_dir", "project_path", "get", "iter_projects",
            "projects_for_member", "upsert", "remove_member", "add_repo", "remove_repo",
            "add_mirror", "remove_mirror", "list_mirrors",
-           "set_status", "owning_project", "is_placeholder_for",
+           "set_status", "owning_project", "owning_projects", "is_placeholder_for",
            "register_from_summary", "backfill_from_charter", "migrate_charters",
            "slack_channel_for", "project_name_for_cwd"]

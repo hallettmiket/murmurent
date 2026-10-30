@@ -71,9 +71,12 @@ Auto-loaded into every CC session via `~/.claude/rules/`:
   entry needs `title`, `date`, `project`, `sensitivity`, `tags`, `sources`.
 - [`rules/headline_first.md`](rules/headline_first.md) — every agent's
   final reply leads with a ≤200-char verdict.
-- [`rules/slack.md`](rules/slack.md) — Slack-posting protocol (after
-  every `git push`, post to the group's own channel). Which channel,
-  workspace and bot is a deployment fact and lives in `rules/local/`.
+- [`rules/slack.md`](rules/slack.md) — Slack-posting protocol: after
+  every `git push`, `murmurent project note "<text>"` posts to the channel the
+  repository's notes belong in (its project's, else the lab's, else nowhere);
+  a session never picks a channel itself. Which workspace and bot is a
+  deployment fact and lives in `rules/local/`. How every kind of message is
+  routed: [`docs/slack_routing.md`](docs/slack_routing.md).
 - [`rules/voice.md`](rules/voice.md) — read the voice guidelines at the start
   of every session, before writing anything a person will read. Points at
   [`output_styles/plain_english.md`](output_styles/plain_english.md) for the
@@ -202,6 +205,11 @@ replies once and cannot hold a back-and-forth.
 - [`docs/slack_setup.md`](docs/slack_setup.md) — mayor's one-time Slack setup:
   workspace + bot token + scopes, `centre-slack-smoke` / `centre-slack-setup`,
   and how lab/core/mayor channels + broadcasts get created.
+- [`docs/slack_routing.md`](docs/slack_routing.md) — where every Slack message
+  goes and what decides it: repository notes (`murmurent project note`), project
+  events, lab events, centre notices, broadcasts; creating, naming, archiving and
+  auditing project channels (`murmurent project channels`); membership
+  reconciliation and its safeguards.
 
 ## Related repos + the public hub
 

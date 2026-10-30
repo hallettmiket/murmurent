@@ -17,6 +17,37 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.10.8] - 2026-10-30
+
+**To upgrade:** `uv tool upgrade murmurent`, then `murmurent install --hooks`,
+then restart Claude Code and the dashboard (**⏻ Stop dashboard**, then start
+it again). From a copy of the repository: `git checkout main && git pull`
+first, then the same two steps.
+
+### Added
+- **One resolver for where a repository's Slack notes go** (#243). Every
+  release note, job notice and status update now follows the same route: a
+  `slack_channel:` override in the repository's `.murmurent.yaml`, else the
+  one active project whose record lists the repository, else the lab's
+  channel, else nowhere. A note with no destination is not sent, and the
+  sender says why. `murmurent project note "<text>"` posts through it;
+  `murmurent project channels` audits every project's channel, bot
+  membership and repositories claimed by two projects. See
+  `docs/slack_routing.md`.
+- **`murmurent project reconcile <name>`** compares a project channel's
+  members with its certified members and reports the drift; `--apply`
+  invites the missing and removes the extras. Members are matched by the
+  roster's `slack:` id first, nobody is removed while a member is
+  unresolved, and the bot is never removed.
+
+### Fixed
+- **A Slack invite counts only when the member arrives** (#246). Slack
+  answers `ok` for a single-channel guest and adds nobody, so the reconcile
+  and `provision-slack` now re-read the channel and name each member who
+  did not arrive, with the reason.
+- The push skill and the push command no longer resolve the channel each
+  their own way, which had sent a dozen projects' notes to one channel.
+
 ## [2026.10.7] - 2026-10-29
 
 **To upgrade:** as for 2026.10.6 below; this release only repairs the

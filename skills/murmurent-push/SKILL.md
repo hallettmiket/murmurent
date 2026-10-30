@@ -63,27 +63,33 @@ Once the pre-flight passes, follow the standard commit-push flow with these murm
 
 ## After the push: Slack release note
 
-Post the release note to **the project's own Slack channel** — this repo is a
-project-attached repo, so its activity belongs in the project's channel, not the
-centre-wide dev channel. Resolve the channel id first:
+Post the release note with the one command that knows where a repository's
+notes belong (`rules/slack.md`, `docs/slack_routing.md`):
 
 ```bash
-murmurent project channel        # prints the cert-project's Slack channel id
+murmurent project note "**<repo-name>** · `<branch>` · `<short-hash>` — _<commit-title>_. <one or two sentences on what changed and why>"
 ```
 
-- If it prints a channel id → post there with `mcp__claude_ai_Slack__slack_send_message` (`channel_id` = that id).
-- If it exits with **"no Slack channel yet"** → the project isn't provisioned.
-  Tell the user to run `murmurent project provision-slack <project>` (PI only), and
-  **skip the Slack post** (don't fall back to #claude-test — a project's notes go
-  to its own channel only). The push still succeeded.
-- If it exits with **"not inside a project repo"** → this isn't a project after
-  all; post no Slack note (a ready-but-unattached repo has no project channel — that's normal).
+It resolves the channel itself: the project whose record lists this repository,
+else the lab's channel, never a shared or development channel. It posts with
+the bot that belongs in that channel and prints one line saying where the note
+went, or why it was not posted. Repeat that line in your summary. The usual
+outcomes:
 
-Message body:
-- **First line**: `**<repo-name>** · `<branch>` · `<short-hash>` — _<commit-title>_`
-- **Second paragraph**: one or two sentences summarising what changed and why (not what files — readers can `git log -p` for that).
+- `posted to C…: the channel of project 'x'` → done.
+- `not posted: project 'x' has no Slack channel yet` → the push still
+  succeeded; tell the user the PI runs `murmurent project provision-slack x`.
+  **Do not post anywhere else.**
+- `not posted: repository 'y' is listed by 2 projects (…)` → the records
+  disagree; tell the user which two. Nothing is posted until one record drops
+  the repository or the marker names a `slack_channel`.
+- `not posted: this folder is not inside a murmurent repository` → a
+  ready-but-unattached repo; no note is normal.
 
-Use `mcp__claude_ai_Slack__slack_send_message`, NOT `mcp__slack__slack_post_message` — the latter's bot identity isn't in the channel and will silently fail with `not_in_channel`. (The bot is added to each project channel at provision time; `provision-slack`/`reconcile` keep its membership current.)
+Do not use `mcp__claude_ai_Slack__slack_send_message` or
+`mcp__slack__slack_post_message` for this: they post as bots that are not in
+the project channels, and they let the session pick the channel, which is how
+one project's notes ended up in another's (#243).
 
 ## What to refuse and why
 
@@ -123,7 +129,7 @@ Pre-flight ✓
 Staging 3 files: src/init.py, exp/00_qc/run_all.py, README.md
 Commit: "init: switch QC normalisation to scran"
 Pushed origin/main -> 4f3b21a
-Slack: posted to the project channel (#dcis_sc_tutorial)
+Slack: posted to C0CAFB0HTFE: the channel of project 'dcis_project'
 ```
 
 **Refusal:**

@@ -1078,26 +1078,36 @@ def project_invite_guests(name: str) -> None:
 
 
 @project_group.command("reconcile",
-                       help="(PI) Sync a cert-project's Slack channel + GitHub "
-                            "repo membership back to its certified members. "
-                            "--check reports drift without changing anything.")
+                       help="(PI) Compare a cert-project's Slack channel + GitHub "
+                            "repo membership with its certified members and report "
+                            "the drift; --apply invites the missing and removes the "
+                            "extras. Nobody is removed while a member's Slack "
+                            "account is unresolved.")
 @click.argument("name")
-@click.option("--check", is_flag=True, help="Report drift only; make no changes.")
-def project_reconcile(name: str, check: bool) -> None:
+@click.option("--apply", "apply_changes", is_flag=True,
+              help="Make the changes. Without it the drift is only reported.")
+@click.option("--check", is_flag=True, hidden=True, help="(the default) report only.")
+def project_reconcile(name: str, apply_changes: bool, check: bool) -> None:
     from .core import cert_provision as _cprov
-    apply = not check
+    apply = bool(apply_changes) and not check
     try:
         s = _cprov.reconcile_slack(name, apply=apply)
         g = _cprov.reconcile_github(name, apply=apply)
     except _cprov.CertProvisionError as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo(f"project {name} — {'check (no changes)' if check else 'reconcile'}")
+    click.echo(f"project {name} — {'reconcile' if apply else 'check (no changes; add --apply to make them)'}")
     if s.get("error") == "not_provisioned":
         click.echo("  slack:  (no channel provisioned)")
     else:
         click.echo(f"  slack:  {'in sync' if s['in_sync'] else 'drift'}"
-                   f" — +{len(s['to_invite'])} invite, -{len(s['to_kick'])} kick"
+                   f" — +{len(s['to_invite'])} invite, -{len(s.get('extras', s['to_kick']))} remove"
                    + (f", {len(s['unresolved'])} unresolved" if s['unresolved'] else ""))
+        if s.get("kick_blocked"):
+            click.echo(f"          {s['kick_blocked']}")
+        if apply and s.get("invited"):
+            click.echo(f"          invited: {', '.join(s['invited'])}")
+        for f in s.get("invite_failed") or []:
+            click.echo(f"          ! {f.get('handle')}: {f.get('reason')}")
     if g.get("error") == "not_provisioned":
         click.echo("  github: (no repo provisioned)")
     else:
@@ -1154,10 +1164,15 @@ def project_push(project: str, message: str | None, detail: bool) -> None:
               "the project repo you're in).")
 def project_channel(project: str) -> None:
     from .core import cert_projects as _cp
+    from .core import slack_routing as _sr
+    if not project:
+        route = _sr.resolve_route()
+        if route.candidates:
+            raise click.ClickException(route.reason)
     name = project or _cp.project_name_for_cwd()
     if not name:
         raise click.ClickException(
-            "not inside a project repo (no CHARTER.md found); pass --project")
+            "not inside a project repo (no .murmurent.yaml found); pass --project")
     if _cp.get(name) is None:
         raise click.ClickException(
             f"no cert-project registered for {name!r} — run `murmurent project "
@@ -1168,6 +1183,82 @@ def project_channel(project: str) -> None:
             f"project {name!r} has no Slack channel yet — run `murmurent project "
             f"provision-slack {name}`")
     click.echo(channel)
+
+
+@project_group.command("note",
+                       help="Post a short note (a release note after a push, say) "
+                            "to the Slack channel this repository's notes belong "
+                            "in: the project's channel, else the lab's. Prints "
+                            "where it went, or why it was not posted. Never "
+                            "guesses a channel.")
+@click.argument("text")
+@click.option("--project", "project", default="",
+              help="Project name (default: the project this repository belongs to).")
+@click.option("--dry-run", is_flag=True, help="Show the destination; post nothing.")
+def project_note(text: str, project: str, dry_run: bool) -> None:
+    from .core import slack_routing as _sr
+    if dry_run:
+        route = _sr.resolve_route(project=project or None)
+        click.echo(route.describe())
+        raise SystemExit(0 if route.ok else 1)
+    ok, route, detail = _sr.post_note(text, project=project or None)
+    click.echo(detail)
+    raise SystemExit(0 if ok else 1)
+
+
+@project_group.command("channels",
+                       help="Audit every project's Slack channel: id, name, whether "
+                            "it is archived, whether the bot is in it, and the "
+                            "repositories that two projects both claim. Read-only.")
+def project_channels() -> None:
+    from .core import cert_projects as _cp
+    from .core import cert_provision as _cprov
+    from .core import slack_routing as _sr
+    rows = []
+    claims: dict[str, list[str]] = {}
+    for p in _cp.iter_projects():
+        for r in p.repos:
+            # only ACTIVE projects compete for a repository; an archived record
+            # that still lists it is ignored by the routing (see owning_project)
+            if p.status == "active":
+                claims.setdefault((r.name or "").casefold(), []).append(p.name)
+        info = ""
+        if p.slack_channel_id:
+            try:
+                _ws, tok = _cprov.resolve_project_slack(p.name)
+                import httpx
+                j = httpx.get("https://slack.com/api/conversations.info",
+                              headers={"Authorization": f"Bearer {tok}"},
+                              params={"channel": p.slack_channel_id}, timeout=8).json()
+                if j.get("ok"):
+                    c = j["channel"]
+                    info = "#" + str(c.get("name", "?"))
+                    if c.get("is_archived"):
+                        info += "  ARCHIVED"
+                    if not c.get("is_member"):
+                        info += "  bot not a member"
+                else:
+                    info = f"({j.get('error')})"
+            except Exception as exc:  # noqa: BLE001
+                info = f"(lookup failed: {exc})"
+        rows.append((p.name, p.status, p.slack_channel_id or "(none)", info))
+    width = max(len(r[0]) for r in rows) if rows else 10
+    for name, status, cid, info in rows:
+        click.echo(f"{name:{width}s}  {status:8s}  {cid:12s}  {info}")
+    dup = {k: v for k, v in claims.items() if len(v) > 1}
+    if dup:
+        click.echo("")
+        click.echo("Repositories claimed by more than one active project (notes from them cannot be routed):")
+        for repo, names in sorted(dup.items()):
+            click.echo(f"  {repo}: {', '.join(names)}")
+    missing = [n for n, s, cid, _i in rows if cid == "(none)" and s == "active"]
+    if missing:
+        click.echo("")
+        click.echo("Active projects with no channel: " + ", ".join(missing)
+                   + "  (PI: murmurent project provision-slack <name>)")
+    here = _sr.resolve_route()
+    click.echo("")
+    click.echo(f"A note from this folder would go to: {here.describe()}")
 
 
 @project_group.group("mirror",

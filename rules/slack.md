@@ -2,28 +2,47 @@
 
 ## After every `git push`
 
-Post a notification to **the group's own Slack channel**, with: repo name,
-branch, commit hash, commit message, and a one-line summary of what changed.
+Post a short note about the push: repository name, branch, commit hash, commit
+message, and a one-line summary of what changed. **One command decides where
+it goes and posts it:**
 
-Always use the **group's own Slack bot token** — never the
-`mcp__claude_ai_Slack__*` integration (a separate, often-disconnected bot).
-Resolve the token exactly as murmurent does:
+```bash
+murmurent project note "<repo> · <branch> · <hash>: <commit title>. <one line on what changed>"
+```
 
-- env `MURMURENT_GROUP_SLACK_TOKEN`, else
-- `~/.config/murmurent/groups/<group>/slack-token` (the PI's machine).
+Run it from inside the repository you pushed. It resolves the channel the way
+murmurent does everywhere (see `docs/slack_routing.md`):
 
-`core.group_reconcile.resolve_group_slack_token(<group>)` returns it. Post with
-that token via `dashboard.slack_notify._post(channel, text, token=<tok>)` — a
-short `python -c` or heredoc is enough.
+1. a `slack_channel` set in the repository's `.murmurent.yaml`, if any;
+2. else the channel of the **project** whose record lists this repository;
+3. else the **lab's** channel from the registry;
+4. else nothing: it prints why, and the note is not posted anywhere.
 
-**Prerequisite:** the group's bot must be a *member* of the channel. If the bot
-has the `channels:join` scope (see
-[`docs/group_slack_setup.md`](../docs/group_slack_setup.md)), murmurent can
-`conversations.join` before posting. If a post returns `not_in_channel` and the
-auto-join fails with `missing_scope`, either add `channels:join` and reinstall
-the app, or invite the bot once in Slack, then re-post.
+It uses the right bot for that channel (the project's workspace, else the
+lab's). Read what it prints and report it, for example
+"Slack: posted to the channel of project 'param_complexity'" or
+"Slack: not posted: project 'bioinfo' has no Slack channel yet".
 
-**Which channel, which workspace, and which bot are deployment facts, not
-murmurent facts.** A centre records its own in `rules/local/`, which is not
-part of the public release. Never hardcode a channel ID, workspace slug or bot
-user into a shared rule: the next centre to install murmurent inherits it.
+Check first with `murmurent project note --dry-run ""` if you want to see the
+destination without posting.
+
+## What never to do
+
+- **Never pick a channel yourself.** Do not post to a channel id from memory,
+  from another rule, from a search of the workspace, or from a previous
+  session. A note that cannot be routed is not posted; say so instead.
+- **Never fall back to a shared or development channel** because the project
+  has none. Tell the user: the PI runs
+  `murmurent project provision-slack <project>`.
+- **Never use the `mcp__claude_ai_Slack__*` or `mcp__slack__*` tools** for these
+  notes. They post as other bots that are not members of the project channels,
+  and they let a session choose the channel, which is the mistake this rule
+  exists to prevent.
+- If the command says the repository is **listed by two projects**, post
+  nothing and tell the user which two; the records need fixing
+  (`murmurent project channels` shows every such case).
+
+**Which workspace and which bot are deployment facts, not murmurent facts.** A
+centre records its own in `rules/local/`, which is not part of the public
+release. Never hardcode a channel ID, workspace slug or bot user into a shared
+rule: the next centre to install murmurent inherits it.
