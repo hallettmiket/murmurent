@@ -15,9 +15,11 @@ Output: plain values (paths, dates, the activity word) and, from
         :func:`ensure_repo_project`, a new project record when a repository
         belongs to no project.
 
-Every repository belongs to exactly one project, its owning project. Other
-projects may name it, or any data folder, under ``reads_from``: they read it
-but do not own it, so nothing there is ever offered to them for clean-up.
+Every repository belongs to at least one project. It may be listed by several
+(#253); its data then lives with its home project, the first that listed it,
+and the others read that project's folders under ``reads_from``. Projects may
+also name any data folder or repository under ``reads_from``: they read it but
+do not own it, so nothing there is ever offered to them for clean-up.
 
 **Activity is worked out, never typed.** A project's ``status`` stays
 ``active`` or ``archived``, because much of murmurent reads any other status as
@@ -97,6 +99,30 @@ def murmurent_home() -> Path:
     return Path(os.environ.get("MURMURENT_HOME") or Path.home() / ".murmurent")
 
 
+SPACE_DIR_ENV = "MURMURENT_SPACE_DIR"
+
+
+def space_dir() -> Path:
+    """The folder the space scan writes to and the space commands read from.
+
+    ``$MURMURENT_SPACE_DIR`` first; then ``space_dir`` in the lab's policy file,
+    which is how the table reaches the PI when the weekly scan runs under a lab
+    service account (``docs/service_account.md``); else this account's own
+    ``<murmurent home>/space``.
+    """
+    explicit = os.environ.get(SPACE_DIR_ENV)
+    if explicit:
+        return Path(explicit).expanduser()
+    try:
+        from .millwright_policy import load_policy
+        configured = load_policy().space_dir
+    except Exception:  # noqa: BLE001 - no policy means the account's own folder
+        configured = ""
+    if configured:
+        return Path(configured).expanduser()
+    return murmurent_home() / SPACE_SUBDIR
+
+
 def runs_dir() -> Path:
     """The folder of job records written by ``murmurent run``."""
     return murmurent_home() / RUNS_SUBDIR
@@ -104,7 +130,7 @@ def runs_dir() -> Path:
 
 def data_dates_path() -> Path:
     """The data scan's record of when each data folder last changed."""
-    return murmurent_home() / SPACE_SUBDIR / DATA_DATES_FILENAME
+    return space_dir() / DATA_DATES_FILENAME
 
 
 # ---------------------------------------------------------------------------
@@ -539,7 +565,7 @@ def project_for_repo(repo_path: Path, *, project_names: set[str],
     """
     from .repo import repos_root
     repo_path = Path(repo_path)
-    name = repo_path.name
+    name = _repo.repo_name(repo_path)
     # Compare with links followed, since the repositories folder is often a
     # link to a larger drive and adopt hands over a resolved path.
     root = _resolved(Path(os.path.normpath((root or repos_root()).expanduser())))
@@ -639,7 +665,7 @@ def ensure_repo_project(repo_path: Path, *, lab: str = "", lead: str = "",
     another machine.
     """
     repo_path = Path(repo_path)
-    name = repo_path.name
+    name = _repo.repo_name(repo_path)
     # Writing a record into a lab records folder that is not there would create
     # it, and other commands would then treat that invented folder as the lab's
     # records (#227). Only pi-init, or cloning the real one, makes it.
@@ -688,7 +714,7 @@ __all__ = [
     "DEFAULT_QUIET_AFTER_MONTHS", "DEFAULT_DORMANT_AFTER_MONTHS",
     "RUNS_SUBDIR", "SPACE_SUBDIR", "DATA_DATES_FILENAME",
     "DATA_DATES_SCHEMA", "SIBLING_ROLES",
-    "murmurent_home", "runs_dir", "data_dates_path",
+    "murmurent_home", "space_dir", "SPACE_DIR_ENV", "runs_dir", "data_dates_path",
     "default_data_folders", "effective_data_folders", "ReadsFrom",
     "resolve_reads_from", "parse_iso_date", "retention_blocks_deletion",
     "UsageEvidence", "newest_commit", "repo_commit_evidence", "job_card_evidence",

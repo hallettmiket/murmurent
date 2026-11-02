@@ -6,13 +6,14 @@ a dozen projects were found in one channel: an always-loaded rule named a
 single channel for every push, while the push skill and the push command each
 resolved the project channel their own way. There is now one resolver,
 `core/slack_routing.py`, and one command, `murmurent project note`, and the
-rule tells sessions to use it.
+rule tells sessions to use it. `murmurent project push` posts its backup note
+through the same resolver, by project name.
 
 ## The five destinations
 
 | Message | Goes to | Decided by |
 |---|---|---|
-| A note about a **repository** (a release note after a push, a job notice, a status update) | the project's channel, else the lab's channel, else nowhere | `slack_routing.resolve_route`: the repository's marker override, then the one project whose record lists the repository, then the lab in the registry |
+| A note about a **repository** (a release note after a push, a job notice, a status update) | the channel of every project that lists the repository, else the lab's channel, else nowhere | `slack_routing.resolve_route`: the repository's marker override, then each active project whose record lists the repository, then the lab in the registry |
 | A **project event** (a SEA changing state, a project request, a member added to a project) | the project's channel; nowhere if the project has none | the project record's `slack_channel_id` |
 | A **lab event** (server etiquette lines, a member leaving the group) | the lab's channel | the registry entry's `slack_channel_id` |
 | A **centre notice** (a join request, a decision, a core booking) | the private mayor channel, else the deployment's configured default | `centre_init` profile `mayor_channel_id`, else `MURMURENT_SLACK_DEFAULT_CHANNEL` / `~/.config/murmurent/slack-default-channel` |
@@ -31,16 +32,28 @@ project's channel or to a development channel; the sender reports why.
    whose traffic should stay out of the project's channel, for example a
    development repository of a project whose channel the whole lab reads.
    It must be a channel id (`C…`), not a name.
-2. **The project whose record lists the repository.** A repository listed by two
-   active projects is ambiguous and gets no channel; `murmurent project
-   channels` lists every such case. Fix the records rather than guessing:
-   remove the repository from one project's record in the lab records
-   repository (`cert_projects/<name>.md`, its `repos:` list).
+2. **Every active project whose record lists the repository.** A repository
+   may be in several projects (#253); the note is then posted once to each
+   project's channel, and the command reports each post. A listing project with
+   no channel yet is skipped, with its reason, and `murmurent project channels`
+   lists every repository in more than one project. If a project should not
+   list the repository, `murmurent project release-repo <project> <repo>` takes
+   it off that record (the clone on disk is untouched).
+   The repository's name is its main copy's folder: a note sent from a git
+   worktree (a second working copy, such as the ones the Desktop app makes
+   under `.claude/worktrees/`) is routed the same way as one sent from the
+   main copy (#250).
 3. **The project's channel**, `slack_channel_id` on its record, created by
    `murmurent project provision-slack <name>` (named `proj-<name>`).
 4. **The lab's channel**, from the registry, when the repository is
    murmurent-ready but belongs to no project with a channel.
 5. **Nowhere.** The command prints the reason and exits 1.
+
+A channel can be found and the note still not sent: the bot token for that
+workspace is kept per machine (`~/.config/murmurent/groups/<lab>/slack-token`).
+From a machine that has none, `murmurent project note` prints "no Slack bot
+token on this machine" with the fix, `murmurent group-slack-setup <lab>`, run
+once there.
 
 The bot is the one for that channel's workspace: the project's workspace for a
 project channel (`cert_provision.resolve_project_slack`), else the lab's bot

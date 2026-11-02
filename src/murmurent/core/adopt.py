@@ -89,6 +89,7 @@ def adopt_clone(
     agents: list[str] | None = None,
     host: str = "local",
     record_project: bool = True,
+    commit: bool = True,
 ) -> AdoptOutcome:
     """Make an existing git clone murmurent-ready.
 
@@ -142,7 +143,7 @@ def adopt_clone(
     if not lab:
         lab = _default_lab()
     try:
-        probes = _rr.make_ready(clone, lab=lab, agents=agents)
+        probes = _rr.make_ready(clone, lab=lab, agents=agents, commit=commit)
     except Exception as exc:  # noqa: BLE001
         raise AdoptError(f"bootstrap failed: {exc}", code="internal") from exc
     _raise_if_required_failed(probes)
@@ -340,7 +341,8 @@ def adoption_status(clone_path: str, *, host: str = "local") -> AdoptionStatus:
             has_marker=r.marker is not None,
             legacy_charter=r.legacy_charter,
             has_claude_agents=r.has_agents_dir,
-            bootstrap_version=str((r.marker or {}).get("bootstrap_version") or ""),
+            bootstrap_version=(_rr.bootstrap_version_of(p)
+                               or str((r.marker or {}).get("bootstrap_version") or "")),
         )
 
     try:

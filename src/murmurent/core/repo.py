@@ -54,6 +54,40 @@ class ProjectRepo:
     charter_path: Path
     members_path: Path | None
 
+    @property
+    def name(self) -> str:
+        """The repository's name: the main copy's folder, even from a worktree."""
+        return repo_name(self.path)
+
+
+def repo_name(path: str | Path) -> str:
+    """The repository's name: its main copy's folder, not the folder in hand.
+
+    A git worktree (a second working copy of a repository, which the Desktop
+    app makes for a session at ``<repo>/.claude/worktrees/<slug>``) carries its
+    own ``.murmurent.yaml`` and its own folder name. Project records, the data
+    root and Slack routing all key on the repository's name, so the slug would
+    match nothing (#250). A linked worktree's ``.git`` is a file that points
+    into the main copy's ``.git/worktrees/<slug>``; the name is the folder above
+    that ``.git``. Anything else, a plain clone or a submodule included, is
+    named after its own folder. Reads one small file; never calls git.
+    """
+    path = Path(path)
+    dot_git = path / ".git"
+    try:
+        if dot_git.is_file():
+            text = dot_git.read_text(encoding="utf-8", errors="replace").strip()
+            if text.startswith("gitdir:"):
+                gitdir = Path(text.split(":", 1)[1].strip())
+                if not gitdir.is_absolute():
+                    gitdir = path / gitdir
+                gitdir = Path(os.path.normpath(gitdir))
+                if gitdir.parent.name == "worktrees" and gitdir.parent.parent.name == ".git":
+                    return gitdir.parent.parent.parent.name or path.name
+    except OSError:
+        pass
+    return path.name
+
 
 def murmurent_repo_root(env: dict[str, str] | None = None) -> Path:
     """Resolve the murmurent repo root, honouring ``$MURMURENT_REPO_ROOT`` if set."""

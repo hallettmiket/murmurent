@@ -59,6 +59,17 @@ At a high level, it shows:
 - your lab's **members**, and
 - your **Oracle** and daily **lab-notebook** panels.
 
+**Which projects you see.** Exactly the ones you are on: every project that
+lists you as a member or lead, in any lab, plus any project you hold a project
+card for. A lab's PI also sees every project of their lab. A project hosted in
+another lab's records is marked "hosted by" that lab; its team, repositories
+and channel come from that lab's records when your machine holds them, else
+from what your project card carried on the day it was issued (the row says
+the date). Its Slack link points into the workspace that hosts the project's
+channel, not your own lab's, and is left out when that workspace is not known
+here. A lead whose project is hosted in another lab's records can still manage
+its members and repositories from here.
+
 **Which murmurent is running.** The top bar says which code the dashboard
 runs, for example `running murmurent_dev · main @ 787faca` for the
 development copy, or `running release v2026.10.0` for an installed release.

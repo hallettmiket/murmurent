@@ -4,11 +4,11 @@ description: Murmurent-aware stage/commit/push for a murmurent-enabled repo. Exc
 user_invocable: true
 ---
 
-Stage changed files, create a descriptive commit, push to the remote tracking branch, and post a Slack release note — but with **murmurent-specific safety rules** that go beyond plain git. This skill is for **murmurent-ready** repos — a `.murmurent.yaml` readiness marker (or a legacy `CHARTER.md` bootstrap) at the root. For a non-murmurent repo, use `/commit-push` instead.
+Stage changed files, create a descriptive commit, push to the remote tracking branch, and post a Slack release note, with **murmurent-specific safety rules** that go beyond plain git. This skill is for **murmurent-ready** repos, those with a `.murmurent.yaml` readiness marker at the root. For a non-murmurent repo, use `/commit-push` instead.
 
 ## Pre-flight (do this BEFORE staging)
 
-1. **Confirm the repo is murmurent-ready.** The working tree must contain `.murmurent.yaml` (the readiness marker) or a legacy `CHARTER.md` at its root. If neither, stop and tell the user "this repo isn't murmurent-ready — use /commit-push instead." (A legacy `CHARTER.md` also means: suggest `murmurent repo upgrade` after the push.)
+1. **Confirm the repo is murmurent-ready.** The working tree must contain `.murmurent.yaml` (the readiness marker) at its root. If not, stop and tell the user "this repo isn't murmurent-ready: use /commit-push instead, or `murmurent repo adopt <folder>` first." A `CHARTER.md` on its own is a project document from an older setup, not the marker: suggest `murmurent repo upgrade`, which stamps the marker and keeps the CHARTER.
 
 2. **Refuse if the diff touches `/data/lab_vm/immutable/` or `/data/lab_vm/append_only/` (or the legacy `raw/`/`refined/`, which stay recognized during the transition).** Those paths are governed per murmurent's data-storage rule (`rules/data-storage.md`): `immutable/` is read-only source data and `append_only/` is append-only outputs. The hook layer would block it anyway, but check `git status` for any path matching `^data/lab_vm/(immutable|append_only|raw|refined)/` and refuse the commit with a clear explanation. (Note: project repos in the machine's repositories folder (`murmurent config repos-root` prints it) should never contain such paths; this guard catches misconfigured `.gitignore` or symlinks.)
 
@@ -41,7 +41,7 @@ Stage changed files, create a descriptive commit, push to the remote tracking br
 
 6b. **Never stage a link under `.claude/agents/` that points outside the repo.** `murmurent repo adopt` links the shared agents into the repo by absolute path into *this member's* home folder, so a committed link breaks those agents for everyone else (issue #150). Check each changed path under `.claude/agents/`: if `test -L <path>` is true and `readlink <path>` is absolute or leads outside the repo, leave it unstaged. `adopt` lists these links in a managed `.gitignore` block; if one is missing, run `murmurent repo upgrade <repo>` to rewrite the block and commit the `.gitignore` change. Ordinary files in `.claude/agents/` are the group's own agents and ARE committed as usual. If `murmurent repo status` reports committed links, tell the user and show its fix line; do not untrack them yourself without asking, because untracking deletes the links from every other member's copy on their next pull.
 
-7. **Validate `.murmurent.yaml` / `CHARTER.md` if modified.** The marker must parse as YAML with `murmurent:` (schema int) and `lab:`; a legacy CHARTER needs `project`, `lead`, `members`, `sensitivity`. If broken, refuse the commit with the specific error.
+7. **Validate `.murmurent.yaml` if modified.** The marker must parse as YAML with `murmurent:` (schema int) and `lab:`. If broken, refuse the commit with the specific error.
 
 8. **Validate `MEMBERS` file if it was modified.** Should be one `@handle` per line. Refuse if a line doesn't match `^@[A-Za-z0-9_-]+$`.
 
@@ -95,14 +95,14 @@ one project's notes ended up in another's (#243).
 
 | Situation | Action | Reason |
 |---|---|---|
-| Repo lacks a readiness marker (`.murmurent.yaml` / legacy `CHARTER.md`) | Refuse; suggest `/commit-push` | Not murmurent-ready |
+| Repo lacks the readiness marker (`.murmurent.yaml`) | Refuse; suggest `/commit-push`, or `murmurent repo adopt` first | Not murmurent-ready |
 | Diff touches `data/lab_vm/immutable\|append_only/` (or legacy `raw\|refined/`) | Refuse | rules/data-storage.md (governed data) |
 | Secret-shaped filename in diff | Stop and ask | Prevent credential leak |
 | `murmurent security secrets-scan --staged` exits non-zero (block hit) | Refuse; show redacted findings | Hardcoded credential in file *content* would reach GitHub |
 | File > 1 MB in `data/`/`src/`/`exp/`/`obsolete/` | Refuse; suggest append_only/ | rules/project-structure.md |
 | `.claude/settings.json` staged | Drop from stage; ensure in `.gitignore` | Machine-absolute paths leak across collaborators |
 | A `.claude/agents/` link pointing outside the repo | Drop from stage; `murmurent repo upgrade` relists it in `.gitignore` | It points into one member's home folder and breaks the agent for everyone else (#150) |
-| Marker/CHARTER invalid YAML / missing fields | Refuse | corrupt readiness metadata |
+| Marker invalid YAML / missing fields | Refuse | corrupt readiness metadata |
 | User asks for `--force`/`--no-verify`/`--amend` | Ask for explicit confirmation | Defaults from CLAUDE.md |
 
 ## What this skill explicitly does NOT do

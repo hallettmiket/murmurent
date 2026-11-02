@@ -490,6 +490,13 @@ def reconcile(*, apply: bool = False) -> ReconcileReport:
             report.errors.append(f"lab_mgmt pull: {sync.detail}")
     except Exception as exc:  # noqa: BLE001
         report.errors.append(f"lab_mgmt pull: {exc}")
+    # A clone that carries a committed marker is registered on this machine
+    # the first time reconcile sees it (#257). Best-effort, path record only.
+    try:
+        from . import repo_ready as _rr
+        _rr.register_ready_clones()
+    except Exception as exc:  # noqa: BLE001
+        report.errors.append(f"register ready clones: {exc}")
     for detector in (
         detect_orphan_installations,
         detect_orphan_registries,

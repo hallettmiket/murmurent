@@ -804,7 +804,11 @@ function RepoInventoryPanel({ span = "c-12" }) {
   const [report, setReport] = useState(null);
   const [busy, setBusy] = useState(true);
   const [err, setErr] = useState(null);
-  const [showAllGithub, setShowAllGithub] = useState(false);
+  // Repositories that are on GitHub but not cloned here are shown by default:
+  // on any one laptop that is the normal state of most of the lab's
+  // repositories, and "what does the lab have?" is answered from GitHub.
+  // The toggle hides them for a view of this computer only.
+  const [showAllGithub, setShowAllGithub] = useState(true);
   // murmurent-infra repos (murmurent, murmurent_*) are pinned to the top of the
   // list but hidden by default — they're infrastructure, not working repos the
   // user manages day-to-day. This toggle reveals them.
@@ -914,7 +918,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
   // Display order:
   //   1. murmurent-infra rows FIRST, but only when showInfra is on (hidden by
   //      default — they're infrastructure, not day-to-day working repos).
-  //   2. then working repos: cloned rows, plus GitHub-only rows when toggled.
+  //   2. then working repos: cloned rows and, unless the toggle is off, rows not cloned here.
   const visibleRows = (() => {
     if (!report) return [];
     const rows = report.rows || [];
@@ -1005,7 +1009,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
           <label style={{fontSize:11, display:"inline-flex", alignItems:"center", gap:4}}>
             <input type="checkbox" checked={showAllGithub}
                    onChange={e => setShowAllGithub(e.target.checked)} />
-            include {stats ? stats.ghOnly : "?"} GitHub-only rows
+            include {stats ? stats.ghOnly : "?"} repos not cloned here
           </label>
           <label style={{fontSize:11, display:"inline-flex", alignItems:"center", gap:4}}
                  title="Show murmurent's own repos (murmurent, murmurent_*) that belong to no project. Those in a project are always listed under it.">
@@ -1054,7 +1058,7 @@ function RepoInventoryPanel({ span = "c-12" }) {
             </li>
             <li>
               <strong>Not cloned</strong>: on GitHub, but not on this computer.
-              Shown only with "include GitHub-only rows".
+              Untick "include repos not cloned here" to see this computer only.
             </li>
           </ul>
           <div style={{marginTop:6}}>
@@ -1095,9 +1099,11 @@ function RepoInventoryPanel({ span = "c-12" }) {
         )}
         {!busy && groups.length === 0 && !err && (
           <div style={{padding:"14px 16px", color:"var(--muted)", fontSize:12, fontFamily:"var(--mono)"}}>
-            No cloned repos found. Click Refresh to scan, or toggle
-            "include GitHub-only rows" to see the {stats ? stats.ghOnly : "—"} repos on
-            GitHub that aren't on this computer.
+            {showAllGithub
+              ? <>No repos found on GitHub or on this computer. Click Refresh to scan.</>
+              : <>No cloned repos found. Click Refresh to scan, or tick
+                  "include repos not cloned here" to see the {stats ? stats.ghOnly : "—"} repos on
+                  GitHub that aren't on this computer.</>}
           </div>
         )}
         {groups.length > 0 && (
@@ -1754,12 +1760,17 @@ function ProjectMembersBlock({ proj: p }) {
   // roster (#207). Without a recorded key, add_member asks for their
   // enrollment request and the enrollment window opens.
   const [outside, setOutside] = useState("");
-  const certMembers = p.cert_members || [];
   const uncertified = p.uncertified_members || [];
+  const invited = p.invited_members || [];
+  // A member on the list without a card is shown once, as "no cert" (#259).
+  const _unc = new Set(uncertified.map(m => m.replace(/^@/, "").toLowerCase()));
+  const certMembers = (p.cert_members || []).filter(m => !_unc.has(m.replace(/^@/, "").toLowerCase()));
   const groupMembers = window.DATA.group_members || [];
   const [busy, setBusy] = React.useState(null);   // handle currently in flight
   const [err, setErr] = React.useState(null);
   const [enrollFor, setEnrollFor] = React.useState(null);  // handle needing enrollment JSON
+  const [enrollRecorded, setEnrollRecorded] = React.useState(false);  // already on the list?
+  const [enrollDm, setEnrollDm] = React.useState(null);  // were the steps DM'd to them?
   const userParam = ((window.DATA.member || {}).handle || "").replace(/^@/, "");
   const q = userParam ? "?user=" + encodeURIComponent(userParam) : "";
 
@@ -1771,6 +1782,7 @@ function ProjectMembersBlock({ proj: p }) {
 
   const addMember = async (handle, enrollment) => {
     if (!handle) return;
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(handle)) handle = handle.replace(/^@/, "");
     setBusy(handle); setErr(null);
     try {
       const r = await fetch("/api/project/" + encodeURIComponent(p.name) + "/members" + q,
@@ -1778,12 +1790,31 @@ function ProjectMembersBlock({ proj: p }) {
           body: JSON.stringify({ handle, enrollment: enrollment || null }) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error((typeof j.detail === "string" ? j.detail : null) || r.statusText);
+      if (!j.ok && j.error === "invited") {
+        // An email murmurent has not met (#258): the project records the
+        // invitation; the lead sends the drafted email. Open the mail client
+        // with it, and keep the text on screen in case nothing opens.
+        setBusy(null);
+        await refresh();
+        const d = j.draft || {};
+        window.alert(j.email + " is invited to " + p.name + ". murmurent has not met them, " +
+                     "so send them the email now opening in your mail app (its text follows " +
+                     "in case it did not open). Their handle fills in when their enrollment arrives.\n\n" +
+                     "Subject: " + (d.subject || "") + "\n\n" + (d.body || ""));
+        if (d.mailto) window.location.href = d.mailto;
+        return;
+      }
       if (!j.ok && j.error === "no_recorded_key") {
         // PoP fallback: the member has no attested key on the roster (carded
-        // before pubkey recording, or external). Open a modal with a COPYABLE
-        // enroll command + a paste box (native window.prompt text can't be
-        // selected/copied — the thing the user asked to fix).
+        // before pubkey recording, or from another group). The server has
+        // already put them on the project's member list ("recorded"), so
+        // refresh to show them as "no cert", then open a modal with a
+        // COPYABLE enroll command + a paste box. The modal can be closed and
+        // the enrollment finished later from their "issue" button.
         setBusy(null);
+        if (j.recorded) await refresh();
+        setEnrollRecorded(!!j.recorded);
+        setEnrollDm(j.dm || null);
         setEnrollFor(handle);
         return;
       }
@@ -1800,8 +1831,8 @@ function ProjectMembersBlock({ proj: p }) {
     const h = handle.replace(/^@/, "");
     const ok = window.confirm(
       "Remove @" + h + " from " + p.name + "?\n\n" +
-      "Their project certificate is revoked (CRL), they are kicked from the " +
-      "private Slack channel, and GitHub access is dropped.");
+      "Their project certificate is revoked, they leave the private Slack channel " +
+      "and every GitHub repository the project lists, and they are told by direct message.");
     if (!ok) return;
     setBusy(h); setErr(null);
     try {
@@ -1810,6 +1841,8 @@ function ProjectMembersBlock({ proj: p }) {
         { method: "DELETE", headers: { Accept: "application/json" } });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error((typeof j.detail === "string" ? j.detail : null) || r.statusText);
+      if (Array.isArray(j.problems) && j.problems.length)
+        window.alert("@" + h + " removed from " + p.name + ", but:\n\n" + j.problems.join("\n"));
       await refresh();
     } catch (ex) { setErr(String(ex.message || ex)); }
     finally { setBusy(null); }
@@ -1901,17 +1934,26 @@ function ProjectMembersBlock({ proj: p }) {
             {addable.map(h => <option key={h} value={h}>{h}</option>)}
           </select>
         )}
+        {invited.map(r => (
+          <span key={"inv:" + r.email} className="mono"
+                style={{fontSize:11, padding:"2px 6px", borderRadius:2,
+                        border:"1px dotted var(--rule-strong)", color:"var(--muted)"}}
+                title={"Invited by email" + (r.by ? " by " + r.by : "") + (r.at ? " on " + r.at : "") +
+                       ". murmurent has not met them yet; their handle takes this place when their enrollment arrives."}>
+            ✉ {r.email} · invited
+          </span>
+        ))}
         {canManage && (
           <span style={{display:"inline-flex", gap:4}}>
             <input value={outside} onChange={e => setOutside(e.target.value)}
                    onKeyDown={e => { if (e.key === "Enter" && outside.trim()) {
-                     addMember(outside.trim().replace(/^@/, "")); setOutside(""); } }}
-                   placeholder="@handle from another group"
-                   title="Someone outside this lab: type their murmurent handle. If their key is not on record, you will be asked for the enrollment request they send you."
-                   style={{fontSize:11, padding:"2px 4px", fontFamily:"var(--mono)", width:170,
+                     addMember(outside.trim()); setOutside(""); } }}
+                   placeholder="@handle or email, from another group"
+                   title="Someone outside this lab: type their murmurent handle, or their email address, and press Enter. A handle joins the member list at once, shown as 'no cert' until you paste the enrollment request they send you. An email murmurent knows becomes the handle; any other records an invitation and drafts the email for you to send."
+                   style={{fontSize:11, padding:"2px 4px", fontFamily:"var(--mono)", width:200,
                            border:"1px solid var(--rule-strong)", borderRadius:2}} />
             <button type="button" className="btn sm" disabled={!!busy || !outside.trim()}
-                    onClick={() => { addMember(outside.trim().replace(/^@/, "")); setOutside(""); }}>
+                    onClick={() => { addMember(outside.trim()); setOutside(""); }}>
               add
             </button>
           </span>
@@ -1928,6 +1970,8 @@ function ProjectMembersBlock({ proj: p }) {
         <EnrollHelpModal
           handle={enrollFor}
           project={p.name}
+          recorded={enrollRecorded}
+          dm={enrollDm}
           onClose={() => setEnrollFor(null)}
           onSubmit={(obj) => { setEnrollFor(null); addMember(enrollFor, obj); }}
         />
@@ -1939,7 +1983,7 @@ function ProjectMembersBlock({ proj: p }) {
 /* EnrollHelpModal — shown when adding a member who has no attested key yet.
    Replaces a native window.prompt (whose text can't be selected) with a modal
    that has a COPYABLE enroll command + a paste box for the JSON they send back. */
-function EnrollHelpModal({ handle, project, onClose, onSubmit }) {
+function EnrollHelpModal({ handle, project, recorded, dm, onClose, onSubmit }) {
   const cmd = "murmurent enroll --project " + project;
   const [json, setJson] = React.useState("");
   const [copied, setCopied] = React.useState(false);
@@ -1975,8 +2019,20 @@ function EnrollHelpModal({ handle, project, onClose, onSubmit }) {
           <button type="button" className="btn sm ghost" onClick={onClose}>✕ close</button>
         </div>
         <p className="muted" style={{fontSize:12, margin:"6px 0 8px"}}>
-          @{h} has no attested key on the roster yet. Send them this command; they run
-          it and send back the JSON it prints, which you paste below.
+          {recorded
+            ? <>@{h} is now on the member list of {project}, shown as <em>no cert</em> until
+                they hold a certificate. Send them this command; they run it and send back
+                the JSON it prints. Paste it below now, or close this and click
+                <strong> issue</strong> next to their name when it arrives.
+                {dm && dm.sent
+                  ? <> These steps were also sent to them by direct message
+                      via {dm.workspace || "Slack"}.</>
+                  : dm && dm.detail && dm.detail !== "not attempted"
+                    ? <> They could not be sent the steps by direct message
+                        ({dm.detail}); send them the command yourself.</>
+                    : null}</>
+            : <>@{h} has no attested key on the roster yet. Send them this command; they run
+                it and send back the JSON it prints, which you paste below.</>}
         </p>
         <div className="row" style={{gap:6, alignItems:"center"}}>
           <input readOnly value={cmd} onFocus={e => e.target.select()} className="mono"
@@ -1999,8 +2055,8 @@ function EnrollHelpModal({ handle, project, onClose, onSubmit }) {
                           resize:"vertical"}} />
         {err && <div style={{color:"var(--red)", fontSize:11, marginTop:4}}>{err}</div>}
         <div className="row" style={{justifyContent:"flex-end", gap:6, marginTop:10}}>
-          <button type="button" className="btn sm ghost" onClick={onClose}>cancel</button>
-          <button type="button" className="btn sm primary" onClick={submit}>add @{h}</button>
+          <button type="button" className="btn sm ghost" onClick={onClose}>{recorded ? "later" : "cancel"}</button>
+          <button type="button" className="btn sm primary" onClick={submit}>{recorded ? "issue certificate" : "add @" + h}</button>
         </div>
       </div>
     </div>
@@ -2011,7 +2067,7 @@ function ProjectReposBlock({ proj: p, isPI, userParam }) {
   const repos = p.repos || [];
   const [show, setShow] = React.useState(false);
   const [f, setF] = React.useState({ repo_name: "", role: "manuscript", path: "",
-                                     overleaf: true });
+                                     overleaf: true, create_remote: false });
   const [busy, setBusy] = React.useState(false);
   const [removing, setRemoving] = React.useState(null);  // repo name in flight
   const [err, setErr] = React.useState(null);
@@ -2029,7 +2085,14 @@ function ProjectReposBlock({ proj: p, isPI, userParam }) {
           body: JSON.stringify(f) });
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error((typeof j.detail === "string" ? j.detail : null) || r.statusText);
-      setShow(false); setF({ repo_name: "", role: "manuscript", path: "", overleaf: true });
+      if (j.remote) {
+        // #269: what creating the remote did and did not do.
+        const rm = j.remote, probs = (rm.problems || []);
+        window.alert((rm.remote_url ? "GitHub: " + rm.remote_url + " (" + rm.created + ")" : "No GitHub remote was made.")
+                     + (rm.github && rm.github.added && rm.github.added.length ? "\naccess granted to: " + rm.github.added.join(", ") : "")
+                     + (probs.length ? "\n\n" + probs.join("\n") : ""));
+      }
+      setShow(false); setF({ repo_name: "", role: "manuscript", path: "", overleaf: true, create_remote: false });
       await refresh();
     } catch (ex) { setErr(String(ex.message || ex)); } finally { setBusy(false); }
   };
@@ -2112,6 +2175,11 @@ function ProjectReposBlock({ proj: p, isPI, userParam }) {
           <label style={{fontSize:11, display:"flex", alignItems:"center", gap:3}}>
             <input type="checkbox" checked={f.overleaf}
                    onChange={e => setF({...f, overleaf: e.target.checked})} /> Overleaf
+          </label>
+          <label style={{fontSize:11, display:"flex", alignItems:"center", gap:3}}
+                 title="For a clone with no GitHub remote: create a private <org>/<repo> on GitHub, push it, and grant every member access (needs gh on this machine).">
+            <input type="checkbox" checked={f.create_remote}
+                   onChange={e => setF({...f, create_remote: e.target.checked})} /> create on GitHub + grant access
           </label>
           <button className="btn sm" disabled={busy || !f.repo_name} onClick={submit}>
             {busy ? "…" : "add"}
@@ -2566,7 +2634,7 @@ function ProjectHeadingMeta({ p }) {
       <Pill tone={(p.sens==="protected"||p.sens==="clinical")?"red":""}>{p.sens}</Pill>
       {p.hosted_by && (
         <span title={p.source === "card"
-                ? "You hold a project card for this project. Its records live in lab " + p.hosted_by + ", which this computer does not have, so the team and repos are not shown."
+                ? "You hold a project card for this project. Its records live in lab " + p.hosted_by + ", which this computer does not have; the team and repos shown are what your card carried" + (p.card_as_of ? " as of " + p.card_as_of : "") + "."
                 : "Recorded in lab " + p.hosted_by + "'s records."}
               style={{...PROJ_TAG, color:"var(--purple)"}}>
           hosted by {p.hosted_by}

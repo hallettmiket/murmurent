@@ -532,22 +532,26 @@ def repo_status_cmd(target: str, host_name: str | None) -> None:
 @click.option("--lab", default=None,
               help="Owning lab slug (default: this machine's lab).")
 @click.option("--all-agents", is_flag=True,
-              help="Pin every commons agent to this repo. Rarely needed: every "
-                   "agent already works in every folder.")
+              help="Link every commons agent, adding to an existing pick. A "
+                   "repository with no marker yet gets every agent anyway, as "
+                   "the dashboard does.")
 @click.option("--agents", "agents_csv", default=None,
-              help="Comma-separated agents to pin to this repo. Default: none. "
-                   "Pinning only matters if this repo must use a specific copy "
-                   "of an agent.")
+              help="Comma-separated agents to link instead of all of them, or "
+                   "'none' to link nothing. The links stay on this machine "
+                   "(listed in .gitignore).")
 @click.option("--host", "host_name", default="local", show_default=True,
               help="'local' or a registered SSH host; remote adopts bootstrap "
                    "over one batched SSH session.")
+@click.option("--commit/--no-commit", default=True,
+              help="Commit the marker and CLAUDE.md stub so every clone is ready "
+                   "(default: yes).")
 def repo_adopt_cmd(path: str, lab: str | None, agents_csv: str | None,
                    all_agents: bool,
-                   host_name: str) -> None:
+                   host_name: str, commit: bool) -> None:
     from .commands import repo_cmd as _repo_cmd
     raise SystemExit(_repo_cmd.cmd_adopt(
         path=path, lab=lab, agents_csv=agents_csv, host_name=host_name,
-        all_agents=all_agents))
+        all_agents=all_agents, commit=commit))
 
 
 @repo_group.command(
@@ -1030,25 +1034,30 @@ def project_rename_slack(name: str, new_name: str) -> None:
 
 
 @project_group.command("provision-github",
-                       help="(PI) Create the cert-project's private GitHub repo "
-                            "and add its certified members as collaborators. "
-                            "Idempotent; needs the gh CLI.")
+                       help="(PI) Give the project's certified members collaborator "
+                            "access on every GitHub repository the project lists. "
+                            "Idempotent; needs the gh CLI. --create makes a private "
+                            "<org>/<name> repository first, for a project that has "
+                            "no repository yet.")
 @click.argument("name")
-@click.option("--org", default="", help="GitHub org (default: lab.md github_org).")
-def project_provision_github(name: str, org: str) -> None:
+@click.option("--org", default="", help="GitHub org for --create (default: lab.md github_org).")
+@click.option("--create", is_flag=True,
+              help="Create <org>/<name> when the project lists no GitHub repository.")
+def project_provision_github(name: str, org: str, create: bool) -> None:
     from .core import cert_provision as _cprov
     try:
-        out = _cprov.provision_github(name, org=org or None)
+        out = _cprov.provision_github(name, org=org or None, create=create)
     except _cprov.CertProvisionError as exc:
         raise click.ClickException(str(exc)) from exc
     if not out["ok"]:
         raise click.ClickException(
-            f"could not provision repo ({out.get('error')}): {out.get('detail')}")
-    click.echo(f"✓ repo {out['repo']} ready.")
+            f"could not grant access ({out.get('error')}): {out.get('detail')}")
+    click.echo(f"✓ access granted on: {', '.join(out['repos'])}")
     for c in out["collaborators"]:
         mark = {"ok": "✓", "fail": "!", "no_github": "·"}.get(c.get("status"), "·")
         who = c.get("login") or c.get("handle")
-        click.echo(f"  {mark} {c.get('handle')} → {who}: {c.get('detail', c.get('status'))}")
+        where = f" on {c['repo']}" if c.get("repo") else ""
+        click.echo(f"  {mark} {c.get('handle')} → {who}{where}: {c.get('detail', c.get('status'))}")
 
 
 @project_group.command("invite-guests",
@@ -1089,6 +1098,7 @@ def project_invite_guests(name: str) -> None:
 @click.option("--check", is_flag=True, hidden=True, help="(the default) report only.")
 def project_reconcile(name: str, apply_changes: bool, check: bool) -> None:
     from .core import cert_provision as _cprov
+    from .core import project_members as _pm
     apply = bool(apply_changes) and not check
     try:
         s = _cprov.reconcile_slack(name, apply=apply)
@@ -1096,6 +1106,22 @@ def project_reconcile(name: str, apply_changes: bool, check: bool) -> None:
     except _cprov.CertProvisionError as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(f"project {name} — {'reconcile' if apply else 'check (no changes; add --apply to make them)'}")
+    # Cards a lead removed on a machine that could not sign the revocation
+    # list (#255): the PI's machine finishes them here.
+    from .core import cert_projects as _cp
+    rec = _cp.get(name)
+    if rec is not None and rec.pending_revocations:
+        if apply:
+            r = _pm.apply_pending_revocations(name)
+            if r["applied"]:
+                click.echo(f"  cards:  revoked {len(r['applied'])} card(s) a lead removed: "
+                           + ", ".join(str(x.get("handle")) for x in r["applied"]))
+            if r["pending"]:
+                click.echo(f"  cards:  {len(r['pending'])} removal(s) still await the PI's "
+                           f"machine ({r['detail']})")
+        else:
+            click.echo(f"  cards:  {len(rec.pending_revocations)} card(s) removed by a lead "
+                       "await revocation; --apply on the PI's machine revokes them")
     if s.get("error") == "not_provisioned":
         click.echo("  slack:  (no channel provisioned)")
     else:
@@ -1109,10 +1135,17 @@ def project_reconcile(name: str, apply_changes: bool, check: bool) -> None:
         for f in s.get("invite_failed") or []:
             click.echo(f"          ! {f.get('handle')}: {f.get('reason')}")
     if g.get("error") == "not_provisioned":
-        click.echo("  github: (no repo provisioned)")
+        click.echo("  github: (the project lists no GitHub repository)")
     else:
         click.echo(f"  github: {'in sync' if g['in_sync'] else 'drift'}"
-                   f" — +{len(g['to_add'])} add, -{len(g['to_remove'])} remove")
+                   f": +{len(g['to_add'])} add, -{len(g['to_remove'])} remove"
+                   f" across {len(g['repos'])} repositor{'y' if len(g['repos']) == 1 else 'ies'}")
+        for row in g.get("per_repo") or []:
+            if not row["in_sync"]:
+                click.echo(f"          {row['repo']}: +{', '.join(row['to_add']) or '-'}"
+                           f"  -{', '.join(row['to_remove']) or '-'}")
+    for prob in list(s.get("invite_failed") and [] or []) + list(g.get("problems") or []):
+        click.echo(f"  ! {prob}")
 
 
 @project_group.command("workspace-check",
@@ -1167,8 +1200,12 @@ def project_channel(project: str) -> None:
     from .core import slack_routing as _sr
     if not project:
         route = _sr.resolve_route()
-        if route.candidates:
-            raise click.ClickException(route.reason)
+        if route.ok and route.source == "project":
+            # A repository in several projects has several channels (#253):
+            # one per line.
+            for one in route.all:
+                click.echo(one.channel_id)
+            return
     name = project or _cp.project_name_for_cwd()
     if not name:
         raise click.ClickException(
@@ -1204,6 +1241,40 @@ def project_note(text: str, project: str, dry_run: bool) -> None:
     ok, route, detail = _sr.post_note(text, project=project or None)
     click.echo(detail)
     raise SystemExit(0 if ok else 1)
+
+
+@project_group.command("add-repo",
+                       help="List one more repository on a project's record: a folder on "
+                            "this machine, or a repository name. A repository may be in "
+                            "several projects; a note about it then goes to each project's "
+                            "channel, and its data stays with the project that listed it "
+                            "first unless --home moves it here. The PI or project lead "
+                            "runs this; it commits and pushes the record.")
+@click.argument("name")
+@click.argument("repo")
+@click.option("--role", default="code", show_default=True,
+              help="code, manuscript, seminar, data or infra.")
+@click.option("--home", is_flag=True,
+              help="Make this project the home of the repository's data folders.")
+@click.option("--create-remote", is_flag=True,
+              help="For a clone with no GitHub remote: create a private <org>/<repo> "
+                   "(org from lab.md), push, record the remote and grant every member "
+                   "access. Needs the gh CLI.")
+def project_add_repo(name: str, repo: str, role: str, home: bool, create_remote: bool) -> None:
+    raise SystemExit(project_cmd.cmd_add_repo(name, repo, role=role, home=home,
+                                              create_remote=create_remote))
+
+
+@project_group.command("release-repo",
+                       help="Take a repository off a project's record, so the project no "
+                            "longer claims it. The clone on disk is untouched. Use it when "
+                            "`murmurent project channels` says two projects claim one "
+                            "repository. The PI or project lead runs this; it commits and "
+                            "pushes the record.")
+@click.argument("name")
+@click.argument("repo")
+def project_release_repo(name: str, repo: str) -> None:
+    raise SystemExit(project_cmd.cmd_release_repo(name, repo))
 
 
 @project_group.command("channels",
@@ -1248,7 +1319,9 @@ def project_channels() -> None:
     dup = {k: v for k, v in claims.items() if len(v) > 1}
     if dup:
         click.echo("")
-        click.echo("Repositories claimed by more than one active project (notes from them cannot be routed):")
+        click.echo("Repositories in more than one active project (a note about one goes "
+                   "to each project's channel; `murmurent project release-repo <project> "
+                   "<repo>` takes it off a project that should not list it):")
         for repo, names in sorted(dup.items()):
             click.echo(f"  {repo}: {', '.join(names)}")
     missing = [n for n, s, cid, _i in rows if cid == "(none)" and s == "active"]

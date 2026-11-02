@@ -61,8 +61,9 @@ paths, not on readiness, so they apply everywhere.
 
 ## The per-repo `.claude/agents/` directory
 
-`adopt` creates this directory, and populates it only if you name agents with
-`--agents`, or all of them with `--all-agents`. Since access comes from
+`adopt` creates this directory and, for a repository with no marker yet, links
+every commons agent into it, as the dashboard's Make ready does; `--agents a,b`
+links only those, and `--agents none` links nothing. Since access comes from
 `~/.claude/agents/` regardless, a repo's own copies do exactly one thing:
 **Claude Code prefers a directory's own agent file over the machine-wide one**,
 so a link here pins that agent, for this repo, to whatever it points at.
@@ -90,8 +91,9 @@ agent — and twice a liability:
   with no error. `murmurent repo status` reports this as a `follows commons`
   line, and the `UserPromptSubmit` hook warns in-session.
 
-If you have no reason to pin an agent to a single repo, run `adopt` with
-neither option and leave the directory empty.
+If you would rather pin nothing to a repo, run `adopt` with `--agents none`
+and leave the directory empty; every agent still works there from
+`~/.claude/agents/`.
 
 ## Start here: any directory
 
@@ -137,22 +139,84 @@ Parameters:
 - `<path>`: the local path to the git clone (e.g. `~/repos/brca_wgs`).
 - `--lab <slug>`: the owning lab's short registry name (its "slug,"
   e.g. `example_lab`). Defaults to this machine's lab.
-- `--agents a,b`: a comma-separated list of which commons agents to wire
-  in (e.g. `bookworm,blacksmith`). Defaults to the standard set if
-  omitted.
+- `--agents a,b`: a comma-separated list of which commons agents to link
+  (e.g. `bookworm,blacksmith`). Left out, a repository with no marker yet
+  gets every agent in the commons, which is what the dashboard's Make ready
+  picks too; a repository that already has a marker keeps its picks.
 - `--host <name>`: which machine to act on. `local` (default) is this
   laptop; any other value is a registered remote machine (see `murmurent
   host list`), acted on over SSH.
+- `--no-commit`: leave the marker and the `CLAUDE.md` stub uncommitted.
+
+### Readiness travels with the clone
+
+Make ready commits what it wrote that belongs in the repository, and only
+that: `.murmurent.yaml`, the `CLAUDE.md` stub, and the `.gitignore` lines that
+keep the agent links out. Anything else you had staged is left as it was. Push,
+and every clone of the repository is ready: on a second machine, `murmurent
+install` (or `murmurent reconcile`) finds the marker, links the agents from it,
+and registers the clone by name, with nothing to type. If the commit cannot be
+made (no git identity set, say), make ready prints the exact command to run.
+
+Which murmurent release linked a repository is a fact about one machine, so it
+is kept on that machine (`~/.murmurent/repo_bootstrap.yaml`), not in the
+committed marker. Older markers carry a `bootstrap_version` line from the days
+when it was; that line is now left exactly as it is, so two machines on
+different releases no longer push it back and forth.
+
+A push from a machine that has no bot token for the lab posts no note, and
+`murmurent project note` says so with the fix: `murmurent group-slack-setup
+<lab>` once on that machine.
 
 ## Every repository is in a project
 
-Each repository belongs to exactly one project, its **owning** project. When
-you adopt a repository that no project lists, Murmurent writes a project record
-for it, with you as lead and only member, in the lab records repository (the
-lab's shared management repository). Adopting it again changes nothing. If the
-repository later joins a bigger project, for example through the dashboard's
-New Project, its one-repository project is archived (kept, not deleted), so it
-still has one owning project.
+Each repository belongs to at least one project. When you adopt a repository
+that no project lists, Murmurent writes a project record for it, with you as
+lead and only member, in the lab records repository (the lab's shared
+management repository). Adopting it again changes nothing. If the repository
+later joins a real project, for example through the dashboard's New Project or
+`murmurent project add-repo`, that one-repository project is archived (kept,
+not deleted), whatever it was called.
+
+### A repository in several projects
+
+A repository may be listed by more than one project: a manuscript that a
+collaboration project shares with the lab's own project, say, or a pipeline two
+studies both run. Then:
+
+- **A note about the repository goes to every project's channel** (a release
+  note after a push, a job notice). `murmurent project channels` lists every
+  repository in more than one project, so nobody is surprised.
+- **Its data stays with its home project**, the project that listed it first.
+  The other projects read that project's data folders: `add-repo` writes them
+  under their `reads_from` for you, so the folders are never offered to those
+  projects for clean-up. To move the data to the project you are adding, pass
+  `--home`; nothing moves otherwise.
+- **The PI or the project's lead** is who can add or release a repository, on
+  the command line as in the dashboard.
+
+```bash
+murmurent project add-repo brca_paper ~/repos/brca/brca_manuscript --role manuscript
+murmurent project add-repo brca_paper brca_manuscript --home     # make brca_paper the data's home
+murmurent project release-repo brca brca_manuscript             # brca no longer lists it
+murmurent project add-repo brca ~/repos/brca/brca_figures --create-remote   # new clone: make it a GitHub repo too
+```
+
+**A brand-new repository.** Members get access to a repository through its
+GitHub remote, so a clone that has none yet gives them nothing. `add-repo
+--create-remote` creates a private `<org>/<repo>` on GitHub (`<org>` is the
+lab's `github_org` in `lab.md`), sets the clone's `origin`, pushes the current
+branch, records the remote on the project, and grants every certified member
+access at once. Without the flag, add-repo tells you the clone has no remote
+and how to fix it. The dashboard's add-repository form has the same choice,
+"create on GitHub + grant access". Creating a repository on GitHub stays a
+project decision, made by the PI or lead here; `murmurent repo adopt` never
+does it.
+
+This is also how a collaborator gets the paper but not the data: a second
+project that lists only the manuscript repository, with the collaborator as a
+member. Access follows project membership, so no per-repository setting is
+needed.
 
 The project's name comes from the repository's name and place:
 
@@ -193,7 +257,7 @@ all optional:
 | Setting | What it holds |
 |---|---|
 | `data_folders` | The folders the project owns. Left empty, these are `immutable/<project>/` and `append_only/<project>/` under the data root, which is right for most projects. Write a folder in full, or relative to the data root (`append_only/brca`) so it is right on every machine. |
-| `reads_from` | What the project reads but does not own: a folder, written as a path (`append_only/shared_cohort`), or another project's repository, by its name. These are never offered to this project for clean-up. |
+| `reads_from` | What the project reads but does not own: a folder, written as a path (`append_only/shared_cohort`), or another project's repository, by its name. These are never offered to this project for clean-up. `add-repo` fills it in when a repository's data lives with another project (its home). |
 | `retain_until` | A date, `YYYY-MM-DD`, before which nothing in the project may be suggested for deletion, for example the end of an ethics approval or a data-sharing agreement. |
 
 Set them with one command, which commits and pushes the record:
@@ -287,9 +351,11 @@ murmurent repo upgrade --all [--add-agents a,b] [--all-agents]
 `--add-agents` links specific new agents into an already-ready repo
 without touching the ones already linked; `--all-agents` links every
 commons agent (new releases included). `--all` applies the upgrade to
-every ready repo in your repositories folder instead of a single path. Neither flag
+every ready repo in your repositories folder instead of a single path, and
+registers on this machine any clone that arrived with its marker. Neither flag
 is needed just to pick up prompt edits to agents already linked; that
-part is automatic.
+part is automatic. An upgrade rewrites the marker only when its schema or its
+agent list changes, so it never leaves a committed file dirty on its own.
 
 ## See also
 

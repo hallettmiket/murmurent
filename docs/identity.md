@@ -407,10 +407,22 @@ See Delegating a project lead, below, for the full command set.
   dashboard; the bundle is DM'd to the lead).
 - `murmurent project-add-member <handle> --project <p>`: the lead signs a
   member in, one click when the member's key is already attested on the
-  roster. External or keyless members first run `murmurent enroll --project
-  <p>` and send the file (`--enrollment`).
-- `murmurent project-remove-member`: revokes the card (adds it to the CRL)
-  and removes the member from the project's private Slack channel.
+  roster. An email address works too: one murmurent knows becomes its
+  handle; any other is recorded as an invitation, with the email drafted
+  for the lead to send. External or keyless members are put on the member list at once,
+  awaiting a certificate; they run `murmurent enroll --project <p>` and
+  send the file, and the lead finishes with `--enrollment`. The steps are
+  sent to them by direct message when the project's workspace is connected.
+  A member from another lab imports the resulting bundle with
+  `--trust-root <this lab's root>` the first time; the message that brings
+  the bundle names the root and gives the exact command.
+- `murmurent project-remove-member`: the PI or the lead removes a member.
+  Their card is revoked (a lead's removal is recorded on the project record,
+  and the PI's `murmurent project reconcile --apply` signs it), they leave
+  the project channel and every GitHub repository the project lists, and
+  they are told by direct message. Removing someone from the lab
+  (`group-remove-member`, or deactivating them on the dashboard) does this
+  for every project of the lab they do not lead.
 - `murmurent project-whoami`: shows which projects this machine's cards
   certify you for.
 

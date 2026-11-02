@@ -63,7 +63,7 @@ def _project_summary(start: str | None = None) -> str | None:
     except Exception:
         return None
     sensitivity = _sens.normalize(parsed.meta.get("sensitivity")) or "?"
-    name = parsed.meta.get("project", repo.path.name)
+    name = parsed.meta.get("project", repo.name)
     body = parsed.body.strip()
     first_para = body.split("\n\n", 1)[0] if body else ""
     members = read_members(repo.members_path) if repo.members_path else []

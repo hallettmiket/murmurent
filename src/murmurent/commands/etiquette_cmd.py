@@ -32,6 +32,10 @@ def etiquette_group() -> None:
 @click.option("--notify", is_flag=True, help="Send the messages.")
 @click.option("--json", "as_json", is_flag=True, help="Print the report as JSON.")
 def etiquette_check(notify: bool, as_json: bool) -> None:
+    from ..core.roster_sync import refresh_note
+    note = refresh_note()
+    if note and not as_json:
+        click.echo(f"  {note}")
     report = _et.check()
     if as_json:
         click.echo(json.dumps(report, indent=2))

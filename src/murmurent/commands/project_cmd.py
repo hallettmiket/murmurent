@@ -584,6 +584,117 @@ def cmd_set(name: str, *, data_folders: tuple = (), reads_from: tuple = (),
     return cmd_status(name)
 
 
+def _require_pi_or_lead(cp, action: str) -> None:
+    """Changing which repositories a project lists is for the project's lead
+    or the lab's PI, as in the dashboard (#253). Refuses anyone else; when
+    neither is known on this machine there is nobody to check against."""
+    from ..core import identity as _id
+    from ..core.lab import pi_handle as _pi
+    actor = _id.resolve(allow_unknown=True).handle.lstrip("@").lower()
+    lead = str(cp.lead or "").lstrip("@").lower()
+    try:
+        pi = str(_pi() or "").lstrip("@").lower()
+    except Exception:  # noqa: BLE001
+        pi = ""
+    allowed = {h for h in (lead, pi) if h and h != "the_pi"}
+    if allowed and actor not in allowed:
+        who = " or ".join(f"@{h}" for h in sorted(allowed))
+        raise click.ClickException(
+            f"only the project lead or the lab PI ({who}) can {action} of {cp.name!r}; "
+            f"you are @{actor or '?'}")
+
+
+def echo_remote_result(res: dict) -> None:
+    """Print what ``create_remote_and_grant`` did and did not do (#269)."""
+    if res.get("remote_url"):
+        click.echo(f"GitHub: {res['remote_url']} ({res.get('created')}"
+                   + (f"; {res['pushed']}" if res.get("pushed") else "") + ")")
+    gh = res.get("github") or {}
+    if gh.get("added"):
+        click.echo(f"  access granted to: {', '.join(gh['added'])}")
+    elif gh.get("ok") and gh.get("in_sync"):
+        click.echo("  every certified member already has access")
+    for prob in res.get("problems") or []:
+        click.echo(f"  ! {prob}")
+
+
+def cmd_add_repo(name: str, repo: str, *, role: str = "code", home: bool = False,
+                 create_remote: bool = False) -> int:
+    """`murmurent project add-repo`: the project lists one more repository
+    (#253). ``repo`` is a folder on this machine or a repository name. A
+    repository may be in several projects; its data stays with its home
+    project unless ``--home`` moves it here. ``--create-remote`` creates a
+    private ``<org>/<repo>`` on GitHub for a clone that has none, pushes it,
+    records the remote and grants every member access (#269)."""
+    from ..core import cert_projects as _cps
+    from ..core import repo as _repo
+    from ..core import repo_remote as _rr
+    cp = _cps.get(name)
+    if cp is None:
+        raise click.ClickException(f"no project named {name!r}.")
+    _require_pi_or_lead(cp, "change the repositories")
+    role = (role or "code").strip().lower()
+    if role not in _cps.VALID_REPO_ROLES:
+        raise click.ClickException(f"role must be one of {', '.join(_cps.VALID_REPO_ROLES)}")
+    path = Path(repo).expanduser()
+    if path.is_dir():
+        rname, rpath = _repo.repo_name(path), str(path.resolve())
+    else:
+        rname, rpath = str(repo).strip().rstrip("/"), ""
+        if "/" in rname:
+            raise click.ClickException(f"{repo} is not a folder on this machine")
+    before = _cps.home_project_of(rname)
+    try:
+        _cps.add_repo(name, role=role, repo_name=rname, path=rpath, home=home)
+    except _cps.CertProjectError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"{name} now lists the repository {rname} ({role}). Its record is "
+               "committed and pushed so the lab sees it.")
+    after = _cps.home_project_of(rname)
+    others = sorted(p.name for p in _cps.owning_projects(rname)
+                    if p.status == "active" and p.name != name)
+    if others:
+        click.echo(f"The repository is also in: {', '.join(others)}. A note about it "
+                   "goes to every one of their channels.")
+        if after == name and before and before != name:
+            click.echo(f"Its data folders moved: they are {name}'s now, and the other "
+                       "projects read them.")
+        elif after and after != name:
+            click.echo(f"Its data stays in {after}'s folders; {name} reads them "
+                       f"(reads_from). To make {name} the home instead: "
+                       f"murmurent project add-repo {name} {rname} --home")
+    if create_remote:
+        echo_remote_result(_rr.create_remote_and_grant(name, rname))
+    elif rpath and not _repo.github_slug(_rr.origin_of(Path(rpath))):
+        click.echo(f"{rname} has no GitHub remote yet, so members get no access to it. "
+                   f"Create one and grant access: murmurent project add-repo {name} "
+                   f"{rpath} --create-remote (or push it yourself, then "
+                   f"murmurent project reconcile {name} --apply).")
+    return cmd_status(name)
+
+
+def cmd_release_repo(name: str, repo: str) -> int:
+    """`murmurent project release-repo`: the project no longer claims the
+    repository (#250). The record changes; the clone on disk does not."""
+    from ..core import cert_projects as _cps
+    cp = _cps.get(name)
+    if cp is None:
+        raise click.ClickException(f"no cert-project named {name!r}")
+    _require_pi_or_lead(cp, "change the repositories")
+    was_home = _cps.home_project_of(repo) == name
+    try:
+        _cps.remove_repo(name, repo)
+    except _cps.CertProjectError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"{name} no longer lists the repository {repo}. Its record is committed "
+               "and pushed so the lab sees it.")
+    others = sorted(p.name for p in _cps.owning_projects(repo) if p.status == "active")
+    if others and was_home:
+        click.echo(f"Its data is still in {name}'s folders, which {', '.join(others)} "
+                   f"read. To move it: murmurent project add-repo <project> {repo} --home")
+    return cmd_status(name)
+
+
 def cmd_status(name: str | None) -> int:
     """``murmurent project status [name]``: one project, as the unit of work.
 
@@ -594,6 +705,7 @@ def cmd_status(name: str | None) -> int:
     from ..core import cert_projects as _cp
     from ..core import lab_vm as _lv
     from ..core import project_unit as _pu
+    from ..core import repo as _repo
 
     if not name:
         name = _cp.project_name_for_cwd()
@@ -637,8 +749,11 @@ def cmd_status(name: str | None) -> int:
             repo_rows.append((r.name, r.role, "not on this computer", ""))
             continue
         when = _pu.newest_commit(path)
+        from ..core import repo_remote as _rr
+        slug = _repo.github_slug(r.remote_url or _rr.origin_of(path))
         repo_rows.append((r.name, r.role, _home_path(path),
-                          f"newest commit {when.date().isoformat()}" if when else "no commits yet"))
+                          (f"newest commit {when.date().isoformat()}" if when else "no commits yet")
+                          + (f"; GitHub {slug}" if slug else "; no GitHub remote")))
     for line in _rows(repo_rows) or ["  (none)"]:
         click.echo(line)
 

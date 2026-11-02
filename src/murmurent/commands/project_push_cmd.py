@@ -567,19 +567,14 @@ def push_project(name: str, *, message: str | None = None,
 
 def _maybe_post_slack(name: str, report: ProjectPushReport,
                       *, env: dict | None = None) -> bool:
-    """Post ONE plain-language note to the project's Slack channel. No channel →
-    skip silently (a supported state per the plan). Best-effort: never raises."""
+    """Post ONE plain-language note to the project's Slack channel, through
+    the one resolver every note uses (``core.slack_routing``, #243/#260). No
+    channel: skip silently (a supported state). Best-effort: never raises."""
     try:
-        channel = _cp.slack_channel_for(name, env)
-        if not channel:
-            return False
-        from ..core.cert_provision import resolve_project_slack
-        _workspace, token = resolve_project_slack(name, env=env)
-        if not token:
-            return False
-        from ..dashboard import slack_notify as _sn
-        return _sn._post(channel, _slack_body(name, report), token=token)
-    except Exception:  # noqa: BLE001 — a Slack hiccup never fails a push
+        from ..core import slack_routing as _sr
+        ok, _route, _detail = _sr.post_note(_slack_body(name, report), project=name, env=env)
+        return bool(ok)
+    except Exception:  # noqa: BLE001 - a Slack hiccup never fails a push
         return False
 
 

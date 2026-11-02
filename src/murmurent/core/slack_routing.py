@@ -48,20 +48,30 @@ class Route:
     repo: str = ""
     source: str = ""        # marker | project | lab | ""
     reason: str = ""        # why there is no channel, when channel_id is empty
-    candidates: list[str] = field(default_factory=list)   # projects, when ambiguous
+    candidates: list[str] = field(default_factory=list)   # every project listing the repo
+    also: list["Route"] = field(default_factory=list)      # further channels for the same note
 
     @property
     def ok(self) -> bool:
         return bool(self.channel_id)
 
     def describe(self) -> str:
-        """One plain line for a person."""
+        """One plain line for a person; every destination when there are several."""
         if self.ok:
-            where = {"marker": "the channel set in .murmurent.yaml",
-                     "project": f"the channel of project '{self.project}'",
-                     "lab": f"the channel of lab '{self.lab}'"}.get(self.source, "its channel")
-            return f"{self.channel_id}: {where}"
+            parts = [r._describe_one() for r in (self, *self.also)]
+            return "; ".join(parts)
         return self.reason or "no Slack channel"
+
+    def _describe_one(self) -> str:
+        where = {"marker": "the channel set in .murmurent.yaml",
+                 "project": f"the channel of project '{self.project}'",
+                 "lab": f"the channel of lab '{self.lab}'"}.get(self.source, "its channel")
+        return f"{self.channel_id}: {where}"
+
+    @property
+    def all(self) -> list["Route"]:
+        """This route and every further one, in order; empty when nothing is routed."""
+        return [self, *self.also] if self.ok else []
 
 
 def _marker_for(start: Path | str | None):
@@ -99,15 +109,23 @@ def resolve_route(start: Path | str | None = None, *, project: str | None = None
     the current folder), or about ``project`` when it is named. The repository's
     own ``slack_channel`` override applies to notes about that repository, so by
     default it is honoured only when no project is named; a caller that passes
-    the folder's own project name sets ``honour_marker=True``. Never raises."""
+    the folder's own project name sets ``honour_marker=True``. Never raises.
+
+    A repository listed by several active projects is routed to each of their
+    channels (#253): the first is returned, the rest are in ``also``, and
+    ``candidates`` names every project. :func:`post_note` posts to all of them.
+    """
     if honour_marker is None:
         honour_marker = not project
     from . import cert_projects as _cp
 
     route = Route()
     repo_path, marker = _marker_for(start)
+    rname = ""
     if repo_path is not None:
-        route.repo = repo_path.name
+        from .repo import repo_name as _repo_name
+        rname = _repo_name(repo_path)
+        route.repo = rname
         route.lab = str(marker.get("lab") or "").removeprefix("lab_")
         # The repository's own override applies to notes ABOUT this repository;
         # a caller naming another project is asking about that project.
@@ -124,41 +142,46 @@ def resolve_route(start: Path | str | None = None, *, project: str | None = None
                             f"{override!r}, which is not a Slack channel id (C…)")
             return route
 
-    name = (project or "").strip()
-    if not name and repo_path is not None:
-        owners = [p for p in _cp.owning_projects(repo_path.name, env=env)
-                  if p.status == "active"] or _cp.owning_projects(repo_path.name, env=env)
-        if len(owners) > 1:
-            route.candidates = sorted(p.name for p in owners)
-            route.reason = (f"repository '{repo_path.name}' is listed by "
-                            f"{len(owners)} projects ({', '.join(route.candidates)}); "
-                            "a note cannot be routed until one of them drops it "
-                            "from its record or the repository's .murmurent.yaml "
-                            "names a slack_channel")
-            return route
-        if owners:
-            name = owners[0].name
-        else:
-            name = _cp.project_name_for_cwd(repo_path, env=env) or ""
-    if name:
+    names: list[str] = []
+    if (project or "").strip():
+        names = [project.strip()]
+    elif repo_path is not None:
+        owners = [p for p in _cp.owning_projects(rname, env=env)
+                  if p.status == "active"] or _cp.owning_projects(rname, env=env)
+        names = [p.name for p in owners]
+        if not names:
+            placeholder = _cp.project_name_for_cwd(repo_path, env=env) or ""
+            names = [placeholder] if placeholder else []
+    route.candidates = list(names) if len(names) > 1 else []
+
+    routed: list[Route] = []
+    unrouted: list[str] = []
+    for name in names:
         rec = _cp.get(name, env)
         if rec is None:
-            route.reason = (f"no Slack channel is recorded for the project '{name}' "
-                            "(there is no project record of that name)")
             if repo_path is None:
+                route.reason = (f"no Slack channel is recorded for the project '{name}' "
+                                "(there is no project record of that name)")
                 return route
-        else:
-            route.project = rec.name
-            route.lab = route.lab or str(rec.lab or "").removeprefix("lab_")
-            if rec.slack_channel_id:
-                route.channel_id, route.source = rec.slack_channel_id, "project"
-                return route
-            route.reason = (f"no Slack channel is recorded for the project '{rec.name}' "
+            unrouted.append(f"no Slack channel is recorded for the project '{name}' "
+                            "(there is no project record of that name)")
+            continue
+        route.lab = route.lab or str(rec.lab or "").removeprefix("lab_")
+        if rec.slack_channel_id and rec.slack_channel_id not in [r.channel_id for r in routed]:
+            routed.append(Route(channel_id=rec.slack_channel_id, project=rec.name,
+                                lab=route.lab, repo=rname, source="project"))
+        elif not rec.slack_channel_id:
+            unrouted.append(f"no Slack channel is recorded for the project '{rec.name}' "
                             f"yet; the PI runs `murmurent project provision-slack {rec.name}`")
-    elif repo_path is None:
+    if not names and repo_path is None:
         route.reason = ("this folder is not inside a murmurent repository "
                         "(no .murmurent.yaml), so there is no project to notify")
         return route
+    if routed:
+        first = routed[0]
+        first.candidates, first.also = route.candidates, routed[1:]
+        return first
+    route.reason = "; ".join(unrouted)
 
     if not route.lab:
         try:
@@ -201,19 +224,34 @@ def post_note(text: str, *, start: Path | str | None = None, project: str | None
     route = resolve_route(start, project=project, env=env)
     if not route.ok:
         return False, route, f"not posted: {route.reason}"
-    tok = token if token is not None else token_for(route)
-    if not tok:
-        who = f"project '{route.project}'" if route.project else f"lab '{route.lab}'"
-        return False, route, f"not posted: no Slack bot token on this machine for {who}"
     if poster is None:
         from ..dashboard.slack_notify import _post as poster  # noqa: PLC0415
-    try:
-        ok = bool(poster(route.channel_id, text, token=tok))
-    except Exception as exc:  # noqa: BLE001
-        return False, route, f"not posted: Slack error ({exc})"
-    return ok, route, (f"posted to {route.describe()}" if ok
-                       else f"not posted: Slack refused the message for {route.channel_id} "
-                            "(is the bot a member of that channel?)")
+    # A repository in several projects: one post per project channel (#253).
+    # Each is reported on its own; the call succeeds when every post did.
+    results: list[str] = []
+    all_ok = True
+    for one in route.all:
+        tok = token if token is not None else token_for(one)
+        if not tok:
+            who = f"project '{one.project}'" if one.project else f"lab '{one.lab}'"
+            results.append(f"not posted: no Slack bot token on this machine for {who}; "
+                           f"run `murmurent group-slack-setup {one.lab or '<lab>'}` here "
+                           "once (the token is per machine)")
+            all_ok = False
+            continue
+        try:
+            ok = bool(poster(one.channel_id, text, token=tok))
+        except Exception as exc:  # noqa: BLE001
+            results.append(f"not posted: Slack error ({exc})")
+            all_ok = False
+            continue
+        if ok:
+            results.append(f"posted to {one._describe_one()}")
+        else:
+            results.append(f"not posted: Slack refused the message for {one.channel_id} "
+                           "(is the bot a member of that channel?)")
+            all_ok = False
+    return all_ok, route, "; ".join(results)
 
 
 __all__ = ["Route", "resolve_route", "token_for", "post_note"]

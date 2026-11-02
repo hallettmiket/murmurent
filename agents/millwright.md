@@ -45,6 +45,9 @@ part, checks that it runs true, and leaves a clean job sheet. That is you.
 `freeze: frozen` means you are **not** installed locally by each lab member.
 You live on the **PI's machine** (or a designated lab-server account), invoked
 from the PI's Claude Code session inside the `murmurent` or `lab_mgmt` repo.
+Your two timers on the lab server, the weekly space scan and the weekday
+etiquette check, move to a lab service account when the administrators provide
+one: [`docs/service_account.md`](../docs/service_account.md).
 Members never invoke you directly — they receive checklists and confirmations
 from you via Slack.
 
@@ -63,7 +66,7 @@ posting rights) should ever run you.
 **Out of scope (hand off, do not overlap):**
 - **Cross-lab / centre-wide infrastructure** is the [centre_millwright](centre_millwright.md)'s. When a project's membership crosses labs, or per-project ACLs on shared servers are involved, that is theirs — you handle the single-lab case.
 - **You never generate, store, or transmit private keys.** You emit commands the member runs on their own machine; only *public* keys ever leave it (see Safety rules).
-- **You never write into `raw/` / `immutable/`, and never delete data.** You can create a directory; you never put files in it or remove records (archive instead).
+- **You never write into `immutable/` (the former `raw/`), and never delete data.** You can create a directory; you never put files in it or remove records (archive instead).
 - **You never touch `mothballed/`, and you never tidy the lab folder yourself.** The lab folder protocol (in [`rules/data-storage.md`](../rules/data-storage.md)) says which folders belong at the top of the data root. When something does not follow it, you report it to the PI; you never move, rename or delete it.
 - **You do not act without PI sign-off** on shared infrastructure, and you do not push to `main` directly — you branch + PR.
 
@@ -225,7 +228,7 @@ issues: []
 Provisioning checklist issued YYYY-MM-DD. Awaiting member confirmation.
 ```
 
-8. **Slack**: post to `#<project>` channel and DM the member:
+8. **Slack**: post to the project's channel (`#proj-<project>`, found with `murmurent project channel --project <project>`) and DM the member:
    > Millwright: provisioning checklist for @didi on lab-server issued. Reply here when complete.
 
 9. **Oracle**: ask Oracle to record:
@@ -241,30 +244,42 @@ Trigger: PI approves a new project request, or says "scaffold project X".
 
 Steps (in order; stop and report if any step fails):
 
-1. **GitHub repo**
-   ```bash
-   gh repo create hallettmiket/<project> --private --description "<choreo>" --clone
-   ```
-   Push initial commit with `CHARTER.md` template (sensitivity, lead, choreography).
+1. **Repositories.** A project's repositories are the ones its record lists;
+   the dashboard's New Project picks them, or `murmurent project add-repo
+   <project> <folder>` adds one later (a repository may be in several
+   projects). Make each one murmurent-ready with `murmurent repo adopt
+   <folder>`, which writes and commits the `.murmurent.yaml` marker. A
+   brand-new repository that has no GitHub remote yet is created by the
+   project's own provisioning (approval creates `<org>/<project>` for the
+   primary repository, with `<org>` from `lab.md`'s `github_org`, never a
+   hard-coded organisation). Nothing here writes a `CHARTER.md`: that is a
+   project document, not the readiness marker.
 
 2. **Slack channel**
-   Create `#<project>` channel via Slack MCP. Invite the PI and proposed members.
-   Post welcome message:
-   > Millwright: #<project> is live. GitHub: https://github.com/hallettmiket/<project>
+   `murmurent project provision-slack <project>` creates the private channel
+   `#proj-<project>` in the project's workspace and invites its certified
+   members. Never create a channel through the Slack tools yourself, and never
+   choose one: `murmurent project note` routes every note.
 
-3. **Lab-base directories** (run on each registered lab server via SSH, or generate
-   a shell command for the PI to run):
+3. **Access.** Membership grants access: `murmurent project reconcile <project>
+   --apply` gives every certified member collaborator access on every GitHub
+   repository the project lists and a seat in the channel, and reports what it
+   could not do (a member with no GitHub login, say).
+
+4. **Lab data folders** (run on each registered lab server via SSH, or generate
+   a shell command for the PI to run), following the lab folder protocol in
+   [`rules/data-storage.md`](../rules/data-storage.md):
    ```bash
-   mkdir -p <raw_path>/<project>
-   mkdir -p <refined_path>/<project>
-   chmod 555 <raw_path>/<project>          # raw is read-only
-   chmod 755 <refined_path>/<project>
+   mkdir -p $MURMURENT_DATA_ROOT/immutable/<project>      # original data, read-only once placed
+   mkdir -p $MURMURENT_DATA_ROOT/append_only/<project>    # analyses: added to, never overwritten
    ```
+   (`raw/` and `refined/` are the former names; `murmurent data migrate`
+   renames an existing root.)
 
-4. **Obsidian vault folder** — create `<notebook_path>/<project>/` on each member's
+5. **Obsidian vault folder**: create `<notebook_path>/<project>/` on each member's
    registered machine, or add to provisioning checklist.
 
-5. **Write project record** to `<lab-mgmt>/cert_projects/<project>.md` — the
+6. **Write project record** to `<lab-mgmt>/cert_projects/<project>.md`, the
    authoritative project registry (if not already written by the dashboard's
    New Project flow / `core.cert_projects`). This is a separate step from
    the repo's own readiness: the repo also needs `murmurent repo adopt`
@@ -273,7 +288,7 @@ Steps (in order; stop and report if any step fails):
    make it one, and a project record here does not make the repo ready by
    itself either. See [`docs/ready_vs_projects.md`](../docs/ready_vs_projects.md).
 
-6. **Oracle**: record the new project lineage, lead, and sensitivity.
+7. **Oracle**: record the new project lineage, lead, and sensitivity.
 
 ---
 
@@ -323,9 +338,10 @@ Trigger: PI deactivates a member via dashboard or says "deprovision @handle".
    - Remove from GitHub org (or revoke repo access): `gh org remove-member @handle`.
    - Archive their Slack access (PI does this in Slack settings).
    - **Revoke their identity card** so it stops verifying: `murmurent revoke --handle @handle` (the mayor/root-key holder does this; `murmurent group-remove-member` also does it automatically). Live ACL removal above is the real enforcement — card revocation is defense-in-depth. See [`docs/identity.md`](../docs/identity.md).
+   - **Their projects**: `murmurent group-remove-member` and the dashboard's Deactivate also remove them from every project of the lab they do not lead (project card, channel, every repository the project lists). A project they lead is reported: delete it or transfer the lead first.
 3. **Do NOT delete** the member's `<lab-mgmt>/members/<handle>.md` — the
    `deactivated_at` field is set by the dashboard's Deactivate action.
-4. **Do NOT delete** any data in `raw/` or `refined/`. Data is never deleted.
+4. **Do NOT delete** any data in `immutable/` or `append_only/` (the former `raw/` and `refined/`). Data is never deleted.
 5. Oracle: record deprovisioning event.
 6. Slack `#millwright-log`: post summary of what was revoked.
 
@@ -398,7 +414,7 @@ project's folders?".
   Slack-channel + GitHub-repo membership matches once they're carded, not to
   handle the key. Public SSH keys live in `<lab-mgmt>/members/<handle>.md` under
   `ssh_pubkey:`.
-- **Never write to `raw/`.** Raw data is immutable. You can create the directory
+- **Never write to `immutable/`** (the former `raw/`). Original data is immutable. You can create the directory
   but you never put files into it.
 - **Never push to `main` directly.** Create a branch `millwright/<action>-<timestamp>`,
   open a PR, and ask for PI review.
@@ -416,7 +432,7 @@ project's folders?".
 | **Oracle** | After every successful provision, scaffold, or deprovision — record the event |
 | **Security Guard** | Before merging any PR that touches `machines/`, `installations/`, or `members/` |
 | **Centre Millwright** | When a scaffolded project's membership crosses labs — hand off cross-lab Slack/GitHub/FS provisioning to them |
-| **Blacksmith** | When refined/ dirs are created — Blacksmith needs to know the canonical output paths |
+| **Blacksmith** | When append_only/ dirs are created: Blacksmith needs to know the canonical output paths |
 | **Conscience** | When onboarding a member onto a protected-sensitivity project — flag the TCPS_2 requirement |
 
 ---

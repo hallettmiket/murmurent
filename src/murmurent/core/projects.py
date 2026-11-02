@@ -100,7 +100,7 @@ def load_summary(repo: ProjectRepo) -> ProjectSummary:
     deco_at = parsed.meta.get("decommissioned_at")
     deco_by = parsed.meta.get("decommissioned_by")
     return ProjectSummary(
-        name=str(parsed.meta.get("project", repo.path.name)),
+        name=str(parsed.meta.get("project", repo.name)),
         path=repo.path,
         sensitivity=_sens.normalize(parsed.meta["sensitivity"]),
         lead=str(parsed.meta["lead"]),

@@ -343,6 +343,12 @@ class ProjectRow(BaseModel):
     # (7) members on the record who hold NO project card yet — drives the
     # lead's "issue certs" button (the creator≠PI flow).
     uncertified_members: list[str] = []
+    # (#258) people invited by email whom murmurent has not met yet:
+    # [{email, by, at}]. The handle takes the entry's place on enrollment.
+    invited_members: list[dict] = []
+    # (#259) for a project known only from the viewer's card bundle: the date
+    # of the team and repository list the bundle carried. None otherwise.
+    card_as_of: str | None = None
     # (7) the VIEWER's verified standing on this project, from their locally
     # stored card bundle: "lead" | "member" | "none".
     my_cert: str = "none"

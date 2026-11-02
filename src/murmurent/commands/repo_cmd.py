@@ -218,35 +218,41 @@ def cmd_status(target: str, host_name: str | None) -> int:
 
 
 def cmd_adopt(*, path: str, lab: str | None, agents_csv: str | None,
-              host_name: str, all_agents: bool = False) -> int:
+              host_name: str, all_agents: bool = False, commit: bool = True) -> int:
     """Make an existing clone murmurent-ready (CLI twin of the Repos
     panel's ↑ adopt button). Every repository belongs to a project (#151),
     so when no project lists this one, a one-repository project is written
     for it; an existing project is never changed.
 
-    ``all_agents`` links every agent in the commons. It exists because the
-    alternative was to name them: with neither option, adopt makes the repo
-    ready with an EMPTY ``.claude/agents/``, which is rarely what anyone
-    wants and is invisible until an agent turns out to be missing. Telling a
-    newcomer to type ``--agents oracle,blacksmith`` instead made them invent a
-    choice they had no basis for making."""
+    Which agents are linked: the ones named with ``--agents``; else, for a
+    repository with no marker yet, every agent in the commons, which is what
+    the dashboard's Make ready picks too (#257: the two used to disagree,
+    none against nearly all); else the existing marker's picks.
+    ``--all-agents`` still links every agent, and adds them to an existing
+    pick. The marker and the CLAUDE.md stub are committed unless
+    ``--no-commit``."""
+    from ..core import repo_ready as _rr
     from ..core.commons import commons_root
 
     agents = ([a.strip() for a in agents_csv.split(",") if a.strip()]
               if agents_csv else None)
-    if all_agents:
+    if agents == ["none"]:            # deliberately link nothing
+        agents = []
+    fresh = host_name == "local" and _rr.read_marker(Path(path).expanduser()) is None
+    if all_agents or (agents is None and fresh):
         src = commons_root() / "agents"
         found = sorted(p.stem for p in src.glob("*.md")) if src.is_dir() else []
-        if not found:
+        if not found and all_agents:
             raise click.ClickException(
                 f"no agents found in {src} — is murmurent installed? "
                 "Run `murmurent doctor`."
             )
-        agents = sorted(set((agents or []) + found))
+        if found:
+            agents = sorted(set((agents or []) + found))
     try:
         outcome = _adopt.adopt_clone(
             clone_path=path, lab=(lab or "").strip(),
-            agents=agents, host=host_name,
+            agents=agents, host=host_name, commit=commit,
         )
     except _adopt.AdoptError as exc:
         raise click.ClickException(str(exc)) from exc

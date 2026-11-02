@@ -347,6 +347,10 @@ def space_scan_lab(no_checksums: bool, notify: bool) -> None:
         # the PI turned the audit off does nothing and reports no failure.
         click.echo(_sl.TURNED_OFF + " Nothing was scanned.")
         return
+    from ..core.roster_sync import refresh_note
+    note = refresh_note()
+    if note:
+        click.echo(f"  {note}")
     _lower_priority()
     try:
         report = _sl.scan_lab(checksums=not no_checksums,

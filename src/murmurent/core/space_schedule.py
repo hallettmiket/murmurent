@@ -16,7 +16,9 @@ set to catch up: a run missed while nobody was logged in happens at the next
 login. :func:`status` says which case applies.
 
 Moving the job to a lab service account later is the same command run under
-that account; nothing here names a person.
+that account; nothing here names a person. ``docs/service_account.md`` walks
+through it, including the shared folder (``space_dir`` in the lab's policy)
+that lets the PI read the table the service account writes.
 """
 
 from __future__ import annotations
@@ -35,7 +37,8 @@ DAYS = {"mon": "Mon", "tue": "Tue", "wed": "Wed", "thu": "Thu", "fri": "Fri",
 
 #: Settings the scan needs that a timer would not otherwise see.
 CARRIED_ENV = ("MURMURENT_HOME", "MURMURENT_DATA_ROOT", "MURMURENT_LAB_MGMT_REPO",
-               "MURMURENT_USER", "MURMURENT_MILLWRIGHT_POLICY", "MURMURENT_REPOS_ROOT")
+               "MURMURENT_USER", "MURMURENT_MILLWRIGHT_POLICY", "MURMURENT_REPOS_ROOT",
+               "MURMURENT_SPACE_DIR")
 
 Runner = Callable[[list[str]], subprocess.CompletedProcess]
 
@@ -178,6 +181,14 @@ def remove(*, run: Runner = _run) -> ScheduleStatus:
     return result
 
 
+def _space_dir_display() -> str:
+    """The space folder as a person would write it (``~`` for the home folder)."""
+    from .project_unit import space_dir
+    path = str(space_dir())
+    home = str(Path.home())
+    return "~" + path[len(home):] if path.startswith(home + "/") else path
+
+
 _BEGIN = "<!-- murmurent-space-scan: begin -->"
 _END = "<!-- murmurent-space-scan: end -->"
 
@@ -210,7 +221,7 @@ def record(when: str, *, env: dict[str, str] | None = None) -> Path | None:
                  f"- **Runs:** `murmurent space scan-lab --notify`, at the lowest priority\n"
                  "- **May:** read sizes, dates, owners and names under the lab's data "
                  "folder; read large same-sized files to fingerprint them; write its "
-                 "table and report in the account's own `~/.murmurent/space/`; send the "
+                 f"table and report in `{_space_dir_display()}`; send the "
                  "PI one Slack message with the lab's bot.\n"
                  "- **May not:** change, move or delete any file; use administrator "
                  "rights; write to GitHub.\n"

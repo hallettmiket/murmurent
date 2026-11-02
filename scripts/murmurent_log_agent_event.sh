@@ -9,10 +9,13 @@
 #   PreToolUse(Agent) → "<agent>: starting — <description>"
 #   SubagentStop      → "<agent>: done"
 #
-# Spoken verdicts (macOS only): when ~/.murmurent/speak exists, each
-# SubagentStop line is also read aloud with the built-in `say` command, one
-# voice per agent. The file is both the on switch and the voice table: empty
-# means the defaults below; a line "<agent> <voice>" overrides one agent.
+# Spoken verdicts: when ~/.murmurent/speak exists, each SubagentStop line is
+# also read aloud, one voice per agent. Two engines: Piper (neural voices,
+# Mac and Linux, installed by scripts/install_piper_voices.sh) is used when
+# the `piper` command and its voices are present; else the macOS `say`
+# command; else Linux `spd-say`. The file is both the on switch and the voice
+# table: empty means the defaults below; a line "<agent> <voice>" overrides
+# one agent, and a line "engine say|piper|spd-say" forces an engine.
 # MURMURENT_SPEAK=0 mutes everything for one session; MURMURENT_SPEAK=1 turns
 # it on without the file. The main session never speaks: only a dispatched
 # subagent carries an agent type, and nothing else reaches this branch.
@@ -179,18 +182,90 @@ default_voice() {
     esac
 }
 
-# The voice for an agent: the override line in $SPEAK_FILE if there is one
-# ("<agent> <voice name, may contain spaces>"), else the default above.
-voice_for() {
-    local agent="$1" line
-    if [[ -f "$SPEAK_FILE" ]]; then
-        line="$(grep -E "^[[:space:]]*${agent}[[:space:]]+" "$SPEAK_FILE" 2>/dev/null | tail -n 1 || true)"
-        if [[ -n "$line" ]]; then
-            printf '%s' "$line" | sed -E "s/^[[:space:]]*${agent}[[:space:]]+//; s/[[:space:]]*$//"
-            return 0
-        fi
+# The default Piper voice per agent (scripts/install_piper_voices.sh fetches
+# them into $VOICES_DIR). Each is a distinct single-speaker English voice.
+VOICES_DIR="${MURMURENT_VOICES_DIR:-$HOME/.murmurent/voices}"
+default_piper_voice() {
+    case "$1" in
+        adversary)         echo "en_GB-alba-medium" ;;
+        conscience)        echo "en_GB-jenny_dioco-medium" ;;
+        judge)             echo "en_GB-alan-medium" ;;
+        bookworm)          echo "en_GB-southern_english_female-low" ;;
+        oracle)            echo "en_US-amy-medium" ;;
+        lab_oracle)        echo "en_US-kristin-medium" ;;
+        blacksmith)        echo "en_US-ryan-medium" ;;
+        artist)            echo "en_US-hfc_female-medium" ;;
+        teacher)           echo "en_US-norman-medium" ;;
+        scribe)            echo "en_US-joe-medium" ;;
+        lawyer)            echo "en_GB-northern_english_male-medium" ;;
+        millwright)        echo "en_US-john-medium" ;;
+        centre_millwright) echo "en_US-bryce-medium" ;;
+        registrar)         echo "en_GB-cori-medium" ;;
+        security_guard)    echo "en_US-hfc_male-medium" ;;
+        *)                 echo "en_US-lessac-medium" ;;
+    esac
+}
+
+# A line "<key> <value>" from $SPEAK_FILE, last one wins; empty if none.
+speak_setting() {
+    local key="$1" line
+    [[ -f "$SPEAK_FILE" ]] || return 0
+    line="$(grep -E "^[[:space:]]*${key}[[:space:]]+" "$SPEAK_FILE" 2>/dev/null | tail -n 1 || true)"
+    [[ -n "$line" ]] && printf '%s' "$line" | sed -E "s/^[[:space:]]*${key}[[:space:]]+//; s/[[:space:]]*$//"
+    return 0
+}
+
+# Which engine speaks: the "engine" line in $SPEAK_FILE if there is one, else
+# piper when it is installed with its default voice, else say, else spd-say.
+speak_engine() {
+    local e
+    e="$(speak_setting engine)"
+    if [[ -n "$e" ]]; then echo "$e"; return 0; fi
+    if command -v piper >/dev/null 2>&1 && [[ -f "$VOICES_DIR/$(default_piper_voice _)".onnx ]]; then
+        echo piper
+    elif command -v say >/dev/null 2>&1; then
+        echo say
+    elif command -v spd-say >/dev/null 2>&1; then
+        echo spd-say
     fi
-    default_voice "$agent"
+}
+
+# Something that plays a wav file: afplay on a Mac, else the usual Linux ones.
+wav_player() {
+    local p
+    for p in afplay paplay aplay pw-play ffplay; do
+        command -v "$p" >/dev/null 2>&1 && { echo "$p"; return 0; }
+    done
+}
+
+# The voice for an agent: the override line in $SPEAK_FILE if there is one
+# ("<agent> <voice name, may contain spaces>"), else the default for the
+# engine in use.
+voice_for() {
+    local agent="$1" engine="$2" v
+    v="$(speak_setting "$agent")"
+    if [[ -n "$v" ]]; then printf '%s' "$v"; return 0; fi
+    if [[ "$engine" == piper ]]; then default_piper_voice "$agent"; else default_voice "$agent"; fi
+}
+
+# Piper: synthesise to a temporary wav and play it. A voice is a model name in
+# $VOICES_DIR or a path to an .onnx file. A voice with no model (for example
+# a Mac `say` name left in the speak file) falls back to the agent's default
+# Piper voice, then to the general default, then to silence.
+speak_with_piper() {
+    local agent="$1" voice="$2" text="$3" model player wav
+    model="$voice"; [[ "$model" != *.onnx ]] && model="$VOICES_DIR/$model.onnx"
+    [[ -f "$model" ]] || model="$VOICES_DIR/$(default_piper_voice "$agent").onnx"
+    [[ -f "$model" ]] || model="$VOICES_DIR/$(default_piper_voice _).onnx"
+    [[ -f "$model" ]] || return 0
+    player="$(wav_player)"; [[ -n "$player" ]] || return 0
+    wav="$(mktemp "${TMPDIR:-/tmp}/murmurent_verdict.XXXXXX").wav"
+    printf '%s\n' "$text" | piper -m "$model" -f "$wav" >/dev/null 2>&1 || { rm -f "$wav"; return 0; }
+    case "$player" in
+        ffplay) ffplay -nodisp -autoexit -loglevel quiet "$wav" ;;
+        *)      "$player" "$wav" ;;
+    esac
+    rm -f "$wav"
 }
 
 # Read "<agent>. <verdict>" aloud, in the background, one voice at a time.
@@ -201,7 +276,10 @@ speak_verdict() {
     local agent="$1" text="$2" voice clean name
     [[ "${MURMURENT_SPEAK:-}" == "0" ]] && return 0
     [[ "${MURMURENT_SPEAK:-}" != "1" && ! -f "$SPEAK_FILE" ]] && return 0
-    command -v say >/dev/null 2>&1 || return 0
+    local engine
+    engine="$(speak_engine)"
+    [[ -n "$engine" ]] || return 0
+    command -v "$engine" >/dev/null 2>&1 || return 0
     # The stop event can fire twice for one agent; say each verdict once.
     local stamp="$HOME/.murmurent/.last_spoken" now key
     now="$(date +%s)"; key="$(printf '%s|%s' "$agent" "$text" | cksum | awk '{print $1}')"
@@ -212,7 +290,7 @@ speak_verdict() {
         fi
     fi
     printf '%s %s\n' "$now" "$key" > "$stamp"
-    voice="$(voice_for "$agent")"
+    voice="$(voice_for "$agent" "$engine")"
     name="${agent//_/ }"
     # What is read: the headline only (the first sentence of the first line),
     # with web addresses, file paths, identifiers and markdown marks removed.
@@ -238,12 +316,13 @@ print(t[:200])
 ')"
     [[ -z "$clean" ]] && clean="done"
     (
-        while pgrep -xq say; do sleep 0.3; done
-        if [[ -n "$voice" ]]; then
-            say -v "$voice" -- "$name. $clean"
-        else
-            say -- "$name. $clean"
-        fi
+        # One verdict at a time, whichever engine or player is talking.
+        while pgrep -q -x 'say|spd-say|piper|afplay|paplay|aplay|pw-play|ffplay'; do sleep 0.3; done
+        case "$engine" in
+            piper)   speak_with_piper "$agent" "$voice" "$name. $clean" ;;
+            spd-say) if [[ -n "$voice" ]]; then spd-say -w -y "$voice" -- "$name. $clean"; else spd-say -w -- "$name. $clean"; fi ;;
+            *)       if [[ -n "$voice" ]]; then say -v "$voice" -- "$name. $clean"; else say -- "$name. $clean"; fi ;;
+        esac
     ) </dev/null >/dev/null 2>&1 &
     disown 2>/dev/null || true
 }

@@ -330,36 +330,71 @@ def _default_collaborator(org: str, name: str, login: str):
     return (res.returncode == 0, (res.stderr or res.stdout or "").strip())
 
 
+def project_github_repos(cp: "_cp.CertProject", *, env: dict | None = None) -> list[str]:
+    """``owner/name`` of every GitHub repository the project lists (#255): from
+    each entry's ``remote_url``, else from the local clone's ``origin``. The
+    older project-level ``github_repo`` is kept in the list while a record
+    still carries one, so access there is revoked like anywhere else."""
+    from pathlib import Path as _P
+    from .repo import github_slug as _slug
+    from .repo_paths import _origin
+    slugs: list[str] = []
+    for r in cp.repos:
+        slug = _slug(r.remote_url) if r.remote_url else ""
+        if not slug and (r.host or "local") == "local" and r.path:
+            path = _P(r.path).expanduser()
+            if (path / ".git").exists():
+                slug = _slug(_origin(path))
+        if slug and slug not in slugs:
+            slugs.append(slug)
+    legacy = cp.github_repo if "/" in str(cp.github_repo or "") else ""
+    if legacy and legacy not in slugs:
+        slugs.append(legacy)
+    return slugs
+
+
 def provision_github(project: str, *, org: str | None = None, lab: str | None = None,
                      env: dict | None = None, repo_creator=None,
-                     collaborator=None) -> dict:
-    """Ensure a private GitHub repo for cert-project ``project`` and add its
-    certified members as collaborators (by their github login on the roster).
-    Stamps ``github_repo`` on the record. ``org`` defaults to ``lab.md``'s
-    github_org. Injectable ``repo_creator`` / ``collaborator`` seams default to
-    the real ``gh`` calls and degrade gracefully when gh is missing."""
+                     collaborator=None, create: bool = False) -> dict:
+    """Give a project's certified members collaborator access on every GitHub
+    repository the project lists (#255). Each member's GitHub login comes from
+    the roster. Nothing is created: a project's repositories are the ones on
+    its record (``murmurent project add-repo``).
+
+    ``create=True`` is the older behaviour, kept for a project with no
+    repository at all yet: make a private ``<org>/<project>`` repository, stamp
+    it as ``github_repo`` and grant access there. ``org`` defaults to
+    ``lab.md``'s github_org. Injectable ``repo_creator`` / ``collaborator`` seams
+    default to the real ``gh`` calls and degrade gracefully when gh is missing."""
     cp = _cp.get(project, env)
     if cp is None:
         raise CertProvisionError(f"no cert-project named {project!r}")
-    if not org:
-        try:
-            from .lab import load_lab_config
-            org = load_lab_config().github_org
-        except Exception:  # noqa: BLE001
-            org = ""
-    if not org:
-        return {"ok": False, "error": "no_github_org",
-                "detail": "no github org (set github_org in lab.md or pass --org)",
-                "repo": None, "collaborators": []}
-    repo_creator = repo_creator or _default_repo_creator
     collaborator = collaborator or _default_collaborator
+    repos = project_github_repos(cp, env=env)
 
-    ok, detail = repo_creator(org, project)
-    if not ok:
-        return {"ok": False, "error": "repo_create_failed", "detail": detail,
-                "repo": None, "collaborators": []}
-    repo = f"{org}/{project}"
-    _cp.upsert(project, lab=(lab or cp.lab), github_repo=repo, env=env)
+    if create and not repos:
+        if not org:
+            try:
+                from .lab import load_lab_config
+                org = load_lab_config().github_org
+            except Exception:  # noqa: BLE001
+                org = ""
+        if not org:
+            return {"ok": False, "error": "no_github_org",
+                    "detail": "no github org (set github_org in lab.md or pass --org)",
+                    "repo": None, "repos": [], "collaborators": []}
+        repo_creator = repo_creator or _default_repo_creator
+        ok, detail = repo_creator(org, project)
+        if not ok:
+            return {"ok": False, "error": "repo_create_failed", "detail": detail,
+                    "repo": None, "repos": [], "collaborators": []}
+        repos = [f"{org}/{project}"]
+        _cp.upsert(project, lab=(lab or cp.lab), github_repo=repos[0], env=env)
+    if not repos:
+        return {"ok": False, "error": "no_repos",
+                "detail": (f"project {project!r} lists no GitHub repository; add one "
+                           f"with `murmurent project add-repo {project} <folder>`"),
+                "repo": None, "repos": [], "collaborators": []}
 
     gh_map = member_github_map([m.lstrip("@") for m in cp.members])
     results: list[dict] = []
@@ -370,10 +405,12 @@ def provision_github(project: str, *, org: str | None = None, lab: str | None = 
             results.append({"handle": h, "status": "no_github",
                             "detail": "no github login on roster"})
             continue
-        cok, cdetail = collaborator(org, project, login)
-        results.append({"handle": h, "login": login,
-                        "status": "ok" if cok else "fail", "detail": cdetail})
-    return {"ok": True, "repo": repo, "collaborators": results}
+        for slug in repos:
+            o, n = slug.split("/", 1)
+            cok, cdetail = collaborator(o, n, login)
+            results.append({"handle": h, "login": login, "repo": slug,
+                            "status": "ok" if cok else "fail", "detail": cdetail})
+    return {"ok": True, "repo": repos[0], "repos": repos, "collaborators": results}
 
 
 def _default_channel_renamer(channel_id: str, name: str, *, token: str | None = None):
@@ -655,42 +692,129 @@ def reconcile_slack(project: str, *, env: dict | None = None, apply: bool = True
 def reconcile_github(project: str, *, env: dict | None = None, apply: bool = True,
                      remove_extras: bool = True, collaborators_fetcher=None,
                      adder=None, remover=None, owner_logins=None) -> dict:
-    """Sync a cert-project's GitHub repo collaborators to its certified members:
-    add missing, remove extras (never ``owner_logins`` — the repo owner can't be a
-    collaborator). ``apply=False`` reports drift only. Reports ``not_provisioned``
-    if the project has no repo yet."""
+    """Sync the collaborators of EVERY GitHub repository the project lists to
+    its certified members (#255): add missing, remove extras (never a
+    repository's owner, nor ``owner_logins``). ``apply=False`` reports drift
+    only. Reports ``not_provisioned`` when the project lists no GitHub
+    repository. ``problems`` names what could not be done: members with no
+    GitHub login on the roster, and calls GitHub refused."""
     cp = _cp.get(project, env)
     if cp is None:
         raise CertProvisionError(f"no cert-project named {project!r}")
-    if not (cp.github_repo and "/" in cp.github_repo):
-        return {"ok": False, "error": "not_provisioned", "added": [], "removed": []}
-    org, name = cp.github_repo.split("/", 1)
+    repos = project_github_repos(cp, env=env)
+    if not repos:
+        return {"ok": False, "error": "not_provisioned", "repos": [], "per_repo": [],
+                "added": [], "removed": [], "to_add": [], "to_remove": [],
+                "in_sync": True, "problems": ["the project lists no GitHub repository"]}
     collaborators_fetcher = collaborators_fetcher or _default_collaborators_fetcher
     adder = adder or _default_collaborator
     remover = remover or _default_collab_remover
 
     handles = [m.lstrip("@").lower() for m in cp.members]
-    desired = set(member_github_map(handles).values())
-    actual = set(collaborators_fetcher(org, name))
+    gh_map = member_github_map(handles)
+    desired = set(gh_map.values())
+    problems = [f"@{h} has no GitHub login on the roster, so no access was granted"
+                for h in handles if not gh_map.get(h)]
     protect = {str(l) for l in (owner_logins or [])}
 
-    to_add = sorted(desired - actual)
-    to_remove = sorted(actual - desired - protect) if remove_extras else []
+    per_repo: list[dict] = []
+    added_all: list[str] = []
+    removed_all: list[str] = []
+    to_add_all: list[str] = []
+    to_remove_all: list[str] = []
+    for slug in repos:
+        org, name = slug.split("/", 1)
+        actual = set(collaborators_fetcher(org, name))
+        to_add = sorted(desired - actual)
+        to_remove = sorted(actual - desired - protect - {org}) if remove_extras else []
+        added, removed = [], []
+        if apply:
+            for login in to_add:
+                ok, detail = adder(org, name, login)
+                if ok:
+                    added.append(login)
+                else:
+                    problems.append(f"could not add {login} to {slug}: {detail}")
+            for login in to_remove:
+                ok, detail = remover(org, name, login)
+                if ok:
+                    removed.append(login)
+                else:
+                    problems.append(f"could not remove {login} from {slug}: {detail}")
+        per_repo.append({"repo": slug, "to_add": to_add, "to_remove": to_remove,
+                         "added": added, "removed": removed,
+                         "in_sync": not to_add and not to_remove})
+        to_add_all += [l for l in to_add if l not in to_add_all]
+        to_remove_all += [l for l in to_remove if l not in to_remove_all]
+        added_all += [l for l in added if l not in added_all]
+        removed_all += [l for l in removed if l not in removed_all]
+    return {"ok": True, "repo": repos[0], "repos": repos, "per_repo": per_repo,
+            "added": added_all if apply else [], "to_add": to_add_all,
+            "removed": removed_all if apply else [], "to_remove": to_remove_all,
+            "in_sync": not to_add_all and not to_remove_all,
+            "problems": problems}
 
-    added, removed = [], []
-    if apply:
-        for login in to_add:
-            ok, _d = adder(org, name, login)
-            if ok:
-                added.append(login)
-        for login in to_remove:
-            ok, _d = remover(org, name, login)
-            if ok:
-                removed.append(login)
-    return {"ok": True, "repo": cp.github_repo,
-            "added": added if apply else [], "to_add": to_add,
-            "removed": removed if apply else [], "to_remove": to_remove,
-            "in_sync": not to_add and not to_remove}
+
+def github_login_of(handle: str, *, env: dict | None = None) -> str:
+    """The GitHub login for ``handle``: the lab roster, else the registrar for a
+    member of another group."""
+    h = str(handle).lstrip("@").lower()
+    login = member_github_map([h], env=env).get(h, "")
+    return str(login or "")
+
+
+def remove_collaborator_everywhere(project: str, handle: str, *, env: dict | None = None,
+                                   remover=None, login: str = "") -> dict:
+    """Take ``handle``'s collaborator access off every GitHub repository the
+    project lists (#255). Aimed at one person, so it is never blocked by the
+    state of anyone else. Returns ``{login, removed, failed, problems}``."""
+    cp = _cp.get(project, env)
+    if cp is None:
+        raise CertProvisionError(f"no cert-project named {project!r}")
+    remover = remover or _default_collab_remover
+    login = login or github_login_of(handle, env=env)
+    repos = project_github_repos(cp, env=env)
+    out = {"login": login, "removed": [], "failed": [], "problems": []}
+    if not login:
+        out["problems"].append(f"@{str(handle).lstrip('@')} has no GitHub login on record; "
+                               "check the repositories by hand")
+        return out
+    if not repos:
+        out["problems"].append("the project lists no GitHub repository")
+        return out
+    for slug in repos:
+        org, name = slug.split("/", 1)
+        ok, detail = remover(org, name, login)
+        if ok:
+            out["removed"].append(slug)
+        else:
+            out["failed"].append({"repo": slug, "detail": detail})
+            out["problems"].append(f"could not remove {login} from {slug}: {detail}")
+    return out
+
+
+def kick_member(project: str, handle: str, *, env: dict | None = None,
+                uid_resolver=None, kicker=None) -> dict:
+    """Remove one person from the project's channel (#255). Resolves only
+    their account, so an unresolved third party never blocks it the way the
+    fail-safe in :func:`reconcile_slack` does. Returns ``{ok, uid, detail}``."""
+    cp = _cp.get(project, env)
+    if cp is None:
+        raise CertProvisionError(f"no cert-project named {project!r}")
+    if not cp.slack_channel_id:
+        return {"ok": False, "uid": "", "detail": "the project has no Slack channel"}
+    _ws, tok = resolve_project_slack(project, env=env)
+    uid_resolver = uid_resolver or (
+        lambda hs, em: _default_uid_resolver(hs, em, token=tok or None))
+    kicker = kicker or (lambda cid, uid: _default_kicker(cid, uid, token=tok or None))
+    h = str(handle).lstrip("@").lower()
+    uid = (uid_resolver([h], member_email_map([h], env=env)) or {}).get(h)
+    if not uid:
+        return {"ok": False, "uid": "",
+                "detail": f"@{h} could not be matched to a Slack account in the "
+                          "project's workspace; remove them from the channel by hand"}
+    ok, detail = kicker(cp.slack_channel_id, uid)
+    return {"ok": bool(ok), "uid": uid, "detail": str(detail)}
 
 
 # ---------------------------------------------------------------------------

@@ -42,6 +42,8 @@ memory and infrastructure on top, when you want it.
 | Using Murmurent in a directory you already have | [Making a repo Murmurent-ready](ready_vs_projects.md) |
 | Starting a project (in your lab, or across labs) | [Creating a project](project_intra.md) |
 | A PI setting up your lab | [Group Slack setup](group_slack_setup.md) · [The lab-mgmt repo](lab_mgmt.md) |
+| A PI moving the server's space scan and etiquette check to a service account | [Running the server timers under a lab service account](service_account.md) |
+| Deciding how repositories, projects and membership should work | [Repositories and projects: review and plan](repos_and_projects_plan.md) (issues 252 to 260) |
 | A mayor bootstrapping a centre | [Centre Slack setup](slack_setup.md) · [Public directory setup](hub_setup.md) |
 | Wondering how the trust model works | [Membership IDs & the trust chain](identity.md) |
 | Looking for a command | [CLI manual](cli_manual.md) |

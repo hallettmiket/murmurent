@@ -169,7 +169,7 @@ def _push_refined(
     handle: str,
     message: str | None,
 ) -> int:
-    project_name = repo.path.name
+    project_name = repo.name
     refined_dir = lab_vm.experiment_append_only_dir(project_name, exp_slug)
     if not refined_dir.is_dir():
         raise click.ClickException(f"append-only dir not found: {refined_dir}")

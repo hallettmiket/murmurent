@@ -812,9 +812,17 @@ def _issue_leaf_as_lead(handle: str, pubkey: str, *, centre: str, group: str,
                          "card_id": p["card_id"]}, env=env)
     except Exception:  # noqa: BLE001
         pass
+    # The team, repositories and channel travel with the card (#259), so a
+    # member whose machine does not hold this lab's records still sees the
+    # project whole. Unsigned and informational: the cards remain the proof.
+    try:
+        from . import cert_projects as _cp
+        summary = _cp.project_summary(proj, env=env)
+    except Exception:  # noqa: BLE001
+        summary = None
     return {"project_card": card, "lead_card": lead_card,
             "pi_card": bundle.get("pi_card"), "group": group, "lab": lab,
-            "project": proj}
+            "project": proj, "project_summary": summary}
 
 
 def issue_project_card_from_roster(handle: str, *, project: str,
@@ -902,10 +910,7 @@ def verify_and_import_project_card(bundle, *, trust_root: str | None = None,
             raise IssuanceError(f"trust anchor: {reason}")
     pinned = _cert.load_pinned_root(centre_name)
     if pinned is None:
-        raise IssuanceError(
-            f"no pinned trust anchor for centre '{centre_name}'. Pass --trust-root "
-            "with the centre's published signing recipient (fingerprint confirmed "
-            "out-of-band).")
+        raise _no_anchor_error(centre_name, bundle)
 
     if isinstance(project_card, dict):
         v = _cert.verify_project_card(project_card, lead_card, pi_card,
@@ -1062,6 +1067,78 @@ def _write_project_delete_report(proj: str, *, group: str, revoked: int,
         extra_meta={"group": group, "revoked_cards": str(revoked)}))
 
 
+# ---------------------------------------------------------------------------
+# The trust root a member must pin, read from a bundle (issue #252)
+# ---------------------------------------------------------------------------
+
+def trust_root_of(bundle: dict) -> dict:
+    """What a member needs to know to import ``bundle``: which key to pin and
+    where it comes from. Works for every bundle shape (``pi_card`` is in all of
+    them). Returns::
+
+        {"realm": <trust realm the card names>,
+         "self_rooted": <True when the PI's own key is the root>,
+         "lab": <the PI's lab, when self-rooted>,
+         "root": <the PI's pubkey when self-rooted, else "">,
+         "import_command": <the exact command to run>,
+         "confirm": <one line on checking the key by another route>}
+
+    A lab that stands on its own has no centre: the PI's own key is the root,
+    the card carries it under ``pi_card.payload.subject.pubkey``, and the member
+    must pass it with ``--trust-root`` the first time. The key is taken from
+    the bundle here only so the PI (or an error message) can print it; the
+    member's machine deliberately never trusts it from the file alone."""
+    pi_card = (bundle or {}).get("pi_card") if isinstance(bundle, dict) else None
+    pi_p = (pi_card or {}).get("payload") or {}
+    subject = pi_p.get("subject") or {}
+    issuer = pi_p.get("issuer") or {}
+    self_rooted = bool(subject.get("fingerprint")) and \
+        issuer.get("fingerprint") == subject.get("fingerprint")
+    roles = pi_p.get("roles") or []
+    lab = str((roles[0] if roles else {}).get("group") or "") if self_rooted else ""
+    realm = ""
+    for key in ("project_card", "member_card", "lead_card", "pi_card"):
+        card = bundle.get(key) if isinstance(bundle, dict) else None
+        if isinstance(card, dict):
+            realm = str((card.get("payload") or {}).get("centre") or "")
+            if realm:
+                break
+    if self_rooted:
+        root = str(subject.get("pubkey") or "")
+        command = f"murmurent import-card bundle.json --trust-root {root}"
+        who = f"the PI of lab '{lab}'" if lab else "the PI"
+        confirm = (f"Confirm that key with {who} or the project lead by another "
+                   "route (a call, a message they send you, their lab's records) "
+                   "before you pin it: a key taken from this file cannot vouch for "
+                   "the file.")
+    else:
+        root = ""
+        command = f"murmurent centre-pin {realm}, then murmurent import-card bundle.json"
+        confirm = ("Your centre publishes its signing key; pin it once with "
+                   "`murmurent centre-pin` before importing.")
+    return {"realm": realm, "self_rooted": self_rooted, "lab": lab, "root": root,
+            "import_command": command, "confirm": confirm}
+
+
+def _no_anchor_error(centre_name: str, bundle: dict) -> "IssuanceError":
+    """The error a member sees when nothing is pinned for the realm a card
+    names. Says which key to pass and where it is, and says "lab" rather than
+    "centre" when the PI is their own root (issue #252)."""
+    info = trust_root_of(bundle)
+    if info["self_rooted"]:
+        lab = f"lab '{info['lab']}'" if info["lab"] else "this lab"
+        return IssuanceError(
+            f"no trust root pinned yet for {lab} (trust realm '{centre_name}'). "
+            f"This card is signed by the PI's own key, which you must pin the "
+            f"first time:\n    {info['import_command']}\n"
+            f"The key is also in the bundle, under pi_card.payload.subject.pubkey. "
+            f"{info['confirm']}")
+    return IssuanceError(
+        f"no pinned trust anchor for centre '{centre_name}'. Pass --trust-root "
+        "with the centre's published signing recipient (fingerprint confirmed "
+        "out-of-band).")
+
+
 def verify_and_import_member_card(bundle, *, trust_root: str | None = None,
                                   env: dict | None = None, now=None,
                                   require_crl: bool = False, crl=None) -> tuple:
@@ -1082,10 +1159,7 @@ def verify_and_import_member_card(bundle, *, trust_root: str | None = None,
             raise IssuanceError(f"trust anchor: {reason}")
     pinned = _cert.load_pinned_root(centre_name)
     if pinned is None:
-        raise IssuanceError(
-            f"no pinned trust anchor for centre '{centre_name}'. Pass --trust-root "
-            "with the centre's published signing recipient (fingerprint confirmed "
-            "out-of-band).")
+        raise _no_anchor_error(centre_name, bundle)
 
     v = _cert.verify_member_card(member_card, pi_card, root_pub=pinned, now=now,
                                  crl=crl, centre=centre_name, require_crl=require_crl)
@@ -1290,6 +1364,7 @@ __all__ = [
     "issue_pi_card", "self_issue_pi_card", "make_enrollment",
     "verify_and_import_pi_card", "issue_member_card",
     "verify_and_import_member_card", "verify_local_identity", "cards_dir",
+    "trust_root_of",
     "issue_project_lead_card", "issue_project_card_from_roster",
     "issue_project_card_pop", "verify_and_import_project_card",
     "verify_project_membership", "delete_project", "repair_project_lead",

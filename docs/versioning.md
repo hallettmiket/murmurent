@@ -15,8 +15,10 @@ reads from there:
   drifted, with `pyproject.toml` and `murmurent --version` reporting
   different versions).
 - `murmurent --version` prints `__version__` (via `cli.py`).
-- `core.repo_ready` stamps `__version__` into every murmurent-ready repo's
-  `.murmurent.yaml` as `bootstrap_version`.
+- `core.repo_ready` records `__version__` per machine
+  (`~/.murmurent/repo_bootstrap.yaml`) as the release that last linked each
+  murmurent-ready repo; it is no longer written into the committed
+  `.murmurent.yaml` (#257).
 - `Remote.murmurent_version()` reads `murmurent --version` over SSH to detect
   cross-machine drift (`host doctor`, the dashboard host health check).
 
@@ -46,11 +48,12 @@ So the version bump carries real meaning: **if the version changed, run
 `MICRO` starts at `0` and increments for a second structural release in the same
 month (`2026.7.0` → `2026.7.1`); the next month resets (`2026.8.0`).
 
-> Note: `Readiness.needs_upgrade` compares the stamped `bootstrap_version`
-> against the current version by **string inequality**, not "is older than". So
-> any version change flips every already-bootstrapped repo to
-> `needs_upgrade = True` once: the intended "a release shipped" signal. Re-stamp
-> with `murmurent repo upgrade --all`.
+> Note: `Readiness.needs_upgrade` compares the release recorded for a repo on
+> this machine against the current version by **string inequality**, not "is
+> older than". So any version change flips every already-bootstrapped repo to
+> `needs_upgrade = True` once: the intended "a release shipped" signal.
+> `murmurent install` re-links every ready repo and records the new release;
+> `murmurent repo upgrade --all` does the same by hand.
 
 ## Releasing
 

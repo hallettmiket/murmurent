@@ -133,12 +133,23 @@ def build_response(
     viewer_groups = _lens.viewer_group_paths(norm)
     home_group = viewer_groups[0][0] if viewer_groups else ""
     cert_projects_all = [v.record for v in visible if v.record is not None]
-    cert_names = {cp.name for cp in cert_projects_all}
+    # A project known only from a card bundle (#259): the bundle's summary
+    # gives its team, repositories and channel, as of the card's issue date.
+    card_only = [v for v in visible if v.record is None and v.source == "card"]
+    cert_names = {cp.name for cp in cert_projects_all} | {v.name for v in card_only}
     cert_members_by_name = {cp.name: list(cp.members) for cp in cert_projects_all}
+    cert_members_by_name.update({v.name: list(v.members) for v in card_only})
     cert_repos_by_name = {
         cp.name: [{"name": r.name, "role": r.role, "host": r.host,
                    "path": r.path, "overleaf": r.overleaf} for r in cp.repos]
         for cp in cert_projects_all}
+    cert_repos_by_name.update({
+        v.name: [{"name": str(r.get("name") or ""), "role": str(r.get("role") or "code"),
+                  "host": str(r.get("host") or "local"), "path": "",
+                  "remote_url": str(r.get("remote_url") or ""), "overleaf": False}
+                 for r in v.repos]
+        for v in card_only})
+    card_as_of_by_name = {v.name: v.as_of for v in card_only if v.as_of}
     # (7) who actually HOLDS a project card (vs merely listed) + (10) which
     # workspace hosts each project — feeds uncertified_members / slack_workspace.
     cert_certified_by_name = {
@@ -146,6 +157,8 @@ def build_response(
                   for c in cp.certs}
         for cp in cert_projects_all}
     cert_ws_by_name = {cp.name: cp.slack_workspace for cp in cert_projects_all}
+    cert_ws_by_name.update({v.name: v.slack_workspace for v in card_only if v.slack_workspace})
+    cert_invited_by_name = {cp.name: [dict(r) for r in cp.invited] for cp in cert_projects_all}
     cert_hosted_by_name = {
         v.name: v.lab for v in visible
         if v.lab and home_group and v.lab.lower() != home_group.lower()}
@@ -227,6 +240,8 @@ def build_response(
                            cert_names=cert_names, cert_members=cert_members_by_name,
                            cert_repos=cert_repos_by_name,
                            cert_certified=cert_certified_by_name,
+                           cert_invited=cert_invited_by_name,
+                           card_as_of=card_as_of_by_name,
                            cert_ws=cert_ws_by_name, viewer=norm,
                            cert_hosted=cert_hosted_by_name,
                            cert_source=cert_source_by_name),
@@ -1123,6 +1138,22 @@ def _spark_labels(today_d: _dt.date) -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _workspace_domain(group: str) -> str | None:
+    """The Slack workspace domain a group's ``lab.md`` declares, when that
+    group's records are on this machine; None otherwise (#259)."""
+    try:
+        from ..core import registrar as _reg
+        from ..core.frontmatter import parse_file as _pf
+        lab_md = _reg._group_lab_md(group)
+        if lab_md is None or not lab_md.is_file():
+            return None
+        meta = _pf(lab_md).meta or {}
+        ws = str(meta.get("slack_workspace") or "").strip()
+        return ws or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _projects(
     projects: list[ProjectSummary],
     all_seas: list[tuple[str, Sea]],
@@ -1136,8 +1167,12 @@ def _projects(
     viewer: str = "",
     cert_hosted: dict[str, str] | None = None,
     cert_source: dict[str, str] | None = None,
+    cert_invited: dict[str, list[dict]] | None = None,
+    card_as_of: dict[str, str] | None = None,
 ) -> list[C.ProjectRow]:
     cert_names = cert_names or set()
+    cert_invited = cert_invited or {}
+    card_as_of = card_as_of or {}
     cert_hosted = cert_hosted or {}
     cert_source = cert_source or {}
     cert_members = cert_members or {}
@@ -1164,7 +1199,12 @@ def _projects(
         from ..core.cert_provision import slack_channel_name as _chan_name
         slack_channel = _chan_name(p.name)   # the name provision-slack uses (proj-<name>)
         _lab_cfg = _load_lab()
-        ws = _lab_cfg.slack_workspace
+        # The link points into the workspace that hosts the project's channel
+        # (#259): the project's own workspace group, else the lab whose
+        # records hold it, else the viewer's lab. A workspace this machine
+        # knows nothing about gives no link rather than a wrong one.
+        ws_group = cert_ws.get(p.name) or cert_hosted.get(p.name) or ""
+        ws = _workspace_domain(ws_group) if ws_group else _lab_cfg.slack_workspace
         slack_url = (
             f"https://{ws}/channels/{slack_channel}"
             if ws and ws != "<set-on-first-publish>"
@@ -1262,6 +1302,8 @@ def _projects(
                     m for m in cert_members.get(p.name, [])
                     if m.lstrip("@").lower() not in cert_certified.get(p.name, set())
                 ],
+                invited_members=cert_invited.get(p.name, []),
+                card_as_of=card_as_of.get(p.name),
                 my_cert=_viewer_project_cert(p.name, viewer,
                                              cert_members.get(p.name, [])),
                 slack_workspace=(cert_ws.get(p.name) or None),

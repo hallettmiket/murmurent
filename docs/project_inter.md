@@ -52,20 +52,55 @@ Allie enters the workspace id in the form and the proposal goes through.
 (The check re-runs at approval, so it fails closed even if rosters changed
 in between.)
 
-**3. Certifying an outside member.** Carlos's key lives only on the Xia
-lab's roster, so Allie has none for him on record. He runs, on his own
-machine:
+**3. Certifying an outside member.** Allie types `@carlos` into the
+project's member box and he is on the list at once, marked *no cert*. (She
+may type his email address instead. If murmurent knows it, from her roster or
+from the Xia lab's records on her machine, it becomes `@carlos`; if not, the
+project records an invitation under the address and murmurent drafts the
+email for her to send, with the command below, where to send the file, and the
+trust root he will need. His handle takes the invitation's place when his
+enrollment arrives.)
+Carlos's key lives only on the Xia lab's roster, so Allie has none for him
+on record. He runs, on his own machine:
 
 ```bash
 murmurent enroll --project spatial_atlas
 ```
 
-and DMs Allie the JSON it prints. She pastes it into the **issue** dialog
+and DMs Allie the JSON it prints. She pastes it into the window that
+opened, or later into the **issue** dialog next to his name
 (or runs `murmurent project-add-member @carlos --project spatial_atlas
 --enrollment carlos.json`). His card is signed by Allie, chained to *her*
 lab's root (anyone in the centre can verify it) and DM'd back through the
 shared workspace. Subsequent additions take a single action: his key is now on
 record.
+
+When Allie adds him and the shared workspace is connected, Carlos also gets a
+direct message with these steps, so she does not have to send them herself.
+
+**3a. Importing the card from another lab.** Carlos's machine has pinned the
+Xia lab's root key, not Allie's. The first card he imports from her lab must
+therefore name her root, and the message that brings his bundle gives the
+exact command:
+
+```bash
+murmurent import-card bundle.json --trust-root ed25519:<Allie's key>
+```
+
+Without `--trust-root`, `import-card` stops with "no trust root pinned yet
+for lab 'allie_lab'" and prints that same command. The key is in the bundle
+too, under `pi_card.payload.subject.pubkey`, but a key taken from the file
+cannot vouch for the file: Carlos should confirm it with Allie by another
+route (a call, a message she sends, her lab's records) before pinning it. He
+does this once; every later card from her lab imports with no flag. Members of
+Allie's own lab never see this step, because they pinned her key when they
+joined the lab.
+
+**3b. What Carlos sees.** On his own dashboard the project is marked
+"hosted by" Allie's lab. If his machine holds her lab's records (a read clone
+named in the registry) the row is read from them; otherwise it shows the team,
+repositories and channel his card carried on the day it was issued, with that
+date. He sees nothing else of Allie's lab.
 
 **4. Repos in two places.** This is supported. Each repo in the project
 carries its own remote, so the code repo can push to `hallettmiket/...` while

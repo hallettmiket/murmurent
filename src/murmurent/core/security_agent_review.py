@@ -497,7 +497,8 @@ def review_project(
     project_root = Path(project_root).expanduser().resolve()
     if not project_root.is_dir():
         raise FileNotFoundError(f"project root does not exist: {project_root}")
-    project_name = project_root.name
+    from .repo import repo_name as _repo_name
+    project_name = _repo_name(project_root)
     cache_dir = cache_dir or CACHE_DIR_DEFAULT
     client = client or AnthropicAdapter()
     result = AgentReviewResult()

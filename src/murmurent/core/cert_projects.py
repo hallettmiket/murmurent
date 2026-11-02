@@ -88,10 +88,17 @@ class RepoRef:
     # a full git URL. Managed as named ``mm-mirror-<slug>`` remotes at push time;
     # ``origin`` is NEVER touched. Each mirror's push is reported separately.
     mirrors: tuple[str, ...] = ()
+    # A repository may be listed by several projects (#253). Its data lives in
+    # the folders of ONE of them, its home project: empty means this project;
+    # a name means the data is kept under that project's folders, which this
+    # project lists under ``reads_from``.
+    home: str = ""
 
     def to_dict(self) -> dict:
         d: dict = {"name": self.name, "role": self.role, "host": self.host,
                    "path": self.path}
+        if self.home:
+            d["home"] = self.home
         if self.remote_path:
             d["remote_path"] = self.remote_path
         if self.remote_url:
@@ -118,7 +125,8 @@ class RepoRef:
             overleaf=bool(d.get("overleaf")),
             repo_kind=str(d.get("repo_kind") or "github").strip().lower() or "github",
             local_repo_root=str(d.get("local_repo_root") or ""),
-            mirrors=tuple(str(m).strip() for m in (d.get("mirrors") or []) if str(m).strip()))
+            mirrors=tuple(str(m).strip() for m in (d.get("mirrors") or []) if str(m).strip()),
+            home=str(d.get("home") or "").strip())
 
 
 def _shared_repo_dict(r: "RepoRef") -> dict:
@@ -243,6 +251,14 @@ class CertProject:
     members: tuple[str, ...] = ()          # certified member handles (@-prefixed)
     # One entry per issued project card: {handle, fingerprint, card_id}.
     certs: tuple[dict, ...] = ()
+    # Cards a project lead removed on a machine that cannot sign the lab's
+    # revocation list (#255): {handle, card_id, by, at}. The PI's machine folds
+    # them into the list on its next `murmurent project reconcile`.
+    pending_revocations: tuple[dict, ...] = ()
+    # People invited by email who murmurent has not met yet (#258):
+    # {email, by, at}. The handle replaces the entry when their enrollment
+    # arrives.
+    invited: tuple[dict, ...] = ()
     # Full repo set (code + manuscript + …). Authoritative; code_repo mirrors the
     # code repo within it.
     repos: tuple[RepoRef, ...] = ()
@@ -284,6 +300,8 @@ class CertProject:
                 "decommissioned_by": self.decommissioned_by,
                 "members": list(self.members),
                 "certs": [dict(c) for c in self.certs],
+                "pending_revocations": [dict(c) for c in self.pending_revocations],
+                "invited": [dict(c) for c in self.invited],
                 "repos": [r.to_dict() for r in self.repos],
                 "data_folders": list(self.data_folders),
                 "reads_from": list(self.reads_from),
@@ -392,6 +410,9 @@ def _parse(path: Path) -> CertProject:
     meta = parse_file(path).meta or {}
     members = tuple(str(m) for m in (meta.get("members") or []))
     certs = tuple(dict(c) for c in (meta.get("certs") or []) if isinstance(c, dict))
+    pending = tuple(dict(c) for c in (meta.get("pending_revocations") or [])
+                    if isinstance(c, dict))
+    invited = tuple(dict(c) for c in (meta.get("invited") or []) if isinstance(c, dict))
     chor = meta.get("choreography")
     name = str(meta.get("project") or path.stem)
     raw_repos = [RepoRef.from_dict(r) for r in (meta.get("repos") or [])
@@ -430,6 +451,8 @@ def _parse(path: Path) -> CertProject:
         decommissioned_by=str(meta.get("decommissioned_by") or ""),
         members=members,
         certs=certs,
+        pending_revocations=pending,
+        invited=invited,
         repos=repos,
         data_folders=_str_list(meta.get("data_folders")),
         reads_from=_str_list(meta.get("reads_from")),
@@ -511,6 +534,10 @@ def _render(p: CertProject) -> str:
         meta["reads_from"] = list(p.reads_from)
     if p.retain_until:
         meta["retain_until"] = p.retain_until
+    if p.pending_revocations:
+        meta["pending_revocations"] = [dict(c) for c in p.pending_revocations]
+    if p.invited:
+        meta["invited"] = [dict(c) for c in p.invited]
     meta["members"] = list(p.members)
     meta["certs"] = [dict(c) for c in p.certs]
     front = yaml.safe_dump(meta, sort_keys=False, allow_unicode=True).strip()
@@ -566,6 +593,7 @@ def upsert(name: str, *, lab: str, member: str | None = None,
            data_folders: list[str] | tuple[str, ...] | None = None,
            reads_from: list[str] | tuple[str, ...] | None = None,
            retain_until: str | None = None,
+           pending_revocations=None, invited=None,
            today: str | None = None, env: dict | None = None) -> CertProject:
     """Create or update a cert project. Optionally add a certified ``member``
     (with their ``cert`` = {handle, fingerprint, card_id}) and/or set project
@@ -640,7 +668,10 @@ def upsert(name: str, *, lab: str, member: str | None = None,
         reads_from=(cur.reads_from if reads_from is None
                     else _str_list(reads_from)),
         retain_until=(cur.retain_until if retain_until is None
-                      else str(retain_until).strip()))
+                      else str(retain_until).strip()),
+        pending_revocations=(cur.pending_revocations if pending_revocations is None
+                             else tuple(dict(c) for c in pending_revocations)),
+        invited=(cur.invited if invited is None else tuple(dict(c) for c in invited)))
     _write(updated, env)
     return updated
 
@@ -666,24 +697,131 @@ def remove_member(name: str, handle: str, *, env: dict | None = None) -> CertPro
     return updated
 
 
+def home_folders(project: str) -> list[str]:
+    """The two default data folders of ``project``, written relative to the data
+    root so they are right on every machine: what another project lists under
+    ``reads_from`` when it shares one of ``project``'s repositories."""
+    return [f"immutable/{project}", f"append_only/{project}"]
+
+
+def home_project_of(repo_name: str, *, env: dict | None = None,
+                    projects: list[CertProject] | None = None) -> str:
+    """The project whose data folders hold ``repo_name``'s data: the ``home``
+    written on its entry, else the first active project that lists it. Empty
+    when no project lists it."""
+    owners = owning_projects(repo_name, projects=projects, env=env)
+    active = [p for p in owners if p.status == "active"] or owners
+    want = str(repo_name or "").strip().casefold()
+    for p in active:
+        for r in p.repos:
+            if (r.name or "").strip().casefold() == want:
+                return r.home or p.name
+    return ""
+
+
 def add_repo(name: str, *, role: str = "code", repo_name: str = "",
              host: str = "local", path: str = "", remote_path: str = "",
              remote_url: str = "", overleaf: bool = False,
-             env: dict | None = None) -> CertProject:
+             home: bool = False, env: dict | None = None) -> CertProject:
     """Add (or replace, by repo name) a repo on an existing cert project. Use for
     a project's manuscript/data repos beyond the primary code repo. A repo with a
-    duplicate ``repo_name`` is replaced. Requires the project to exist."""
+    duplicate ``repo_name`` is replaced. Requires the project to exist.
+
+    A repository may be listed by several projects (#253). Its data stays in
+    the folders of its **home** project, the first one that listed it, and
+    every other project that lists it gets that project's data folders under
+    ``reads_from``. ``home=True`` makes ``name`` the home instead: the other
+    projects' entries then point at ``name`` and read its folders. The home
+    never moves unless asked.
+    """
     cur = get(name, env)
     if cur is None:
         raise CertProjectError(f"no cert-project named {name!r}")
-    rname = repo_name or (Path(path).name if path else name)
+    from .repo import repo_name as _repo_name                 # lazy: avoid import cycle
+    rname = repo_name or (_repo_name(Path(path)) if path else name)
+    others = [p for p in owning_projects(rname, env=env)
+              if p.status == "active" and p.name.casefold() != str(name).casefold()
+              and not is_placeholder_for(p, rname)]
+    current_home = ""
+    if others:
+        current_home = home_project_of(rname, projects=others, env=env)
+        if current_home.casefold() == str(name).casefold():
+            current_home = ""
     ref = RepoRef(name=rname, role=str(role).strip().lower() or "code", host=host,
                   path=path, remote_path=remote_path, remote_url=remote_url,
-                  overleaf=bool(overleaf))
+                  overleaf=bool(overleaf),
+                  home="" if (home or not current_home) else current_home)
     kept = [r for r in cur.repos if r.name != rname]
-    updated = upsert(name, lab=cur.lab, repos=[*kept, ref], env=env)
+    reads_from = list(cur.reads_from)
+    if ref.home:
+        reads_from += [f for f in home_folders(ref.home) if f not in reads_from]
+    elif home and current_home:
+        # This project is the home now: it no longer reads the old home's folders.
+        reads_from = [f for f in reads_from if f not in home_folders(current_home)]
+    updated = upsert(name, lab=cur.lab, repos=[*kept, ref], reads_from=reads_from, env=env)
+    if home and others:
+        # The data moves house: every other project now reads this one's folders.
+        for other in others:
+            repos = [replace_repo_home(r, str(name)) if r.name.casefold() == rname.casefold()
+                     else r for r in other.repos]
+            rf = [f for f in other.reads_from
+                  if not current_home or f not in home_folders(current_home)]
+            rf += [f for f in home_folders(str(name)) if f not in rf]
+            upsert(other.name, lab=other.lab, repos=repos, reads_from=rf, env=env)
     _retire_placeholders(rname, name, env)
     return updated
+
+
+def replace_repo_home(ref: RepoRef, home: str) -> RepoRef:
+    """``ref`` with its home project set to ``home``."""
+    from dataclasses import replace
+    return replace(ref, home=home)
+
+
+def project_summary(name: str, *, env: dict | None = None) -> dict | None:
+    """What a member of a project hosted in another lab's records needs to
+    see it on their dashboard (#259): team, repositories and channel, as of
+    today. Travels unsigned inside the project-card bundle; the signed cards
+    stay the proof. None when the project is not in these records."""
+    import datetime as _dt
+    cp = get(name, env)
+    if cp is None:
+        return None
+    return {"name": cp.name, "lab": cp.lab, "lead": cp.lead, "status": cp.status,
+            "sensitivity": cp.sensitivity, "members": list(cp.members),
+            "repos": [{"name": r.name, "role": r.role, "remote_url": r.remote_url,
+                       "host": r.host} for r in cp.repos],
+            "slack_workspace": cp.slack_workspace,
+            "slack_channel_id": cp.slack_channel_id,
+            "slack_channel_name": cp.slack_channel_name,
+            "as_of": _dt.date.today().isoformat()}
+
+
+def locate(name: str, *, env: dict | None = None):
+    """Find project ``name`` in the records this machine holds: the current
+    records root first, then every lab or core the registry names whose
+    records are on disk (#259: a lead or member whose project is hosted in
+    another lab's records). Returns ``(record, records_root)`` or
+    ``(None, None)``."""
+    from . import repo as _repo
+    cp = get(name, env)
+    if cp is not None:
+        return cp, _repo.lab_mgmt_repo_root(env)
+    try:
+        from . import registrar as _reg
+        reg = _reg.read_registry(env)
+        groups = [*reg.labs, *reg.cores]
+    except Exception:  # noqa: BLE001
+        return None, None
+    for g in groups:
+        root = Path(str(g.lab_mgmt_path or "")).expanduser() if g.lab_mgmt_path else None
+        if root is None or not root.is_dir():
+            continue
+        with _repo.use_lab_mgmt_root(root):
+            found = get(name, env)
+        if found is not None:
+            return found, root
+    return None, None
 
 
 def owning_project(repo_name: str, *, projects: list[CertProject] | None = None,
@@ -701,8 +839,9 @@ def owning_project(repo_name: str, *, projects: list[CertProject] | None = None,
 def owning_projects(repo_name: str, *, projects: list[CertProject] | None = None,
                     env: dict | None = None) -> list[CertProject]:
     """EVERY project whose record lists repository ``repo_name``, in registry
-    order. One is the rule; two or more active ones is a records problem that
-    :mod:`slack_routing` refuses to guess across (issue #243)."""
+    order. A repository may belong to several projects (#253): a note about it
+    goes to each of their channels (:mod:`slack_routing`), and its data lives
+    with its home project (:func:`home_project_of`)."""
     want = str(repo_name or "").strip().casefold()
     if not want:
         return []
@@ -714,19 +853,22 @@ def owning_projects(repo_name: str, *, projects: list[CertProject] | None = None
 def is_placeholder_for(cp: CertProject, repo_name: str) -> bool:
     """True for the one-repository project ``repo adopt`` makes for a repository.
 
-    That is an active project named after its only repository, never given a
-    Slack channel, a GitHub repository or a project card.
+    That is an active project whose only repository is ``repo_name``, with at
+    most its lead as a member, never given a Slack channel, a GitHub repository
+    or a project card. Its name does not matter (#253): adopt names it after
+    the repository or the project folder, so a placeholder ``x`` holding only
+    ``x_manuscript`` is one too.
     """
     want = str(repo_name or "").strip().casefold()
     return (cp.status == "active" and len(cp.repos) == 1
-            and cp.name.casefold() == want
             and (cp.repos[0].name or "").casefold() == want
+            and len(cp.members) <= 1
             and not cp.certs and not cp.slack_channel_id and not cp.github_repo)
 
 
 def _retire_placeholders(repo_name: str, new_owner: str, env: dict | None) -> None:
     """After ``repo_name`` joins project ``new_owner``, archive the one-repository
-    project adopt made for it, so the repository has one owning project.
+    project adopt made for it: a real project now lists the repository.
 
     Archiving keeps the record and its history; nothing is deleted. A project
     that is more than a placeholder (see :func:`is_placeholder_for`) is never
@@ -886,7 +1028,7 @@ def backfill_from_charter(*, env: dict | None = None,
             meta = _pf(repo.charter_path).meta or {}
         except Exception:  # noqa: BLE001
             continue
-        name = str(meta.get("project") or repo.path.name)
+        name = str(meta.get("project") or repo.name)
         # A remote-pointer project's tree lives on another host; capture that so
         # reconcile can reach it. Local projects → host="local".
         host, remote_path = "local", ""
@@ -955,7 +1097,7 @@ def migrate_charters(*, delete: bool = True, env: dict | None = None,
             meta = _pf(repo.charter_path).meta or {}
         except Exception:  # noqa: BLE001
             continue
-        by_name[str(meta.get("project") or repo.path.name)] = repo.charter_path
+        by_name[str(meta.get("project") or repo.name)] = repo.charter_path
 
     for name in migrated:
         charter_path = by_name.get(name)
@@ -1006,14 +1148,14 @@ def project_name_for_cwd(start=None, env: dict | None = None) -> str | None:
 
     In order: the project whose record lists this repository (so a
     ``x_manuscript`` repository answers ``x``, issue #151), then its CHARTER.md
-    ``project`` field, then the repository's folder name. None if not inside a
-    project repo."""
+    ``project`` field, then the repository's name (its main copy's folder, even
+    from a git worktree, #250). None if not inside a project repo."""
     from . import repo as _repo
     pr = _repo.find_project_repo(start)
     if pr is None:
         return None
     try:
-        owner = owning_project(pr.path.name, env=env)
+        owner = owning_project(pr.name, env=env)
         if owner is not None:
             return owner.name
     except Exception:  # noqa: BLE001 - the registry is a better answer, not a required one
@@ -1025,7 +1167,7 @@ def project_name_for_cwd(start=None, env: dict | None = None) -> str | None:
             return str(name)
     except Exception:  # noqa: BLE001
         pass
-    return pr.path.name
+    return pr.name
 
 
 def slack_channel_for(name: str, env: dict | None = None) -> str:
@@ -1055,5 +1197,7 @@ __all__ = ["CertProject", "RepoRef", "VALID_REPO_ROLES", "CertProjectError",
            "projects_for_member", "upsert", "remove_member", "add_repo", "remove_repo",
            "add_mirror", "remove_mirror", "list_mirrors",
            "set_status", "owning_project", "owning_projects", "is_placeholder_for",
+           "home_project_of", "home_folders", "replace_repo_home",
+           "project_summary", "locate",
            "register_from_summary", "backfill_from_charter", "migrate_charters",
            "slack_channel_for", "project_name_for_cwd"]

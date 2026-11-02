@@ -101,9 +101,12 @@ class ProjectMemberBody(BaseModel):
     """JSON body for ``POST /api/project/{project}/members`` — add a member.
     ``enrollment`` is the PoP fallback for keyless/external members."""
 
-    handle: str
+    handle: str                  # a murmurent handle, or an email address (#258)
     enrollment: dict | None = None
     dm: bool = True
+    # When their key is not on file (someone from another group), still put
+    # them on the project's member list now; the certificate follows later.
+    record_pending: bool = True
 
 
 class AddMemberBody(BaseModel):
@@ -138,6 +141,9 @@ class ProjectRepoBody(BaseModel):
     remote_path: str = ""
     remote_url: str = ""
     overleaf: bool = False
+    # (#269) create a private <org>/<repo> on GitHub for a clone with no
+    # remote, push, record it and grant every member access.
+    create_remote: bool = False
 
 
 class WorkspaceLaunchBody(BaseModel):
@@ -3587,12 +3593,22 @@ def create_app() -> FastAPI:
             lab = ""
         slack = (_invite_to_group_channel(lab, rec.handle) if action == "activate"
                  else _remove_from_group_channel(lab, rec.handle))
+        # Leaving the lab means leaving its projects (#255): each project's
+        # channel, repositories and card. Reported per project, never raising.
+        projects: list[dict] = []
+        if action == "deactivate":
+            from ..core import project_members as _pm
+            try:
+                projects = _pm.remove_from_all_projects(rec.handle, actor=actor)
+            except Exception as exc:  # noqa: BLE001
+                projects = [{"project": "?", "ok": False, "error": str(exc)}]
         return {
             "ok": True,
             "handle": rec.handle,
             "status": rec.status,
             "report": str(report) if report else None,
             "slack": slack,
+            "projects": projects,
         }
 
     # -----------------------------------------------------------------
@@ -4066,9 +4082,10 @@ def create_app() -> FastAPI:
         project: str,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
-        """PI-only: provision a cert-project's private Slack channel + GitHub repo
-        and sync both to its certified members. No-ops gracefully (reports
-        missing_token / no_github_org) without a Slack token / gh."""
+        """PI-only: provision a cert-project's private Slack channel and grant
+        its certified members access on every GitHub repository it lists
+        (#255; nothing is created on GitHub). No-ops gracefully (reports
+        missing_token / no_repos) without a Slack token / gh."""
         from ..core import cert_provision as _cprov
 
         _require_pi(user)
@@ -4085,12 +4102,15 @@ def create_app() -> FastAPI:
         body: ProjectRepoBody,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
-        """PI-only: assign a repo (code / manuscript / data / infra) to a cert
-        project. Idempotent by repo name. This is how a project gains its
-        manuscript repo (role=manuscript, overleaf=true) alongside its code repo."""
+        """PI or project lead: assign a repo (code / manuscript / data / infra)
+        to a cert project. Idempotent by repo name. This is how a project gains
+        its manuscript repo (role=manuscript, overleaf=true) alongside its code
+        repo. A repository may be in several projects (#253); its data stays
+        with the project that listed it first."""
         from ..core import cert_projects as _cp
 
-        _require_pi(user)
+        _require_project_lead(project, user)
+        _enter_project_root(project)
         role = (body.role or "code").strip().lower()
         if role not in _cp.VALID_REPO_ROLES:
             raise HTTPException(status_code=400,
@@ -4110,7 +4130,14 @@ def create_app() -> FastAPI:
             from ..core import project_cc_init as _cci
             note_written = _cci.write_overleaf_manuscript_note(
                 body.path, project=project, repo_name=body.repo_name)
+        remote = None
+        if body.create_remote:
+            from ..core import repo_remote as _rr
+            remote = _rr.create_remote_and_grant(project, body.repo_name or
+                                                 next((r.name for r in cp.repos), ""))
+            cp = _cp.get(project) or cp
         return {"ok": True, "project": project, "overleaf_note": note_written,
+                "remote": remote,
                 "repos": [r.to_dict() for r in cp.repos]}
 
     @app.delete("/api/project/{project}/repos/{repo_name}")
@@ -4119,12 +4146,13 @@ def create_app() -> FastAPI:
         repo_name: str,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
-        """PI-only: detach a repo from a cert project. Only the project record
-        changes — the clone on disk is left alone. 404 if the project or the
-        named repo doesn't exist."""
+        """PI or project lead: detach a repo from a cert project. Only the
+        project record changes; the clone on disk is left alone. 404 if the
+        project or the named repo doesn't exist."""
         from ..core import cert_projects as _cp
 
-        _require_pi(user)
+        _require_project_lead(project, user)
+        _enter_project_root(project)
         try:
             cp = _cp.remove_repo(project, repo_name)
         except _cp.CertProjectError as exc:
@@ -4162,18 +4190,27 @@ def create_app() -> FastAPI:
         One click when the member's pubkey is on the roster: their project card
         is issued, DM'd over the project's Slack workspace, and they're invited
         to the private channel. A keyless/external member returns
-        ``{"ok": false, "error": "no_recorded_key"}`` — re-call with their PoP
-        ``enrollment`` (they run `murmurent enroll --project <p>`)."""
+        ``{"ok": false, "error": "no_recorded_key", "recorded": true}``: they
+        are on the project's member list, awaiting a certificate. Re-call with
+        their PoP ``enrollment`` (they run `murmurent enroll --project <p>`)
+        whenever it arrives. ``handle`` may be an email address (#258): one
+        murmurent knows becomes its handle; any other is recorded as an
+        invitation and the reply carries the drafted email
+        (``{"ok": false, "error": "invited", "draft": {...}}``)."""
         from ..core import issuance as _iss
         from ..core import project_members as _pm
 
-        _require_project_lead(project, user)
-        handle = body.handle.strip().lstrip("@")
+        actor = _require_project_lead(project, user)
+        _enter_project_root(project)
+        handle = body.handle.strip()
+        if not ("@" in handle[1:] and "." in handle):      # an email keeps its @
+            handle = handle.lstrip("@")
         if not handle:
             raise HTTPException(status_code=422, detail="handle is required")
         try:
             out = _pm.add_member(project, handle, enrollment=body.enrollment,
-                                 dm=body.dm)
+                                 dm=body.dm, record_pending=body.record_pending,
+                                 actor=actor)
         except (_iss.IssuanceError, _pm.ProjectMemberError) as exc:
             raise HTTPException(status_code=400, detail=str(exc))
         # Don't ship the full bundle back to the browser unless the DM failed
@@ -4188,16 +4225,19 @@ def create_app() -> FastAPI:
         handle: str,
         user: str = Query("", description="Actor handle; falls back to $MURMURENT_USER."),
     ) -> dict:
-        """(7)/(8) Remove a member: revoke their project card (CRL), drop them
-        from the registry, kick them from the private channel, drop GitHub
-        access. Lead or PI only; refuses to remove the lead."""
+        """(7)/(8) Remove a member: revoke their project card (a lead's removal
+        is recorded for the PI's machine to sign), drop them from the record,
+        remove them from the private channel and from every GitHub repository
+        the project lists, and tell them by direct message (#255). Lead or PI
+        only; refuses to remove the lead. The reply lists ``problems``."""
         from ..core import issuance as _iss
         from ..core import project_members as _pm
         from ..core import revocation as _rev
 
-        _require_project_lead(project, user)
+        actor = _require_project_lead(project, user)
+        _enter_project_root(project)
         try:
-            return _pm.remove_member(project, handle)
+            return _pm.remove_member(project, handle, actor=actor)
         except _pm.ProjectMemberError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
         except (_iss.IssuanceError, _rev.RevocationError) as exc:
@@ -6361,6 +6401,18 @@ def create_app() -> FastAPI:
             )
         return actor
 
+    def _enter_project_root(project: str) -> None:
+        """Point this request's records root at the records that hold
+        ``project`` when they are another lab's on this machine (#259). The
+        thread-local override lasts for the request, as the per-request
+        viewer scoping does."""
+        from ..core import cert_projects as _cp
+        from ..core import repo as _repo
+        cp, root = _cp.locate(project)
+        if cp is not None and root is not None \
+                and Path(root).resolve() != Path(_repo.lab_mgmt_repo_root()).resolve():
+            _repo._thread_local.lab_mgmt_root = Path(root)
+
     def _require_project_lead(project: str, user: str) -> str:
         """The actor must be the project's LEAD or the lab PI. This is the UI
         gate only — the crypto is the real one (project cards can only be
@@ -6369,7 +6421,9 @@ def create_app() -> FastAPI:
         from ..core.lab import pi_handle as _pi
         actor = _resolve_actor(user)
         _require_active(actor)
-        cp = _cp.get(project)
+        # The record may live in another lab's records on this machine (#259:
+        # a lead whose project is hosted elsewhere).
+        cp, _root = _cp.locate(project)
         lead = (cp.lead if cp else "").lstrip("@").lower()
         try:
             pi = _pi().lower()
@@ -6379,7 +6433,7 @@ def create_app() -> FastAPI:
             raise HTTPException(
                 status_code=403,
                 detail=f"only the project lead (@{lead or '?'}) or the lab PI "
-                       f"can manage {project!r} membership")
+                       f"can manage {project!r} (its members and repositories)")
         return actor
 
     @app.post("/api/sea_catalog")

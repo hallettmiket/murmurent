@@ -81,13 +81,58 @@ class Readiness:
     @property
     def needs_upgrade(self) -> bool:
         """True when a marker-ready repo was bootstrapped by an older marker
-        shape (schema/version lags), OR when a repo still carries only a legacy
-        CHARTER.md bootstrap and wants a one-time marker stamp."""
+        shape (schema lags), when this machine last linked it under another
+        murmurent release, OR when a repo still carries only a legacy
+        CHARTER.md bootstrap and wants a one-time marker stamp.
+
+        The release that linked a repo is a fact about this machine, kept in
+        ``~/.murmurent/repo_bootstrap.yaml`` (#257). It used to be written
+        into the committed marker as ``bootstrap_version``, so two machines on
+        different releases pushed that line back and forth; a marker that
+        still carries the line is read as a fallback and never rewritten."""
         if self.marker is None:
             return self.legacy_charter
         if int(self.marker.get("murmurent") or 0) < MARKER_SCHEMA:
             return True
-        return str(self.marker.get("bootstrap_version") or "") != _version()
+        recorded = bootstrap_version_of(self.path) or \
+            str(self.marker.get("bootstrap_version") or "")
+        return recorded != _version()
+
+
+def _bootstrap_record_file() -> Path:
+    import os
+    return Path(os.environ.get("MURMURENT_HOME") or Path.home() / ".murmurent") / "repo_bootstrap.yaml"
+
+
+def _read_bootstrap_record() -> dict[str, str]:
+    try:
+        data = yaml.safe_load(_bootstrap_record_file().read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001 - no record means "never linked here"
+        return {}
+    return {str(k): str(v) for k, v in data.items()} if isinstance(data, dict) else {}
+
+
+def _repo_key(repo: Path) -> str:
+    from .repo import repo_name as _repo_name
+    return _repo_name(Path(repo).expanduser())
+
+
+def record_bootstrap(repo: Path, version: str | None = None) -> None:
+    """Note, for this machine only, which murmurent release last linked
+    ``repo`` (#257). Best-effort."""
+    data = _read_bootstrap_record()
+    data[_repo_key(repo)] = str(version or _version())
+    try:
+        _bootstrap_record_file().parent.mkdir(parents=True, exist_ok=True)
+        _bootstrap_record_file().write_text(yaml.safe_dump(data, sort_keys=True),
+                                            encoding="utf-8")
+    except OSError:
+        pass
+
+
+def bootstrap_version_of(repo: Path) -> str:
+    """The release that last linked ``repo`` on this machine, or ''."""
+    return _read_bootstrap_record().get(_repo_key(repo), "")
 
 
 def read_marker(repo: Path) -> dict | None:
@@ -127,18 +172,26 @@ def _write_marker(repo: Path, *, lab: str, agents: list[str],
     erased a choreography's declaration, after which ``choreography install``
     refused the repo as not being one.
     """
+    existing = read_marker(repo) or {}
     marker = {
         "murmurent": MARKER_SCHEMA,
         "lab": lab or "",
         "ready_since": ready_since or _dt.date.today().isoformat(),
-        "bootstrap_version": _version(),
         "agents": sorted(set(agents or [])),
     }
-    for key, value in (read_marker(repo) or {}).items():
+    # ``bootstrap_version`` is no longer written (#257): the release that
+    # linked a repo is per machine. A marker that already carries the line
+    # keeps it as it is, so an upgrade never dirties a committed file for it.
+    if existing.get("bootstrap_version"):
+        marker["bootstrap_version"] = existing["bootstrap_version"]
+    for key, value in existing.items():
         if key not in READINESS_FIELDS:
             marker[key] = value
     f = Path(repo) / MARKER_FILENAME
-    f.write_text(yaml.safe_dump(marker, sort_keys=False), encoding="utf-8")
+    text = yaml.safe_dump(marker, sort_keys=False)
+    if existing and existing == marker:
+        return f                      # nothing changed: leave the file alone
+    f.write_text(text, encoding="utf-8")
     return f
 
 
@@ -185,9 +238,71 @@ def ensure_marker(repo: Path, *, lab: str = "",
         ready_since=str((existing or {}).get("ready_since") or "") or None)
 
 
+#: Files make ready writes that belong in the repository: the marker, the
+#: CLAUDE.md stub, and the .gitignore lines that keep agent links out.
+READINESS_FILES: tuple[str, ...] = (MARKER_FILENAME, "CLAUDE.md", ".gitignore")
+READINESS_COMMIT_MESSAGE = "Make this repository murmurent-ready"
+
+
+def commit_readiness(repo: Path, *, message: str = READINESS_COMMIT_MESSAGE) -> Probe:
+    """Commit the readiness files, and only them, so readiness travels with
+    every clone (#257). Never touches anything else staged. A repository that
+    is not git, or where git cannot commit, gets a probe saying what to run."""
+    import subprocess
+    repo = Path(repo).expanduser()
+    if not (repo / ".git").exists():
+        return Probe(name="commit", status="ok", required=False,
+                     detail="not a git repository; nothing to commit")
+    files = [f for f in READINESS_FILES if (repo / f).is_file()]
+    hint = (f"commit them yourself: git add {' '.join(files)} && "
+            f"git commit -m \"{message}\" -- {' '.join(files)}")
+    try:
+        subprocess.run(["git", "-C", str(repo), "add", "--", *files],
+                       check=True, capture_output=True, text=True, timeout=30)
+        staged = subprocess.run(["git", "-C", str(repo), "diff", "--cached", "--quiet",
+                                 "--", *files], capture_output=True, text=True, timeout=30)
+        if staged.returncode == 0:
+            return Probe(name="commit", status="ok", required=False,
+                         detail="readiness files already committed")
+        done = subprocess.run(["git", "-C", str(repo), "commit", "-q", "--only",
+                               "-m", message, "--", *files],
+                              capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return Probe(name="commit", status="warn", required=False,
+                     detail=f"could not commit ({exc}); {hint}")
+    if done.returncode != 0:
+        why = (done.stderr or done.stdout or "git commit failed").strip().splitlines()
+        return Probe(name="commit", status="warn", required=False,
+                     detail=f"could not commit ({why[0] if why else '?'}); {hint}")
+    return Probe(name="commit", status="ok", required=False,
+                 detail=f"committed {', '.join(files)}: push, and every clone is ready")
+
+
+def register_ready_clones(repos_root: Path | None = None) -> list[Path]:
+    """Note every murmurent-ready repository under the repositories folder on
+    this machine (#257): a clone made by hand on a second machine, carrying
+    the committed marker, is then found by name like one adopted here.
+    Returns the repositories seen. Writes only this machine's path record."""
+    from . import repo_paths as _rp
+    from .repo import repos_root as _repos_root
+    root = Path(repos_root) if repos_root else _repos_root()
+    if not root.is_dir():
+        return []
+    tops = sorted(c for c in root.iterdir() if c.is_dir())
+    nested = [g for t in tops if not (t / ".git").exists()
+              for g in sorted(t.iterdir()) if g.is_dir() and (g / ".git").exists()]
+    seen: list[Path] = []
+    for child in tops + nested:
+        if (child / MARKER_FILENAME).is_file() and (child / ".git").exists():
+            _rp.record(_repo_key(child), child)
+            seen.append(child)
+    return seen
+
+
 def make_ready(clone_path: Path, *, lab: str = "",
                agents: list[str] | None = None,
-               murmurent_root: Path | None = None) -> list[Probe]:
+               murmurent_root: Path | None = None,
+               commit: bool = True) -> list[Probe]:
     """Make ``clone_path`` murmurent-ready: marker + CC bootstrap.
 
     The agent symlinks point into :func:`commons.commons_root` — the same
@@ -207,10 +322,16 @@ def make_ready(clone_path: Path, *, lab: str = "",
     is recorded so multi-lab machines know whose commons this repo
     follows. Idempotent: an existing marker is preserved (its agent
     picks win when ``agents`` is None); re-running refreshes symlinks.
+
+    The marker, the CLAUDE.md stub and the .gitignore lines are committed
+    (``commit=True``) so readiness travels with every clone (#257); nothing
+    else staged is touched. The release that did the linking is recorded for
+    this machine only.
     """
     from . import project_cc_init as _cci
 
     repo = Path(clone_path).expanduser()
+    name = _repo_key(repo)
     probes: list[Probe] = []
     existing = read_marker(repo)
     picked = list(agents) if agents is not None else list(
@@ -229,11 +350,15 @@ def make_ready(clone_path: Path, *, lab: str = "",
 
     root = murmurent_root or commons_root()
     probes.extend(_cci.bootstrap_local(repo, root, agents=picked,
-                                       project_name=repo.name))
+                                       project_name=name))
     # Note where this repository is on this machine (#166), so it is found
-    # wherever it sits, including inside a project folder.
+    # wherever it sits, including inside a project folder, and which release
+    # linked it (#257). The name is the main copy's, not a worktree folder's.
     from . import repo_paths as _rp
-    _rp.record(repo.name, repo)
+    _rp.record(name, repo)
+    record_bootstrap(repo)
+    if commit:
+        probes.append(commit_readiness(repo))
     return probes
 
 
@@ -297,9 +422,14 @@ def upgrade(clone_path: Path, *, add_agents: list[str] | None = None,
     _write_marker(repo, lab=lab, agents=agents,
                   ready_since=str((r.marker or {}).get("ready_since") or "") or None)
     probes.append(Probe(name="marker", status="ok",
-                        detail=f"schema {MARKER_SCHEMA}, bootstrap_version "
+                        detail=f"schema {MARKER_SCHEMA}; linked here by murmurent "
                                f"{_version()}", required=False))
     from . import project_cc_init as _cci
-    probes.extend(_cci.bootstrap_local(repo, root, agents=agents,
-                                       project_name=repo.name))
+    name = _repo_key(repo)
+    probes.extend(_cci.bootstrap_local(repo, root, agents=agents, project_name=name))
+    # A clone that arrived with the marker (a second machine) is registered
+    # the first time install or upgrade sees it (#257).
+    from . import repo_paths as _rp
+    _rp.record(name, repo)
+    record_bootstrap(repo)
     return probes

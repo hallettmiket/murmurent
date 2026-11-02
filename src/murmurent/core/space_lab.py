@@ -16,8 +16,9 @@ Output:  Rows in the space table (core.space_table), one scan per project plus
 Runs on a timer under the PI's account, on the conditions agreed on #151: it
 only reads, never uses administrator rights, posts with the lab's bot rather
 than a personal token, and its timer entry is written down in the lab records
-repository. When a lab service account exists, the timer moves to it and
-nothing here changes.
+repository. When a lab service account exists, the timer moves to it, and
+``space_dir`` in the lab's policy points both accounts at one folder, so the
+PI still reads the result under their own login (docs/service_account.md).
 
 Only this lab's folders are scanned: other labs on a shared server keep their
 own procedures.
@@ -69,13 +70,13 @@ class LabScanBusy(RuntimeError):
 
 def report_path() -> Path:
     """Where the last lab scan's report is kept."""
-    return _pu.murmurent_home() / _pu.SPACE_SUBDIR / REPORT_FILENAME
+    return _pu.space_dir() / REPORT_FILENAME
 
 
 @contextmanager
 def _lock() -> Iterator[None]:
     """Hold the lab-scan lock, or raise :class:`LabScanBusy`."""
-    path = _pu.murmurent_home() / _pu.SPACE_SUBDIR / LOCK_FILENAME
+    path = _pu.space_dir() / LOCK_FILENAME
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     with open(path, "w", encoding="utf-8") as handle:
         try:

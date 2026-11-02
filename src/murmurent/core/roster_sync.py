@@ -85,6 +85,24 @@ def roster_info() -> RosterSyncResult:
     )
 
 
+def refresh_note() -> str:
+    """Fast-forward the lab records clone before a scheduled run; "" when there
+    is nothing to say.
+
+    The timers (the space scan, the etiquette check) read project records and
+    the roster from a clone, and a clone nobody pulls describes a lab that no
+    longer exists. A failure is a note for the log, never a stop: the run goes
+    ahead on what the clone holds.
+    """
+    try:
+        sync = pull_lab_mgmt()
+    except Exception as exc:  # noqa: BLE001 - never let the pull stop the run
+        return f"lab records not refreshed: {exc}"
+    if not sync.is_git or sync.ok:
+        return ""
+    return f"lab records not refreshed: {sync.detail}"
+
+
 def pull_lab_mgmt() -> RosterSyncResult:
     """Fast-forward the lab_mgmt clone from its remote.
 

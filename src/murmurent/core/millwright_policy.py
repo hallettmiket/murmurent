@@ -161,6 +161,12 @@ class Policy:
         The Slack channel, such as ``#computers``, that the daily etiquette
         summary is posted to with the lab's bot (step 4). Empty means the
         summary goes to the PI as a direct message.
+    space_dir : str
+        The folder the space scan writes its table and report to, and the space
+        commands read from. Set it when the weekly scan runs under a lab
+        service account and the PI reads the result under their own login
+        (see ``docs/service_account.md``). Empty means each account's own
+        ``~/.murmurent/space/``.
     sources : tuple of str
         The files read, in order, after the built-in defaults.
     problems : tuple of str
@@ -195,6 +201,7 @@ class Policy:
     mothball_target: str = ""
     mothball_target_fill_limit: float = 0.90
     etiquette_summary_channel: str = ""
+    space_dir: str = ""
     sources: tuple[str, ...] = ()
     problems: tuple[str, ...] = ()
 
@@ -307,6 +314,7 @@ _CHECKERS = {
     "mothball_target": lambda value: str(value or "").strip(),
     "mothball_target_fill_limit": _check_fraction,
     "etiquette_summary_channel": lambda value: str(value or "").strip(),
+    "space_dir": lambda value: str(value or "").strip(),
     "duplicate_min_mb": _check_int(1),
     "duplicate_max_read_gb": _check_int(0),
     "scan_threads": _check_int(1, 32),

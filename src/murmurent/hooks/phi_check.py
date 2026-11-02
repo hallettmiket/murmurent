@@ -57,7 +57,7 @@ def _project_name(repo) -> str:
                 return str(name)
     except Exception:  # noqa: BLE001
         pass
-    return repo.path.name
+    return repo.name
 
 
 def _lab_mgmt_records_readable() -> bool:

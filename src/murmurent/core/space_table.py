@@ -117,8 +117,9 @@ def now_iso() -> str:
 
 
 def table_path() -> Path:
-    """Where the table lives: ``<murmurent home>/space/space.sqlite``."""
-    return _pu.murmurent_home() / _pu.SPACE_SUBDIR / TABLE_FILENAME
+    """Where the table lives: ``<murmurent home>/space/space.sqlite``, or the
+    folder ``space_dir`` names in the lab's policy (:func:`project_unit.space_dir`)."""
+    return _pu.space_dir() / TABLE_FILENAME
 
 
 def connect(path: Path | None = None) -> sqlite3.Connection:

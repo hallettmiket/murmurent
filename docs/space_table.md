@@ -208,6 +208,7 @@ lab's management repository, alongside the rules for `murmurent run`:
 | `disk_emergency_fill_fraction` | 0.90 | A disk fuller than this is an emergency |
 | `emergency_item_share_of_free` | 0.25 | One item bigger than this share of free space is an emergency |
 | `scan_threads` | 8 | Folders listed at once. On the lab's drive this made little difference (about 10 minutes per million files either way) |
+| `space_dir` | empty | Where the table and report live. Set it when the weekly scan runs under a lab service account, so the PI reads the result under their own login; see [Running the server timers under a lab service account](service_account.md) |
 
 `murmurent jobs policy` prints the settings in force.
 
@@ -268,6 +269,11 @@ it runs only while you have a session on the server, and a missed run happens
 at your next login. `murmurent space schedule` says which applies. To have it
 run while you are logged out, ask the administrator to run
 `loginctl enable-linger <your login>`.
+
+**Under a service account.** When the administrators give the lab a service
+account on the server, the same two commands run under it instead of the PI's
+login, and one setting lets the PI keep reading the result:
+[Running the server timers under a lab service account](service_account.md).
 
 Run it by hand at any time with `murmurent space scan-lab`.
 To redo the report's summaries from the last scan, without walking the drive

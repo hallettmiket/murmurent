@@ -77,33 +77,51 @@ BR pane runs `tail -F ~/.murmurent/agents.log`. Same log across every
 project on this machine, so you see all subagent activity in one
 place.
 
-### Spoken verdicts (macOS)
+### Spoken verdicts
 
-The same hook can read each agent's verdict aloud, one voice per agent,
-using the `say` command that ships with macOS. Nothing leaves the machine
-and no account is needed. The main session never speaks: only a dispatched
+The same hook can read each agent's verdict aloud, one voice per agent, so
+you know who finished without looking. Nothing leaves the machine and no
+account is needed. The main session never speaks: only a dispatched
 subagent reaches this branch of the hook.
 
-Turn it on by creating the file `~/.murmurent/speak`:
+Two engines. **Piper** is a free neural text-to-speech engine that runs on
+the machine itself, on a Mac or on Linux, with natural voices; it is the
+one to use. The Mac's own **`say`** command works without installing
+anything and is the fallback when Piper is absent; on Linux without Piper
+the hook tries `spd-say`, whose voices are the old robotic ones.
+
+Install Piper and one voice per agent (about 1 GB of voice models under
+`~/.murmurent/voices`, fetched once):
 
 ```bash
-touch ~/.murmurent/speak
+bash scripts/install_piper_voices.sh
 ```
 
-An empty file uses the default voices below. To change one, add a line
-`<agent> <voice>`; voice names may contain spaces. `say -v '?'` lists every
-voice installed on your Mac, and `say -v Moira "hello"` auditions one.
+That also creates `~/.murmurent/speak`, the on switch. Hear every voice
+introduce its agent with `bash scripts/install_piper_voices.sh audition`.
 
-| Agent | Voice | | Agent | Voice |
-|---|---|---|---|---|
-| adversary | Tessa | | scribe | Reed |
-| conscience | Moira | | lawyer | Aman |
-| judge | Daniel | | millwright | Eddy |
-| bookworm | Karen | | centre_millwright | Rocko |
-| oracle | Samantha | | registrar | Sandy |
-| lab_oracle | Shelley | | security_guard | Rishi |
-| blacksmith | Fred | | artist | Flo |
-| teacher | Grandpa | | (any other) | the system voice |
+| Agent | Piper voice | Mac `say` voice | | Agent | Piper voice | Mac `say` voice |
+|---|---|---|---|---|---|---|
+| adversary | en_GB-alba | Tessa | | scribe | en_US-joe | Reed |
+| conscience | en_GB-jenny_dioco | Moira | | lawyer | en_GB-northern_english_male | Aman |
+| judge | en_GB-alan | Daniel | | millwright | en_US-john | Eddy |
+| bookworm | en_GB-southern_english_female | Karen | | centre_millwright | en_US-bryce | Rocko |
+| oracle | en_US-amy | Samantha | | registrar | en_GB-cori | Sandy |
+| lab_oracle | en_US-kristin | Shelley | | security_guard | en_US-hfc_male | Rishi |
+| blacksmith | en_US-ryan | Fred | | artist | en_US-hfc_female | Flo |
+| teacher | en_US-norman | Grandpa | | (any other) | en_US-lessac | the system voice |
+
+(Piper names carry a quality suffix, `-medium` or `-low`, in the file name;
+`bash scripts/install_piper_voices.sh list` prints the exact ones.)
+
+`~/.murmurent/speak` is also the voice table. An empty file uses the
+defaults above. One line changes one agent: `adversary en_GB-cori-medium`
+for Piper, or `adversary Moira` for `say`. The line `engine say` (or
+`engine piper`, `engine spd-say`) forces an engine; without it the hook
+picks Piper when it is installed with its voices, else `say`, else
+`spd-say`. Other Piper voices: `~/.local/share/uv/tools/piper-tts/bin/python
+-m piper.download_voices` lists them, and the same command with a name
+and `--download-dir ~/.murmurent/voices` fetches one.
 
 Only the headline is read: the first sentence of the agent's first line,
 with web addresses, file paths, DOIs and markdown stripped out, since
@@ -111,17 +129,9 @@ those are for reading, not listening. Each verdict is spoken once, and
 verdicts queue rather than talk over each other. The hook returns at once,
 so speech never holds Claude Code up.
 
-To hear the natural English voices one after another, each introducing
-itself:
-
-```bash
-for v in Daniel Karen Moira Samantha Tessa Rishi Aman Kathy Fred Albert Ralph Reed Flo Eddy Rocko Sandy Shelley Grandma Grandpa Junior; do say -v "$v" "Hello, I am $v"; done
-```
-
 To mute: delete the file, or set `MURMURENT_SPEAK=0` in the shell that
 starts Claude Code for one session. `MURMURENT_SPEAK=1` turns it on
-without the file. On Linux, where there is no `say`, the setting is
-ignored.
+without the file.
 
 **Known limit**: CC subagents return one final message rather than a
 live stream of their thinking. The reporter shows agent start/end

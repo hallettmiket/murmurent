@@ -748,10 +748,16 @@ def enroll(nonce: str, group: str, project: str, out_file: str | None) -> None:
         click.echo("  • Either way, you finish with:  murmurent import-card <bundle-file> "
                    "--trust-root <the root they give you>")
     elif is_project:
-        click.echo(f"Send the file {out_file} to your PI so they can issue your "
-                   "project card:")
-        click.echo(f"  murmurent issue-project-card {out_file} --project {project} "
-                   "--lab <lab>")
+        click.echo(f"Send the file {out_file} to the lead of project '{project}' "
+                   "(the person who added you); they issue your project card with it:")
+        click.echo(f"  • They run:  murmurent project-add-member {ident.at_handle} "
+                   f"--project {project} --enrollment {out_file}")
+        click.echo("  • Your signed card comes back as a bundle.json, by Slack direct "
+                   "message when the project's workspace is connected, else by hand.")
+        click.echo("  • You finish with:  murmurent import-card bundle.json "
+                   "--trust-root <the lead's lab root, given in that message>")
+        click.echo("    The --trust-root part is needed the first time you import a "
+                   "card from a lab whose key your machine has not pinned.")
     else:
         click.echo(f"Send the file {out_file} to your mayor; they run "
                    "`murmurent issue-pi-card <file>`.")
@@ -1063,8 +1069,20 @@ def issue_project_lead_card_cmd(handle: str, project: str, lab: str,
               help="PoP enrollment file (fallback for keyless/external members).")
 @click.option("--dm/--no-dm", default=True,
               help="DM the bundle on Slack (default: yes).")
+@click.option("--pending/--no-pending", default=True,
+              help="When their key is not on file (someone from another group), "
+                   "put them on the project's member list now anyway; finish "
+                   "with --enrollment later (default: yes).")
+@click.option("--open-mail/--no-open-mail", default=True,
+              help="For an email address murmurent does not know: open the drafted "
+                   "invitation in your mail client (default: yes).")
 def project_add_member_cmd(handle: str, project: str, lab: str,
-                           enrollment_file: str, dm: bool) -> None:
+                           enrollment_file: str, dm: bool, pending: bool,
+                           open_mail: bool) -> None:
+    """HANDLE is a murmurent handle, or an email address (#258): one murmurent
+    knows becomes its handle; any other is recorded as an invitation and the
+    email to send is drafted for you."""
+    from ..core import identity as _id
     from ..core import issuance as _iss
     from ..core import project_members as _pm
     import json as _json
@@ -1076,17 +1094,46 @@ def project_add_member_cmd(handle: str, project: str, lab: str,
                                      .read_text(encoding="utf-8"))
         except (OSError, ValueError) as exc:
             raise click.ClickException(f"cannot read enrollment: {exc}") from exc
+    actor = _id.resolve(allow_unknown=True).handle
     try:
         out = _pm.add_member(project, handle, lab=lab or None,
-                             enrollment=enrollment, dm=dm)
+                             enrollment=enrollment, dm=dm, record_pending=pending,
+                             actor=actor, open_mail=open_mail)
     except (_iss.IssuanceError, _pm.ProjectMemberError) as exc:
         raise click.ClickException(str(exc)) from exc
+    if out.get("error") == "invited":
+        click.echo(f"✓ {out['email']} is invited to {project}. murmurent has not met them "
+                   "yet, so send them this; their handle fills in when their enrollment "
+                   "arrives (re-run with --enrollment <file>).")
+        if out.get("opened"):
+            click.echo("  Opened your email app with the invitation drafted; press Send.")
+        else:
+            click.echo("")
+            click.echo(f"  Subject: {out['draft']['subject']}")
+            click.echo("")
+            for line in out["draft"]["body"].splitlines():
+                click.echo(f"  {line}")
+        return
+    if not out.get("ok") and out.get("recorded"):
+        click.echo(f"✓ {handle} is on {project}'s member list, awaiting a certificate.")
+        click.echo(f"  Their key is not on file. They run `murmurent enroll --project "
+                   f"{project}` and send you the file; then re-run with "
+                   f"--enrollment <file> to issue their project card.")
+        dm_res = out.get("dm") or {}
+        if dm_res.get("sent"):
+            click.echo(f"  ✓ Those steps were sent to them by direct message via "
+                       f"{dm_res.get('workspace', 'Slack')}.")
+        elif dm:
+            click.echo(f"  The steps could not be sent to them by direct message "
+                       f"({dm_res.get('detail', '?')}); send them yourself:\n\n"
+                       + _pm.enrollment_steps_text(project) + "\n")
+        return
     if not out.get("ok"):
         raise click.ClickException(
             f"{out.get('detail', out.get('error'))}\n"
             f"  Fallback: they run `murmurent enroll --project {project}` and "
             f"send you the file; re-run with --enrollment <file>.")
-    click.echo(f"✓ {handle} added to {out['group']}")
+    click.echo(f"✓ @{str(out.get('handle') or handle).lstrip('@')} added to {out['group']}")
     dm_res = out.get("dm") or {}
     click.echo(f"  {'✓ DM sent via ' + dm_res.get('workspace', '') if dm_res.get('sent') else 'DM: ' + str(dm_res.get('detail'))}")
     slack = out.get("slack") or {}
@@ -1097,27 +1144,48 @@ def project_add_member_cmd(handle: str, project: str, lab: str,
         click.echo(_json.dumps(out["bundle"], indent=2))
 
 
+def echo_removal(out: dict) -> None:
+    """Print what removing a member did and did not do (#255)."""
+    handle, project = out.get("handle", "?"), out.get("project", "?")
+    card = ("card revoked" if out.get("revoked")
+            else "card revocation awaits the PI's machine" if out.get("revocation_pending")
+            else "no card to revoke")
+    click.echo(f"✓ {handle} removed from {project} ({card})")
+    slack = out.get("slack") or {}
+    if slack.get("ok"):
+        click.echo("  Slack: removed from the project channel")
+    gh = out.get("github") or {}
+    if gh.get("removed"):
+        click.echo(f"  GitHub: access removed on {', '.join(gh['removed'])}")
+    dm = out.get("dm") or {}
+    if dm.get("sent"):
+        click.echo(f"  told by direct message via {dm.get('workspace', 'Slack')}")
+    for prob in out.get("problems") or []:
+        click.echo(f"  ! {prob}")
+
+
 @click.command("project-remove-member",
-                help="PI: remove a member from a project — revokes their project "
-                     "card (CRL), drops them from the registry, kicks them from "
-                     "the private channel, and removes GitHub access. Refuses to "
+                help="PI or project lead: remove a member from a project. Revokes "
+                     "their project card (a lead's removal is recorded for the PI's "
+                     "machine to sign), drops them from the record, removes them "
+                     "from the project channel and from every GitHub repository the "
+                     "project lists, and tells them by direct message. Refuses to "
                      "remove the lead (delete the project instead).")
 @click.argument("handle")
 @click.option("--project", required=True, help="Project to remove them from.")
 @click.option("--lab", default="", help="Lab that owns the project.")
-def project_remove_member_cmd(handle: str, project: str, lab: str) -> None:
+@click.option("--dm/--no-dm", default=True, help="Tell them by direct message (default: yes).")
+def project_remove_member_cmd(handle: str, project: str, lab: str, dm: bool) -> None:
+    from ..core import identity as _id
     from ..core import issuance as _iss
     from ..core import project_members as _pm
     from ..core import revocation as _rev
+    actor = _id.resolve(allow_unknown=True).handle
     try:
-        out = _pm.remove_member(project, handle, lab=lab or None)
+        out = _pm.remove_member(project, handle, lab=lab or None, actor=actor, dm=dm)
     except (_iss.IssuanceError, _pm.ProjectMemberError, _rev.RevocationError) as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo(f"✓ {handle} removed from {project}"
-               + (" (card revoked)" if out.get("revoked") else " (no card to revoke)"))
-    slack = out.get("slack") or {}
-    if slack.get("ok"):
-        click.echo(f"  channel sync: -{len(slack.get('kicked') or [])} kicked")
+    echo_removal(out)
 
 
 @click.command("project-whoami",
@@ -1938,6 +2006,24 @@ def group_remove_member(group: str, handle: str, delete: bool, yes: bool) -> Non
     for p in probes:
         icon = "✓" if p.status == "ok" else ("!" if p.status == "warn" else "✗")
         click.echo(f"  [{icon}] {p.name}: {p.detail}")
+    # Leaving the lab means leaving its projects (#255): channel, repositories
+    # and card for each, with the same report as project-remove-member.
+    from ..core import identity as _id
+    from ..core import project_members as _pm
+    actor = _id.resolve(allow_unknown=True).handle
+    results = _pm.remove_from_all_projects(norm, actor=actor)
+    if not results:
+        click.echo("  [✓] projects: member of none")
+    for r in results:
+        if r.get("ok"):
+            card = ("card revoked" if r.get("revoked")
+                    else "card awaits the PI's machine" if r.get("revocation_pending")
+                    else "no card")
+            click.echo(f"  [✓] project {r['project']}: removed ({card})")
+            for prob in r.get("problems") or []:
+                click.echo(f"      ! {prob}")
+        else:
+            click.echo(f"  [!] project {r.get('project')}: {r.get('error')}")
     # Defense-in-depth: revoke their identity card in the centre CRL. Live access
     # was already pulled above (Slack/GitHub/registry); this stops the card itself
     # from verifying. Best-effort — needs the centre root key (mayor's machine).

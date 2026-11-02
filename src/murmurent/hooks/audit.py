@@ -45,7 +45,7 @@ def _summarise_args(args: Any) -> str:
 
 def _project_name(start: str | None = None) -> str | None:
     repo = find_project_repo(start or os.getcwd())
-    return repo.path.name if repo is not None else None
+    return repo.name if repo is not None else None
 
 
 def write_entry(payload: dict[str, Any], *, log_dir: Path | None = None) -> Path:

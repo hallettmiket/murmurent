@@ -120,7 +120,7 @@ command available in any murmurent-bootstrapped CC session.
 
 | Skill | Role |
 |---|---|
-| [`/murmurent-push`](skills/murmurent-push/SKILL.md) | Murmurent-aware stage/commit/push: skips per-machine + secret-shaped files, refuses large files that belong in `append_only/`, never touches the data root's `immutable/`\|`append_only/` (or legacy `raw/`\|`refined/`), posts a Slack release note. Use instead of generic `/commit-push` for any **murmurent-ready** repo (`.murmurent.yaml`, or a legacy `CHARTER.md` bootstrap). |
+| [`/murmurent-push`](skills/murmurent-push/SKILL.md) | Murmurent-aware stage/commit/push: skips per-machine + secret-shaped files, refuses large files that belong in `append_only/`, never touches the data root's `immutable/`\|`append_only/` (or legacy `raw/`\|`refined/`), posts a Slack release note. Use instead of generic `/commit-push` for any **murmurent-ready** repo (one with a `.murmurent.yaml` marker). |
 | [`/murmurent-project-push`](skills/murmurent-project-push/SKILL.md) | Project-WIDE commit/push: backs up **every** repo a project owns (via `murmurent project push`), running the `/murmurent-push` pre-flight per repo (secret scan, secret-shaped names, governed-data + large-file guards). A repo that fails is blocked, the rest proceed; one plain-language summary + one Slack note to the project channel. Use to "back up my whole project". |
 | [`/murmurent-update-me`](skills/murmurent-update-me/SKILL.md) | Post a plain-English status update for the current project to its Slack channel: what is running, what finished since the last update, what is blocked and on whom, and next steps. Facts come from a read-only script (running jobs on every lab account, the agent log, outputs, quality gates, git, GitHub progress issues) and win over the state document where they disagree. Refuses credentials, `publication/` paths and counts under six. Per-project settings in an optional `update_me:` block of `.murmurent.yaml`. `dry-run` shows the text without posting. |
 | [`/murmurent-admin`](skills/murmurent-admin/SKILL.md) | Prime context before admin-level (centre / mayor / registrar / join / provisioning) work: reloads murmurent's purpose from the code and docs, and pins Obsidian maps-legends and CC guidance to the top. A centre with its own reference documents adds them via `rules/local/`. |
@@ -186,6 +186,10 @@ replies once and cannot hold a back-and-forth.
   (governance-level: repos + certified members, in `cert_projects/`) — the
   split that replaced adopt-also-minting-a-project.
 - [`docs/reconcile.md`](docs/reconcile.md) — `murmurent reconcile` drift-detection routine + daily `/routine` schedule.
+- [`docs/service_account.md`](docs/service_account.md): running the server's two
+  policing timers (weekly space scan, weekday etiquette check) under a lab service
+  account instead of the PI's login; the `space_dir` policy setting that lets the
+  PI keep reading the scan's table.
 - [`docs/versioning.md`](docs/versioning.md) — CalVer scheme (`YYYY.M.MICRO`),
   single-source version in `__init__.py`, when to bump vs not, releases; schema
   versions are independent.

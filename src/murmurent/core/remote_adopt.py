@@ -70,11 +70,14 @@ def _render_remote_marker(*, lab: str, agents_csv: str,
     host. Mirrors :func:`core.repo_ready._write_marker`'s fields. ``lab`` is
     sanitized to a safe slug by the caller."""
     import datetime as _dt
+    # ``bootstrap_version`` is no longer written into the marker (#257): the
+    # release that linked a repo is a fact about one machine. The parameter
+    # stays so callers need not change.
+    del bootstrap_version
     lines = [
         f"murmurent: {_rr.MARKER_SCHEMA}",
         f"lab: {lab}",
         f"ready_since: {_dt.date.today().isoformat()}",
-        f"bootstrap_version: {bootstrap_version}",
         "agents:",
     ]
     lines.extend(f"- {a}" for a in agents_csv.split())
@@ -137,7 +140,10 @@ def build_remote_adopt_script(
         'if [ ! -d "$DEST/.git" ]; then',
         '  echo "marker:fail:not a git working tree: $DEST"',
         'elif [ -f "$DEST/.murmurent.yaml" ]; then',
-        '  echo "marker:ok:already exists at $DEST/.murmurent.yaml (preserved)"',
+        ('  echo "marker:warn:already exists at $DEST/.murmurent.yaml (preserved; its agents '
+         'list was not changed: run murmurent repo upgrade --add-agents on the host)"'
+         if safe_agents else
+         '  echo "marker:ok:already exists at $DEST/.murmurent.yaml (preserved)"'),
         'else',
         "  cat > \"$DEST/.murmurent.yaml\" <<'__MURMURENT_MARKER_EOF__'",
         marker_text.rstrip("\n"),

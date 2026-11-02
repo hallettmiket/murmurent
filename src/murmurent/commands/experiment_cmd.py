@@ -180,7 +180,7 @@ def cmd_list(project_name: str | None) -> int:
             performer = parsed.meta.get("performer") or []
             performer_str = ", ".join(performer) if isinstance(performer, list) else str(performer)
             table.add_row(
-                repo.path.name,
+                repo.name,
                 exp_dir.name,
                 str(parsed.meta.get("status", "?")),
                 str(parsed.meta.get("analysis_status", "?")),

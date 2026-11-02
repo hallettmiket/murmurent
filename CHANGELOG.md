@@ -17,6 +17,86 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.11.0] - 2026-11-02
+
+**To upgrade:** `uv tool upgrade murmurent`, then `murmurent install --hooks`,
+then restart Claude Code and the dashboard (**⏻ Stop dashboard**, then start
+it again). From a copy of the repository: `git checkout main && git pull`
+first, then the same two steps. The install re-links every ready repository
+itself; nothing else to run.
+
+This release is the outcome of a review of how repositories, projects and
+membership work (`docs/repos_and_projects_plan.md`, issues 252 to 260, 269).
+The rules it settles: a repository may belong to several projects; membership
+of a project means access to every repository it lists, granted and revoked
+together; readiness travels with the clone; each person sees exactly their
+projects; a collaborator from another lab can finish joining from the message
+they receive.
+
+### Added
+- **A repository may belong to several projects** (#253). A note about it
+  goes to every project's channel; its data stays with its home project, the
+  first that listed it, and the other projects read that folder. New
+  `murmurent project add-repo <project> <folder> [--role] [--home]`; it and
+  `release-repo` are for the PI or the project lead.
+- **`add-repo --create-remote`** (#269) creates a private `<org>/<repo>` on
+  GitHub for a clone that has none, pushes it, records the remote and grants
+  every member access in one step. `project status` shows each repository's
+  remote.
+- **Membership grants and revokes access on every repository** (#255).
+  Adding a member grants collaborator access on every GitHub repository the
+  project lists; removing one revokes it everywhere, removes them from the
+  channel and tells them by direct message. A lead who is not the PI can
+  remove members; the PI's `project reconcile --apply` signs the revocation.
+  Leaving the lab (`group-remove-member`, or deactivation on the dashboard)
+  removes the person from every project they do not lead.
+- **Invite a project member by email** (#258). An address murmurent knows
+  becomes the handle; any other records an invitation and drafts the email,
+  with the enroll command and the trust root to expect; the handle fills in
+  when the enrollment arrives.
+- **Collaborators from another lab can finish joining** (#252). The message
+  that brings a project card names the lab's trust root and the exact
+  `import-card --trust-root` command; a pending member is sent the
+  enrollment steps; the import error names the key and where it is.
+- **Server timers under a lab service account** (#249): the weekly space
+  scan and the weekday etiquette check can run under a service account, with
+  a shared `space_dir` so the PI keeps reading the table. See
+  `docs/service_account.md`.
+- **Outside members by handle** (#248): type a handle from another group
+  into a project's member box and they join the list at once, awaiting a
+  certificate.
+- **Spoken verdicts with Piper voices** (#272). `bash
+  scripts/install_piper_voices.sh` installs Piper, a free neural
+  text-to-speech engine that runs on the machine itself, and fetches one
+  natural English voice per agent. The agent-event hook uses Piper when it
+  is present, on a Mac or on Linux, and otherwise the Mac's `say` or
+  Linux's `spd-say` as before. `engine say` in `~/.murmurent/speak` forces
+  the old engine; `audition` plays every voice.
+
+### Changed
+- **Readiness travels with the clone** (#257). Make ready commits the marker,
+  the CLAUDE.md stub and the `.gitignore` lines for agent links, so every
+  clone is ready; a clone carrying the marker is registered when `install` or
+  `reconcile` sees it. The release that linked a repository is recorded per
+  machine, no longer written into the committed marker. `repo adopt` links
+  every commons agent for a fresh repository, as the dashboard does
+  (`--agents none` links nothing).
+- **The dashboard shows each person exactly their projects** (#259): the
+  ones that list them, from any lab, plus any they hold a card for; the PI
+  sees every project of the lab. A project hosted in another lab shows its
+  team and repositories from the card bundle or the host lab's records, and
+  its Slack link points into the right workspace.
+- **No GitHub repository per project.** `provision-github` grants access on
+  the repositories a project lists and creates nothing unless `--create`.
+- The millwright's scaffold, the readiness and project guides, the push skill
+  and the routing page say what the code does (#260).
+
+### Fixed
+- A note sent from a git worktree is routed like one from the main copy
+  (#250); `murmurent project release-repo` takes a repository off a record.
+- `murmurent inventory show` works on a machine with GitHub only (#264);
+  the documentation site build link (#266).
+
 ## [2026.10.8] - 2026-10-30
 
 **To upgrade:** `uv tool upgrade murmurent`, then `murmurent install --hooks`,
