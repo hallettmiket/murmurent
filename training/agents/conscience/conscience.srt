@@ -1,0 +1,35 @@
+1
+00:00:00,400 --> 00:00:09,500
+This is the conscience. It reviews your writing for equity, diversity, inclusion and decolonization, and hands back the fixed text.
+
+2
+00:00:09,900 --> 00:00:22,800
+It quotes the exact line, says what a reader or a reviewer gets wrong because of it, and hands back a rewritten passage to paste in, with the version it recommends.
+
+3
+00:00:22,800 --> 00:00:39,700
+Every finding cites the source it rests on, or is marked as its own knowledge to check. When nothing is built yet, it returns a design instead: who is included, who is asked, whose risk is named.
+
+4
+00:00:40,100 --> 00:00:51,800
+Its scope is equity: framing, language, and who a study includes. About a community, it uses what that community has published about itself, and says where that stops.
+
+5
+00:00:51,800 --> 00:01:03,100
+Statistics go to the adversary and lawfulness to the lawyer. It edits your file only when you ask it to apply the changes.
+
+6
+00:01:03,500 --> 00:01:09,599
+A real run, on a made-up Participants paragraph. A member asks for a review.
+
+7
+00:01:09,599 --> 00:01:27,700
+The answer is Flagged: the draft calls an English-only cohort from one clinic representative of Canada. Each finding quotes the line and names its source, and a closing list says what it could not back up, for the bookworm to find.
+
+8
+00:01:28,100 --> 00:01:45,799
+To use it, ask Claude Code for the conscience and point it at a section, a grant or a course outline. The first line is the verdict: OK or Flagged for a review, Designed for a plan, or Gap when it cannot deliver.
+
+9
+00:01:45,799 --> 00:02:02,400
+It draws on a curated list of resources chosen for the centre's region. The bookworm can propose additions to the centre's list, such as a funder's equity guidance, and a person approves each one.

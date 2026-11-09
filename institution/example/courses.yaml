@@ -1,0 +1,26 @@
+# A fetch rule plus a cache. The rule's url must be on one of the pack's domains;
+# `{subject}` and `{number}` are filled in per course. The parser reads pages shaped
+# like Western's master timetable: an <h4> per course, then a table with a header row.
+fetch:
+  url: https://timetable.example.edu/search.cfm
+  method: POST
+  fields:
+    subject: '{subject}'
+    catalognbr: '{number}'
+    command: search
+  parser: timetable_tables
+  limits: >-
+    What the page shows is what the cache holds. State here which columns the
+    institution's public timetable gives (section, component, room, days, time) and
+    which it does not, so the clerk answers Unknown for the rest.
+cache:
+- code: BIOCHEM 3380G
+  subject: BIOCHEM
+  number: '3380'
+  title: BIOCHEMISTRY LABORATORY
+  found: true
+  sections:
+  - {section: '001', component: LEC, class_nbr: '9313', status: Full, campus: Main, delivery_type: In Person}
+  - {section: '003', component: LAB, class_nbr: '9511', status: Full, campus: Main, delivery_type: In Person}
+  source: https://timetable.example.edu/search.cfm
+  date_read: '2026-11-07'

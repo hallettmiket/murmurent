@@ -2,10 +2,80 @@
 
 Material for learning Murmurent, and for the tools used to make it.
 
-1. [Getting started with Murmurent](#getting-started-with-murmurent-video-6-min-50-s), a 7-minute video
-2. [Using ElevenLabs from Claude Code](#using-elevenlabs-from-claude-code), from signing up to making audio, including the free student offer
+**All the videos, in one place: <https://mikehallett.science/assets/videos/>.**
+That page, and the "Videos and news" section of the README, are written by
+`training/front_page.py` from [`index.yaml`](index.yaml) in this folder: add a
+video or a news line there and run the script; never edit the generated section
+by hand (a test checks it).
 
-## Getting started with Murmurent (video, 6 min 50 s)
+1. [Getting started with Murmurent](#getting-started-with-murmurent-video-7-min-10-s), a 7-minute video
+2. [Using ElevenLabs from Claude Code](#using-elevenlabs-from-claude-code), from signing up to making audio, including the free student offer
+3. [A thesis an examiner can question](thesis_package/README.md), a 6-minute animated walkthrough of paper packages, thesis packages and the docent, rendered from a script in that folder
+4. [One short movie per agent](#one-short-movie-per-agent), seventeen movies of about two minutes each: what the agent does, what it will not do, one real run, and how to use it through Claude Code
+5. [Working through Claude Code, and the skills](#working-through-claude-code-and-the-skills), seven movies of two to three minutes: the one every other movie assumes, the two push skills, the status update, a course across sessions, the mayor's tools, the lab notebook, and the data root
+
+## One short movie per agent
+
+One movie for each of the seventeen commons agents (issue #288), each about two
+minutes, in the same style as the thesis-package video: drawn from a script,
+every chat scene a real run of the agent on `examples/` or on synthetic data,
+captions burned in, narration with ElevenLabs (voice Matilda). Each movie
+quotes the agent's own `agents/<agent>.md` for what it does and what it
+refuses, so a change to the agent is a change to the movie, and a hook reminds
+a session to re-render when the agent file is edited. How they are made and
+updated: [`agents/README.md`](agents/README.md).
+
+**Checked against** Murmurent 2026.11.0, 7 November 2026. All seventeen are
+narrated. Each scene is timed from the measured length of its voice clip, so
+re-voicing a changed sentence re-times the picture with it.
+
+| Agent | Watch | Length | Narrated | Chapters |
+|---|---|---|---|---|
+| [`oracle`](../agents/oracle.md) | [The oracle](https://mikehallett.science/assets/videos/murmurent_agent_oracle.html) | 2:08 | yes | 0:00 Welcome, 0:09 What it does, 0:45 What it will not do, 1:08 A real example, 1:40 How to use it |
+| [`bookworm`](../agents/bookworm.md) | [The bookworm](https://mikehallett.science/assets/videos/murmurent_agent_bookworm.html) | 2:16 | yes | 0:00 Welcome, 0:11 What it does, 0:33 What it will not do, 0:52 A real example, 1:14 How to direct it, 1:43 How to use it |
+| [`adversary`](../agents/adversary.md) | [The adversary](https://mikehallett.science/assets/videos/murmurent_agent_adversary.html) | 2:11 | yes | 0:00 Welcome, 0:10 What it does, 0:31 What it will not do, 0:51 A real example, 1:16 How to direct it, 1:43 How to use it |
+| [`artist`](../agents/artist.md) | [The artist](https://mikehallett.science/assets/videos/murmurent_agent_artist.html) | 2:15 | yes | 0:00 Welcome, 0:11 What it does, 0:33 What it will not do, 0:55 A real example, 1:17 How to direct it, 1:47 How to use it |
+| [`scribe`](../agents/scribe.md) | [The scribe](https://mikehallett.science/assets/videos/murmurent_agent_scribe.html) | 2:17 | yes | 0:00 Welcome, 0:11 What it does, 0:36 What it will not do, 1:00 A real example, 1:26 How to direct it, 1:51 How to use it |
+| [`teacher`](../agents/teacher.md) | [The teacher](https://mikehallett.science/assets/videos/murmurent_agent_teacher.html) | 1:52 | yes | 0:00 Welcome, 0:10 What it does, 0:37 What it will not do, 1:02 A real example, 1:24 How to use it |
+| [`lab_oracle`](../agents/lab_oracle.md) | [The lab oracle](https://mikehallett.science/assets/videos/murmurent_agent_lab_oracle.html) | 1:48 | yes | 0:00 Welcome, 0:08 What it does, 0:28 What it will not do, 0:49 A real example, 1:20 How to use it |
+| [`blacksmith`](../agents/blacksmith.md) | [The blacksmith](https://mikehallett.science/assets/videos/murmurent_agent_blacksmith.html) | 2:13 | yes | 0:00 Welcome, 0:12 What it does, 0:32 What it will not do, 0:52 A real example, 1:16 How to direct it, 1:45 How to use it |
+| [`conscience`](../agents/conscience.md) | [The conscience](https://mikehallett.science/assets/videos/murmurent_agent_conscience.html) | 1:48 | yes | 0:00 Welcome, 0:10 What it does, 0:37 What it will not do, 0:58 A real example, 1:22 How to use it |
+| [`lawyer`](../agents/lawyer.md) | [The lawyer](https://mikehallett.science/assets/videos/murmurent_agent_lawyer.html) | 1:52 | yes | 0:00 Welcome, 0:12 What it does, 0:37 What it will not do, 0:58 A real example, 1:20 How to use it |
+| [`millwright`](../agents/millwright.md) | [The millwright](https://mikehallett.science/assets/videos/murmurent_agent_millwright.html) | 1:48 | yes | 0:00 Welcome, 0:11 What it does, 0:35 What it will not do, 1:00 A real example, 1:20 How to use it |
+| [`centre_millwright`](../agents/centre_millwright.md) | [The centre millwright](https://mikehallett.science/assets/videos/murmurent_agent_centre_millwright.html) | 1:46 | yes | 0:00 Welcome, 0:12 What it does, 0:39 What it will not do, 1:01 A real example, 1:20 How to use it |
+| [`judge`](../agents/judge.md) | [The judge](https://mikehallett.science/assets/videos/murmurent_agent_judge.html) | 1:45 | yes | 0:00 Welcome, 0:11 What it does, 0:34 What it will not do, 0:56 A real example, 1:18 How to use it |
+| [`registrar`](../agents/registrar.md) | [The registrar](https://mikehallett.science/assets/videos/murmurent_agent_registrar.html) | 1:52 | yes | 0:00 Welcome, 0:12 What it does, 0:39 What it will not do, 1:05 A real example, 1:26 How to use it |
+| [`security_guard`](../agents/security_guard.md) | [The security guard](https://mikehallett.science/assets/videos/murmurent_agent_security_guard.html) | 1:52 | yes | 0:00 Welcome, 0:12 What it does, 0:37 What it will not do, 1:00 A real example, 1:23 How to use it |
+| [`clerk`](../agents/clerk.md) | [The clerk](https://mikehallett.science/assets/videos/murmurent_agent_clerk.html) | 2:52 | yes | 0:00 Welcome, 0:16 What it does, 0:49 What it will not do, 1:23 A real example, 2:01 How to direct it, 2:17 How to use it |
+| [`docent`](../agents/docent.md) | [The docent](https://mikehallett.science/assets/videos/murmurent_agent_docent.html) | 1:51 | yes | 0:00 Welcome, 0:11 What it does, 0:34 What it will not do, 0:54 A real example, 1:23 How to use it |
+
+
+## Working through Claude Code, and the skills
+
+Seven movies (issue #290, and the lab notebook and the data root at Mike's request) in the same style as the agent movies, from
+[`training/skills/`](skills/): one scene file each on the shared renderer
+(`training/lib/movie.py`), quotes checked against the skill's own `SKILL.md`,
+every terminal and chat scene a real run (dry runs where a real one would post
+or change something; a throwaway repository with invented secrets for the push
+skills), captions burned in, narration with ElevenLabs. **Working through
+Claude Code** is the one to watch first: every other movie assumes it.
+
+**Checked against** Murmurent 2026.11.0, 7 November 2026. The getting-started
+video (made against 2026.9.9) was re-checked the same day: every command it
+shows still exists, and it now ends with a short coda pointing at the Claude
+Code movie.
+
+| Movie | Watch | Length | Chapters |
+|---|---|---|---|
+| [`training/skills/claude_code`](skills/claude_code/scenes.py) | [Working through Claude Code](https://mikehallett.science/assets/videos/murmurent_claude_code.html) | 2:18 | 0:00 Welcome, 0:09 Opening a project, 0:31 Addressing an agent, 0:51 A real exchange, 1:13 The agent log pane, 1:31 What the hooks refuse, 1:58 How to use it |
+| [`training/skills/push`](skills/push/scenes.py) | [Backing up with /murmurent-push](https://mikehallett.science/assets/videos/murmurent_push.html) | 2:04 | 0:00 Welcome, 0:09 What it refuses, 0:37 A real run, 1:01 Where the note goes, 1:22 The whole project, 1:43 How to use it |
+| [`training/skills/update_me`](skills/update_me/scenes.py) | [A status update with /murmurent-update-me](https://mikehallett.science/assets/videos/murmurent_update_me.html) | 1:43 | 0:00 Welcome, 0:12 Where the facts come from, 0:34 The script, 0:53 A real dry run, 1:13 What it refuses, 1:27 How to use it |
+| [`training/skills/course`](skills/course/scenes.py) | [Learning a subject with teacher course](https://mikehallett.science/assets/videos/murmurent_course.html) | 1:51 | 0:00 Welcome, 0:11 The interview, 0:33 A real first session, 0:58 The folder is the memory, 1:14 Later sessions, 1:30 How to use it |
+| [`training/skills/mayor_tools`](skills/mayor_tools/scenes.py) | [The mayor's and PI's tools](https://mikehallett.science/assets/videos/murmurent_mayor_tools.html) | 1:57 | 0:00 Welcome, 0:11 /murmurent-admin, 0:36 /murmurent-onboard, 1:03 What onboard refuses, 1:17 /murmurent-reset, 1:40 How to use it |
+| [`training/skills/notebook`](skills/notebook/scenes.py) | [Your lab notebook](https://mikehallett.science/assets/videos/murmurent_notebook.html) | 2:30 | 0:00 Welcome, 0:13 Morning: the plan, 0:23 The gel photo, 0:49 A voice note, 1:07 The entry, 1:23 Prompts: write, send, keep, 1:44 End of day: ask, 1:59 End of week: the report, 2:14 How to use it |
+| [`training/skills/data_root`](skills/data_root/scenes.py) | [The data root: where big files live](https://mikehallett.science/assets/videos/murmurent_data_root.html) | 2:50 | 0:00 Welcome, 0:09 Three tiers, 0:29 The folders, 0:54 What each folder is for, 1:59 What the hooks refuse, 2:18 Keeping it tidy, 2:32 How to use it |
+
+## Getting started with Murmurent (video, 7 min 10 s)
 
 A narrated walkthrough for someone who has never used Murmurent. It explains
 what Murmurent is, then goes through installing it, checking the install,
@@ -18,7 +88,7 @@ appears on screen as the commands you would type.
 | **Where it is** | [mikehallett.science](https://mikehallett.science/assets/videos/murmurent_getting_started.html), to watch in the browser with captions. The [video file itself](https://mikehallett.science/assets/videos/murmurent_getting_started_1080p.mp4) (33 MB, 1080p) can be downloaded. |
 | **Transcript** | [murmurent_getting_started.srt](murmurent_getting_started.srt), in this folder: the full narration with timings, which also works as a subtitle file |
 | **Made with** | [ElevenLabs](https://elevenlabs.io): the narration (voice "Matilda") and the music |
-| **Checked against** | Murmurent 2026.9.9 |
+| **Checked against** | Murmurent 2026.9.9; every command re-checked against 2026.11.0 on 2026-11-07 |
 
 ### Chapters
 
@@ -39,6 +109,7 @@ appears on screen as the commands you would type.
 | 5:26 | Choreographies | `choreography list`, `install`, `init`, publishing one to the hub |
 | 6:03 | Getting help | asking Claude Code, `murmurent doctor`, where to report bugs |
 | 6:30 | Recap | |
+| 6:50 | Coda | watch the Claude Code movie next (added 2026-11-07) |
 
 ### How it was made
 

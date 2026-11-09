@@ -42,7 +42,6 @@ import datetime as _dt
 import getpass
 import json
 import os
-import pwd
 import shlex
 import subprocess
 from dataclasses import asdict, dataclass, field
@@ -133,6 +132,10 @@ def read_gpu_holders(run: Runner = _run) -> tuple[dict[int, set[int]], dict[int,
 
 
 def _is_person(user: str) -> bool:
+    # Imported here, not at the top: `pwd` exists only on Unix, and this module
+    # is loaded by every `murmurent` command, so a top-level import stopped the
+    # whole CLI on Windows before it printed anything (#281).
+    import pwd
     try:
         return pwd.getpwnam(user).pw_uid >= FIRST_PERSON_UID
     except KeyError:

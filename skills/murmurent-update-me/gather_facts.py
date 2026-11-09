@@ -36,11 +36,9 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import datetime as dt
-import grp
 import json
 import logging
 import os
-import pwd
 import re
 import socket
 import subprocess
@@ -48,6 +46,12 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+
+try:
+    import grp
+    import pwd
+except ImportError:  # Windows: the facts come from a lab server; importing must still work (#281)
+    grp = pwd = None  # type: ignore[assignment]
 
 LOGGER = logging.getLogger("update_me.gather")
 

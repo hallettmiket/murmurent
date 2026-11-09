@@ -52,8 +52,50 @@ project's channel or to a development channel; the sender reports why.
 A channel can be found and the note still not sent: the bot token for that
 workspace is kept per machine (`~/.config/murmurent/groups/<lab>/slack-token`).
 From a machine that has none, `murmurent project note` prints "no Slack bot
-token on this machine" with the fix, `murmurent group-slack-setup <lab>`, run
-once there.
+token on this machine" with the one command to run there: on the PI's machine
+`murmurent group-slack-setup <lab>`, on a member's machine
+`murmurent group-slack-unlock <lab>` (next section).
+
+## How a member's machine gets the bot token
+
+The PI's machine is the only one that is handed the lab's bot token, by
+`murmurent group-slack-setup`. A certified member pushing from their own
+machine used to be stuck at "no Slack bot token on this machine", with no
+supported way past it but the PI copying the token to them by hand.
+
+**The choice: the PI seals the token to each member's own key and commits it
+to the lab records.** Every certified member's roster entry
+(`members/<handle>.md`) already carries the public key their machine attested
+when their card was issued, and the private half is on that machine
+(`~/.murmurent/keys/id_ed25519`). So nothing new has to be installed, generated
+or sent:
+
+1. The PI runs `murmurent group-slack-share <lab>`. It encrypts the token so
+   that any one of the active members' keys can open it (one slot per member,
+   the envelope scheme `age` uses, done with the library murmurent already
+   signs cards with), writes `security/slack_bot_token.sealed.json` in the
+   records repository, commits and pushes. Members without an attested key are
+   listed, not included.
+2. The member pulls the lab records, which they clone anyway, and runs
+   `murmurent group-slack-unlock <lab>` once. It opens the box with the
+   machine's key and stores the token at the per-machine path above, mode
+   0600. `murmurent project note` tries the same thing on its own when the
+   machine has no token yet, so in the usual case the member runs nothing.
+3. After adding a member, or rotating the token, the PI shares again.
+
+**Revocation means rotation.** The box stays in git history, and a key that
+could open it then can open it forever. When a member leaves the lab, the PI
+rotates the token in Slack, runs `group-slack-setup` with the new one, and
+shares again; the old box opens to a dead token.
+
+**The alternative, not taken: a relay.** A service on the lab server could hold
+the only copy of the token and accept notes signed with a member's card,
+posting each as that member (`docs/slack_cc_integration.md`, "Model C"). It
+keeps the token off every member's machine and makes attribution verifiable,
+but it is a service to host, keep up and reach from every machine, and today
+no lab has one. The sealed box costs a file in a repository members already
+pull. The relay remains the design to move to if non-repudiation of who posted
+a note ever matters more than the hosting.
 
 The bot is the one for that channel's workspace: the project's workspace for a
 project channel (`cert_provision.resolve_project_slack`), else the lab's bot

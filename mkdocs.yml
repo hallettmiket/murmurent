@@ -88,7 +88,8 @@ nav:
       - Your Obsidian vault:
           - Layout & what Murmurent touches: obsidian-usage.md
           - The Oracle (personal & lab memory): oracle-workflow.md
-          - The lab notebook: lab_notebook_guide.md
+          - The lab notebook: lab_notebook.md
+          - Lab notebook guide (dashboard and experiments): lab_notebook_guide.md
           - Reference files (murmurent_data/): murmurent_data.md
           - Vault vignettes (step by step):
               - Start here: vault_vignettes/index.md
@@ -135,6 +136,7 @@ nav:
   - Reference:
       - CLI manual: cli_manual.md
       - "Reporting checklists (TRIPOD+AI, PROBAST+AI, REMARK)": reporting_guidelines.md
+      - "The institution pack (the Clerk)": institution_pack.md
       - "Writing guide for manuscripts (the Scribe)": scientific_writing.md
       - Architecture diagrams: diagrams.md
       - Versioning: versioning.md

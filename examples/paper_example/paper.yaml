@@ -1,0 +1,17 @@
+# Example paper package: synthetic data, one claim. `murmurent paper check examples/paper_example`.
+paper: 1
+title: Serum enlarges colonies of a synthetic isolate compendium
+authors:
+  - name: A. Candidate
+  - name: M. Supervisor
+status: in-prep
+doi: ''
+sensitivity: standard
+source: main.tex
+claims:
+  - id: c1
+    text: Colonies grown in serum are larger than controls, and the difference holds under permutation.
+    where: Results, first paragraph
+    figure: fig:signal
+    code: exp/1_signal/run_all.py
+    data: [data/signal.csv]

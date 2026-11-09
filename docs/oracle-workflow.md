@@ -81,17 +81,28 @@ tier first attempts a best-effort `git pull --ff-only` of your vault (once
 per process), so recall always reflects your latest synced notes, even
 ones you saved on another machine.
 
-### Three tiers, one query surface
+### Four tiers, one query surface
 
-`kind` ∈ {`personal`, `lab`, `notebook`, `both`, `all`}:
+`kind` is one of `personal`, `lab`, `notebook`, `sessions`, `both`, `all`:
 
 | kind | Reads from |
 |---|---|
 | `personal` | `<vault>/oracle/` (curated frontmatter-required entries) |
 | `lab` | `~/repos/murmurent_lab_mgmt_<lab>/oracle/` (curated, lab-shared) |
-| `notebook` | `<vault>/<notebook_subfolder>/` (daily entries; frontmatter optional) |
+| `notebook` | `<vault>/<notebook_subfolder>/` (your own daily notes; frontmatter optional) |
+| `sessions` | `<vault>/sessions/<date>/` (the prompts you gave Claude Code, recorded by a hook) |
 | `both` | `personal + lab` (legacy default; preserved for back-compat) |
-| `all` | `personal + lab + notebook` |
+| `all` | `personal + lab + notebook + sessions`, with the notes before the sessions |
+
+The notebook has two streams because they are written by two hands: the
+notes are yours, and the sessions are written automatically, one file per
+Claude Code session, with each prompt's time, project, repository and commit.
+Searching `notebook` finds what you thought; searching `sessions` finds what
+you asked; `all` returns both and lists every note before any session, so a
+prompt never outranks the note that answers the question. The sessions
+stream stays in your personal vault and is never published to the lab. How
+the notebook is kept, captured into and reported from:
+[The lab notebook](lab_notebook.md).
 
 The **notebook tier** is permissive: daily lab notebook files
 don't need to conform to the Oracle schema. Missing fields are
@@ -103,6 +114,11 @@ derived from path conventions:
   for flat layouts (`<vault>/lab-notebook/2026-05-15.md`)
 - `title`: first `# heading` in the body, or the filename
 - `tags` / `sensitivity`: from frontmatter if present, else defaults
+- `audience`: from frontmatter if present, else `me` (who may read the
+  entry in a `murmurent notebook report`; see [The lab notebook](lab_notebook.md))
+
+A session file's date comes from its folder, `sessions/<date>/`, when its
+frontmatter does not carry one.
 
 This lets one MCP call (`kind=all`) return curated Oracle findings
 alongside the raw notebook mentions that surfaced them, useful for
@@ -125,3 +141,4 @@ than crashing.
 - [`agents/lab_oracle.md`](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md): read-only lab tier.
 - [`rules/oracle_schema.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/oracle_schema.md): required frontmatter.
 - [`docs/obsidian-usage.md`](obsidian-usage.md): your Obsidian vault layout and what Murmurent touches (your `maps-legends`, etc.).
+- [`docs/lab_notebook.md`](lab_notebook.md): the notebook's two streams, `murmurent notebook add | split | open | report`, and the `audience` field.

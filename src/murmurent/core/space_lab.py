@@ -27,7 +27,6 @@ own procedures.
 from __future__ import annotations
 
 import datetime as _dt
-import fcntl
 import json
 import os
 from contextlib import contextmanager
@@ -78,6 +77,11 @@ def _lock() -> Iterator[None]:
     """Hold the lab-scan lock, or raise :class:`LabScanBusy`."""
     path = _pu.space_dir() / LOCK_FILENAME
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        import fcntl
+    except ImportError:  # Windows: no file locks; a lab scan runs on a Unix server anyway (#281)
+        yield
+        return
     with open(path, "w", encoding="utf-8") as handle:
         try:
             fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)

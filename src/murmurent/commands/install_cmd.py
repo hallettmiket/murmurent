@@ -41,6 +41,17 @@ HOOK_REGISTRATIONS: list[dict[str, Any]] = [
         "label": "murmurent-agent-report-stop",
     },
     {
+        # Tells each subagent, before its first prompt, which language to
+        # write its spoken "Aloud:" line in when the machine has chosen one
+        # (`murmurent config speak-language`, #279). Prints nothing for
+        # English, so a machine with no choice is unchanged.
+        "event": "SubagentStart",
+        "matcher": None,
+        "command": "bash <MURMURENT_COMMONS>/scripts/murmurent_log_agent_event.sh",
+        "env": {},
+        "label": "murmurent-agent-report-start",
+    },
+    {
         "event": "PreToolUse",
         "matcher": "Write|Edit|Bash|NotebookEdit",
         "module": "murmurent.hooks.raw_guard",
@@ -79,6 +90,17 @@ HOOK_REGISTRATIONS: list[dict[str, Any]] = [
         "label": "murmurent-context-inject",
     },
     {
+        # Records each prompt in the personal vault's sessions/<date>/ stream
+        # with the time, project, repository and commit (#292), so nobody
+        # pastes prompts into the lab notebook. Withholds a prompt that
+        # matches a PHI or secret pattern and says so. Never blocks.
+        "event": "UserPromptSubmit",
+        "matcher": ".*",
+        "module": "murmurent.hooks.session_log",
+        "env": {},
+        "label": "murmurent-session-log",
+    },
+    {
         "event": "PostToolUse",
         "matcher": ".*",
         "module": "murmurent.hooks.audit",
@@ -97,6 +119,16 @@ HOOK_REGISTRATIONS: list[dict[str, Any]] = [
         "module": "murmurent.hooks.conscience_gaps",
         "env": {},
         "label": "murmurent-conscience-gaps",
+    },
+    {
+        # When agents/<x>.md is edited, remind the session once that the agent's
+        # training movie was checked against an older version of the file and
+        # name the command that re-renders it (#288). A prompt, never a block.
+        "event": "PostToolUse",
+        "matcher": "Write|Edit|MultiEdit|NotebookEdit",
+        "module": "murmurent.hooks.agent_movie",
+        "env": {},
+        "label": "murmurent-agent-movie",
     },
     # The personal vault follows you between machines without a button:
     # brought in when a session starts, sent as soon as a session writes a

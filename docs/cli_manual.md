@@ -58,6 +58,7 @@ Stored in `~/.murmurent/machine.yaml`. Each applies to this computer only.
 |---|---|
 | `murmurent config repos-root [FOLDER]` | Show, or set, the folder where this computer keeps its git repositories (default `~/repos`). Setting it moves nothing |
 | `murmurent config project-layout [nested\|flat]` | Show, or set, where new projects go: `nested` (one project folder holding its code, manuscript and seminar repositories; the default) or `flat` (each repository directly in the repositories folder). Existing projects are not moved |
+| `murmurent config speak-language [CODE] [--voice NAME] [--list]` | Show, or set, the language agents speak their verdicts in on this computer (a Piper language code such as `fr_FR`; `en` is English, the default). Writes the `language` line of `~/.murmurent/speak` and fetches that language's voice when Piper is installed; `--list` shows the languages with a voice, `--voice` names a Piper voice for one the table lacks |
 
 ## Command reference
 
@@ -93,6 +94,8 @@ Personal preferences profile lives at `~/.claude/murmurent-preferences.yaml` (lo
 | `murmurent group list` | List groups visible from your identity |
 | `murmurent group join <group>` | Request membership; PI approves |
 | `murmurent group leave <group>` | Remove yourself from a group |
+| `murmurent group-slack-share <group>` *PI* | Seal the lab's Slack bot token to each active member's attested card key and commit it to the lab records (`security/slack_bot_token.sealed.json`), so members can post notes from their own machines. Re-run after adding a member or rotating the token |
+| `murmurent group-slack-unlock <group>` | Member: open the token the PI shared, with this machine's key, and store it at `~/.config/murmurent/groups/<group>/slack-token`. `murmurent project note` tries this itself when the machine has no token; `--check` only reports |
 | `murmurent group-setup <group> --set <key>=<value>` *PI* | Fill in a group's post-creation details, written to its `lab.md` (repeatable `--set`; interactive without `--set`). Keys: `github`, `github_org`, `notebook_host`, `notebook_path`, `slack_workspace`, `slack_invite_url`, `data_host`, `data_raw`, `data_refined`. Setting `github=<org>/<repo>` also fills `github_org` when unset, clearing the "no GitHub org configured" warning |
 
 ### Roles (PI-only commands marked)
@@ -202,6 +205,19 @@ Experiments follow the lab project structure: `exp/<integer>_<slug>/` in the pro
 | `murmurent experiment status <project> <slug> --set <state>` | Update the `status` field on a notebook entry |
 | `murmurent experiment ingest <project> <slug> <source> [--instrument <t>] [--accept] [--dry-run]` | Classify files in `<source>` as raw vs derived (instrument profile + generic patterns), present for mandatory review, then copy: raw → `$MURMURENT_DATA_ROOT/immutable/<project>/<slug>/` (chmod a-w), derived → `.../append_only/<project>/<slug>/instrument_outputs/`. Compute SHA-256; update `immutable_data:`, `instrument_outputs:`, `checksums:` in `notebook.md`. |
 | `murmurent experiment attach <project> <slug> <file>` | Place a documentation file (photo of paper notebook page, sketch) into the appropriate subfolder; downsamples camera photos; never used for data files |
+
+### Lab notebook
+
+The daily notebook in your vault: notes in `lab-notebook/<date>.md`, the
+prompts you gave Claude Code recorded by a hook in `sessions/<date>/`. Full
+page: [The lab notebook](lab_notebook.md).
+
+| Command | Effect |
+|---|---|
+| `murmurent notebook add <text or file> [--project P] [--host H] [--handwritten] [--kind K] [--note T] [--sensitivity S] [--date D] [--dry-run]` | Put a line of text, a photo, a handwritten page, a sound note, a video or a result file into today's entry. Small result files stay in the vault's `attachments/`; images, sound, video and large files go to `append_only/<P>/notebook/<date>/` on the project's data host, never overwritten; the entry keeps the link, a thumbnail or poster frame (none for a protected project), and any transcription or description marked as machine-made |
+| `murmurent notebook open <host>:<path> [--no-open]` | Fetch a copy of a file the notebook links to into `~/.murmurent/notebook_cache/` and open it |
+| `murmurent notebook split [--dry-run]` | Move pasted prompts (long second-person paragraphs) out of existing entries into `sessions/<date>/pasted.md`; each original kept under `obsolete/`; prints every move; deletes nothing |
+| `murmurent notebook report --for <supervisor\|lab\|project:<name>> --since <date> [--until <date>] [--out DIR] [--title T]` | Collect the whole entries whose `audience` admits the reader, refuse restricted and protected ones, write `material.md` + `sources.md` for the scribe and artist, render one self-contained `report.html`, list every entry and file drawn on; sends nothing |
 
 ### Inventory
 
@@ -328,6 +344,42 @@ The full workflow is in [Assembling a choreography](assembling_choreographies.md
 
 The full guide is [Running long jobs](run_launcher.md).
 
+### Papers and theses
+
+A paper as a queryable package, and a thesis composed of them; see
+[`paper_package.md`](paper_package.md).
+
+| Command | What it does |
+|---|---|
+| `murmurent paper init <dir> --title ... [--author ...] [--lab ...]` | Scaffold a paper package: `paper.yaml`, `main.tex`, `CLAUDE.md`, `queries/`, marker. Never overwrites. |
+| `murmurent paper check [<dir>] [--strict]` | Every claim has its code, data and figure; exits 1 on an error (or a warning with `--strict`). |
+| `murmurent paper build [<dir>] [--pdf]` | Write `build/claim_map.md`; with `--pdf`, run latexmk on the source. |
+| `murmurent thesis init <dir> --title ... [--candidate ...]` | Scaffold a thesis package with SGPS front matter and chapter stubs. |
+| `murmurent thesis adopt <thesis.tex> <dir> [--title ...] [--candidate ...]` | Turn one monolithic thesis `.tex` into a package: preamble kept, SGPS front matter and chapters split, a draft claim per figure, figures and `.bib` files copied. The source folder is not changed. |
+| `murmurent thesis check [<dir>] [--strict]` | Check the thesis and every paper package in it: front matter and its word limits, chapter order, permissions, sensitivity. |
+| `murmurent thesis build [<dir>] [--pdf]` | Assemble `build/main.tex` in the SGPS order and `build/claim_map.md` for every chapter. |
+| `murmurent thesis talk [<dir>] [--minutes 20] [--pdf]` | Draft the defence talk: `build/talk_plan.md` (timed, one slide per claim) and `build/talk.tex` (Beamer). |
+| `murmurent thesis paperwork [<dir>]` | Write `build/paperwork.md`: the submission checklist from the institution pack's `thesis_examination` procedure (the built-in SGPS seed when no pack is found), deadlines from the defence date, board, forms, Veritas and final-submission steps. |
+
+### The institution pack
+
+Dated, sourced facts about the institution that the clerk answers from; see
+[`institution_pack.md`](institution_pack.md). The pack is chosen by `--pack`,
+else `$MURMURENT_INSTITUTION_PACK`, else the centre's `unique_name` under
+`institution/`.
+
+| Command | What it does |
+|---|---|
+| `murmurent institution init <unique_name> --name ... --domain ... [--seed-thesis]` | Scaffold a pack; `--seed-thesis` writes `procedures/thesis_examination.yaml` from the seed built into murmurent. Never overwrites. |
+| `murmurent institution validate [--pack P]` | Every fact has `source` and `date_read`, every source is inside the pack's domains, dates parse; lists stale facts. Exits 1 on an error. |
+| `murmurent institution show <office\|procedure\|holiday\|term\|deadline\|course\|letterhead\|packs> [key]` | One thing from the pack with its source, date and age note; `Unknown` with the nearest facts when absent. |
+| `murmurent institution review <file> [--level undergraduate\|graduate] [--term T] [--html OUT] [--markdown]` | A whole course outline: every policy for the level, the schedule against the pack's holidays and non-instructional days, the grade weights, what is unclear. Writes an HTML report (default `outputs/clerk/<name>_review.html`); exits 1 on a `Fix`. |
+| `murmurent institution check <file> [--pack P]` | Office holders, emails, postal codes, colours and fonts in a document against the pack. `Correct / Fix / Unknown` per finding; exits 1 on a `Fix`. |
+| `murmurent institution date <YYYY-MM-DD> --days N [--pack P]` | N working days before (negative) or after the date, skipping weekends and the pack's holidays; says which holidays it skipped. `--days 0` moves a holiday to the next working day. |
+| `murmurent institution walk <procedure> [--anchor DATE] [--variant doctoral] [--done 1,2] [--next]` | The steps with their forms and deadlines counted from the anchor date. |
+| `murmurent institution fetch-course <SUBJECT> <number> [--apply]` | Run the pack's course fetch rule for one course; `--apply` caches it in `courses.yaml`. |
+| `murmurent institution refresh [--apply] [--kind office ...]` | Re-read every fact from its source, inside the pack's domains only, and report confirmed, changed and unreachable facts with their dates. Dry run; `--apply` stamps today's date on confirmed facts and refreshes the course cache. A changed fact is reported, not rewritten. |
+
 ### Space
 
 | Command | Effect |
@@ -382,6 +434,16 @@ Note: `provision` is no longer a CLI command; it is a tool on the `inventory` MC
 | `murmurent review <PR-url>` | Open a review session |
 | `murmurent capture` | Open `inbox/YYYY-MM-DD_HHMM.md` for a quick note |
 | `murmurent triage` | Run `/process-inbox`-equivalent flow on `inbox/` |
+
+### `murmurent prompt`
+
+Prompts written in Obsidian, sent to Claude Code, and kept
+([`docs/lab_notebook.md`](lab_notebook.md)).
+
+| Command | What it does |
+|---|---|
+| `murmurent prompt new` | Open today's `prompts/<date>.md` in the vault, created with a heading when missing. |
+| `murmurent prompt send [--text T] [--file F] [--to APP] [--tmux PANE] [--no-paste] [--project P]` | Copy a prompt to the clipboard, paste it into Claude Code (an app on macOS, or a tmux pane) and record it under `sessions/<date>/sent.md`. With no `--text` or `--file`, the latest block of today's prompts file. |
 
 ## Examples
 

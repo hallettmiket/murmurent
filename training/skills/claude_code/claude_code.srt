@@ -1,0 +1,43 @@
+1
+00:00:00,400 --> 00:00:10,300
+This is how you work with Murmurent: you type to Claude Code in plain English. Every other movie assumes these two minutes.
+
+2
+00:00:10,700 --> 00:00:22,399
+You open your project folder, which is already set up for Murmurent. The agents and the shared rules arrive once, with the install, so every session has them.
+
+3
+00:00:22,399 --> 00:00:29,699
+Then you start Claude Code in that folder. From then on, you type English.
+
+4
+00:00:30,099 --> 00:00:49,799
+Ask for what you want in plain English, and Claude Code does the work. When you want a specialist, name it: ask the bookworm for papers, ask the adversary to check an analysis, ask the oracle to remember a finding. Each agent has one job.
+
+5
+00:00:50,199 --> 00:00:57,099
+Here is a real exchange. The member names the security guard and says what to check.
+
+6
+00:00:57,099 --> 00:01:08,399
+The first line of every reply is the answer. Here it is Blocked. Read that line first; the detail below says where and why.
+
+7
+00:01:08,800 --> 00:01:23,700
+Each agent's first line also appears in a small window as it finishes. Keep that window in a corner of the screen, and you can follow the agents without reading their full replies.
+
+8
+00:01:24,100 --> 00:01:41,799
+Your work is kept. Every request you type is kept in your notebook's record of sessions, except one that looks like patient details or a password. Ask the oracle to remember a finding, and it keeps it for the next time you ask.
+
+9
+00:01:41,799 --> 00:01:48,700
+And inside Claude Code, agents are stopped from changing your lab's original data.
+
+10
+00:01:49,100 --> 00:02:00,799
+Three habits matter. Name the agent and give it the files themselves. Read the first line of the reply. And ask the oracle to remember what you find.
+
+11
+00:02:00,799 --> 00:02:08,599
+Each agent has its own short movie that shows it this way.

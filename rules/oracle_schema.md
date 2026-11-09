@@ -67,12 +67,18 @@ sources:      ['@handle']             # who observed / contributed
 ## Optional fields
 
 ```yaml
+audience:     me | supervisor | lab | project:<name>   # lab-notebook entries; default me
 related:      ['[[other_entry]]', '[[methods/qc_drift]]']
 source_sea:   <SEA #>                 # if surfaced via a cross-group SEA
 source_exp:   <experiment_id>         # if surfaced in a specific experiment
 url:          <DOI or link>           # for literature-derived entries
 ```
 
+- **audience**: who may read a lab-notebook entry, for `murmurent notebook
+  report`. `me` (the default) never leaves the vault; `supervisor`, `lab` and
+  `project:<name>` let the report for that reader take the whole entry. A
+  `restricted` or `protected` entry is refused whatever its audience. See
+  [`docs/lab_notebook.md`](../docs/lab_notebook.md).
 - **related**: Obsidian wikilinks to other oracle entries. Drives the
   graph view in Obsidian and the `oracle_related()` MCP tool.
 - **source_sea** / **source_exp**: precise provenance when known.

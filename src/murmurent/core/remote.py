@@ -175,6 +175,47 @@ class Remote:
             )
         return result
 
+    def copy_to(self, local: Path | str, remote_path: str, *, timeout: int = 600) -> RemoteResult:
+        """Copy one local file to ``remote_path`` on the host (``scp``, batch
+        mode). On a local host it is a plain copy. The caller checks that the
+        target does not exist; this never overwrites on its own behalf."""
+        return self._copy(str(local), remote_path, direction="to", timeout=timeout)
+
+    def copy_from(self, remote_path: str, local: Path | str, *, timeout: int = 600) -> RemoteResult:
+        """Copy one file from ``remote_path`` on the host to ``local``."""
+        return self._copy(remote_path, str(local), direction="from", timeout=timeout)
+
+    def _copy(self, src: str, dst: str, *, direction: str, timeout: int) -> RemoteResult:
+        if self.host.kind == "local" or self.host.name == LOCAL_NAME:
+            argv = ["cp", "-p", src, dst]
+            summary = f"cp -p {src} {dst}"
+        elif self.host.kind == "ssh":
+            if not self.host.ssh_host:
+                raise ValueError(f"host {self.host.name!r}: ssh kind requires ssh_host")
+            remote_side = f"{self.host.ssh_host}:{dst if direction == 'to' else src}"
+            pair = [src, remote_side] if direction == "to" else [remote_side, dst]
+            argv = ["scp", "-q", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", *pair]
+            summary = " ".join(argv)
+        else:
+            raise ValueError(f"unknown host kind: {self.host.kind!r}")
+        start = _dt.datetime.now()
+        try:
+            proc = subprocess.run(argv, capture_output=True, text=True, timeout=timeout, check=False)
+        except subprocess.TimeoutExpired as exc:
+            _append_audit(host=self.host, command=summary, returncode=124,
+                          duration_ms=_ms_since(start))
+            raise RemoteError(f"timeout after {timeout}s copying to host {self.host.name!r}",
+                              returncode=124, stdout="", stderr=str(exc)) from exc
+        _append_audit(host=self.host, command=summary, returncode=proc.returncode,
+                      duration_ms=_ms_since(start))
+        result = RemoteResult(host=self.host.name, command=summary, returncode=proc.returncode,
+                              stdout=proc.stdout or "", stderr=proc.stderr or "")
+        if not result.ok:
+            raise RemoteError(
+                f"copy failed on {self.host.name!r} (rc={proc.returncode}): {_summarise(summary, 120)}",
+                returncode=proc.returncode, stdout=result.stdout, stderr=result.stderr)
+        return result
+
     def probe(self) -> RemoteResult:
         """Cheap connectivity check — runs ``true`` on the host."""
         return self.run("true", check=False, timeout=15)

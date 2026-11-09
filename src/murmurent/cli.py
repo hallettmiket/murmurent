@@ -10,6 +10,7 @@ Output: Side effects per subcommand; v1 working commands write to stdout.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import click
@@ -53,11 +54,30 @@ def _stub(*_args, **_kwargs) -> None:
     click.echo(NOT_IMPLEMENTED_MSG)
 
 
+def tolerate_console_encoding() -> None:
+    """Let murmurent's ✓ and ✗ reach a console that cannot encode them.
+
+    A Windows console usually runs with a legacy code page (cp1252), on which
+    ``click.echo("✓")`` raises ``UnicodeEncodeError`` and the command dies
+    half-way through its output (#281). Swap the undecodable character for
+    ``?`` instead. Streams that are not real consoles (the test runner's, a
+    pipe already in UTF-8) are left alone.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        encoding = (getattr(stream, "encoding", None) or "").lower().replace("-", "")
+        if encoding and encoding != "utf8" and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(errors="replace")
+            except (ValueError, OSError):  # pragma: no cover - closed or odd stream
+                pass
+
+
 @click.group(help="murmurent — group-level agentic infrastructure CLI.")
 @click.version_option(__version__, prog_name="murmurent")
 @click.pass_context
 def cli(ctx: click.Context) -> None:
     """Top-level entry point."""
+    tolerate_console_encoding()
     # Clone-first identity: the first real command a member runs after cloning
     # mints THIS machine's ed25519 keypair (their unique murmurent ID). Idempotent
     # + best-effort; ``MURMURENT_NO_AUTOKEY`` (set by the test suite) opts out. Only
@@ -214,6 +234,61 @@ def config_project_layout(layout: str | None) -> None:
     path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
     click.echo(f"New projects will be {layout}. Existing projects are not moved "
                "(to move one: murmurent project gather <name>).")
+
+
+@config_group.command("speak-language",
+                      help="Show or set the language agents speak their verdicts in on "
+                           "this computer (a Piper language code such as fr_FR; "
+                           "'en' goes back to English). Stored as the 'language' "
+                           "line of ~/.murmurent/speak. Fetches the language's voice "
+                           "when Piper is installed.")
+@click.argument("code", required=False)
+@click.option("--voice", default="", metavar="NAME",
+              help="A Piper voice for every agent in this language, instead of the "
+                   "table's. Required for a language the table does not list.")
+@click.option("--list", "list_", is_flag=True, help="List the languages with a voice.")
+def config_speak_language(code: str | None, voice: str, list_: bool) -> None:
+    import shutil
+    import subprocess
+    from .core import speak as _speak
+
+    table = _speak.languages()
+    if list_:
+        click.echo("en     English     (one voice per agent)")
+        for l in table:
+            click.echo(f"{l.code:6} {l.name:11} {l.piper_voice:28} {l.say_voice}")
+        return
+    if not code:
+        lang, chosen = _speak.current()
+        if not lang:
+            click.echo("English (the default; one voice per agent)")
+            return
+        known = {l.code: l for l in table}.get(lang)
+        name = known.name if known else lang
+        v = chosen or (known.piper_voice if known else "no voice set")
+        click.echo(f"{name} ({lang}), Piper voice {v}")
+        return
+    known = {l.code: l for l in table}.get(code)
+    if not _speak.is_english(code) and known is None and not voice:
+        raise click.ClickException(
+            f"{code} is not in the table (murmurent config speak-language --list). "
+            "Name a Piper voice for it with --voice; "
+            "~/.local/share/uv/tools/piper-tts/bin/python -m piper.download_voices lists them.")
+    path = _speak.set_language(code, voice)
+    if _speak.is_english(code):
+        click.echo(f"Agents speak English again ({path}).")
+        return
+    chosen = voice or known.piper_voice
+    click.echo(f"Agents will write and speak their Aloud line in "
+               f"{known.name if known else code}, Piper voice {chosen} ({path}).")
+    installer = _speak.hook_script().with_name("install_piper_voices.sh")
+    if shutil.which("piper") and installer.is_file():
+        click.echo("Fetching the voice if it is not there yet...")
+        subprocess.run(["bash", str(installer)], check=False)
+    else:
+        click.echo(f"Piper is not installed; the Mac's own voice is used. "
+                   f"For Piper voices: bash {installer}")
+    click.echo("Restart Claude Code for agents already running to pick it up.")
 
 
 @cli.command("setup", help="Wire the murmurent commons (agents, rules, skills) into ~/.claude/.")
@@ -2935,11 +3010,23 @@ from .commands.centre_cmd import centre_pin as _centre_pin
 from .commands.centre_cmd import centre_hub_publish as _centre_hub_publish
 from .commands.centre_cmd import group_setup as _group_setup
 from .commands.centre_cmd import group_slack_setup as _group_slack_setup
+from .commands.centre_cmd import group_slack_share as _group_slack_share
+from .commands.centre_cmd import group_slack_unlock as _group_slack_unlock
 from .commands.centre_cmd import group_reconcile_cmd as _group_reconcile_cmd
 from .commands.centre_cmd import group_remove_member as _group_remove_member
 from .commands.centre_cmd import group_init_toolkit as _group_init_toolkit
 from .commands.centre_cmd import join_request_group as _join_request_group
 from .commands.keyring_cmd import keyring_group as _keyring_group
+from .commands.thesis_cmd import paper_group as _paper_group
+from .commands.thesis_cmd import thesis_group as _thesis_group
+from .commands.notebook_cmd import notebook_group as _notebook_group
+cli.add_command(_paper_group)
+cli.add_command(_thesis_group)
+cli.add_command(_notebook_group)
+from .commands.institution_cmd import institution_group as _institution_group
+cli.add_command(_institution_group)
+from .commands.prompt_cmd import prompt_group as _prompt_group
+cli.add_command(_prompt_group)
 cli.add_command(_centre_init_cmd)
 cli.add_command(_centre_status_cmd)
 cli.add_command(_centre_slack_smoke)
@@ -2973,6 +3060,8 @@ cli.add_command(_centre_pin)
 cli.add_command(_centre_hub_publish)
 cli.add_command(_group_setup)
 cli.add_command(_group_slack_setup)
+cli.add_command(_group_slack_share)
+cli.add_command(_group_slack_unlock)
 cli.add_command(_group_reconcile_cmd)
 cli.add_command(_group_remove_member)
 cli.add_command(_group_init_toolkit)

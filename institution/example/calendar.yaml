@@ -1,0 +1,26 @@
+# Invented dates on the reserved example.edu domain. Replace for your institution.
+holidays:
+- {name: New Year's Day, date: '2027-01-01', source: https://www.example.edu/hr/holidays.html, date_read: '2026-11-07'}
+- {name: Family Day, date: '2027-02-15', source: https://www.example.edu/hr/holidays.html, date_read: '2026-11-07'}
+- {name: Good Friday, date: '2027-03-26', source: https://www.example.edu/hr/holidays.html, date_read: '2026-11-07'}
+- {name: Founders' Day, date: '2027-04-12', source: https://www.example.edu/hr/holidays.html, date_read: '2026-11-07'}
+- {name: Victoria Day, date: '2027-05-24', source: https://www.example.edu/hr/holidays.html, date_read: '2026-11-07'}
+terms:
+- name: Winter 2027 classes
+  start: '2027-01-04'
+  end: '2027-04-09'
+  evidence: '2027-01-04'
+  source: https://www.example.edu/registrar/sessional_dates.html
+  date_read: '2026-11-07'
+- name: Winter 2027 final examination period
+  start: '2027-04-13'
+  end: '2027-04-30'
+  evidence: '2027-04-13'
+  source: https://www.example.edu/registrar/sessional_dates.html
+  date_read: '2026-11-07'
+deadlines:
+- name: Annual research report to the Dean
+  date: '2027-06-30'
+  evidence: June 30
+  source: https://www.example.edu/science/annual_report.html
+  date_read: '2026-11-07'

@@ -217,6 +217,16 @@ def token_for(route: Route) -> str:
     return ""
 
 
+def _missing_token_hint(lab: str) -> str:
+    """The exact command for this machine: the PI sets the token up, a member
+    unlocks the copy the PI shared (``slack_token_share``)."""
+    try:
+        from .slack_token_share import missing_token_hint
+        return missing_token_hint(lab)
+    except Exception:  # noqa: BLE001
+        return f"run `murmurent group-slack-setup {lab or '<lab>'}` here once"
+
+
 def post_note(text: str, *, start: Path | str | None = None, project: str | None = None,
               env: dict | None = None, poster=None, token: str | None = None) -> tuple[bool, Route, str]:
     """Post ``text`` where :func:`resolve_route` says. Returns ``(posted, route,
@@ -235,8 +245,7 @@ def post_note(text: str, *, start: Path | str | None = None, project: str | None
         if not tok:
             who = f"project '{one.project}'" if one.project else f"lab '{one.lab}'"
             results.append(f"not posted: no Slack bot token on this machine for {who}; "
-                           f"run `murmurent group-slack-setup {one.lab or '<lab>'}` here "
-                           "once (the token is per machine)")
+                           f"{_missing_token_hint(one.lab)}")
             all_ok = False
             continue
         try:

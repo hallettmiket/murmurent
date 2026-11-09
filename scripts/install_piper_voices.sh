@@ -7,7 +7,11 @@
 # Author: Mike Hallett (with Claude Code)
 # Date: 2026-11-02
 # Input:  none. Optional first argument: `audition` plays every voice once,
-#         each introducing the agent it speaks for; `list` prints the table.
+#         each introducing the agent it speaks for; `list` prints the table;
+#         `languages` prints the languages verdicts can be spoken in (#279).
+#         When ~/.murmurent/speak holds a "language <code>" line (set with
+#         `murmurent config speak-language`), that language's voice is fetched
+#         as well.
 # Output: the `piper` command (uv tool, else pipx), the voices under
 #         ~/.murmurent/voices (about 60 MB each, 1 GB in all; a voice that is
 #         already there is kept), and ~/.murmurent/speak, the on switch.
@@ -37,9 +41,32 @@ agent_voices() {
       | sed -E 's/^[[:space:]]+([a-z_*]+)\)[[:space:]]+echo "([^"]+)".*/\1 \2/'
 }
 
+# The language → voice table lives in the hook too: "<code> <English name>
+# <piper voice> <mac voice>", one line per language.
+language_voices() {
+    sed -n '/^language_voice()/,/^}/p' "$HOOK" \
+      | grep -E '^[[:space:]]+[a-z]{2}_[A-Z]{2}\)[[:space:]]+echo' \
+      | sed -E 's/^[[:space:]]+([a-z_A-Z]+)\)[[:space:]]+echo "([^"|]+)\|([^"|]+)\|([^"|]+)".*/\1 \2 \3 \4/'
+}
+
+# The voice the spoken language needs, if one is set: a "voice" line in the
+# speak file, else the table's voice for the "language" line. Empty for English.
+language_voice_wanted() {
+    local lang v
+    [[ -f "$SPEAK_FILE" ]] || return 0
+    lang="$(grep -E '^[[:space:]]*language[[:space:]]+' "$SPEAK_FILE" | tail -n 1 | awk '{print $2}')"
+    case "$lang" in ""|en|en_*|english|English) return 0 ;; esac
+    v="$(grep -E '^[[:space:]]*voice[[:space:]]+' "$SPEAK_FILE" | tail -n 1 | awk '{print $2}')"
+    [[ -n "$v" ]] && { echo "$v"; return 0; }
+    language_voices | awk -v l="$lang" '$1 == l {print $3}'
+}
+
 case "${1:-}" in
     list)
         agent_voices | sed 's/^\*/default/' | column -t
+        exit 0 ;;
+    languages)
+        language_voices | column -t
         exit 0 ;;
     audition)
         command -v piper >/dev/null || die "piper is not installed; run this script with no argument first"
@@ -58,7 +85,7 @@ case "${1:-}" in
         done
         exit 0 ;;
     "") ;;
-    *) die "usage: $0 [list|audition]" ;;
+    *) die "usage: $0 [list|languages|audition]" ;;
 esac
 
 echo "[1/4] The piper command"
@@ -92,6 +119,11 @@ PIPER_PY="$(dirname "$(readlink -f "$(command -v piper)")")/python"
 [[ -x "$PIPER_PY" ]] || PIPER_PY="$(dirname "$(command -v piper)")/python"
 [[ -x "$PIPER_PY" ]] || die "cannot find the Python that runs piper (looked beside $(command -v piper))"
 wanted="$(agent_voices | awk '{print $2}' | sort -u)"
+lang_voice="$(language_voice_wanted)"
+if [[ -n "$lang_voice" ]]; then
+    echo "  spoken language set in $SPEAK_FILE: adding its voice, $lang_voice"
+    wanted="$(printf '%s\n%s\n' "$wanted" "$lang_voice" | sort -u)"
+fi
 missing=()
 for v in $wanted; do
     [[ -f "$VOICES_DIR/$v.onnx" && -f "$VOICES_DIR/$v.onnx.json" ]] || missing+=("$v")
@@ -122,4 +154,5 @@ echo "Done. The next agent verdict will be spoken with Piper."
 echo "Hear every voice:   bash $0 audition"
 echo "Change one:         echo 'adversary en_GB-cori-medium' >> $SPEAK_FILE"
 echo "Mac voices instead: echo 'engine say' >> $SPEAK_FILE"
+echo "Another language:   murmurent config speak-language fr_FR   (list: bash $0 languages)"
 echo "Mute:               rm $SPEAK_FILE   (or MURMURENT_SPEAK=0 for one session)"

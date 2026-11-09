@@ -1,0 +1,102 @@
+title: Thesis examination (example; the SGPS seed with invented sources)
+read_on: '2026-11-06'
+confirm_with: the Graduate Program Coordinator
+constants:
+  lay_summary_max_words: 350
+  abstract_max_words:
+    doctoral: 350
+    masters: 150
+  supplement_max_mb: 100
+  lead_working_days:
+    doctoral: 25
+    masters: 15
+  board_roles:
+    doctoral:
+      external: 1
+      university: 1
+      program: 2
+    masters:
+      university: 1
+      program: 1
+  board_roles_optional:
+  - knowledge_keeper
+board_text:
+  doctoral: 'Doctoral boards (SGPS regulation 8.4): one External Examiner from another university, one
+    University Examiner from another Western department, and two Program Examiners; a Knowledge Keeper
+    may be added. The supervisor attends but does not vote.'
+  masters: 'Master''s boards (SGPS regulation 8.4): no external examiner; at least one examiner from outside
+    the program, the rest set by the program. Confirm the composition with the Graduate Program Coordinator.'
+steps:
+- title: Supervisor confirms the thesis is ready for examination
+  owner: supervisor
+- title: Date, time and format of the defence agreed with the supervisor and examiners
+  owner: candidate
+- title: Proposed Examiner Form, to the Graduate Program Coordinator
+  form: Proposed Examiner Form
+  owner: candidate
+  deadline:
+    relative_to: defence
+    by:
+      doctoral: -25
+      masters: -15
+    rule: With the examination request, five working weeks before a doctoral defence and three before
+      a master's.
+- title: Thesis Examination Request Form, to the Graduate Program Coordinator (no signatures needed since
+    June 2026)
+  form: Thesis Examination Request Form
+  owner: candidate
+  deadline:
+    relative_to: defence
+    by:
+      doctoral: -25
+      masters: -15
+    rule: Latest day for the examination request and the preliminary submission in Veritas.
+- title: 'Preliminary submission in Veritas: log in to the Graduate Student Web Services Portal, open
+    the Veritas Thesis Examination Portal, begin the submission (title, format, the formatting, copyright
+    and publication confirmations), upload the thesis (.pdf or .docx) and the supplementary files, submit
+    for preliminary examination (files lock after this)'
+  form: Veritas Thesis Examination Portal
+  owner: candidate
+  deadline:
+    relative_to: defence
+    by:
+      doctoral: -25
+      masters: -15
+    rule: Same day as the examination request.
+- title: Complete the candidate approval request Veritas sends
+  owner: candidate
+- title: Supervisor confirms readiness; Graduate Chair approves the request
+  owner: supervisor, graduate chair
+- title: Examiners' preliminary reports
+  owner: examiners
+  deadline:
+    relative_to: defence
+    working_days: -5
+    rule: Due five working days before the defence.
+- title: 'The defence: talk of 10 to 15 minutes when no public lecture is required, or the length the
+    program sets; examiners question in rounds (about 15 to 20 minutes each, then 5 to 10); no personal
+    devices'
+  owner: candidate
+  deadline:
+    relative_to: defence
+    working_days: 0
+    rule: The defence date.
+- title: Revisions approved by the examiners who asked for them
+  owner: candidate
+- title: 'Final submission (Open Repository): final thesis uploaded with its metadata, embargo requested
+    if needed, release for research purposes authorized, non-exclusive licence granted (Library and Archives
+    Canada; copyright stays with the candidate), SGPS formatting review passed'
+  form: Open Repository (Scholarship@Western)
+  owner: candidate
+  deadline:
+    relative_to: defence
+    working_days: 5
+    rule: Within about one week after the defence, and by the last day of the current term, or registration
+      and fees continue into the next term.
+sources:
+- name: Graduate school thesis pages
+  source: https://grad.example.edu/thesis/index.html
+  date_read: '2026-11-07'
+- name: Graduate school examination timelines
+  source: https://grad.example.edu/thesis/timelines.html
+  date_read: '2026-11-07'

@@ -31,8 +31,8 @@ import argparse
 import subprocess
 import datetime as dt
 import logging
+import getpass
 import os
-import pwd
 import re
 import sys
 from pathlib import Path
@@ -241,7 +241,7 @@ def post(message: str) -> None:
 def record_post(now: dt.datetime) -> None:
     """Append the time of this post to the post log, readable by this account only."""
     POST_LOG.parent.mkdir(parents=True, exist_ok=True)
-    account = pwd.getpwuid(os.getuid()).pw_name
+    account = getpass.getuser()  # works on Windows too, where pwd does not exist (#281)
     with POST_LOG.open("a", encoding="utf-8") as handle:
         handle.write(f"{now.isoformat(timespec='minutes')}\t{CHANNEL_ID}\t{account}\t{PROJECT}\n")
     POST_LOG.chmod(POST_LOG_MODE)

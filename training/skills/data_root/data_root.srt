@@ -1,0 +1,39 @@
+1
+00:00:00,400 --> 00:00:11,900
+The data root is where a lab's big files live, on the lab's server, in folders with clear rules. Here is what each folder is for.
+
+2
+00:00:12,300 --> 00:00:34,399
+Murmurent remembers at three levels: what an agent sees in one session, what the oracle keeps, and the big files. The big files live in one folder on the lab's server, the data root. Protected or very large data stays there, and you reach it from your laptop over the network.
+
+3
+00:00:34,799 --> 00:00:53,699
+Eight folders sit at the top. Inside most, every project has a folder with its own name. So a project called project x keeps its original data in immutable and its results in append only, under the same experiment names as its code.
+
+4
+00:00:54,100 --> 00:01:05,799
+Immutable is the data as it arrived: from the instrument, a collaborator or a public source. It stays exactly as placed, so every analysis traces back to it.
+
+5
+00:01:05,799 --> 00:01:21,099
+Append only is where analyses write. Each new result or version is added beside the last, so a result you reported last year is still there. Modifiable holds a project's working files, the data that may change.
+
+6
+00:01:21,099 --> 00:01:38,400
+Mothballed is how the server makes room. Move there what you no longer need on the server; it goes to long-term storage and then leaves the server. Release holds the lab's own copy of what it published: the papers and the software.
+
+7
+00:01:38,400 --> 00:01:51,700
+Cottage holds each person's large files, such as software environments, because home folders are small. Tools holds programs the whole lab uses, and db the databases several people share.
+
+8
+00:01:52,100 --> 00:02:17,800
+Once installed, guards inside Claude Code keep these rules for every agent. Overwriting anything in immutable or append only is refused, in these words: a change to immutable data, a result that writes over an older one, an edit to a result. The guards catch an agent's mistake; what you do yourself in a terminal is yours to keep careful.
+
+9
+00:02:18,200 --> 00:02:33,100
+One check compares the data root with these rules, here on a demo with three planted mistakes. It reads names only. The PI decides; agents report and leave every file where it is.
+
+10
+00:02:33,500 --> 00:02:52,100
+When you ask an agent for work, name the folder: original data to immutable, results to append only, working files to modifiable. A new result is a new version beside the old one. Big data stays on the server.

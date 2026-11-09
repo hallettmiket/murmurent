@@ -110,8 +110,9 @@ them toward the mission.
 One sitting, self-contained, `lessons/lesson_<n>.html`.
 
 Follow the **same HTML conventions the [`teacher`](../../agents/teacher.md) agent uses** —
-inline CSS/JS only with no CDN, body content only, and theme-aware via both
-`prefers-color-scheme` and `data-theme`. Keep one look across a course's lessons; a learner
+inline CSS/JS only with no CDN, body content only, theme-aware via both
+`prefers-color-scheme` and `data-theme`, and mathematics as equations (LaTeX in
+prose; MathML on the page, with the LaTeX source beside it). Keep one look across a course's lessons; a learner
 should recognise them.
 
 Structure, per teacher's output conventions: plain-bullet punchline → detail, carrying its

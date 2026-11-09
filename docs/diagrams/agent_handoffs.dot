@@ -1,0 +1,131 @@
+// Purpose: Which reference agent hands work to which, as each agent's own
+//          file states it. Rendered by scripts/render_diagrams.sh.
+// Author:  Mike Hallett (with Claude Code)
+// Date:    2026-11-09
+//
+// Reading it: every agent is started by the member's Claude Code session,
+// which is not drawn. A solid arrow means the agent at the tail names the
+// agent at the head in its reply as the one to take the next step (a
+// hand-off line); the session then dispatches it. The one automatic case
+// is the adversary, which dispatches the lawyer itself. A dashed arrow is
+// a review or a check rather than a piece of work handed on.
+
+digraph agent_handoffs {
+  graph [
+    rankdir=TB,
+    fontname="EB Garamond",
+    fontsize=11,
+    bgcolor="#FAF8F5",
+    pad=0.3,
+    nodesep=0.35,
+    ranksep=0.6,
+    splines=true,
+    compound=true,
+    newrank=true,
+    label=<<B>Who hands work to whom</B><BR/><FONT POINT-SIZE="10">Each arrow is a hand-off written in the agent's own file. The member's Claude Code session starts every agent and carries each hand-off to the next one.</FONT>>,
+    labelloc=t,
+  ];
+  node [
+    shape=box,
+    style="rounded,filled",
+    fontname="EB Garamond",
+    fontsize=12,
+    fontcolor="#1A1A1A",
+    color="#4F2683",
+    fillcolor="#FFFFFF",
+    penwidth=1.2,
+    margin="0.18,0.10",
+  ];
+  edge [
+    color="#5B5B5B",
+    fontname="Courier Prime",
+    fontsize=8,
+    fontcolor="#5B5B5B",
+    arrowsize=0.7,
+  ];
+
+  subgraph cluster_memory {
+    label=<<B>Memory</B>>;
+    fontsize=11; fontcolor="#4F2683"; color="#4F2683";
+    style="rounded,dashed"; bgcolor="#F1ECE3";
+    oracle     [label="oracle\n(personal memory)"];
+    lab_oracle [label="lab oracle\n(lab memory)"];
+  }
+
+  subgraph cluster_research {
+    label=<<B>Research and production</B>>;
+    fontsize=11; fontcolor="#4F2683"; color="#4F2683";
+    style="rounded,dashed"; bgcolor="#F1ECE3";
+    blacksmith [label="blacksmith\n(computation)"];
+    bookworm   [label="bookworm\n(literature, citations)"];
+    artist     [label="artist\n(figures)"];
+    teacher    [label="teacher\n(explanations, courses)"];
+    scribe     [label="scribe\n(scientific writing)"];
+    docent     [label="docent\n(paper and thesis packages)"];
+  }
+
+  subgraph cluster_review {
+    label=<<B>Review and adjudication</B>>;
+    fontsize=11; fontcolor="#4F2683"; color="#4F2683";
+    style="rounded,dashed"; bgcolor="#F1ECE3";
+    adversary      [label="adversary\n(methods audit)"];
+    conscience     [label="conscience\n(equity and bias)"];
+    lawyer         [label="lawyer\n(patents, data permission)"];
+    security_guard [label="security guard\n(secrets, patient data)"];
+    judge          [label="judge\n(combines contributions)"];
+  }
+
+  subgraph cluster_admin {
+    label=<<B>Infrastructure and administration</B>>;
+    fontsize=11; fontcolor="#4F2683"; color="#4F2683";
+    style="rounded,dashed"; bgcolor="#F1ECE3";
+    millwright        [label="millwright\n(one lab's infrastructure)"];
+    centre_millwright [label="centre millwright\n(cross-lab infrastructure)"];
+    registrar         [label="registrar\n(centre registry)"];
+    clerk             [label="clerk\n(the institution's rules)"];
+  }
+
+  // Research and production
+  blacksmith -> artist     [label="numbers to plot"];
+  blacksmith -> adversary  [label="audit the split"];
+  blacksmith -> bookworm   [label="check against\nthe literature"];
+  artist     -> blacksmith [label="a metric not\nyet computed"];
+  bookworm   -> artist     [label="references\nfor captions"];
+  bookworm   -> artist     [label="critiques\nfigures", style=dashed];
+  teacher    -> bookworm   [label="a citation\nto verify"];
+  teacher    -> artist     [label="a figure from\nreal data"];
+  scribe     -> bookworm   [label="a doubtful\ncitation"];
+  scribe     -> adversary  [label="a methods or\nreporting question"];
+  scribe     -> conscience [label="wording about\npeople"];
+  docent     -> adversary  [label="a doubt about\na method"];
+  docent     -> bookworm   [label="a citation\nto verify"];
+  docent     -> artist     [label="a figure\nto redraw"];
+  docent     -> teacher    [label="a method\nto explain"];
+  docent     -> scribe     [label="the words on\ndefence slides"];
+  docent     -> clerk      [label="paperwork,\ndates, offices"];
+
+  // Review and adjudication
+  adversary      -> lawyer         [label="IP-bearing work\n(dispatched automatically)", penwidth=1.8, color="#4F2683", fontcolor="#4F2683"];
+  adversary      -> bookworm       [label="a reference\nto find"];
+  adversary      -> security_guard [label="siblings: science\nversus what leaves", style=dashed, dir=none];
+  security_guard -> conscience     [label="patient data blocked\nin a protected project"];
+  security_guard -> bookworm       [label="a real person\nor vendor named"];
+  judge          -> artist         [label="the combined\npresentation"];
+  judge          -> adversary      [label="combination\nreviewed", style=dashed];
+  conscience     -> bookworm       [label="a resource\nto add", style=dashed];
+
+  // Memory
+  oracle -> lab_oracle [label="promoted by the member\n(murmurent oracle publish)", style=dashed];
+
+  // Infrastructure and administration
+  millwright        -> oracle            [label="record\nthe event"];
+  millwright        -> security_guard    [label="before a change to\nmachines or members"];
+  millwright        -> centre_millwright [label="membership\ncrosses labs"];
+  millwright        -> blacksmith        [label="where outputs\nbelong"];
+  millwright        -> conscience        [label="onboarding onto a\nprotected project"];
+  centre_millwright -> registrar         [label="sign-off\nbefore writes"];
+  centre_millwright -> millwright        [label="per-lab\nprovisioning"];
+  centre_millwright -> security_guard    [label="permissions\naudit", style=dashed];
+  clerk             -> conscience        [label="a course outline,\nfor equity"];
+  clerk             -> scribe            [label="redo the\nsyllabus"];
+}

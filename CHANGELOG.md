@@ -17,6 +17,174 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+## [2026.11.1] - 2026-11-09
+
+### Fixed
+- **Spoken verdicts no longer talk over each other or repeat.** The lock
+  that makes verdicts wait their turn recorded the hook's pid instead of the
+  speaking subshell's, so every waiter took the lock while the previous voice
+  was still talking; it now records the right pid. A verdict queued for more
+  than two minutes is dropped rather than read as a backlog. The same event
+  delivered twice (the hook registered in a project's `.claude/settings.json`
+  as well as the user's, a leftover from before 2026-05-17) is logged and
+  spoken once; `murmurent doctor` warns about the stale project registration.
+
+### Changed (training movies, #302, #303)
+- Every agent and skill movie rewritten through the scribe in plain language: cards are short statements rather than quotations from the agent files, scope is stated positively, no file paths or commands on screen, and each movie says what a lab can tailor. The oracle movie tells the cross-project story the PI asked for: a marker of early liver cancer (GPC3, separating early hepatocellular carcinoma from a dysplastic nodule), recalled eight months later from a screening gene list. The adversary checked each movie against its agent's file and the artist reviewed the frames.
+
+### Added (documentation)
+- A figure of which agent hands work to which, drawn from the hand-off lines in the agents' own files, on the reference-agents page (`docs/diagrams/agent_handoffs.dot`).
+
+### Fixed (agent files)
+- The millwright and registrar open with their own verdict words rather than a paragraph copied from the security guard; the registrar's file no longer calls itself read-only, since the code creates, archives and updates labs and cores; the security guard no longer claims the conscience is told automatically when it blocks on patient data (nothing tells one agent about another's verdict; it names the hand-off in its reply).
+
+### Added (course review, the scribe)
+- `murmurent institution review`: the clerk reviews a whole course outline, every rule for its level (`applies_to` on a policy), each dated lecture, lab and assessment against the holidays and non-instructional days, the grade weights, and what the outline leaves unclear, as an HTML report. The conscience reviews the same outline separately; the scribe redoes it on request (#300).
+- The scribe may edit a manuscript in place when asked, writes in whatever format the manuscript uses, uses the house style by default, and a lab tailors it with its own papers in `docs/scientific_writing_examples.md` (#301).
+
+### Added
+- **The clerk reviews a syllabus against the institution's rules.** Rules live
+  in the pack under `policies/<name>.yaml`, each quoted as the institution's
+  page words it with the page and the date read (`murmurent institution
+  learn-rule`, which fetches the page and refuses a quote it does not find);
+  `murmurent institution check <file> --policy course_outlines` finds the
+  assessments in a course outline and reports each rule as Fix, Correct or
+  Unknown: a test in the last weeks of classes, a new assignment introduced
+  too late, a final examination too early. The Western pack holds the
+  Academic Calendar's rules on scheduling tests, assignments and examinations.
+- **Prompts written in Obsidian, sent with one keystroke, and kept.**
+  `murmurent prompt new` opens today's `prompts/<date>.md` in the vault;
+  `murmurent prompt send` copies the selected prompt or the latest block,
+  pastes it into Claude Code (an app on macOS, or a tmux pane) and records it
+  under `sessions/<date>/sent.md`, so prompts no longer vanish with the
+  session. Bound to a hotkey through Obsidian's Shell commands plugin
+  (`docs/lab_notebook.md`). The notebook movie is re-made as a bench
+  scientist's day in natural language, with the commands as footnotes.
+- **Two more training movies**: the lab notebook (adding text, photos and
+  voice notes from Claude Code, the entry as Obsidian shows it, prompts moved
+  out of old notes, a report for a supervisor from entries marked for them)
+  and the data root (tier-3 memory: what immutable, append_only, modifiable,
+  mothballed, release, cottage, tools and db are for, how a project's folders
+  mirror its repository, what the hooks refuse, the layout check). The
+  bookworm, blacksmith, artist, scribe and adversary movies gain a "how to
+  direct it" scene: example requests that name the format, the destination
+  (Zotero, a Streamlit app, a slide deck in Western's colours) and the method.
+- **Five more training movies** (#290): working through Claude Code (the one
+  every other movie assumes), the two push skills, the status update, a
+  course across sessions, and the mayor's and PI's tools, under
+  `training/skills/`, on a generic scene module (`training/lib/movie.py`)
+  that quotes a skill's own `SKILL.md`. The getting-started video was
+  re-checked against this release and ends with a coda pointing at the
+  Claude Code movie.
+- **One place for the videos and the news** (#289). `training/index.yaml`
+  lists every training video (the standalone ones, the agent movies) and one
+  line per release or new capability; `training/front_page.py` writes from it
+  the "Videos and news" section of the README and the page at
+  mikehallett.science/assets/videos/, so the two cannot drift apart. The
+  agent movies carry their own emoji badge, as the seminar slides mark them.
+- **The lab notebook: two streams** (#292). A new `UserPromptSubmit` hook,
+  `murmurent.hooks.session_log`, records every prompt given to Claude Code in
+  the personal vault under `sessions/<date>/<session>.md` with the time,
+  project, repository and commit, so the day's notes in `lab-notebook/` hold
+  only notes. A prompt matching a PHI or secret pattern is withheld and the
+  hook says so; the stream is never published to the lab. The oracle MCP gains
+  `kind=sessions`, and `kind=all` lists the notes before the sessions.
+  `murmurent notebook split` moves prompt-shaped blocks out of existing
+  entries into `sessions/<date>/pasted.md`, keeps each original under
+  `obsolete/`, prints what it moved and deletes nothing.
+- **The lab notebook: capture** (#293). `murmurent notebook add` puts text,
+  an image, a handwritten page, a sound note, a video or a result file into
+  today's entry. Small result files stay in the vault's `attachments/`;
+  images, sound, video and large files go to
+  `append_only/<project>/notebook/<date>/` on the project's data host (the
+  lab's `data_host`, else the main repository's host; local or over SSH),
+  never overwriting. The entry keeps the link, a thumbnail or poster frame
+  (none for a protected project), and machine-made text marked as such: an
+  ElevenLabs transcription when the Keychain holds `elevenlabs-api-key`,
+  checked for PHI patterns first, or a marked placeholder for the session to
+  fill. `murmurent notebook open <host>:<path>` fetches a copy to look at.
+  `core.remote.Remote` gains `copy_to` and `copy_from`.
+- **The lab notebook: audience and reports** (#294). An entry's `audience`
+  (`me` by default, `supervisor`, `lab`, `project:<name>`) says who may read
+  it. `murmurent notebook report --for <audience> --since <date>` collects
+  the whole entries marked for that reader, refuses restricted and protected
+  ones as `oracle publish` does, writes `material.md` and `sources.md` for
+  the scribe and the artist, renders one self-contained `report.html` with a
+  marked slot for the scribe's `narrative.md`, prints every entry and file it
+  drew on, and sends nothing. Documented in `docs/lab_notebook.md`.
+- **The clerk and the institution pack** (#291). A new commons agent, the
+  `clerk`: ask it anything about your institution and it reads the answer off
+  the institution's own web pages (a web search limited to the institution's
+  domains, then the page), names the page and the date it read it, and
+  remembers the fact in the **institution pack**, `institution/<unique_name>/`
+  (`facts.yaml` for what it looked up, `directory.yaml` for office holders it
+  confirmed, plus what the centre keeps on purpose: procedures, holidays, the
+  letterhead). `Unknown` when the institution's pages do not say; never from
+  memory. A remembered fact older than `verify_after_days` is re-read before
+  it is relied on; `murmurent institution refresh` re-reads every fact on a
+  schedule. Three jobs on top: check a document's office holders and
+  addresses, compute a date in working days that never lands on a holiday,
+  walk a procedure to its next steps. `murmurent institution
+  recall|lookup|learn|verify|check|date|walk|refresh|fetch-course|init|validate`.
+  The Western pack is withheld from the release; an example pack ships. The
+  thesis paperwork reads the pack's procedure, and the docent asks the clerk
+  for it.
+- **One short training movie per commons agent** (#288): sixteen movies under
+  `training/agents/<agent>/`, each 90 seconds to 3 minutes, rendered from a
+  scene file by the shared renderer in `training/lib/` (lifted from the
+  thesis-package video), quoting the agent's own `.md`, showing one real run,
+  and narrated with ElevenLabs. `training/index.yaml` stamps each movie with
+  the version and the hash of the agent file it was checked against. A new
+  `PostToolUse` hook, `murmurent.hooks.agent_movie`, prompts once per session
+  to re-render a movie when its `agents/<x>.md` is edited; the release
+  checklist in `docs/versioning.md` repeats the step.
+- **Paper packages, thesis packages and the `docent`.** A paper becomes a
+  queryable package: `paper.yaml` maps each central claim to the code and
+  data behind it; `murmurent paper init|check|build` scaffold, validate and
+  render `build/claim_map.md`. A thesis is composed of paper packages or of
+  chapters with their own claims: `murmurent thesis init|check|build` assemble
+  `build/main.tex` in Western's SGPS order, `thesis talk` drafts a timed
+  defence talk (one slide per claim, Beamer), and `thesis paperwork` writes
+  the SGPS submission checklist from the manifest. The new `docent` agent
+  answers an examiner's or reader's questions with a location, logs them
+  append-only, and walks the candidate through the commands. Examples under
+  `examples/`. Design, limits and sources: `docs/paper_package.md` (issue #284).
+- **Windows on ARM installs without a compiler** (#281). `cryptography`
+  stopped shipping Windows ARM wheels after 46.0.3, so `uv tool install`
+  on a Surface or a Parallels VM tried to build it with Rust and failed.
+  That platform is now held at 46.0.3 in `pyproject.toml`; every other
+  platform keeps the current release.
+- **Windows: supported through WSL, and `murmurent` now starts on a native
+  Windows Python** (#281). Every command used to stop with "No module named
+  'pwd'" before printing anything, and the vault-sync hook failed the same way
+  on `fcntl`; those imports are now made only where Unix has them. `murmurent
+  doctor` gains an "operating system" check that names WSL on Windows, and
+  `docs/setup.md` says how to install it. A Windows console with a legacy
+  code page no longer kills a command at the first ✓: the character is
+  replaced instead. The run supervisor and the update-me script import
+  there too. Nothing else is ported: the bash hooks, the symlinked commons
+  and spoken verdicts still need Unix.
+- **Agents can speak their verdicts in another language** (#279).
+  `murmurent config speak-language fr_FR` (or any of the languages
+  `--list` shows) records the choice in `~/.murmurent/speak` and fetches that
+  language's Piper voice. A new `SubagentStart` hook (installed by
+  `murmurent install --hooks`) tells each agent, before its first prompt, to
+  write its `Aloud:` line in that language; the hook then reads it with a
+  voice for the language (one Piper voice per language, or the Mac's own).
+  Headline and detail stay in English. English stays the default; a machine
+  that picks no language is unchanged. `docs/vscode-workflow.md`, "Spoken
+  verdicts".
+- **Members can post project notes from their own machines.** The lab's Slack
+  bot token used to exist only on the PI's machine, so `murmurent project note`
+  from a member's machine stopped at "no Slack bot token on this machine". New
+  `murmurent group-slack-share <lab>` (PI) seals the token to the card key each
+  active member attested at issuance and commits the box to the lab records
+  (`security/slack_bot_token.sealed.json`); new `murmurent group-slack-unlock
+  <lab>` (member) opens it with the machine's own key and stores the token at
+  the usual per-machine path. `murmurent project note` tries the unlock itself
+  when a machine has no token, and otherwise prints the exact command for that
+  machine. Design and the relay alternative: `docs/slack_routing.md`.
+
 ## [2026.11.0] - 2026-11-02
 
 **To upgrade:** `uv tool upgrade murmurent`, then `murmurent install --hooks`,
@@ -72,6 +240,12 @@ they receive.
   is present, on a Mac or on Linux, and otherwise the Mac's `say` or
   Linux's `spd-say` as before. `engine say` in `~/.murmurent/speak` forces
   the old engine; `audition` plays every voice.
+- **Agents say their verdict in plain English.** Every agent now writes a
+  second line beginning `Aloud:` under its headline, a summary of at most 100
+  words written to be heard, and the hook speaks that line instead of the
+  headline's shorthand. Piper voices were re-chosen by listening (the `high`
+  voices for the agents heard most often) and are read a little slower with
+  less noise; `speed` and `noise` lines in `~/.murmurent/speak` tune that.
 
 ### Changed
 - **Readiness travels with the clone** (#257). Make ready commits the marker,

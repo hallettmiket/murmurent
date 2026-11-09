@@ -3,6 +3,12 @@
 > A concrete guide for keeping a murmurent-compatible lab notebook
 > as a lab member.
 
+For the daily notebook's two streams (notes and recorded prompts),
+`murmurent notebook add` (photos, handwriting, sound, video, result files),
+the `audience` field and `murmurent notebook report`, read
+[The lab notebook](lab_notebook.md). This page covers the dashboard's
+daily-journal panel and the per-experiment `notebook.md`.
+
 There are **two distinct things** in Murmurent that the word "notebook" can
 mean. Distinguishing them prevents most of the common confusion:
 

@@ -1,0 +1,43 @@
+1
+00:00:00,400 --> 00:00:14,300
+This is the scribe. It writes and revises scientific text in a house style built from one PI's own edits, which your lab can replace with its own. It keeps every fact.
+
+2
+00:00:14,700 --> 00:00:26,000
+It revises text you give it, mostly by cutting, and lists every change with its reason. And it drafts a section from your results, figures and notes.
+
+3
+00:00:26,000 --> 00:00:42,500
+It writes in your lab's voice by default; nobody has to ask for the house style. It uses whatever format the manuscript is in, LaTeX, Word or Markdown, and edits the manuscript itself when you ask.
+
+4
+00:00:42,899 --> 00:01:04,599
+Every fact, number and citation stays as you wrote it; one that looks wrong is flagged for you to check. Where a citation or a number is missing, it marks the place. If the material has a hole, say a number nobody has measured, it answers Gap and says what would fill it.
+
+5
+00:01:04,599 --> 00:01:13,099
+A lab tailors it by adding its own published papers and its PI's edits as examples.
+
+6
+00:01:13,500 --> 00:01:20,399
+A real run, on a passage written to be bad. The member asks for a revision.
+
+7
+00:01:20,399 --> 00:01:34,500
+The verdict is Revised. Every number survives, each change is listed with its reason, and the one change to the claim itself is shown for the author to accept or refuse.
+
+8
+00:01:34,900 --> 00:01:45,799
+Say what you want in one plain sentence. Tighten the Discussion and list the changes. Draft the Methods from your notes, with the missing pieces marked.
+
+9
+00:01:45,799 --> 00:01:53,700
+Or write a figure legend for a grant, in Word, under a word limit.
+
+10
+00:01:54,100 --> 00:02:09,400
+To use it, just ask Claude Code: ask the scribe to tighten a section, or to draft one from your results and notes. Give it the text and say which part of the paper it is for.
+
+11
+00:02:09,400 --> 00:02:20,800
+The first line of the reply is the verdict: Revised, Drafted or Gap. Then the text, and what changed and why.

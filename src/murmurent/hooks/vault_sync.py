@@ -30,7 +30,6 @@ once.
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import subprocess
@@ -97,7 +96,10 @@ def run_worker() -> None:
     pending.touch()
     with open(state / "vault_sync.lock", "w") as lock:
         try:
+            import fcntl
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except ImportError:
+            pass  # Windows has no flock; two workers at once only sync twice (#281)
         except BlockingIOError:
             return
         for _ in range(5):

@@ -1,0 +1,39 @@
+1
+00:00:00,400 --> 00:00:10,699
+This is the lab oracle, the lab's shared memory. It answers one question: what has the lab agreed on, and who said so?
+
+2
+00:00:11,099 --> 00:00:20,000
+It holds the findings the whole lab has agreed on, and for each one it names who published it and when.
+
+3
+00:00:20,000 --> 00:00:30,100
+Findings arrive when a member publishes them from their own oracle. Everybody reads it; new entries arrive only by publishing.
+
+4
+00:00:30,499 --> 00:00:41,000
+Your own oracle holds your working notes; the lab oracle holds what the lab has agreed. It always says which memory an answer comes from.
+
+5
+00:00:41,000 --> 00:00:54,299
+The bookworm finds papers and the blacksmith runs analyses. If the lab has no entry on a topic, it says so, and suggests you check your own oracle.
+
+6
+00:00:54,699 --> 00:01:06,000
+A real run, on a demo lab memory. The member asks what the lab agreed on for a quality threshold in single-cell experiments, and who published it.
+
+7
+00:01:06,000 --> 00:01:15,700
+It finds one entry: the threshold, who published it, the lab meeting that decided it, and the value used before.
+
+8
+00:01:16,099 --> 00:01:35,799
+Then the member asks it to change the number. It answers that changes arrive by publishing, shows what the entry says now, and leaves it as it is: a member writes the change in their own oracle and publishes it, once the lab has decided.
+
+9
+00:01:36,199 --> 00:01:51,099
+To use it, just ask Claude Code: ask the lab oracle what the lab has agreed on about a topic. To add something, ask your own oracle to prepare it, and publish it to the lab.
+
+10
+00:01:51,099 --> 00:02:02,899
+The first line of the reply is the verdict: Found, Not found or Unsure, with the name of who published the entry.

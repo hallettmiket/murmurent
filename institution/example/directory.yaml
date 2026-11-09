@@ -1,0 +1,24 @@
+# A generic directory. Every entry is invented; the sources are on the reserved
+# example.edu domain and resolve nowhere. Replace the whole file for your institution.
+offices:
+- office: Vice-President (Research)
+  person: Ada Example
+  title: Vice-President (Research)
+  email: vpr@example.edu
+  address: Main Building, Room 100, 1 University Road, Exampleton, Ontario, Canada, A1A 1A1
+  source: https://www.example.edu/research/leadership.html
+  date_read: '2026-11-07'
+- office: Dean of Science
+  person: Charles Example
+  title: Dean of Science
+  email: sciencedean@example.edu
+  address: Science Building, Room 240, 1 University Road, Exampleton, Ontario, Canada, A1A 1A2
+  source: https://www.example.edu/science/people.html
+  date_read: '2026-11-07'
+- office: Graduate Program Chair, Biochemistry
+  person: Grace Example
+  title: Graduate Program Chair
+  email: biochem-grad@example.edu
+  address: Medical Sciences Building, Room 342, Exampleton, Ontario, Canada, A1A 1A3
+  source: https://www.example.edu/biochem/contacts.html
+  date_read: '2026-11-07'

@@ -1,6 +1,7 @@
 # Murmurent
 
 **▶ [Watch the 7-minute getting-started video](https://mikehallett.science/assets/videos/murmurent_getting_started.html)**
+**▶ [All the training videos](https://mikehallett.science/assets/videos/)**: one short video per agent, and the thesis-package walkthrough.
 (install, the agents, and joining a lab or a centre).
 
 Murmurent is an agentic AI operating system that provides:
@@ -46,6 +47,8 @@ memory and infrastructure on top, when you want it.
 | Deciding how repositories, projects and membership should work | [Repositories and projects: review and plan](repos_and_projects_plan.md) (issues 252 to 260) |
 | A mayor bootstrapping a centre | [Centre Slack setup](slack_setup.md) · [Public directory setup](hub_setup.md) |
 | Wondering how the trust model works | [Membership IDs & the trust chain](identity.md) |
+| Packaging a paper or a thesis so an examiner can question it | [Paper packages and the thesis built from them](paper_package.md) |
+| Keeping a lab notebook, capturing photos and recordings into it, and reporting from it to a supervisor or the lab | [The lab notebook](lab_notebook.md) |
 | Looking for a command | [CLI manual](cli_manual.md) |
 | Looking for a published choreography to install | The [`murmurent_public`](https://github.com/hallettmiket/murmurent_public) directory keeps the index of all public choreographies in [`choreographies.tsv`](https://github.com/hallettmiket/murmurent_public/blob/main/choreographies.tsv); see [Choreographies](choreography.md) |
 

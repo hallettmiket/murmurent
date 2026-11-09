@@ -63,6 +63,32 @@ def _link_dir(src_dir: Path, dest_dir: Path, pattern: str, kind: str) -> tuple[i
     return (created, repointed, preserved)
 
 
+def _symlink_refusal(cc: Path) -> str | None:
+    """Why this account cannot create symlinks under ``cc``, or None if it can.
+
+    Windows refuses symlinks to an ordinary account unless Developer Mode is on
+    (WinError 1314, "A required privilege is not held by the client"), and the
+    commons is wired with symlinks. Found out with one probe link so that the
+    answer is a sentence instead of a traceback half-way through (#281).
+    """
+    cc.mkdir(parents=True, exist_ok=True)
+    probe = cc / ".murmurent_symlink_probe"
+    try:
+        if probe.is_symlink() or probe.exists():
+            probe.unlink()
+        probe.symlink_to(cc)
+        probe.unlink()
+    except OSError as exc:
+        return (
+            f"this account cannot create symlinks ({exc.strerror or exc}).\n"
+            "    murmurent is supported on Windows through WSL: install it and run "
+            "the Linux steps in docs/setup.md there.\n"
+            "    To try the native route anyway, turn on Developer Mode "
+            "(Settings, System, For developers) and run this again."
+        )
+    return None
+
+
 def _prune_dangling(dest_dir: Path, root: Path, kind: str) -> int:
     """Remove symlinks in ``dest_dir`` that point INTO the commons at a file
     that is gone: an agent retired from the commons, a rule renamed.
@@ -110,6 +136,11 @@ def cmd_setup(*, force: bool = False, show_next_step: bool = True) -> int:
             "murmurent clone.",
             err=True,
         )
+        return 1
+
+    refusal = _symlink_refusal(cc)
+    if refusal:
+        click.echo(f"  x {refusal}", err=True)
         return 1
 
     totals = [0, 0, 0]

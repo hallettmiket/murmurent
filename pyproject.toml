@@ -45,7 +45,12 @@ dependencies = [
     "mcp>=1.0,<2",
     # ed25519 identity-card signing (core/idkeys.py). Hard dep — the identity
     # chain must be available in every install, not gated behind an extra.
-    "cryptography>=42",
+    # Windows on ARM (Surface, a Parallels VM on a Mac): cryptography stopped
+    # shipping win_arm64 wheels after 46.0.3, and building it needs Rust and
+    # the MSVC linker, which a student does not have (#281). Hold that platform
+    # at the last wheel; lift the cap when upstream ships ARM wheels again.
+    "cryptography>=42; sys_platform != 'win32' or platform_machine != 'ARM64'",
+    "cryptography>=42,<=46.0.3; sys_platform == 'win32' and platform_machine == 'ARM64'",
 ]
 
 [project.urls]

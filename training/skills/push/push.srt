@@ -1,0 +1,39 @@
+1
+00:00:00,400 --> 00:00:13,849
+This skill backs up your work. You type its name, murmurent push, in Claude Code. It saves your changes to GitHub, the lab's online copy, and tells the project's channel what changed.
+
+2
+00:00:14,250 --> 00:00:31,046
+What makes it special are the checks it runs before anything leaves your computer. A file named like a password or a key stays behind. An access key or token written inside a file stops the backup, and the skill shows only a few letters from each end.
+
+3
+00:00:31,046 --> 00:00:44,492
+A data file over one megabyte stops the backup, and the skill names where the file belongs. Nothing from the lab's data folders on the server, original data or results, is ever saved to GitHub.
+
+4
+00:00:44,899 --> 00:00:57,935
+Here are the real checks the skill runs, on a practice folder made for this movie. The member typed only the skill's name. It found two access keys written into a settings file and showed them cut short.
+
+5
+00:00:57,935 --> 00:01:06,411
+It left a credentials file behind, named a three-megabyte data file and where it should go, and saved nothing to GitHub.
+
+6
+00:01:06,800 --> 00:01:15,887
+After a backup, the skill decides where the note goes. These commands show where a note would go; after a real backup the skill posts it there.
+
+7
+00:01:15,887 --> 00:01:25,014
+The note goes to the project's own channel, else the lab's. With no channel on record, nothing is posted, and it says so.
+
+8
+00:01:25,400 --> 00:01:38,017
+A second skill, murmurent project push, backs up every part of a project on this computer at once: the code, the manuscript and the rest. Each part gets the same checks.
+
+9
+00:01:38,017 --> 00:01:45,379
+A part that fails waits for you while the others are saved, and one summary goes to the project's channel.
+
+10
+00:01:45,800 --> 00:02:06,000
+To use it, type the skill's name in Claude Code. If something stops it, it names the file and the reason: remove the cause and run it again. The project-wide skill can also keep a second copy in a partner lab's GitHub account.

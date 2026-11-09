@@ -1,0 +1,47 @@
+1
+00:00:00,400 --> 00:00:17,100
+This is the clerk. Ask it anything about your institution: who runs an office, when an exam must be printed, whether a course outline follows the rules. It reads the answer on the institution's own pages, then and there.
+
+2
+00:00:17,500 --> 00:00:31,200
+It reads the institution's public pages when you ask, and names the page and the date. It remembers what it found, and re-reads the page before relying on it, because people change offices.
+
+3
+00:00:31,200 --> 00:00:46,900
+It also reviews a whole course outline: every rule it has on file for the course's level, and the others by reading; every date against holidays; and whether the grades add to one hundred.
+
+4
+00:00:47,300 --> 00:01:00,600
+When the pages do not say, the answer is Unknown, with the nearest thing they do say. A page behind a login it leaves to you, and says where to read it.
+
+5
+00:01:00,600 --> 00:01:11,900
+After a course review, the conscience reviews the outline for equity and inclusion, and the scribe redoes it with the fixes on request.
+
+6
+00:01:12,300 --> 00:01:18,800
+A real run. An instructor asks when their final exam must be printed this fall.
+
+7
+00:01:18,800 --> 00:01:33,300
+The clerk quotes the rule and the exam period, each with its page, and works out the date. The course's own exam date sits behind a login, so that part is Unknown.
+
+8
+00:01:33,700 --> 00:01:45,000
+Asked who runs the equity, diversity and inclusion office, it answers with the name, title and public email, each from a page it opened.
+
+9
+00:01:45,400 --> 00:02:02,300
+Then a whole course outline. Two things must change: a quiz in the last three weeks of classes, and a lab report announced too late. Each comes with the rule quoted and the page it was read from.
+
+10
+00:02:02,700 --> 00:02:14,600
+Say what to look at: a course outline and its level, who holds an office, or a count of working days that skips holidays.
+
+11
+00:02:15,000 --> 00:02:24,700
+To use it, type your question to Claude Code and name the clerk. The first line is the verdict: Correct, Fix or Unknown.
+
+12
+00:02:24,700 --> 00:02:36,900
+Its memory holds short facts from your university's pages, each with its page and date; another university gets a memory of its own.

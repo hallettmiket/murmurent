@@ -162,15 +162,47 @@ def _add(centre: str, ids) -> dict:
     return st
 
 
-def _crl_signing_priv():
-    """The key that signs this machine's CRLs: the centre root key (mayor) if
-    present, else this machine's own identity key. A standalone PI is their lab's
-    CA — their machine key IS the lab's trust anchor (pinned at ``pi-init``), so a
-    CRL they sign verifies against that pin. Returns None if neither key exists."""
-    if _cr.have_root_key():
-        return _cr.load_root_private()
+def _pinned_fingerprint(centre: str | None) -> str | None:
+    """Fingerprint of the key pinned as ``centre``'s trust anchor, or None when
+    nothing is pinned (or ``centre`` is not given)."""
+    if not centre:
+        return None
+    try:
+        from . import idkeys as _k
+        pinned = _cert.load_pinned_root(centre)
+        return _k.fingerprint(pinned) if pinned else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _root_key_signs_for(centre: str | None) -> bool:
+    """True when this machine holds a centre root key AND it is the key the
+    verifier trusts for ``centre`` (or nothing is pinned for ``centre``, so there
+    is no other key to match). A machine can hold the root key of one centre and
+    be a member of another, for example a test centre of its own; signing the
+    other centre's list with it makes that list fail verification."""
+    if not _cr.have_root_key():
+        return False
+    pinned = _pinned_fingerprint(centre)
+    return pinned is None or _cr.root_fingerprint() == pinned
+
+
+def _crl_signing_priv(centre: str | None = None):
+    """The key that signs this machine's CRLs for ``centre``: the centre root key
+    (mayor) if present, else this machine's own identity key. A standalone PI is
+    their lab's CA — their machine key IS the lab's trust anchor (pinned at
+    ``pi-init``), so a CRL they sign verifies against that pin.
+
+    When ``centre`` has a pinned trust anchor, only a key matching that pin is
+    returned, so a list is never signed with another centre's key. Returns None
+    if no suitable key exists."""
     from . import idkeys as _k
-    return _k.load_private() if _k.have_keys() else None
+    pinned = _pinned_fingerprint(centre)
+    if _root_key_signs_for(centre):
+        return _cr.load_root_private()
+    if _k.have_keys() and (pinned is None or _k.local_fingerprint() == pinned):
+        return _k.load_private()
+    return None
 
 
 def build_fresh_crl(centre: str, *, signing_priv=None) -> dict:
@@ -199,6 +231,10 @@ def revoke(centre: str, *, card_id: str | None = None,
     if not _cr.have_root_key():
         raise RevocationError(
             "no centre root key; revocation must run on the mayor's machine")
+    if not _root_key_signs_for(centre):
+        raise RevocationError(
+            f"this machine's centre root key is not the key trusted for "
+            f"'{centre}'; revoke on that centre's mayor's machine")
     ids = [i for i in (card_id, fingerprint) if i]
     if not ids:
         raise RevocationError("nothing to revoke (need card_id or fingerprint)")
@@ -235,7 +271,7 @@ def revoke_with_local_key(centre: str, *, card_id: str | None = None,
     holds (centre root for the mayor, the machine's own identity key for a
     standalone PI — see :func:`_crl_signing_priv`). Used by per-member project
     removal, where the actor is a PI/lead, not the mayor."""
-    priv = _crl_signing_priv()
+    priv = _crl_signing_priv(centre)
     if priv is None:
         raise RevocationError(
             "no signing key on this machine (need the centre root key or your PI key)")
@@ -256,7 +292,7 @@ def revoke_project(centre: str, group: str) -> dict:
     Card ids only, never fingerprints: a fingerprint is the holder's key, shared
     with their lab card and their other project cards (the lead's is the PI's
     own), so revoking it would cancel every card that person holds."""
-    priv = _crl_signing_priv()
+    priv = _crl_signing_priv(centre)
     if priv is None:
         raise RevocationError(
             "no signing key on this machine (need the centre root key or your PI key)")
@@ -298,14 +334,19 @@ def current_crl(centre: str) -> dict | None:
     and the verifier then fails closed. Before the standalone-PI branch, a PI
     with no root key was locked out of their own dashboard a week after their
     last revocation, and renewing their card did not help, since the card and
-    the list are separate things."""
-    if _cr.have_root_key():
+    the list are separate things.
+
+    A root key is only used for the centre it is pinned for. A machine holding
+    one centre's root key (a test centre, say) that is a member of another
+    centre gets the other centre's distributed list, not one signed with the
+    wrong key that then fails verification."""
+    if _root_key_signs_for(centre):
         try:
             return publish(centre)
         except RevocationError:
             return None
     if _is_own_trust_anchor(centre):
-        priv = _crl_signing_priv()
+        priv = _crl_signing_priv(centre)
         if priv is not None:
             try:
                 return publish(centre, signing_priv=priv)

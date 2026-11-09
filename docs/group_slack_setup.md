@@ -129,6 +129,21 @@ invite link for anyone missing) and, with `--apply`, adds members as GitHub
 collaborators on your lab's repo (if `github` is set via `murmurent
 group-setup`). Re-running is safe.
 
+## 5. Share the token with your members
+
+```bash
+murmurent group-slack-share <group>
+```
+
+Members post project notes (`murmurent project note`) from their own
+machines, and that needs the bot token there. This seals it to each active
+member's attested card key and commits the box to the lab records; a member's
+machine opens it with its own key (`murmurent group-slack-unlock <group>`, or
+`murmurent project note` on its own). Re-run after adding a member or rotating
+the token. The full account, and the alternative not taken, is in
+[`slack_routing.md`](slack_routing.md), "How a member's machine gets the bot
+token".
+
 ## Notes
 
 - **Free/Pro Slack supports invite links only** (there's a paid tier for a

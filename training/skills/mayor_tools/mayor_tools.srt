@@ -1,0 +1,35 @@
+1
+00:00:00,400 --> 00:00:14,300
+Three tools for the people who run a centre or a lab: the centre's administrator, called the mayor, and each lab's head. Each is typed by its slash name in Claude Code.
+
+2
+00:00:14,700 --> 00:00:30,399
+Before anyone changes how the centre runs, how people join or how labs are set up, they type slash murmurent admin. Claude Code first reads the centre's design documents and code, so it works from the real design.
+
+3
+00:00:30,399 --> 00:00:44,500
+It also settles one question: the mayor is a person who sets up the centre once, and the registrar is the agent that keeps the centre's list of labs and projects.
+
+4
+00:00:44,899 --> 00:01:03,799
+Someone who wants to join emails the mayor a locked request, and the mayor types slash murmurent onboard. It first checks that a centre exists; on this laptop there is none, so it stops there, and the rest is what it runs on the mayor's machine.
+
+5
+00:01:03,799 --> 00:01:26,700
+It unlocks the request, shows who is asking and why, and asks: approve or decline? Approving a new lab creates its Slack channel, a shared code space on GitHub, and access to its folders, so it waits for a clear yes. A person joining an existing lab is approved by that lab's head.
+
+6
+00:01:27,100 --> 00:01:40,400
+It approves only after the mayor's clear yes. It reads every detail from the request itself, and it keeps the requester's contact details private, out of Slack and GitHub.
+
+7
+00:01:40,800 --> 00:01:58,900
+Slash murmurent reset returns a machine to a fresh start, for example before setting up a centre again. It works in levels. Here is a real preview on this laptop: every step it would take, the backup it writes first, and what it keeps.
+
+8
+00:01:58,900 --> 00:02:10,599
+Your access keys and other projects' settings stay unless you name them. It runs for real only after you read the preview and say yes.
+
+9
+00:02:11,000 --> 00:02:26,800
+To use them: admin before changing how the centre runs. Onboard when a join request arrives, and give the answer yourself. Reset after reading the preview; the backup is taken for you.

@@ -51,9 +51,15 @@ DISK_WARN_HOURS = 24
 FOLDER_WALK_MAX_ENTRIES = 200_000
 FOLDER_WALK_MAX_SECONDS = 20.0
 ECHO_MAX_BYTES = 64 * 1024
+# Keyed by signal number. Windows has no SIGKILL, and importing this module
+# must not fail there even though a supervisor only ever runs on a server (#281).
 SIGNAL_HINTS = {
-    signal.SIGKILL: "This often means the server ran out of memory, or someone stopped it by force.",
-    signal.SIGSEGV: "The program crashed (a memory access error).",
+    number: hint
+    for name, hint in (
+        ("SIGKILL", "This often means the server ran out of memory, or someone stopped it by force."),
+        ("SIGSEGV", "The program crashed (a memory access error)."),
+    )
+    if (number := getattr(signal, name, None)) is not None
 }
 
 

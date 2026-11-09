@@ -1,0 +1,107 @@
+1
+00:00:00,400 --> 00:00:15,900
+This is how a thesis becomes something an examiner can question, and how the same package helps the candidate present it: the thesis, the defence talk and the paperwork, all from one map of the claims.
+
+2
+00:00:16,300 --> 00:00:31,200
+A defence at Western has a candidate, a supervisor who attends but does not vote, and a board of examiners: one from another university, one from another Western department, and one or two from the program.
+
+3
+00:00:31,200 --> 00:00:41,899
+Each examiner reads the thesis, writes a preliminary report, and then questions the candidate. The program coordinator opens the examination and confirms the deadlines.
+
+4
+00:00:42,299 --> 00:01:01,799
+Today the examiner gets a PDF. The questions worth asking, where a claim is made, what is behind a figure, whether a result still holds, what the thesis does not address, all wait for the defence, where there is time for only a few of them.
+
+5
+00:01:02,199 --> 00:01:16,099
+The idea is small. Every central claim is written down with its evidence: the sentence it rests on, the figure, the script that made the figure, and the data the script read.
+
+6
+00:01:16,500 --> 00:01:30,399
+The unit is the paper, so every paper gains readers who can question it, not only the one thesis. A thesis is a composition of paper packages plus the candidate's own chapters.
+
+7
+00:01:30,799 --> 00:01:46,299
+The manifest lists the chapters, the examiners and the defence date. Four commands turn it into the thesis of record, the claim map, the talk and the paperwork. Everything an examiner asks is logged beside them.
+
+8
+00:01:46,700 --> 00:01:58,799
+The candidate's side first. The check refuses a package whose claims point at code or data that is not there. Here the synthetic example passes with nothing to report.
+
+9
+00:01:58,799 --> 00:02:11,500
+A claim with no script is allowed and marked, so a package degrades to readable, never to broken. The work of mapping is real, and it is the candidate's.
+
+10
+00:02:11,900 --> 00:02:21,000
+Build assembles the chapters in the order SGPS asks for, keeps the candidate's own preamble, and writes the claim map.
+
+11
+00:02:21,400 --> 00:02:38,500
+The claim map is what every examiner reads first: every claim in every chapter, where it is made, which figure shows it, which script made it, from which data.
+
+12
+00:02:38,900 --> 00:02:49,199
+The defence talk is drafted from the same map: one timed slide per claim, with the background and the methods as backup slides.
+
+13
+00:02:49,599 --> 00:03:07,299
+The minutes are a budget, not a script. The results get the time; the introduction and the conclusion get what is left. The sentences on each slide are the scribe's job and a figure made for a page is redrawn by the artist.
+
+14
+00:03:07,299 --> 00:03:19,599
+When there are more claims than minutes, the plan says so. The pilot thesis, with thirty-four claims, got forty-two slides and a warning, which is the right answer.
+
+15
+00:03:20,000 --> 00:03:24,299
+Paperwork writes the Western checklist from the manifest.
+
+16
+00:03:24,699 --> 00:03:39,999
+The deadlines are counted back from the defence date: the examination request and the preliminary submission, the examiners' reports, the final submission. The board is checked against the regulation, and the word limits against the front matter.
+
+17
+00:03:39,999 --> 00:03:51,099
+The requirements were read from the SGPS pages on a stated date. Where a deadline or a form matters, the Graduate Program Coordinator confirms it.
+
+18
+00:03:51,500 --> 00:04:04,400
+Now the examiner. They open the package in Claude Code and ask the docent, in plain words. Every answer carries a location: a section, a figure, a script, a data file.
+
+19
+00:04:04,400 --> 00:04:16,300
+Before it reports a number, the docent re-runs the script behind the claim and shows what it printed. The examiner is not asked to trust a sentence.
+
+20
+00:04:16,699 --> 00:04:35,400
+When the thesis does not address something, the answer is Absent, said plainly, with the nearest thing the thesis does address and where. The gap is not filled with what the field generally believes. A fluent wrong answer would be worse than the PDF.
+
+21
+00:04:35,800 --> 00:04:48,300
+Every question is appended to a log under the examiner's handle, with the answer and the locations it rests on. The log is part of the record of the examination.
+
+22
+00:04:48,300 --> 00:05:07,000
+That is what the package does for the committee as a whole: what was asked, what the thesis answered and what it could not are all visible, before the defence. The candidate should run the docent on their own thesis before anyone else does.
+
+23
+00:05:07,400 --> 00:05:22,900
+The candidate asks the same agent about the package rather than about the work: whether the talk fits, what paperwork is open. The docent infers which side it is on from the question and never asks.
+
+24
+00:05:23,300 --> 00:05:35,400
+Put together: the candidate makes the package pass and questions it first. The examiners read the PDF of record with the package beside it, and ask as they read.
+
+25
+00:05:35,400 --> 00:05:44,500
+The defence then spends its time on what the log did not settle, which is what a defence is for.
+
+26
+00:05:44,900 --> 00:05:59,600
+Some things it does not do, on purpose. It does not grade. It is offline. The PDF stays the thesis of record. Protected data stays on its server. And it never edits the thesis.
+
+27
+00:06:00,000 --> 00:06:20,100
+To try it: adopt an existing thesis or start a new package, check, build, draft the talk, write the paperwork, then open the package in Claude Code and ask the docent. The design and its known hard problems are in docs slash paper package.

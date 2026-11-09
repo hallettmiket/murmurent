@@ -37,7 +37,7 @@ import json
 import os
 import re
 import sys
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -52,12 +52,19 @@ from ..core import sensitivity as _sens
 ENV_NOTEBOOK = "MURMURENT_NOTEBOOK_DIR"
 DEFAULT_NOTEBOOK_SUBFOLDER = "lab-notebook"
 
-VALID_KINDS: tuple[str, ...] = ("personal", "lab", "notebook", "both", "all")
+ENV_SESSIONS = "MURMURENT_SESSIONS_DIR"
+SESSIONS_SUBFOLDER = "sessions"
+
+VALID_KINDS: tuple[str, ...] = ("personal", "lab", "notebook", "sessions", "both", "all")
 # Backwards-compat: ``both`` originally meant {personal, lab}. ``all``
 # is the post-2026-05-17 superset that also includes ``notebook`` (the
-# user's daily lab-notebook entries in <vault>/<notebook_subfolder>/).
-# We keep ``both`` so existing callers (and the murmurent dashboard) work
-# unchanged. ``notebook`` queries the notebook tier in isolation.
+# user's daily lab-notebook entries in <vault>/<notebook_subfolder>/) and,
+# since #292, ``sessions`` (the prompts given to Claude Code, written by the
+# session_log hook under <vault>/sessions/<date>/). ``all`` lists the notes
+# tiers first and the sessions after them. We keep ``both`` so existing
+# callers (and the murmurent dashboard) work unchanged.
+#: Order of the tiers in a combined listing: notes before prompts.
+KIND_RANK: dict[str, int] = {"personal": 0, "lab": 0, "notebook": 0, "sessions": 1}
 
 
 # ---------------------------------------------------------------------------
@@ -69,7 +76,7 @@ VALID_KINDS: tuple[str, ...] = ("personal", "lab", "notebook", "both", "all")
 class OracleEntry:
     """One entry's metadata + body, normalised across personal/lab tiers."""
 
-    kind: str                  # "personal" | "lab"
+    kind: str                  # "personal" | "lab" | "notebook" | "sessions"
     path: str                  # absolute path on this machine
     title: str
     date: str
@@ -79,6 +86,7 @@ class OracleEntry:
     sources: list[str]
     related: list[str]
     body: str                  # markdown body (no frontmatter)
+    audience: list[str] = field(default_factory=lambda: ["me"])  # who may read it (#294)
 
     def to_dict(self, *, include_body: bool = True) -> dict[str, Any]:
         d = asdict(self)
@@ -162,6 +170,24 @@ def _safe_notebook_dir() -> Path | None:
     return _dir_if_exists(vault_root / sub)
 
 
+def _safe_sessions_dir() -> Path | None:
+    """Resolve ``<vault>/sessions`` on this machine (#292): the stream of
+    prompts given to Claude Code, written by ``murmurent.hooks.session_log``.
+    ``$MURMURENT_SESSIONS_DIR`` overrides it. ``None`` when no vault resolves
+    or the folder does not exist yet."""
+    pin = os.environ.get(ENV_SESSIONS, "").strip()
+    if pin:
+        return _dir_if_exists(Path(pin).expanduser())
+    try:
+        from ..core import lab_notebook as _nb
+        root = _nb.vault_root()
+    except Exception:  # noqa: BLE001
+        root = None
+    if root is None:
+        return None
+    return _dir_if_exists(root / SESSIONS_SUBFOLDER)
+
+
 def _dir_if_exists(p: Path) -> Path | None:
     """Return ``p`` if it exists, else ``None``.
 
@@ -234,6 +260,16 @@ def _iter_paths(kind: str) -> list[tuple[str, Path]]:
                     out.append(("notebook", f))
             except (OSError, PermissionError):
                 pass
+    if kind in ("sessions", "all"):
+        p = _safe_sessions_dir()
+        if p is not None:
+            try:
+                for f in p.rglob("*.md"):
+                    if f.name in {"MEMORY.md", "README.md", "index.md"}:
+                        continue
+                    out.append(("sessions", f))
+            except (OSError, PermissionError):
+                pass
     return out
 
 
@@ -269,13 +305,13 @@ def _parse_entry(kind: str, path: Path) -> OracleEntry | None:
         meta = None
         body = text
     if meta is None or not isinstance(meta, dict):
-        if kind == "notebook":
-            meta = {}  # accept frontmatter-less notebooks
+        if kind in ("notebook", "sessions"):
+            meta = {}  # accept frontmatter-less notebooks + session files
         else:
             return None  # personal + lab tiers require schema
 
-    if kind == "notebook":
-        return _parse_notebook_entry(path, meta, body)
+    if kind in ("notebook", "sessions"):
+        return _parse_notebook_entry(path, meta, body, kind=kind)
 
     tags = meta.get("tags") or []
     sources = meta.get("sources") or []
@@ -292,7 +328,16 @@ def _parse_entry(kind: str, path: Path) -> OracleEntry | None:
         sources=[str(s) for s in sources] if isinstance(sources, list) else [],
         related=[str(r) for r in related] if isinstance(related, list) else [],
         body=body,
+        audience=_audience(meta),
     )
+
+
+def _audience(meta: dict[str, Any]) -> list[str]:
+    try:
+        from ..core.lab_notebook import audiences_of
+        return audiences_of(meta)
+    except Exception:  # noqa: BLE001
+        return ["me"]
 
 
 # Filename pattern for date-stamped daily notebooks: YYYY-MM-DD.md or
@@ -301,8 +346,10 @@ def _parse_entry(kind: str, path: Path) -> OracleEntry | None:
 _NOTEBOOK_DATE_RE = re.compile(r"^(?P<date>\d{4}-\d{2}-\d{2})(?:_(?P<slug>.+))?$")
 
 
-def _parse_notebook_entry(path: Path, meta: dict[str, Any], body: str) -> OracleEntry:
-    """Build an OracleEntry from a notebook file.
+def _parse_notebook_entry(path: Path, meta: dict[str, Any], body: str,
+                          kind: str = "notebook") -> OracleEntry:
+    """Build an OracleEntry from a notebook file, or (``kind="sessions"``) from
+    a session file under ``sessions/<date>/``, whose date is its folder's name.
 
     Notebook conventions assumed (in order of preference):
       - ``<vault>/lab-notebook/<project>/<YYYY-MM-DD>.md`` (nested)
@@ -317,8 +364,11 @@ def _parse_notebook_entry(path: Path, meta: dict[str, Any], body: str) -> Oracle
     # Date from filename, unless frontmatter overrides.
     fname_match = _NOTEBOOK_DATE_RE.match(path.stem)
     date_from_name = fname_match.group("date") if fname_match else ""
+    if not date_from_name and kind == "sessions":
+        folder_match = _NOTEBOOK_DATE_RE.match(path.parent.name)
+        date_from_name = folder_match.group("date") if folder_match else ""
     # Project from parent dir, unless flat-layout (parent is lab-notebook itself).
-    notebook_root = _safe_notebook_dir()
+    notebook_root = _safe_notebook_dir() if kind == "notebook" else None
     project_from_path = ""
     if notebook_root is not None:
         try:
@@ -332,7 +382,7 @@ def _parse_notebook_entry(path: Path, meta: dict[str, Any], body: str) -> Oracle
     title = str(meta.get("title") or _first_h1(body) or path.stem)
     tags = meta.get("tags") or []
     return OracleEntry(
-        kind="notebook",
+        kind=kind,
         path=str(path),
         title=title,
         date=str(meta.get("date") or date_from_name),
@@ -346,6 +396,7 @@ def _parse_notebook_entry(path: Path, meta: dict[str, Any], body: str) -> Oracle
         sources=[str(s) for s in (meta.get("sources") or [])] if isinstance(meta.get("sources"), list) else [],
         related=[str(r) for r in (meta.get("related") or [])] if isinstance(meta.get("related"), list) else [],
         body=body,
+        audience=_audience(meta),
     )
 
 
@@ -458,13 +509,21 @@ def tool_search(
     if query:
         scored = [(_score(e, query), e) for e in filtered]
         scored = [(s, e) for s, e in scored if s > 0]
-        scored.sort(key=lambda pair: (-pair[0], pair[1].date), reverse=False)
-        # Python's sort by negative score sorts descending; date sorts
-        # ascending. Reverse the whole list to get newest-first for ties.
+        # Best score first; among equals the newest first; and the notes tiers
+        # always before the sessions tier (#292), so a prompt never outranks
+        # the note that answers the question.
+        scored.sort(key=lambda pair: pair[1].date, reverse=True)
+        scored.sort(key=lambda pair: (_rank(pair[1]), -pair[0]))
         result = [e for _, e in scored]
     else:
         result = sorted(filtered, key=lambda e: e.date, reverse=True)
+        result.sort(key=_rank)
     return [e.to_dict(include_body=False) for e in result[:limit]]
+
+
+def _rank(entry: OracleEntry) -> int:
+    """Notes (personal, lab, notebook) before sessions; stable otherwise."""
+    return KIND_RANK.get(entry.kind, 0)
 
 
 def tool_get(path: str) -> dict[str, Any]:
@@ -485,8 +544,11 @@ def tool_get(path: str) -> dict[str, Any]:
     # personal check would otherwise claim).
     kind = "lab"
     notebook = _safe_notebook_dir()
+    sessions = _safe_sessions_dir()
     personal = _safe_personal_dir()
-    if notebook and _is_under(p, notebook):
+    if sessions and _is_under(p, sessions):
+        kind = "sessions"
+    elif notebook and _is_under(p, notebook):
         kind = "notebook"
     elif personal and _is_under(p, personal):
         kind = "personal"
@@ -504,6 +566,7 @@ def tool_list(kind: str = "both") -> list[dict[str, Any]]:
     no body parsing beyond what frontmatter needs."""
     entries = _load_entries(kind)
     entries.sort(key=lambda e: e.date, reverse=True)
+    entries.sort(key=_rank)
     return [e.to_dict(include_body=False) for e in entries]
 
 
@@ -545,12 +608,14 @@ def _build_server():  # pragma: no cover - exercised only when mcp is installed
     server = FastMCP(
         name="murmurent-oracle",
         instructions=(
-            "Murmurent oracle. Three tiers, queryable separately or "
+            "Murmurent oracle. Four tiers, queryable separately or "
             "together: `personal` (your Obsidian vault `oracle/`), "
-            "`lab` (lab-mgmt repo `oracle/`), `notebook` (your daily "
-            "lab-notebook entries in <vault>/<notebook_subfolder>/). "
+            "`lab` (lab-mgmt repo `oracle/`), `notebook` (your own daily "
+            "notes in <vault>/<notebook_subfolder>/), `sessions` (the prompts "
+            "you gave Claude Code, recorded in <vault>/sessions/<date>/). "
             "Use `kind=both` for {personal, lab} (default), `kind=all` "
-            "for {personal, lab, notebook}, or any single tier name. "
+            "for {personal, lab, notebook, sessions} with the notes before the "
+            "sessions, or any single tier name. "
             "`oracle_search` filters by query + project/tags/sensitivity/"
             "source. `oracle_get(path)` fetches one entry (notebooks "
             "tolerate missing frontmatter; personal + lab require it). "

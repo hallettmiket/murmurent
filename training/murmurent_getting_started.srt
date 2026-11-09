@@ -416,3 +416,11 @@ is linked on screen.
 101
 00:06:42,630 --> 00:06:44,850
 Now, go and meet your agents.
+
+102
+00:06:50,500 --> 00:07:04,199
+One more thing. Before you start working, watch the two-minute movie on working through Claude Code: how to address an agent by name, what a verdict line is, and what the hooks refuse.
+
+103
+00:07:04,199 --> 00:07:10,100
+All the videos are at mikehallett dot science, slash assets, slash videos.

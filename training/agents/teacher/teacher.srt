@@ -1,0 +1,39 @@
+1
+00:00:00,400 --> 00:00:13,900
+This is the teacher. It explains things in plain words: a sentence that lost you, in a minute; a method or a paper, in one sitting; a whole subject, over weeks.
+
+2
+00:00:14,300 --> 00:00:22,800
+When a sentence Claude Code just wrote lost you, it says it again in plain words, in under a minute.
+
+3
+00:00:22,800 --> 00:00:43,299
+It explains a method or a paper in one sitting: in chat, or on request as a page where you mark what lost you. For a subject that takes weeks, it runs a course in your own session, with lessons that remember what you have learned.
+
+4
+00:00:43,699 --> 00:00:59,000
+Its scope is teaching. It shows a real image or a video it has checked before drawing anything, and it links only to what it has actually opened. A debrief stays offline, because your session is private.
+
+5
+00:00:59,000 --> 00:01:08,299
+Figures made from your data go to the artist, and citations it cannot verify go to the bookworm.
+
+6
+00:01:08,700 --> 00:01:17,599
+A real run. A wet-lab biologist asks what a permutation test is, and why the example uses five thousand of them.
+
+7
+00:01:17,599 --> 00:01:30,500
+The answer is Explained: short bullets, each technical term defined, the real numbers from the analysis, which it re-ran, and a takeaway to carry to the next problem.
+
+8
+00:01:30,900 --> 00:01:44,000
+There are three things to type, in this order: debrief, at the sentence that lost you; explain, with the method or paper; and course, with the subject.
+
+9
+00:01:44,400 --> 00:01:49,700
+The first line is Explained, or Gap when it cannot honestly deliver.
+
+10
+00:01:49,700 --> 00:02:01,900
+Say who it is for in your request, such as a wet-lab biologist; otherwise it writes for a colleague from a neighbouring field.

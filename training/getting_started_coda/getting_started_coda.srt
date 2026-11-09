@@ -1,0 +1,7 @@
+1
+00:00:00,400 --> 00:00:14,099
+One more thing. Before you start working, watch the two-minute movie on working through Claude Code: how to address an agent by name, what a verdict line is, and what the hooks refuse.
+
+2
+00:00:14,099 --> 00:00:20,000
+All the videos are at mikehallett dot science, slash assets, slash videos.

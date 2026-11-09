@@ -8,6 +8,8 @@
 # Wired up via .claude/settings.json:
 #   PreToolUse(Agent) → "<agent>: starting — <description>"
 #   SubagentStop      → "<agent>: done"
+#   SubagentStart     → nothing logged; when a spoken language is set, tells
+#                       the subagent to write its "Aloud:" line in it (#279)
 #
 # Spoken verdicts: when ~/.murmurent/speak exists, each SubagentStop line is
 # also read aloud, one voice per agent. Two engines: Piper (neural voices,
@@ -15,7 +17,12 @@
 # the `piper` command and its voices are present; else the macOS `say`
 # command; else Linux `spd-say`. The file is both the on switch and the voice
 # table: empty means the defaults below; a line "<agent> <voice>" overrides
-# one agent, and a line "engine say|piper|spd-say" forces an engine.
+# one agent, a line "engine say|piper|spd-say" forces an engine, and
+# "speed <n>" / "noise <n>" tune Piper (see PIPER_SPEED_DEFAULT below), and
+# "language <code>" (a Piper language code such as fr_FR; set with
+# `murmurent config speak-language`) makes every agent write and speak its
+# "Aloud:" line in that language, with one voice for that language from the
+# table in language_voice below; a "voice <name>" line replaces that voice.
 # MURMURENT_SPEAK=0 mutes everything for one session; MURMURENT_SPEAK=1 turns
 # it on without the file. The main session never speaks: only a dispatched
 # subagent carries an agent type, and nothing else reaches this branch.
@@ -183,28 +190,100 @@ default_voice() {
 }
 
 # The default Piper voice per agent (scripts/install_piper_voices.sh fetches
-# them into $VOICES_DIR). Each is a distinct single-speaker English voice.
+# them into $VOICES_DIR). Each is a distinct single-speaker English voice,
+# chosen for being easy to follow: "high" quality where one exists, and none
+# of the voices that listeners found hard to understand (#272).
 VOICES_DIR="${MURMURENT_VOICES_DIR:-$HOME/.murmurent/voices}"
 default_piper_voice() {
     case "$1" in
-        adversary)         echo "en_GB-alba-medium" ;;
-        conscience)        echo "en_GB-jenny_dioco-medium" ;;
-        judge)             echo "en_GB-alan-medium" ;;
+        teacher)           echo "en_US-lessac-high" ;;
+        judge)             echo "en_US-ryan-high" ;;
+        adversary)         echo "en_GB-cori-high" ;;
+        scribe)            echo "en_US-ljspeech-high" ;;
         bookworm)          echo "en_GB-southern_english_female-low" ;;
+        conscience)        echo "en_GB-jenny_dioco-medium" ;;
         oracle)            echo "en_US-amy-medium" ;;
         lab_oracle)        echo "en_US-kristin-medium" ;;
-        blacksmith)        echo "en_US-ryan-medium" ;;
+        blacksmith)        echo "en_US-hfc_male-medium" ;;
         artist)            echo "en_US-hfc_female-medium" ;;
-        teacher)           echo "en_US-norman-medium" ;;
-        scribe)            echo "en_US-joe-medium" ;;
-        lawyer)            echo "en_GB-northern_english_male-medium" ;;
+        lawyer)            echo "en_GB-alan-medium" ;;
         millwright)        echo "en_US-john-medium" ;;
         centre_millwright) echo "en_US-bryce-medium" ;;
-        registrar)         echo "en_GB-cori-medium" ;;
-        security_guard)    echo "en_US-hfc_male-medium" ;;
+        registrar)         echo "en_US-joe-medium" ;;
+        security_guard)    echo "en_GB-northern_english_male-medium" ;;
         *)                 echo "en_US-lessac-medium" ;;
     esac
 }
+
+# Spoken language (#279). One row per language murmurent knows how to voice:
+# the Piper language code, the language's English name (what the agent is
+# told to write in), the Piper voice every agent shares in that language
+# (few languages have fifteen voices, so agents are told apart by name, not
+# voice), and the Mac `say` voice shipped for it. English keeps the per-agent
+# tables above. `murmurent config speak-language` and
+# scripts/install_piper_voices.sh read this table from here, so the three can
+# never disagree. A language not listed still works when a "voice" line in
+# $SPEAK_FILE names a Piper voice for it.
+language_voice() {
+    case "$1" in
+        fr_FR) echo "French|fr_FR-siwis-medium|Thomas" ;;
+        de_DE) echo "German|de_DE-thorsten-high|Anna" ;;
+        es_ES) echo "Spanish|es_ES-davefx-medium|Mónica" ;;
+        es_MX) echo "Spanish|es_MX-claude-high|Paulina" ;;
+        it_IT) echo "Italian|it_IT-paola-medium|Alice" ;;
+        pt_BR) echo "Portuguese|pt_BR-faber-medium|Luciana" ;;
+        pt_PT) echo "Portuguese|pt_PT-tugão-medium|Joana" ;;
+        nl_NL) echo "Dutch|nl_NL-pim-medium|Xander" ;;
+        nl_BE) echo "Dutch|nl_BE-nathalie-medium|Ellen" ;;
+        sv_SE) echo "Swedish|sv_SE-nst-medium|Alva" ;;
+        da_DK) echo "Danish|da_DK-talesyntese-medium|Sara" ;;
+        no_NO) echo "Norwegian|no_NO-talesyntese-medium|Nora" ;;
+        fi_FI) echo "Finnish|fi_FI-harri-medium|Satu" ;;
+        pl_PL) echo "Polish|pl_PL-gosia-medium|Zosia" ;;
+        cs_CZ) echo "Czech|cs_CZ-jirka-medium|Zuzana" ;;
+        hu_HU) echo "Hungarian|hu_HU-anna-medium|Tünde" ;;
+        ro_RO) echo "Romanian|ro_RO-mihai-medium|Ioana" ;;
+        el_GR) echo "Greek|el_GR-rapunzelina-medium|Melina" ;;
+        tr_TR) echo "Turkish|tr_TR-dfki-medium|Yelda" ;;
+        ru_RU) echo "Russian|ru_RU-irina-medium|Milena" ;;
+        uk_UA) echo "Ukrainian|uk_UA-ukrainian_tts-medium|Lesya" ;;
+        ca_ES) echo "Catalan|ca_ES-upc_ona-medium|Montse" ;;
+        he_IL) echo "Hebrew|he_IL-saspeech-medium|Carmit" ;;
+        ar_JO) echo "Arabic|ar_JO-kareem-medium|Majed" ;;
+        hi_IN) echo "Hindi|hi_IN-priyamvada-medium|Lekha" ;;
+        zh_CN) echo "Chinese|zh_CN-huayan-medium|Tingting" ;;
+        ja_JP) echo "Japanese|ja_JP-hi_fi_captain-medium|Kyoko" ;;
+        ko_KR) echo "Korean|ko_KR-kss-medium|Yuna" ;;
+        vi_VN) echo "Vietnamese|vi_VN-vais1000-medium|Linh" ;;
+        *)     echo "" ;;
+    esac
+}
+
+# The spoken language: the "language" line in $SPEAK_FILE, or English (empty)
+# when there is none or it names English.
+speak_language() {
+    local l
+    l="$(speak_setting language)"
+    case "$l" in ""|en|en_*|english|English) echo "" ;; *) echo "$l" ;; esac
+}
+
+# The one voice every agent uses in the spoken language: the "voice" line in
+# $SPEAK_FILE if there is one, else the table's voice for the language. Empty
+# for English, and for an unknown language with no "voice" line.
+language_piper_voice() {
+    local lang v
+    lang="$(speak_language)"; [[ -n "$lang" ]] || return 0
+    v="$(speak_setting voice)"
+    [[ -n "$v" ]] && { printf '%s' "$v"; return 0; }
+    language_voice "$lang" | cut -d'|' -f2
+}
+
+# Piper's own defaults are fast and breathy enough that some voices slur.
+# Verdicts are read 15% slower with less noise; "speed" and "noise" lines in
+# $SPEAK_FILE change that (speed 1.0 is Piper's pace, larger is slower;
+# noise 0.667 is Piper's default, smaller is cleaner).
+PIPER_SPEED_DEFAULT=1.15
+PIPER_NOISE_DEFAULT=0.4
 
 # A line "<key> <value>" from $SPEAK_FILE, last one wins; empty if none.
 speak_setting() {
@@ -221,7 +300,9 @@ speak_engine() {
     local e
     e="$(speak_setting engine)"
     if [[ -n "$e" ]]; then echo "$e"; return 0; fi
-    if command -v piper >/dev/null 2>&1 && [[ -f "$VOICES_DIR/$(default_piper_voice _)".onnx ]]; then
+    local probe
+    probe="$(language_piper_voice)"; probe="${probe:-$(default_piper_voice _)}"
+    if command -v piper >/dev/null 2>&1 && [[ -f "$VOICES_DIR/$probe".onnx ]]; then
         echo piper
     elif command -v say >/dev/null 2>&1; then
         echo say
@@ -245,6 +326,12 @@ voice_for() {
     local agent="$1" engine="$2" v
     v="$(speak_setting "$agent")"
     if [[ -n "$v" ]]; then printf '%s' "$v"; return 0; fi
+    local lang
+    lang="$(speak_language)"
+    if [[ -n "$lang" ]]; then
+        if [[ "$engine" == piper ]]; then language_piper_voice; else language_voice "$lang" | cut -d'|' -f3; fi
+        return 0
+    fi
     if [[ "$engine" == piper ]]; then default_piper_voice "$agent"; else default_voice "$agent"; fi
 }
 
@@ -255,12 +342,27 @@ voice_for() {
 speak_with_piper() {
     local agent="$1" voice="$2" text="$3" model player wav
     model="$voice"; [[ "$model" != *.onnx ]] && model="$VOICES_DIR/$model.onnx"
-    [[ -f "$model" ]] || model="$VOICES_DIR/$(default_piper_voice "$agent").onnx"
-    [[ -f "$model" ]] || model="$VOICES_DIR/$(default_piper_voice _).onnx"
+    if [[ ! -f "$model" ]]; then
+        local lv
+        lv="$(language_piper_voice)"
+        if [[ -n "$lv" ]]; then
+            # Another language: its voice or nothing. An English voice reading
+            # French is worse than silence, and the installer fetches it.
+            model="$VOICES_DIR/$lv.onnx"
+        else
+            model="$VOICES_DIR/$(default_piper_voice "$agent").onnx"
+            [[ -f "$model" ]] || model="$VOICES_DIR/$(default_piper_voice _).onnx"
+        fi
+    fi
     [[ -f "$model" ]] || return 0
     player="$(wav_player)"; [[ -n "$player" ]] || return 0
     wav="$(mktemp "${TMPDIR:-/tmp}/murmurent_verdict.XXXXXX").wav"
-    printf '%s\n' "$text" | piper -m "$model" -f "$wav" >/dev/null 2>&1 || { rm -f "$wav"; return 0; }
+    local speed noise
+    speed="$(speak_setting speed)"; speed="${speed:-$PIPER_SPEED_DEFAULT}"
+    noise="$(speak_setting noise)"; noise="${noise:-$PIPER_NOISE_DEFAULT}"
+    printf '%s\n' "$text" | piper -m "$model" -f "$wav" \
+        --length-scale "$speed" --noise-scale "$noise" --noise-w-scale 0.5 >/dev/null 2>&1 \
+      || { rm -f "$wav"; return 0; }
     case "$player" in
         ffplay) ffplay -nodisp -autoexit -loglevel quiet "$wav" ;;
         *)      "$player" "$wav" ;;
@@ -268,59 +370,105 @@ speak_with_piper() {
     rm -f "$wav"
 }
 
+# Has this exact event been seen in the last minute? Keeps one stamp file per
+# event under ~/.murmurent/.seen/<kind>/, and prunes stamps older than an
+# hour, so a hook that fires twice for one event (two settings files, or a
+# stop event delivered twice) logs and speaks it once.
+seen_before() {
+    local kind="$1" agent="$2" text="$3" dir key stamp
+    dir="$HOME/.murmurent/.seen/$kind"; mkdir -p "$dir" 2>/dev/null || return 1
+    key="$(printf '%s|%s' "$agent" "$text" | cksum | awk '{print $1}')"
+    stamp="$dir/$key"
+    # A stamp is a directory because mkdir is atomic: two copies of the same
+    # event arriving in the same instant cannot both create it, so exactly one
+    # goes through. A stamp older than a minute is a new event.
+    if [[ -d "$stamp" ]]; then
+        [[ -n "$(find "$stamp" -maxdepth 0 -mmin -1 2>/dev/null)" ]] && return 0
+        rmdir "$stamp" 2>/dev/null || true     # an old stamp: this is a new event
+    fi
+    mkdir "$stamp" 2>/dev/null || return 0
+    find "$dir" -mindepth 1 -maxdepth 1 -mmin +60 -exec rmdir {} + 2>/dev/null
+    return 1
+}
+
 # Read "<agent>. <verdict>" aloud, in the background, one voice at a time.
 # Returns at once so the hook never holds Claude Code up; a verdict that
 # arrives while another is being spoken waits its turn rather than talking
 # over it. Silent unless enabled (see the header), and on anything but a Mac.
 speak_verdict() {
-    local agent="$1" text="$2" voice clean name
+    local agent="$1" text="$2" full="${3:-}" voice clean name aloud lang
     [[ "${MURMURENT_SPEAK:-}" == "0" ]] && return 0
     [[ "${MURMURENT_SPEAK:-}" != "1" && ! -f "$SPEAK_FILE" ]] && return 0
     local engine
     engine="$(speak_engine)"
     [[ -n "$engine" ]] || return 0
     command -v "$engine" >/dev/null 2>&1 || return 0
-    # The stop event can fire twice for one agent; say each verdict once.
-    local stamp="$HOME/.murmurent/.last_spoken" now key
-    now="$(date +%s)"; key="$(printf '%s|%s' "$agent" "$text" | cksum | awk '{print $1}')"
-    if [[ -f "$stamp" ]]; then
-        read -r prev_t prev_k < "$stamp" || true
-        if [[ "${prev_k:-}" == "$key" && $(( now - ${prev_t:-0} )) -lt 60 ]]; then
-            return 0
-        fi
-    fi
-    printf '%s %s\n' "$now" "$key" > "$stamp"
+    # The same verdict can arrive twice (the hook registered in two settings
+    # files, or a stop event fired twice); say it once. One stamp per verdict,
+    # so eight agents finishing together cannot overwrite each other's stamp.
+    seen_before "spoken" "$agent" "$text" && return 0
     voice="$(voice_for "$agent" "$engine")"
     name="${agent//_/ }"
-    # What is read: the headline only (the first sentence of the first line),
-    # with web addresses, file paths, identifiers and markdown marks removed.
-    # A verdict is a sentence for the ear; anything a person would need to
-    # read stays in the log.
-    clean="$(printf '%s' "$text" | /usr/bin/python3 -c '
-import re, sys
+    # What is read: the agent's "Aloud:" line when it wrote one (plain English,
+    # up to 100 words; see rules/headline_first.md), else the headline only
+    # (the first sentence of the first line). Either way web addresses, file
+    # paths, identifiers and markdown marks are removed: a verdict is a
+    # sentence for the ear, and anything a person would need to read stays in
+    # the log.
+    aloud="$(printf '%s' "$full" | grep -m1 -E '^[[:space:]]*[*_]*Aloud:' | sed -E 's/^[[:space:]]*[*_]*Aloud:[*_]*[[:space:]]*//' || true)"
+    clean="$(printf '%s' "${aloud:-$text}" | ALOUD="${aloud:+1}" /usr/bin/python3 -c '
+import os, re, sys
 t = sys.stdin.read().strip().splitlines()
 t = t[0] if t else ""
 t = re.sub(r"https?://\S+|www\.\S+", "", t)            # web addresses
 t = re.sub(r"(?<![\w])~?/[\w./-]+", "", t)               # file paths
 t = re.sub(r"\b(doi|pmid|arxiv)\s*:?\s*\S+", "", t, flags=re.I)
 t = re.sub(r"[*_`#>\[\]()]", "", t)
-m = re.match(r"(.+?[.!?])(\s|$)|(.+?)(\s+-\s+)", t)                    # first sentence, before dashes become commas
-t = (m.group(1) or m.group(3)) if m else t
+if not os.environ.get("ALOUD"):
+    m = re.match(r"(.+?[.!?])(\s|$)|(.+?)(\s+-\s+)", t)                # first sentence, before dashes become commas
+    t = (m.group(1) or m.group(3)) if m else t
 t = re.sub(r"\s*[—–]\s*|\s+-\s+", ", ", t)
 t = re.sub(r"\s+", " ", t)
 t = re.sub(r"\s*,(\s*,)+", ",", t)                                   # doubled commas
 t = re.sub(r"\b(in|at|see|from|to|of|under|on)\s*([,.]|$)", r"\2", t)   # word left dangling by a removed path
 t = re.sub(r"\s+([,.])", r"\1", t)                                  # space before punctuation
 t = re.sub(r"\s+", " ", t).strip(" ,;:")
-print(t[:200])
+t = " ".join(t.split()[:100])                                        # at most 100 words
+print(t if os.environ.get("ALOUD") else t[:200])
 ')"
     [[ -z "$clean" ]] && clean="done"
     (
-        # One verdict at a time, whichever engine or player is talking.
+        # One verdict at a time, whichever engine or player is talking. Eight
+        # agents finishing in the same second must speak in turn, so the turn
+        # is a lock directory (mkdir is atomic) that each speaker holds while
+        # it talks; the others wait. A lock left by a speaker that died (its
+        # pid is in the directory and no longer runs) is taken over.
+        local lock="$HOME/.murmurent/.speak_lock" waited=0
+        until mkdir "$lock" 2>/dev/null; do
+            # The pid in the lock is the speaking subshell's own ($BASHPID): $$
+            # would be the hook's pid, long gone, and every waiter would take
+            # the lock while the previous voice was still talking.
+            # Take over a lock only when its speaker is dead AND the lock is
+            # older than any verdict can last: a waiter that read a pid just
+            # as that speaker finished must not delete the lock the next
+            # speaker has already taken.
+            if [[ -f "$lock/pid" ]] && ! kill -0 "$(cat "$lock/pid" 2>/dev/null)" 2>/dev/null \
+               && [[ -z "$(find "$lock" -maxdepth 0 -mmin -2 2>/dev/null)" ]]; then
+                rm -rf "$lock"; continue
+            fi
+            sleep 0.3; waited=$(( waited + 1 ))
+            # A verdict that has queued for two minutes is stale news; drop
+            # it rather than read a backlog nobody can follow.
+            [[ $waited -gt 400 ]] && exit 0
+        done
+        # The subshell's own pid (bash 3.2 on a Mac has no $BASHPID).
+        sh -c 'echo $PPID' > "$lock/pid"
+        trap 'rm -rf "$lock"' EXIT
         while pgrep -q -x 'say|spd-say|piper|afplay|paplay|aplay|pw-play|ffplay'; do sleep 0.3; done
         case "$engine" in
             piper)   speak_with_piper "$agent" "$voice" "$name. $clean" ;;
-            spd-say) if [[ -n "$voice" ]]; then spd-say -w -y "$voice" -- "$name. $clean"; else spd-say -w -- "$name. $clean"; fi ;;
+            spd-say) local lang_flag=(); lang="$(speak_language)"; [[ -n "$lang" ]] && lang_flag=(-l "${lang%%_*}")
+                     if [[ -n "$voice" ]]; then spd-say -w "${lang_flag[@]}" -y "$voice" -- "$name. $clean"; else spd-say -w "${lang_flag[@]}" -- "$name. $clean"; fi ;;
             *)       if [[ -n "$voice" ]]; then say -v "$voice" -- "$name. $clean"; else say -- "$name. $clean"; fi ;;
         esac
     ) </dev/null >/dev/null 2>&1 &
@@ -338,10 +486,34 @@ case "$EVENT" in
         # nameless line (see the AGENT-resolution note above).
         [[ -z "$AGENT" ]] && exit 0
         short="${DESC:0:100}"
+        seen_before "started" "$AGENT" "$short" && exit 0
         # Trailing blank line keeps the BR pane visually airy — easier
         # to scan one event at a time than a dense wall of text.
         printf '\033[%sm[%s] %s: starting — %s\033[0m\n\n' \
             "$COLOR" "$ts" "$AGENT" "$short" >> "$LOG"
+        ;;
+    SubagentStart)
+        # Nothing is logged (PreToolUse already wrote the "starting" line).
+        # When a spoken language is set, tell the subagent before its first
+        # prompt to write its "Aloud:" line in that language (#279). Claude
+        # Code adds what is printed here to the subagent's context. Silent for
+        # English and when spoken verdicts are off, so nothing changes then.
+        [[ -z "$AGENT" ]] && exit 0
+        [[ "${MURMURENT_SPEAK:-}" == "0" ]] && exit 0
+        [[ "${MURMURENT_SPEAK:-}" != "1" && ! -f "$SPEAK_FILE" ]] && exit 0
+        lang="$(speak_language)"
+        [[ -n "$lang" ]] || exit 0
+        lang_name="$(language_voice "$lang" | cut -d'|' -f1)"
+        lang_name="${lang_name:-the language with code $lang}"
+        printf '%s' "$lang_name" | /usr/bin/python3 -c '
+import json, sys
+name = sys.stdin.read()
+ctx = ("Spoken verdicts on this machine are in " + name + ". Write your Aloud: line "
+       "(the second line of your final reply, see rules/headline_first.md) in " + name +
+       ", keeping the label Aloud: itself as it is. Everything else, headline included, "
+       "stays as you would normally write it.")
+print(json.dumps({"hookSpecificOutput": {"hookEventName": "SubagentStart", "additionalContext": ctx}}))
+'
         ;;
     SubagentStop)
         # No agent_type → this stop did not come from a dispatched subagent,
@@ -359,9 +531,10 @@ case "$EVENT" in
         # in practice.
         msg="${msg:0:200}"
         [[ -z "$msg" ]] && msg="done"
+        seen_before "stopped" "$AGENT" "$msg" && exit 0
         printf '\033[%sm[%s] %s: %s\033[0m\n\n' \
             "$COLOR" "$ts" "$AGENT" "$msg" >> "$LOG"
-        speak_verdict "$AGENT" "$msg"
+        speak_verdict "$AGENT" "$msg" "$LAST_MSG"
         ;;
     *)
         # Unrecognised event — log a single dim line so the user knows

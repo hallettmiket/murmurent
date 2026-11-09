@@ -1,0 +1,19 @@
+# Invented visual identity on the reserved example.edu domain. Replace for your institution.
+source: https://www.example.edu/brand/colours.html
+date_read: '2026-11-07'
+colours:
+- {name: Example Blue, role: primary, hex: '#003366', rgb: '0, 51, 102'}
+- {name: White, role: primary, hex: '#FFFFFF', rgb: '255, 255, 255'}
+- {name: Example Gold, role: accent, hex: '#FFCC00', rgb: '255, 204, 0'}
+colour_rules:
+- Blue and white are primary; gold is for small accents only.
+fonts:
+- {name: Benton Sans, role: primary, weights: Book for body copy; Bold for headings,
+   source: https://www.example.edu/brand/typography.html, date_read: '2026-11-07'}
+- {name: Georgia, role: accent, weights: Regular; pull quotes only,
+   source: https://www.example.edu/brand/typography.html, date_read: '2026-11-07'}
+letterhead_templates:
+  source: https://www.example.edu/brand/letterhead.html
+  date_read: '2026-11-07'
+  format: Word (.docx), one template per faculty and department
+  university_contact_block: 1 University Road, Exampleton, Ontario, Canada, A1A 1A1

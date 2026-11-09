@@ -1927,6 +1927,68 @@ def group_slack_setup(group: str, token: str, invite_url: str, workspace: str,
                "lab's repo. Report-only by default — safe to re-run any time.")
 
 
+@click.command("group-slack-share",
+               help="PI: share your lab's Slack bot token with its certified members "
+                    "without copying it by hand. Seals the token to the public key "
+                    "each active member attested when their card was issued, writes "
+                    "the box to security/slack_bot_token.sealed.json in the lab "
+                    "records repository and pushes it. Members then run "
+                    "`murmurent group-slack-unlock <group>` (or just "
+                    "`murmurent project note`, which tries it on its own). "
+                    "Re-run after adding a member or rotating the token.")
+@click.argument("group")
+@click.option("--no-push", is_flag=True, help="Write and commit the box; do not push.")
+def group_slack_share(group: str, no_push: bool) -> None:
+    from ..core import registrar as _R
+    from ..core import slack_token_share as _sts
+    if not _R.group_exists(group):
+        raise click.ClickException(f"no lab or core named {group!r}.")
+    rep = _sts.share_group_token(group, push=not no_push)
+    if not rep.ok:
+        raise click.ClickException(rep.error)
+    click.echo(f"✓ sealed the Slack bot token of '{group}' to {len(rep.sealed_for)} "
+               f"member key(s): {', '.join('@' + h for h in rep.sealed_for)}")
+    click.echo(f"  written to {rep.path}")
+    for line in rep.git:
+        click.echo(f"  {line}")
+    if rep.without_key:
+        click.echo(f"! no attested key on the roster, so not included: "
+                   f"{', '.join('@' + h for h in rep.without_key)}. A key is recorded "
+                   "when a member's card is issued; re-issue theirs, then re-run this.")
+    click.echo(f"\nMembers: `git pull` the lab records, then `murmurent group-slack-unlock "
+               f"{group}` once (murmurent project note does this on its own too).")
+    click.echo("When a member leaves, rotate the token in Slack, run "
+               f"`murmurent group-slack-setup {group}` with the new one, and share again: "
+               "the old box stays in git history, openable by their key.")
+
+
+@click.command("group-slack-unlock",
+               help="Member: open the Slack bot token your PI shared through the lab "
+                    "records (`murmurent group-slack-share`) with this machine's "
+                    "identity key, and store it at "
+                    "~/.config/murmurent/groups/<group>/slack-token (mode 0600), so "
+                    "`murmurent project note` posts from here. Run once per machine, "
+                    "and again after the PI rotates the token.")
+@click.argument("group")
+@click.option("--check", is_flag=True,
+              help="Open the box and report; write nothing.")
+def group_slack_unlock(group: str, check: bool) -> None:
+    from ..core import slack_token_share as _sts
+    rep = _sts.unlock_group_token(group, write=not check)
+    if not rep.ok:
+        click.echo(f"✗ {rep.error}")
+        if rep.fix:
+            click.echo(f"  Next: {rep.fix}")
+        raise click.exceptions.Exit(1)
+    when = f" (sealed {rep.sealed_at}" + (f" by @{rep.sealed_by})" if rep.sealed_by else ")")
+    if check:
+        click.echo(f"✓ this machine can open the shared Slack bot token of '{group}'{when}")
+    else:
+        click.echo(f"✓ stored the Slack bot token of '{group}' at {rep.path} (mode 0600){when}")
+        click.echo("  `murmurent project note \"<text>\"` from a project repository now posts "
+                   "from this machine.")
+
+
 @click.command("group-reconcile",
                 help="Group-level millwright (the PI runs this): propagate the "
                      "group's members into its OWN Slack workspace and GitHub "

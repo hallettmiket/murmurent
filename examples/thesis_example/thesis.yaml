@@ -1,0 +1,48 @@
+# Example thesis package: one paper-package chapter and one monograph chapter
+# with its own claims. `murmurent thesis check examples/thesis_example`.
+thesis: 1
+title: Colony phenotypes of a synthetic isolate compendium
+candidate:
+  name: A. Candidate
+supervisor: M. Supervisor
+degree: Doctor of Philosophy
+program: Biochemistry
+university: Western University
+format: integrated-article
+keywords: [colony morphology, synthetic data, worked example]
+sensitivity: standard
+defence:
+  date: '2027-04-16'
+  format: hybrid
+examiners:
+  - {role: external, name: E. Xaminer, affiliation: Another University}
+  - {role: university, name: U. Examiner, affiliation: "Western, another department"}
+  - {role: program, name: P. One, affiliation: "Western, Biochemistry"}
+  - {role: program, name: P. Two, affiliation: "Western, Biochemistry"}
+front:
+  abstract: front/abstract.tex
+  lay_summary: front/lay_summary.tex
+  genai_statement: front/genai_statement.tex
+  coauthorship: front/coauthorship.tex
+chapters:
+  - kind: introduction
+    title: Introduction
+    source: chapters/01_introduction.tex
+  - kind: paper
+    package: ../paper_example
+    bridge: chapters/02_bridge.tex
+  - kind: chapter
+    title: Colony size and country of origin
+    source: chapters/03_metadata.tex
+    claims:
+      - id: c3.1
+        text: Colony size does not differ by country of origin in the synthetic compendium.
+        where: Section 3.2
+        figure: fig:country
+        code: exp/3_metadata/run_all.py
+        data: [../paper_example/data/signal.csv]
+  - kind: conclusion
+    title: Conclusion
+    source: chapters/99_conclusion.tex
+appendices: []
+bibliography: ''

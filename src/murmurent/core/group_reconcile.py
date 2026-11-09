@@ -36,9 +36,13 @@ def _group_slack_token_path(group: str) -> Path:
     return Path.home() / ".config" / "murmurent" / "groups" / group / "slack-token"
 
 
-def resolve_group_slack_token(group: str, *, allow_file: bool = True) -> str:
+def resolve_group_slack_token(group: str, *, allow_file: bool = True,
+                              allow_shared: bool = True) -> str:
     """The group's OWN Slack bot token: env ``MURMURENT_GROUP_SLACK_TOKEN`` first,
-    then ``~/.config/murmurent/groups/<group>/slack-token`` (the PI's machine)."""
+    then ``~/.config/murmurent/groups/<group>/slack-token`` (written by
+    ``group-slack-setup`` on the PI's machine), then the copy the PI sealed to
+    this machine's key in the lab records (``slack_token_share``), which is
+    stored at that same path so the next call finds it there."""
     tok = os.environ.get("MURMURENT_GROUP_SLACK_TOKEN", "").strip()
     if tok or not allow_file:
         return tok
@@ -48,6 +52,14 @@ def resolve_group_slack_token(group: str, *, allow_file: bool = True) -> str:
             return f.read_text(encoding="utf-8").strip()
     except OSError:
         pass
+    if allow_shared and group:
+        try:
+            from .slack_token_share import unlock_group_token
+            rep = unlock_group_token(group)
+            if rep.token:
+                return rep.token
+        except Exception:  # noqa: BLE001 - no shared copy is a normal answer
+            pass
     return ""
 
 

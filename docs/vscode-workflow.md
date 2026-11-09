@@ -102,29 +102,39 @@ introduce its agent with `bash scripts/install_piper_voices.sh audition`.
 
 | Agent | Piper voice | Mac `say` voice | | Agent | Piper voice | Mac `say` voice |
 |---|---|---|---|---|---|---|
-| adversary | en_GB-alba | Tessa | | scribe | en_US-joe | Reed |
-| conscience | en_GB-jenny_dioco | Moira | | lawyer | en_GB-northern_english_male | Aman |
-| judge | en_GB-alan | Daniel | | millwright | en_US-john | Eddy |
-| bookworm | en_GB-southern_english_female | Karen | | centre_millwright | en_US-bryce | Rocko |
-| oracle | en_US-amy | Samantha | | registrar | en_GB-cori | Sandy |
-| lab_oracle | en_US-kristin | Shelley | | security_guard | en_US-hfc_male | Rishi |
-| blacksmith | en_US-ryan | Fred | | artist | en_US-hfc_female | Flo |
-| teacher | en_US-norman | Grandpa | | (any other) | en_US-lessac | the system voice |
+| teacher | en_US-lessac-high | Grandpa | | artist | en_US-hfc_female-medium | Flo |
+| judge | en_US-ryan-high | Daniel | | lawyer | en_GB-alan-medium | Aman |
+| adversary | en_GB-cori-high | Tessa | | millwright | en_US-john-medium | Eddy |
+| scribe | en_US-ljspeech-high | Reed | | centre_millwright | en_US-bryce-medium | Rocko |
+| bookworm | en_GB-southern_english_female-low | Karen | | registrar | en_US-joe-medium | Sandy |
+| conscience | en_GB-jenny_dioco-medium | Moira | | security_guard | en_GB-northern_english_male-medium | Rishi |
+| oracle | en_US-amy-medium | Samantha | | (any other) | en_US-lessac-medium | the system voice |
+| lab_oracle | en_US-kristin-medium | Shelley | | | | |
+| blacksmith | en_US-hfc_male-medium | Fred | | | | |
 
-(Piper names carry a quality suffix, `-medium` or `-low`, in the file name;
-`bash scripts/install_piper_voices.sh list` prints the exact ones.)
+The voices were chosen by listening: Piper's `high` voices (lessac, ryan,
+cori, ljspeech) are the easiest to follow and go to the agents heard most
+often; voices listeners found hard to understand (alba, norman) are not used.
+`bash scripts/install_piper_voices.sh list` prints the exact names.
 
 `~/.murmurent/speak` is also the voice table. An empty file uses the
 defaults above. One line changes one agent: `adversary en_GB-cori-medium`
 for Piper, or `adversary Moira` for `say`. The line `engine say` (or
 `engine piper`, `engine spd-say`) forces an engine; without it the hook
 picks Piper when it is installed with its voices, else `say`, else
-`spd-say`. Other Piper voices: `~/.local/share/uv/tools/piper-tts/bin/python
+`spd-say`. Piper is run 15% slower than its own pace and with less noise,
+because at its defaults some voices slur: `speed 1.0` restores its pace
+(larger is slower) and `noise 0.667` its default breathiness (smaller is
+cleaner). Other Piper voices: `~/.local/share/uv/tools/piper-tts/bin/python
 -m piper.download_voices` lists them, and the same command with a name
 and `--download-dir ~/.murmurent/voices` fetches one.
 
-Only the headline is read: the first sentence of the agent's first line,
-with web addresses, file paths, DOIs and markdown stripped out, since
+**What is read.** Each agent writes a second line beginning `Aloud:` under
+its headline: a plain-English summary of at most 100 words, written to be
+heard (see [`rules/headline_first.md`](https://github.com/hallettmiket/murmurent/blob/main/rules/headline_first.md)). The hook
+speaks that line. When an agent has not written one, it falls back to the
+headline: the first sentence of the agent's first line. Either way,
+web addresses, file paths, DOIs and markdown are stripped out, since
 those are for reading, not listening. Each verdict is spoken once, and
 verdicts queue rather than talk over each other. The hook returns at once,
 so speech never holds Claude Code up.
@@ -132,6 +142,39 @@ so speech never holds Claude Code up.
 To mute: delete the file, or set `MURMURENT_SPEAK=0` in the shell that
 starts Claude Code for one session. `MURMURENT_SPEAK=1` turns it on
 without the file.
+
+**Another language.** Agents speak English unless this machine chooses a
+language:
+
+```bash
+murmurent config speak-language fr_FR      # French; --list shows the choices
+murmurent config speak-language en         # back to English
+```
+
+That writes a `language fr_FR` line into `~/.murmurent/speak` and, when
+Piper is installed, fetches the French voice (about 60 MB). From the next
+session on, a hook tells each agent as it starts to write its `Aloud:` line
+in French; the headline and the detail stay in English, so the log pane and
+the dashboard read as before. The hook then speaks the line with the
+language's voice: one Piper voice shared by every agent (few languages have
+fifteen), chosen from the table that `bash scripts/install_piper_voices.sh
+languages` prints, or the Mac voice Apple ships for that language when
+`say` is the engine (download it once in System Settings, Accessibility,
+Spoken Content, if it is not there). Agents are still told apart because
+each verdict begins with the agent's name. Nothing changes on a machine
+that picks no language, and the Mac's own voices need no download for
+English.
+
+The choices made, and the alternatives: the setting is per machine, in the
+voice table the hook already reads, rather than per project or per member,
+because the person listening is the one at the machine. Agents learn the
+language from a `SubagentStart` hook rather than by reading a file, so an
+agent costs nothing extra and the agent files carry one sentence, not a
+language each. To give one agent a different voice in that language, add
+`<agent> <voice>` as for English; to use a language the table lacks, pass
+`--voice <piper voice>` (the `piper.download_voices` command lists them all,
+over forty languages), which writes a `voice` line the hook uses for every
+agent.
 
 **Known limit**: CC subagents return one final message rather than a
 live stream of their thinking. The reporter shows agent start/end

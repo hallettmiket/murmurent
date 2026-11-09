@@ -1,0 +1,31 @@
+1
+00:00:00,400 --> 00:00:18,699
+This is the teacher's course mode. When a subject takes weeks rather than one sitting, you type teacher course and the subject. It teaches you over several sessions, with lessons you mark up and a record of what you have shown you know.
+
+2
+00:00:19,099 --> 00:00:30,799
+It starts by interviewing you, one question at a time: what you will do with the subject, by when, what you already have, and where you get stuck.
+
+3
+00:00:30,799 --> 00:00:43,299
+That last answer matters most, and the goal as a whole tells the course what to leave out. Your goal is written down and re-read every session.
+
+4
+00:00:43,699 --> 00:00:59,799
+Here is a real first session, with a practice learner whose answers were set in advance. The goal: choose a permutation test, which shuffles the group labels, for colony sizes, and defend it at lab meeting in three weeks.
+
+5
+00:00:59,799 --> 00:01:18,299
+The first lesson has a figure you play with: shuffle the labels and watch the gaps pile up. In this practice run the reading had not come back yet; a real course finds its sources through the bookworm before writing a lesson.
+
+6
+00:01:18,700 --> 00:01:42,799
+Everything lives in one course folder: your goal, the sources, the lessons and the learning records. After each lesson, a record notes what you showed you know and what you fumbled, so nothing you have mastered is taught twice. Each session picks the next smallest step toward your goal, from what the records show you know.
+
+7
+00:01:43,200 --> 00:01:58,099
+Later sessions start with two or three questions from earlier lessons, weighted to what you fumbled. Struggling to recall is where lasting memory comes from, so the teacher gives you time to think.
+
+8
+00:01:58,500 --> 00:02:17,899
+To use it, type teacher course and the subject. Answer the interview. Open each lesson, mark the sentence that lost you, and take the quiz; the next session starts from there. For one method or one paper, teacher explain is enough.

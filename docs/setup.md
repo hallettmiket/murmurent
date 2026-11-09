@@ -21,6 +21,17 @@ are. It also asks where you keep your git repositories on this computer, for
 example `~/repos`, `~/repo` or `~/repositories`. To see or change that folder
 later, run `murmurent config repos-root` (give a folder to change it).
 
+!!! note "On a Windows PC: install WSL first"
+    Murmurent runs on Windows **through WSL** (Windows Subsystem for Linux,
+    an Ubuntu that runs inside Windows), not on Windows itself. In an
+    administrator PowerShell run `wsl --install`, restart, open the Ubuntu
+    app it added, and run the one line above inside it. Keep your
+    repositories and your vault inside Ubuntu (under `~`), not under
+    `/mnt/c`, which is slow. Claude Code inside WSL is the Linux build, and
+    the dashboard opens in your Windows browser at the usual address. A
+    native Windows Python can run `murmurent doctor`, which says this, but
+    the hooks, the linked commons and spoken verdicts need Unix (#281).
+
 !!! note "You are finished after the command above"
     You do **not** need to run any of the steps that follow. They are shown
     only for transparency, and for the rare case of installing by hand. If
