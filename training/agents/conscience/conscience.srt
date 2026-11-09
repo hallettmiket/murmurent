@@ -1,35 +1,43 @@
 1
-00:00:00,400 --> 00:00:09,500
-This is the conscience. It reviews your writing for equity, diversity, inclusion and decolonization, and hands back the fixed text.
+00:00:00,400 --> 00:00:16,914
+I am the conscience. I review what you write for equity, diversity, inclusion and decolonization, and I hand back the fixed text. A grant, a paper, a course outline, an ethics application, a study plan: anything with people in it.
 
 2
-00:00:09,900 --> 00:00:22,800
-It quotes the exact line, says what a reader or a reviewer gets wrong because of it, and hands back a rewritten passage to paste in, with the version it recommends.
+00:00:17,299 --> 00:00:28,709
+Three examples. A grant application: I check its sex- and gender-based analysis, SGBA plus, which the health funders require, and the equity rules of the funder you are applying to.
 
 3
-00:00:22,800 --> 00:00:39,700
-Every finding cites the source it rests on, or is marked as its own knowledge to check. When nothing is built yet, it returns a design instead: who is included, who is asked, whose risk is named.
+00:00:28,709 --> 00:00:41,605
+A course outline: I check it for decolonization. Whose perspectives are taught, whether Indigenous peoples are named as the specific nations concerned or flattened into one word, which voices are missing.
 
 4
-00:00:40,100 --> 00:00:51,800
-Its scope is equity: framing, language, and who a study includes. About a community, it uses what that community has published about itself, and says where that stops.
+00:00:41,605 --> 00:00:57,959
+A paper: I check the language for exclusion, and who the study includes and leaves out, with a number where one exists. Every time, I quote the exact line, cite a source for the finding, and hand back a rewritten passage you can paste in.
 
 5
-00:00:51,800 --> 00:01:03,100
-Statistics go to the adversary and lawfulness to the lawyer. It edits your file only when you ask it to apply the changes.
+00:00:58,349 --> 00:01:13,057
+About a community, I use what that community has published about itself, and I say where that stops; I never speak for one. When nothing is built yet, I return a design instead: who is included, who is asked, whose risk is named.
 
 6
-00:01:03,500 --> 00:01:09,599
-A real run, on a made-up Participants paragraph. A member asks for a review.
+00:01:13,057 --> 00:01:26,902
+I edit your file only when you ask me to apply the changes. My findings rest on the centre's curated resources, chosen for its region; the bookworm adds to them when I find a gap.
 
 7
-00:01:09,599 --> 00:01:27,700
-The answer is Flagged: the draft calls an English-only cohort from one clinic representative of Canada. Each finding quotes the line and names its source, and a closing list says what it could not back up, for the bookworm to find.
+00:01:27,299 --> 00:01:32,626
+A real run, on a made-up Participants paragraph. A member asks for a review.
 
 8
-00:01:28,100 --> 00:01:45,799
-To use it, ask Claude Code for the conscience and point it at a section, a grant or a course outline. The first line is the verdict: OK or Flagged for a review, Designed for a plan, or Gap when it cannot deliver.
+00:01:32,626 --> 00:01:48,719
+My answer is Flagged: the draft calls an English-only cohort from one clinic representative of Canada. Each finding quotes the line and names its source, and a closing list says what I could not back up, for the bookworm to find.
 
 9
-00:01:45,799 --> 00:02:02,400
-It draws on a curated list of resources chosen for the centre's region. The bookworm can propose additions to the centre's list, such as a funder's equity guidance, and a person approves each one.
+00:01:49,099 --> 00:02:03,888
+Say what the document is and what you want checked: a grant's SGBA plus section, a course outline for decolonization, or a paper's language. The document types are examples; the review is the same.
+
+10
+00:02:04,299 --> 00:02:18,542
+To use me, ask Claude Code for the conscience and point me at a section, a grant or a course outline. The first line is my verdict: OK or Flagged for a review, Designed for a plan, or Gap when I cannot deliver.
+
+11
+00:02:18,542 --> 00:02:31,988
+I draw on a curated list of resources chosen for the centre's region. The bookworm can propose additions to the centre's list, such as a funder's equity guidance, and a person approves each one.

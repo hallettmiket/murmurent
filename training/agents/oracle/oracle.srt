@@ -1,43 +1,43 @@
 1
-00:00:00,400 --> 00:00:14,035
-This is the oracle, your personal research memory. Everybody in the lab has an oracle. A chat window forgets; the oracle keeps what you found, and you can search those memories whenever you like.
+00:00:00,400 --> 00:00:13,013
+I am the oracle, your personal research memory. Everybody in the lab has an oracle. A chat window forgets; I keep what you found, and you can search those memories whenever you like.
 
 2
-00:00:14,450 --> 00:00:23,398
-It stores your key findings, each with the project and experiment it came from, and searches them across all your projects, over the years.
+00:00:13,400 --> 00:00:22,069
+I store your key findings, each with the project and experiment it came from, and search them across all your projects, over the years.
 
 3
-00:00:23,398 --> 00:00:39,101
-It also searches your lab notebook: your notes for each day, and the prompts you gave Claude Code, which are recorded automatically. Everything lives in your own Obsidian notes, a folder you can open and browse yourself.
+00:00:22,069 --> 00:00:37,540
+I also search your lab notebook: your notes for each day, and the prompts you gave Claude Code, which are recorded automatically. Everything lives in your own Obsidian notes, a folder you can open and browse yourself.
 
 4
-00:00:39,500 --> 00:00:53,278
-When you choose, it prepares a finding for the lab oracle, the lab's shared memory, and you publish it. Protected and restricted findings, such as patient data or unpublished results, stay in your own notes.
+00:00:37,949 --> 00:00:51,217
+When you choose, I prepare a finding for the lab oracle, the lab's shared memory, and you publish it. Protected and restricted findings, such as patient data or unpublished results, stay in your own notes.
 
 5
-00:00:53,278 --> 00:01:05,452
-The bookworm finds papers and the blacksmith runs analyses; the oracle keeps what you found. It remains factual: if it holds nothing on a topic, it says so.
+00:00:51,217 --> 00:01:00,465
+I keep what you found, not what the literature says. I remain factual: if I hold nothing on a topic, I say so.
 
 6
-00:01:05,850 --> 00:01:28,349
-A real run. In March, in a project on liver nodules, the small growths in a scarred liver that can turn into cancer, the member asks the oracle to remember that the gene GPC3 marks early hepatocellular carcinoma, the first stage of liver cancer, and tells it apart from a nodule that has not turned.
+00:01:00,849 --> 00:01:20,293
+A real run. In March, in a project on liver nodules, the small growths in a scarred liver that can turn into cancer, the member asks me to remember that the gene GPC3 marks early hepatocellular carcinoma, the first stage of liver cancer, and tells it apart from a nodule that has not turned.
 
 7
-00:01:28,349 --> 00:01:32,879
-It files the finding with its project and experiment.
+00:01:20,293 --> 00:01:24,776
+I file the finding with its project and experiment.
 
 8
-00:01:33,300 --> 00:01:42,600
-Eight months later, in a liver screening project, the member passes six genes and asks what they know about early liver cancer.
+00:01:25,200 --> 00:01:33,126
+Eight months later, in a liver screening project, the member passes me six genes and asks what they know about early liver cancer.
 
 9
-00:01:42,600 --> 00:01:54,300
-The oracle recalls GPC3, because early hepatocellular carcinoma is early liver cancer. For the other five, it says plainly that it holds nothing of theirs.
+00:01:33,126 --> 00:01:44,529
+I recall GPC3, because early hepatocellular carcinoma is early liver cancer. For the other five, I say plainly that I hold nothing of theirs.
 
 10
-00:01:54,700 --> 00:02:06,713
-To use it, just ask Claude Code: ask the oracle to remember a finding, or what you know about a topic. Give it the finding and where it came from; it asks for anything missing.
+00:01:44,950 --> 00:01:55,338
+To use me, just ask Claude Code: ask the oracle to remember a finding, or what you know about a topic. Give me the finding and where it came from; I ask for anything missing.
 
 11
-00:02:06,713 --> 00:02:18,254
+00:01:55,338 --> 00:02:05,857
 The first line of the reply is the verdict: Remembered, Found, Not found or Unsure. You can open every entry in Obsidian.

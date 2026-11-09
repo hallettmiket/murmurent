@@ -169,10 +169,10 @@ videos:
 - key: notebook
   title: "Your lab notebook"
   tagline: "A day at the bench, and how it reaches your notebook"
-  date: 2026-11-08
-  version: 2026.11.0
-  seconds: 152
-  summary: "A bench scientist's day with the lab notebook: the plan in the morning, a gel photo from the phone, a voice note with gloves on, a prompt written in Obsidian and sent to Claude Code with one keystroke, the day recalled, and a report for the supervisor. Natural language throughout; the commands as footnotes."
+  date: 2026-11-09
+  version: 2026.11.1
+  seconds: 172
+  summary: "A bench scientist's day with the lab notebook: the experimental design if you like, a gel photo from the phone, a voice note with gloves on, a prompt written in Obsidian and sent to Claude Code with one keystroke, the day recalled, and a report for the supervisor. Natural language throughout; the commands as footnotes."
   page: https://mikehallett.science/assets/videos/murmurent_notebook.html
   file: https://mikehallett.science/assets/videos/murmurent_notebook_720p.mp4
   transcript: training/skills/notebook/notebook.srt
@@ -180,14 +180,14 @@ videos:
   sources:
   chapters:
     - ["0:00", "Welcome"]
-    - ["0:13", "The plan"]
-    - ["0:23", "The gel photo"]
-    - ["0:50", "A voice note"]
-    - ["1:08", "The entry"]
-    - ["1:23", "Prompts: write, send, keep"]
-    - ["1:40", "End of day: ask"]
-    - ["1:55", "End of week: the report"]
-    - ["2:13", "How to use it"]
+    - ["0:13", "The design"]
+    - ["0:30", "The gel photo"]
+    - ["0:57", "A voice note"]
+    - ["1:15", "The entry"]
+    - ["1:33", "Prompts: write, send, keep"]
+    - ["2:01", "End of day: ask"]
+    - ["2:16", "End of week: the report"]
+    - ["2:35", "How to use it"]
 - key: data_root
   title: "The data root: where big files live"
   tagline: "Where the lab's big files live, and what each folder is for"
@@ -245,257 +245,259 @@ movies:
   agent_sha256: 4ccaa69779f9dabfb86eb0918c8800e17882bd5e3f2b44e60048abed1a563bea
   file: training/agents/oracle/oracle_narrated.mp4
   make: python3 training/agents/oracle/make.py
-  seconds: 138
+  seconds: 126
   chapters:
     - ["0:00", "Welcome"]
-    - ["0:14", "What it does"]
-    - ["0:39", "Its scope"]
-    - ["1:05", "A real example"]
-    - ["1:54", "How to use it"]
+    - ["0:13", "What it does"]
+    - ["0:37", "Its scope"]
+    - ["1:00", "A real example"]
+    - ["1:44", "How to use it"]
 - agent: bookworm
   title: The bookworm
-  tagline: "Finds the literature and checks every citation against its source"
-  version: 2026.11.0
-  date: 2026-11-08
+  tagline: "Finds the papers and the database records your project needs, and checks each one against its source"
+  version: 2026.11.1
+  date: 2026-11-09
   agent_sha256: 705fec4b04253ba77bc16824932f1e1d41d89d981158a7e8db98acdb554db11b
   file: training/agents/bookworm/bookworm_narrated.mp4
   make: python3 training/agents/bookworm/make.py
-  seconds: 134
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:11", "What it does"]
-    - ["0:34", "Its scope"]
-    - ["0:53", "A real example"]
-    - ["1:15", "How to direct it"]
-    - ["1:39", "How to use it"]
-- agent: adversary
-  title: The adversary
-  tagline: "The sceptical reviewer who tries to break your result before a referee does"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: 10de8035a56e66b9cac23af36fb4c2d5bd9870ffc58f3c043e5a8cc84d324547
-  file: training/agents/adversary/adversary_narrated.mp4
-  make: python3 training/agents/adversary/make.py
-  seconds: 146
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:12", "What it does"]
-    - ["0:42", "Its scope"]
-    - ["1:14", "A real example"]
-    - ["1:41", "How to direct it"]
-    - ["1:57", "How to use it"]
-- agent: artist
-  title: The artist
-  tagline: "Figures, reports and slides made from your real results"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: 30b918640fbe02472cea2bd7eff6ae80ddf9e4292264dbc3a6b014ec340955d0
-  file: training/agents/artist/artist_narrated.mp4
-  make: python3 training/agents/artist/make.py
-  seconds: 124
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:08", "What it does"]
-    - ["0:32", "Its scope"]
-    - ["0:53", "A real example"]
-    - ["1:16", "How to direct it"]
-    - ["1:38", "How to use it"]
-- agent: scribe
-  title: The scribe
-  tagline: "Scientific writing in your lab's own voice"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: 161da45268cd3ddc6f6df5e0956094965cf6a3df37ad33b688954ce72a456898
-  file: training/agents/scribe/scribe_narrated.mp4
-  make: python3 training/agents/scribe/make.py
-  seconds: 141
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:14", "What it does"]
-    - ["0:42", "Its scope"]
-    - ["1:13", "A real example"]
-    - ["1:34", "How to direct it"]
-    - ["1:53", "How to use it"]
-- agent: teacher
-  title: The teacher
-  tagline: "Plain words: in a minute in chat, on a page you annotate, or over weeks"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: e1ee79164cd5db3afcbe53e3a51d0c05020d1a75c94a8ff2346ae0e1f05081a5
-  file: training/agents/teacher/teacher_narrated.mp4
-  make: python3 training/agents/teacher/make.py
-  seconds: 122
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:13", "What it does"]
-    - ["0:43", "Its scope"]
-    - ["1:08", "A real example"]
-    - ["1:30", "How to direct it"]
-    - ["1:44", "How to use it"]
-- agent: lab_oracle
-  title: The lab oracle
-  tagline: "The lab's shared memory"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: 040d8579d1a1fc415362bfddca15ff6b859dc95add4848b29ca49a3b24c2540e
-  file: training/agents/lab_oracle/lab_oracle_narrated.mp4
-  make: python3 training/agents/lab_oracle/make.py
-  seconds: 123
+  seconds: 151
   chapters:
     - ["0:00", "Welcome"]
     - ["0:10", "What it does"]
-    - ["0:30", "Its scope"]
-    - ["0:54", "A real example"]
-    - ["1:35", "How to use it"]
-- agent: blacksmith
-  title: The blacksmith
-  tagline: "Runs the analysis on your own data and shows you the code"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: 45b32ffc161a50718b4ef96323fd79a4d11d98a5319067131302973e3dea6d24
-  file: training/agents/blacksmith/blacksmith_narrated.mp4
-  make: python3 training/agents/blacksmith/make.py
-  seconds: 132
+    - ["0:47", "Its scope"]
+    - ["1:11", "A real example"]
+    - ["1:30", "How to direct it"]
+    - ["1:58", "How to use it"]
+- agent: adversary
+  title: The adversary
+  tagline: "The sceptical reviewer who tries to break your result before a referee does"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: 10de8035a56e66b9cac23af36fb4c2d5bd9870ffc58f3c043e5a8cc84d324547
+  file: training/agents/adversary/adversary_narrated.mp4
+  make: python3 training/agents/adversary/make.py
+  seconds: 160
   chapters:
     - ["0:00", "Welcome"]
-    - ["0:13", "What it does"]
-    - ["0:39", "Its scope"]
-    - ["1:00", "A real example"]
-    - ["1:25", "How to direct it"]
-    - ["1:47", "How to use it"]
-- agent: conscience
-  title: The conscience
-  tagline: "Equity, diversity, inclusion and decolonization review that says where every finding comes from"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: d2038feea86a734313d012dfdcfc6922424d7148c56de9b661f0c4c42cf9580f
-  file: training/agents/conscience/conscience_narrated.mp4
-  make: python3 training/agents/conscience/make.py
-  seconds: 122
+    - ["0:11", "What it does"]
+    - ["1:00", "Its scope"]
+    - ["1:24", "A real example"]
+    - ["1:54", "How to direct it"]
+    - ["2:12", "How to use it"]
+- agent: artist
+  title: The artist
+  tagline: "Figures, reports and slides made from your real results"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: 30b918640fbe02472cea2bd7eff6ae80ddf9e4292264dbc3a6b014ec340955d0
+  file: training/agents/artist/artist_narrated.mp4
+  make: python3 training/agents/artist/make.py
+  seconds: 103
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:07", "What it does"]
+    - ["0:27", "Its scope"]
+    - ["0:44", "A real example"]
+    - ["1:05", "How to direct it"]
+    - ["1:21", "How to use it"]
+- agent: scribe
+  title: The scribe
+  tagline: "Scientific writing in your lab's own voice"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: 161da45268cd3ddc6f6df5e0956094965cf6a3df37ad33b688954ce72a456898
+  file: training/agents/scribe/scribe_narrated.mp4
+  make: python3 training/agents/scribe/make.py
+  seconds: 127
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:11", "What it does"]
+    - ["0:42", "Its scope"]
+    - ["1:06", "A real example"]
+    - ["1:24", "How to direct it"]
+    - ["1:45", "How to use it"]
+- agent: teacher
+  title: The teacher
+  tagline: "Plain words, like Feynman: in a minute in chat, on a page with a quiz, or over weeks"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: e1ee79164cd5db3afcbe53e3a51d0c05020d1a75c94a8ff2346ae0e1f05081a5
+  file: training/agents/teacher/teacher_narrated.mp4
+  make: python3 training/agents/teacher/make.py
+  seconds: 180
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:16", "What it does"]
+    - ["0:45", "Its scope"]
+    - ["1:23", "A real example"]
+    - ["1:45", "The idea, drawn"]
+    - ["2:27", "How to direct it"]
+    - ["2:42", "How to use it"]
+- agent: lab_oracle
+  title: The lab oracle
+  tagline: "The lab's shared memory"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: 040d8579d1a1fc415362bfddca15ff6b859dc95add4848b29ca49a3b24c2540e
+  file: training/agents/lab_oracle/lab_oracle_narrated.mp4
+  make: python3 training/agents/lab_oracle/make.py
+  seconds: 101
   chapters:
     - ["0:00", "Welcome"]
     - ["0:09", "What it does"]
-    - ["0:39", "Its scope"]
-    - ["1:03", "A real example"]
-    - ["1:27", "How to use it"]
+    - ["0:25", "Its scope"]
+    - ["0:41", "A real example"]
+    - ["1:17", "How to use it"]
+- agent: blacksmith
+  title: The blacksmith
+  tagline: "Runs the analysis on your own data and shows you the code"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: 45b32ffc161a50718b4ef96323fd79a4d11d98a5319067131302973e3dea6d24
+  file: training/agents/blacksmith/blacksmith_narrated.mp4
+  make: python3 training/agents/blacksmith/make.py
+  seconds: 111
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:10", "What it does"]
+    - ["0:34", "Its scope"]
+    - ["0:53", "A real example"]
+    - ["1:14", "How to direct it"]
+    - ["1:30", "How to use it"]
+- agent: conscience
+  title: The conscience
+  tagline: "Equity, diversity, inclusion and decolonization review that says where every finding comes from"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: d2038feea86a734313d012dfdcfc6922424d7148c56de9b661f0c4c42cf9580f
+  file: training/agents/conscience/conscience_narrated.mp4
+  make: python3 training/agents/conscience/make.py
+  seconds: 152
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:16", "What it does"]
+    - ["0:57", "Its scope"]
+    - ["1:26", "A real example"]
+    - ["1:48", "How to direct it"]
+    - ["2:03", "How to use it"]
 - agent: lawyer
   title: The lawyer
   tagline: "Patents, and whether your project's data may move or be shared"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: 3303d2ee3c5e7ea870af38f5e6dffcfc2c8987fc63642b5b0dac91dc2b6468df
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: b9065d58756ee5478ff45c123e29f7e2a2b47e0291a59689b76de6a884ea0652
   file: training/agents/lawyer/lawyer_narrated.mp4
   make: python3 training/agents/lawyer/make.py
-  seconds: 142
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:20", "What it does"]
-    - ["0:54", "Its scope"]
-    - ["1:15", "A real example"]
-    - ["1:49", "How to use it"]
-- agent: millwright
-  title: The millwright
-  tagline: "Sets up new members and new projects for your lab"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: 425252681c7ac9b221e4ea79e6d2e3b0636dfb01e799f5159fc0ea5248e54ae6
-  file: training/agents/millwright/millwright_narrated.mp4
-  make: python3 training/agents/millwright/make.py
-  seconds: 135
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:13", "What it does"]
-    - ["0:57", "Its scope"]
-    - ["1:24", "A real example"]
-    - ["1:45", "How to use it"]
-- agent: centre_millwright
-  title: The centre millwright
-  tagline: "Keeps every project's access consistent across the centre"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: 1cbc96e730fb153e1acca70c9fa61c03c3f782911d1187416202713704a1149c
-  file: training/agents/centre_millwright/centre_millwright_narrated.mp4
-  make: python3 training/agents/centre_millwright/make.py
-  seconds: 116
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:13", "What it does"]
-    - ["0:47", "Its scope"]
-    - ["1:08", "A real example"]
-    - ["1:29", "How to use it"]
-- agent: judge
-  title: The judge
-  tagline: "Puts several answers to one question side by side, with who found what"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: bd86954fe8c9fd9da362185d4d0c9a58d0bcf78ddf6d889018298c6f32d03b3b
-  file: training/agents/judge/judge_narrated.mp4
-  make: python3 training/agents/judge/make.py
-  seconds: 130
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:12", "What it does"]
-    - ["0:45", "Its scope"]
-    - ["1:13", "A real example"]
-    - ["1:42", "How to use it"]
-- agent: registrar
-  title: The registrar
-  tagline: "The centre's one list of labs, cores and collaborations"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: e62f392b00af9fc5250240cf0b4ba2efd54bed5b3990d84b8601dd3e4d6c2b93
-  file: training/agents/registrar/registrar_narrated.mp4
-  make: python3 training/agents/registrar/make.py
-  seconds: 116
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:13", "What it does"]
-    - ["0:42", "Its scope"]
-    - ["1:07", "A real example"]
-    - ["1:24", "How to use it"]
-- agent: security_guard
-  title: The security guard
-  tagline: "Checks what leaves your lab for passwords and patient data"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: 57e55efefee0725b99b58fb1ec22cfb598068c62a0dcdf5b25d904d0d10976b2
-  file: training/agents/security_guard/security_guard_narrated.mp4
-  make: python3 training/agents/security_guard/make.py
-  seconds: 114
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:13", "What it does"]
-    - ["0:39", "Its scope"]
-    - ["1:01", "A real example"]
-    - ["1:31", "How to use it"]
-- agent: docent
-  title: The docent
-  tagline: "Answers questions about a paper or thesis with the exact place in the work"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: d0d1246dcbe638da683dcd35c8f7d2a6be8ee2a867961142e296a19defa05db4
-  file: training/agents/docent/docent_narrated.mp4
-  make: python3 training/agents/docent/make.py
-  seconds: 146
-  chapters:
-    - ["0:00", "Welcome"]
-    - ["0:14", "What it does"]
-    - ["0:42", "Its scope"]
-    - ["1:16", "A real example"]
-    - ["1:52", "How to use it"]
-- agent: clerk
-  title: The clerk
-  tagline: "Ask it anything about your institution; it reads the answer off the institution's own pages"
-  version: 2026.11.0
-  date: 2026-11-08
-  agent_sha256: a32d4189105200754cc9b72139523a8651773a3c1c9099b089a7890d08e1e0d8
-  file: training/agents/clerk/clerk_narrated.mp4
-  make: python3 training/agents/clerk/make.py
-  seconds: 157
+  seconds: 139
   chapters:
     - ["0:00", "Welcome"]
     - ["0:17", "What it does"]
     - ["0:46", "Its scope"]
-    - ["1:11", "A real example"]
-    - ["2:02", "How to direct it"]
-    - ["2:14", "How to use it"]
+    - ["1:26", "A real example"]
+    - ["1:56", "How to use it"]
+- agent: millwright
+  title: The millwright
+  tagline: "Gets a new member's computer connected to the lab, and sets up each new project"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: 0d749a8b115e5a0444284636a112dabb519c54e7893248d6270a087a40799fed
+  file: training/agents/millwright/millwright_narrated.mp4
+  make: python3 training/agents/millwright/make.py
+  seconds: 121
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:13", "What it does"]
+    - ["0:48", "Its scope"]
+    - ["1:15", "A real example"]
+    - ["1:32", "How to use it"]
+- agent: centre_millwright
+  title: The centre millwright
+  tagline: "Keeps every project's access consistent across the centre"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: 1cbc96e730fb153e1acca70c9fa61c03c3f782911d1187416202713704a1149c
+  file: training/agents/centre_millwright/centre_millwright_narrated.mp4
+  make: python3 training/agents/centre_millwright/make.py
+  seconds: 101
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:12", "What it does"]
+    - ["0:39", "Its scope"]
+    - ["0:56", "A real example"]
+    - ["1:13", "How to use it"]
+- agent: judge
+  title: The judge
+  tagline: "Puts several answers to one question side by side, with who found what"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: bd86954fe8c9fd9da362185d4d0c9a58d0bcf78ddf6d889018298c6f32d03b3b
+  file: training/agents/judge/judge_narrated.mp4
+  make: python3 training/agents/judge/make.py
+  seconds: 137
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:10", "What it does"]
+    - ["0:46", "Its scope"]
+    - ["1:16", "A real example"]
+    - ["1:48", "How to use it"]
+- agent: registrar
+  title: The registrar
+  tagline: "The centre's one list of labs, cores and collaborations"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: 6fb8c4282d8a608658836d2d2bfd417fada3c85e08b972e958ceadca1dbbeeac
+  file: training/agents/registrar/registrar_narrated.mp4
+  make: python3 training/agents/registrar/make.py
+  seconds: 105
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:12", "What it does"]
+    - ["0:37", "Its scope"]
+    - ["0:57", "A real example"]
+    - ["1:14", "How to use it"]
+- agent: security_guard
+  title: The security guard
+  tagline: "Checks what leaves your lab for passwords and patient data"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: 39a529c56900031ab5a751c284b19f6c94e2e1849bb540ae50f41063b31ffdca
+  file: training/agents/security_guard/security_guard_narrated.mp4
+  make: python3 training/agents/security_guard/make.py
+  seconds: 103
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:11", "What it does"]
+    - ["0:31", "Its scope"]
+    - ["0:55", "A real example"]
+    - ["1:22", "How to use it"]
+- agent: docent
+  title: The docent
+  tagline: "Answers questions about a paper or thesis with the exact place in the work"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: d0d1246dcbe638da683dcd35c8f7d2a6be8ee2a867961142e296a19defa05db4
+  file: training/agents/docent/docent_narrated.mp4
+  make: python3 training/agents/docent/make.py
+  seconds: 120
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:11", "What it does"]
+    - ["0:34", "Its scope"]
+    - ["1:03", "A real example"]
+    - ["1:33", "How to use it"]
+- agent: clerk
+  title: The clerk
+  tagline: "Ask it anything about your institution; it reads the answer off the institution's own pages"
+  version: 2026.11.1
+  date: 2026-11-09
+  agent_sha256: 04e39d8d3111d1bb5b49e433335b28d6330f908997ccf36df926d5b4c10d4b8e
+  file: training/agents/clerk/clerk_narrated.mp4
+  make: python3 training/agents/clerk/make.py
+  seconds: 151
+  chapters:
+    - ["0:00", "Welcome"]
+    - ["0:15", "What it does"]
+    - ["0:43", "Its scope"]
+    - ["1:09", "A real example"]
+    - ["1:57", "How to direct it"]
+    - ["2:10", "How to use it"]

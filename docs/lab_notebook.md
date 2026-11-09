@@ -50,6 +50,27 @@ Select the prompt in any note, press the key: it lands in Claude Code and in
 your sessions stream. `murmurent prompt send --to Terminal` or `--tmux <pane>`
 chooses where it is pasted; `--no-paste` only copies and records.
 
+### Keeping prompts out of the day's entry
+
+A sent prompt stays where you wrote it, so a day of long prompts clouds the
+entry. Three ways to keep the entry clean; the first is the one to set up
+once and forget:
+
+1. **Send and clear.** In the Shell commands plugin, open the command's
+   settings, under *Output*, and set the channel for standard output to
+   **Replace selection**; add `--quiet` to the command:
+   `murmurent prompt send --quiet --text {{selection}}`. The command prints
+   nothing when it succeeds, so the selected prompt is replaced by nothing:
+   it leaves the note the moment it is sent, and the sessions record
+   (`sessions/<date>/sent.md`) is where it lives from then on, with the time.
+   An error is printed to the error channel, and the selection stays.
+2. **A prompts file.** Say "open today's prompts" (`murmurent prompt new`):
+   `prompts/<date>.md` is a page for prompts alone, outside the entry, and
+   the hotkey works there as anywhere.
+3. **Clean up what is already there.** `murmurent notebook split` moves the
+   prompt-shaped blocks out of existing entries into the sessions record
+   (below).
+
 Three things about the sessions stream:
 
 - It stays in your personal vault. It is never published to the lab oracle,

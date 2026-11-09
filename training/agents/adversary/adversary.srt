@@ -1,39 +1,47 @@
 1
-00:00:00,400 --> 00:00:12,300
-This is the adversary, the sceptical reviewer. It tries to break your result before a referee does: it re-runs your analysis and checks what your write-up claims.
+00:00:00,400 --> 00:00:11,852
+I am the adversary, the sceptical reviewer. I try to break your result before a referee does: I re-run your analysis and I check what your write-up claims.
 
 2
-00:00:12,700 --> 00:00:25,600
-It re-runs your code rather than trusting the write-up, and looks for the classic faults: test data leaking into training, a result that seems too good, a step nobody can reproduce.
+00:00:12,250 --> 00:00:29,511
+I re-run your code rather than trusting the write-up. Most of what I see is not a classifier: it is a t-test, an analysis of variance, a regression, a survival curve, the statistics of an ordinary thesis. I reproduce those the same way.
 
 3
-00:00:25,600 --> 00:00:42,500
-In a write-up, it checks that each cited paper is real and says what you claim. For a written-up prediction model, it goes through the reporting checklist a journal will use and names each item you missed.
+00:00:29,511 --> 00:00:43,661
+I look for the classic faults: the wrong test for the data, a hidden grouping, samples that are not independent, a result that seems too good, and, for a prediction model, test data leaking into training.
 
 4
-00:00:42,899 --> 00:00:57,399
-Its scope is how a result was produced and whether it holds up. Each finding is marked as checked, by re-running or reading, or as only suspected, and an unclear result is reported as unclear.
+00:00:43,661 --> 00:01:00,246
+In a write-up, I check that each cited paper is real and says what you claim. For a prediction model, I go through the reporting checklist a journal will use, TRIPOD plus AI, and name each item you missed.
 
 5
-00:00:57,399 --> 00:01:14,700
-When the work names a compound to make or data about to move, it asks the lawyer itself and includes the answer. The blacksmith builds the analysis, the artist draws the figures, and the bookworm finds the reading.
+00:01:00,649 --> 00:01:10,852
+My scope is how a result was produced and whether it holds up. Each finding is marked as checked, when I confirmed it by running something, or only suspected.
 
 6
-00:01:15,100 --> 00:01:25,200
-A real run, on the made-up example that ships with Murmurent. A member asks whether colonies grown in serum really are larger than controls.
+00:01:10,852 --> 00:01:24,280
+When a result touches a patent or governed data, I refer it to the lawyer myself, mid-audit, and fold their verdict into mine. I audit what was built; I do not build it.
 
 7
-00:01:25,200 --> 00:01:41,299
-The answer is Questions. The number reproduces exactly, but the serum and control samples come from different countries, and the Methods describe a step the code never takes. The last line says no legal question arises.
+00:01:24,700 --> 00:01:34,252
+A real run, on the example paper that ships with Murmurent: do colonies grown in serum come out larger, and does the difference hold?
 
 8
-00:01:41,700 --> 00:01:57,600
-Say what to check and what worries you: leakage in a classifier, a manuscript against the checklist a journal will use, or whether the papers you cite are real and say what you claim.
+00:01:34,252 --> 00:01:54,803
+The verdict is Questions. The number reproduces exactly, but the serum and control samples come from different countries, the test is one-sided and the write-up does not say so, and the Methods misdescribe the code. Each finding says whether I checked it or only suspect it.
 
 9
-00:01:58,000 --> 00:02:13,700
-To use it, ask Claude Code for the adversary and say what to check. Give it the code and the data, not a summary, because it runs them. The first line is the verdict: Pass, Questions or Reject.
+00:01:55,200 --> 00:02:04,427
+Say what to audit: the tests in a thesis chapter, a classifier before submission, or a Results section against its own numbers.
 
 10
-00:02:13,700 --> 00:02:25,500
-Its checklists cover prediction models and single-marker studies; for other study designs it names the right checklist but does not check it.
+00:02:04,427 --> 00:02:12,342
+Say what you want settled, and I say for each finding whether I checked it or only suspect it.
+
+11
+00:02:12,750 --> 00:02:26,481
+To use me, type to Claude Code and name me: ask the adversary to audit the statistics in a chapter, or a result before you submit it. Give me the folder with the code and the data.
+
+12
+00:02:26,481 --> 00:02:39,787
+The first line is my verdict: Pass, Questions or Reject. Then each finding, marked checked or suspected, with what would settle it.

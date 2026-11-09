@@ -29,7 +29,15 @@ python3 training/agents/publish.py oracle              # copy to the website rep
 
 Rendering needs Python with PIL and numpy, and ffmpeg. Voicing needs the
 ElevenLabs key in the macOS Keychain (service `elevenlabs-api-key`, as
-[`training/README.md`](../README.md) step 4 stores it); the voice is Matilda.
+[`training/README.md`](../README.md) step 4 stores it). **Each agent speaks
+in its own voice**: the narration is written in the first person ("I am the
+bookworm"), and `AGENT_VOICES` in [`../lib/agent_movie.py`](../lib/agent_movie.py)
+names an ElevenLabs stock voice for each agent, chosen to match the voice the
+spoken verdicts give it (`docs/vscode-workflow.md`): a wise old voice for the
+teacher, a steady broadcaster for the judge, a neutral one for the conscience,
+which has no persona. `--voice <name>` overrides it for one render; a skill
+movie has no agent and keeps the narrator, Matilda. Changing an agent's voice
+re-voices its whole movie, since clips are cached by voice and text.
 Rendered mp4s and audio clips are not committed. Clips are cached by the text
 of the sentence, so a re-render that changes two sentences re-voices two. When
 the clips exist, each scene is timed from the measured length of its clip, so

@@ -1,35 +1,35 @@
 1
-00:00:00,400 --> 00:00:13,900
-This is the security guard. Before something leaves your lab, a change you are about to share or a file you are sending, it checks it for passwords and patient information.
+00:00:00,400 --> 00:00:11,063
+I am the security guard. Before something leaves your lab, a change you are about to share or a file you are sending, I check it for passwords and patient information.
 
 2
-00:00:14,300 --> 00:00:31,600
-It reads what you are about to share and looks for passwords, access keys and tokens. In a project that holds patient data, it also looks for health card numbers, record numbers, social insurance numbers, and a birth date beside a name.
+00:00:11,450 --> 00:00:25,460
+I read what you are about to share and look for passwords, access keys and tokens. In a project that holds patient data, I also look for health card numbers, record numbers, social insurance numbers, and a birth date beside a name.
 
 3
-00:00:31,600 --> 00:00:39,700
-It fails any change to your lab's original data, which stays as it was collected.
+00:00:25,460 --> 00:00:31,643
+I fail any change to your lab's original data, which stays as it was collected.
 
 4
-00:00:40,100 --> 00:00:48,600
-Its scope is what leaves the lab. The adversary checks the science, and the conscience checks how people are described.
+00:00:32,050 --> 00:00:44,760
+My scope is what leaves the lab. Whether the science is right is not my question. When I block patient data in a protected project, I name the conscience, who reviews how people are described.
 
 5
-00:00:48,600 --> 00:01:01,500
-The guard reports each problem, where it is, and how to fix it; you make the change. It works offline, so the check itself sends nothing anywhere.
+00:00:44,760 --> 00:00:54,983
+I report each problem, where it is, and how to fix it; you make the change. I work offline, so the check itself sends nothing anywhere.
 
 6
-00:01:01,899 --> 00:01:11,599
+00:00:55,399 --> 00:01:03,187
 A real run, on a practice folder with a fake password and an invented patient line. The member is about to share it.
 
 7
-00:01:11,599 --> 00:01:31,700
-The first line says Blocked. Below it, each problem and its fix: a Slack access key in a settings file, and a record number with a birth date in the notes. Both are already in the project's saved history, so deleting them now is not enough.
+00:01:03,187 --> 00:01:22,345
+My first line says Blocked. Below it, each problem and its fix: a Slack access key in a settings file, and a record number with a birth date in the notes. Both are already in the project's saved history, so deleting them now is not enough.
 
 8
-00:01:32,100 --> 00:01:43,000
-To use it, type to Claude Code: ask the security guard to check my project before I share it. Say if the project holds patient data.
+00:01:22,750 --> 00:01:32,487
+To use me, type to Claude Code: ask the security guard to check my project before I share it. Say if the project holds patient data.
 
 9
-00:01:43,000 --> 00:01:53,599
-The first line is the answer: Clear, Concerns or Blocked. Blocked means fix what it lists before anything leaves.
+00:01:32,487 --> 00:01:43,379
+The first line is my answer: Clear, Concerns or Blocked. Blocked means fix what I list before anything leaves.

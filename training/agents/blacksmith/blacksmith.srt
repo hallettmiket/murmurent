@@ -1,43 +1,43 @@
 1
-00:00:00,400 --> 00:00:13,099
-This is the blacksmith. It runs the analysis: it loads your data, computes what you ask for, trains and tests models, and builds small apps to explore the results.
+00:00:00,400 --> 00:00:10,691
+I am the blacksmith. I run the analysis: I load your data, compute what you ask for, train and test models, and build small apps to explore the results.
 
 2
-00:00:13,500 --> 00:00:27,600
-It loads your data tables, such as CSV and Excel files, computes the features and statistics you ask for, and trains and evaluates classifiers. It builds interactive apps so you can explore a dataset.
+00:00:11,099 --> 00:00:23,392
+I load your data tables, such as CSV and Excel files, compute the features and statistics you ask for, and train and evaluate classifiers. I build interactive apps so you can explore a dataset.
 
 3
-00:00:27,600 --> 00:00:39,700
-What makes it different: it runs the computation itself on your data, and leaves the commented code beside the result, so anyone can repeat it.
+00:00:23,392 --> 00:00:34,358
+What makes me different: I run the computation itself on your data, and leave the commented code beside the result, so anyone can repeat it.
 
 4
-00:00:40,100 --> 00:00:51,000
-The blacksmith covers the computing. The artist turns its numbers into publication figures, the bookworm compares them with the literature, and the adversary checks the method.
+00:00:34,749 --> 00:00:45,463
+I cover the computing: data, statistics, models and apps. I leave the commented code beside each result, so the adversary can run it again and check the method.
 
 5
-00:00:51,000 --> 00:01:00,300
-It reads your original data and leaves it untouched. Each new result goes in a new, numbered file.
+00:00:45,463 --> 00:00:53,271
+I read your original data and leave it untouched. Each new result goes in a new, numbered file.
 
 6
-00:01:00,700 --> 00:01:13,600
-A real run, on simulated data. Growth medium turned out to be mixed up with country, so the member asks for the serum effect within each country, with a matching test.
+00:00:53,649 --> 00:01:04,270
+A real run, on simulated data. Growth medium turned out to be mixed up with country, so the member asks me for the serum effect within each country, with a matching test.
 
 7
-00:01:13,600 --> 00:01:25,700
-The answer is Done. The effect holds, but the countries disagree, and the blacksmith says so. It saves the results and the code that made them.
+00:01:04,270 --> 00:01:14,140
+My answer is Done. The effect holds, but the countries disagree, and I say so. I save the results and the code that made them.
 
 8
-00:01:26,100 --> 00:01:38,200
+00:01:14,549 --> 00:01:24,055
 Say what you want built: an app to explore your quality control, a classifier tested the way your data demand, or a series of steps on a counts table.
 
 9
-00:01:38,200 --> 00:01:47,300
-It works in Python by default; name a template script in your request and it follows it.
+00:01:24,055 --> 00:01:30,856
+I work in Python by default; name a template script in your request and I follow it.
 
 10
-00:01:47,700 --> 00:01:59,400
-To use it, type to Claude Code and name it: ask the blacksmith to compute, train or build something. Tell it which data, and what you want out.
+00:01:31,250 --> 00:01:39,687
+To use me, type to Claude Code and name me: ask the blacksmith to compute, train or build something. Tell me which data, and what you want out.
 
 11
-00:01:59,400 --> 00:02:12,000
-The reply starts with Done, Failed or Partial. Then come the numbers, the files and the code, so the adversary can run it again.
+00:01:39,687 --> 00:01:50,811
+My reply starts with Done, Failed or Partial. Then come the numbers, the files and the code, so the adversary can run it again.

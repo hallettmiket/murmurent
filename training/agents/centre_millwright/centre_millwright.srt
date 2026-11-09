@@ -1,35 +1,35 @@
 1
-00:00:00,400 --> 00:00:13,500
-This is the centre millwright. It works for the centre's administrator, the registrar, and keeps each project's access the same everywhere: its Slack channel, its code and its data folders.
+00:00:00,400 --> 00:00:12,316
+I am the centre millwright. I work for the centre's administrator, the registrar, and keep each project's access the same everywhere: its Slack channel, its code and its data folders.
 
 2
-00:00:13,900 --> 00:00:33,200
-Each project has a list of its members. The centre millwright compares that list with who is actually in the project's channel, on its code, and on its folders on the shared servers. Any difference is drift, and it reports each one with what it would change.
+00:00:12,700 --> 00:00:27,081
+Each project has a list of its members. I compare that list with who is actually in the project's channel, on its code, and on its folders on the shared servers. Any difference is drift, and I report each one with what I would change.
 
 3
-00:00:33,200 --> 00:00:47,300
-It also sets up projects whose members come from several labs, inviting the others as guests. It works one project at a time, and changes nothing until the registrar approves.
+00:00:27,081 --> 00:00:39,441
+I also set up projects whose members come from several labs, inviting the others as guests. I work one project at a time, and change nothing until the registrar approves.
 
 4
-00:00:47,699 --> 00:00:59,799
-Each lab's own millwright sets up that lab's members; the centre millwright takes over once a project crosses labs. It reads each lab's records, which the lab's PI keeps.
+00:00:39,850 --> 00:00:49,773
+Each lab's own millwright sets up that lab's members; I take over once a project crosses labs. I read each lab's records, which the lab's PI keeps.
 
 5
-00:00:59,799 --> 00:01:08,700
-When a channel is no longer needed, it archives it, so the registrar can bring it back.
+00:00:49,773 --> 00:00:56,653
+When a channel is no longer needed, I archive it, so the registrar can bring it back.
 
 6
-00:01:09,099 --> 00:01:16,799
-A real run that changes nothing. The registrar asks it to check the centre's records on this machine.
+00:00:57,050 --> 00:01:03,119
+A real run that changes nothing. The registrar asks me to check the centre's records on this machine.
 
 7
-00:01:16,799 --> 00:01:29,299
-The comparison of members with their access could not run here, and it says so. It then lists eight local items, each with what it would do.
+00:01:03,119 --> 00:01:13,081
+The comparison of members with their access could not run here, and I say so. I then list eight local items, each with what I would do.
 
 8
-00:01:29,699 --> 00:01:40,199
-To use it, ask the centre millwright, on the registrar's computer, to check one project or every project. It shows each difference before anything changes.
+00:01:13,500 --> 00:01:23,748
+To use me, ask the centre millwright, on the registrar's computer, to check one project or every project. I show each difference before anything changes.
 
 9
-00:01:40,199 --> 00:01:56,399
-The first line is the verdict: Reconciled, Drift, or Blocked while it waits for approval. A centre sets its own name, Slack workspace and GitHub organisation, and every project's names follow from them.
+00:01:23,748 --> 00:01:40,862
+The first line is the verdict: Reconciled, Drift, or Blocked while I wait for approval. A centre sets its own name, Slack workspace and GitHub organisation, and every project's names follow from them.

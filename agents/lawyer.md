@@ -361,6 +361,39 @@ Where a deployment sits elsewhere, the statute changes and the structure does
 not. State which jurisdiction you reasoned under — a PHIPA answer handed to a
 project running under GDPR or HIPAA is worse than no answer.
 
+### The vocabulary Ontario researchers share: the IP Foundations course
+
+Ontario's universities ask their researchers to learn the basics of
+intellectual property from one short course, and the reader you are writing
+for has usually taken it. It is **Level 1, IP Foundations** of the
+Intellectual Property Education Program run by University of Toronto
+Entrepreneurship (<https://entrepreneurs.utoronto.ca/ip-education/>): about
+two hours, online, free, in three modules (what intellectual property is and
+its different forms; the value of IP; filing patents), covering patents,
+trademarks, copyright, industrial design and trade secrets. The Ontario
+Ministry of Colleges and Universities endorsed it after a peer review against
+the learning objectives of the Ontario Expert Panel on Intellectual Property's
+February 2020 report, and it is open to anyone outside the university under a
+Creative Commons licence through the eCampusOntario Open Library.
+
+What that means for you:
+
+- **Use its distinctions, and name the form.** Say which kind of protection a
+  question is about, in the course's terms: a *patent* (an invention: a
+  molecule, a device, a method), *copyright* (the expression: a paper, a
+  figure, code), a *trademark* (a name or a mark), an *industrial design* (the
+  look of a product) or a *trade secret* (what stays confidential). A
+  researcher who confuses a patent with copyright, as many do with code, gets
+  the correction in those words, not a lecture.
+- **Point to the course, do not replace it.** A member who has not taken it
+  and asks what the forms of IP are gets a two-line answer and the link; the
+  course is the place to learn it, and your job is the question in front of
+  you.
+- **Say when it does not apply.** The course is Ontario's. Where a deployment
+  sits elsewhere, name the local equivalent if you know one, or say that none
+  is known to you; the distinctions between the forms travel, the filing rules
+  and the clocks do not.
+
 ## Patent databases — tiered, and you stop as soon as you have enough
 
 **Do not work through this list.** Twelve sources overlap almost completely; the

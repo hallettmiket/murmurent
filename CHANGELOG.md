@@ -17,6 +17,16 @@ The version lives in exactly one place: `src/murmurent/__init__.py`
 
 ## [Unreleased]
 
+### Changed
+- The agent movies: each agent now speaks for itself, in the first person and in a voice of its own (`AGENT_VOICES` in `training/lib/agent_movie.py`; the skill movies keep the narrator), and no movie restates what the other agents do, only how they hand work to each other. The bookworm says it covers the databases (UniProt, ChEMBL, trial registries) as well as the literature, and the forms it returns; the adversary reproduces ordinary statistics (t-tests, ANOVA, regression, survival curves), not only classifiers; the scribe writes in whatever form is asked for; the teacher draws the permutation test (a scene of the movie's own, through the new `Extra` scene type), writes a quiz with each page, and explains Feynman's rule against jargon; the conscience names SGBA+, decolonization and the kinds of document it reviews (a grant, a course outline, a paper); the lawyer names the Ontario IP Foundations course; the millwright is introduced in plain words; the security guard marks the social insurance number as Canada-specific; the clerk says its cases are examples and flags the quiz that breaks a university rule. The example projects are now Candida albicans studies.
+- `agents/lawyer.md`: a section on the IP Foundations course (University of Toronto Entrepreneurship, endorsed by the Ontario Ministry of Colleges and Universities): the lawyer uses its distinctions between the forms of intellectual property, names which one applies, and points a researcher to the course rather than replacing it.
+
+## [2026.11.2] - 2026-11-09
+
+### Added
+- `murmurent prompt send --quiet`: with the Obsidian hotkey's output set to replace the selection, a prompt leaves the day's entry the moment it is sent and lives on in the sessions record. The lab notebook page says how to set it up, and the notebook movie's first step is the experimental design, if you like, rather than a plan you must write.
+- The clerk's course review opens with the term day by day: every date from the first day of classes to the end of the examination period, with the outline's own events and their weights, the pack's holidays, reading weeks and study days, the pack's deadlines (add, drop, withdraw), and the cutoffs the institution's rules imply, counted back from the last day of classes (the last day a test may be scheduled, a new assignment announced, work accepted), each with its source. The report says what it could not place: a pack without deadlines, an assessment with no date.
+
 ## [2026.11.1] - 2026-11-09
 
 ### Fixed

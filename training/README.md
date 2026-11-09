@@ -19,35 +19,38 @@ by hand (a test checks it).
 One movie for each of the seventeen commons agents (issue #288), each about two
 minutes, in the same style as the thesis-package video: drawn from a script,
 every chat scene a real run of the agent on `examples/` or on synthetic data,
-captions burned in, narration with ElevenLabs (voice Matilda). Each movie
+captions burned in, narration with ElevenLabs. Each agent speaks for itself,
+in the first person and in a voice of its own (the table of voices is in
+[`agents/README.md`](agents/README.md)), so a viewer gets to know them one
+by one; the skill movies keep the narrator, Matilda. Each movie
 quotes the agent's own `agents/<agent>.md` for what it does and what it
 refuses, so a change to the agent is a change to the movie, and a hook reminds
 a session to re-render when the agent file is edited. How they are made and
 updated: [`agents/README.md`](agents/README.md).
 
-**Checked against** Murmurent 2026.11.0, 7 November 2026. All seventeen are
+**Checked against** Murmurent 2026.11.1, 9 November 2026. All seventeen are
 narrated. Each scene is timed from the measured length of its voice clip, so
 re-voicing a changed sentence re-times the picture with it.
 
 | Agent | Watch | Length | Narrated | Chapters |
 |---|---|---|---|---|
-| [`oracle`](../agents/oracle.md) | [The oracle](https://mikehallett.science/assets/videos/murmurent_agent_oracle.html) | 2:08 | yes | 0:00 Welcome, 0:09 What it does, 0:45 What it will not do, 1:08 A real example, 1:40 How to use it |
-| [`bookworm`](../agents/bookworm.md) | [The bookworm](https://mikehallett.science/assets/videos/murmurent_agent_bookworm.html) | 2:16 | yes | 0:00 Welcome, 0:11 What it does, 0:33 What it will not do, 0:52 A real example, 1:14 How to direct it, 1:43 How to use it |
-| [`adversary`](../agents/adversary.md) | [The adversary](https://mikehallett.science/assets/videos/murmurent_agent_adversary.html) | 2:11 | yes | 0:00 Welcome, 0:10 What it does, 0:31 What it will not do, 0:51 A real example, 1:16 How to direct it, 1:43 How to use it |
-| [`artist`](../agents/artist.md) | [The artist](https://mikehallett.science/assets/videos/murmurent_agent_artist.html) | 2:15 | yes | 0:00 Welcome, 0:11 What it does, 0:33 What it will not do, 0:55 A real example, 1:17 How to direct it, 1:47 How to use it |
-| [`scribe`](../agents/scribe.md) | [The scribe](https://mikehallett.science/assets/videos/murmurent_agent_scribe.html) | 2:17 | yes | 0:00 Welcome, 0:11 What it does, 0:36 What it will not do, 1:00 A real example, 1:26 How to direct it, 1:51 How to use it |
-| [`teacher`](../agents/teacher.md) | [The teacher](https://mikehallett.science/assets/videos/murmurent_agent_teacher.html) | 1:52 | yes | 0:00 Welcome, 0:10 What it does, 0:37 What it will not do, 1:02 A real example, 1:24 How to use it |
-| [`lab_oracle`](../agents/lab_oracle.md) | [The lab oracle](https://mikehallett.science/assets/videos/murmurent_agent_lab_oracle.html) | 1:48 | yes | 0:00 Welcome, 0:08 What it does, 0:28 What it will not do, 0:49 A real example, 1:20 How to use it |
-| [`blacksmith`](../agents/blacksmith.md) | [The blacksmith](https://mikehallett.science/assets/videos/murmurent_agent_blacksmith.html) | 2:13 | yes | 0:00 Welcome, 0:12 What it does, 0:32 What it will not do, 0:52 A real example, 1:16 How to direct it, 1:45 How to use it |
-| [`conscience`](../agents/conscience.md) | [The conscience](https://mikehallett.science/assets/videos/murmurent_agent_conscience.html) | 1:48 | yes | 0:00 Welcome, 0:10 What it does, 0:37 What it will not do, 0:58 A real example, 1:22 How to use it |
-| [`lawyer`](../agents/lawyer.md) | [The lawyer](https://mikehallett.science/assets/videos/murmurent_agent_lawyer.html) | 1:52 | yes | 0:00 Welcome, 0:12 What it does, 0:37 What it will not do, 0:58 A real example, 1:20 How to use it |
-| [`millwright`](../agents/millwright.md) | [The millwright](https://mikehallett.science/assets/videos/murmurent_agent_millwright.html) | 1:48 | yes | 0:00 Welcome, 0:11 What it does, 0:35 What it will not do, 1:00 A real example, 1:20 How to use it |
-| [`centre_millwright`](../agents/centre_millwright.md) | [The centre millwright](https://mikehallett.science/assets/videos/murmurent_agent_centre_millwright.html) | 1:46 | yes | 0:00 Welcome, 0:12 What it does, 0:39 What it will not do, 1:01 A real example, 1:20 How to use it |
-| [`judge`](../agents/judge.md) | [The judge](https://mikehallett.science/assets/videos/murmurent_agent_judge.html) | 1:45 | yes | 0:00 Welcome, 0:11 What it does, 0:34 What it will not do, 0:56 A real example, 1:18 How to use it |
-| [`registrar`](../agents/registrar.md) | [The registrar](https://mikehallett.science/assets/videos/murmurent_agent_registrar.html) | 1:52 | yes | 0:00 Welcome, 0:12 What it does, 0:39 What it will not do, 1:05 A real example, 1:26 How to use it |
-| [`security_guard`](../agents/security_guard.md) | [The security guard](https://mikehallett.science/assets/videos/murmurent_agent_security_guard.html) | 1:52 | yes | 0:00 Welcome, 0:12 What it does, 0:37 What it will not do, 1:00 A real example, 1:23 How to use it |
-| [`clerk`](../agents/clerk.md) | [The clerk](https://mikehallett.science/assets/videos/murmurent_agent_clerk.html) | 2:52 | yes | 0:00 Welcome, 0:16 What it does, 0:49 What it will not do, 1:23 A real example, 2:01 How to direct it, 2:17 How to use it |
-| [`docent`](../agents/docent.md) | [The docent](https://mikehallett.science/assets/videos/murmurent_agent_docent.html) | 1:51 | yes | 0:00 Welcome, 0:11 What it does, 0:34 What it will not do, 0:54 A real example, 1:23 How to use it |
+| [`oracle`](../agents/oracle.md) | [The oracle](https://mikehallett.science/assets/videos/murmurent_agent_oracle.html) | 2:06 | yes | 0:00 Welcome, 0:13 What it does, 0:37 Its scope, 1:00 A real example, 1:44 How to use it |
+| [`bookworm`](../agents/bookworm.md) | [The bookworm](https://mikehallett.science/assets/videos/murmurent_agent_bookworm.html) | 2:31 | yes | 0:00 Welcome, 0:10 What it does, 0:47 Its scope, 1:11 A real example, 1:30 How to direct it, 1:58 How to use it |
+| [`adversary`](../agents/adversary.md) | [The adversary](https://mikehallett.science/assets/videos/murmurent_agent_adversary.html) | 2:40 | yes | 0:00 Welcome, 0:11 What it does, 1:00 Its scope, 1:24 A real example, 1:54 How to direct it, 2:12 How to use it |
+| [`artist`](../agents/artist.md) | [The artist](https://mikehallett.science/assets/videos/murmurent_agent_artist.html) | 1:43 | yes | 0:00 Welcome, 0:07 What it does, 0:27 Its scope, 0:44 A real example, 1:05 How to direct it, 1:21 How to use it |
+| [`scribe`](../agents/scribe.md) | [The scribe](https://mikehallett.science/assets/videos/murmurent_agent_scribe.html) | 2:07 | yes | 0:00 Welcome, 0:11 What it does, 0:42 Its scope, 1:06 A real example, 1:24 How to direct it, 1:45 How to use it |
+| [`teacher`](../agents/teacher.md) | [The teacher](https://mikehallett.science/assets/videos/murmurent_agent_teacher.html) | 3:00 | yes | 0:00 Welcome, 0:16 What it does, 0:45 Its scope, 1:23 A real example, 1:45 The idea, drawn, 2:27 How to direct it, 2:42 How to use it |
+| [`lab_oracle`](../agents/lab_oracle.md) | [The lab oracle](https://mikehallett.science/assets/videos/murmurent_agent_lab_oracle.html) | 1:41 | yes | 0:00 Welcome, 0:09 What it does, 0:25 Its scope, 0:41 A real example, 1:17 How to use it |
+| [`blacksmith`](../agents/blacksmith.md) | [The blacksmith](https://mikehallett.science/assets/videos/murmurent_agent_blacksmith.html) | 1:51 | yes | 0:00 Welcome, 0:10 What it does, 0:34 Its scope, 0:53 A real example, 1:14 How to direct it, 1:30 How to use it |
+| [`conscience`](../agents/conscience.md) | [The conscience](https://mikehallett.science/assets/videos/murmurent_agent_conscience.html) | 2:32 | yes | 0:00 Welcome, 0:16 What it does, 0:57 Its scope, 1:26 A real example, 1:48 How to direct it, 2:03 How to use it |
+| [`lawyer`](../agents/lawyer.md) | [The lawyer](https://mikehallett.science/assets/videos/murmurent_agent_lawyer.html) | 2:19 | yes | 0:00 Welcome, 0:17 What it does, 0:46 Its scope, 1:26 A real example, 1:56 How to use it |
+| [`millwright`](../agents/millwright.md) | [The millwright](https://mikehallett.science/assets/videos/murmurent_agent_millwright.html) | 2:01 | yes | 0:00 Welcome, 0:13 What it does, 0:48 Its scope, 1:15 A real example, 1:32 How to use it |
+| [`centre_millwright`](../agents/centre_millwright.md) | [The centre millwright](https://mikehallett.science/assets/videos/murmurent_agent_centre_millwright.html) | 1:41 | yes | 0:00 Welcome, 0:12 What it does, 0:39 Its scope, 0:56 A real example, 1:13 How to use it |
+| [`judge`](../agents/judge.md) | [The judge](https://mikehallett.science/assets/videos/murmurent_agent_judge.html) | 2:17 | yes | 0:00 Welcome, 0:10 What it does, 0:46 Its scope, 1:16 A real example, 1:48 How to use it |
+| [`registrar`](../agents/registrar.md) | [The registrar](https://mikehallett.science/assets/videos/murmurent_agent_registrar.html) | 1:45 | yes | 0:00 Welcome, 0:12 What it does, 0:37 Its scope, 0:57 A real example, 1:14 How to use it |
+| [`security_guard`](../agents/security_guard.md) | [The security guard](https://mikehallett.science/assets/videos/murmurent_agent_security_guard.html) | 1:43 | yes | 0:00 Welcome, 0:11 What it does, 0:31 Its scope, 0:55 A real example, 1:22 How to use it |
+| [`clerk`](../agents/clerk.md) | [The clerk](https://mikehallett.science/assets/videos/murmurent_agent_clerk.html) | 2:31 | yes | 0:00 Welcome, 0:15 What it does, 0:43 Its scope, 1:09 A real example, 1:57 How to direct it, 2:10 How to use it |
+| [`docent`](../agents/docent.md) | [The docent](https://mikehallett.science/assets/videos/murmurent_agent_docent.html) | 2:00 | yes | 0:00 Welcome, 0:11 What it does, 0:34 Its scope, 1:03 A real example, 1:33 How to use it |
 
 
 ## Working through Claude Code, and the skills
@@ -60,7 +63,7 @@ or change something; a throwaway repository with invented secrets for the push
 skills), captions burned in, narration with ElevenLabs. **Working through
 Claude Code** is the one to watch first: every other movie assumes it.
 
-**Checked against** Murmurent 2026.11.0, 7 November 2026. The getting-started
+**Checked against** Murmurent 2026.11.1, 9 November 2026. The getting-started
 video (made against 2026.9.9) was re-checked the same day: every command it
 shows still exists, and it now ends with a short coda pointing at the Claude
 Code movie.

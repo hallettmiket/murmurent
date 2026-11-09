@@ -44,6 +44,35 @@ MAX_SECONDS = 180
 from .glyphs import GLYPHS, MEMBER_GLYPH, glyph_of  # noqa: E402,F401
 MIN_SECONDS = 90
 
+# Each agent speaks in its own voice (the narration is written in the first
+# person), so a viewer gets to know them one by one. The names are ElevenLabs
+# stock voices on the account; narrate.voice_id_for resolves them. A skill
+# movie, which has no agent, keeps the narrator, Matilda.
+NARRATOR = "Matilda"
+AGENT_VOICES = {
+    "oracle": "Sarah",              # mature, reassuring: your own memory
+    "lab_oracle": "Bella",          # professional, warm: the lab's memory
+    "bookworm": "Alice",            # clear educator, British
+    "blacksmith": "Brian",          # deep, resonant
+    "adversary": "Lily",            # confident, British: the sceptical reviewer
+    "artist": "Jessica",            # bright, warm
+    "teacher": "Bill",              # wise, mature: Feynman
+    "conscience": "River",          # neutral, calm, informative: no persona
+    "scribe": "George",             # warm storyteller, British
+    "docent": "Eric",               # smooth, trustworthy: the guide
+    "clerk": "Matilda",             # knowledgeable, professional
+    "lawyer": "Roger",              # laid-back, classy, working an angle
+    "millwright": "Chris",          # charming, down-to-earth
+    "centre_millwright": "Charlie", # deep, confident, energetic
+    "judge": "Daniel",              # steady broadcaster
+    "registrar": "Will",            # relaxed optimist
+    "security_guard": "Adam",       # dominant, firm
+}
+
+
+def voice_for(agent: str) -> str:
+    return AGENT_VOICES.get(agent, NARRATOR)
+
 
 def murmurent_version() -> str:
     text = (ROOT / "src" / "murmurent" / "__init__.py").read_text()
@@ -73,6 +102,17 @@ class Exchange:
 
 
 @dataclass
+class Extra:
+    """One more scene of the movie's own, drawn by the scene file: its name, the narration
+    over it, draw(img, t, sc) and its chapter title. Shown after the real example."""
+    name: str
+    narration: list[str]
+    draw: object
+    chapter: str | None = None
+    tail: float = 1.5
+
+
+@dataclass
 class AgentSpec:
     agent: str                       # file name in agents/, e.g. "oracle"
     title: str                       # "The oracle"
@@ -94,6 +134,7 @@ class AgentSpec:
     refuses_heading: str = "Its scope"                                   # the second scene's title
     directions: list[tuple[str, str]] = field(default_factory=list)   # (what you type, what it produces)
     directions_narration: list[str] = field(default_factory=list)
+    extras: list[Extra] = field(default_factory=list)                  # scenes of the movie's own, after the example
 
 
 # --------------------------------------------------------------------------- #
@@ -387,6 +428,8 @@ def build_scenes(spec: AgentSpec, folder: Path, version: str) -> list[Scene]:
         sc.append(Scene(f"example{ex.key}", ex.narration,
                         lambda img, t, s, who=who, q=q, reply=reply, ex=ex: s_chat(img, t, s, spec, who, q, reply, ex.chips, str(folder / ex.figure) if ex.figure else ""),
                         "A real example" if i == 0 else None, min_anim=chat_duration(q, ex.chips, reply), tail=1.2))
+    for ex in spec.extras:
+        sc.append(Scene(ex.name, ex.narration, ex.draw, ex.chapter, tail=ex.tail))
     if spec.directions:
         sc.append(Scene("directions", spec.directions_narration, lambda img, t, s: s_directions(img, t, s, spec),
                         "How to direct it", tail=1.8))
@@ -432,13 +475,17 @@ def main(spec: AgentSpec, folder: Path, argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description=f"Render the {spec.title} movie.")
     ap.add_argument("--stills", default=None, help="save a PNG every five seconds here instead of encoding")
     ap.add_argument("--no-voice", action="store_true", help="render the silent movie only")
-    ap.add_argument("--voice", default="Matilda")
+    ap.add_argument("--voice", default=None, help=f"an ElevenLabs voice; default: the agent's own ({voice_for(spec.agent)})")
     args = ap.parse_args(argv)
+    if args.voice is None:
+        args.voice = voice_for(spec.agent)
     version = murmurent_version()
     sha = check_quotes(spec)
     from .narrate import clip_durations
-    texts = spec.intro + spec.does_narration + spec.refuses_narration + spec.howto_narration
+    texts = spec.intro + spec.does_narration + spec.refuses_narration + spec.howto_narration + spec.directions_narration
     for ex in spec.examples:
+        texts += ex.narration
+    for ex in spec.extras:
         texts += ex.narration
     scene_mod.DURATIONS.update(clip_durations(folder, texts, args.voice))
     if scene_mod.DURATIONS:

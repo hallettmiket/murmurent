@@ -113,7 +113,7 @@ when a video and the written documentation disagree, the documentation is right.
 | [A status update with /murmurent-update-me](https://mikehallett.science/assets/videos/murmurent_update_me.html) | 2:11 | The status-update skill: a plain-English note for the project's channel, built from facts the computer reads fresh each time, what stays out of the channel, and the dry run that shows the note without posting it. (checked against 2026.11.0) |
 | [Learning a subject with teacher course](https://mikehallett.science/assets/videos/murmurent_course.html) | 2:18 | The teacher's course mode: an interview for your goal, lessons you mark up, a quiz in each, and a record of what you have shown you know, so nothing is taught twice. (checked against 2026.11.0) |
 | [The mayor's and PI's tools](https://mikehallett.science/assets/videos/murmurent_mayor_tools.html) | 2:27 | The three administrative skills: priming context before admin work, processing an encrypted join request with an explicit decision, and resetting a machine after a backup and a dry run. (checked against 2026.11.0) |
-| [Your lab notebook](https://mikehallett.science/assets/videos/murmurent_notebook.html) | 2:32 | A bench scientist's day with the lab notebook: the plan in the morning, a gel photo from the phone, a voice note with gloves on, a prompt written in Obsidian and sent to Claude Code with one keystroke, the day recalled, and a report for the supervisor. Natural language throughout; the commands as footnotes. (checked against 2026.11.0) |
+| [Your lab notebook](https://mikehallett.science/assets/videos/murmurent_notebook.html) | 2:52 | A bench scientist's day with the lab notebook: the experimental design if you like, a gel photo from the phone, a voice note with gloves on, a prompt written in Obsidian and sent to Claude Code with one keystroke, the day recalled, and a report for the supervisor. Natural language throughout; the commands as footnotes. (checked against 2026.11.1) |
 | [The data root: where big files live](https://mikehallett.science/assets/videos/murmurent_data_root.html) | 2:52 | Murmurent's third tier of memory: the lab's data root on its server, what immutable, append_only, modifiable, mothballed, release, cottage, tools and db are for, how a project's folders mirror its repository, what the hooks refuse, and the layout check. (checked against 2026.11.0) |
 
 One two-minute movie per agent: what it does, what it will not do, one real run, and how to
@@ -121,23 +121,23 @@ use it through Claude Code.
 
 | Agent | Movie | Length |
 |---|---|---|
-| [`oracle`](https://github.com/hallettmiket/murmurent/blob/main/agents/oracle.md) | [The oracle](https://mikehallett.science/assets/videos/murmurent_agent_oracle.html) | 2:18 |
-| [`bookworm`](https://github.com/hallettmiket/murmurent/blob/main/agents/bookworm.md) | [The bookworm](https://mikehallett.science/assets/videos/murmurent_agent_bookworm.html) | 2:14 |
-| [`adversary`](https://github.com/hallettmiket/murmurent/blob/main/agents/adversary.md) | [The adversary](https://mikehallett.science/assets/videos/murmurent_agent_adversary.html) | 2:26 |
-| [`artist`](https://github.com/hallettmiket/murmurent/blob/main/agents/artist.md) | [The artist](https://mikehallett.science/assets/videos/murmurent_agent_artist.html) | 2:04 |
-| [`scribe`](https://github.com/hallettmiket/murmurent/blob/main/agents/scribe.md) | [The scribe](https://mikehallett.science/assets/videos/murmurent_agent_scribe.html) | 2:21 |
-| [`teacher`](https://github.com/hallettmiket/murmurent/blob/main/agents/teacher.md) | [The teacher](https://mikehallett.science/assets/videos/murmurent_agent_teacher.html) | 2:02 |
-| [`lab_oracle`](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md) | [The lab oracle](https://mikehallett.science/assets/videos/murmurent_agent_lab_oracle.html) | 2:03 |
-| [`blacksmith`](https://github.com/hallettmiket/murmurent/blob/main/agents/blacksmith.md) | [The blacksmith](https://mikehallett.science/assets/videos/murmurent_agent_blacksmith.html) | 2:12 |
-| [`conscience`](https://github.com/hallettmiket/murmurent/blob/main/agents/conscience.md) | [The conscience](https://mikehallett.science/assets/videos/murmurent_agent_conscience.html) | 2:02 |
-| [`lawyer`](https://github.com/hallettmiket/murmurent/blob/main/agents/lawyer.md) | [The lawyer](https://mikehallett.science/assets/videos/murmurent_agent_lawyer.html) | 2:22 |
-| [`millwright`](https://github.com/hallettmiket/murmurent/blob/main/agents/millwright.md) | [The millwright](https://mikehallett.science/assets/videos/murmurent_agent_millwright.html) | 2:15 |
-| [`centre_millwright`](https://github.com/hallettmiket/murmurent/blob/main/agents/centre_millwright.md) | [The centre millwright](https://mikehallett.science/assets/videos/murmurent_agent_centre_millwright.html) | 1:56 |
-| [`judge`](https://github.com/hallettmiket/murmurent/blob/main/agents/judge.md) | [The judge](https://mikehallett.science/assets/videos/murmurent_agent_judge.html) | 2:10 |
-| [`registrar`](https://github.com/hallettmiket/murmurent/blob/main/agents/registrar.md) | [The registrar](https://mikehallett.science/assets/videos/murmurent_agent_registrar.html) | 1:56 |
-| [`security_guard`](https://github.com/hallettmiket/murmurent/blob/main/agents/security_guard.md) | [The security guard](https://mikehallett.science/assets/videos/murmurent_agent_security_guard.html) | 1:54 |
-| [`clerk`](https://github.com/hallettmiket/murmurent/blob/main/agents/clerk.md) | [The clerk](https://mikehallett.science/assets/videos/murmurent_agent_clerk.html) | 2:37 |
-| [`docent`](https://github.com/hallettmiket/murmurent/blob/main/agents/docent.md) | [The docent](https://mikehallett.science/assets/videos/murmurent_agent_docent.html) | 2:26 |
+| [`oracle`](https://github.com/hallettmiket/murmurent/blob/main/agents/oracle.md) | [The oracle](https://mikehallett.science/assets/videos/murmurent_agent_oracle.html) | 2:06 |
+| [`bookworm`](https://github.com/hallettmiket/murmurent/blob/main/agents/bookworm.md) | [The bookworm](https://mikehallett.science/assets/videos/murmurent_agent_bookworm.html) | 2:31 |
+| [`adversary`](https://github.com/hallettmiket/murmurent/blob/main/agents/adversary.md) | [The adversary](https://mikehallett.science/assets/videos/murmurent_agent_adversary.html) | 2:40 |
+| [`artist`](https://github.com/hallettmiket/murmurent/blob/main/agents/artist.md) | [The artist](https://mikehallett.science/assets/videos/murmurent_agent_artist.html) | 1:43 |
+| [`scribe`](https://github.com/hallettmiket/murmurent/blob/main/agents/scribe.md) | [The scribe](https://mikehallett.science/assets/videos/murmurent_agent_scribe.html) | 2:07 |
+| [`teacher`](https://github.com/hallettmiket/murmurent/blob/main/agents/teacher.md) | [The teacher](https://mikehallett.science/assets/videos/murmurent_agent_teacher.html) | 3:00 |
+| [`lab_oracle`](https://github.com/hallettmiket/murmurent/blob/main/agents/lab_oracle.md) | [The lab oracle](https://mikehallett.science/assets/videos/murmurent_agent_lab_oracle.html) | 1:41 |
+| [`blacksmith`](https://github.com/hallettmiket/murmurent/blob/main/agents/blacksmith.md) | [The blacksmith](https://mikehallett.science/assets/videos/murmurent_agent_blacksmith.html) | 1:51 |
+| [`conscience`](https://github.com/hallettmiket/murmurent/blob/main/agents/conscience.md) | [The conscience](https://mikehallett.science/assets/videos/murmurent_agent_conscience.html) | 2:32 |
+| [`lawyer`](https://github.com/hallettmiket/murmurent/blob/main/agents/lawyer.md) | [The lawyer](https://mikehallett.science/assets/videos/murmurent_agent_lawyer.html) | 2:19 |
+| [`millwright`](https://github.com/hallettmiket/murmurent/blob/main/agents/millwright.md) | [The millwright](https://mikehallett.science/assets/videos/murmurent_agent_millwright.html) | 2:01 |
+| [`centre_millwright`](https://github.com/hallettmiket/murmurent/blob/main/agents/centre_millwright.md) | [The centre millwright](https://mikehallett.science/assets/videos/murmurent_agent_centre_millwright.html) | 1:41 |
+| [`judge`](https://github.com/hallettmiket/murmurent/blob/main/agents/judge.md) | [The judge](https://mikehallett.science/assets/videos/murmurent_agent_judge.html) | 2:17 |
+| [`registrar`](https://github.com/hallettmiket/murmurent/blob/main/agents/registrar.md) | [The registrar](https://mikehallett.science/assets/videos/murmurent_agent_registrar.html) | 1:45 |
+| [`security_guard`](https://github.com/hallettmiket/murmurent/blob/main/agents/security_guard.md) | [The security guard](https://mikehallett.science/assets/videos/murmurent_agent_security_guard.html) | 1:43 |
+| [`clerk`](https://github.com/hallettmiket/murmurent/blob/main/agents/clerk.md) | [The clerk](https://mikehallett.science/assets/videos/murmurent_agent_clerk.html) | 2:31 |
+| [`docent`](https://github.com/hallettmiket/murmurent/blob/main/agents/docent.md) | [The docent](https://mikehallett.science/assets/videos/murmurent_agent_docent.html) | 2:00 |
 
 **News**, newest first (releases and new capabilities; the full record is the
 [changelog](https://github.com/hallettmiket/murmurent/blob/main/CHANGELOG.md)):

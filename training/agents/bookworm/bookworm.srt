@@ -1,43 +1,47 @@
 1
-00:00:00,400 --> 00:00:11,500
-This is the bookworm. It finds the published papers and database records your project needs, and it checks each one before you rely on it.
+00:00:00,400 --> 00:00:10,412
+I am the bookworm. I find the published papers and the database records your project needs, and I check each one before you rely on it.
 
 2
-00:00:11,900 --> 00:00:23,200
-It finds and summarises the papers your project needs, keeps your reading list, and annotates your results with what the public databases already know about each gene.
+00:00:10,800 --> 00:00:16,219
+I find and summarise the papers your project needs, and I keep your reading list.
 
 3
-00:00:23,200 --> 00:00:34,900
-What makes it different: it checks every citation and every number it reports against the paper itself, and labels each one verified or not.
+00:00:16,219 --> 00:00:32,365
+I am not only about the literature. I look up facts in the scientific databases: a gene in UniProt, a compound and its measured activities in ChEMBL, a trial in a trials registry, and I annotate your results with what is already known.
 
 4
-00:00:35,299 --> 00:00:46,200
-The bookworm covers the published papers and the public databases. The blacksmith runs the analysis, the adversary judges the method, and the artist draws the figures.
+00:00:32,365 --> 00:00:47,558
+What makes me different: I check every citation and every number I report against the paper itself, and I label each one verified, mismatch, retracted, secondary only, or unresolved.
 
 5
-00:00:46,200 --> 00:00:53,500
-When two databases disagree, it shows you the conflict and names both sources.
+00:00:47,949 --> 00:00:59,220
+I cover the published papers and the public databases. When two databases disagree, I show you both records and name their sources; I never quietly pick one.
 
 6
-00:00:53,899 --> 00:01:03,200
-A real run. A draft cites a real paper for a striking number, and the member asks the bookworm to check both.
+00:00:59,220 --> 00:01:11,812
+Other agents lean on me: the teacher and the conscience send me the citations they cannot verify, and I keep the centre's reporting guidelines and equity resources current.
 
 7
-00:01:03,200 --> 00:01:15,700
-The paper is real. The number is not in it. The bookworm labels each part, and suggests dropping the figure or citing a study that measured it.
+00:01:12,200 --> 00:01:19,755
+A real run. A draft cites a real paper for a striking number, and the member asks me to check both.
 
 8
-00:01:16,100 --> 00:01:26,600
-Say what you want back: a reading list in your Zotero library, a table for the reviewers, or your gene list annotated with its sources.
+00:01:19,755 --> 00:01:30,136
+The paper is real. The number is not in it. I label each part, and suggest dropping the figure or citing a study that measured it.
 
 9
-00:01:26,600 --> 00:01:39,300
-It searches PubMed, CrossRef and the preprint servers. If you have connected your own Zotero library, it adds each paper there. The checking is always done.
+00:01:30,550 --> 00:01:45,814
+Say what you want back, and in what form: a reading list in your Zotero library, a table for the reviewers, or your gene list annotated from the databases. HTML, PowerPoint, Word or LaTeX, as you ask.
 
 10
-00:01:39,700 --> 00:01:55,000
-To use it, type to Claude Code and name it: ask the bookworm to check a draft, or to find what is known about a gene. Give it the paper and the sentence that relies on it.
+00:01:45,814 --> 00:01:58,513
+I search PubMed, CrossRef, the preprint servers and the databases. If you have connected your own Zotero library, I add each paper there. The checking is always done.
 
 11
-00:01:55,000 --> 00:02:13,600
-The reply starts with a one-line verdict: how many sources it found, or, for a check, the problem it found. Then each item carries a label, from verified to unresolved. An unresolved number is one you cannot use yet.
+00:01:58,900 --> 00:02:11,842
+To use me, type to Claude Code and name me: ask the bookworm to check a draft, or to find what is known about a gene or a compound. Give me the paper and the sentence that relies on it.
+
+12
+00:02:11,842 --> 00:02:31,324
+My reply starts with a one-line verdict: how many sources I found, or, for a check, the problem I found. Then each item carries a label, from verified to unresolved. An unresolved number is one you cannot use yet.

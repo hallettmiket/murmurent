@@ -1,43 +1,43 @@
 1
-00:00:00,400 --> 00:00:08,699
-This is the artist. It turns your results into figures, reports and slides that make the science clear.
+00:00:00,400 --> 00:00:07,069
+I am the artist. I turn your results into figures, reports and slides that make the science clear.
 
 2
-00:00:09,099 --> 00:00:23,199
-It draws publication figures, from model-accuracy curves to heatmaps and volcano plots, each one labelled, with proper axes and legends. It builds slide decks, and keeps a project report of the figures so far.
+00:00:07,450 --> 00:00:20,206
+I draw publication figures, from model-accuracy curves to heatmaps and volcano plots, each one labelled, with proper axes and legends. I build slide decks, and keep a project report of the figures so far.
 
 3
-00:00:23,199 --> 00:00:32,500
-What makes it different: it draws each figure from your real data and saves it at print resolution.
+00:00:20,206 --> 00:00:27,782
+What makes me different: I draw each figure from your real data and save it at print resolution.
 
 4
-00:00:32,899 --> 00:00:44,600
-The artist covers figures, reports and slides. The blacksmith computes the numbers, the bookworm supplies the references for captions, and the adversary checks that a figure is honest.
+00:00:28,199 --> 00:00:37,287
+I cover figures, reports and slides. I draw the numbers as they arrive, from your results or an analysis already run; I compute none myself.
 
 5
-00:00:44,600 --> 00:00:53,900
-It never invents a data point to fill a plot; when an input is missing, it says so.
+00:00:37,287 --> 00:00:44,306
+I never invent a data point to fill a plot; when an input is missing, I say so.
 
 6
-00:00:54,299 --> 00:01:04,000
-A real run, on simulated data. The member asks for one figure: colony size by growth medium, every point shown, the means marked.
+00:00:44,699 --> 00:00:56,249
+A real run, on simulated data. The member asks me for one figure: colony size by growth medium, every point shown, the means marked.
 
 7
-00:01:04,000 --> 00:01:16,500
-The answer is Rendered. The image itself says the data are simulated, the caption says what to notice, and the artist states that it ran no test.
+00:00:56,249 --> 00:01:05,468
+My answer is Rendered. The image itself says the data are simulated, the caption says what to notice, and I state that I ran no test.
 
 8
-00:01:16,900 --> 00:01:28,599
+00:01:05,849 --> 00:01:14,101
 Say what you want and where it is going: a figure sized for a journal, a deck for lab meeting, or a new page in the project report.
 
 9
-00:01:28,599 --> 00:01:38,500
-Name your colours and figure size in the request; within a project it keeps one palette for every figure.
+00:01:14,101 --> 00:01:22,017
+Name your colours and figure size in the request; within a project I keep one palette for every figure.
 
 10
-00:01:38,900 --> 00:01:53,799
-To use it, type to Claude Code and name it: ask the artist for a figure from your results, and say what it is for. A figure for a talk differs from one for a paper.
+00:01:22,399 --> 00:01:33,484
+To use me, type to Claude Code and name me: ask the artist for a figure from your results, and say what it is for. A figure for a talk differs from one for a paper.
 
 11
-00:01:53,799 --> 00:02:04,400
-The reply starts with Rendered, Skipped or Failed. Then the figure, and a caption that says what to notice.
+00:01:33,484 --> 00:01:42,564
+My reply starts with Rendered, Skipped or Failed. Then the figure, and a caption that says what to notice.

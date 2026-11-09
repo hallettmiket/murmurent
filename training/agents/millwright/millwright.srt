@@ -1,39 +1,39 @@
 1
-00:00:00,400 --> 00:00:13,500
-This is the millwright. The PI uses it to set up the lab: a working computer for a new member, and the folders, channel and access for a new project.
+00:00:00,400 --> 00:00:13,013
+I am the millwright. I do the technical setup so that nobody else has to: I connect a new member's computer to the lab, and I set up the folders, the channel and the access for each new project.
 
 2
-00:00:13,900 --> 00:00:33,200
-For a new member, it gives them read access to the lab's records and writes a checklist they follow on their own computer: reach the lab server, install Claude Code, and create their personal notes. The member gets it in Slack and replies when it is done.
+00:00:13,400 --> 00:00:26,295
+When someone joins, I connect them: a checklist they follow on their own computer to reach the lab server, install Claude Code and create their personal notes. They get it in Slack and reply when it is done.
 
 3
-00:00:33,200 --> 00:00:44,500
-For a new project, it sets up the project's code on GitHub, a private Slack channel for its members, and its data folders on the lab server.
+00:00:26,295 --> 00:00:37,891
+When a project starts, I set up its code on GitHub, a private Slack channel for its members, and its data folders on the lab server, laid out the way the lab's rules say files are stored.
 
 4
-00:00:44,500 --> 00:00:57,399
-It also checks that each member's setup still works. Before it changes anything the lab shares, it shows the full plan and asks the PI to confirm.
+00:00:37,891 --> 00:00:48,904
+I keep to those rules, and I check that each member's setup still works. Before I change anything the lab shares, I show the full plan and I ask the PI to confirm.
 
 5
-00:00:57,799 --> 00:01:05,099
-It covers one lab. When a project's members come from several labs, the centre millwright takes over.
+00:00:49,299 --> 00:00:55,322
+I cover one lab. When a project's members come from several labs, the centre millwright takes over.
 
 6
-00:01:05,099 --> 00:01:24,400
-Each member makes their own secret key on their own computer, and only the public half leaves it. Folders that break the lab's layout are untidy, and it reports them to the PI, who decides. Data is never deleted; old records are archived.
+00:00:55,322 --> 00:01:15,762
+Security and privacy are part of the setup. Each member makes their own secret key on their own computer, and only the public half leaves it. Folders that break the lab's layout are untidy, and I report them to the PI, who decides. Data is never deleted; old records are archived.
 
 7
-00:01:24,800 --> 00:01:31,300
-A real run that only reads. The PI asks it to check this machine's setup.
+00:01:16,150 --> 00:01:21,011
+A real run that only reads. The PI asks me to check this machine's setup.
 
 8
-00:01:31,300 --> 00:01:45,000
+00:01:21,011 --> 00:01:32,925
 Murmurent runs, but the shared agents are not yet linked, and the safety checks use a different copy of Python. Each problem comes with its fix, and nothing was changed.
 
 9
-00:01:45,400 --> 00:02:00,700
-To use it, the PI types to Claude Code and names it: ask the millwright to set up a project, add a new member, or check everyone's setup. It shows the plan and waits for a yes.
+00:01:33,350 --> 00:01:45,038
+To use me, the PI types to Claude Code and names me: ask the millwright to set up a project, add a new member, or check everyone's setup. I show the plan and wait for a yes.
 
 10
-00:02:00,700 --> 00:02:15,300
-The first line is the verdict: Provisioned, Skipped or Failed. A lab tailors it through its own records: the lab's machines and folders fill in each new member's checklist.
+00:01:45,038 --> 00:02:00,527
+The first line is my verdict: Provisioned, Skipped or Failed. A lab tailors me through its own records: the lab's machines and folders fill in each new member's checklist.

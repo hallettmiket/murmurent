@@ -1,43 +1,43 @@
 1
-00:00:00,400 --> 00:00:14,300
-This is the scribe. It writes and revises scientific text in a house style built from one PI's own edits, which your lab can replace with its own. It keeps every fact.
+00:00:00,400 --> 00:00:11,852
+I am the scribe. I write and revise scientific text in a house style built from one PI's own edits, which your lab can replace with its own. I keep every fact.
 
 2
-00:00:14,700 --> 00:00:26,000
-It revises text you give it, mostly by cutting, and lists every change with its reason. And it drafts a section from your results, figures and notes.
+00:00:12,250 --> 00:00:21,477
+I revise text you give me, mostly by cutting, and I list every change with its reason. And I draft a section from your results, figures and notes.
 
 3
-00:00:26,000 --> 00:00:42,500
-It writes in your lab's voice by default; nobody has to ask for the house style. It uses whatever format the manuscript is in, LaTeX, Word or Markdown, and edits the manuscript itself when you ask.
+00:00:21,477 --> 00:00:42,706
+I write in your lab's voice by default; nobody has to ask for the house style. I write in whatever form you ask for: the LaTeX of a manuscript, a Word file for a grant, a Markdown page, a letter to an editor, a thesis chapter, a lay summary. And I edit the file itself when you ask.
 
 4
-00:00:42,899 --> 00:01:04,599
-Every fact, number and citation stays as you wrote it; one that looks wrong is flagged for you to check. Where a citation or a number is missing, it marks the place. If the material has a hole, say a number nobody has measured, it answers Gap and says what would fill it.
+00:00:43,100 --> 00:00:59,339
+Every fact, number and citation stays as you wrote it; one that looks wrong is flagged for you to check. Where a citation or a number is missing, I mark the place. If the material has a hole, say a number nobody has measured, I answer Gap and say what would fill it.
 
 5
-00:01:04,599 --> 00:01:13,099
-A lab tailors it by adding its own published papers and its PI's edits as examples.
+00:00:59,339 --> 00:01:06,776
+A lab tailors me by adding its own published papers and its PI's edits as examples.
 
 6
-00:01:13,500 --> 00:01:20,399
+00:01:07,200 --> 00:01:12,526
 A real run, on a passage written to be bad. The member asks for a revision.
 
 7
-00:01:20,399 --> 00:01:34,500
-The verdict is Revised. Every number survives, each change is listed with its reason, and the one change to the claim itself is shown for the author to accept or refuse.
+00:01:12,526 --> 00:01:24,114
+My verdict is Revised. Every number survives, each change is listed with its reason, and the one change to the claim itself is shown for the author to accept or refuse.
 
 8
-00:01:34,900 --> 00:01:45,799
+00:01:24,500 --> 00:01:33,820
 Say what you want in one plain sentence. Tighten the Discussion and list the changes. Draft the Methods from your notes, with the missing pieces marked.
 
 9
-00:01:45,799 --> 00:01:53,700
-Or write a figure legend for a grant, in Word, under a word limit.
+00:01:33,820 --> 00:01:45,311
+Or write a figure legend for a grant, in Word, under a word limit. Those are examples; ask for any piece of scientific writing, in any form.
 
 10
-00:01:54,100 --> 00:02:09,400
-To use it, just ask Claude Code: ask the scribe to tighten a section, or to draft one from your results and notes. Give it the text and say which part of the paper it is for.
+00:01:45,700 --> 00:01:56,831
+To use me, just ask Claude Code: ask the scribe to tighten a section, or to draft one from your results and notes. Give me the text and say which part of the paper it is for.
 
 11
-00:02:09,400 --> 00:02:20,800
-The first line of the reply is the verdict: Revised, Drafted or Gap. Then the text, and what changed and why.
+00:01:56,831 --> 00:02:07,304
+The first line of my reply is the verdict: Revised, Drafted or Gap. Then the text, and what changed and why.

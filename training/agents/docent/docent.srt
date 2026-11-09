@@ -1,39 +1,39 @@
 1
-00:00:00,400 --> 00:00:14,699
-This is the docent. A reviewer or an examiner asks it about a paper or a thesis, and it answers with the exact place in the work: the chapter, the figure, the script.
+00:00:00,400 --> 00:00:11,666
+I am the docent. A reviewer or an examiner asks me about a paper or a thesis, and I answer with the exact place in the work: the chapter, the figure, the script.
 
 2
-00:00:15,099 --> 00:00:26,399
-Every answer names the place in the work it rests on, and quotes the sentence. When a claim has code, it re-runs it before reporting the number.
+00:00:12,050 --> 00:00:21,834
+Every answer I give names the place in the work it rests on, and quotes the sentence. When a claim has code, I re-run it before reporting the number.
 
 3
-00:00:26,399 --> 00:00:42,900
-When the work does not address the question, it says Absent, and names the nearest thing the work does cover. Every question and answer is kept in a log, part of the record of the examination.
+00:00:21,834 --> 00:00:34,890
+When the work does not address the question, I say Absent, and name the nearest thing the work does cover. Every question and answer is kept in a log, part of the record of the examination.
 
 4
-00:00:43,299 --> 00:00:58,200
-It works for both sides. For a reviewer or an examiner, it answers questions about the work. For the author, it helps build the package: the work with each claim linked to its code and data.
+00:00:35,299 --> 00:00:48,056
+I work for both sides. For a reviewer or an examiner, I answer questions about the work. For the author, I help build the package: the work with each claim linked to its code and data.
 
 5
-00:00:58,200 --> 00:01:16,700
-It points at the work and leaves the judging to others: the adversary audits the method, and the examiner decides. The institution's own steps and deadlines come from the clerk. It works offline, because a thesis under examination is not public.
+00:00:48,056 --> 00:01:03,527
+I point at the work and leave the judging to others: the examiner decides. For the institution's own steps and deadlines, I ask the clerk. I work offline, because a thesis under examination is not public.
 
 6
-00:01:17,099 --> 00:01:26,399
-A real exchange, on a made-up thesis. The examiner asks where it shows that serum enlarges colonies, and whether that result holds.
+00:01:03,949 --> 00:01:12,480
+A real exchange, on a made-up thesis. The examiner asks me where it shows that serum enlarges colonies, and whether that result holds.
 
 7
-00:01:26,399 --> 00:01:40,099
-The docent names the chapter and the figure, re-runs the script, and gets the same numbers. It also says what the text leaves out, and who should judge the test.
+00:01:12,480 --> 00:01:22,721
+I name the chapter and the figure, re-run the script, and get the same numbers. I also say what the text leaves out, and who should judge the test.
 
 8
-00:01:40,500 --> 00:01:52,199
-Asked about incubation temperature, which the thesis never mentions, it answers Absent, lists where it looked, and names the nearest thing the thesis does cover.
+00:01:23,099 --> 00:01:33,062
+Asked about incubation temperature, which the thesis never mentions, I answer Absent, list where I looked, and name the nearest thing the thesis does cover.
 
 9
-00:01:52,599 --> 00:02:06,699
-To use it, open the package in Claude Code and type your question to the docent. Give it the question in plain words; it works out whether you are the examiner or the author.
+00:01:33,449 --> 00:01:43,187
+To use me, open the package in Claude Code and type your question to the docent. Give me the question in plain words; I work out whether you are the examiner or the author.
 
 10
-00:02:06,699 --> 00:02:26,099
-The first line is the verdict: Located, Absent, or Incomplete when the package itself is missing something. The detail gives the places and the re-run. Each package carries its own note on where things are, and the docent reads it first.
+00:01:43,187 --> 00:02:00,487
+The first line is the verdict: Located, Absent, or Incomplete when the package itself is missing something. The detail gives the places and the re-run. Each package carries its own note on where things are, and I read it first.

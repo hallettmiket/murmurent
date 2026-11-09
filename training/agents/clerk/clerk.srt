@@ -1,47 +1,47 @@
 1
-00:00:00,400 --> 00:00:17,100
-This is the clerk. Ask it anything about your institution: who runs an office, when an exam must be printed, whether a course outline follows the rules. It reads the answer on the institution's own pages, then and there.
+00:00:00,400 --> 00:00:15,707
+I am the clerk. Ask me anything about your institution: who runs an office, when an exam must be printed, whether a course outline follows the rules. I read the answer on the institution's own pages, then and there.
 
 2
-00:00:17,500 --> 00:00:31,200
-It reads the institution's public pages when you ask, and names the page and the date. It remembers what it found, and re-reads the page before relying on it, because people change offices.
+00:00:16,099 --> 00:00:27,881
+I read the institution's public pages when you ask, and I name the page and the date. I remember what I found, and I re-read the page before relying on it, because people change offices.
 
 3
-00:00:31,200 --> 00:00:46,900
-It also reviews a whole course outline: every rule it has on file for the course's level, and the others by reading; every date against holidays; and whether the grades add to one hundred.
+00:00:27,881 --> 00:00:43,538
+I can also review a whole document against the institution's rules, a course outline for instance: every rule for the course's level, every date against the calendar and the holidays, and whether the grades add to one hundred.
 
 4
-00:00:47,300 --> 00:01:00,600
-When the pages do not say, the answer is Unknown, with the nearest thing they do say. A page behind a login it leaves to you, and says where to read it.
+00:00:43,949 --> 00:00:54,059
+When the pages do not say, my answer is Unknown, with the nearest thing they do say. A page behind a login I leave to you, and I say where to read it.
 
 5
-00:01:00,600 --> 00:01:11,900
-After a course review, the conscience reviews the outline for equity and inclusion, and the scribe redoes it with the fixes on request.
+00:00:54,059 --> 00:01:09,437
+I work with other agents: after a course review, the conscience reviews the outline for equity and inclusion, and the scribe redoes it with the fixes. The docent asks me for a thesis's paperwork and deadlines.
 
 6
-00:01:12,300 --> 00:01:18,800
-A real run. An instructor asks when their final exam must be printed this fall.
+00:01:09,849 --> 00:01:17,265
+A real run, one example among many. An instructor asks when their final exam must be printed this fall.
 
 7
-00:01:18,800 --> 00:01:33,300
-The clerk quotes the rule and the exam period, each with its page, and works out the date. The course's own exam date sits behind a login, so that part is Unknown.
+00:01:17,265 --> 00:01:27,971
+I quote the rule and the exam period, each with its page, and work out the date. The course's own exam date sits behind a login, so that part is Unknown.
 
 8
-00:01:33,700 --> 00:01:45,000
-Asked who runs the equity, diversity and inclusion office, it answers with the name, title and public email, each from a page it opened.
+00:01:28,349 --> 00:01:39,938
+Another example. Asked who runs the equity, diversity and inclusion office, I answer with the name, title and public email, each from a page I opened.
 
 9
-00:01:45,400 --> 00:02:02,300
-Then a whole course outline. Two things must change: a quiz in the last three weeks of classes, and a lab report announced too late. Each comes with the rule quoted and the page it was read from.
+00:01:40,349 --> 00:01:57,418
+Then a whole course outline. The university has a rule: no test in the last three weeks of classes. This outline puts a quiz there, so I flag it, quoting the rule and its page. A lab report announced too late breaks a second rule.
 
 10
-00:02:02,700 --> 00:02:14,600
-Say what to look at: a course outline and its level, who holds an office, or a count of working days that skips holidays.
+00:01:57,799 --> 00:02:10,313
+These are examples, not a list of what I can do. Ask me anything the institution's pages answer: a policy, a deadline, a form, a fee, a room.
 
 11
-00:02:15,000 --> 00:02:24,700
-To use it, type your question to Claude Code and name the clerk. The first line is the verdict: Correct, Fix or Unknown.
+00:02:10,699 --> 00:02:20,159
+To use me, type your question to Claude Code and name me, the clerk. The first line is my verdict: Correct, Fix or Unknown.
 
 12
-00:02:24,700 --> 00:02:36,900
-Its memory holds short facts from your university's pages, each with its page and date; another university gets a memory of its own.
+00:02:20,159 --> 00:02:31,097
+My memory holds short facts from your university's pages, each with its page and date; another university gets a memory of its own.

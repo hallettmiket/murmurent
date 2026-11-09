@@ -41,8 +41,11 @@ def prompt_new(no_open: bool) -> None:
 @click.option("--no-paste", is_flag=True, help="Copy to the clipboard and record only.")
 @click.option("--project", default="", help="Project to record it under (default: general).")
 @click.option("--stdin", "from_stdin", is_flag=True, help="Read the prompt from standard input.")
+@click.option("--quiet", is_flag=True,
+              help="Print nothing on success. With the Obsidian hotkey's output set to replace the selection, "
+                   "the prompt leaves the note once sent; the sessions record keeps it.")
 def prompt_send(text: str | None, file_: str | None, to: str, tmux_pane: str, no_paste: bool, project: str,
-                from_stdin: bool) -> None:
+                from_stdin: bool, quiet: bool) -> None:
     paths = _nb.require_paths()
     try:
         if from_stdin:
@@ -58,5 +61,7 @@ def prompt_send(text: str | None, file_: str | None, to: str, tmux_pane: str, no
     except _ps.SendError as exc:
         click.echo(str(exc), err=True)
         sys.exit(1)
+    if quiet:
+        return
     where = f"pasted into {sent.pasted_to}" if sent.pasted_to else "on the clipboard"
     click.echo(f"sent ({len(sent.text)} characters, {where}); recorded in {paths.rel(sent.record)}")

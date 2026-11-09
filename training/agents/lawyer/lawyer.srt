@@ -1,35 +1,39 @@
 1
-00:00:00,400 --> 00:00:20,699
-This is the lawyer. It searches the patent databases around a gene, a molecule or a device. And it rules on whether a project may move or share data that a privacy law, an agreement or an ethics approval controls, always from the law, agreement or approval itself.
+00:00:00,400 --> 00:00:17,286
+I am the lawyer. I search the patent databases around a gene, a molecule or a device. And I rule on whether a project may move or share data that a privacy law, an agreement or an ethics approval controls, always from the law, agreement or approval itself.
 
 2
-00:00:21,099 --> 00:00:34,799
-It searches the patent databases worldwide for genes, proteins, molecules and devices, and explains the claims in plain words a scientist can act on: who owns what, what has expired, what is pending.
+00:00:17,699 --> 00:00:30,874
+I search the patent databases worldwide for genes, proteins, molecules and devices, and I explain the claims in plain words a scientist can act on: who owns what, what has expired, what is pending.
 
 3
-00:00:34,799 --> 00:00:54,500
-For data, it reads the signed agreement or the ethics approval before it rules, and names what is missing when it cannot find one. It checks first whether there is anything to search, so a question with no patent at stake costs one step.
+00:00:30,874 --> 00:00:46,856
+For data, I read the signed agreement or the ethics approval before I rule, and I name what is missing when I cannot find one. I check first whether there is anything to search, so a question with no patent at stake costs one step.
 
 4
-00:00:54,899 --> 00:01:07,799
-It informs your decision. A binding opinion goes through the institution's research office, and the institution's patent office does the filing. The bookworm reads journal papers; the lawyer reads patent filings.
+00:00:47,250 --> 00:00:56,059
+I inform your decision. A binding opinion goes through the institution's research office, and the institution's patent office does the filing.
 
 5
-00:01:07,799 --> 00:01:15,900
-For every patent, it says whether the status is confirmed across databases or only inferred.
+00:00:56,059 --> 00:01:10,673
+I speak the vocabulary of the short course Ontario asks its researchers to take, IP Foundations: a patent for an invention, copyright for a paper or code, a trademark, a trade secret. And I name which one applies.
 
 6
-00:01:16,300 --> 00:01:29,600
-A real run, on a made-up question: may we publish a short protocol note and post our script under an open licence? That is a freedom-to-operate question: whether anyone's patent blocks you.
+00:01:10,673 --> 00:01:26,608
+The adversary refers work to me in the middle of an audit; I triage first, so a referral with nothing to search costs one step. For every patent, I say whether the status is confirmed across databases or only inferred.
 
 7
-00:01:29,600 --> 00:01:49,300
-The verdict is Clear, after the first check alone. Publishing is not an act a patent reaches, so no database was searched, and the answer says so. It adds the one deadline to know: publishing starts the clock on filing a patent of your own.
+00:01:27,000 --> 00:01:39,710
+A real run, on a made-up question: may we publish a short protocol note and post our script under an open licence? That is a freedom-to-operate question: whether anyone's patent blocks you.
 
 8
-00:01:49,700 --> 00:02:00,600
-To use it, type to Claude Code and name the lawyer. Give it the molecule or the data, and what you intend to do with it.
+00:01:39,710 --> 00:01:56,453
+My verdict is Clear, after the first check alone. Publishing is not an act a patent reaches, so I searched no database, and I say so. I add the one deadline to know: publishing starts the clock on filing a patent of your own.
 
 9
-00:02:00,600 --> 00:02:21,600
-The first line is the verdict: Clear, Conflict or Unknown. The detail names what it searched, or the clause it relied on. It reads the agreements and ethics approvals your lab keeps in its project records. The adversary also sends it questions during an audit.
+00:01:56,849 --> 00:02:04,033
+To use me, type to Claude Code and name the lawyer. Give me the molecule or the data, and what you intend to do with it.
+
+10
+00:02:04,033 --> 00:02:19,383
+The first line is my verdict: Clear, Conflict or Unknown. The detail names what I searched, or the clause I relied on. I read the agreements and ethics approvals your lab keeps in its project records.

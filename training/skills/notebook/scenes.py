@@ -6,7 +6,7 @@ from lib.movie import Movie, Part, Quote
 ENTRY = """## 14:48
 Run 3 serum plates look bigger than the controls; re-plate the two Peru isolates tomorrow.
 ## 15:28
-Plan: run gel 27 on the four serum samples, lane 3 is the control; extract RNA from plates 5 and 6 after lunch.
+Design: gel 27 on the four serum samples, lane 3 is the control; RNA from plates 5 and 6 after lunch.
 ## 15:28 image: gel_27.jpg
 ![[gel_27_thumb.jpg]]
 - note: lane 3 is the control
@@ -33,17 +33,18 @@ MOVIE = Movie(
     tagline="A day at the bench, and how it reaches your notebook",
     glyph="📓",
     colour=LAV,
-    summary="A bench scientist's day with the lab notebook: the plan in the morning, a gel photo from the phone, a voice note with gloves on, a prompt written in Obsidian and sent to Claude Code with one keystroke, the day recalled, and a report for the supervisor. Natural language throughout; the commands as footnotes.",
+    summary="A bench scientist's day with the lab notebook: the experimental design if you like, a gel photo from the phone, a voice note with gloves on, a prompt written in Obsidian and sent to Claude Code with one keystroke, the day recalled, and a report for the supervisor. Natural language throughout; the commands as footnotes.",
     parts=[
         Part("title", ["Your lab notebook lives in your own Obsidian vault. Here is one day at the bench, and how "
                        "it reaches the notebook by talking to Claude Code. The command behind each step is a "
                        "footnote; you never type it."]),
-        Part("story", chapter="The plan", heading="First: write the plan in Obsidian", picture="bench",
-             prompt="(in Obsidian, in today's entry) Plan: run gel 27 on the four serum samples, lane 3 is the control.",
+        Part("story", chapter="The design", heading="First, if you like: the experimental design, in Obsidian", picture="bench",
+             prompt="(in Obsidian, in today's entry) Design: gel 27 on the four serum samples, lane 3 is the control.",
              reply=["Nothing to run: the entry is a plain text note in your vault, and the oracle reads it as it is."],
              footnote="none: lab-notebook/2026-11-07.md is yours to write; murmurent reads it",
-             narration=["First you write the plan in Obsidian, in today's entry, as you would in a paper "
-                        "notebook: a line or two under a heading."]),
+             narration=["First, you might write down the experimental design in Obsidian, in today's entry, "
+                        "as you would in a paper notebook: a line or two. Or not; the day's entry starts "
+                        "whenever you first add something to it."]),
         Part("story", chapter="The gel photo", heading="At the bench: the gel photo, phone to laptop to notebook", picture="phone",
              prompt="add this photo of gel 27 to today's notebook, lane 3 is the control",
              reply=["Added image gel_27.jpg to today's entry under 15:28.",
@@ -65,18 +66,19 @@ MOVIE = Movie(
                         "service is set up when you add it; otherwise the entry says it was skipped."]),
         Part("obsidian", chapter="The entry", heading="The day's entry, as Obsidian shows it", note_title="2026-11-07",
              note_lines=ENTRY, sidebar=["2026-11-05", "2026-11-07", "attachments", "prompts", "sessions"],
-             narration=["In Obsidian the day is one page: the plan, the gel with its small copy and a link to the "
+             narration=["In Obsidian the day is one page: the design, the gel with its small copy and a link to the "
                         "original, and the voice note. The entry also records its project and its audience: who "
                         "may read it."]),
         Part("story", chapter="Prompts: write, send, keep", heading="Afternoon: a prompt written in Obsidian, sent with one key",
              picture="obsidian",
              prompt="(written in Obsidian, selected, sent with one key) ask the blacksmith to count the bands in gel_27.jpg per lane and compare lane 3, the control, with the others",
-             reply=["The prompt lands in Claude Code and the blacksmith gets to work. It is also kept in",
-                    "today's sessions page with the time, so it stays after the session closes."],
-             footnote="murmurent prompt send --text {{selection}}   (the Obsidian hotkey runs it; no file to make)",
+             reply=["The prompt lands in Claude Code and the blacksmith gets to work. It is kept in",
+                    "today's sessions page with the time, and it leaves the note it was written in."],
+             footnote="murmurent prompt send --quiet --text {{selection}}   (the Obsidian hotkey, set to replace the selection)",
              narration=["Long prompts are easier to write in Obsidian than in a terminal. Write one in any note, "
                         "select it and press one key, set up once: it goes into Claude Code and is kept with the time, like "
-                        "every prompt Claude Code receives."]),
+                        "every prompt Claude Code receives. Set the key to replace the selection and the prompt "
+                        "leaves the note, so a day of prompts does not cloud the entry."]),
         Part("chat", chapter="End of day: ask", key="1", agent="oracle", colour=LAV, who="Member",
              chips=[("read today's entry", True), ("read the sessions", True)],
              narration=["At the end of the day you ask the oracle what you noted about gel 27 and what is planned "

@@ -3,37 +3,37 @@
 Your lab notebook lives in your own Obsidian vault. Here is one day at the bench, and how it reaches the notebook by talking to Claude Code. The command behind each step is a footnote; you never type it.
 
 2
-00:00:14,250 --> 00:00:23,098
-First you write the plan in Obsidian, in today's entry, as you would in a paper notebook: a line or two under a heading.
+00:00:14,250 --> 00:00:30,750
+First, you might write down the experimental design in Obsidian, in today's entry, as you would in a paper notebook: a line or two. Or not; the day's entry starts whenever you first add something to it.
 
 3
-00:00:23,500 --> 00:00:37,371
+00:00:31,149 --> 00:00:45,021
 You photograph the gel with your phone and send it to the laptop (AirDrop on a Mac). Drag the file into Claude Code and say: add this photo of gel 27 to today's notebook, lane 3 is the control.
 
 4
-00:00:37,371 --> 00:00:50,259
+00:00:45,021 --> 00:00:57,909
 The original goes to the lab server, kept as it is; the vault keeps a small copy. Claude Code then writes one line on what it sees, marked as a reading, not the record.
 
 5
-00:00:50,649 --> 00:01:08,275
+00:00:58,299 --> 00:01:15,925
 With gloves on, you record a voice note: lane four has an extra band, run it again tomorrow. It goes to the server the same way. It is written out as text if a speech-to-text service is set up when you add it; otherwise the entry says it was skipped.
 
 6
-00:01:08,700 --> 00:01:23,724
-In Obsidian the day is one page: the plan, the gel with its small copy and a link to the original, and the voice note. The entry also records its project and its audience: who may read it.
+00:01:16,350 --> 00:01:33,250
+In Obsidian the day is one page: the design, the gel with its small copy and a link to the original, and the voice note. The entry also records its project and its audience: who may read it.
 
 7
-00:01:24,100 --> 00:01:40,099
-Long prompts are easier to write in Obsidian than in a terminal. Write one in any note, select it and press one key, set up once: it goes into Claude Code and is kept with the time, like every prompt Claude Code receives.
+00:01:33,650 --> 00:02:01,750
+Long prompts are easier to write in Obsidian than in a terminal. Write one in any note, select it and press one key, set up once: it goes into Claude Code and is kept with the time, like every prompt Claude Code receives. Set the key to replace the selection and the prompt leaves the note, so a day of prompts does not cloud the entry.
 
 8
-00:01:40,500 --> 00:01:55,013
+00:02:02,150 --> 00:02:16,663
 At the end of the day you ask the oracle what you noted about gel 27 and what is planned for tomorrow. It answers from the entry, block by block, with the times, and names the parts still waiting for a reading.
 
 9
-00:01:55,400 --> 00:02:13,350
+00:02:17,050 --> 00:02:35,000
 At the end of the week you ask: make my report for my supervisor since the first of November. It takes only the entries your supervisor is allowed to read, lists every entry and file it drew on, and writes a page. It sends nothing until you say so.
 
 10
-00:02:13,750 --> 00:02:32,349
+00:02:35,400 --> 00:02:51,585
 Day to day: photos and voice notes go from the phone into Claude Code with a sentence. Prompts are written in Obsidian and sent with one key. Each entry says who may read it, and a report follows that.

@@ -1,35 +1,35 @@
 1
-00:00:00,400 --> 00:00:13,500
-This is the registrar. It works for the centre's administrator, such as a research director, and keeps one list of every lab, core facility and collaboration, and who leads each.
+00:00:00,400 --> 00:00:12,224
+I am the registrar. I work for the centre's administrator, such as a research director, and keep one list of every lab, core facility and collaboration, and who leads each.
 
 2
-00:00:13,900 --> 00:00:27,600
-It keeps one list of the centre's labs, cores and collaborations, each with its lead and its status, and it holds to one rule: each PI leads at most one lab or core.
+00:00:12,599 --> 00:00:23,498
+I keep one list of the centre's labs, cores and collaborations, each with its lead and its status, and I hold to one rule: each PI leads at most one lab or core.
 
 3
-00:00:27,600 --> 00:00:42,899
-It shows the administrator which members, in any lab, have expired or missing training, such as research ethics. And it signs each PI's identity card, the signed record that says who they are.
+00:00:23,498 --> 00:00:37,344
+I show the administrator which members, in any lab, have expired or missing training, such as research ethics. And I sign each PI's identity card, the signed record that says who they are.
 
 4
-00:00:43,299 --> 00:00:58,200
-The registrar sees each lab from the outside. Each lab keeps its own notebooks, code, memory and member list, and edits them itself. Archiving a lab changes its status in the list, and its files stay.
+00:00:37,749 --> 00:00:50,320
+I see each lab from the outside. Each lab keeps its own notebooks, code, memory and member list, and edits them itself. Archiving a lab changes its status in the list, and its files stay.
 
 5
-00:00:58,200 --> 00:01:07,099
-When a collaboration needs channels and folders, the registrar approves and the centre millwright sets them up.
+00:00:50,320 --> 00:00:57,386
+When a collaboration needs channels and folders, I approve them and the centre millwright sets them up.
 
 6
-00:01:07,500 --> 00:01:13,199
-A real run that only reads. The administrator asks for the centre-wide view.
+00:00:57,799 --> 00:01:03,126
+A real run that only reads. The administrator asks me for the centre-wide view.
 
 7
-00:01:13,199 --> 00:01:24,899
-It finds one lab and its PI, no cores or collaborations yet, and one gap named plainly: nobody is recorded as registrar. Nothing was changed.
+00:01:03,126 --> 00:01:14,760
+I find one lab and its PI, no cores or collaborations yet, and one gap named plainly: nobody is recorded as registrar. I changed nothing.
 
 8
-00:01:25,299 --> 00:01:40,199
-To use it, the administrator types to Claude Code and names it: ask the registrar which labs and cores are registered, or whether an entry is incomplete. It refuses a PI who already leads another group.
+00:01:15,150 --> 00:01:28,463
+To use me, the administrator types to Claude Code and names me: ask the registrar which labs and cores are registered, or whether an entry is incomplete. I refuse a PI who already leads another group.
 
 9
-00:01:40,199 --> 00:01:55,599
-When it records, finds a conflict or skips, the first line says so: Recorded, Conflict or Skipped. A centre chooses its own registrar and records its own labs, cores and collaborations.
+00:01:28,463 --> 00:01:45,299
+When I record, find a conflict or skip, the first line says so: Recorded, Conflict or Skipped. A centre chooses its own registrar and records its own labs, cores and collaborations.

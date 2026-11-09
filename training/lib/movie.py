@@ -203,8 +203,8 @@ def _pic_bench(d, x, y, w, h, p):
         rrect(d, (bx, y + h - 130, bx + 50, y + h - 60), (40, 70, 90), (120, 160, 190), 6, 2)
     d.rounded_rectangle([x + w - 200, y + h - 160, x + w - 20, y + h - 60], radius=8, fill=(40, 40, 48), outline=(120, 120, 130), width=3)
     d.text((x + w - 185, y + h - 140), "notebook: 2026-11-07", font=F_TINY, fill=(200, 200, 210))
-    d.text((x + w - 185, y + h - 116), "## 09:10 plan", font=F_TINY, fill=(240, 200, 120))
-    d.text((x + w - 185, y + h - 96), "run gel 27, lanes 1 to 4", font=F_TINY, fill=(200, 200, 210))
+    d.text((x + w - 185, y + h - 116), "## 09:10 design", font=F_TINY, fill=(240, 200, 120))
+    d.text((x + w - 185, y + h - 96), "gel 27, lanes 1 to 4", font=F_TINY, fill=(200, 200, 210))
 
 
 def _pic_obsidian(d, x, y, w, h, p):

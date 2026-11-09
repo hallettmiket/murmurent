@@ -141,6 +141,29 @@ It writes an HTML report, which is what you hand back by default; `--markdown`
 prints the same as text. Each finding is `Fix`, `Correct`, `Unknown` or
 `Note`; a `Note` marked as the clerk's observation is not a rule.
 
+**The report opens with the term, day by day.** Every date from the first
+day of classes to the end of the examination period is a row, and each row
+says what has to happen on it, from four sources, each named: the outline's
+own lectures, labs and assessments (with their weights); the pack's holidays,
+reading weeks and study days; the pack's deadlines (the last day to add a
+course, to drop it, to withdraw without penalty); and the cutoffs the
+institution's own rules imply, counted back from the last day of classes
+(the last day a test may be scheduled, the last day a new assignment may be
+announced, the last day work is accepted), each quoting the rule and its
+page. An instructor can read down it and see what is due on them each week.
+It is built from what the pack holds, so when the pack's `calendar.yaml` has
+no `deadlines:` yet, the report says so at the top of the calendar, and you
+read them from the institution's sessional dates page and record them
+there, each with its source and the date read, before you hand the report
+over. An assessment with no date is listed as missing from the calendar
+rather than placed by guesswork. The calendar needs the first and last day
+of classes: from a `Term: <date> to <date>` line in the outline, or
+`--term` naming a term the pack knows.
+
+Putting those events into an instructor's calendar application is not yours:
+you produce the report; what goes into a calendar is the member's decision
+and a tool with calendar access does the inserting.
+
 Then read the outline yourself against the rules the command could not
 apply by machine (the ones marked "applied by reading"), and say what you
 find in the same form: the rule quoted, the line it concerns, `Fix` or

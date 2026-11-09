@@ -8,43 +8,42 @@ SPEC = AgentSpec(
     tagline="Runs the analysis on your own data and shows you the code",
     colour=AMBER,
     icon="code",
-    intro=["This is the blacksmith. It runs the analysis: it loads your data, computes what you ask for, "
-           "trains and tests models, and builds small apps to explore the results."],
+    intro=["I am the blacksmith. I run the analysis: I load your data, compute what you ask for, "
+           "train and test models, and build small apps to explore the results."],
     does=[
-        Quote("Loads your data tables, such as CSV and Excel files", "loads"),
-        Quote("Computes features, statistics and classifiers on your data", "computes"),
+        Quote("Loads your data tables, such as CSV and Excel files", "load"),
+        Quote("Computes features, statistics and classifiers on your data", "compute"),
         Quote("Builds interactive apps to explore a dataset", "apps"),
         Quote("Runs the computation itself and leaves the commented code beside the result", "computation itself"),
     ],
     does_narration=[
-        "It loads your data tables, such as CSV and Excel files, computes the features and statistics you ask for, and "
-        "trains and evaluates classifiers. It builds interactive apps so you can explore a dataset.",
-        "What makes it different: it runs the computation itself on your data, and leaves the commented "
+        "I load your data tables, such as CSV and Excel files, compute the features and statistics you ask for, and "
+        "train and evaluate classifiers. I build interactive apps so you can explore a dataset.",
+        "What makes me different: I run the computation itself on your data, and leave the commented "
         "code beside the result, so anyone can repeat it."],
     refuses=[
         Quote("Covers the computing: data, statistics, models and apps", "computing"),
-        Quote("The artist makes the publication figures", "artist"),
-        Quote("The adversary checks the method", "adversary"),
+        Quote("Leaves code the adversary can run again", "adversary"),
         Quote("Leaves original data untouched; new results go in new files", "original"),
     ],
     refuses_narration=[
-        "The blacksmith covers the computing. The artist turns its numbers into publication figures, the "
-        "bookworm compares them with the literature, and the adversary checks the method.",
-        "It reads your original data and leaves it untouched. Each new result goes in a new, numbered file."],
+        "I cover the computing: data, statistics, models and apps. I leave the commented code beside "
+        "each result, so the adversary can run it again and check the method.",
+        "I read your original data and leave it untouched. Each new result goes in a new, numbered file."],
     examples=[
         Exchange("1", ["A real run, on simulated data. Growth medium turned out to be mixed up with country, "
-                       "so the member asks for the serum effect within each country, with a matching test.",
-                       "The answer is Done. The effect holds, but the countries disagree, and the blacksmith "
-                       "says so. It saves the results and the code that made them."],
+                       "so the member asks me for the serum effect within each country, with a matching test.",
+                       "My answer is Done. The effect holds, but the countries disagree, and I "
+                       "say so. I save the results and the code that made them."],
                  [("read the data", True), ("shuffle test within each country", True), ("write the results", True)]),
     ],
     prompt="ask the blacksmith to train a classifier on my experiment's data, with five-fold cross-validation",
     give="The data, where it lives, and what you want computed or predicted.",
     verdicts="Done, Failed or Partial, then the numbers, the files it wrote and the code that made them.",
     howto_narration=[
-        "To use it, type to Claude Code and name it: ask the blacksmith to compute, train or build something. "
-        "Tell it which data, and what you want out.",
-        "The reply starts with Done, Failed or Partial. Then come the numbers, the files and the code, so the "
+        "To use me, type to Claude Code and name me: ask the blacksmith to compute, train or build something. "
+        "Tell me which data, and what you want out.",
+        "My reply starts with Done, Failed or Partial. Then come the numbers, the files and the code, so the "
         "adversary can run it again."],
     directions=[
         ("ask the blacksmith to build an app over my quality-control results, so I can filter cells by mitochondrial fraction and watch the counts change",
@@ -57,6 +56,6 @@ SPEC = AgentSpec(
     directions_narration=[
         "Say what you want built: an app to explore your quality control, a classifier tested the way your "
         "data demand, or a series of steps on a counts table.",
-        "It works in Python by default; name a template script in your request and it follows it."],
+        "I work in Python by default; name a template script in your request and I follow it."],
     docs=["rules/data-storage.md"],
 )

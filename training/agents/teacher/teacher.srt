@@ -1,39 +1,51 @@
 1
-00:00:00,400 --> 00:00:13,900
-This is the teacher. It explains things in plain words: a sentence that lost you, in a minute; a method or a paper, in one sitting; a whole subject, over weeks.
+00:00:00,400 --> 00:00:16,125
+I am the teacher. I explain things in plain words: a sentence that lost you, in a minute; a method or a paper, in one sitting; a whole subject, over weeks. I answer to Feynman.
 
 2
-00:00:14,300 --> 00:00:22,800
-When a sentence Claude Code just wrote lost you, it says it again in plain words, in under a minute.
+00:00:16,549 --> 00:00:24,383
+When a sentence Claude Code just wrote lost you, I say it again in plain words, in under a minute.
 
 3
-00:00:22,800 --> 00:00:43,299
-It explains a method or a paper in one sitting: in chat, or on request as a page where you mark what lost you. For a subject that takes weeks, it runs a course in your own session, with lessons that remember what you have learned.
+00:00:24,383 --> 00:00:45,660
+I explain a method or a paper in one sitting: in chat, or on request as a page where you mark what lost you, ending in a short quiz that grades itself. For a subject that takes weeks, I run a course in your own session, with lessons that remember what you have learned.
 
 4
-00:00:43,699 --> 00:00:59,000
-Its scope is teaching. It shows a real image or a video it has checked before drawing anything, and it links only to what it has actually opened. A debrief stays offline, because your session is private.
+00:00:46,049 --> 00:01:09,209
+I work by Feynman's rule: if it cannot be said simply, it is not understood yet. AI loves jargon, and jargon is where a reader gets lost. So I allow myself at most three technical terms, each defined, and when I cannot honestly explain, I say Gap rather than sound fluent.
 
 5
-00:00:59,000 --> 00:01:08,299
-Figures made from your data go to the artist, and citations it cannot verify go to the bookworm.
+00:01:09,209 --> 00:01:23,705
+I show a real image or a video I have checked before drawing anything, and I link only to what I have actually opened. A debrief stays offline, because your session is private.
 
 6
-00:01:08,700 --> 00:01:17,599
+00:01:24,099 --> 00:01:33,094
 A real run. A wet-lab biologist asks what a permutation test is, and why the example uses five thousand of them.
 
 7
-00:01:17,599 --> 00:01:30,500
-The answer is Explained: short bullets, each technical term defined, the real numbers from the analysis, which it re-ran, and a takeaway to carry to the next problem.
+00:01:33,094 --> 00:01:45,936
+My answer is Explained: short bullets, each term defined, the real numbers from the analysis, which I re-ran, and a takeaway for the next problem.
 
 8
-00:01:30,900 --> 00:01:44,000
-There are three things to type, in this order: debrief, at the sentence that lost you; explain, with the method or paper; and course, with the subject.
+00:01:46,349 --> 00:01:57,620
+On a page I would also draw it. Serum colonies on the left, controls on the right, and the real gap between their averages, nearly one millimetre.
 
 9
-00:01:44,400 --> 00:01:49,700
-The first line is Explained, or Gap when it cannot honestly deliver.
+00:01:57,620 --> 00:02:09,401
+If serum did nothing, the labels would not matter. So I shuffle them, measure the gap again, and add it to the pile. Again and again, five thousand times.
 
 10
-00:01:49,700 --> 00:02:01,900
-Say who it is for in your request, such as a wet-lab biologist; otherwise it writes for a colleague from a neighbouring field.
+00:02:09,401 --> 00:02:27,048
+The pile is what chance alone produces. The real gap sits far out on the right, reached once in five thousand shuffles. That is the whole test; the quiz asks what fifty shuffles would change.
+
+11
+00:02:27,449 --> 00:02:42,238
+Three things to type: debrief, at the sentence that lost you; explain, with the method or paper, adding 'as a page' for the figure and the quiz; and course, with the subject.
+
+12
+00:02:42,649 --> 00:02:47,836
+The first line is Explained, or Gap when I cannot honestly deliver.
+
+13
+00:02:47,836 --> 00:02:59,842
+Say who it is for when you type your request, such as a wet-lab biologist; otherwise I write for a colleague from a neighbouring field.
